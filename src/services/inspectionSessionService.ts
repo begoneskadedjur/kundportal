@@ -461,6 +461,28 @@ export async function getLatestInspectionValuesForCustomer(
 }
 
 /**
+ * Hämta mätvärden per station för en specifik session (för trendberäkning)
+ */
+export async function getInspectionValuesForSession(
+  sessionId: string
+): Promise<Map<string, number | null>> {
+  const [outdoorInspections, indoorInspections] = await Promise.all([
+    getOutdoorInspectionsForSession(sessionId),
+    getIndoorInspectionsForSession(sessionId)
+  ])
+  const valueMap = new Map<string, number | null>()
+  outdoorInspections.forEach(insp => {
+    const stationId = (insp.station as any)?.id
+    if (stationId) valueMap.set(stationId, insp.measurement_value ?? null)
+  })
+  indoorInspections.forEach(insp => {
+    const stationId = (insp.station as any)?.id
+    if (stationId) valueMap.set(stationId, insp.measurement_value ?? null)
+  })
+  return valueMap
+}
+
+/**
  * Hämta komplett inspektionsdata för kundportalen
  * Returnerar senaste session med alla inspektionsresultat
  */

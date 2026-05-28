@@ -45,6 +45,7 @@ import {
   getOutdoorInspectionsForSession,
   getIndoorInspectionsForSession,
   getLatestInspectionValuesForCustomer,
+  getInspectionValuesForSession,
   getSessionPhotos,
 } from '../../services/inspectionSessionService'
 import type { InspectionSessionPhoto } from '../../types/inspectionSession'
@@ -65,6 +66,20 @@ import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailS
 import LoadingSpinner from '../shared/LoadingSpinner'
 import Select, { type SelectOptionGroup } from '../ui/Select'
 import { generateInspectionPDF, generateInspectionExcel } from '../../services/inspectionReportService'
+
+function calcTrend(
+  current: number | null,
+  previous: number | null
+): { trend: number | null; trendDirection: 'up' | 'down' | 'stable' } {
+  if (current === null || previous === null) {
+    return { trend: null, trendDirection: 'stable' }
+  }
+  const diff = current - previous
+  return {
+    trend: diff,
+    trendDirection: diff > 0 ? 'up' : diff < 0 ? 'down' : 'stable'
+  }
+}
 
 interface InspectionSessionsViewProps {
   customerId: string
@@ -253,10 +268,17 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         floorPlanData || FloorPlanService.getFloorPlansByCustomer(customerId)
       ])
 
-      // Hämta inspektioner för denna session
-      const [sessionOutdoor, sessionIndoor] = await Promise.all([
+      // Hitta föregående session för trendberäkning
+      const sessionIndex = allSessions.findIndex(s => s.id === sessionId)
+      const previousSession = sessionIndex >= 0 ? allSessions[sessionIndex + 1] : undefined
+
+      // Hämta inspektioner för denna session + föregående sessions mätvärden
+      const [sessionOutdoor, sessionIndoor, previousValues] = await Promise.all([
         getOutdoorInspectionsForSession(sessionId),
-        getIndoorInspectionsForSession(sessionId)
+        getIndoorInspectionsForSession(sessionId),
+        previousSession
+          ? getInspectionValuesForSession(previousSession.id)
+          : Promise.resolve(new Map<string, number | null>())
       ])
 
       // Skapa nummermappning baserat på placed_at
@@ -310,8 +332,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
           } : null,
           calculatedStatus,
           originalOutdoorStation: station,
-          trend: null,
-          trendDirection: 'stable' as const
+          ...calcTrend(insp?.measurement_value ?? null, previousValues.get(station.id) ?? null)
         } as StationWithLatestInspection
       })
 
@@ -379,8 +400,7 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
             originalIndoorStation: station,
             floorPlanId: plan.id,
             floorPlanName: plan.name,
-            trend: null,
-            trendDirection: 'stable' as const
+            ...calcTrend(insp?.measurement_value ?? null, previousValues.get(station.id) ?? null)
           } as StationWithLatestInspection
         })
 
