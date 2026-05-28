@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react'
 import {
   MapPin, Check, ChevronRight, Plus, Trash2,
   Building2, ArrowLeft, ArrowRight, AlertCircle, CheckCircle,
-  Search, Pencil, X
+  Pencil, X
 } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
@@ -61,8 +61,8 @@ function BoundariesMapPanel({
   const mapRef = useRef<google.maps.Map | null>(null)
   const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null)
   const drawnPolygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map())
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null)
-  const searchInputRef = useRef<HTMLInputElement>(null)
+  const autocompleteContainerRef = useRef<HTMLDivElement>(null)
+  const autocompleteInitRef = useRef(false)
 
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null)
   const [drawingActive, setDrawingActive] = useState(false)
@@ -144,20 +144,25 @@ function BoundariesMapPanel({
     })
   }, [activeRegionId, regions])
 
-  // Initialisera Places Autocomplete när isLoaded ändras
+  // Initialisera PlaceAutocompleteElement (Places API New) när kartan är laddad
   useEffect(() => {
-    if (!isLoaded || !searchInputRef.current || autocompleteRef.current) return
-    const ac = new google.maps.places.Autocomplete(searchInputRef.current, {
+    if (!isLoaded || !autocompleteContainerRef.current || autocompleteInitRef.current) return
+    autocompleteInitRef.current = true
+
+    const autocomplete = new google.maps.places.PlaceAutocompleteElement({
       types: ['(regions)'],
-      componentRestrictions: { country: 'se' },
-    })
-    autocompleteRef.current = ac
-    ac.addListener('place_changed', () => {
-      const place = ac.getPlace()
-      if (place.geometry?.viewport) {
-        mapRef.current?.fitBounds(place.geometry.viewport)
-      } else if (place.geometry?.location) {
-        mapRef.current?.panTo(place.geometry.location)
+      requestedRegion: 'se',
+    } as any)
+    autocomplete.style.width = '100%'
+    autocompleteContainerRef.current.appendChild(autocomplete)
+
+    autocomplete.addEventListener('gmp-placeselect', async (e: any) => {
+      const place: google.maps.places.Place = e.place
+      await place.fetchFields({ fields: ['location', 'viewport'] })
+      if (place.viewport) {
+        mapRef.current?.fitBounds(place.viewport)
+      } else if (place.location) {
+        mapRef.current?.panTo(place.location)
         mapRef.current?.setZoom(11)
       }
     })
@@ -223,16 +228,8 @@ function BoundariesMapPanel({
 
   return (
     <div className="space-y-3">
-      {/* Sökfält */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-        <input
-          ref={searchInputRef}
-          type="text"
-          placeholder="Sök stad eller kommun för att navigera..."
-          className="w-full pl-9 pr-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-        />
-      </div>
+      {/* Sökfält — PlaceAutocompleteElement monteras här */}
+      <div ref={autocompleteContainerRef} className="w-full" />
 
       <div className="flex gap-3">
         {/* Regionlista till vänster */}
