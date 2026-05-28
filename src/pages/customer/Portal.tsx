@@ -250,10 +250,8 @@ const CustomerPortal: React.FC = () => {
     )
   }
 
-  // För multisite/regionalkunder utan customer_id - omdirigera direkt
-  if (!customer && profile?.organization_id && userRole) {
-    const portalPath = organization?.is_regional ? '/regional' : '/organisation'
-    navigate(portalPath, { replace: true })
+  // För multisite/regionalkunder utan customer_id - visa loading medan useEffect redirectar
+  if (!customer && profile?.organization_id) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
         <div className="text-center">
