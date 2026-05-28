@@ -61,6 +61,14 @@ export default function MultisiteProtectedRoute({ children }: MultisiteProtected
         </div>
       );
     }
+    // organization_id finns men userRole ännu ej laddad — vänta
+    if (profile.organization_id) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <LoadingSpinner text="Laddar organisationsdata..." />
+        </div>
+      );
+    }
     // No multisite role — redirect to regular customer portal or login
     const redirectPath = profile.customer_id ? '/customer' : '/login';
     return <Navigate to={redirectPath} replace />;
