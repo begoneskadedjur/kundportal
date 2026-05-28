@@ -3,6 +3,9 @@ import {
   Building2, User, Calendar, Briefcase, FileText,
   CreditCard, CheckCircle, ChevronRight, ChevronLeft, AlertCircle
 } from 'lucide-react'
+import DatePicker, { registerLocale } from 'react-datepicker'
+import { sv } from 'date-fns/locale'
+import 'react-datepicker/dist/react-datepicker.css'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
@@ -13,6 +16,8 @@ import { CustomerGroupService } from '../../../services/customerGroupService'
 import { CustomerGroup } from '../../../types/customerGroups'
 import { useContractTypeOptions } from '../../../hooks/useContractTypeOptions'
 import toast from 'react-hot-toast'
+
+registerLocale('sv', sv)
 
 interface CreateCustomerManuallyModalProps {
   isOpen: boolean
@@ -95,17 +100,29 @@ export default function CreateCustomerManuallyModal({
   const set = (field: keyof FormData, value: any) => {
     setForm(prev => {
       const next = { ...prev, [field]: value }
-      // Auto-beräkna månadsvärde när årsvärde ändras (om månadsf. inte överskrivits)
+
+      // Auto-beräkna månadsvärde när årsvärde ändras (om det inte överskrivits manuellt)
       if (field === 'annual_value' && value && !prev.monthly_value) {
         const parsed = parseFloat(value)
-        if (!isNaN(parsed)) {
-          next.monthly_value = (parsed / 12).toFixed(0)
-        }
+        if (!isNaN(parsed)) next.monthly_value = (parsed / 12).toFixed(0)
       }
+
+      // Auto-beräkna totalt kontraktsvärde från annual_value × avtalslängd (heltal år)
+      const annualRaw = field === 'annual_value' ? value : prev.annual_value
+      const lengthRaw = field === 'contract_length' ? value : prev.contract_length
+      const annualNum = parseFloat(annualRaw)
+      const yearsMatch = String(lengthRaw).match(/^(\d+(?:[.,]\d+)?)\s*(år)?$/i)
+      if (!isNaN(annualNum) && yearsMatch) {
+        const years = parseFloat(yearsMatch[1].replace(',', '.'))
+        next.total_contract_value = (annualNum * years).toFixed(0)
+      }
+
       return next
     })
     if (errors[field]) setErrors(prev => ({ ...prev, [field]: undefined }))
   }
+
+  const dateInputClass = 'w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none'
 
   const validateStep = (s: Step): boolean => {
     const errs: Partial<Record<keyof FormData, string>> = {}
@@ -425,30 +442,51 @@ export default function CreateCustomerManuallyModal({
                     ]}
                   />
                 </div>
-                <Input
-                  label="Startdatum"
-                  type="date"
-                  value={form.contract_start_date}
-                  onChange={e => set('contract_start_date', e.target.value)}
-                />
-                <Input
-                  label="Slutdatum"
-                  type="date"
-                  value={form.contract_end_date}
-                  onChange={e => set('contract_end_date', e.target.value)}
-                />
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Startdatum</label>
+                  <DatePicker
+                    selected={form.contract_start_date ? new Date(form.contract_start_date) : null}
+                    onChange={d => set('contract_start_date', d ? d.toISOString().split('T')[0] : '')}
+                    locale="sv"
+                    dateFormat="yyyy-MM-dd"
+                    placeholderText="ÅÅÅÅ-MM-DD"
+                    className={dateInputClass}
+                    wrapperClassName="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Slutdatum</label>
+                  <DatePicker
+                    selected={form.contract_end_date ? new Date(form.contract_end_date) : null}
+                    onChange={d => set('contract_end_date', d ? d.toISOString().split('T')[0] : '')}
+                    locale="sv"
+                    dateFormat="yyyy-MM-dd"
+                    placeholderText="ÅÅÅÅ-MM-DD"
+                    className={dateInputClass}
+                    wrapperClassName="w-full"
+                  />
+                </div>
                 <Input
                   label="Avtalslängd"
                   value={form.contract_length}
                   onChange={e => set('contract_length', e.target.value)}
                   placeholder="T.ex. 3 år"
                 />
-                <Input
-                  label="Servicefrekvens"
-                  value={form.service_frequency}
-                  onChange={e => set('service_frequency', e.target.value)}
-                  placeholder="T.ex. Kvartalsvis"
-                />
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Servicefrekvens</label>
+                  <Select
+                    value={form.service_frequency}
+                    onChange={v => set('service_frequency', v)}
+                    placeholder="Välj frekvens"
+                    options={[
+                      { value: 'Månadsvis', label: 'Månadsvis' },
+                      { value: 'Kvartalsvis', label: 'Kvartalsvis' },
+                      { value: 'Halvårsvis', label: 'Halvårsvis' },
+                      { value: 'Årsvis', label: 'Årsvis' },
+                      { value: 'Vid behov', label: 'Vid behov' },
+                    ]}
+                  />
+                </div>
               </div>
             </div>
 
