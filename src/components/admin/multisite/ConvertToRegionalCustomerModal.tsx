@@ -68,6 +68,8 @@ function BoundariesMapPanel({
   const [drawingActive, setDrawingActive] = useState(false)
   // Ref för att undvika stale closure i polygoncomplete-listener
   const activeRegionIdRef = useRef<string | null>(null)
+  // Cache för kommundata (laddas en gång)
+  const kommunGeoJsonRef = useRef<any[] | null>(null)
 
   // Hitta aktiv region
   const activeRegion = regions.find(r => r.tempId === activeRegionId) || null
@@ -150,6 +152,56 @@ function BoundariesMapPanel({
     })
   }, [activeRegionId, regions])
 
+  // Rita kommunpolygon på kartan för aktiv region, baserat på GeoJSON-koordinater
+  const applyKommunPolygon = useCallback((geoJsonGeometry: any, regionId: string, color: string) => {
+    if (!mapRef.current) return
+
+    // Ta bort gammal polygon för denna region
+    const old = drawnPolygonsRef.current.get(regionId)
+    if (old) old.setMap(null)
+
+    // Konvertera GeoJSON-koordinater ([lng, lat]) → Google Maps paths
+    const toLatLngs = (ring: number[][]) => ring.map(([lng, lat]) => ({ lat, lng }))
+    let paths: any[]
+    if (geoJsonGeometry.type === 'Polygon') {
+      paths = geoJsonGeometry.coordinates.map(toLatLngs)
+    } else if (geoJsonGeometry.type === 'MultiPolygon') {
+      paths = geoJsonGeometry.coordinates.flatMap((poly: number[][][]) => poly.map(toLatLngs))
+    } else {
+      return
+    }
+
+    const polygon = new google.maps.Polygon({
+      paths,
+      strokeColor: color,
+      strokeWeight: 2,
+      strokeOpacity: 0.9,
+      fillColor: color,
+      fillOpacity: 0.3,
+      editable: true,
+      zIndex: 2,
+      map: mapRef.current,
+    })
+    drawnPolygonsRef.current.set(regionId, polygon)
+
+    // Spara path (bara ytterring för MultiPolygon — tar första)
+    const firstRing = paths[0] as Array<{ lat: number; lng: number }>
+    onPolygonSaved(regionId, firstRing)
+
+    // Lyssna på manuella justeringar
+    const updatePath = () => {
+      const newPath = polygon.getPath().getArray().map((ll: any) => ({ lat: ll.lat(), lng: ll.lng() }))
+      onPolygonSaved(regionId, newPath)
+    }
+    google.maps.event.addListener(polygon.getPath(), 'set_at', updatePath)
+    google.maps.event.addListener(polygon.getPath(), 'insert_at', updatePath)
+
+    // Centrera kartan på polygonen
+    const bounds = new google.maps.LatLngBounds()
+    firstRing.forEach(p => bounds.extend(p))
+    mapRef.current.fitBounds(bounds)
+  }, [onPolygonSaved])
+
   // Initialisera PlaceAutocompleteElement (Places API New) när kartan är laddad
   useEffect(() => {
     if (!isLoaded || !autocompleteContainerRef.current || autocompleteInitRef.current) return
@@ -164,15 +216,44 @@ function BoundariesMapPanel({
 
     autocomplete.addEventListener('gmp-placeselect', async (e: any) => {
       const place: google.maps.places.Place = e.place
-      await place.fetchFields({ fields: ['location', 'viewport'] })
-      if (place.viewport) {
-        mapRef.current?.fitBounds(place.viewport)
-      } else if (place.location) {
-        mapRef.current?.panTo(place.location)
-        mapRef.current?.setZoom(11)
+      await place.fetchFields({ fields: ['displayName', 'location', 'viewport'] })
+
+      const placeName: string = (place as any).displayName || ''
+
+      // Ladda kommundata om det inte redan är gjort
+      if (!kommunGeoJsonRef.current) {
+        try {
+          const res = await fetch('https://raw.githubusercontent.com/okfse/sweden-geojson/master/swedish_municipalities.geojson')
+          const data = await res.json()
+          kommunGeoJsonRef.current = data.features || []
+        } catch {
+          kommunGeoJsonRef.current = []
+        }
+      }
+
+      // Matcha mot kommunnamn (t.ex. "Huddinge" matchar "Huddinge" eller "Huddinge kommun")
+      const normalizeKommun = (s: string) => s.toLowerCase().replace(/\s+kommun$/i, '').trim()
+      const needle = normalizeKommun(placeName)
+      const match = kommunGeoJsonRef.current!.find((f: any) => {
+        const name = normalizeKommun(f.properties?.kom_namn || '')
+        return name === needle || name.includes(needle) || needle.includes(name)
+      })
+
+      const currentId = activeRegionIdRef.current
+      if (match && currentId) {
+        const region = regions.find(r => r.tempId === currentId)
+        applyKommunPolygon(match.geometry, currentId, region?.color || '#3b82f6')
+      } else {
+        // Fallback: centrera bara kartan
+        if (place.viewport) {
+          mapRef.current?.fitBounds(place.viewport)
+        } else if (place.location) {
+          mapRef.current?.panTo(place.location)
+          mapRef.current?.setZoom(11)
+        }
       }
     })
-  }, [isLoaded])
+  }, [isLoaded, regions, applyKommunPolygon])
 
   const startDrawing = useCallback(() => {
     if (!drawingManagerRef.current || !activeRegionId) return
