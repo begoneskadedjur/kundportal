@@ -68,7 +68,12 @@ import {
   getOutdoorInspectionsForSession,
   getIndoorInspectionsForSession,
   reopenInspectionSession,
-  updateCaseStatusToCompleted
+  updateCaseStatusToCompleted,
+  updateSessionNotes,
+  uploadSessionPhoto,
+  deleteSessionPhoto,
+  getSessionPhotos,
+  updateSessionPhotoCaption
 } from '../../services/inspectionSessionService'
 import { PreparationService } from '../../services/preparationService'
 import type { Preparation } from '../../types/preparations'
@@ -76,7 +81,8 @@ import type { Preparation } from '../../types/preparations'
 // Typer
 import type {
   InspectionSessionWithRelations,
-  SessionProgress
+  SessionProgress,
+  InspectionSessionPhoto
 } from '../../types/inspectionSession'
 import type { InspectionStatus } from '../../types/indoor'
 import { INSPECTION_STATUS_CONFIG, calculateInspectionStatus } from '../../types/indoor'
@@ -219,6 +225,14 @@ export default function StationInspectionModule() {
 
   // Foto lightbox
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
+
+  // Sessionskommentarer och -bilder
+  const [sessionNotes, setSessionNotes] = useState('')
+  const [sessionPhotos, setSessionPhotos] = useState<InspectionSessionPhoto[]>([])
+  const [sessionPhotoUploading, setSessionPhotoUploading] = useState(false)
+  const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null)
+  const [editingCaptionValue, setEditingCaptionValue] = useState('')
+  const sessionPhotoInputRef = useRef<HTMLInputElement>(null)
 
   // Bekräftelsedialog för att avsluta inspektion
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
@@ -386,6 +400,13 @@ export default function StationInspectionModule() {
             console.log(`Laddade ${inspectedCount} befintliga inspektioner för återupptagande`)
           }
         }
+
+        // Ladda sessionsanteckningar och -bilder
+        if (sessionData.notes) {
+          setSessionNotes(sessionData.notes)
+        }
+        const photos = await getSessionPhotos(sessionData.id)
+        setSessionPhotos(photos)
 
       } catch (err) {
         console.error('Error loading data:', err)
@@ -1219,6 +1240,67 @@ export default function StationInspectionModule() {
     }
   }
 
+  // Spara sessionsanteckningar (auto-save vid blur)
+  const handleSessionNotesBlur = async () => {
+    if (!session) return
+    try {
+      await updateSessionNotes(session.id, sessionNotes)
+    } catch {
+      toast.error('Kunde inte spara anteckning')
+    }
+  }
+
+  // Ladda upp sessionsbilder
+  const handleSessionPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!session || !e.target.files) return
+    const files = Array.from(e.target.files)
+
+    if (sessionPhotos.length + files.length > 10) {
+      toast.error('Max 10 bilder per inspektion')
+      e.target.value = ''
+      return
+    }
+
+    setSessionPhotoUploading(true)
+    try {
+      for (const file of files) {
+        const photo = await uploadSessionPhoto(session.id, file)
+        if (photo) {
+          setSessionPhotos(prev => [...prev, photo])
+        }
+      }
+      toast.success(files.length === 1 ? 'Bild uppladdad' : `${files.length} bilder uppladdade`)
+    } catch {
+      toast.error('Kunde inte ladda upp bild')
+    } finally {
+      setSessionPhotoUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  // Radera sessionsbild
+  const handleDeleteSessionPhoto = async (photo: InspectionSessionPhoto) => {
+    try {
+      await deleteSessionPhoto(photo.id, photo.photo_path)
+      setSessionPhotos(prev => prev.filter(p => p.id !== photo.id))
+    } catch {
+      toast.error('Kunde inte radera bilden')
+    }
+  }
+
+  // Spara bildtext
+  const handleSaveCaption = async (photoId: string) => {
+    try {
+      await updateSessionPhotoCaption(photoId, editingCaptionValue)
+      setSessionPhotos(prev => prev.map(p =>
+        p.id === photoId ? { ...p, caption: editingCaptionValue || null } : p
+      ))
+      setEditingCaptionId(null)
+    } catch {
+      toast.error('Kunde inte spara bildtext')
+    }
+  }
+
   // Lås upp avslutad inspektion för korrigering
   const handleReopenInspection = async () => {
     if (!session) return
@@ -1557,6 +1639,116 @@ export default function StationInspectionModule() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* Övriga kommentarer + bilder - visas alltid när session finns */}
+          {session && (
+            <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
+              <h3 className="font-medium text-white flex items-center gap-2 text-sm">
+                <FileText className="w-4 h-4 text-[#20c58f]" />
+                Övriga kommentarer
+              </h3>
+
+              {/* Kommentarfält */}
+              <textarea
+                value={sessionNotes}
+                onChange={e => setSessionNotes(e.target.value)}
+                onBlur={handleSessionNotesBlur}
+                disabled={session.status === 'completed'}
+                placeholder={session.status === 'completed' ? 'Inga kommentarer' : 'Lägg till kommentarer om besöket...'}
+                rows={3}
+                className="w-full bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f] disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+
+              {/* Bilder */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
+                    <Camera className="w-3.5 h-3.5" />
+                    Bilder ({sessionPhotos.length}/10)
+                  </span>
+                  {session.status !== 'completed' && (
+                    <button
+                      onClick={() => sessionPhotoInputRef.current?.click()}
+                      disabled={sessionPhotoUploading || sessionPhotos.length >= 10}
+                      className="flex items-center gap-1.5 px-3 py-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors"
+                    >
+                      {sessionPhotoUploading ? (
+                        <>
+                          <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
+                          Laddar upp...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3.5 h-3.5" />
+                          Lägg till bild
+                        </>
+                      )}
+                    </button>
+                  )}
+                  <input
+                    ref={sessionPhotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleSessionPhotoUpload}
+                  />
+                </div>
+
+                {sessionPhotos.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {sessionPhotos.map(photo => (
+                      <div key={photo.id} className="relative flex-shrink-0 w-24 group">
+                        <img
+                          src={photo.url}
+                          alt={photo.caption || 'Sessionsbild'}
+                          className="w-24 h-24 object-cover rounded-lg border border-slate-700 cursor-pointer"
+                          onClick={() => setLightboxPhoto(photo.url || null)}
+                        />
+                        {session.status !== 'completed' && (
+                          <button
+                            onClick={() => handleDeleteSessionPhoto(photo)}
+                            className="absolute top-1 right-1 bg-red-500/90 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                        {/* Bildtext */}
+                        {editingCaptionId === photo.id ? (
+                          <div className="mt-1 flex gap-1">
+                            <input
+                              autoFocus
+                              value={editingCaptionValue}
+                              onChange={e => setEditingCaptionValue(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') handleSaveCaption(photo.id)
+                                if (e.key === 'Escape') setEditingCaptionId(null)
+                              }}
+                              className="flex-1 bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:border-[#20c58f] w-0"
+                            />
+                            <button onClick={() => handleSaveCaption(photo.id)} className="text-[#20c58f]"><Check className="w-3 h-3" /></button>
+                          </div>
+                        ) : (
+                          <p
+                            onClick={() => {
+                              if (session.status !== 'completed') {
+                                setEditingCaptionId(photo.id)
+                                setEditingCaptionValue(photo.caption || '')
+                              }
+                            }}
+                            className={`text-xs text-slate-400 mt-1 text-center truncate ${session.status !== 'completed' ? 'cursor-pointer hover:text-slate-300' : ''}`}
+                            title={photo.caption || undefined}
+                          >
+                            {photo.caption || (session.status !== 'completed' ? <span className="italic text-slate-600">Lägg till text</span> : '')}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Tabs - visas alltid */}
           <div className="flex gap-2">

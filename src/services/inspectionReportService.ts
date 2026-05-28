@@ -7,6 +7,7 @@ import {
   getOutdoorInspectionsForSession,
   getIndoorInspectionsForSession,
   getSessionInspectionSummary,
+  getSessionPhotos,
   type InspectionLevelSummary
 } from './inspectionSessionService'
 import type { OutdoorInspectionWithRelations } from '../types/inspectionSession'
@@ -90,7 +91,10 @@ function downloadBlob(blob: Blob, filename: string) {
 // ============================================
 
 export async function generateInspectionPDF(sessionId: string): Promise<void> {
-  const data = await getReportData(sessionId)
+  const [data, sessionPhotos] = await Promise.all([
+    getReportData(sessionId),
+    getSessionPhotos(sessionId)
+  ])
   if (!data) throw new Error('Kunde inte hämta sessionsdata')
 
   const { session, outdoorInspections, indoorInspections, summary } = data
@@ -117,7 +121,8 @@ export async function generateInspectionPDF(sessionId: string): Promise<void> {
       } : null,
       outdoorInspections,
       indoorInspections,
-      summary
+      summary,
+      sessionPhotos: sessionPhotos.map(p => ({ url: p.url, caption: p.caption }))
     })
   })
 
@@ -195,7 +200,10 @@ function applyDataRow(row: ExcelJS.Row, isAlt: boolean) {
 }
 
 export async function generateInspectionExcel(sessionId: string): Promise<void> {
-  const data = await getReportData(sessionId)
+  const [data, sessionPhotos] = await Promise.all([
+    getReportData(sessionId),
+    getSessionPhotos(sessionId)
+  ])
   if (!data) throw new Error('Kunde inte hämta sessionsdata')
 
   const { session, outdoorInspections, indoorInspections, summary } = data
@@ -448,6 +456,46 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       row.getCell(9).alignment = { wrapText: true, vertical: 'top' }
       rowIdx++
     })
+  }
+
+  // ============================================================
+  // FLIK: Bilder (om sessionen har bilder)
+  // ============================================================
+  if (sessionPhotos.length > 0) {
+    const wsPhotos = wb.addWorksheet('Bilder')
+    wsPhotos.columns = [
+      { width: 6 },
+      { width: 60 },
+      { width: 40 },
+    ]
+
+    const photoTitleRow = wsPhotos.addRow(['BILDER FRÅN BESÖKET', '', ''])
+    wsPhotos.mergeCells('A1:C1')
+    photoTitleRow.height = 28
+    photoTitleRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF' + BG_DARK } }
+    photoTitleRow.getCell(1).font = { bold: true, size: 13, color: { argb: 'FF' + BG_GREEN } }
+    photoTitleRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'left', indent: 1 }
+
+    wsPhotos.addRow([])
+
+    const photoHeaderRow = wsPhotos.addRow(['#', 'Länk till bild', 'Bildtext'])
+    applyHeaderRow(photoHeaderRow, 3)
+
+    sessionPhotos.forEach((photo, idx) => {
+      const row = wsPhotos.addRow([
+        idx + 1,
+        photo.url || photo.photo_path,
+        photo.caption || '',
+      ])
+      applyDataRow(row, idx % 2 === 1)
+      if (photo.url) {
+        row.getCell(2).value = { text: `Bild ${idx + 1}`, hyperlink: photo.url }
+        row.getCell(2).font = { size: 9, color: { argb: 'FF' + '20C58F' }, underline: true }
+      }
+      row.getCell(3).alignment = { wrapText: true, vertical: 'top' }
+    })
+
+    wsPhotos.views = [{ state: 'frozen', ySplit: 3 }]
   }
 
   // ============================================================

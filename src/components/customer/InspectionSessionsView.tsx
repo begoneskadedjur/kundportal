@@ -45,7 +45,9 @@ import {
   getOutdoorInspectionsForSession,
   getIndoorInspectionsForSession,
   getLatestInspectionValuesForCustomer,
+  getSessionPhotos,
 } from '../../services/inspectionSessionService'
+import type { InspectionSessionPhoto } from '../../types/inspectionSession'
 import { useDebounce } from '../../hooks/useDebounce'
 import type { EquipmentPlacementWithRelations } from '../../types/database'
 import type { FloorPlanWithRelations } from '../../services/floorPlanService'
@@ -173,6 +175,12 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const [downloadingReport, setDownloadingReport] = useState<string | null>(null)
   const [reportDropdownOpen, setReportDropdownOpen] = useState<string | null>(null)
 
+  // Sessionskommentarer och -bilder (kundvy)
+  const [selectedSessionNotes, setSelectedSessionNotes] = useState<string | null>(null)
+  const [selectedSessionPhotos, setSelectedSessionPhotos] = useState<InspectionSessionPhoto[]>([])
+  const [sessionPhotoLightbox, setSessionPhotoLightbox] = useState<LightboxPhoto[] | null>(null)
+  const [sessionPhotoLightboxIndex, setSessionPhotoLightboxIndex] = useState(0)
+
   // Stäng rapport-dropdown vid klick utanför
   useEffect(() => {
     if (!reportDropdownOpen) return
@@ -215,9 +223,14 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         setSelectedSessionId(latestSession.id)
         setLastInspectionDate(latestSession.completed_at || latestSession.created_at || null)
         setLastTechnicianName(latestSession.technician?.name || null)
+        setSelectedSessionNotes(latestSession.notes || null)
 
-        // Ladda stationsdata för senaste sessionen
-        await loadSessionStationData(latestSession.id, outdoorStations, floorPlanData)
+        // Ladda stationsdata + bilder för senaste sessionen
+        const [, photos] = await Promise.all([
+          loadSessionStationData(latestSession.id, outdoorStations, floorPlanData),
+          getSessionPhotos(latestSession.id)
+        ])
+        setSelectedSessionPhotos(photos)
       }
     } catch (error) {
       console.error('Error fetching inspection data:', error)
@@ -420,7 +433,12 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
       if (session) {
         setLastInspectionDate(session.completed_at || session.created_at || null)
         setLastTechnicianName(session.technician?.name || null)
+        setSelectedSessionNotes(session.notes || null)
       }
+
+      // Ladda sessionsbilder
+      const photos = await getSessionPhotos(sessionId)
+      setSelectedSessionPhotos(photos)
     } catch (error) {
       console.error('Error loading session station data:', error)
     } finally {
@@ -997,7 +1015,62 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
               </div>
             </div>
           )}
+          {/* Teknikerkommentar + bilder */}
+          {!loadingSessionData && (selectedSessionNotes || selectedSessionPhotos.length > 0) && (
+            <div className="space-y-2 pt-1">
+              {selectedSessionNotes && (
+                <div className="bg-slate-900/40 border border-slate-700/50 rounded-lg px-3 py-2.5">
+                  <p className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1">
+                    <FileText className="w-3.5 h-3.5" />
+                    Teknikerkommentar
+                  </p>
+                  <p className="text-sm text-slate-200 whitespace-pre-wrap">{selectedSessionNotes}</p>
+                </div>
+              )}
+              {selectedSessionPhotos.length > 0 && (
+                <div className="bg-slate-900/40 border border-slate-700/50 rounded-lg px-3 py-2.5">
+                  <p className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-2">
+                    <Camera className="w-3.5 h-3.5" />
+                    Bilder från besöket ({selectedSessionPhotos.length})
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {selectedSessionPhotos.map((photo, idx) => (
+                      <div key={photo.id} className="relative group cursor-pointer" onClick={() => {
+                        const lightboxPhotos: LightboxPhoto[] = selectedSessionPhotos.map(p => ({
+                          url: p.url || '',
+                          stationNumber: '',
+                          stationType: 'outdoor' as const,
+                          status: 'ok',
+                          inspectedAt: p.uploaded_at,
+                          findings: p.caption || undefined
+                        }))
+                        setSessionPhotoLightbox(lightboxPhotos)
+                        setSessionPhotoLightboxIndex(idx)
+                      }}>
+                        <img
+                          src={photo.url}
+                          alt={photo.caption || `Bild ${idx + 1}`}
+                          className="w-20 h-20 object-cover rounded-lg border border-slate-700 group-hover:border-[#20c58f] transition-colors"
+                        />
+                        {photo.caption && (
+                          <p className="text-xs text-slate-400 mt-0.5 text-center truncate max-w-20" title={photo.caption}>{photo.caption}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
+
+        {/* Lightbox för sessionsbilder */}
+        <InspectionPhotoLightbox
+          photos={sessionPhotoLightbox || []}
+          initialIndex={sessionPhotoLightboxIndex}
+          isOpen={sessionPhotoLightbox !== null}
+          onClose={() => setSessionPhotoLightbox(null)}
+        />
 
         {/* Filter, sök och rapport */}
         <div className="flex flex-wrap gap-2">

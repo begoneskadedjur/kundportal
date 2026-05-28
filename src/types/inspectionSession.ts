@@ -48,6 +48,20 @@ export const INSPECTION_SESSION_STATUS_CONFIG: Record<InspectionSessionStatus, {
 }
 
 // ============================================
+// SESSION PHOTOS
+// ============================================
+
+export interface InspectionSessionPhoto {
+  id: string
+  session_id: string
+  photo_path: string
+  caption: string | null
+  uploaded_at: string
+  uploaded_by: string | null
+  url?: string // signerad URL, populeras vid hämtning
+}
+
+// ============================================
 // DATABASE TYPES
 // ============================================
 

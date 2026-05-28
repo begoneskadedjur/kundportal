@@ -14,7 +14,8 @@ import {
   CreateIndoorInspectionInput,
   InspectionSessionStatus,
   SessionProgress,
-  InspectionSummary
+  InspectionSummary,
+  InspectionSessionPhoto
 } from '../types/inspectionSession'
 import type { IndoorStationWithRelations, IndoorStationInspectionWithRelations } from '../types/indoor'
 import type { InspectionStatus } from '../types/indoor'
@@ -1240,6 +1241,138 @@ export async function getInspectionPhotoUrl(
     .createSignedUrl(photoPath, 3600)
 
   return data?.signedUrl || null
+}
+
+// ============================================
+// SESSION NOTES UPDATE
+// ============================================
+
+/**
+ * Uppdatera sessionsanteckningar utan att avsluta sessionen
+ */
+export async function updateSessionNotes(
+  sessionId: string,
+  notes: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('station_inspection_sessions')
+    .update({ notes: notes || null })
+    .eq('id', sessionId)
+
+  if (error) {
+    console.error('Error updating session notes:', error)
+    throw error
+  }
+}
+
+// ============================================
+// SESSION PHOTO FUNCTIONS
+// ============================================
+
+/**
+ * Ladda upp sessionsfoto och spara i databasen
+ */
+export async function uploadSessionPhoto(
+  sessionId: string,
+  file: File,
+  caption?: string
+): Promise<InspectionSessionPhoto | null> {
+  const compressed = await compressToWebP(file)
+  const timestamp = Date.now()
+  const fileName = `session/${sessionId}/${timestamp}.webp`
+
+  const { error: uploadError } = await supabase.storage
+    .from('inspection-photos')
+    .upload(fileName, compressed, { contentType: 'image/webp' })
+
+  if (uploadError) {
+    console.error('Error uploading session photo:', uploadError)
+    return null
+  }
+
+  const { data, error: dbError } = await supabase
+    .from('inspection_session_photos')
+    .insert({
+      session_id: sessionId,
+      photo_path: fileName,
+      caption: caption || null
+    })
+    .select()
+    .single()
+
+  if (dbError || !data) {
+    console.error('Error saving session photo record:', dbError)
+    await supabase.storage.from('inspection-photos').remove([fileName])
+    return null
+  }
+
+  const url = await getInspectionPhotoUrl(fileName)
+  return { ...data, url: url || undefined }
+}
+
+/**
+ * Radera sessionsfoto (storage + databasrad)
+ */
+export async function deleteSessionPhoto(
+  photoId: string,
+  photoPath: string
+): Promise<void> {
+  await supabase.storage.from('inspection-photos').remove([photoPath])
+
+  const { error } = await supabase
+    .from('inspection_session_photos')
+    .delete()
+    .eq('id', photoId)
+
+  if (error) {
+    console.error('Error deleting session photo record:', error)
+    throw error
+  }
+}
+
+/**
+ * Hämta alla sessionsfoton med signerade URL:er
+ */
+export async function getSessionPhotos(
+  sessionId: string
+): Promise<InspectionSessionPhoto[]> {
+  const { data, error } = await supabase
+    .from('inspection_session_photos')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('uploaded_at', { ascending: true })
+
+  if (error || !data) {
+    console.error('Error fetching session photos:', error)
+    return []
+  }
+
+  const photosWithUrls = await Promise.all(
+    data.map(async (photo) => {
+      const url = await getInspectionPhotoUrl(photo.photo_path)
+      return { ...photo, url: url || undefined }
+    })
+  )
+
+  return photosWithUrls
+}
+
+/**
+ * Uppdatera bildtext för sessionsfoto
+ */
+export async function updateSessionPhotoCaption(
+  photoId: string,
+  caption: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('inspection_session_photos')
+    .update({ caption: caption || null })
+    .eq('id', photoId)
+
+  if (error) {
+    console.error('Error updating session photo caption:', error)
+    throw error
+  }
 }
 
 // ============================================

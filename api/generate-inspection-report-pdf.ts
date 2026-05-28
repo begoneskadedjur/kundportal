@@ -222,6 +222,18 @@ async function fetchFloorPlanBase64(imagePath: string): Promise<string | null> {
   }
 }
 
+async function fetchImageAsBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) return null
+    const buffer = await response.arrayBuffer()
+    const contentType = response.headers.get('content-type') || 'image/webp'
+    return `data:${contentType};base64,${Buffer.from(buffer).toString('base64')}`
+  } catch {
+    return null
+  }
+}
+
 async function generateInspectionReportHTML(data: {
   session: any
   customer: any
@@ -231,13 +243,42 @@ async function generateInspectionReportHTML(data: {
   summary: { ok: number; warning: number; critical: number; total: number }
   dynamicLabels: Record<string, string>
   dynamicColors: Record<string, string>
+  sessionPhotos?: Array<{ url?: string; caption?: string | null }>
 }, browser: any) {
-  const { session, customer, technician, outdoorInspections, indoorInspections, dynamicLabels, dynamicColors } = data
+  const { session, customer, technician, outdoorInspections, indoorInspections, dynamicLabels, dynamicColors, sessionPhotos } = data
 
   // Sortera utomhusinspektioner efter placed_at för korrekt numrering (samma som kundportalen)
   const sortedOutdoor = [...outdoorInspections].sort((a, b) =>
     new Date(a.station?.placed_at || 0).getTime() - new Date(b.station?.placed_at || 0).getTime()
   )
+
+  // Hämta sessionsbilder som base64
+  let sessionPhotosHtml = ''
+  if (sessionPhotos && sessionPhotos.length > 0) {
+    const photoBase64List = await Promise.all(
+      sessionPhotos.map(async (p) => {
+        const base64 = p.url ? await fetchImageAsBase64(p.url) : null
+        return { base64, caption: p.caption }
+      })
+    )
+    const validPhotos = photoBase64List.filter(p => p.base64)
+    if (validPhotos.length > 0) {
+      const photoItems = validPhotos.map(p => `
+        <div style="break-inside:avoid;">
+          <img src="${p.base64}" style="width:100%;height:120px;object-fit:cover;border-radius:6px;border:1px solid ${beGoneColors.border};display:block;" alt="${p.caption || 'Bild'}" />
+          ${p.caption ? `<p style="font-size:9px;color:${beGoneColors.mediumGray};margin-top:3px;text-align:center;">${p.caption}</p>` : ''}
+        </div>
+      `).join('')
+      sessionPhotosHtml = `
+        <div class="notes-section" style="margin-bottom:20px;">
+          <div class="notes-label">Bilder från besöket</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;">
+            ${photoItems}
+          </div>
+        </div>
+      `
+    }
+  }
 
   // Rendera Google Maps satellitbild via Puppeteer
   const mapBase64 = await renderSatelliteMapScreenshot(browser, sortedOutdoor)
@@ -708,6 +749,8 @@ async function generateInspectionReportHTML(data: {
     </div>
     ` : ''}
 
+    ${sessionPhotosHtml}
+
     ${sortedOutdoor.length > 0 ? `
     <div class="section">
       <div class="section-header">
@@ -761,7 +804,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { session, customer, technician, outdoorInspections, indoorInspections, summary } = req.body
+    const { session, customer, technician, outdoorInspections, indoorInspections, summary, sessionPhotos } = req.body
 
     if (!session || !summary) {
       return res.status(400).json({ error: 'Missing session or summary data' })
@@ -799,7 +842,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       indoorInspections: indoorInspections || [],
       summary,
       dynamicLabels,
-      dynamicColors
+      dynamicColors,
+      sessionPhotos: sessionPhotos || []
     }, browser)
 
     const page = await browser.newPage()
