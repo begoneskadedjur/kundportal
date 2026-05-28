@@ -66,9 +66,14 @@ function BoundariesMapPanel({
 
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null)
   const [drawingActive, setDrawingActive] = useState(false)
+  // Ref för att undvika stale closure i polygoncomplete-listener
+  const activeRegionIdRef = useRef<string | null>(null)
 
   // Hitta aktiv region
   const activeRegion = regions.find(r => r.tempId === activeRegionId) || null
+
+  // Synka ref med state
+  useEffect(() => { activeRegionIdRef.current = activeRegionId }, [activeRegionId])
 
   // Initialisera karta
   useEffect(() => {
@@ -99,29 +104,30 @@ function BoundariesMapPanel({
     dm.setMap(mapRef.current)
     drawingManagerRef.current = dm
 
-    // Lyssna på när polygon ritas klar
+    // Lyssna på när polygon ritas klar — använd ref för att undvika stale closure
     google.maps.event.addListener(dm, 'polygoncomplete', (polygon: google.maps.Polygon) => {
-      if (!activeRegionId) {
+      const currentId = activeRegionIdRef.current
+      if (!currentId) {
         polygon.setMap(null)
         return
       }
       // Ta bort eventuell gammal polygon för denna region
-      const old = drawnPolygonsRef.current.get(activeRegionId)
+      const old = drawnPolygonsRef.current.get(currentId)
       if (old) old.setMap(null)
-      drawnPolygonsRef.current.set(activeRegionId, polygon)
+      drawnPolygonsRef.current.set(currentId, polygon)
 
       // Stoppa ritläge
       dm.setDrawingMode(null)
       setDrawingActive(false)
 
       // Spara path
-      const path = polygon.getPath().getArray().map(ll => ({ lat: ll.lat(), lng: ll.lng() }))
-      onPolygonSaved(activeRegionId, path)
+      const path = polygon.getPath().getArray().map((ll: any) => ({ lat: ll.lat(), lng: ll.lng() }))
+      onPolygonSaved(currentId, path)
 
       // Gör polygonen redigerbar och lyssna på ändringar
       const updatePath = () => {
-        const newPath = polygon.getPath().getArray().map(ll => ({ lat: ll.lat(), lng: ll.lng() }))
-        onPolygonSaved(activeRegionId, newPath)
+        const newPath = polygon.getPath().getArray().map((ll: any) => ({ lat: ll.lat(), lng: ll.lng() }))
+        onPolygonSaved(activeRegionIdRef.current!, newPath)
       }
       google.maps.event.addListener(polygon.getPath(), 'set_at', updatePath)
       google.maps.event.addListener(polygon.getPath(), 'insert_at', updatePath)
@@ -262,56 +268,55 @@ function BoundariesMapPanel({
         </div>
 
         {/* Karta */}
-        <div className="flex-1 relative">
-          <div ref={mapDivRef} style={{ width: '100%', height: '360px', borderRadius: '12px', overflow: 'hidden' }} />
+        <div className="flex-1 flex flex-col gap-2">
+          <div ref={mapDivRef} style={{ width: '100%', height: '340px', borderRadius: '12px', overflow: 'hidden' }} />
 
-          {/* Rita-kontroller overlay */}
-          {activeRegionId && (
-            <div className="absolute top-2 right-2 flex flex-col gap-1.5">
+          {/* Rita-kontroller under kartan */}
+          {activeRegionId ? (
+            <div className="flex items-center gap-2">
               {!drawingActive ? (
                 <>
                   <button
                     onClick={startDrawing}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-900/90 text-white border border-slate-600 hover:border-[#20c58f] transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-white border border-slate-600 hover:border-[#20c58f] transition-colors"
                   >
                     <Pencil className="w-3.5 h-3.5" />
-                    Rita polygon
+                    Rita polygon för {activeRegion?.site_name}
                   </button>
                   {activeRegion?.polygon && activeRegion.polygon.length > 0 && (
                     <button
                       onClick={() => clearPolygon(activeRegionId)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-900/90 text-red-400 border border-slate-600 hover:border-red-500 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-red-400 border border-slate-600 hover:border-red-500 transition-colors"
                     >
                       <X className="w-3.5 h-3.5" />
-                      Ta bort
+                      Ta bort polygon
                     </button>
                   )}
                 </>
               ) : (
-                <button
-                  onClick={cancelDrawing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-900/80 text-red-200 border border-red-600 hover:bg-red-900 transition-colors"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  Avbryt ritning
-                </button>
+                <>
+                  <span className="text-xs text-[#20c58f] animate-pulse">Klicka på kartan för att rita — dubbelklicka för att avsluta</span>
+                  <button
+                    onClick={cancelDrawing}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-900/60 text-red-200 border border-red-600 hover:bg-red-900 transition-colors ml-auto"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Avbryt
+                  </button>
+                </>
               )}
             </div>
-          )}
-
-          {!activeRegionId && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-center">
-                <MapPin className="w-5 h-5 text-slate-400 mx-auto mb-1" />
-                <p className="text-xs text-slate-400">Välj en region till vänster<br />för att börja rita</p>
-              </div>
-            </div>
+          ) : (
+            <p className="text-xs text-slate-500 flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5" />
+              Välj en region i listan för att rita dess gräns på kartan
+            </p>
           )}
         </div>
       </div>
 
-      <p className="text-xs text-slate-500">
-        Rita polygoner för att markera varje regions geografiska yta på kundportalskartan. Klicka på punkterna för att forma gränsen — dubbelklicka för att avsluta polygonen.
+      <p className="text-xs text-slate-600">
+        Dubbelklicka på sista punkten för att avsluta polygonen. Dra i punkterna efteråt för att justera gränsen.
       </p>
     </div>
   )
@@ -531,7 +536,7 @@ export default function ConvertToRegionalCustomerModal({
             disabled={loading}
             className="flex items-center gap-2"
           >
-            {loading ? <LoadingSpinner size="sm" /> : <CheckCircle className="w-4 h-4" />}
+            {loading ? <LoadingSpinner /> : <CheckCircle className="w-4 h-4" />}
             Konvertera
           </Button>
         )}
