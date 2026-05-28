@@ -2,11 +2,11 @@
 // samma tekniska struktur som multisite men med gemensam inloggning
 // och karta med färgkodade regioner i portalen.
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   MapPin, Check, ChevronRight, Plus, Trash2,
   Building2, ArrowLeft, ArrowRight, AlertCircle, CheckCircle,
-  Pencil, X
+  Pencil, X, Search
 } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
@@ -48,7 +48,7 @@ interface ConvertToRegionalCustomerModalProps {
 
 type Step = 'regions' | 'boundaries' | 'confirm'
 
-// Rita-steg: hanterar DrawingManager + Places Autocomplete för en region
+// Rita-steg: lokal kommunsökning + manuell polygon-ritning (ingen DrawingManager/Places API)
 function BoundariesMapPanel({
   regions,
   onPolygonSaved,
@@ -56,85 +56,62 @@ function BoundariesMapPanel({
   regions: PendingRegion[]
   onPolygonSaved: (tempId: string, path: Array<{ lat: number; lng: number }> | null) => void
 }) {
-  const { isLoaded, error } = useGoogleMaps({ libraries: ['marker', 'drawing', 'places'] })
+  const { isLoaded, error } = useGoogleMaps({ libraries: ['marker'] })
   const mapDivRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
-  const drawingManagerRef = useRef<google.maps.drawing.DrawingManager | null>(null)
   const drawnPolygonsRef = useRef<Map<string, google.maps.Polygon>>(new Map())
-  const autocompleteContainerRef = useRef<HTMLDivElement>(null)
-  const autocompleteInitRef = useRef(false)
+  // Manuell ritning
+  const drawingPointsRef = useRef<google.maps.Marker[]>([])
+  const drawingListenersRef = useRef<google.maps.MapsEventListener[]>([])
+  const previewPolylineRef = useRef<google.maps.Polyline | null>(null)
+  // Stale-closure-säker ref
+  const activeRegionIdRef = useRef<string | null>(null)
+  // Kommundata-cache
+  const kommunFeaturesRef = useRef<any[] | null>(null)
 
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null)
   const [drawingActive, setDrawingActive] = useState(false)
-  // Ref för att undvika stale closure i polygoncomplete-listener
-  const activeRegionIdRef = useRef<string | null>(null)
-  // Cache för kommundata (laddas en gång)
-  const kommunGeoJsonRef = useRef<any[] | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showDropdown, setShowDropdown] = useState(false)
+  const [kommunLoading, setKommunLoading] = useState(false)
 
-  // Hitta aktiv region
   const activeRegion = regions.find(r => r.tempId === activeRegionId) || null
 
-  // Synka ref med state
   useEffect(() => { activeRegionIdRef.current = activeRegionId }, [activeRegionId])
+
+  // Ladda kommundata eager när kartan är redo
+  useEffect(() => {
+    if (!isLoaded || kommunFeaturesRef.current) return
+    setKommunLoading(true)
+    fetch('https://raw.githubusercontent.com/okfse/sweden-geojson/master/swedish_municipalities.geojson')
+      .then(r => r.json())
+      .then(d => { kommunFeaturesRef.current = d.features || [] })
+      .catch(() => { kommunFeaturesRef.current = [] })
+      .finally(() => setKommunLoading(false))
+  }, [isLoaded])
+
+  // Sökresultat — filtrerar lokalt i minnet, inga API-anrop
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim() || !kommunFeaturesRef.current) return []
+    const q = searchQuery.toLowerCase()
+    return kommunFeaturesRef.current
+      .filter((f: any) => f.properties?.kom_namn?.toLowerCase().includes(q))
+      .slice(0, 8)
+  }, [searchQuery, kommunLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialisera karta
   useEffect(() => {
     if (!isLoaded || !mapDivRef.current || mapRef.current) return
-
     mapRef.current = new google.maps.Map(mapDivRef.current, {
-      center: { lat: 59.33, lng: 18.07 }, // Stockholm
-      zoom: 7,
+      center: { lat: 59.33, lng: 18.07 },
+      zoom: 5,
       mapTypeId: 'roadmap',
-      disableDefaultUI: false,
       zoomControl: true,
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
     })
-
-    // DrawingManager
-    const dm = new google.maps.drawing.DrawingManager({
-      drawingMode: null,
-      drawingControl: false,
-      polygonOptions: {
-        fillOpacity: 0.25,
-        strokeWeight: 2,
-        editable: true,
-        zIndex: 2,
-      },
-    })
-    dm.setMap(mapRef.current)
-    drawingManagerRef.current = dm
-
-    // Lyssna på när polygon ritas klar — använd ref för att undvika stale closure
-    google.maps.event.addListener(dm, 'polygoncomplete', (polygon: google.maps.Polygon) => {
-      const currentId = activeRegionIdRef.current
-      if (!currentId) {
-        polygon.setMap(null)
-        return
-      }
-      // Ta bort eventuell gammal polygon för denna region
-      const old = drawnPolygonsRef.current.get(currentId)
-      if (old) old.setMap(null)
-      drawnPolygonsRef.current.set(currentId, polygon)
-
-      // Stoppa ritläge
-      dm.setDrawingMode(null)
-      setDrawingActive(false)
-
-      // Spara path
-      const path = polygon.getPath().getArray().map((ll: any) => ({ lat: ll.lat(), lng: ll.lng() }))
-      onPolygonSaved(currentId, path)
-
-      // Gör polygonen redigerbar och lyssna på ändringar
-      const updatePath = () => {
-        const newPath = polygon.getPath().getArray().map((ll: any) => ({ lat: ll.lat(), lng: ll.lng() }))
-        onPolygonSaved(activeRegionIdRef.current!, newPath)
-      }
-      google.maps.event.addListener(polygon.getPath(), 'set_at', updatePath)
-      google.maps.event.addListener(polygon.getPath(), 'insert_at', updatePath)
-    })
-  }, [isLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isLoaded])
 
   // Uppdatera polygon-färger när aktiv region ändras
   useEffect(() => {
@@ -145,34 +122,21 @@ function BoundariesMapPanel({
         poly.setOptions({
           strokeColor: r.color,
           fillColor: r.color,
-          strokeOpacity: activeRegionId === r.tempId ? 1 : 0.6,
-          fillOpacity: activeRegionId === r.tempId ? 0.35 : 0.2,
+          strokeOpacity: activeRegionId === r.tempId ? 1 : 0.5,
+          fillOpacity: activeRegionId === r.tempId ? 0.35 : 0.15,
         })
       }
     })
   }, [activeRegionId, regions])
 
-  // Rita kommunpolygon på kartan för aktiv region, baserat på GeoJSON-koordinater
-  const applyKommunPolygon = useCallback((geoJsonGeometry: any, regionId: string, color: string) => {
-    if (!mapRef.current) return
-
-    // Ta bort gammal polygon för denna region
+  // Spara en färdig polygon på kartan och i state
+  const commitPolygon = useCallback((path: Array<{ lat: number; lng: number }>, regionId: string, color: string) => {
+    if (!mapRef.current || path.length < 3) return
     const old = drawnPolygonsRef.current.get(regionId)
     if (old) old.setMap(null)
 
-    // Konvertera GeoJSON-koordinater ([lng, lat]) → Google Maps paths
-    const toLatLngs = (ring: number[][]) => ring.map(([lng, lat]) => ({ lat, lng }))
-    let paths: any[]
-    if (geoJsonGeometry.type === 'Polygon') {
-      paths = geoJsonGeometry.coordinates.map(toLatLngs)
-    } else if (geoJsonGeometry.type === 'MultiPolygon') {
-      paths = geoJsonGeometry.coordinates.flatMap((poly: number[][][]) => poly.map(toLatLngs))
-    } else {
-      return
-    }
-
     const polygon = new google.maps.Polygon({
-      paths,
+      paths: path,
       strokeColor: color,
       strokeWeight: 2,
       strokeOpacity: 0.9,
@@ -183,107 +147,133 @@ function BoundariesMapPanel({
       map: mapRef.current,
     })
     drawnPolygonsRef.current.set(regionId, polygon)
+    onPolygonSaved(regionId, path)
 
-    // Spara path (bara ytterring för MultiPolygon — tar första)
-    const firstRing = paths[0] as Array<{ lat: number; lng: number }>
-    onPolygonSaved(regionId, firstRing)
-
-    // Lyssna på manuella justeringar
     const updatePath = () => {
       const newPath = polygon.getPath().getArray().map((ll: any) => ({ lat: ll.lat(), lng: ll.lng() }))
       onPolygonSaved(regionId, newPath)
     }
     google.maps.event.addListener(polygon.getPath(), 'set_at', updatePath)
     google.maps.event.addListener(polygon.getPath(), 'insert_at', updatePath)
+  }, [onPolygonSaved])
 
-    // Centrera kartan på polygonen
+  // Applicera kommunpolygon från GeoJSON
+  const applyKommunPolygon = useCallback((geometry: any, regionId: string, color: string) => {
+    if (!mapRef.current) return
+    const toLatLngs = (ring: number[][]) => ring.map(([lng, lat]) => ({ lat, lng }))
+    let paths: Array<{ lat: number; lng: number }>[]
+    if (geometry.type === 'Polygon') {
+      paths = geometry.coordinates.map(toLatLngs)
+    } else if (geometry.type === 'MultiPolygon') {
+      paths = geometry.coordinates.flatMap((poly: number[][][]) => poly.map(toLatLngs))
+    } else {
+      return
+    }
+    const firstRing = paths[0]
+    commitPolygon(firstRing, regionId, color)
+
     const bounds = new google.maps.LatLngBounds()
     firstRing.forEach(p => bounds.extend(p))
     mapRef.current.fitBounds(bounds)
-  }, [onPolygonSaved])
+  }, [commitPolygon])
 
-  // Initialisera PlaceAutocompleteElement (Places API New) när kartan är laddad
-  useEffect(() => {
-    if (!isLoaded || !autocompleteContainerRef.current || autocompleteInitRef.current) return
-    autocompleteInitRef.current = true
+  // Välj kommun från dropdown
+  const selectKommun = useCallback((feature: any) => {
+    const currentId = activeRegionIdRef.current
+    const region = regions.find(r => r.tempId === currentId)
+    if (region && currentId) {
+      applyKommunPolygon(feature.geometry, currentId, region.color)
+      setSearchQuery(feature.properties.kom_namn)
+    }
+    setShowDropdown(false)
+  }, [regions, applyKommunPolygon])
 
-    const autocomplete = new google.maps.places.PlaceAutocompleteElement({
-      types: ['(regions)'],
-      requestedRegion: 'se',
-    } as any)
-    autocomplete.style.width = '100%'
-    autocompleteContainerRef.current.appendChild(autocomplete)
+  // Cleanup-hjälp för manuell ritning
+  const cleanupTempDrawing = useCallback(() => {
+    drawingPointsRef.current.forEach(m => m.setMap(null))
+    drawingPointsRef.current = []
+    previewPolylineRef.current?.setMap(null)
+    previewPolylineRef.current = null
+    drawingListenersRef.current.forEach(l => google.maps.event.removeListener(l))
+    drawingListenersRef.current = []
+  }, [])
 
-    autocomplete.addEventListener('gmp-placeselect', async (e: any) => {
-      const place: google.maps.places.Place = e.place
-      await place.fetchFields({ fields: ['displayName', 'location', 'viewport'] })
-
-      const placeName: string = (place as any).displayName || ''
-
-      // Ladda kommundata om det inte redan är gjort
-      if (!kommunGeoJsonRef.current) {
-        try {
-          const res = await fetch('https://raw.githubusercontent.com/okfse/sweden-geojson/master/swedish_municipalities.geojson')
-          const data = await res.json()
-          kommunGeoJsonRef.current = data.features || []
-        } catch {
-          kommunGeoJsonRef.current = []
-        }
-      }
-
-      // Matcha mot kommunnamn (t.ex. "Huddinge" matchar "Huddinge" eller "Huddinge kommun")
-      const normalizeKommun = (s: string) => s.toLowerCase().replace(/\s+kommun$/i, '').trim()
-      const needle = normalizeKommun(placeName)
-      const match = kommunGeoJsonRef.current!.find((f: any) => {
-        const name = normalizeKommun(f.properties?.kom_namn || '')
-        return name === needle || name.includes(needle) || needle.includes(name)
-      })
-
-      const currentId = activeRegionIdRef.current
-      if (match && currentId) {
-        const region = regions.find(r => r.tempId === currentId)
-        applyKommunPolygon(match.geometry, currentId, region?.color || '#3b82f6')
-      } else {
-        // Fallback: centrera bara kartan
-        if (place.viewport) {
-          mapRef.current?.fitBounds(place.viewport)
-        } else if (place.location) {
-          mapRef.current?.panTo(place.location)
-          mapRef.current?.setZoom(11)
-        }
-      }
-    })
-  }, [isLoaded, regions, applyKommunPolygon])
+  const updatePreviewPolyline = useCallback((color: string) => {
+    const path = drawingPointsRef.current.map(m => m.getPosition()!)
+    if (previewPolylineRef.current) {
+      previewPolylineRef.current.setPath(path)
+    } else {
+      previewPolylineRef.current = new google.maps.Polyline({
+        path,
+        map: mapRef.current!,
+        strokeColor: color,
+        strokeWeight: 2,
+        strokeOpacity: 0.7,
+        strokeDasharray: '4 4',
+      } as any)
+    }
+  }, [])
 
   const startDrawing = useCallback(() => {
-    if (!drawingManagerRef.current || !activeRegionId) return
-    // Ta bort eventuell gammal polygon
+    if (!mapRef.current || !activeRegionId) return
+    const region = regions.find(r => r.tempId === activeRegionId)
+    const color = region?.color || '#3b82f6'
+
+    // Ta bort gammal polygon
     const old = drawnPolygonsRef.current.get(activeRegionId)
     if (old) {
       old.setMap(null)
       drawnPolygonsRef.current.delete(activeRegionId)
       onPolygonSaved(activeRegionId, null)
     }
-    const region = regions.find(r => r.tempId === activeRegionId)
-    drawingManagerRef.current.setOptions({
-      polygonOptions: {
-        strokeColor: region?.color || '#3b82f6',
-        fillColor: region?.color || '#3b82f6',
-        fillOpacity: 0.25,
-        strokeWeight: 2,
-        editable: true,
-        zIndex: 2,
-      },
-    })
-    drawingManagerRef.current.setDrawingMode(google.maps.drawing.OverlayType.POLYGON)
+    cleanupTempDrawing()
     setDrawingActive(true)
-  }, [activeRegionId, regions, onPolygonSaved])
+    mapRef.current.setOptions({ draggableCursor: 'crosshair' })
+
+    const clickListener = mapRef.current.addListener('click', (e: any) => {
+      if (!e.latLng) return
+      const marker = new google.maps.Marker({
+        position: e.latLng,
+        map: mapRef.current!,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 5,
+          fillColor: color,
+          fillOpacity: 1,
+          strokeWeight: 1.5,
+          strokeColor: '#fff',
+        },
+        zIndex: 10,
+      })
+      drawingPointsRef.current.push(marker)
+      updatePreviewPolyline(color)
+    })
+
+    const dblClickListener = mapRef.current.addListener('dblclick', (e: any) => {
+      // Förhindra zoom vid dubbelklick
+      if (e.stop) e.stop()
+      const path = drawingPointsRef.current.map(m => ({
+        lat: m.getPosition()!.lat(),
+        lng: m.getPosition()!.lng(),
+      }))
+      cleanupTempDrawing()
+      setDrawingActive(false)
+      mapRef.current?.setOptions({ draggableCursor: '' })
+      const id = activeRegionIdRef.current
+      if (id && path.length >= 3) {
+        const col = regions.find(r => r.tempId === id)?.color || '#3b82f6'
+        commitPolygon(path, id, col)
+      }
+    })
+
+    drawingListenersRef.current = [clickListener, dblClickListener]
+  }, [activeRegionId, regions, onPolygonSaved, cleanupTempDrawing, updatePreviewPolyline, commitPolygon])
 
   const cancelDrawing = useCallback(() => {
-    if (!drawingManagerRef.current) return
-    drawingManagerRef.current.setDrawingMode(null)
+    cleanupTempDrawing()
     setDrawingActive(false)
-  }, [])
+    mapRef.current?.setOptions({ draggableCursor: '' })
+  }, [cleanupTempDrawing])
 
   const clearPolygon = useCallback((tempId: string) => {
     const old = drawnPolygonsRef.current.get(tempId)
@@ -297,10 +287,8 @@ function BoundariesMapPanel({
   if (error) {
     return (
       <div className="flex items-center justify-center py-12 text-center">
-        <div>
-          <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-          <p className="text-sm text-slate-400">{error}</p>
-        </div>
+        <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+        <p className="text-sm text-slate-400">{error}</p>
       </div>
     )
   }
@@ -315,11 +303,35 @@ function BoundariesMapPanel({
 
   return (
     <div className="space-y-3">
-      {/* Sökfält — PlaceAutocompleteElement monteras här */}
-      <div ref={autocompleteContainerRef} className="w-full" />
+      {/* Kommunsökning — lokal filtrering, inga API-anrop */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        <input
+          value={searchQuery}
+          onChange={e => { setSearchQuery(e.target.value); setShowDropdown(true) }}
+          onFocus={() => setShowDropdown(true)}
+          onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+          placeholder={kommunLoading ? 'Laddar kommuner...' : 'Sök kommunnamn (t.ex. Huddinge)...'}
+          disabled={kommunLoading}
+          className="w-full pl-9 pr-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] disabled:opacity-50"
+        />
+        {showDropdown && searchResults.length > 0 && (
+          <div className="absolute top-full mt-1 w-full z-50 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden">
+            {searchResults.map((f: any) => (
+              <button
+                key={f.properties.kom_namn}
+                onMouseDown={() => selectKommun(f)}
+                className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-700 transition-colors"
+              >
+                {f.properties.kom_namn}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="flex gap-3">
-        {/* Regionlista till vänster */}
+        {/* Regionlista */}
         <div className="w-44 flex-shrink-0 space-y-1.5">
           <p className="text-xs font-medium text-slate-400 mb-2">Välj region att rita:</p>
           {regions.map(r => {
@@ -330,15 +342,9 @@ function BoundariesMapPanel({
                 key={r.tempId}
                 onClick={() => setActiveRegionId(isActive ? null : r.tempId)}
                 className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-left transition-all ${
-                  isActive
-                    ? 'border'
-                    : 'bg-slate-800/40 border border-slate-700/50 text-slate-300 hover:border-slate-600'
+                  isActive ? 'border' : 'bg-slate-800/40 border border-slate-700/50 text-slate-300 hover:border-slate-600'
                 }`}
-                style={isActive ? {
-                  backgroundColor: r.color + '20',
-                  borderColor: r.color + '60',
-                  color: r.color,
-                } : {}}
+                style={isActive ? { backgroundColor: r.color + '20', borderColor: r.color + '60', color: r.color } : {}}
               >
                 <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
                 <span className="flex-1 truncate">{r.site_name}</span>
@@ -350,11 +356,10 @@ function BoundariesMapPanel({
 
         {/* Karta */}
         <div className="flex-1 flex flex-col gap-2">
-          <div ref={mapDivRef} style={{ width: '100%', height: '340px', borderRadius: '12px', overflow: 'hidden' }} />
+          <div ref={mapDivRef} style={{ width: '100%', height: '320px', borderRadius: '12px', overflow: 'hidden' }} />
 
-          {/* Rita-kontroller under kartan */}
           {activeRegionId ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               {!drawingActive ? (
                 <>
                   <button
@@ -362,7 +367,7 @@ function BoundariesMapPanel({
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-white border border-slate-600 hover:border-[#20c58f] transition-colors"
                   >
                     <Pencil className="w-3.5 h-3.5" />
-                    Rita polygon för {activeRegion?.site_name}
+                    Rita manuellt
                   </button>
                   {activeRegion?.polygon && activeRegion.polygon.length > 0 && (
                     <button
@@ -376,7 +381,7 @@ function BoundariesMapPanel({
                 </>
               ) : (
                 <>
-                  <span className="text-xs text-[#20c58f] animate-pulse">Klicka på kartan för att rita — dubbelklicka för att avsluta</span>
+                  <span className="text-xs text-[#20c58f]">Klicka för att lägga till punkter — dubbelklicka för att avsluta</span>
                   <button
                     onClick={cancelDrawing}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-900/60 text-red-200 border border-red-600 hover:bg-red-900 transition-colors ml-auto"
@@ -390,14 +395,14 @@ function BoundariesMapPanel({
           ) : (
             <p className="text-xs text-slate-500 flex items-center gap-1.5">
               <MapPin className="w-3.5 h-3.5" />
-              Välj en region i listan för att rita dess gräns på kartan
+              Sök en kommun ovan eller välj en region i listan och rita manuellt
             </p>
           )}
         </div>
       </div>
 
       <p className="text-xs text-slate-600">
-        Dubbelklicka på sista punkten för att avsluta polygonen. Dra i punkterna efteråt för att justera gränsen.
+        Sök ett kommunnamn för att hämta gränsen automatiskt. Eller rita manuellt — klicka punkter, dubbelklicka för att avsluta. Dra i punkterna för att justera.
       </p>
     </div>
   )
