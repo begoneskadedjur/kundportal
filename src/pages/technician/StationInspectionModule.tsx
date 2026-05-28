@@ -2304,6 +2304,22 @@ export default function StationInspectionModule() {
                       {progress.indoorProgress.inspected}/{progress.indoorProgress.total}
                     </span>
                   </div>
+                  {sessionNotes && (
+                    <div className="flex justify-between text-slate-400 mt-1 pt-1 border-t border-slate-800">
+                      <span>Kommentar:</span>
+                      <span className="text-[#20c58f] flex items-center gap-1">
+                        <FileText className="w-3 h-3" /> Ja
+                      </span>
+                    </div>
+                  )}
+                  {sessionPhotos.length > 0 && (
+                    <div className="flex justify-between text-slate-400 mt-1">
+                      <span>Bilder:</span>
+                      <span className="text-[#20c58f] flex items-center gap-1">
+                        <Camera className="w-3 h-3" /> {sessionPhotos.length} st
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
