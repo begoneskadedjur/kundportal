@@ -1,19 +1,13 @@
-// Kartvy för regionalkunder — visar alla regioners stationer färgkodade på en gemensam karta.
-// Ersätter tabb-navigationen i organisation-portalen för kunder med is_regional=true.
+// Kartvy för regionalkunder — stationer med normala stationstyps-färger + transparenta regionpolygoner.
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { MapPin, Filter, Layers } from 'lucide-react'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { CustomerOutdoorStationDetailSheet } from '../customer/CustomerOutdoorStationDetailSheet'
 import { EquipmentService } from '../../services/equipmentService'
+import { supabase } from '../../lib/supabase'
 import type { EquipmentPlacementWithRelations } from '../../types/database'
 import LoadingSpinner from '../shared/LoadingSpinner'
-
-// Färger matchar de som används i ConvertToRegionalCustomerModal
-const REGION_COLORS = [
-  '#20c58f', '#3b82f6', '#f59e0b', '#ef4444',
-  '#8b5cf6', '#ec4899', '#14b8a6', '#f97316',
-]
 
 interface SiteOption {
   id: string
@@ -21,10 +15,19 @@ interface SiteOption {
   region?: string | null
 }
 
-interface RegionStations {
+interface RegionData {
   site: SiteOption
   color: string
   stations: EquipmentPlacementWithRelations[]
+  polygon: Array<{ lat: number; lng: number }> | null
+}
+
+interface CustomerRegionRow {
+  id: string
+  customer_id: string
+  geojson_polygon: any
+  color: string
+  opacity: number
 }
 
 interface RegionalMapViewProps {
@@ -33,50 +36,80 @@ interface RegionalMapViewProps {
   highlightedStationId?: string | null
 }
 
+function geoJsonToLatLngs(geojson: any): Array<{ lat: number; lng: number }> | null {
+  if (!geojson) return null
+  const type = geojson.type
+  const coords = geojson.coordinates
+  if (!coords) return null
+  // Polygon → first ring
+  if (type === 'Polygon' && Array.isArray(coords[0])) {
+    return coords[0].map(([lng, lat]: [number, number]) => ({ lat, lng }))
+  }
+  // MultiPolygon → first polygon, first ring
+  if (type === 'MultiPolygon' && Array.isArray(coords[0]?.[0])) {
+    return coords[0][0].map(([lng, lat]: [number, number]) => ({ lat, lng }))
+  }
+  return null
+}
+
 export default function RegionalMapView({
   sites,
   organizationName,
   highlightedStationId,
 }: RegionalMapViewProps) {
-  const [regionData, setRegionData] = useState<RegionStations[]>([])
+  const [regionData, setRegionData] = useState<RegionData[]>([])
   const [loading, setLoading] = useState(true)
   const [activeRegions, setActiveRegions] = useState<Set<string>>(new Set(sites.map(s => s.id)))
   const [selectedStation, setSelectedStation] = useState<EquipmentPlacementWithRelations | null>(null)
 
-  const loadStations = useCallback(async () => {
+  const loadData = useCallback(async () => {
     if (sites.length === 0) { setLoading(false); return }
     setLoading(true)
     try {
-      const results = await Promise.all(
-        sites.map(async (site, index) => {
-          const color = REGION_COLORS[index % REGION_COLORS.length]
-          const stations = await EquipmentService.getEquipmentByCustomer(site.id)
-          // Overrida markörfärg med regionfärg
-          const coloredStations = stations
-            .filter(s => s.status === 'active' && s.latitude && s.longitude)
-            .map(s => ({
-              ...s,
-              station_type_data: s.station_type_data
-                ? { ...s.station_type_data, color }
-                : { id: '', code: '', name: site.site_name, color, icon: null, prefix: null,
-                    measurement_unit: null, measurement_label: null,
-                    threshold_warning: null, threshold_critical: null,
-                    threshold_direction: null, threshold_source: null },
-            }))
-          return { site, color, stations: coloredStations }
-        })
+      const siteIds = sites.map(s => s.id)
+
+      // Hämta stationer och regionposter parallellt
+      const [stationsResults, { data: regionRows }] = await Promise.all([
+        Promise.all(sites.map(site =>
+          EquipmentService.getEquipmentByCustomer(site.id)
+            .then(stations => ({ siteId: site.id, stations }))
+        )),
+        supabase
+          .from('customer_regions')
+          .select('id, customer_id, geojson_polygon, color, opacity')
+          .in('customer_id', siteIds)
+      ])
+
+      const regionMap = new Map<string, CustomerRegionRow>(
+        (regionRows || []).map(r => [r.customer_id, r])
       )
+
+      const results: RegionData[] = sites.map((site, index) => {
+        const regionRow = regionMap.get(site.id)
+        // Färg: från DB om polygon finns, annars fallback-palett
+        const FALLBACK_COLORS = ['#20c58f', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316']
+        const color = regionRow?.color || FALLBACK_COLORS[index % FALLBACK_COLORS.length]
+
+        const stationsData = stationsResults.find(r => r.siteId === site.id)?.stations || []
+        const stations = stationsData.filter(s => s.status === 'active' && s.latitude && s.longitude)
+
+        const polygon = regionRow?.geojson_polygon
+          ? geoJsonToLatLngs(regionRow.geojson_polygon)
+          : null
+
+        return { site, color, stations, polygon }
+      })
+
       setRegionData(results)
     } catch (err) {
-      console.error('RegionalMapView: fel vid laddning av stationer', err)
+      console.error('RegionalMapView: fel vid laddning', err)
     } finally {
       setLoading(false)
     }
   }, [sites])
 
-  useEffect(() => { loadStations() }, [loadStations])
+  useEffect(() => { loadData() }, [loadData])
 
-  // Synkronisera activeRegions när sites ändras
   useEffect(() => {
     setActiveRegions(new Set(sites.map(s => s.id)))
   }, [sites])
@@ -89,12 +122,22 @@ export default function RegionalMapView({
     })
   }
 
-  // Flat lista med stationer för aktiva regioner
   const visibleStations = regionData
     .filter(r => activeRegions.has(r.site.id))
     .flatMap(r => r.stations)
 
   const totalStations = regionData.reduce((sum, r) => sum + r.stations.length, 0)
+
+  // Polygoner för aktiva regioner med definierade gränser
+  const regionPolygons = regionData
+    .filter(r => activeRegions.has(r.site.id) && r.polygon)
+    .map(r => ({
+      id: r.site.id,
+      paths: r.polygon!,
+      color: r.color,
+      opacity: 0.2,
+      label: r.site.site_name,
+    }))
 
   if (loading) {
     return (
@@ -140,9 +183,7 @@ export default function RegionalMapView({
                 key={r.site.id}
                 onClick={() => toggleRegion(r.site.id)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                  active
-                    ? 'border-transparent text-white'
-                    : 'border-slate-700 text-slate-500 bg-transparent'
+                  active ? 'border-transparent' : 'border-slate-700 text-slate-500'
                 }`}
                 style={active ? { backgroundColor: r.color + '30', borderColor: r.color + '60', color: r.color } : {}}
               >
@@ -151,9 +192,10 @@ export default function RegionalMapView({
                   style={{ backgroundColor: active ? r.color : '#475569' }}
                 />
                 {r.site.site_name}
-                <span className={`${active ? 'opacity-70' : 'opacity-40'}`}>
-                  ({r.stations.length})
-                </span>
+                <span className="opacity-60">({r.stations.length})</span>
+                {r.polygon && (
+                  <span className="opacity-50 text-[10px]">▪</span>
+                )}
               </button>
             )
           })}
@@ -169,7 +211,7 @@ export default function RegionalMapView({
 
         {/* Karta */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-          {visibleStations.length === 0 ? (
+          {visibleStations.length === 0 && regionPolygons.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <MapPin className="w-12 h-12 text-slate-600 mb-4" />
               <p className="text-slate-400 text-sm">
@@ -184,6 +226,7 @@ export default function RegionalMapView({
           ) : (
             <EquipmentMap
               equipment={visibleStations}
+              regionPolygons={regionPolygons}
               height="600px"
               showControls
               readOnly
@@ -194,22 +237,21 @@ export default function RegionalMapView({
         </div>
 
         {/* Legend */}
-        {regionData.length > 0 && totalStations > 0 && (
+        {regionData.some(r => r.polygon) && (
           <div className="flex flex-wrap gap-4 px-1">
-            {regionData.map(r => (
+            {regionData.filter(r => r.polygon).map(r => (
               <div key={r.site.id} className="flex items-center gap-2 text-xs text-slate-400">
-                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: r.color }} />
+                <span
+                  className="w-8 h-3 rounded border"
+                  style={{ backgroundColor: r.color + '40', borderColor: r.color + '80' }}
+                />
                 <span>{r.site.site_name}</span>
-                {r.site.region && r.site.region !== r.site.site_name && (
-                  <span className="text-slate-600">({r.site.region})</span>
-                )}
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Stationsdetaljer */}
       {selectedStation && (
         <CustomerOutdoorStationDetailSheet
           station={selectedStation}

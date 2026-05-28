@@ -38,6 +38,13 @@ interface EquipmentMapProps {
   inspectedStationIds?: Set<string>
   highlightedStationId?: string | null
   newStationIds?: Set<string>
+  regionPolygons?: Array<{
+    id: string
+    paths: Array<{ lat: number; lng: number }>
+    color: string
+    opacity?: number
+    label?: string
+  }>
 }
 
 // CSS för pulsering av highlighted marker
@@ -72,9 +79,10 @@ export function EquipmentMap({
   showNumbers = false,
   inspectedStationIds,
   highlightedStationId,
-  newStationIds
+  newStationIds,
+  regionPolygons,
 }: EquipmentMapProps) {
-  const { isLoaded, error: mapError } = useGoogleMaps({ libraries: ['marker'] })
+  const { isLoaded, error: mapError } = useGoogleMaps({ libraries: ['marker', 'drawing', 'places'] })
 
   // Refs
   const mapContainerRef = useRef<HTMLDivElement>(null)
@@ -85,6 +93,7 @@ export function EquipmentMap({
   const clickListenerRef = useRef<google.maps.MapsEventListener | null>(null)
   const pulseOverlayRef = useRef<google.maps.Marker | null>(null)
   const newStationOverlaysRef = useRef<google.maps.Marker[]>([])
+  const regionPolygonsRef = useRef<google.maps.Polygon[]>([])
 
   // State
   const [selectedEquipmentData, setSelectedEquipmentData] = useState<EquipmentPlacementWithRelations | null>(null)
@@ -464,6 +473,32 @@ export function EquipmentMap({
       newStationOverlaysRef.current.push(marker)
     })
   }, [newStationIds, equipment, isLoaded])
+
+  // Regionpolygoner
+  useEffect(() => {
+    if (!mapRef.current || !isLoaded) return
+
+    // Rensa gamla polygoner
+    regionPolygonsRef.current.forEach(p => p.setMap(null))
+    regionPolygonsRef.current = []
+
+    if (!regionPolygons || regionPolygons.length === 0) return
+
+    regionPolygons.forEach(region => {
+      if (!region.paths || region.paths.length < 3) return
+      const polygon = new google.maps.Polygon({
+        paths: region.paths,
+        strokeColor: region.color,
+        strokeWeight: 2,
+        strokeOpacity: 0.8,
+        fillColor: region.color,
+        fillOpacity: region.opacity ?? 0.2,
+        map: mapRef.current!,
+        zIndex: 1,
+      })
+      regionPolygonsRef.current.push(polygon)
+    })
+  }, [regionPolygons, isLoaded])
 
   // Preview-markör och GPS-cirkel
   useEffect(() => {
