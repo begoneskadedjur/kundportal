@@ -119,7 +119,8 @@ const CustomerPortal: React.FC = () => {
 
       // Om användaren ENDAST har multisite-åtkomst och ingen traditionell kundåtkomst
       if (isMultisiteUser && !hasTraditionalCustomerAccess) {
-        navigate('/organisation', { replace: true })
+        const portalPath = organization?.is_regional ? '/regional' : '/organisation'
+        navigate(portalPath, { replace: true })
         return
       }
     }
@@ -249,22 +250,16 @@ const CustomerPortal: React.FC = () => {
     )
   }
 
-  // För multisite-användare utan customer_id - visa meddelande om att de ska använda organisationsportalen
+  // För multisite/regionalkunder utan customer_id - omdirigera direkt
   if (!customer && profile?.organization_id && userRole) {
+    const portalPath = organization?.is_regional ? '/regional' : '/organisation'
+    navigate(portalPath, { replace: true })
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex items-center justify-center">
-        <Card className="text-center p-8 max-w-md bg-slate-800/50 backdrop-blur border-slate-700">
-          <div className="text-emerald-500 mb-4">
-            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-5 0H3m2 0h4M9 7h6m-6 4h6m-6 4h6m-6 4h6" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-white mb-2">Organisationsportal</h2>
-          <p className="text-slate-400 mb-4">Du är inloggad som {userRole} för din organisation. Använd organisationsportalen för att hantera dina ärenden.</p>
-          <Button onClick={() => navigate('/organisation')} className="bg-emerald-500 hover:bg-emerald-600">
-            Gå till Organisationsportal
-          </Button>
-        </Card>
+        <div className="text-center">
+          <LoadingSpinner />
+          <p className="text-white mt-4">Omdirigerar till organisationsportal...</p>
+        </div>
       </div>
     )
   }
