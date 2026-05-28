@@ -240,8 +240,9 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         setSelectedSessionNotes(latestSession.notes || null)
 
         // Ladda stationsdata + bilder för senaste sessionen
+        // Skicka sessionsData direkt — state är ej satt ännu när loadSessionStationData körs
         const [, photos] = await Promise.all([
-          loadSessionStationData(latestSession.id, outdoorStations, floorPlanData),
+          loadSessionStationData(latestSession.id, outdoorStations, floorPlanData, sessionsData),
           getSessionPhotos(latestSession.id)
         ])
         setSelectedSessionPhotos(photos)
@@ -258,7 +259,8 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
   const loadSessionStationData = async (
     sessionId: string,
     outdoorStations?: EquipmentPlacementWithRelations[],
-    floorPlanData?: FloorPlanWithRelations[]
+    floorPlanData?: FloorPlanWithRelations[],
+    allSessionsOverride?: InspectionSessionWithRelations[]
   ) => {
     setLoadingSessionData(true)
     try {
@@ -269,8 +271,10 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
       ])
 
       // Hitta föregående session för trendberäkning
-      const sessionIndex = allSessions.findIndex(s => s.id === sessionId)
-      const previousSession = sessionIndex >= 0 ? allSessions[sessionIndex + 1] : undefined
+      // allSessionsOverride används vid initial laddning då allSessions-state ej är satt ännu
+      const sessionList = allSessionsOverride ?? allSessions
+      const sessionIndex = sessionList.findIndex(s => s.id === sessionId)
+      const previousSession = sessionIndex >= 0 ? sessionList[sessionIndex + 1] : undefined
 
       // Hämta inspektioner för denna session + föregående sessions mätvärden
       const [sessionOutdoor, sessionIndoor, previousValues] = await Promise.all([
