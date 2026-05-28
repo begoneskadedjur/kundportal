@@ -27,6 +27,7 @@ import {
 import Button from '../../ui/Button'
 import UnacknowledgedRecommendationsModal from './UnacknowledgedRecommendationsModal'
 import ConvertToMultisiteInline from './ConvertToMultisiteInline'
+import ConvertToRegionalCustomerModal from './ConvertToRegionalCustomerModal'
 
 interface Organization {
   id: string
@@ -122,6 +123,7 @@ interface CompactOrganizationTableProps {
   onConvertSuccess?: () => void
   onViewAsCustomer?: (org: Organization) => void
   onViewAsUser?: (org: Organization, user: OrganizationUser) => void
+  onConvertToRegional?: (org: Organization) => void
 }
 
 const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
@@ -147,12 +149,14 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   onCancelConvert,
   onConvertSuccess,
   onViewAsCustomer,
-  onViewAsUser
+  onViewAsUser,
+  onConvertToRegional,
 }) => {
   const [hoveredOrgId, setHoveredOrgId] = useState<string | null>(null)
   const [showActionsForOrg, setShowActionsForOrg] = useState<string | null>(null)
   const [showRecommendationsModal, setShowRecommendationsModal] = useState(false)
   const [selectedOrgForModal, setSelectedOrgForModal] = useState<Organization | null>(null)
+  const [regionalConvertOrg, setRegionalConvertOrg] = useState<Organization | null>(null)
 
   // Hjälpfunktion för bekräftelsestatus (trafikljus)
   const getAcknowledgmentStatus = (org: Organization) => {
@@ -356,7 +360,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     </div>
                   )}
 
-                  {/* Konvertera till multisite — mobil */}
+                  {/* Konvertera — mobil */}
                   {org.organizationType === 'single' && (
                     convertingOrgId === org.id ? (
                       <ConvertToMultisiteInline
@@ -365,13 +369,20 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         onCancel={onCancelConvert!}
                       />
                     ) : (
-                      <div className="mt-3">
+                      <div className="mt-3 flex flex-wrap gap-2">
                         <button
                           onClick={() => onConvertToMultisite?.(org)}
                           className="flex items-center gap-1.5 px-3 py-2 text-xs bg-slate-800 text-[#20c58f] rounded-lg hover:bg-slate-700 min-h-[44px]"
                         >
                           <Building2 className="w-3.5 h-3.5" />
                           Konvertera till multisite
+                        </button>
+                        <button
+                          onClick={() => setRegionalConvertOrg(org)}
+                          className="flex items-center gap-1.5 px-3 py-2 text-xs bg-slate-800 text-blue-400 rounded-lg hover:bg-slate-700 min-h-[44px]"
+                        >
+                          <MapPin className="w-3.5 h-3.5" />
+                          Konvertera till regionalkund
                         </button>
                       </div>
                     )
@@ -891,7 +902,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     </div>
                   </div>
 
-                  {/* Konvertera till multisite — bara för vanliga kunder */}
+                  {/* Konvertera — bara för vanliga kunder */}
                   {org.organizationType === 'single' && (
                     convertingOrgId === org.id ? (
                       <ConvertToMultisiteInline
@@ -900,7 +911,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         onCancel={onCancelConvert!}
                       />
                     ) : (
-                      <div className="mt-4">
+                      <div className="mt-4 flex flex-wrap gap-2">
                         <Button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -912,6 +923,18 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         >
                           <Building2 className="w-3.5 h-3.5" />
                           Konvertera till multisite
+                        </Button>
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setRegionalConvertOrg(org)
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2 text-blue-400 border-blue-400/30 hover:border-blue-400/60"
+                        >
+                          <MapPin className="w-3.5 h-3.5" />
+                          Konvertera till regionalkund
                         </Button>
                       </div>
                     )
@@ -936,6 +959,27 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
         }}
         organizationId={selectedOrgForModal.organization_id}
         organizationName={selectedOrgForModal.name}
+      />
+    )}
+
+    {/* Modal för konvertering till regionalkund */}
+    {regionalConvertOrg && (
+      <ConvertToRegionalCustomerModal
+        customer={{
+          id: regionalConvertOrg.id,
+          name: regionalConvertOrg.name,
+          contact_person: regionalConvertOrg.contact_person,
+          contact_email: regionalConvertOrg.contact_email ?? regionalConvertOrg.primary_contact_email,
+          contact_phone: regionalConvertOrg.contact_phone,
+          contract_type: regionalConvertOrg.contract_type,
+        }}
+        isOpen={!!regionalConvertOrg}
+        onClose={() => setRegionalConvertOrg(null)}
+        onSuccess={() => {
+          setRegionalConvertOrg(null)
+          onConvertSuccess?.()
+          onConvertToRegional?.(regionalConvertOrg)
+        }}
       />
     )}
     </>

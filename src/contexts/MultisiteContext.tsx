@@ -148,7 +148,8 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
           billing_address: orgData.billing_address,
           is_active: orgData.is_active,
           created_at: orgData.created_at,
-          updated_at: orgData.updated_at
+          updated_at: orgData.updated_at,
+          is_regional: orgData.is_regional ?? false,
         })
       }
 
@@ -278,7 +279,8 @@ export function MultisiteProvider({ children }: MultisiteProviderProps) {
           billing_address: orgData.billing_address,
           is_active: orgData.is_active,
           created_at: orgData.created_at,
-          updated_at: orgData.updated_at
+          updated_at: orgData.updated_at,
+          is_regional: orgData.is_regional ?? false,
         }
         setOrganization(organization)
       }

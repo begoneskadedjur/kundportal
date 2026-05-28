@@ -14,6 +14,7 @@ import MultisiteInspectionsView from '../../components/organisation/MultisiteIns
 import MultisiteCasesView from '../../components/organisation/MultisiteCasesView'
 import MultisiteReportsView from '../../components/organisation/MultisiteReportsView'
 import MultisiteQuotesView from '../../components/organisation/MultisiteQuotesView'
+import RegionalMapView from '../../components/organisation/RegionalMapView'
 
 const ROLE_LABELS: Record<string, string> = {
   verksamhetschef: 'Verksamhetschef',
@@ -157,15 +158,23 @@ const OrganisationPortal: React.FC = () => {
       )}
 
       {currentView === 'stations' && (
-        <MultisiteStationsView
-          selectedSiteId={selectedSiteId}
-          sites={siteOptions}
-          organizationName={organization?.organization_name}
-          userRoleType={userRole.role_type}
-          highlightedStationId={highlightedStationId}
-          highlightedStationType={highlightedStationType}
-          highlightedFloorPlanId={highlightedFloorPlanId}
-        />
+        organization?.is_regional ? (
+          <RegionalMapView
+            sites={siteOptions}
+            organizationName={organization?.organization_name}
+            highlightedStationId={highlightedStationId}
+          />
+        ) : (
+          <MultisiteStationsView
+            selectedSiteId={selectedSiteId}
+            sites={siteOptions}
+            organizationName={organization?.organization_name}
+            userRoleType={userRole.role_type}
+            highlightedStationId={highlightedStationId}
+            highlightedStationType={highlightedStationType}
+            highlightedFloorPlanId={highlightedFloorPlanId}
+          />
+        )
       )}
 
       {currentView === 'inspections' && (

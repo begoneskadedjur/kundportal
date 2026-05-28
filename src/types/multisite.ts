@@ -12,6 +12,8 @@ export interface MultisiteOrganization {
   is_active: boolean
   created_at: string
   updated_at: string
+  is_regional?: boolean
+  organization_id?: string
 }
 
 export interface OrganizationSite {
