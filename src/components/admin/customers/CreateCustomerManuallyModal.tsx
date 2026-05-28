@@ -285,6 +285,7 @@ export default function CreateCustomerManuallyModal({
                       { value: 'private', label: 'Privatperson' },
                       { value: 'business', label: 'Företag' },
                       { value: 'organization', label: 'Organisation' },
+                      { value: 'authority', label: 'Myndighet' },
                     ]}
                   />
                 </div>
