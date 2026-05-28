@@ -94,6 +94,7 @@ export function EquipmentMap({
   const pulseOverlayRef = useRef<google.maps.Marker | null>(null)
   const newStationOverlaysRef = useRef<google.maps.Marker[]>([])
   const regionPolygonsRef = useRef<google.maps.Polygon[]>([])
+  const hasAutoZoomedRef = useRef(false)
 
   // State
   const [selectedEquipmentData, setSelectedEquipmentData] = useState<EquipmentPlacementWithRelations | null>(null)
@@ -239,6 +240,36 @@ export function EquipmentMap({
       map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 })
     }
   }, [isLoaded])
+
+  // Auto-zoom: täck alla polygoner + stationer när data laddas in
+  useEffect(() => {
+    if (!mapRef.current || !isLoaded) return
+    if (hasAutoZoomedRef.current) return
+
+    const hasPolygons = regionPolygons && regionPolygons.length > 0
+    const hasEquipment = equipment.length > 0
+
+    if (!hasPolygons && !hasEquipment) return
+
+    const bounds = new google.maps.LatLngBounds()
+
+    if (hasPolygons) {
+      regionPolygons!.forEach(poly => {
+        poly.paths.forEach(point => bounds.extend(point))
+      })
+    }
+
+    if (hasEquipment) {
+      equipment.forEach(item => {
+        bounds.extend({ lat: item.latitude, lng: item.longitude })
+      })
+    }
+
+    if (!bounds.isEmpty()) {
+      mapRef.current.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 })
+      hasAutoZoomedRef.current = true
+    }
+  }, [isLoaded, regionPolygons, equipment])
 
   // Hantera kartklick
   useEffect(() => {
