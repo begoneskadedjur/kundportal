@@ -52,7 +52,6 @@ import { useDebounce } from '../../hooks/useDebounce'
 import type { EquipmentPlacementWithRelations } from '../../types/database'
 import type { FloorPlanWithRelations } from '../../services/floorPlanService'
 import {
-  calculateInspectionStatus,
   type IndoorStationWithRelations,
   type IndoorStationInspectionWithRelations,
   type InspectionStatus
@@ -413,17 +412,12 @@ export function InspectionSessionsView({ customerId, companyName, onNavigateToSt
         if (!station.latestInspection) {
           counts.noInspection++
         } else {
-          const prepThresholds = station.thresholdSource === 'preparation'
-            ? (station.latestInspection as any).preparation ?? null
-            : null
-          const lvl = calculateInspectionStatus(
-            station.latestInspection.measurementValue,
-            station.thresholdWarning,
-            station.thresholdCritical,
-            station.thresholdDirection,
-            prepThresholds
-          )
-          counts[lvl]++
+          const status = station.latestInspection.status as keyof typeof counts
+          if (status in counts) {
+            counts[status]++
+          } else {
+            counts.none++
+          }
         }
       })
       setStatusCounts(counts)
