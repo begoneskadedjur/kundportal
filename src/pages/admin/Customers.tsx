@@ -18,6 +18,7 @@ import EditCustomerModal from '../../components/admin/customers/EditCustomerModa
 import RenewalWorkflowModal from '../../components/admin/customers/RenewalWorkflowModal'
 import TerminateContractModal from '../../components/admin/customers/TerminateContractModal'
 import AddContractCustomerModal from '../../components/admin/customers/AddContractCustomerModal'
+import CreateCustomerManuallyModal from '../../components/admin/customers/CreateCustomerManuallyModal'
 import AddXpertContractCustomerModal from '../../components/admin/customers/AddXpertContractCustomerModal'
 import ImportCustomerByPdfModal from '../../components/admin/customers/ImportCustomerByPdfModal'
 import ImportCustomerByOrgnrModal from '../../components/admin/customers/ImportCustomerByOrgnrModal'
@@ -368,6 +369,7 @@ export default function Customers() {
   const [renewalOrganization, setRenewalOrganization] = useState<any>(null)
   const [terminateModalOpen, setTerminateModalOpen] = useState(false)
   const [terminateOrganization, setTerminateOrganization] = useState<any>(null)
+  const [addManualCustomerOpen, setAddManualCustomerOpen] = useState(false)
   const [addContractCustomerOpen, setAddContractCustomerOpen] = useState(false)
   const [addXpertContractCustomerOpen, setAddXpertContractCustomerOpen] = useState(false)
   const [importByPdfOpen, setImportByPdfOpen] = useState(false)
@@ -859,6 +861,17 @@ export default function Customers() {
             {importDropdownOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                 <div className="py-1">
+                  <button
+                    onClick={() => { setImportDropdownOpen(false); setAddManualCustomerOpen(true) }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-300 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-colors"
+                  >
+                    <Edit3 className="w-4 h-4 flex-shrink-0" />
+                    <div>
+                      <div className="font-medium">Lägg till kund manuellt</div>
+                      <div className="text-xs text-slate-500 mt-0.5">Fyll i alla uppgifter för hand</div>
+                    </div>
+                  </button>
+                  <div className="mx-4 my-1 border-t border-slate-700/50" />
                   <button
                     onClick={() => { setImportDropdownOpen(false); setImportByOrgnrOpen(true) }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-sm text-slate-300 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-colors"
@@ -1658,6 +1671,13 @@ export default function Customers() {
           setTerminateOrganization(null)
         }}
         onTerminated={refresh}
+      />
+
+      {/* Add Customer Manually Modal */}
+      <CreateCustomerManuallyModal
+        isOpen={addManualCustomerOpen}
+        onClose={() => setAddManualCustomerOpen(false)}
+        onCustomerCreated={refresh}
       />
 
       {/* Import Customer by Org.nr Modal */}
