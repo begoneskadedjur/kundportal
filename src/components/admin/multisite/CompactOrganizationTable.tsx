@@ -44,6 +44,7 @@ interface Organization {
   users_count?: number
   total_value?: number
   organizationType?: 'multisite' | 'single'
+  is_regional?: boolean
   contract_type?: string
   contract_end_date?: string
   contract_length?: number
@@ -484,9 +485,15 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                 {/* Typ */}
                 <div className="col-span-1 text-center">
                   {org.organizationType === 'multisite' ? (
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                      Multisite
-                    </span>
+                    org.is_regional ? (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        Regionalkund
+                      </span>
+                    ) : (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                        Multisite
+                      </span>
+                    )
                   ) : (
                     <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 border border-green-500/30">
                       Kund
@@ -701,8 +708,8 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     </div>
                   </div>
 
-                  {/* Enheter - Visa endast för multisite organisationer */}
-                  {org.organizationType === 'multisite' && (
+                  {/* Enheter — bara för vanliga multisite, inte regionalkunder */}
+                  {org.organizationType === 'multisite' && !org.is_regional && (
                     <div className="mt-4">
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
@@ -762,6 +769,44 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                       ) : (
                         <p className="text-sm text-slate-500 text-center py-4">
                           Inga enheter registrerade
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Regioner — bara för regionalkunder */}
+                  {org.organizationType === 'multisite' && org.is_regional && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                          <MapPin className="w-4 h-4 text-emerald-400" />
+                          Regioner ({organizationSites[org.id]?.length || 0})
+                        </h4>
+                      </div>
+                      {organizationSites[org.id] && organizationSites[org.id].length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {organizationSites[org.id].map(site => (
+                            <div
+                              key={site.id}
+                              className="flex items-center gap-3 p-2 bg-slate-800/50 rounded-lg"
+                            >
+                              <div className="p-1.5 bg-emerald-500/20 rounded">
+                                <MapPin className="w-3 h-3 text-emerald-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm text-white font-medium truncate">
+                                  {site.site_name}
+                                </p>
+                                {site.region && (
+                                  <p className="text-xs text-slate-400">{site.region}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-500 text-center py-4">
+                          Inga regioner registrerade
                         </p>
                       )}
                     </div>

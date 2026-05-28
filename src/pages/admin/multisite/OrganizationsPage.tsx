@@ -49,6 +49,7 @@ interface Organization {
   total_value?: number
   // Organisationstyp för unified view
   organizationType?: 'multisite' | 'single'
+  is_regional?: boolean
   // Avtalsinfo
   contract_type?: string
   contract_end_date?: string
@@ -386,6 +387,7 @@ export default function OrganizationsPage() {
           updated_at: org.updated_at,
           organization_id: org.organization_id,
           organizationType: 'multisite' as const,
+          is_regional: org.is_regional ?? false,
           sites_count: sitesCount || 0,
           users_count: usersCount || 0,
           activeUsersCount: activeUsers?.length || 0,
