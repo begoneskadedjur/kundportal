@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { MapPin, Filter, Layers } from 'lucide-react'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
+import { EquipmentList } from '../shared/equipment/EquipmentList'
 import { CustomerOutdoorStationDetailSheet } from '../customer/CustomerOutdoorStationDetailSheet'
 import { EquipmentService } from '../../services/equipmentService'
 import { supabase } from '../../lib/supabase'
@@ -248,6 +249,24 @@ export default function RegionalMapView({
                 <span>{r.site.site_name}</span>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Stationslista under kartan */}
+        {visibleStations.length > 0 && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-800">
+              <h2 className="text-base font-semibold text-white">
+                Utplacerade stationer ({visibleStations.length})
+              </h2>
+            </div>
+            <div className="p-4">
+              <EquipmentList
+                equipment={visibleStations}
+                readOnly
+                showFilters
+              />
+            </div>
           </div>
         )}
       </div>
