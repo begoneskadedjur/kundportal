@@ -98,6 +98,7 @@ import Schedule from './pages/customer/Schedule';
 
 // Organisation Portal
 import OrganisationPortal from './pages/organisation/Portal'
+import RegionalPortal from './pages/organisation/RegionalPortal'
 
 // Shared components
 import ProtectedRoute from './components/shared/ProtectedRoute'
@@ -384,6 +385,16 @@ function App() {
               element={
                 <MultisiteProtectedRoute>
                   <OrganisationPortal />
+                </MultisiteProtectedRoute>
+              }
+            />
+
+            {/* Regional Portal — kartbaserad portal för regionalkunder */}
+            <Route
+              path="/regional"
+              element={
+                <MultisiteProtectedRoute>
+                  <RegionalPortal />
                 </MultisiteProtectedRoute>
               }
             />

@@ -95,12 +95,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               try {
                 const { data: multisiteRole } = await supabase
                   .from('multisite_user_roles')
-                  .select('role_type')
+                  .select('role_type, organization_id')
                   .eq('user_id', userId)
                   .eq('is_active', true)
                   .maybeSingle();
 
-                targetPath = multisiteRole ? '/organisation' : '/customer';
+                if (multisiteRole) {
+                  // Kolla om organisationen är en regionalkund
+                  const { data: orgData } = await supabase
+                    .from('customers')
+                    .select('is_regional')
+                    .eq('organization_id', multisiteRole.organization_id)
+                    .eq('site_type', 'huvudkontor')
+                    .maybeSingle();
+
+                  targetPath = orgData?.is_regional ? '/regional' : '/organisation';
+                } else {
+                  targetPath = '/customer';
+                }
                 console.log(`AuthContext: Customer with customer_id: ${profileData.customer_id}, multisite_role: ${multisiteRole?.role_type}. Going to: ${targetPath}`);
               } catch (error) {
                 console.error('Error checking multisite role:', error);
