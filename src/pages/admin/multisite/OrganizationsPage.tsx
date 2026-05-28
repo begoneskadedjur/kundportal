@@ -1259,6 +1259,7 @@ export default function OrganizationsPage() {
           organizationId={selectedOrg.id}
           organizationName={selectedOrg.name}
           existingUser={editingUser}
+          is_regional={selectedOrg.is_regional}
         />
       )}
 

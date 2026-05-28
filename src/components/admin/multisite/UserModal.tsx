@@ -11,6 +11,7 @@ interface UserModalProps {
   onSuccess: () => void
   organizationId: string
   organizationName: string
+  is_regional?: boolean
   existingUser?: {
     id: string
     user_id: string
@@ -27,50 +28,64 @@ interface Site {
   region: string
 }
 
-const ROLES = [
-  {
-    value: 'verksamhetschef',
-    label: 'Verksamhetschef',
-    icon: Building2,
-    colorBg: 'bg-purple-500/10',
-    colorBorder: 'border-purple-500/50',
-    colorRing: 'ring-purple-500/30',
-    colorBorderDefault: 'border-purple-500/20',
-    colorIcon: 'text-purple-400',
-    colorLabel: 'text-purple-300',
-    desc: 'Full översikt över hela organisationen. Ser alla enheter, kan hantera användare och inställningar.',
-    portalDesc: 'Ser alla enheter och all data i organisationsportalen.',
-    needsSites: false
-  },
-  {
-    value: 'regionchef',
-    label: 'Regionchef',
-    icon: MapPin,
-    colorBg: 'bg-blue-500/10',
-    colorBorder: 'border-blue-500/50',
-    colorRing: 'ring-blue-500/30',
-    colorBorderDefault: 'border-blue-500/20',
-    colorIcon: 'text-blue-400',
-    colorLabel: 'text-blue-300',
-    desc: 'Ansvarar för utvalda enheter inom sin region. Kan bjuda in platsansvariga.',
-    portalDesc: 'Ser enbart sina tilldelade enheter i portalen.',
-    needsSites: true
-  },
-  {
-    value: 'platsansvarig',
-    label: 'Platsansvarig',
-    icon: User,
-    colorBg: 'bg-green-500/10',
-    colorBorder: 'border-green-500/50',
-    colorRing: 'ring-green-500/30',
-    colorBorderDefault: 'border-green-500/20',
-    colorIcon: 'text-green-400',
-    colorLabel: 'text-green-300',
-    desc: 'Ansvarar för specifika enheter. Kan begära service och se rapporter.',
-    portalDesc: 'Ser enbart sin tilldelade enhet i portalen.',
-    needsSites: true
-  }
-] as const
+function getRoles(isRegional: boolean) {
+  return [
+    {
+      value: 'verksamhetschef',
+      label: 'Verksamhetschef',
+      icon: Building2,
+      colorBg: 'bg-purple-500/10',
+      colorBorder: 'border-purple-500/50',
+      colorRing: 'ring-purple-500/30',
+      colorBorderDefault: 'border-purple-500/20',
+      colorIcon: 'text-purple-400',
+      colorLabel: 'text-purple-300',
+      desc: isRegional
+        ? 'Full översikt över hela organisationen. Ser alla regioner, kan hantera användare och inställningar.'
+        : 'Full översikt över hela organisationen. Ser alla enheter, kan hantera användare och inställningar.',
+      portalDesc: isRegional
+        ? 'Ser alla regioner och all data i organisationsportalen.'
+        : 'Ser alla enheter och all data i organisationsportalen.',
+      needsSites: false
+    },
+    {
+      value: 'regionchef',
+      label: 'Regionchef',
+      icon: MapPin,
+      colorBg: 'bg-blue-500/10',
+      colorBorder: 'border-blue-500/50',
+      colorRing: 'ring-blue-500/30',
+      colorBorderDefault: 'border-blue-500/20',
+      colorIcon: 'text-blue-400',
+      colorLabel: 'text-blue-300',
+      desc: isRegional
+        ? 'Ansvarar för utvalda regioner. Kan bjuda in regionansvariga.'
+        : 'Ansvarar för utvalda enheter inom sin region. Kan bjuda in platsansvariga.',
+      portalDesc: isRegional
+        ? 'Ser enbart sina tilldelade regioner i portalen.'
+        : 'Ser enbart sina tilldelade enheter i portalen.',
+      needsSites: true
+    },
+    {
+      value: 'platsansvarig',
+      label: isRegional ? 'Regionansvarig' : 'Platsansvarig',
+      icon: User,
+      colorBg: 'bg-green-500/10',
+      colorBorder: 'border-green-500/50',
+      colorRing: 'ring-green-500/30',
+      colorBorderDefault: 'border-green-500/20',
+      colorIcon: 'text-green-400',
+      colorLabel: 'text-green-300',
+      desc: isRegional
+        ? 'Ansvarar för specifika regioner. Kan begära service och se rapporter.'
+        : 'Ansvarar för specifika enheter. Kan begära service och se rapporter.',
+      portalDesc: isRegional
+        ? 'Ser enbart sin tilldelade region i portalen.'
+        : 'Ser enbart sin tilldelade enhet i portalen.',
+      needsSites: true
+    }
+  ]
+}
 
 export default function UserModal({
   isOpen,
@@ -78,6 +93,7 @@ export default function UserModal({
   onSuccess,
   organizationId,
   organizationName,
+  is_regional,
   existingUser
 }: UserModalProps) {
   const [loading, setLoading] = useState(false)
@@ -88,6 +104,8 @@ export default function UserModal({
   const [sites, setSites] = useState<Site[]>([])
   const [loadingSites, setLoadingSites] = useState(false)
   const [sendInviteEmail, setSendInviteEmail] = useState(true)
+
+  const ROLES = getRoles(is_regional ?? false)
 
   useEffect(() => {
     if (isOpen) {
@@ -137,7 +155,7 @@ export default function UserModal({
       })))
     } catch (error) {
       console.error('Error fetching sites:', error)
-      toast.error('Kunde inte hämta enheter')
+      toast.error(is_regional ? 'Kunde inte hämta regioner' : 'Kunde inte hämta enheter')
     } finally {
       setLoadingSites(false)
     }
@@ -159,7 +177,7 @@ export default function UserModal({
 
     const currentRole = ROLES.find(r => r.value === roleType)
     if (currentRole?.needsSites && selectedSites.length === 0) {
-      toast.error(`Vänligen välj minst en enhet för ${currentRole.label.toLowerCase()}`)
+      toast.error(`Vänligen välj minst en ${is_regional ? 'region' : 'enhet'} för ${currentRole.label.toLowerCase()}`)
       return
     }
 
@@ -244,7 +262,6 @@ export default function UserModal({
           throw new Error(result.error || 'Kunde inte skapa användare')
         }
 
-        // Kolla om det finns enskilda fel i resultatet
         const failedUsers = result.results?.filter((r: any) => !r.success) || []
         if (failedUsers.length > 0) {
           throw new Error(failedUsers[0].error || 'Kunde inte skapa användare')
@@ -363,12 +380,12 @@ export default function UserModal({
             </div>
           </div>
 
-          {/* Enheter (för platsansvarig och regionchef) */}
+          {/* Enheter/Regioner (för platsansvarig/regionansvarig och regionchef) */}
           {selectedRole?.needsSites && (
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
               <label className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5" />
-                Välj enheter *
+                {is_regional ? 'Välj regioner *' : 'Välj enheter *'}
               </label>
               {loadingSites ? (
                 <div className="flex items-center justify-center py-4">
@@ -403,12 +420,12 @@ export default function UserModal({
                 </div>
               ) : (
                 <p className="text-slate-400 text-sm py-4 text-center border border-slate-700/50 rounded-lg">
-                  Inga enheter tillgängliga
+                  {is_regional ? 'Inga regioner tillgängliga' : 'Inga enheter tillgängliga'}
                 </p>
               )}
               {selectedSites.length > 0 && (
                 <p className="text-xs text-[#20c58f] mt-1.5">
-                  {selectedSites.length} enhet(er) valda
+                  {selectedSites.length} {is_regional ? 'region(er)' : 'enhet(er)'} valda
                 </p>
               )}
             </div>
@@ -423,7 +440,7 @@ export default function UserModal({
               </h4>
               <div className="text-xs text-slate-300">
                 {roleType === 'verksamhetschef' ? (
-                  <p>Alla {sites.length} enheter i {organizationName} — full översikt med alla rapporter, ärenden och statistik.</p>
+                  <p>Alla {sites.length} {is_regional ? 'regioner' : 'enheter'} i {organizationName} — full översikt med alla rapporter, ärenden och statistik.</p>
                 ) : (
                   <div>
                     <p className="mb-1">{selectedRole?.portalDesc}</p>
