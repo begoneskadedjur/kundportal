@@ -28,6 +28,7 @@ import Button from '../../ui/Button'
 import UnacknowledgedRecommendationsModal from './UnacknowledgedRecommendationsModal'
 import ConvertToMultisiteInline from './ConvertToMultisiteInline'
 import ConvertToRegionalCustomerModal from './ConvertToRegionalCustomerModal'
+import ManageRegionsModal from './ManageRegionsModal'
 
 interface Organization {
   id: string
@@ -158,6 +159,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   const [showRecommendationsModal, setShowRecommendationsModal] = useState(false)
   const [selectedOrgForModal, setSelectedOrgForModal] = useState<Organization | null>(null)
   const [regionalConvertOrg, setRegionalConvertOrg] = useState<Organization | null>(null)
+  const [manageRegionsOrg, setManageRegionsOrg] = useState<Organization | null>(null)
 
   // Hjälpfunktion för bekräftelsestatus (trafikljus)
   const getAcknowledgmentStatus = (org: Organization) => {
@@ -387,6 +389,19 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                         </button>
                       </div>
                     )
+                  )}
+
+                  {/* Hantera regioner — bara för regionalkunder */}
+                  {org.organizationType === 'multisite' && org.is_regional && (
+                    <div className="mt-3">
+                      <button
+                        onClick={() => setManageRegionsOrg(org)}
+                        className="flex items-center gap-1.5 px-3 py-2 text-xs bg-[#20c58f]/10 text-[#20c58f] border border-[#20c58f]/30 rounded-lg hover:bg-[#20c58f]/20 min-h-[44px] transition-colors"
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        Hantera regioner
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -985,6 +1000,24 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     )
                   )}
 
+                  {/* Hantera regioner — bara för regionalkunder */}
+                  {org.organizationType === 'multisite' && org.is_regional && (
+                    <div className="mt-4">
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setManageRegionsOrg(org)
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2 text-[#20c58f] border-[#20c58f]/30 hover:border-[#20c58f]/60"
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        Hantera regioner
+                      </Button>
+                    </div>
+                  )}
+
                 </div>
               )}
             </div>
@@ -1024,6 +1057,40 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
           setRegionalConvertOrg(null)
           onConvertSuccess?.()
           onConvertToRegional?.(regionalConvertOrg)
+        }}
+      />
+    )}
+
+    {/* Modal för att hantera/rita om regioner för befintliga regionalkunder */}
+    {manageRegionsOrg && (
+      <ManageRegionsModal
+        organization={{
+          id: manageRegionsOrg.id,
+          name: manageRegionsOrg.name,
+          customers: [
+            // huvudkontor-raden
+            {
+              id: manageRegionsOrg.id,
+              name: manageRegionsOrg.name,
+              site_type: 'huvudkontor',
+              organization_id: manageRegionsOrg.organization_id,
+            },
+            // enhet-rader från organizationSites
+            ...(organizationSites[manageRegionsOrg.id] || []).map(site => ({
+              id: site.id,
+              name: site.site_name,
+              site_name: site.site_name,
+              region: site.region,
+              site_type: 'enhet',
+              organization_id: manageRegionsOrg.organization_id,
+            })),
+          ],
+        }}
+        isOpen={!!manageRegionsOrg}
+        onClose={() => setManageRegionsOrg(null)}
+        onSuccess={() => {
+          setManageRegionsOrg(null)
+          onConvertSuccess?.()
         }}
       />
     )}
