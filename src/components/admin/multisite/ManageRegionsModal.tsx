@@ -78,8 +78,6 @@ export default function ManageRegionsModal({
   const loadExistingData = async () => {
     setInitializing(true)
     try {
-      const orgId = organization.customers[0]?.organization_id ?? null
-
       // Load enhet-rows
       const enhetRows = organization.customers.filter(c => c.site_type === 'enhet')
 
@@ -124,12 +122,13 @@ export default function ManageRegionsModal({
       const nextIdx = REGION_COLORS.findIndex(c => !usedColors.has(c))
       setNewColorIndex(nextIdx >= 0 ? nextIdx : 0)
 
-      // Load all stations for this organization
-      if (orgId) {
+      // Load all stations for this organization via customer_id IN (alla enheter + huvudkontor)
+      const allCustomerIds = organization.customers.map(c => c.id)
+      if (allCustomerIds.length > 0) {
         const { data: stationData } = await supabase
           .from('equipment_placements')
           .select('id, latitude, longitude, customer_id')
-          .eq('organization_id', orgId)
+          .in('customer_id', allCustomerIds)
           .not('latitude', 'is', null)
           .not('longitude', 'is', null)
 
