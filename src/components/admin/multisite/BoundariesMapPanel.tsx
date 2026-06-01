@@ -12,6 +12,31 @@ interface NominatimResult {
   class: string
 }
 
+type LatLng = { lat: number; lng: number }
+
+function perpendicularDistance(p: LatLng, a: LatLng, b: LatLng): number {
+  const dx = b.lng - a.lng, dy = b.lat - a.lat
+  if (dx === 0 && dy === 0) return Math.hypot(p.lng - a.lng, p.lat - a.lat)
+  const t = ((p.lng - a.lng) * dx + (p.lat - a.lat) * dy) / (dx * dx + dy * dy)
+  return Math.hypot(p.lng - (a.lng + t * dx), p.lat - (a.lat + t * dy))
+}
+
+function simplifyPolygon(points: LatLng[], tolerance: number): LatLng[] {
+  if (points.length <= 4) return points
+  let maxDist = 0, maxIdx = 0
+  const start = points[0], end = points[points.length - 1]
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = perpendicularDistance(points[i], start, end)
+    if (d > maxDist) { maxDist = d; maxIdx = i }
+  }
+  if (maxDist > tolerance) {
+    const left = simplifyPolygon(points.slice(0, maxIdx + 1), tolerance)
+    const right = simplifyPolygon(points.slice(maxIdx), tolerance)
+    return [...left.slice(0, -1), ...right]
+  }
+  return [start, end]
+}
+
 export interface PanelRegion {
   tempId: string
   site_name: string
@@ -176,7 +201,7 @@ export default function BoundariesMapPanel({
     } else {
       return
     }
-    const firstRing = paths[0]
+    const firstRing = simplifyPolygon(paths[0], 0.0003)
     commitPolygon(firstRing, regionId, color)
 
     const bounds = new google.maps.LatLngBounds()
