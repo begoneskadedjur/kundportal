@@ -122,6 +122,7 @@ export default function BoundariesMapPanel({
       mapTypeControl: false,
       streetViewControl: false,
       fullscreenControl: false,
+      disableDoubleClickZoom: true,
     })
   }, [isLoaded])
 
@@ -149,6 +150,7 @@ export default function BoundariesMapPanel({
           strokeColor: assignedRegion ? '#fff' : '#94a3b8',
         },
         zIndex: 1,
+        clickable: false,
       })
       stationMarkersRef.current.push(marker)
     })
