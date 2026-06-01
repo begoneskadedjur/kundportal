@@ -283,8 +283,8 @@ export default function BoundariesMapPanel({
         strokeColor: color,
         strokeWeight: 2,
         strokeOpacity: 0.7,
-        strokeDasharray: '4 4',
-      } as any)
+        clickable: false,
+      })
     }
   }, [])
 
@@ -347,6 +347,7 @@ export default function BoundariesMapPanel({
           strokeColor: '#fff',
         },
         zIndex: isFirst ? 15 : 10,
+        clickable: isFirst,
       })
       drawingPointsRef.current.push(marker)
       updatePreviewPolyline(col)
