@@ -1,7 +1,16 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { MapPin, Check, AlertCircle, Pencil, X, Search } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { MapPin, Check, AlertCircle, Pencil, X, Search, Loader2 } from 'lucide-react'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { useGoogleMaps } from '../../../hooks/useGoogleMaps'
+
+interface NominatimResult {
+  place_id: number
+  display_name: string
+  osm_type: string
+  osm_id: number
+  type: string
+  class: string
+}
 
 export interface PanelRegion {
   tempId: string
@@ -35,37 +44,40 @@ export default function BoundariesMapPanel({
   const drawingListenersRef = useRef<google.maps.MapsEventListener[]>([])
   const previewPolylineRef = useRef<google.maps.Polyline | null>(null)
   const activeRegionIdRef = useRef<string | null>(null)
-  const kommunFeaturesRef = useRef<any[] | null>(null)
 
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null)
   const [drawingActive, setDrawingActive] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
-  const [kommunLoading, setKommunLoading] = useState(false)
+  const [searchResults, setSearchResults] = useState<NominatimResult[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
   const [noRegionWarning, setNoRegionWarning] = useState(false)
 
   const activeRegion = regions.find(r => r.tempId === activeRegionId) || null
 
   useEffect(() => { activeRegionIdRef.current = activeRegionId }, [activeRegionId])
 
-  // Ladda kommundata eager när kartan är redo
+  // Nominatim-sökning med 350ms debounce
   useEffect(() => {
-    if (!isLoaded || kommunFeaturesRef.current) return
-    setKommunLoading(true)
-    fetch('https://raw.githubusercontent.com/okfse/sweden-geojson/master/swedish_municipalities.geojson')
-      .then(r => r.json())
-      .then(d => { kommunFeaturesRef.current = d.features || [] })
-      .catch(() => { kommunFeaturesRef.current = [] })
-      .finally(() => setKommunLoading(false))
-  }, [isLoaded])
+    const q = searchQuery.trim()
+    if (!q) { setSearchResults([]); return }
 
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim() || !kommunFeaturesRef.current) return []
-    const q = searchQuery.toLowerCase()
-    return kommunFeaturesRef.current
-      .filter((f: any) => f.properties?.kom_namn?.toLowerCase().includes(q))
-      .slice(0, 8)
-  }, [searchQuery, kommunLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+    const timer = setTimeout(async () => {
+      setSearchLoading(true)
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&countrycodes=se&format=json&limit=8&accept-language=sv`
+        const res = await fetch(url, { headers: { 'Accept-Language': 'sv' } })
+        const data: NominatimResult[] = await res.json()
+        setSearchResults(data)
+      } catch {
+        setSearchResults([])
+      } finally {
+        setSearchLoading(false)
+      }
+    }, 350)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   // Initialisera karta
   useEffect(() => {
@@ -172,7 +184,7 @@ export default function BoundariesMapPanel({
     mapRef.current.fitBounds(bounds)
   }, [commitPolygon])
 
-  const selectKommun = useCallback((feature: any) => {
+  const selectNominatimResult = useCallback(async (result: NominatimResult) => {
     let currentId = activeRegionIdRef.current
     // Auto-välj om bara en region finns
     if (!currentId && regions.length === 1) {
@@ -181,15 +193,34 @@ export default function BoundariesMapPanel({
       activeRegionIdRef.current = currentId
     }
     const region = regions.find(r => r.tempId === currentId)
-    if (region && currentId) {
-      applyKommunPolygon(feature.geometry, currentId, region.color)
-      setSearchQuery(feature.properties.kom_namn)
-      setNoRegionWarning(false)
-    } else {
+    setShowDropdown(false)
+
+    if (!region || !currentId) {
       setNoRegionWarning(true)
       setTimeout(() => setNoRegionWarning(false), 3000)
+      return
     }
-    setShowDropdown(false)
+
+    // Visa kortnamn i sökfältet
+    const shortName = result.display_name.split(',')[0].trim()
+    setSearchQuery(shortName)
+    setNoRegionWarning(false)
+    setSearchLoading(true)
+
+    try {
+      // Hämta polygon från Nominatim med polygon_geojson=1
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(result.display_name)}&countrycodes=se&format=geojson&polygon_geojson=1&limit=1`
+      const res = await fetch(url, { headers: { 'Accept-Language': 'sv' } })
+      const data = await res.json()
+      const geometry = data?.features?.[0]?.geometry
+      if (geometry) {
+        applyKommunPolygon(geometry, currentId, region.color)
+      }
+    } catch {
+      // tyst fel — användaren kan rita manuellt
+    } finally {
+      setSearchLoading(false)
+    }
   }, [regions, applyKommunPolygon])
 
   const cleanupTempDrawing = useCallback(() => {
@@ -304,27 +335,30 @@ export default function BoundariesMapPanel({
 
   return (
     <div className="space-y-3">
-      {/* Kommunsökning */}
+      {/* Områdessökning via Nominatim */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        {searchLoading
+          ? <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin pointer-events-none" />
+          : <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        }
         <input
           value={searchQuery}
           onChange={e => { setSearchQuery(e.target.value); setShowDropdown(true) }}
           onFocus={() => setShowDropdown(true)}
           onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-          placeholder={kommunLoading ? 'Laddar kommuner...' : 'Sök officiellt kommunnamn (t.ex. Huddinge, Stockholm)...'}
-          disabled={kommunLoading}
-          className="w-full pl-9 pr-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] disabled:opacity-50"
+          placeholder="Sök område, stadsdel eller kommun (t.ex. Farsta, Huddinge)..."
+          className="w-full pl-9 pr-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
         />
         {showDropdown && searchResults.length > 0 && (
           <div className="absolute top-full mt-1 w-full z-50 bg-slate-800 border border-slate-700 rounded-lg shadow-xl overflow-hidden">
-            {searchResults.map((f: any) => (
+            {searchResults.map((r) => (
               <button
-                key={f.properties.kom_namn}
-                onMouseDown={() => selectKommun(f)}
-                className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-700 transition-colors"
+                key={r.place_id}
+                onMouseDown={() => selectNominatimResult(r)}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-slate-700 transition-colors"
               >
-                {f.properties.kom_namn}
+                <span className="text-white">{r.display_name.split(',')[0].trim()}</span>
+                <span className="text-slate-500 text-xs ml-1.5 truncate">{r.display_name.split(',').slice(1, 3).join(',').trim()}</span>
               </button>
             ))}
           </div>
@@ -412,7 +446,7 @@ export default function BoundariesMapPanel({
       </div>
 
       <p className="text-xs text-slate-600">
-        Sök ett officiellt kommunnamn för att hämta gränsen automatiskt. Obs: stadsdelar (t.ex. Farsta, Södermalm) är inte sökbara — använd kommunnamnet (t.ex. Stockholm) eller rita manuellt för en anpassad gräns.
+        Sök ett område, stadsdel eller kommun för att hämta gränsen automatiskt. Polygonen kan sedan justeras manuellt — dra i punkterna för att anpassa.
       </p>
     </div>
   )
