@@ -68,6 +68,7 @@ export default function BoundariesMapPanel({
   const drawingPointsRef = useRef<google.maps.Marker[]>([])
   const drawingListenersRef = useRef<google.maps.MapsEventListener[]>([])
   const previewPolylineRef = useRef<google.maps.Polyline | null>(null)
+  const rubberBandPosRef = useRef<google.maps.LatLng | null>(null)
   const activeRegionIdRef = useRef<string | null>(null)
 
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null)
@@ -259,6 +260,7 @@ export default function BoundariesMapPanel({
     drawingPointsRef.current = []
     previewPolylineRef.current?.setMap(null)
     previewPolylineRef.current = null
+    rubberBandPosRef.current = null
     drawingListenersRef.current.forEach(l => google.maps.event.removeListener(l))
     drawingListenersRef.current = []
   }, [])
@@ -360,7 +362,19 @@ export default function BoundariesMapPanel({
       finishDrawing()
     })
 
-    drawingListenersRef.current = [clickListener, dblClickListener]
+    const mouseMoveListener = mapRef.current.addListener('mousemove', (e: any) => {
+      if (!e.latLng || drawingPointsRef.current.length === 0) return
+      rubberBandPosRef.current = e.latLng
+      const path = [
+        ...drawingPointsRef.current.map(m => m.getPosition()!),
+        e.latLng,
+      ]
+      if (previewPolylineRef.current) {
+        previewPolylineRef.current.setPath(path)
+      }
+    })
+
+    drawingListenersRef.current = [clickListener, dblClickListener, mouseMoveListener]
   }, [activeRegionId, regions, onPolygonSaved, cleanupTempDrawing, updatePreviewPolyline, commitPolygon])
 
   const cancelDrawing = useCallback(() => {
