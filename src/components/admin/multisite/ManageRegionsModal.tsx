@@ -374,8 +374,8 @@ export default function ManageRegionsModal({
       // 4. Delete removed regions (after station reassignment so FK refs are gone)
       if (toDelete.length > 0) {
         const deleteIds = toDelete.map(r => r.dbId!)
-        // case_billing_items.customer_id har NO ACTION FK — nollställ innan DELETE
-        await supabase.from('case_billing_items').update({ customer_id: null }).in('customer_id', deleteIds)
+        // case_billing_items.customer_id har NO ACTION FK — flytta till huvudkontoret innan DELETE
+        await supabase.from('case_billing_items').update({ customer_id: hoofdkontorId }).in('customer_id', deleteIds)
         await supabase.from('customer_regions').delete().in('customer_id', deleteIds)
         await supabase.from('customers').delete().in('id', deleteIds)
       }
