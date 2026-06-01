@@ -18,7 +18,7 @@ import CaseDetailsModal from '../customer/CaseDetailsModal'
 
 // Organisation components (för alla enheter)
 import OrganizationServiceRequest from './OrganizationServiceRequest'
-import { ChevronRight, Phone, Mail, User, FileText } from 'lucide-react'
+import { ChevronRight } from 'lucide-react'
 
 interface SiteOption {
   id: string
@@ -201,7 +201,12 @@ function AllSitesDashboard({ sites, userRoleType, isRegional }: { sites: SiteOpt
       supabase.from('cases').select('id, status, scheduled_start, scheduled_end, service_type, customer_id').in('customer_id', siteIds),
       supabase.from('station_inspection_sessions').select('id, status, case:cases!inner(customer_id)').eq('status', 'completed').in('cases.customer_id', siteIds),
       isRegional && organization?.id
-        ? supabase.from('customers').select('company_name, contact_name, contact_email, contact_phone, contract_type, contract_status, annual_premium, address').eq('id', organization.id).single()
+        ? supabase.from('customers').select(
+            'company_name, organization_number, contact_person, contact_email, contact_phone, contact_address, ' +
+            'contract_type, contract_status, contract_start_date, contract_end_date, contract_length, ' +
+            'annual_value, total_contract_value, monthly_value, agreement_text, product_summary, service_details, ' +
+            'assigned_account_manager, account_manager_email, sales_person'
+          ).eq('id', organization.id).single()
         : Promise.resolve({ data: null }),
     ])
 
@@ -381,64 +386,10 @@ function AllSitesDashboard({ sites, userRoleType, isRegional }: { sites: SiteOpt
 
           {/* Avtal & kontakt — bara för regionalkunder */}
           {isRegional && hoofdCustomer && (
-            <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-700/60">
-                <h3 className="text-sm font-semibold text-white">Avtal & kontakt</h3>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/40">
-                <div className="px-5 py-4 space-y-3">
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Kontaktperson</p>
-                  {hoofdCustomer.contact_name && (
-                    <div className="flex items-center gap-2 text-sm text-white">
-                      <User className="w-4 h-4 text-slate-500 shrink-0" />
-                      {hoofdCustomer.contact_name}
-                    </div>
-                  )}
-                  {hoofdCustomer.contact_email && (
-                    <div className="flex items-center gap-2 text-sm text-slate-300">
-                      <Mail className="w-4 h-4 text-slate-500 shrink-0" />
-                      <a href={`mailto:${hoofdCustomer.contact_email}`} className="hover:text-[#20c58f] transition-colors truncate">
-                        {hoofdCustomer.contact_email}
-                      </a>
-                    </div>
-                  )}
-                  {hoofdCustomer.contact_phone && (
-                    <div className="flex items-center gap-2 text-sm text-slate-300">
-                      <Phone className="w-4 h-4 text-slate-500 shrink-0" />
-                      <a href={`tel:${hoofdCustomer.contact_phone}`} className="hover:text-[#20c58f] transition-colors">
-                        {hoofdCustomer.contact_phone}
-                      </a>
-                    </div>
-                  )}
-                </div>
-                <div className="px-5 py-4 space-y-3">
-                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Avtalsinformation</p>
-                  {hoofdCustomer.contract_type && (
-                    <div className="flex items-center gap-2 text-sm text-white">
-                      <FileText className="w-4 h-4 text-slate-500 shrink-0" />
-                      {hoofdCustomer.contract_type}
-                    </div>
-                  )}
-                  {hoofdCustomer.contract_status && (
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        hoofdCustomer.contract_status === 'active'
-                          ? 'bg-[#20c58f]/15 text-[#20c58f]'
-                          : 'bg-slate-700 text-slate-400'
-                      }`}>
-                        {hoofdCustomer.contract_status === 'active' ? 'Aktivt avtal' : hoofdCustomer.contract_status}
-                      </span>
-                    </div>
-                  )}
-                  {hoofdCustomer.annual_premium != null && (
-                    <div className="text-sm text-slate-300">
-                      <span className="text-slate-500">Årspremie: </span>
-                      {Number(hoofdCustomer.annual_premium).toLocaleString('sv-SE')} kr
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <>
+              <ContractValueCard customer={hoofdCustomer} />
+              <RelationshipShowcase customer={hoofdCustomer} />
+            </>
           )}
 
           <PartnershipValueSection />

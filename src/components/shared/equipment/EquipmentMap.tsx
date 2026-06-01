@@ -416,7 +416,26 @@ export function EquipmentMap({
 
     // Sätt upp clusterer om enableClustering, annars sätt map direkt
     if (enableClustering && newMarkers.length > 0) {
-      clustererRef.current = new MarkerClusterer({ map, markers: newMarkers })
+      clustererRef.current = new MarkerClusterer({
+        map,
+        markers: newMarkers,
+        renderer: {
+          render: ({ count, position }) =>
+            new google.maps.Marker({
+              position,
+              label: { text: String(count), color: '#fff', fontSize: '12px', fontWeight: 'bold' },
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: count > 100 ? 28 : count > 50 ? 24 : count > 10 ? 20 : 16,
+                fillColor: '#475569',
+                fillOpacity: 0.92,
+                strokeColor: '#fff',
+                strokeWeight: 2,
+              },
+              zIndex: 1000 + count,
+            }),
+        },
+      })
     }
 
     // Auto-bounds vid equipment-ändring
