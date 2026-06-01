@@ -70,6 +70,8 @@ export default function BoundariesMapPanel({
   const previewPolylineRef = useRef<google.maps.Polyline | null>(null)
   const rubberBandPosRef = useRef<google.maps.LatLng | null>(null)
   const activeRegionIdRef = useRef<string | null>(null)
+  const regionsRef = useRef(regions)
+  const drawingColorRef = useRef('#3b82f6')
 
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null)
   const [drawingActive, setDrawingActive] = useState(false)
@@ -82,6 +84,7 @@ export default function BoundariesMapPanel({
   const activeRegion = regions.find(r => r.tempId === activeRegionId) || null
 
   useEffect(() => { activeRegionIdRef.current = activeRegionId }, [activeRegionId])
+  useEffect(() => { regionsRef.current = regions }, [regions])
 
   // Avbryt pågående ritning automatiskt när aktiv region byts
   useEffect(() => {
@@ -123,6 +126,7 @@ export default function BoundariesMapPanel({
       streetViewControl: false,
       fullscreenControl: false,
       disableDoubleClickZoom: true,
+      gestureHandling: 'none',
     })
   }, [isLoaded])
 
@@ -286,8 +290,9 @@ export default function BoundariesMapPanel({
 
   const startDrawing = useCallback(() => {
     if (!mapRef.current || !activeRegionId) return
-    const region = regions.find(r => r.tempId === activeRegionId)
+    const region = regionsRef.current.find(r => r.tempId === activeRegionId)
     const color = region?.color || '#3b82f6'
+    drawingColorRef.current = color
 
     const old = drawnPolygonsRef.current.get(activeRegionId)
     if (old) {
@@ -306,7 +311,7 @@ export default function BoundariesMapPanel({
         fillColor: '#ffffff',
         fillOpacity: 0.95,
         strokeWeight: 3,
-        strokeColor: color,
+        strokeColor: drawingColorRef.current,
       })
       marker.setZIndex(20)
       marker.setOptions({ cursor: 'pointer' })
@@ -322,21 +327,21 @@ export default function BoundariesMapPanel({
       mapRef.current?.setOptions({ draggableCursor: '', clickableIcons: true })
       const id = activeRegionIdRef.current
       if (id && path.length >= 3) {
-        const col = regions.find(r => r.tempId === id)?.color || '#3b82f6'
-        commitPolygon(path, id, col)
+        commitPolygon(path, id, drawingColorRef.current)
       }
     }
 
     const clickListener = mapRef.current.addListener('click', (e: any) => {
       if (!e.latLng) return
       const isFirst = drawingPointsRef.current.length === 0
+      const col = drawingColorRef.current
       const marker = new google.maps.Marker({
         position: e.latLng,
         map: mapRef.current!,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
           scale: isFirst ? 7 : 5,
-          fillColor: color,
+          fillColor: col,
           fillOpacity: 1,
           strokeWeight: isFirst ? 2.5 : 1.5,
           strokeColor: '#fff',
@@ -344,7 +349,7 @@ export default function BoundariesMapPanel({
         zIndex: isFirst ? 15 : 10,
       })
       drawingPointsRef.current.push(marker)
-      updatePreviewPolyline(color)
+      updatePreviewPolyline(col)
 
       // Gör startpunkten klickbar för att stänga när vi har ≥3 punkter
       if (drawingPointsRef.current.length === 3) {
@@ -378,7 +383,7 @@ export default function BoundariesMapPanel({
     })
 
     drawingListenersRef.current = [clickListener, dblClickListener, mouseMoveListener]
-  }, [activeRegionId, regions, onPolygonSaved, cleanupTempDrawing, updatePreviewPolyline, commitPolygon])
+  }, [activeRegionId, onPolygonSaved, cleanupTempDrawing, updatePreviewPolyline, commitPolygon])
 
   const cancelDrawing = useCallback(() => {
     cleanupTempDrawing()
