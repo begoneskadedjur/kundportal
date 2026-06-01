@@ -380,6 +380,25 @@ export default function ManageRegionsModal({
         await supabase.from('customers').delete().in('id', deleteIds)
       }
 
+      // 5. Synka multisite_user_roles.site_ids — byt ut IDs för raderade/återskapade regioner
+      const { data: roleRows } = await supabase
+        .from('multisite_user_roles')
+        .select('id, site_ids')
+        .eq('organization_id', orgId)
+
+      for (const row of roleRows ?? []) {
+        const keptIds = ((row.site_ids ?? []) as string[]).filter(id =>
+          toKeep.some(r => r.dbId === id)
+        )
+        const newIds = Object.values(newDbIds)
+        const updated = [...new Set([...keptIds, ...newIds])]
+        const sortedOld = [...(row.site_ids ?? [])].sort().join()
+        const sortedNew = [...updated].sort().join()
+        if (sortedOld !== sortedNew) {
+          await supabase.from('multisite_user_roles').update({ site_ids: updated }).eq('id', row.id)
+        }
+      }
+
       toast.success(`Regioner sparade! ${updates.length} stationer tilldelade.`)
       onSuccess()
       handleClose()
