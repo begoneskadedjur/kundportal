@@ -294,27 +294,20 @@ export default function BoundariesMapPanel({
     setDrawingActive(true)
     mapRef.current.setOptions({ draggableCursor: 'crosshair' })
 
-    const clickListener = mapRef.current.addListener('click', (e: any) => {
-      if (!e.latLng) return
-      const marker = new google.maps.Marker({
-        position: e.latLng,
-        map: mapRef.current!,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 5,
-          fillColor: color,
-          fillOpacity: 1,
-          strokeWeight: 1.5,
-          strokeColor: '#fff',
-        },
-        zIndex: 10,
+    const setFirstMarkerCloseable = (marker: google.maps.Marker) => {
+      marker.setIcon({
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 9,
+        fillColor: '#ffffff',
+        fillOpacity: 0.95,
+        strokeWeight: 3,
+        strokeColor: color,
       })
-      drawingPointsRef.current.push(marker)
-      updatePreviewPolyline(color)
-    })
+      marker.setZIndex(20)
+      marker.setOptions({ cursor: 'pointer' })
+    }
 
-    const dblClickListener = mapRef.current.addListener('dblclick', (e: any) => {
-      if (e.stop) e.stop()
+    const finishDrawing = () => {
       const path = drawingPointsRef.current.map(m => ({
         lat: m.getPosition()!.lat(),
         lng: m.getPosition()!.lng(),
@@ -327,6 +320,44 @@ export default function BoundariesMapPanel({
         const col = regions.find(r => r.tempId === id)?.color || '#3b82f6'
         commitPolygon(path, id, col)
       }
+    }
+
+    const clickListener = mapRef.current.addListener('click', (e: any) => {
+      if (!e.latLng) return
+      const isFirst = drawingPointsRef.current.length === 0
+      const marker = new google.maps.Marker({
+        position: e.latLng,
+        map: mapRef.current!,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: isFirst ? 7 : 5,
+          fillColor: color,
+          fillOpacity: 1,
+          strokeWeight: isFirst ? 2.5 : 1.5,
+          strokeColor: '#fff',
+        },
+        zIndex: isFirst ? 15 : 10,
+      })
+      drawingPointsRef.current.push(marker)
+      updatePreviewPolyline(color)
+
+      // Gör startpunkten klickbar för att stänga när vi har ≥3 punkter
+      if (drawingPointsRef.current.length === 3) {
+        setFirstMarkerCloseable(drawingPointsRef.current[0])
+      }
+
+      // Startpunkts-listener sätts en gång
+      if (isFirst) {
+        marker.addListener('click', () => {
+          if (drawingPointsRef.current.length < 3) return
+          finishDrawing()
+        })
+      }
+    })
+
+    const dblClickListener = mapRef.current.addListener('dblclick', (e: any) => {
+      if (e.stop) e.stop()
+      finishDrawing()
     })
 
     drawingListenersRef.current = [clickListener, dblClickListener]
@@ -456,7 +487,7 @@ export default function BoundariesMapPanel({
                 </>
               ) : (
                 <>
-                  <span className="text-xs text-[#20c58f]">Klicka för att lägga till punkter — dubbelklicka för att avsluta</span>
+                  <span className="text-xs text-[#20c58f]">Klicka för att lägga till punkter — klicka på startpunkten eller dubbelklicka för att avsluta</span>
                   <button
                     onClick={cancelDrawing}
                     className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-900/60 text-red-200 border border-red-600 hover:bg-red-900 transition-colors ml-auto"
