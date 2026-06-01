@@ -126,7 +126,8 @@ export default function BoundariesMapPanel({
       streetViewControl: false,
       fullscreenControl: false,
       disableDoubleClickZoom: true,
-      gestureHandling: 'none',
+      gestureHandling: 'cooperative',
+      clickableIcons: false,
     })
   }, [isLoaded])
 
@@ -269,7 +270,6 @@ export default function BoundariesMapPanel({
     rubberBandPosRef.current = null
     drawingListenersRef.current.forEach(l => google.maps.event.removeListener(l))
     drawingListenersRef.current = []
-    mapRef.current?.setOptions({ clickableIcons: true })
   }, [])
 
   const updatePreviewPolyline = useCallback((color: string) => {
@@ -302,7 +302,7 @@ export default function BoundariesMapPanel({
     }
     cleanupTempDrawing()
     setDrawingActive(true)
-    mapRef.current.setOptions({ draggableCursor: 'crosshair', clickableIcons: false })
+    mapRef.current.setOptions({ draggableCursor: 'crosshair' })
 
     const setFirstMarkerCloseable = (marker: google.maps.Marker) => {
       marker.setIcon({
@@ -324,7 +324,7 @@ export default function BoundariesMapPanel({
       }))
       cleanupTempDrawing()
       setDrawingActive(false)
-      mapRef.current?.setOptions({ draggableCursor: '', clickableIcons: true })
+      mapRef.current?.setOptions({ draggableCursor: '' })
       const id = activeRegionIdRef.current
       if (id && path.length >= 3) {
         commitPolygon(path, id, drawingColorRef.current)
@@ -388,7 +388,7 @@ export default function BoundariesMapPanel({
   const cancelDrawing = useCallback(() => {
     cleanupTempDrawing()
     setDrawingActive(false)
-    mapRef.current?.setOptions({ draggableCursor: '', clickableIcons: true })
+    mapRef.current?.setOptions({ draggableCursor: '' })
   }, [cleanupTempDrawing])
 
   const clearPolygon = useCallback((tempId: string) => {
