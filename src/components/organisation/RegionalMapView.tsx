@@ -149,6 +149,7 @@ export default function RegionalMapView({
       color: r.color,
       opacity: 0.2,
       label: r.site.site_name,
+      stationCount: r.stations.length,
     }))
 
   // Unika typer för typfiltret
@@ -261,6 +262,7 @@ export default function RegionalMapView({
               readOnly
               highlightedStationId={highlightedStationId}
               onEquipmentClick={setSelectedStation}
+              onRegionClick={(siteId) => toggleRegion(siteId)}
             />
           )}
         </div>

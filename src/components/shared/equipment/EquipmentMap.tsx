@@ -44,7 +44,9 @@ interface EquipmentMapProps {
     color: string
     opacity?: number
     label?: string
+    stationCount?: number
   }>
+  onRegionClick?: (id: string, bounds: google.maps.LatLngBounds) => void
 }
 
 // CSS för pulsering av highlighted marker
@@ -81,6 +83,7 @@ export function EquipmentMap({
   highlightedStationId,
   newStationIds,
   regionPolygons,
+  onRegionClick,
 }: EquipmentMapProps) {
   const { isLoaded, error: mapError } = useGoogleMaps({ libraries: ['marker', 'drawing', 'places'] })
 
@@ -94,6 +97,7 @@ export function EquipmentMap({
   const pulseOverlayRef = useRef<google.maps.Marker | null>(null)
   const newStationOverlaysRef = useRef<google.maps.Marker[]>([])
   const regionPolygonsRef = useRef<google.maps.Polygon[]>([])
+  const regionLabelsRef = useRef<google.maps.Marker[]>([])
   const hasAutoZoomedRef = useRef(false)
 
   // State
@@ -509,14 +513,20 @@ export function EquipmentMap({
   useEffect(() => {
     if (!mapRef.current || !isLoaded) return
 
-    // Rensa gamla polygoner
+    // Rensa gamla polygoner och labels
     regionPolygonsRef.current.forEach(p => p.setMap(null))
     regionPolygonsRef.current = []
+    regionLabelsRef.current.forEach(m => m.setMap(null))
+    regionLabelsRef.current = []
 
     if (!regionPolygons || regionPolygons.length === 0) return
 
     regionPolygons.forEach(region => {
       if (!region.paths || region.paths.length < 3) return
+
+      const bounds = new google.maps.LatLngBounds()
+      region.paths.forEach(p => bounds.extend(p))
+
       const polygon = new google.maps.Polygon({
         paths: region.paths,
         strokeColor: region.color,
@@ -526,10 +536,48 @@ export function EquipmentMap({
         fillOpacity: region.opacity ?? 0.2,
         map: mapRef.current!,
         zIndex: 1,
+        ...(onRegionClick ? { cursor: 'pointer' } : {}),
       })
+
+      if (onRegionClick) {
+        polygon.addListener('click', () => {
+          mapRef.current?.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 })
+          onRegionClick(region.id, bounds)
+        })
+      }
+
       regionPolygonsRef.current.push(polygon)
+
+      // Centroid-label med regionnamn + stationsantal
+      if (region.label) {
+        const center = bounds.getCenter()
+        const countText = region.stationCount != null ? ` (${region.stationCount})` : ''
+        const label = new google.maps.Marker({
+          position: center,
+          map: mapRef.current!,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 0,
+          },
+          label: {
+            text: `${region.label}${countText}`,
+            color: '#ffffff',
+            fontSize: '11px',
+            fontWeight: '600',
+          },
+          zIndex: 2,
+          clickable: !!onRegionClick,
+        })
+        if (onRegionClick) {
+          label.addListener('click', () => {
+            mapRef.current?.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 })
+            onRegionClick(region.id, bounds)
+          })
+        }
+        regionLabelsRef.current.push(label)
+      }
     })
-  }, [regionPolygons, isLoaded])
+  }, [regionPolygons, isLoaded, onRegionClick])
 
   // Preview-markör och GPS-cirkel
   useEffect(() => {
