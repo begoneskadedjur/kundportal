@@ -18,7 +18,7 @@ import CaseDetailsModal from '../customer/CaseDetailsModal'
 
 // Organisation components (för alla enheter)
 import OrganizationServiceRequest from './OrganizationServiceRequest'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Phone, Mail, User, FileText } from 'lucide-react'
 
 interface SiteOption {
   id: string
@@ -30,17 +30,19 @@ interface MultisiteDashboardViewProps {
   selectedSiteId: string | 'all'
   sites: SiteOption[]
   userRoleType: 'verksamhetschef' | 'regionchef' | 'platsansvarig'
+  isRegional?: boolean
 }
 
 export default function MultisiteDashboardView({
   selectedSiteId,
   sites,
-  userRoleType
+  userRoleType,
+  isRegional = false,
 }: MultisiteDashboardViewProps) {
   if (selectedSiteId !== 'all') {
     return <SingleSiteDashboard siteId={selectedSiteId} sites={sites} />
   }
-  return <AllSitesDashboard sites={sites} userRoleType={userRoleType} />
+  return <AllSitesDashboard sites={sites} userRoleType={userRoleType} isRegional={isRegional} />
 }
 
 // =============================================
@@ -175,9 +177,10 @@ interface AggregatedKPIs {
   nextVisit: { start: Date; end: Date | null } | null
 }
 
-function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userRoleType: string }) {
+function AllSitesDashboard({ sites, userRoleType, isRegional }: { sites: SiteOption[]; userRoleType: string; isRegional: boolean }) {
   const { organization } = useMultisite()
   const [customers, setCustomers] = useState<Record<string, any>>({})
+  const [hoofdCustomer, setHoofdCustomer] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'all' | string>('all')
   const [aggregated, setAggregated] = useState<AggregatedKPIs | null>(null)
@@ -193,11 +196,16 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
     if (sites.length === 0) { setLoading(false); return }
     const siteIds = sites.map(s => s.id)
 
-    const [{ data: customersData }, { data: casesData }, { data: sessionsData }] = await Promise.all([
+    const [{ data: customersData }, { data: casesData }, { data: sessionsData }, { data: hoofdData }] = await Promise.all([
       supabase.from('customers').select('*').in('id', siteIds),
       supabase.from('cases').select('id, status, scheduled_start, scheduled_end, service_type, customer_id').in('customer_id', siteIds),
       supabase.from('station_inspection_sessions').select('id, status, case:cases!inner(customer_id)').eq('status', 'completed').in('cases.customer_id', siteIds),
+      isRegional && organization?.id
+        ? supabase.from('customers').select('company_name, contact_name, contact_email, contact_phone, contract_type, contract_status, annual_premium, address').eq('id', organization.id).single()
+        : Promise.resolve({ data: null }),
     ])
+
+    if (hoofdData) setHoofdCustomer(hoofdData)
 
     if (customersData) {
       const map: Record<string, any> = {}
@@ -370,6 +378,68 @@ function AllSitesDashboard({ sites, userRoleType }: { sites: SiteOption[]; userR
               })}
             </div>
           </div>
+
+          {/* Avtal & kontakt — bara för regionalkunder */}
+          {isRegional && hoofdCustomer && (
+            <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-slate-700/60">
+                <h3 className="text-sm font-semibold text-white">Avtal & kontakt</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-0 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/40">
+                <div className="px-5 py-4 space-y-3">
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Kontaktperson</p>
+                  {hoofdCustomer.contact_name && (
+                    <div className="flex items-center gap-2 text-sm text-white">
+                      <User className="w-4 h-4 text-slate-500 shrink-0" />
+                      {hoofdCustomer.contact_name}
+                    </div>
+                  )}
+                  {hoofdCustomer.contact_email && (
+                    <div className="flex items-center gap-2 text-sm text-slate-300">
+                      <Mail className="w-4 h-4 text-slate-500 shrink-0" />
+                      <a href={`mailto:${hoofdCustomer.contact_email}`} className="hover:text-[#20c58f] transition-colors truncate">
+                        {hoofdCustomer.contact_email}
+                      </a>
+                    </div>
+                  )}
+                  {hoofdCustomer.contact_phone && (
+                    <div className="flex items-center gap-2 text-sm text-slate-300">
+                      <Phone className="w-4 h-4 text-slate-500 shrink-0" />
+                      <a href={`tel:${hoofdCustomer.contact_phone}`} className="hover:text-[#20c58f] transition-colors">
+                        {hoofdCustomer.contact_phone}
+                      </a>
+                    </div>
+                  )}
+                </div>
+                <div className="px-5 py-4 space-y-3">
+                  <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Avtalsinformation</p>
+                  {hoofdCustomer.contract_type && (
+                    <div className="flex items-center gap-2 text-sm text-white">
+                      <FileText className="w-4 h-4 text-slate-500 shrink-0" />
+                      {hoofdCustomer.contract_type}
+                    </div>
+                  )}
+                  {hoofdCustomer.contract_status && (
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        hoofdCustomer.contract_status === 'active'
+                          ? 'bg-[#20c58f]/15 text-[#20c58f]'
+                          : 'bg-slate-700 text-slate-400'
+                      }`}>
+                        {hoofdCustomer.contract_status === 'active' ? 'Aktivt avtal' : hoofdCustomer.contract_status}
+                      </span>
+                    </div>
+                  )}
+                  {hoofdCustomer.annual_premium != null && (
+                    <div className="text-sm text-slate-300">
+                      <span className="text-slate-500">Årspremie: </span>
+                      {Number(hoofdCustomer.annual_premium).toLocaleString('sv-SE')} kr
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <PartnershipValueSection />
         </div>

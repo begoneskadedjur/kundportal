@@ -5,6 +5,7 @@ import { MapPin, Filter, Layers, Search, Camera, ExternalLink, ChevronDown, Chev
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
+import { useMultisite } from '../../contexts/MultisiteContext'
 import { CustomerOutdoorStationDetailSheet } from '../customer/CustomerOutdoorStationDetailSheet'
 import { EquipmentService } from '../../services/equipmentService'
 import { supabase } from '../../lib/supabase'
@@ -71,6 +72,8 @@ export default function RegionalMapView({
   organizationName,
   highlightedStationId,
 }: RegionalMapViewProps) {
+  const { organization } = useMultisite()
+  const isRegional = organization?.is_regional ?? false
   const [regionData, setRegionData] = useState<RegionData[]>([])
   const [loading, setLoading] = useState(true)
   const [activeRegions, setActiveRegions] = useState<Set<string>>(new Set(sites.map(s => s.id)))
@@ -263,6 +266,8 @@ export default function RegionalMapView({
               highlightedStationId={highlightedStationId}
               onEquipmentClick={setSelectedStation}
               onRegionClick={(siteId) => toggleRegion(siteId)}
+              enableClustering={isRegional}
+              defaultMapType={isRegional ? 'roadmap' : 'satellite'}
             />
           )}
         </div>

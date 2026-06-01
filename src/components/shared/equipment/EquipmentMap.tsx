@@ -1,6 +1,7 @@
 // src/components/shared/equipment/EquipmentMap.tsx - Google Maps-karta för utrustningsvisning
 // Omskriven från Leaflet till Google Maps API
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import { MarkerClusterer } from '@googlemaps/markerclusterer'
 import {
   EquipmentPlacementWithRelations,
   EQUIPMENT_TYPE_CONFIG
@@ -47,6 +48,7 @@ interface EquipmentMapProps {
     stationCount?: number
   }>
   onRegionClick?: (id: string, bounds: google.maps.LatLngBounds) => void
+  defaultMapType?: 'roadmap' | 'satellite' | 'hybrid'
 }
 
 // CSS för pulsering av highlighted marker
@@ -84,6 +86,8 @@ export function EquipmentMap({
   newStationIds,
   regionPolygons,
   onRegionClick,
+  enableClustering = false,
+  defaultMapType = 'satellite',
 }: EquipmentMapProps) {
   const { isLoaded, error: mapError } = useGoogleMaps({ libraries: ['marker', 'drawing', 'places'] })
 
@@ -98,6 +102,7 @@ export function EquipmentMap({
   const newStationOverlaysRef = useRef<google.maps.Marker[]>([])
   const regionPolygonsRef = useRef<google.maps.Polygon[]>([])
   const regionLabelsRef = useRef<google.maps.Marker[]>([])
+  const clustererRef = useRef<MarkerClusterer | null>(null)
   const hasAutoZoomedRef = useRef(false)
 
   // State
@@ -212,10 +217,14 @@ export function EquipmentMap({
 
     const zoom = equipment.length === 1 ? DETAIL_ZOOM : DEFAULT_ZOOM
 
+    const mapTypeId = defaultMapType === 'roadmap' ? google.maps.MapTypeId.ROADMAP
+      : defaultMapType === 'hybrid' ? google.maps.MapTypeId.HYBRID
+      : google.maps.MapTypeId.SATELLITE
+
     const map = new google.maps.Map(mapContainerRef.current, {
       center,
       zoom,
-      mapTypeId: google.maps.MapTypeId.SATELLITE,
+      mapTypeId,
       mapTypeControl: true,
       mapTypeControlOptions: {
         position: google.maps.ControlPosition.TOP_RIGHT,
@@ -303,11 +312,17 @@ export function EquipmentMap({
   useEffect(() => {
     if (!mapRef.current || !isLoaded) return
 
-    // Rensa gamla markörer
+    // Rensa gamla markörer och clusterer
+    if (clustererRef.current) {
+      clustererRef.current.clearMarkers()
+      clustererRef.current.setMap(null)
+      clustererRef.current = null
+    }
     markersRef.current.forEach(m => m.setMap(null))
     markersRef.current = []
 
     const map = mapRef.current
+    const newMarkers: google.maps.Marker[] = []
 
     equipment.forEach(item => {
       const color = getEquipmentColor(item)
@@ -360,7 +375,7 @@ export function EquipmentMap({
 
       const marker = new google.maps.Marker({
         position: { lat: item.latitude, lng: item.longitude },
-        map,
+        map: enableClustering ? null : map,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
           scale: isRelocating ? 18 : isHighlighted ? 16 : 14,
@@ -394,8 +409,15 @@ export function EquipmentMap({
       } else {
         marker.addListener('click', () => handleMarkerClick(item))
       }
-      markersRef.current.push(marker)
+      newMarkers.push(marker)
     })
+
+    markersRef.current = newMarkers
+
+    // Sätt upp clusterer om enableClustering, annars sätt map direkt
+    if (enableClustering && newMarkers.length > 0) {
+      clustererRef.current = new MarkerClusterer({ map, markers: newMarkers })
+    }
 
     // Auto-bounds vid equipment-ändring
     if (equipment.length > 1 && !highlightedStationId) {
@@ -408,7 +430,7 @@ export function EquipmentMap({
       map.setCenter({ lat: equipment[0].latitude, lng: equipment[0].longitude })
       map.setZoom(DETAIL_ZOOM)
     }
-  }, [equipment, isLoaded, getEquipmentColor, inspectedStationIds, highlightedStationId, equipmentNumberMap, handleMarkerClick, relocatingStationId])
+  }, [equipment, isLoaded, getEquipmentColor, inspectedStationIds, highlightedStationId, equipmentNumberMap, handleMarkerClick, relocatingStationId, enableClustering])
 
   // Panorera till highlighted station (wizard-läge)
   useEffect(() => {

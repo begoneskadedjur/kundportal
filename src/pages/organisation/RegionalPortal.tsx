@@ -132,6 +132,7 @@ const RegionalPortal: React.FC = () => {
             selectedSiteId={selectedSiteId}
             sites={siteOptions}
             userRoleType={userRole.role_type}
+            isRegional={organization?.is_regional ?? false}
           />
         )}
 
