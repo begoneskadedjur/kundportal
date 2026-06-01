@@ -82,6 +82,12 @@ export default function BoundariesMapPanel({
 
   useEffect(() => { activeRegionIdRef.current = activeRegionId }, [activeRegionId])
 
+  // Avbryt pågående ritning automatiskt när aktiv region byts
+  useEffect(() => {
+    if (drawingActive) cancelDrawing()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRegionId])
+
   // Nominatim-sökning med 350ms debounce
   useEffect(() => {
     const q = searchQuery.trim()
