@@ -263,6 +263,7 @@ export default function BoundariesMapPanel({
     rubberBandPosRef.current = null
     drawingListenersRef.current.forEach(l => google.maps.event.removeListener(l))
     drawingListenersRef.current = []
+    mapRef.current?.setOptions({ clickableIcons: true })
   }, [])
 
   const updatePreviewPolyline = useCallback((color: string) => {
@@ -480,26 +481,25 @@ export default function BoundariesMapPanel({
 
           {activeRegionId ? (
             <div className="flex items-center gap-2 flex-wrap">
-              {!drawingActive ? (
-                <>
-                  <button
-                    onClick={startDrawing}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-white border border-slate-600 hover:border-[#20c58f] transition-colors"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    Rita manuellt
-                  </button>
-                  {activeRegion?.polygon && activeRegion.polygon.length > 0 && (
-                    <button
-                      onClick={() => clearPolygon(activeRegionId)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-red-400 border border-slate-600 hover:border-red-500 transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      Ta bort polygon
-                    </button>
-                  )}
-                </>
-              ) : (
+              {!drawingActive && (
+                <button
+                  onClick={startDrawing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-white border border-slate-600 hover:border-[#20c58f] transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  Rita manuellt
+                </button>
+              )}
+              {activeRegion?.polygon && activeRegion.polygon.length > 0 && (
+                <button
+                  onClick={() => { if (drawingActive) cancelDrawing(); clearPolygon(activeRegionId) }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-red-400 border border-slate-600 hover:border-red-500 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Ta bort polygon
+                </button>
+              )}
+              {drawingActive && (
                 <>
                   <span className="text-xs text-[#20c58f]">Klicka för att lägga till punkter — klicka på startpunkten eller dubbelklicka för att avsluta</span>
                   <button
