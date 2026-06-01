@@ -42,6 +42,7 @@ export default function BoundariesMapPanel({
   const [searchQuery, setSearchQuery] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
   const [kommunLoading, setKommunLoading] = useState(false)
+  const [noRegionWarning, setNoRegionWarning] = useState(false)
 
   const activeRegion = regions.find(r => r.tempId === activeRegionId) || null
 
@@ -172,11 +173,21 @@ export default function BoundariesMapPanel({
   }, [commitPolygon])
 
   const selectKommun = useCallback((feature: any) => {
-    const currentId = activeRegionIdRef.current
+    let currentId = activeRegionIdRef.current
+    // Auto-välj om bara en region finns
+    if (!currentId && regions.length === 1) {
+      currentId = regions[0].tempId
+      setActiveRegionId(currentId)
+      activeRegionIdRef.current = currentId
+    }
     const region = regions.find(r => r.tempId === currentId)
     if (region && currentId) {
       applyKommunPolygon(feature.geometry, currentId, region.color)
       setSearchQuery(feature.properties.kom_namn)
+      setNoRegionWarning(false)
+    } else {
+      setNoRegionWarning(true)
+      setTimeout(() => setNoRegionWarning(false), 3000)
     }
     setShowDropdown(false)
   }, [regions, applyKommunPolygon])
@@ -301,7 +312,7 @@ export default function BoundariesMapPanel({
           onChange={e => { setSearchQuery(e.target.value); setShowDropdown(true) }}
           onFocus={() => setShowDropdown(true)}
           onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-          placeholder={kommunLoading ? 'Laddar kommuner...' : 'Sök kommunnamn (t.ex. Huddinge)...'}
+          placeholder={kommunLoading ? 'Laddar kommuner...' : 'Sök officiellt kommunnamn (t.ex. Huddinge, Stockholm)...'}
           disabled={kommunLoading}
           className="w-full pl-9 pr-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] disabled:opacity-50"
         />
@@ -316,6 +327,12 @@ export default function BoundariesMapPanel({
                 {f.properties.kom_namn}
               </button>
             ))}
+          </div>
+        )}
+        {noRegionWarning && (
+          <div className="absolute top-full mt-1 w-full z-50 flex items-center gap-2 px-3 py-2 bg-amber-900/80 border border-amber-700 rounded-lg shadow-xl">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+            <span className="text-xs text-amber-300">Välj en region i listan nedan innan du väljer kommun</span>
           </div>
         )}
       </div>
@@ -349,7 +366,7 @@ export default function BoundariesMapPanel({
 
         {/* Karta */}
         <div className="flex-1 flex flex-col gap-2">
-          <div ref={mapDivRef} style={{ width: '100%', height: '320px', borderRadius: '12px', overflow: 'hidden' }} />
+          <div ref={mapDivRef} style={{ width: '100%', height: '480px', borderRadius: '12px', overflow: 'hidden' }} />
 
           {activeRegionId ? (
             <div className="flex items-center gap-2 flex-wrap">
@@ -395,7 +412,7 @@ export default function BoundariesMapPanel({
       </div>
 
       <p className="text-xs text-slate-600">
-        Sök ett kommunnamn för att hämta gränsen automatiskt. Eller rita manuellt — klicka punkter, dubbelklicka för att avsluta. Dra i punkterna för att justera.
+        Sök ett officiellt kommunnamn för att hämta gränsen automatiskt. Obs: stadsdelar (t.ex. Farsta, Södermalm) är inte sökbara — använd kommunnamnet (t.ex. Stockholm) eller rita manuellt för en anpassad gräns.
       </p>
     </div>
   )

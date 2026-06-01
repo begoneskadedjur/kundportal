@@ -469,7 +469,7 @@ export default function ManageRegionsModal({
       isOpen={isOpen}
       onClose={handleClose}
       title={`Hantera regioner — ${organization.name}`}
-      size="xl"
+      size="full"
       preventClose={loading}
       footer={footer}
     >
@@ -600,11 +600,94 @@ export default function ManageRegionsModal({
 
             {/* ── STEG 2: GRÄNSER ── */}
             {step === 'boundaries' && (
-              <BoundariesMapPanel
-                regions={activeRegions}
-                onPolygonSaved={handlePolygonSaved}
-                stations={stations}
-              />
+              <div className="space-y-3">
+                {/* Region-hantering inline */}
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-slate-400" />
+                    Regioner ({activeRegions.length})
+                  </h3>
+
+                  {/* Befintliga regioner */}
+                  {regions.length > 0 && (
+                    <div className="space-y-1.5">
+                      {regions.map(r => (
+                        <div
+                          key={r.tempId}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 border rounded-lg transition-opacity ${
+                            r.markedForDeletion
+                              ? 'opacity-40 bg-red-900/10 border-red-800/30 line-through'
+                              : 'bg-slate-800/40 border-slate-700/50'
+                          }`}
+                        >
+                          <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: r.color }} />
+                          <span className="flex-1 text-xs text-white truncate">{r.site_name}</span>
+                          <span className="text-xs text-slate-500">{r.region}</span>
+                          {r.dbId ? (
+                            <button
+                              onClick={() => toggleDelete(r.tempId)}
+                              className={`p-0.5 transition-colors ${r.markedForDeletion ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-red-400'}`}
+                              title={r.markedForDeletion ? 'Ångra borttagning' : 'Markera för borttagning'}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => removeNew(r.tempId)}
+                              className="p-0.5 text-slate-500 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Lägg till ny region — kompakt inline */}
+                  <div className="flex items-end gap-2 flex-wrap">
+                    <div className="flex-1 min-w-[120px]">
+                      <Input
+                        label="Regionnamn"
+                        value={newName}
+                        onChange={e => setNewName(e.target.value)}
+                        placeholder="T.ex. Region Nord"
+                        onKeyDown={e => e.key === 'Enter' && addRegion()}
+                      />
+                    </div>
+                    <div className="w-28">
+                      <Input
+                        label="Regionkod"
+                        value={newCode}
+                        onChange={e => setNewCode(e.target.value)}
+                        placeholder="T.ex. Nord"
+                        onKeyDown={e => e.key === 'Enter' && addRegion()}
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 pb-0.5">
+                      {REGION_COLORS.map((color, i) => (
+                        <button
+                          key={color}
+                          onClick={() => setNewColorIndex(i)}
+                          className={`w-5 h-5 rounded-full transition-transform ${newColorIndex === i ? 'ring-2 ring-white ring-offset-1 ring-offset-slate-800 scale-110' : 'hover:scale-105'}`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={addRegion} className="flex items-center gap-1.5 pb-0.5">
+                      <Plus className="w-3.5 h-3.5" />
+                      Lägg till
+                    </Button>
+                  </div>
+                  {formError && <p className="text-xs text-red-400">{formError}</p>}
+                </div>
+
+                <BoundariesMapPanel
+                  regions={activeRegions}
+                  onPolygonSaved={handlePolygonSaved}
+                  stations={stations}
+                />
+              </div>
             )}
 
             {/* ── STEG 3: BEKRÄFTA ── */}
