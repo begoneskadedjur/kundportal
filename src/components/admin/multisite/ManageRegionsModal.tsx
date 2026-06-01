@@ -262,14 +262,7 @@ export default function ManageRegionsModal({
 
       if (!orgId) throw new Error('organization_id saknas')
 
-      // 1. Delete removed regions: polygons first, then customer rows
-      if (toDelete.length > 0) {
-        const deleteIds = toDelete.map(r => r.dbId!)
-        await supabase.from('customer_regions').delete().in('customer_id', deleteIds)
-        await supabase.from('customers').delete().in('id', deleteIds)
-      }
-
-      // 2. Create new enhet-rows
+      // 1. Create new enhet-rows (moved: delete happens after station reassignment)
       let newDbIds: Record<string, string> = {}
       if (toCreate.length > 0) {
         const hoofdkontorRow = organization.customers.find(c =>
@@ -277,6 +270,7 @@ export default function ManageRegionsModal({
         )
         const toInsert = toCreate.map(r => ({
           company_name: `${organization.name} — ${r.site_name}`,
+          contact_email: `region-${r.region.toLowerCase().replace(/\s+/g, '-')}@intern.begone.se`,
           site_name: r.site_name,
           region: r.region,
           organization_id: orgId,
@@ -284,7 +278,7 @@ export default function ManageRegionsModal({
           is_multisite: true,
           is_regional: true,
           site_type: 'enhet' as const,
-          contract_type: hoofdkontorRow?.site_type ? null : null,
+          contract_type: null,
           contract_status: 'active' as const,
           is_active: true,
           source_type: 'manual' as const,
@@ -375,6 +369,13 @@ export default function ManageRegionsModal({
           console.error('Station assignment error:', updateErr)
           toast('Vissa stationer kunde inte tilldelas region.', { icon: '⚠️' })
         }
+      }
+
+      // 4. Delete removed regions (after station reassignment so FK refs are gone)
+      if (toDelete.length > 0) {
+        const deleteIds = toDelete.map(r => r.dbId!)
+        await supabase.from('customer_regions').delete().in('customer_id', deleteIds)
+        await supabase.from('customers').delete().in('id', deleteIds)
       }
 
       toast.success(`Regioner sparade! ${updates.length} stationer tilldelade.`)

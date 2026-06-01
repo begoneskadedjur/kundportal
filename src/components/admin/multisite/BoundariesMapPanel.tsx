@@ -294,7 +294,7 @@ export default function BoundariesMapPanel({
     }
     cleanupTempDrawing()
     setDrawingActive(true)
-    mapRef.current.setOptions({ draggableCursor: 'crosshair' })
+    mapRef.current.setOptions({ draggableCursor: 'crosshair', clickableIcons: false })
 
     const setFirstMarkerCloseable = (marker: google.maps.Marker) => {
       marker.setIcon({
@@ -316,7 +316,7 @@ export default function BoundariesMapPanel({
       }))
       cleanupTempDrawing()
       setDrawingActive(false)
-      mapRef.current?.setOptions({ draggableCursor: '' })
+      mapRef.current?.setOptions({ draggableCursor: '', clickableIcons: true })
       const id = activeRegionIdRef.current
       if (id && path.length >= 3) {
         const col = regions.find(r => r.tempId === id)?.color || '#3b82f6'
@@ -380,7 +380,7 @@ export default function BoundariesMapPanel({
   const cancelDrawing = useCallback(() => {
     cleanupTempDrawing()
     setDrawingActive(false)
-    mapRef.current?.setOptions({ draggableCursor: '' })
+    mapRef.current?.setOptions({ draggableCursor: '', clickableIcons: true })
   }, [cleanupTempDrawing])
 
   const clearPolygon = useCallback((tempId: string) => {
