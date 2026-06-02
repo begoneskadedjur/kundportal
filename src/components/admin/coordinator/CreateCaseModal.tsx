@@ -436,6 +436,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       // Om en site är vald för multisite-kund, använd sitens data där det finns
       let dataSource = customer;
       if (selectedSiteId) {
+        // Rondering: kontaktinfo alltid från HK (customer), inte region-siten
+        if (caseType === 'rondering') {
+          // dataSource förblir customer (HK) — inget att göra
+        } else {
         const site = contractCustomers.find(c => c.id === selectedSiteId);
         if (!site) {
           console.error('Selected site not found:', selectedSiteId);
@@ -472,8 +476,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           contact_email: dataSource.contact_email,
           org_nr: dataSource.organization_number
         });
+        } // end else (non-rondering site logic)
       }
-      
+
       if (dataSource) {
         setFormData(prev => ({
           ...prev,
@@ -545,9 +550,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     };
   }, [customerDropdownOpen]);
 
-  // Förvälj tjänst "Återbesök / Uppföljning" under grupp "Övrigt" för inspection-typ
+  // Förvälj tjänst "Återbesök / Uppföljning" under grupp "Övrigt" för inspection- och rondering-typ
   useEffect(() => {
-    if (caseType === 'inspection' && !serviceGroupId && !serviceId) {
+    if ((caseType === 'inspection' || caseType === 'rondering') && !serviceGroupId && !serviceId) {
       setServiceGroupId('43bda891-8b72-4d19-8dcd-5573ba71d84b');
       setServiceId('4d84758a-f98c-4980-a7e7-ee59a374934a');
     }
@@ -681,7 +686,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       if (!searchAddress) {
         return toast.error('Kunden saknar adress. Ange adress manuellt.');
       }
-    } else {
+    } else if (caseType !== 'rondering') {
       if (!formData.adress || !serviceId) {
         return toast.error('Adress och Tjänst måste vara ifyllda.');
       }
@@ -988,6 +993,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
           contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
           case_number: caseNumber,
+          service_id: serviceId || null,
         }]);
         if (error) throw error;
 
@@ -1922,7 +1928,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3 flex flex-col">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Zap className="w-4 h-4 text-blue-400"/>Intelligent Bokning</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <AddressAutocomplete label="Adress *" value={typeof formData.adress === 'string' ? formData.adress : ''} onChange={handleAddressChange} placeholder="Fullständig adress..." required />
+                    {caseType !== 'rondering' && (
+                      <AddressAutocomplete label="Adress *" value={typeof formData.adress === 'string' ? formData.adress : ''} onChange={handleAddressChange} placeholder="Fullständig adress..." required />
+                    )}
                     <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Hitta tider från:</label>
                         <DatePicker selected={searchStartDate} onChange={(date) => handleDateChange(date, 'searchStartDate')} locale="sv" dateFormat="yyyy-MM-dd" placeholderText="Välj startdatum..." isClearable className="w-full" />
