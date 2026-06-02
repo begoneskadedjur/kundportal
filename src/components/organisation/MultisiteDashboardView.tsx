@@ -384,14 +384,6 @@ function AllSitesDashboard({ sites, userRoleType, isRegional }: { sites: SiteOpt
             </div>
           </div>
 
-          {/* Avtal & kontakt — bara för regionalkunder */}
-          {isRegional && hoofdCustomer && (
-            <>
-              <ContractValueCard customer={hoofdCustomer} />
-              <RelationshipShowcase customer={hoofdCustomer} />
-            </>
-          )}
-
           <PartnershipValueSection />
         </div>
       )}
@@ -403,14 +395,14 @@ function AllSitesDashboard({ sites, userRoleType, isRegional }: { sites: SiteOpt
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
-              <ContractValueCard customer={activeSiteCustomer} />
+              <ContractValueCard customer={isRegional && hoofdCustomer ? hoofdCustomer : activeSiteCustomer} />
               <ServiceAssessmentSummary
                 customerId={activeSite.id}
                 onOpenCaseDetails={handleOpenCaseDetails}
               />
             </div>
             <div className="space-y-6">
-              <RelationshipShowcase customer={activeSiteCustomer} />
+              <RelationshipShowcase customer={isRegional && hoofdCustomer ? hoofdCustomer : activeSiteCustomer} />
             </div>
           </div>
 
