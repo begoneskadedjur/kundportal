@@ -25,6 +25,7 @@ import Input from '../../ui/Input';
 import Select from '../../ui/Select'
 import AddressAutocomplete from '../../ui/AddressAutocomplete'
 import type { GeocodeResult } from '../../../services/geocoding';
+import { reverseGeocode } from '../../../services/geocoding';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 
@@ -686,7 +687,28 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       if (!searchAddress) {
         return toast.error('Kunden saknar adress. Ange adress manuellt.');
       }
-    } else if (caseType !== 'rondering') {
+    } else if (caseType === 'rondering') {
+      // Beräkna regionens centroid via polygon och reverse-geocoda till adress
+      if (!selectedSiteId) return toast.error('Välj en region först.');
+      const { data: regionRow } = await supabase
+        .from('customer_regions')
+        .select('geojson_polygon')
+        .eq('customer_id', selectedSiteId)
+        .single();
+      if (regionRow?.geojson_polygon) {
+        const poly = regionRow.geojson_polygon;
+        const ring: number[][] = poly.type === 'Polygon'
+          ? poly.coordinates[0]
+          : poly.coordinates[0][0];
+        const lat = ring.reduce((s: number, c: number[]) => s + c[1], 0) / ring.length;
+        const lng = ring.reduce((s: number, c: number[]) => s + c[0], 0) / ring.length;
+        searchAddress = await reverseGeocode(lat, lng) ?? '';
+      }
+      if (!searchAddress) {
+        return toast.error('Kunde inte hämta adress för regionen. Rita om polygonen i Hantera regioner.');
+      }
+      searchPestType = selectedService?.name || null;
+    } else {
       if (!formData.adress || !serviceId) {
         return toast.error('Adress och Tjänst måste vara ifyllda.');
       }

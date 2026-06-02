@@ -28,6 +28,22 @@ export type GeocodingResponse = GeocodingSuccess | GeocodingError
 const geocodeCache = new Map<string, GeocodeResult>()
 
 /**
+ * Reverse-geocoda koordinater till en formatterad adress
+ */
+export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+  const key = import.meta.env.VITE_GOOGLE_GEOCODING
+  if (!key) return null
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}&language=sv`
+  try {
+    const res = await fetch(url)
+    const data = await res.json()
+    return data.results?.[0]?.formatted_address ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Geocoda en adress till koordinater med Google Maps API
  * Använder specifik VITE_GOOGLE_GEOCODING API-nyckel
  */
