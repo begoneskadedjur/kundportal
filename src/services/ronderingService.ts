@@ -35,14 +35,14 @@ export class RonderingService {
   ): Promise<RonderingStationLog> {
     const { data, error } = await supabase
       .from('rondering_station_logs')
-      .insert({
+      .upsert({
         case_id: caseId,
         station_id: stationId,
         technician_id: technicianId,
         technician_name: technicianName,
         status,
         note: note ?? null,
-      })
+      }, { onConflict: 'case_id,station_id' })
       .select()
       .single()
     if (error) throw new Error(error.message)
