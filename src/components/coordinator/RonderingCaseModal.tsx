@@ -108,6 +108,9 @@ export default function RonderingCaseModal({
   const [loadingStations, setLoadingStations] = useState(false)
   const [stationSearch, setStationSearch] = useState('')
 
+  // Förhindra dubbelklick — håller reda på vilka stationer som håller på att processas
+  const [pendingStations, setPendingStations] = useState<Set<string>>(new Set())
+
   // Status-meny per station
   const [openStatusMenu, setOpenStatusMenu] = useState<string | null>(null)
   const [noteModal, setNoteModal] = useState<{ stationId: string; logId: string; currentNote: string } | null>(null)
@@ -255,43 +258,50 @@ export default function RonderingCaseModal({
 
   // Bocka av / avbocka station
   const toggleStation = async (station: Station) => {
+    if (pendingStations.has(station.id)) return
+    setPendingStations(prev => new Set(prev).add(station.id))
+
     const existing = stationLogs.find(l => l.station_id === station.id)
-    if (existing) {
-      // Avbocka
-      setStationLogs(prev => prev.filter(l => l.station_id !== station.id))
-      try {
-        await RonderingService.removeLog(caseData.id, station.id)
-      } catch {
-        setStationLogs(prev => [...prev, existing])
-        toast.error('Kunde inte ta bort avbockning')
+    try {
+      if (existing) {
+        // Avbocka
+        setStationLogs(prev => prev.filter(l => l.station_id !== station.id))
+        try {
+          await RonderingService.removeLog(caseData.id, station.id)
+        } catch {
+          setStationLogs(prev => [...prev, existing])
+          toast.error('Kunde inte ta bort avbockning')
+        }
+      } else {
+        // Bocka av — optimistisk uppdatering
+        const optimistic: RonderingStationLog = {
+          id: `tmp-${station.id}`,
+          case_id: caseData.id,
+          station_id: station.id,
+          inspected_at: new Date().toISOString(),
+          technician_id: profile?.id || null,
+          technician_name: profile?.full_name || null,
+          status: 'ok',
+          note: null,
+          created_at: new Date().toISOString(),
+        }
+        setStationLogs(prev => [...prev, optimistic])
+        try {
+          const real = await RonderingService.logStation(
+            caseData.id,
+            station.id,
+            profile?.id || null,
+            profile?.full_name || null,
+            'ok'
+          )
+          setStationLogs(prev => prev.map(l => l.id === optimistic.id ? real : l))
+        } catch {
+          setStationLogs(prev => prev.filter(l => l.id !== optimistic.id))
+          toast.error('Kunde inte logga inspektion')
+        }
       }
-    } else {
-      // Bocka av — optimistisk uppdatering
-      const optimistic: RonderingStationLog = {
-        id: `tmp-${station.id}`,
-        case_id: caseData.id,
-        station_id: station.id,
-        inspected_at: new Date().toISOString(),
-        technician_id: profile?.id || null,
-        technician_name: profile?.full_name || null,
-        status: 'ok',
-        note: null,
-        created_at: new Date().toISOString(),
-      }
-      setStationLogs(prev => [...prev, optimistic])
-      try {
-        const real = await RonderingService.logStation(
-          caseData.id,
-          station.id,
-          profile?.id || null,
-          profile?.full_name || null,
-          'ok'
-        )
-        setStationLogs(prev => prev.map(l => l.id === optimistic.id ? real : l))
-      } catch {
-        setStationLogs(prev => prev.filter(l => l.id !== optimistic.id))
-        toast.error('Kunde inte logga inspektion')
-      }
+    } finally {
+      setPendingStations(prev => { const next = new Set(prev); next.delete(station.id); return next })
     }
   }
 
@@ -611,7 +621,8 @@ export default function RonderingCaseModal({
                           <button
                             type="button"
                             onClick={() => toggleStation(station)}
-                            className="flex-shrink-0"
+                            disabled={pendingStations.has(station.id)}
+                            className={`flex-shrink-0 transition-opacity ${pendingStations.has(station.id) ? 'opacity-40 cursor-wait' : ''}`}
                           >
                             {isChecked
                               ? <CheckSquare className={`w-5 h-5 ${STATUS_COLOR[st]}`} />
