@@ -20,6 +20,7 @@ import Card from '../../components/ui/Card'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
 import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal'
+import RonderingCaseModal from '../../components/coordinator/RonderingCaseModal'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ReportModal from '../../components/admin/technicians/ReportModal'
 import { BeGoneCaseRow, WorkSchedule } from '../../types/database' // NYTT: Importerar den centrala typen
@@ -28,10 +29,10 @@ import '../../styles/FullCalendar.css'
 
 // Definiera en mer komplett typ för ärenden som används i denna komponent
 type ScheduleCaseType = BeGoneCaseRow & {
-    case_type: 'private' | 'business' | 'contract' | 'inspection' | 'establishment';
+    case_type: 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering';
     case_price?: number;
     technician_role?: 'primary' | 'secondary' | 'tertiary';
-    service_type?: string; // 'routine' | 'inspection' | 'establishment' etc.
+    service_type?: string;
 }
 
 const toDateString = (date: Date): string => date.toISOString().split('T')[0];
@@ -93,6 +94,13 @@ const getStatusColor = (status: string, caseType?: string): { bg: string; text: 
     if (ls.includes('pågående')) return { bg: 'bg-cyan-800/50', text: 'text-cyan-200', border: 'border-cyan-600/50' };
     if (ls.includes('bokad') || ls.includes('bokat')) return { bg: 'bg-cyan-700/50', text: 'text-cyan-100', border: 'border-cyan-500/50' };
     return { bg: 'bg-cyan-800/50', text: 'text-cyan-200', border: 'border-cyan-600/50' };
+  }
+
+  // Sky-blå för rondering
+  if (caseType === 'rondering') {
+    if (ls.includes('avslutat')) return { bg: 'bg-sky-900/50', text: 'text-sky-300', border: 'border-sky-700/50' };
+    if (ls.includes('pågående')) return { bg: 'bg-sky-800/50', text: 'text-sky-200', border: 'border-sky-600/50' };
+    return { bg: 'bg-sky-700/50', text: 'text-sky-100', border: 'border-sky-500/50' };
   }
 
   // Premium lila färgschema för avtalsärenden
@@ -209,9 +217,11 @@ export default function TechnicianSchedule() {
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false);
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [isEstablishmentModalOpen, setIsEstablishmentModalOpen] = useState(false);
+  const [isRonderingModalOpen, setIsRonderingModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<ScheduleCaseType | null>(null);
   const [selectedInspectionCase, setSelectedInspectionCase] = useState<ScheduleCaseType | null>(null);
   const [selectedEstablishmentCase, setSelectedEstablishmentCase] = useState<ScheduleCaseType | null>(null);
+  const [selectedRonderingCase, setSelectedRonderingCase] = useState<ScheduleCaseType | null>(null);
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES));
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileView, setMobileView] = useState<'agenda' | 'month'>('agenda');
@@ -257,6 +267,7 @@ export default function TechnicianSchedule() {
         // Bestäm case_type baserat på service_type
         const caseType = c.service_type === 'inspection' ? 'inspection' as const
           : c.service_type === 'establishment' ? 'establishment' as const
+          : c.service_type === 'rondering_trafikkontoret' ? 'rondering' as const
           : 'contract' as const;
         return {
           ...c,
@@ -360,6 +371,9 @@ export default function TechnicianSchedule() {
     } else if (caseData.case_type === 'establishment') {
       setSelectedEstablishmentCase(caseData);
       setIsEstablishmentModalOpen(true);
+    } else if (caseData.case_type === 'rondering') {
+      setSelectedRonderingCase(caseData);
+      setIsRonderingModalOpen(true);
     } else if (caseData.case_type === 'contract') {
       setSelectedCase(caseData);
       setIsEditContractModalOpen(true);
@@ -372,8 +386,8 @@ export default function TechnicianSchedule() {
   const handleUpdateSuccess = (updatedCase?: any) => {
     // Om inget updatedCase skickades = ärendet har raderats
     // Ta bort det från listan och stäng modalen
-    if (!updatedCase && (selectedCase || selectedInspectionCase || selectedEstablishmentCase)) {
-      const caseIdToRemove = selectedCase?.id || selectedInspectionCase?.id || selectedEstablishmentCase?.id;
+    if (!updatedCase && (selectedCase || selectedInspectionCase || selectedEstablishmentCase || selectedRonderingCase)) {
+      const caseIdToRemove = selectedCase?.id || selectedInspectionCase?.id || selectedEstablishmentCase?.id || selectedRonderingCase?.id;
       setCases(prevCases => prevCases.filter(c => c.id !== caseIdToRemove));
       setIsEditModalOpen(false);
       setIsEditContractModalOpen(false);
@@ -636,6 +650,17 @@ export default function TechnicianSchedule() {
         }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedEstablishmentCase}
+      />
+
+      {/* Modal för rondering-ärenden */}
+      <RonderingCaseModal
+        isOpen={isRonderingModalOpen}
+        onClose={() => {
+          setIsRonderingModalOpen(false);
+          setSelectedRonderingCase(null);
+        }}
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedRonderingCase}
       />
 
       <FilterPanel isOpen={isFilterPanelOpen} onClose={() => setIsFilterPanelOpen(false)} activeStatuses={activeStatuses} setActiveStatuses={setActiveStatuses} />
