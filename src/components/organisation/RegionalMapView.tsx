@@ -1,7 +1,7 @@
 // Kartvy för regionalkunder — stationer med normala stationstyps-färger + transparenta regionpolygoner.
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { MapPin, Filter, Layers, Search, Camera, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
+import { MapPin, Layers, Search, Camera, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
@@ -212,27 +212,23 @@ export default function RegionalMapView({
           </div>
         </div>
 
-        {/* Region-filter chips */}
+        {/* Region-filter */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="flex items-center gap-1.5 text-xs text-slate-400">
-            <Filter className="w-3.5 h-3.5" />
-            Visa:
-          </span>
           {regionData.map(r => {
             const active = activeRegions.has(r.site.id)
             return (
               <button
                 key={r.site.id}
                 onClick={() => toggleRegion(r.site.id)}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                  active ? 'border-transparent' : 'border-slate-700 text-slate-500'
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                  active
+                    ? 'bg-slate-800 border-slate-600 text-white'
+                    : 'bg-slate-800/30 border-slate-700/50 text-slate-500 hover:border-slate-600 hover:text-slate-400'
                 }`}
-                style={active ? { backgroundColor: r.color + '30', borderColor: r.color + '60', color: r.color } : {}}
               >
-                <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: active ? r.color : '#475569' }} />
+                <span className="w-2 h-2 rounded-full flex-shrink-0 transition-opacity" style={{ backgroundColor: r.color, opacity: active ? 1 : 0.4 }} />
                 {r.site.site_name}
-                <span className="opacity-60">({r.stations.length})</span>
-                {r.polygon && <span className="opacity-50 text-[10px]">▪</span>}
+                <span className={`text-[11px] font-mono ${active ? 'text-slate-400' : 'text-slate-600'}`}>{r.stations.length}</span>
               </button>
             )
           })}
