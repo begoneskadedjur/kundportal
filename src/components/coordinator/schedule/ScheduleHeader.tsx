@@ -1,6 +1,6 @@
 // ScheduleHeader.tsx — Header med datumnavigation, vy-växlare, filter och knappar
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, FileText, CalendarOff, SlidersHorizontal, User, Building, FileCheck, ClipboardCheck, MapPin } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, FileText, CalendarOff, SlidersHorizontal, User, Building, FileCheck, ClipboardCheck, MapPin, Map } from 'lucide-react'
 import { AnimatePresence } from 'framer-motion'
 import Button from '../../ui/Button'
 import { StatusLegend } from './StatusLegend'
@@ -11,7 +11,7 @@ import { ScheduleFilterPopover } from './ScheduleFilterPopover'
 import type { Technician } from '../../../types/database'
 
 export type ViewMode = 'day' | 'week' | 'month'
-export type CaseType = 'private' | 'business' | 'contract' | 'inspection' | 'establishment'
+export type CaseType = 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering'
 
 interface ScheduleHeaderProps {
   currentDate: Date
@@ -302,6 +302,13 @@ export function ScheduleHeader({
               >
                 <MapPin className="w-4 h-4 text-lime-400" />
                 Etablering
+              </button>
+              <button
+                onClick={() => { onCreateCase('rondering'); setCreateMenuOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
+              >
+                <Map className="w-4 h-4 text-sky-400" />
+                Rondering Trafikkontoret
               </button>
             </div>
           )}
