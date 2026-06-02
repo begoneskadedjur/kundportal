@@ -80,15 +80,17 @@ export default function BoundariesMapPanel({
   const [searchResults, setSearchResults] = useState<NominatimResult[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [noRegionWarning, setNoRegionWarning] = useState(false)
+  const [addMode, setAddMode] = useState(false)
 
   const activeRegion = regions.find(r => r.tempId === activeRegionId) || null
 
   useEffect(() => { activeRegionIdRef.current = activeRegionId }, [activeRegionId])
   useEffect(() => { regionsRef.current = regions }, [regions])
 
-  // Avbryt pågående ritning automatiskt när aktiv region byts
+  // Avbryt pågående ritning + addMode automatiskt när aktiv region byts
   useEffect(() => {
     if (drawingActive) cancelDrawing()
+    setAddMode(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRegionId])
 
@@ -223,6 +225,42 @@ export default function BoundariesMapPanel({
     mapRef.current.fitBounds(bounds)
   }, [commitPolygon])
 
+  const convexHullLatLng = useCallback((points: LatLng[]): LatLng[] => {
+    if (points.length < 3) return points
+    const pts = [...points].sort((a, b) => a.lng !== b.lng ? a.lng - b.lng : a.lat - b.lat)
+    const cross = (O: LatLng, A: LatLng, B: LatLng) =>
+      (A.lng - O.lng) * (B.lat - O.lat) - (A.lat - O.lat) * (B.lng - O.lng)
+    const lo: LatLng[] = [], hi: LatLng[] = []
+    for (const p of pts) {
+      while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop()
+      lo.push(p)
+    }
+    for (const p of [...pts].reverse()) {
+      while (hi.length >= 2 && cross(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop()
+      hi.push(p)
+    }
+    hi.pop(); lo.pop()
+    return lo.concat(hi)
+  }, [])
+
+  const mergePolygon = useCallback((geometry: any, regionId: string, region: PanelRegion) => {
+    if (!mapRef.current) return
+    const toLatLngs = (ring: number[][]) => ring.map(([lng, lat]) => ({ lat, lng }))
+    let newPts: LatLng[] = []
+    if (geometry.type === 'Polygon') {
+      newPts = geometry.coordinates.flatMap(toLatLngs)
+    } else if (geometry.type === 'MultiPolygon') {
+      newPts = geometry.coordinates.flatMap((poly: number[][][]) => poly.flatMap(toLatLngs))
+    }
+    const existing = region.polygon ?? []
+    const hull = convexHullLatLng([...existing, ...newPts])
+    if (hull.length < 3) return
+    commitPolygon(hull, regionId, region.color)
+    const bounds = new google.maps.LatLngBounds()
+    hull.forEach(p => bounds.extend(p))
+    mapRef.current.fitBounds(bounds)
+  }, [commitPolygon, convexHullLatLng])
+
   const selectNominatimResult = useCallback(async (result: NominatimResult) => {
     let currentId = activeRegionIdRef.current
     // Auto-välj om bara en region finns
@@ -253,14 +291,20 @@ export default function BoundariesMapPanel({
       const data = await res.json()
       const geometry = data?.features?.[0]?.geometry
       if (geometry) {
-        applyKommunPolygon(geometry, currentId, region.color)
+        const isAdding = addMode && !!region.polygon && region.polygon.length > 0
+        if (isAdding) {
+          mergePolygon(geometry, currentId, region)
+        } else {
+          applyKommunPolygon(geometry, currentId, region.color)
+        }
+        setAddMode(false)
       }
     } catch {
       // tyst fel — användaren kan rita manuellt
     } finally {
       setSearchLoading(false)
     }
-  }, [regions, applyKommunPolygon])
+  }, [regions, applyKommunPolygon, mergePolygon, addMode])
 
   const cleanupTempDrawing = useCallback(() => {
     drawingPointsRef.current.forEach(m => m.setMap(null))
@@ -421,6 +465,23 @@ export default function BoundariesMapPanel({
   return (
     <div className="space-y-3">
       {/* Områdessökning via Nominatim */}
+      <div className="flex items-center gap-2 mb-1">
+        <button
+          onClick={() => setAddMode(v => !v)}
+          disabled={!activeRegion?.polygon || activeRegion.polygon.length === 0}
+          title={!activeRegion?.polygon ? 'Välj ett område först' : addMode ? 'Klicka för att byta till ersätt-läge' : 'Klicka för att lägga till ett område till befintlig polygon'}
+          className={`flex-shrink-0 text-xs px-2.5 py-1.5 rounded-lg border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
+            addMode
+              ? 'bg-[#20c58f] border-[#20c58f] text-white font-medium'
+              : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+          }`}
+        >
+          {addMode ? '+ Lägg till område' : 'Ersätt polygon'}
+        </button>
+        {addMode && (
+          <span className="text-xs text-[#20c58f]">Sök ett område att utöka regionen med</span>
+        )}
+      </div>
       <div className="relative">
         {searchLoading
           ? <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 animate-spin pointer-events-none" />
@@ -431,7 +492,7 @@ export default function BoundariesMapPanel({
           onChange={e => { setSearchQuery(e.target.value); setShowDropdown(true) }}
           onFocus={() => setShowDropdown(true)}
           onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-          placeholder="Sök område, stadsdel eller kommun (t.ex. Farsta, Huddinge)..."
+          placeholder={addMode ? 'Sök område att lägga till...' : 'Sök område, stadsdel eller kommun (t.ex. Farsta, Huddinge)...'}
           className="w-full pl-9 pr-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
         />
         {showDropdown && searchResults.length > 0 && (
