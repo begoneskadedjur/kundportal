@@ -8,7 +8,7 @@ import {
   X, Building, Building2, Calendar, Save, Check, Map, MapPin,
   CheckSquare, Square, AlertTriangle, MessageSquare, History,
   Trash2, FileText, Users, User, Phone, Mail, ChevronDown,
-  Footprints, Clock
+  Footprints, Clock, Plus
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -19,7 +19,6 @@ import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { DROPDOWN_STATUSES } from '../../types/database'
-import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
 import { toSwedishISOString } from '../../utils/dateHelpers'
@@ -174,7 +173,7 @@ export default function RonderingCaseModal({
       if (caseData.customer_id) {
         const { data: customer } = await supabase
           .from('customers')
-          .select('*, parent:customers!customers_parent_customer_id_fkey(company_name, organization_number)')
+          .select('*')
           .eq('id', caseData.customer_id)
           .single()
         setCustomerData(customer)
@@ -508,26 +507,53 @@ export default function RonderingCaseModal({
 
             {/* Tekniker */}
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
-              <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                <Users className="w-4 h-4 text-slate-400" />
-                Tekniker
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                {[
-                  { label: 'Primär tekniker', idKey: 'primary_technician_id' as const, nameKey: 'primary_technician_name' as const },
-                  { label: 'Sekundär tekniker', idKey: 'secondary_technician_id' as const, nameKey: 'secondary_technician_name' as const },
-                  { label: 'Tertiär tekniker', idKey: 'tertiary_technician_id' as const, nameKey: 'tertiary_technician_name' as const },
-                ].map(({ label, idKey, nameKey }) => (
-                  <div key={idKey}>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">{label}</label>
-                    <TechnicianDropdown
-                      technicians={technicians}
-                      value={formData[idKey]}
-                      onChange={(id, name) => setFormData(prev => ({ ...prev, [idKey]: id, [nameKey]: name }))}
-                      placeholder="Välj tekniker..."
-                    />
-                  </div>
-                ))}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-400 mr-0.5">Tekniker</span>
+                {([
+                  { key: 'primary_technician_id' as const, nameKey: 'primary_technician_name' as const, label: 'Primär' },
+                  { key: 'secondary_technician_id' as const, nameKey: 'secondary_technician_name' as const, label: 'Sekundär' },
+                  { key: 'tertiary_technician_id' as const, nameKey: 'tertiary_technician_name' as const, label: 'Tertiär' },
+                ]).map((slot) => {
+                  const techId = formData[slot.key] || ''
+                  const tech = technicians.find(t => t.id === techId)
+                  const initials = tech ? tech.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : ''
+                  return (
+                    <div key={slot.key} className="relative">
+                      <div
+                        className={`w-9 h-9 rounded-full flex items-center justify-center cursor-pointer transition-all ${
+                          tech
+                            ? 'bg-[#20c58f]/20 border-2 border-[#20c58f]'
+                            : 'border-2 border-dashed border-slate-600 hover:border-slate-500'
+                        }`}
+                        title={tech ? `${tech.name} (${slot.label})` : `${slot.label} tekniker`}
+                      >
+                        {tech ? (
+                          <span className="text-xs font-bold text-[#20c58f]">{initials}</span>
+                        ) : (
+                          <Plus className="w-3 h-3 text-slate-500" />
+                        )}
+                      </div>
+                      <select
+                        value={techId}
+                        onChange={(e) => {
+                          const selectedTech = technicians.find(t => t.id === e.target.value)
+                          setFormData(prev => ({
+                            ...prev,
+                            [slot.key]: e.target.value,
+                            [slot.nameKey]: selectedTech?.name || '',
+                          }))
+                        }}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        title={slot.label}
+                      >
+                        <option value="">Ingen</option>
+                        {technicians.map(t => (
+                          <option key={t.id} value={t.id}>{t.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                })}
               </div>
             </div>
 
