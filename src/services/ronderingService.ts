@@ -33,8 +33,8 @@ export class RonderingService {
     status: RonderingStationStatus = 'ok',
     note?: string
   ): Promise<RonderingStationLog> {
-    // Försök INSERT — om 409 (duplicate) returnera befintlig rad
-    const { data, error } = await supabase
+    // INSERT utan .single() — hämta sedan raden explicit
+    const { error } = await supabase
       .from('rondering_station_logs')
       .insert({
         case_id: caseId,
@@ -44,25 +44,20 @@ export class RonderingService {
         status,
         note: note ?? null,
       })
-      .select()
-      .single()
 
-    if (error) {
-      // 23505 = unique_violation (PostgreSQL), PostgREST returnerar HTTP 409
-      if (error.code === '23505' || (error as any).status === 409) {
-        // Raden finns redan — hämta den
-        const { data: existing, error: fetchError } = await supabase
-          .from('rondering_station_logs')
-          .select('*')
-          .eq('case_id', caseId)
-          .eq('station_id', stationId)
-          .single()
-        if (fetchError) throw new Error(fetchError.message)
-        return existing
-      }
+    if (error && error.code !== '23505') {
       throw new Error(error.message)
     }
-    return data
+
+    // Hämta raden (oavsett om den precis skapades eller redan fanns)
+    const { data: existing, error: fetchError } = await supabase
+      .from('rondering_station_logs')
+      .select('*')
+      .eq('case_id', caseId)
+      .eq('station_id', stationId)
+      .single()
+    if (fetchError) throw new Error(fetchError.message)
+    return existing
   }
 
   static async updateLogStatus(
