@@ -20,6 +20,7 @@ import type { Absence } from '../../components/coordinator/schedule/AbsenceBlock
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
 import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal'
+import RonderingCaseModal from '../../components/coordinator/RonderingCaseModal'
 import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal'
 import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal'
 import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetailsModal'
@@ -88,9 +89,11 @@ export default function CoordinatorSchedule() {
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null)
   const [selectedContractCase, setSelectedContractCase] = useState<Case | null>(null)
   const [selectedInspectionCase, setSelectedInspectionCase] = useState<Case | null>(null)
+  const [selectedRonderingCase, setSelectedRonderingCase] = useState<Case | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false)
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false)
+  const [isRonderingModalOpen, setIsRonderingModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [caseTypeForCreate, setCaseTypeForCreate] = useState<CaseType | null>(null)
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false)
@@ -134,6 +137,7 @@ export default function CoordinatorSchedule() {
       case_type: (
         contractCase.service_type === 'establishment' ? 'establishment' :
         contractCase.service_type === 'inspection' ? 'inspection' :
+        contractCase.service_type === 'rondering_trafikkontoret' ? 'rondering' :
         'contract'
       ) as any,
       description: contractCase.description,
@@ -335,11 +339,13 @@ export default function CoordinatorSchedule() {
   // ─── Modal-hantering ───
 
   const handleOpenCaseModal = useCallback((caseData: BeGoneCaseRow) => {
-    if (caseData.case_type === 'contract' || caseData.case_type === 'establishment' || caseData.case_type === 'inspection') {
+    if (caseData.case_type === 'contract' || caseData.case_type === 'establishment' || caseData.case_type === 'inspection' || (caseData as any).case_type === 'rondering') {
       const cc = contractCases.find(c => c.id === caseData.id)
       if (cc) {
         if (cc.service_type === 'inspection') {
           setSelectedInspectionCase(cc); setIsInspectionModalOpen(true)
+        } else if (cc.service_type === 'rondering_trafikkontoret') {
+          setSelectedRonderingCase(cc); setIsRonderingModalOpen(true)
         } else {
           setSelectedContractCase(cc); setIsEditContractModalOpen(true)
         }
@@ -553,6 +559,12 @@ export default function CoordinatorSchedule() {
         onClose={() => { setIsInspectionModalOpen(false); setSelectedInspectionCase(null) }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedInspectionCase}
+      />
+      <RonderingCaseModal
+        isOpen={isRonderingModalOpen}
+        onClose={() => { setIsRonderingModalOpen(false); setSelectedRonderingCase(null) }}
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedRonderingCase}
       />
       <CreateCaseModal
         isOpen={isCreateModalOpen}

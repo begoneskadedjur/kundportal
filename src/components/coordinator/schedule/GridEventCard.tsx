@@ -55,6 +55,7 @@ export const GridEventCard = memo(function GridEventCard({
     : (caseData as any).case_type === 'business' ? 'Företag'
     : (caseData as any).case_type === 'inspection' ? 'Avtalat Servicebesök'
     : (caseData as any).case_type === 'establishment' ? 'Etablering'
+    : (caseData as any).case_type === 'rondering' ? 'Rondering TK'
     : null
 
   const displayPrimary = (caseData as any).case_type === 'inspection'

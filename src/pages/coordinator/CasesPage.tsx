@@ -12,6 +12,7 @@ import { STATUS_CONFIG, isCompletedStatus, ClickUpStatus } from '../../types/dat
 import { formatAddress } from '../../utils/addressFormatter'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
+import RonderingCaseModal from '../../components/coordinator/RonderingCaseModal'
 import toast from 'react-hot-toast'
 
 // ─── Typer ───────────────────────────────────────────────────────────────────
@@ -388,6 +389,7 @@ export default function CasesPage() {
   // Modal state
   const [editCaseOpen, setEditCaseOpen] = useState(false)
   const [editContractOpen, setEditContractOpen] = useState(false)
+  const [editRonderingOpen, setEditRonderingOpen] = useState(false)
   const [selectedCase, setSelectedCase] = useState<ArendeRow | null>(null)
 
   // ── Datahämtning ───────────────────────────────────────────────────────────
@@ -500,8 +502,15 @@ export default function CasesPage() {
 
   const openCase = (c: ArendeRow) => {
     setSelectedCase(c)
-    if (c.case_type === 'contract') setEditContractOpen(true)
-    else setEditCaseOpen(true)
+    if (c.case_type === 'contract') {
+      if ((c._raw as any)?.service_type === 'rondering_trafikkontoret') {
+        setEditRonderingOpen(true)
+      } else {
+        setEditContractOpen(true)
+      }
+    } else {
+      setEditCaseOpen(true)
+    }
   }
 
   // ── Kolumnhuvuden ─────────────────────────────────────────────────────────
@@ -645,6 +654,14 @@ export default function CasesPage() {
           isOpen={editContractOpen}
           onClose={() => { setEditContractOpen(false); setSelectedCase(null) }}
           onSuccess={() => { setEditContractOpen(false); setSelectedCase(null); fetchData() }}
+          caseData={selectedCase._raw}
+        />
+      )}
+      {editRonderingOpen && selectedCase && (
+        <RonderingCaseModal
+          isOpen={editRonderingOpen}
+          onClose={() => { setEditRonderingOpen(false); setSelectedCase(null) }}
+          onSuccess={() => { setEditRonderingOpen(false); setSelectedCase(null); fetchData() }}
           caseData={selectedCase._raw}
         />
       )}

@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus, ShoppingCart } from 'lucide-react';
+import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus, ShoppingCart, Map } from 'lucide-react';
 import CaseServiceSelector from '../../shared/CaseServiceSelector';
 import ServiceArticleSelector from '../../shared/ServiceArticleSelector';
 import { CaseBillingService } from '../../../services/caseBillingService';
@@ -58,12 +58,12 @@ const getTeamEfficiencyInfo = (score: number): { label: string; color: string } 
 interface CreateCaseModalProps {
   isOpen: boolean; onClose: () => void; onSuccess: () => void;
   technicians: Technician[]; initialCaseData?: BeGoneCaseRow | null;
-  initialCaseType?: 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | null;
+  initialCaseType?: 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | null;
 }
 
 export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
-  const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | 'establishment' | null>(null);
+  const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
   const [serviceGroupId, setServiceGroupId] = useState<string | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
@@ -568,6 +568,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       .filter(c => {
         if (caseType === 'inspection') return customersWithStations.has(c.id);
         if (caseType === 'establishment') return !c.parent_customer_id;
+        // Rondering: visa bara regionalkunder (huvud-kunder med is_regional=true)
+        if (caseType === 'rondering') return c.is_regional === true && !c.parent_customer_id;
         if (c.parent_customer_id) return false;
         return true;
       })
@@ -583,7 +585,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
   // Account Manager: hitta vilken tekniker som är kundens AM
   const accountManagerTechId = useMemo(() => {
-    if (caseType !== 'contract' && caseType !== 'inspection' && caseType !== 'establishment') return null;
+    if (caseType !== 'contract' && caseType !== 'inspection' && caseType !== 'establishment' && caseType !== 'rondering') return null;
     const siteCustomer = selectedSiteId ? contractCustomers.find(c => c.id === selectedSiteId) : null;
     const parentCustomer = selectedContractCustomer ? contractCustomers.find(c => c.id === selectedContractCustomer) : null;
     // account_manager_email lagrar @begone.se-email, kan vara slash-separerad
@@ -600,9 +602,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     return siteCustomer?.assigned_account_manager || parentCustomer?.assigned_account_manager || null;
   }, [selectedContractCustomer, selectedSiteId, contractCustomers]);
 
-  const selectCaseType = (type: 'private' | 'business' | 'contract' | 'inspection' | 'establishment') => {
+  const selectCaseType = (type: 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering') => {
     setCaseType(type);
-    if ((type === 'contract' || type === 'inspection' || type === 'establishment') && contractCustomers.length === 0) {
+    if ((type === 'contract' || type === 'inspection' || type === 'establishment' || type === 'rondering') && contractCustomers.length === 0) {
       toast.error('Inga avtalskunder hittades');
       return;
     }
@@ -774,14 +776,18 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       return toast.error("Alla fält med * under 'Bokning & Detaljer' måste vara ifyllda.");
     }
 
-    if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment') && !selectedContractCustomer) {
+    if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering') && !selectedContractCustomer) {
       return toast.error('Du måste välja en avtalskund');
     }
 
     // Validera site för multisite-kunder
     const customer = contractCustomers.find(c => c.id === selectedContractCustomer);
-    if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment') && customer?.is_multisite && !selectedSiteId) {
-      return toast.error('Du måste välja en anläggning för denna multisite-kund');
+    if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering') && customer?.is_multisite && !selectedSiteId) {
+      return toast.error('Du måste välja en region för denna kund');
+    }
+    // Rondering kräver alltid en region (kunden är alltid multisite/regional)
+    if (caseType === 'rondering' && !selectedSiteId) {
+      return toast.error('Du måste välja en region');
     }
     
     setLoading(true);
@@ -958,6 +964,34 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         }
 
         toast.success(`Etablering inbokad för ${customerName}!`);
+
+      } else if (caseType === 'rondering') {
+        // Rondering Trafikkontoret: customer_id = vald region (selectedSiteId)
+        const regionCustomerId = selectedSiteId!;
+        const regionCustomer = contractCustomers.find(c => c.id === regionCustomerId);
+        const customerName = regionCustomer?.company_name || 'Okänd region';
+
+        const { error } = await supabase.from('cases').insert([{
+          customer_id: regionCustomerId,
+          site_id: regionCustomerId,
+          title: caseNumber,
+          description: formData.description || null,
+          status: 'Bokad',
+          service_type: 'rondering_trafikkontoret',
+          scheduled_start: formData.start_date,
+          scheduled_end: formData.due_date,
+          primary_technician_id: formData.primary_assignee_id || null,
+          primary_technician_name: formData.primary_assignee_name || null,
+          secondary_technician_id: formData.secondary_assignee_id || null,
+          tertiary_technician_id: formData.tertiary_assignee_id || null,
+          contact_person: formData.kontaktperson || customer?.contact_person || null,
+          contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
+          contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
+          case_number: caseNumber,
+        }]);
+        if (error) throw error;
+
+        toast.success(`Rondering inbokad för ${customerName}!`);
 
       } else if (caseType === 'contract') {
         // Hantera avtalskundärenden
@@ -1213,6 +1247,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       case 'business': return 'Nytt ärende: Företag';
       case 'contract': return 'Nytt ärende: Avtalskund';
       case 'inspection': return 'Ny stationskontroll';
+      case 'establishment': return 'Ny etablering';
+      case 'rondering': return 'Ny rondering: Trafikkontoret';
       default: return 'Nytt ärende';
     }
   };
@@ -1271,6 +1307,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         <p className="text-xs text-lime-400 mt-1">{contractCustomers.length} kunder</p>
                       )}
                     </button>
+                    <button type="button" onClick={() => selectCaseType('rondering')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-sky-500/30 cursor-pointer">
+                      <Map className="w-6 h-6 mx-auto mb-1.5 text-sky-400" />
+                      <h3 className="text-sm font-semibold">Rondering Trafikkontoret</h3>
+                      <p className="text-xs text-slate-400 mt-1">Egenkontrollprogram</p>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1282,11 +1323,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               )}
               {error && (<div className="bg-red-500/20 border border-red-500/40 p-3 rounded-xl flex items-center gap-3"><AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" /><p className="text-sm text-red-400">{error}</p></div>)}
               
-              {/* Avtalskund-väljare (för contract och inspection) — sökbar dropdown */}
-              {(caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment') && (
-                <div className={`p-3 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : caseType === 'establishment' ? 'bg-lime-500/10 border-lime-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-xl`}>
+              {/* Avtalskund-väljare (för contract, inspection, establishment, rondering) — sökbar dropdown */}
+              {(caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering') && (
+                <div className={`p-3 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : caseType === 'establishment' ? 'bg-lime-500/10 border-lime-500/30' : caseType === 'rondering' ? 'bg-sky-500/10 border-sky-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-xl`}>
                   <label className="block text-xs font-medium text-slate-400 mb-1">
-                    {caseType === 'inspection' ? 'Välj kund med stationer *' : caseType === 'establishment' ? 'Välj avtalskund (nyetablering) *' : 'Välj avtalskund *'}
+                    {caseType === 'inspection' ? 'Välj kund med stationer *' : caseType === 'establishment' ? 'Välj avtalskund (nyetablering) *' : caseType === 'rondering' ? 'Välj regionalkund *' : 'Välj avtalskund *'}
                   </label>
                   <div ref={customerDropdownRef} className="relative">
                     <button
@@ -1304,7 +1345,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         </span>
                       ) : (
                         <span className="text-slate-500 text-sm">
-                          {caseType === 'inspection' ? 'Sök och välj kund med stationer...' : caseType === 'establishment' ? 'Sök och välj avtalskund...' : 'Sök och välj kund...'}
+                          {caseType === 'inspection' ? 'Sök och välj kund med stationer...' : caseType === 'establishment' ? 'Sök och välj avtalskund...' : caseType === 'rondering' ? 'Sök och välj regionalkund...' : 'Sök och välj kund...'}
                         </span>
                       )}
                       <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${customerDropdownOpen ? 'rotate-180' : ''}`} />
@@ -1392,6 +1433,35 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         />
                         <p className="text-xs text-slate-500 mt-1">
                           Välj vilken anläggning {caseType === 'inspection' ? 'stationskontrollen' : 'ärendet'} gäller
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()
+              )}
+
+              {/* Region-väljare för rondering — regionalkunder är alltid multisite */}
+              {caseType === 'rondering' && selectedContractCustomer && (
+                (() => {
+                  const selectedCustomer = contractCustomers.find(c => c.id === selectedContractCustomer);
+                  if (selectedCustomer?.organization_id) {
+                    return (
+                      <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-xl">
+                        <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
+                          <Map className="w-4 h-4 text-sky-400" />
+                          Välj region *
+                        </label>
+                        <SiteSelector
+                          organizationId={selectedCustomer.organization_id}
+                          value={selectedSiteId}
+                          onChange={setSelectedSiteId}
+                          required={true}
+                          placeholder="Välj region..."
+                          className="w-full"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                          Välj vilken region ronderingen gäller
                         </p>
                       </div>
                     );

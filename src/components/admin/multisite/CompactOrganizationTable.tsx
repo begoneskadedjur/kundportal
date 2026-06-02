@@ -29,6 +29,8 @@ import UnacknowledgedRecommendationsModal from './UnacknowledgedRecommendationsM
 import ConvertToMultisiteInline from './ConvertToMultisiteInline'
 import ConvertToRegionalCustomerModal from './ConvertToRegionalCustomerModal'
 import ManageRegionsModal from './ManageRegionsModal'
+import RonderingRapportView from '../RonderingRapportView'
+import { Map } from 'lucide-react'
 
 interface Organization {
   id: string
@@ -160,6 +162,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   const [selectedOrgForModal, setSelectedOrgForModal] = useState<Organization | null>(null)
   const [regionalConvertOrg, setRegionalConvertOrg] = useState<Organization | null>(null)
   const [manageRegionsOrg, setManageRegionsOrg] = useState<Organization | null>(null)
+  const [ronderingOrg, setRonderingOrg] = useState<Organization | null>(null)
 
   // Hjälpfunktion för bekräftelsestatus (trafikljus)
   const getAcknowledgmentStatus = (org: Organization) => {
@@ -391,15 +394,22 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     )
                   )}
 
-                  {/* Hantera regioner — bara för regionalkunder */}
+                  {/* Hantera regioner + Rondering — bara för regionalkunder */}
                   {org.organizationType === 'multisite' && org.is_regional && (
-                    <div className="mt-3">
+                    <div className="mt-3 flex items-center gap-2">
                       <button
                         onClick={() => setManageRegionsOrg(org)}
                         className="flex items-center gap-1.5 px-3 py-2 text-xs bg-[#20c58f]/10 text-[#20c58f] border border-[#20c58f]/30 rounded-lg hover:bg-[#20c58f]/20 min-h-[44px] transition-colors"
                       >
                         <MapPin className="w-3.5 h-3.5" />
                         Hantera regioner
+                      </button>
+                      <button
+                        onClick={() => setRonderingOrg(org)}
+                        className="flex items-center gap-1.5 px-3 py-2 text-xs bg-sky-500/10 text-sky-400 border border-sky-500/30 rounded-lg hover:bg-sky-500/20 min-h-[44px] transition-colors"
+                      >
+                        <Map className="w-3.5 h-3.5" />
+                        Rondering
                       </button>
                     </div>
                   )}
@@ -1092,6 +1102,16 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
           setManageRegionsOrg(null)
           onConvertSuccess?.()
         }}
+      />
+    )}
+
+    {/* Rondering Trafikkontoret — rapport för regionalkunder */}
+    {ronderingOrg && ronderingOrg.organization_id && (
+      <RonderingRapportView
+        isOpen={!!ronderingOrg}
+        onClose={() => setRonderingOrg(null)}
+        organizationId={ronderingOrg.organization_id}
+        organizationName={ronderingOrg.name}
       />
     )}
     </>

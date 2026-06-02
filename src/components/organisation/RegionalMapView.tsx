@@ -15,6 +15,7 @@ import {
   getEquipmentStatusLabel
 } from '../../types/database'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import { RonderingService } from '../../services/ronderingService'
 
 const SECTION_PAGE_SIZE = 10
 
@@ -79,6 +80,15 @@ export default function RegionalMapView({
   const [activeRegions, setActiveRegions] = useState<Set<string>>(new Set(sites.map(s => s.id)))
   const [selectedStation, setSelectedStation] = useState<EquipmentPlacementWithRelations | null>(null)
 
+  // Senaste rondering per region: { caseId, scheduledStart, inspected, total, actionRequired }
+  const [latestRondering, setLatestRondering] = useState<Map<string, {
+    caseId: string
+    scheduledStart: string | null
+    inspected: number
+    total: number
+    actionRequired: number
+  }>>(new Map())
+
   // Tabell-state
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -117,6 +127,42 @@ export default function RegionalMapView({
       })
 
       setRegionData(results)
+
+      // Hämta senaste rondering-ärende per region
+      try {
+        const { data: ronderingCases } = await supabase
+          .from('cases')
+          .select('id, customer_id, scheduled_start')
+          .eq('service_type', 'rondering_trafikkontoret')
+          .in('customer_id', siteIds)
+          .order('scheduled_start', { ascending: false })
+
+        if (ronderingCases && ronderingCases.length > 0) {
+          // En per region (senaste)
+          const latestPerSite = new Map<string, typeof ronderingCases[0]>()
+          for (const c of ronderingCases) {
+            if (!latestPerSite.has(c.customer_id)) latestPerSite.set(c.customer_id, c)
+          }
+
+          const ronderingMap = new Map<string, { caseId: string; scheduledStart: string | null; inspected: number; total: number; actionRequired: number }>()
+
+          await Promise.all(Array.from(latestPerSite.entries()).map(async ([siteId, rc]) => {
+            const logs = await RonderingService.getLogsForCase(rc.id)
+            const siteStations = results.find(r => r.site.id === siteId)?.stations || []
+            ronderingMap.set(siteId, {
+              caseId: rc.id,
+              scheduledStart: rc.scheduled_start,
+              inspected: logs.length,
+              total: siteStations.length,
+              actionRequired: logs.filter(l => l.status === 'action_required').length,
+            })
+          }))
+
+          setLatestRondering(ronderingMap)
+        }
+      } catch (e) {
+        // Tyst fel — rondering-data är inte kritisk
+      }
     } catch (err) {
       console.error('RegionalMapView: fel vid laddning', err)
     } finally {
@@ -229,6 +275,21 @@ export default function RegionalMapView({
                 <span className="w-2 h-2 rounded-full flex-shrink-0 transition-opacity" style={{ backgroundColor: r.color, opacity: active ? 1 : 0.4 }} />
                 {r.site.site_name}
                 <span className={`text-[11px] font-mono ${active ? 'text-slate-400' : 'text-slate-600'}`}>{r.stations.length}</span>
+                {latestRondering.has(r.site.id) && (() => {
+                  const ron = latestRondering.get(r.site.id)!
+                  const pct = ron.total > 0 ? Math.round((ron.inspected / ron.total) * 100) : 0
+                  return (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ml-0.5 ${
+                      ron.actionRequired > 0
+                        ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
+                        : pct === 100
+                        ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                        : 'bg-sky-500/20 border-sky-500/30 text-sky-300'
+                    }`} title={`Senaste rondering: ${ron.inspected}/${ron.total} stationer`}>
+                      {pct}%
+                    </span>
+                  )
+                })()}
               </button>
             )
           })}
