@@ -33,19 +33,35 @@ export class RonderingService {
     status: RonderingStationStatus = 'ok',
     note?: string
   ): Promise<RonderingStationLog> {
+    // Försök INSERT — om 409 (duplicate) returnera befintlig rad
     const { data, error } = await supabase
       .from('rondering_station_logs')
-      .upsert({
+      .insert({
         case_id: caseId,
         station_id: stationId,
         technician_id: technicianId,
         technician_name: technicianName,
         status,
         note: note ?? null,
-      }, { onConflict: 'case_id,station_id' })
+      })
       .select()
       .single()
-    if (error) throw new Error(error.message)
+
+    if (error) {
+      // 23505 = unique_violation (PostgreSQL), PostgREST returnerar HTTP 409
+      if (error.code === '23505' || (error as any).status === 409) {
+        // Raden finns redan — hämta den
+        const { data: existing, error: fetchError } = await supabase
+          .from('rondering_station_logs')
+          .select('*')
+          .eq('case_id', caseId)
+          .eq('station_id', stationId)
+          .single()
+        if (fetchError) throw new Error(fetchError.message)
+        return existing
+      }
+      throw new Error(error.message)
+    }
     return data
   }
 
