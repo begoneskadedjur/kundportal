@@ -279,7 +279,7 @@ export default function RonderingCaseModal({
           case_id: caseData.id,
           station_id: station.id,
           inspected_at: new Date().toISOString(),
-          technician_id: profile?.id || null,
+          technician_id: profile?.technician_id || null,
           technician_name: profile?.full_name || null,
           status: 'ok',
           note: null,
@@ -290,7 +290,7 @@ export default function RonderingCaseModal({
           const real = await RonderingService.logStation(
             caseData.id,
             station.id,
-            profile?.id || null,
+            profile?.technician_id || null,
             profile?.full_name || null,
             'ok'
           )
