@@ -121,7 +121,22 @@ export default function RonderingCaseModal({
   const [hasPendingImageChanges, setHasPendingImageChanges] = useState(false)
   const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
 
-  const { generateWorkReport } = useModernWorkReportGeneration()
+  const reportData = {
+    ...(caseData || {}),
+    case_type: 'contract' as const,
+    rapport: formData.work_report,
+    kontaktperson: formData.contact_person,
+    telefon_kontaktperson: formData.contact_phone,
+    e_post_kontaktperson: formData.contact_email,
+    primary_assignee_name: formData.primary_technician_name,
+    scheduled_start: formData.scheduled_start?.toISOString() ?? null,
+  }
+
+  const {
+    downloadReport, sendToTechnician, sendToContact,
+    isGenerating, canGenerateReport,
+    totalReports, hasRecentReport, currentReport, getTimeSinceReport
+  } = useModernWorkReportGeneration(reportData)
 
   const handleClose = useCallback(() => {
     if (hasPendingImageChanges && imageGalleryRef.current) {
@@ -386,10 +401,16 @@ export default function RonderingCaseModal({
           {/* Header-actionrad med rapport */}
           <div className="mb-4 -mt-4 -mx-4 px-4 py-3 bg-slate-800/30 border-b border-slate-700 flex items-center justify-end gap-2">
             <WorkReportDropdown
-              caseId={caseData?.id}
-              caseData={caseData}
-              customerData={customerData}
-              onGenerate={(text) => setFormData(prev => ({ ...prev, work_report: text }))}
+              onDownload={downloadReport}
+              onSendToTechnician={sendToTechnician}
+              onSendToContact={sendToContact}
+              disabled={!canGenerateReport || isGenerating}
+              technicianName={formData.primary_technician_name}
+              contactName={formData.contact_person}
+              totalReports={totalReports}
+              hasRecentReport={hasRecentReport}
+              currentReport={currentReport}
+              getTimeSinceReport={getTimeSinceReport}
             />
           </div>
 
