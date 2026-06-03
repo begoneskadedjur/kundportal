@@ -74,12 +74,14 @@ export default function RonderingMapSection({
   const polygonRef = useRef<google.maps.Polygon | null>(null)
 
   // GPS-spårning
+  const GPS_ACCURACY_THRESHOLD = 50 // meter — ignorera nätverkspositioner sämre än detta
   const positionMarkerRef = useRef<google.maps.Marker | null>(null)
   const trackPolylineRef = useRef<google.maps.Polyline | null>(null)
   const trackPointsRef = useRef<google.maps.LatLng[]>([])
   const watchIdRef = useRef<number | null>(null)
   const [isTracking, setIsTracking] = useState(false)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
+  const [gpsLocked, setGpsLocked] = useState(false)
 
   // Klick-dialog state
   const [pendingClick, setPendingClick] = useState<{ lat: number; lng: number } | null>(null)
@@ -268,6 +270,7 @@ export default function RonderingMapSection({
     trackPointsRef.current = []
     setIsTracking(false)
     setGpsAccuracy(null)
+    setGpsLocked(false)
   }, [])
 
   const startTracking = useCallback(() => {
@@ -278,7 +281,7 @@ export default function RonderingMapSection({
     setIsTracking(true)
     setGpsAccuracy(null)
     trackPointsRef.current = []
-    toast('GPS startat — precisionen förbättras inom 10–30 sekunder utomhus', { icon: '📍', duration: 4000 })
+    toast('GPS startat — markör visas när precisionen är under 50m', { icon: '📍', duration: 5000 })
 
     trackPolylineRef.current = new google.maps.Polyline({
       path: [],
@@ -292,6 +295,13 @@ export default function RonderingMapSection({
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
+        const accuracy = pos.coords.accuracy
+        setGpsAccuracy(Math.round(accuracy))
+
+        // Ignorera nätverkspositioner — vänta på riktig GPS-signal
+        if (accuracy > GPS_ACCURACY_THRESHOLD) return
+
+        setGpsLocked(true)
         const latLng = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude)
         if (!positionMarkerRef.current) {
           positionMarkerRef.current = new google.maps.Marker({
@@ -307,7 +317,6 @@ export default function RonderingMapSection({
         }
         trackPointsRef.current = [...trackPointsRef.current, latLng]
         trackPolylineRef.current?.setPath(trackPointsRef.current)
-        setGpsAccuracy(Math.round(pos.coords.accuracy))
       },
       (err) => {
         console.warn('GPS-fel:', err)
@@ -363,7 +372,12 @@ export default function RonderingMapSection({
           <span className="text-xs font-normal text-slate-500 ml-1">Klicka på kartan för att markera ett fel</span>
         </h3>
         <div className="flex items-center gap-2">
-          {isTracking && gpsAccuracy !== null && (
+          {isTracking && gpsAccuracy !== null && !gpsLocked && (
+            <span className="text-xs text-amber-400 animate-pulse" title="Väntar på GPS-signal">
+              Låser in... ±{gpsAccuracy}m
+            </span>
+          )}
+          {isTracking && gpsAccuracy !== null && gpsLocked && (
             <span className={`text-xs font-medium ${
               gpsAccuracy < 20 ? 'text-emerald-400' :
               gpsAccuracy < 50 ? 'text-amber-400' : 'text-red-400'
