@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useGoogleMaps } from '../../hooks/useGoogleMaps'
+import Select from '../ui/Select'
 import { supabase } from '../../lib/supabase'
 import { Camera, Trash2, MapPin, X, Check } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -281,24 +282,19 @@ export default function RonderingMapSection({
             </div>
 
             {/* Kategori-väljare */}
-            <div className="grid grid-cols-5 gap-1 mb-2">
-              {(Object.entries(ANNOTATION_CATEGORIES) as [RonderingAnnotationCategory, typeof ANNOTATION_CATEGORIES[keyof typeof ANNOTATION_CATEGORIES]][]).map(([key, cat]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setNewCategory(key)}
-                  title={cat.label}
-                  className={`flex flex-col items-center p-1.5 rounded-lg text-xs transition-all ${
-                    newCategory === key
-                      ? 'ring-2 ring-white bg-slate-700'
-                      : 'bg-slate-800 hover:bg-slate-700'
-                  }`}
-                >
-                  <span className="text-base">{cat.emoji}</span>
-                </button>
-              ))}
+            <div className="mb-2">
+              <Select
+                value={newCategory}
+                onChange={val => setNewCategory(val as RonderingAnnotationCategory)}
+                options={[
+                  { value: 'rats',       label: 'Råttaktivitet' },
+                  { value: 'birds',      label: 'Fågelspillning' },
+                  { value: 'insects',    label: 'Insektsangrepp' },
+                  { value: 'sanitation', label: 'Sanitärt problem' },
+                  { value: 'other',      label: 'Övrigt' },
+                ]}
+              />
             </div>
-            <p className="text-xs text-slate-400 mb-2">{ANNOTATION_CATEGORIES[newCategory].label}</p>
 
             {/* Anteckning */}
             <textarea
@@ -339,7 +335,7 @@ export default function RonderingMapSection({
             const cat = ANNOTATION_CATEGORIES[ann.category]
             return (
               <div key={ann.id} className="flex items-start gap-2 px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
-                <span className="text-lg flex-shrink-0 mt-0.5">{cat.emoji}</span>
+                <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: cat.color }} />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium" style={{ color: cat.color }}>{cat.label}</p>
                   {ann.note && <p className="text-xs text-slate-400 mt-0.5">{ann.note}</p>}

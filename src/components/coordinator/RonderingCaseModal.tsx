@@ -255,7 +255,7 @@ export default function RonderingCaseModal({
 
       setShowSaveSuccess(true)
       setTimeout(() => setShowSaveSuccess(false), 2000)
-      onSuccess?.()
+      onSuccess?.(caseData)
     } catch (e: any) {
       toast.error(e.message || 'Kunde inte spara')
     } finally {
