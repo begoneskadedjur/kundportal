@@ -45,6 +45,7 @@ import InvoicingPage from './pages/admin/invoicing';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import CustomerAnalytics from './pages/admin/CustomerAnalytics';
+import RonderingPage from './pages/admin/RonderingPage';
 import MonthlyReport from './pages/admin/MonthlyReport';
 import ImageBank from './pages/admin/ImageBank';
 import TeamChat from './pages/admin/TeamChat';
@@ -145,6 +146,7 @@ function App() {
               <Route path="dashboard-demo" element={<ProtectedRoute requiredRole="admin"><DashboardDemo /></ProtectedRoute>} />
               <Route path="befintliga-kunder" element={<ProtectedRoute requiredRole="admin"><Customers /></ProtectedRoute>} />
               <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="admin"><CustomerDetails /></ProtectedRoute>} />
+              <Route path="rondering" element={<ProtectedRoute requiredRole="admin"><RonderingPage /></ProtectedRoute>} />
               <Route path="kundprognos" element={<ProtectedRoute requiredRole="admin"><CustomerAnalytics /></ProtectedRoute>} />
               <Route path="manadsrapport" element={<ProtectedRoute requiredRole="admin"><MonthlyReport /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><Leads /></ProtectedRoute>} />

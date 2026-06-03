@@ -13,6 +13,7 @@ interface RonderingRapportViewProps {
   onClose: () => void
   organizationId: string // organization_id som delas av alla region-kunder
   organizationName: string
+  mode?: 'modal' | 'page'
 }
 
 interface RonderingCase {
@@ -40,6 +41,7 @@ export default function RonderingRapportView({
   onClose,
   organizationId,
   organizationName,
+  mode = 'modal',
 }: RonderingRapportViewProps) {
   const [cases, setCases] = useState<RonderingCase[]>([])
   const [loading, setLoading] = useState(false)
@@ -47,7 +49,8 @@ export default function RonderingRapportView({
   const [expandedLogs, setExpandedLogs] = useState<Record<string, any[]>>({})
 
   useEffect(() => {
-    if (!isOpen || !organizationId) return
+    if (mode === 'modal' && !isOpen) return
+    if (!organizationId) return
     const load = async () => {
       setLoading(true)
       try {
@@ -114,7 +117,7 @@ export default function RonderingRapportView({
       }
     }
     load()
-  }, [isOpen, organizationId])
+  }, [isOpen, organizationId, mode])
 
   const toggleCase = async (caseId: string) => {
     if (expandedCase === caseId) {
@@ -128,28 +131,10 @@ export default function RonderingRapportView({
     }
   }
 
-  if (!isOpen) return null
+  if (mode === 'modal' && !isOpen) return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
-          <div>
-            <div className="flex items-center gap-2">
-              <Map className="w-5 h-5 text-sky-400" />
-              <h2 className="text-lg font-semibold text-white">Rondering Trafikkontoret</h2>
-            </div>
-            <p className="text-sm text-slate-400 mt-0.5">{organizationName}</p>
-          </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+  const content = (
+    <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {loading ? (
             <div className="py-12 text-center text-slate-400">Laddar ronderingshistorik...</div>
           ) : cases.length === 0 ? (
@@ -257,6 +242,28 @@ export default function RonderingRapportView({
             })
           )}
         </div>
+  )
+
+  if (mode === 'page') return content
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700">
+          <div>
+            <div className="flex items-center gap-2">
+              <Map className="w-5 h-5 text-sky-400" />
+              <h2 className="text-lg font-semibold text-white">Rondering Trafikkontoret</h2>
+            </div>
+            <p className="text-sm text-slate-400 mt-0.5">{organizationName}</p>
+          </div>
+          <button onClick={onClose} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        {content}
       </div>
     </div>
   )
