@@ -79,6 +79,7 @@ export default function RonderingMapSection({
   const trackPointsRef = useRef<google.maps.LatLng[]>([])
   const watchIdRef = useRef<number | null>(null)
   const [isTracking, setIsTracking] = useState(false)
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
 
   // Klick-dialog state
   const [pendingClick, setPendingClick] = useState<{ lat: number; lng: number } | null>(null)
@@ -112,10 +113,6 @@ export default function RonderingMapSection({
       fullscreenControl: false,
     })
 
-    if (stations.length > 1) {
-      mapRef.current.fitBounds(bounds, 40)
-    }
-
     // Klick på kartan → öppna dialog
     mapRef.current.addListener('click', (e: google.maps.MapMouseEvent) => {
       if (!e.latLng) return
@@ -124,7 +121,7 @@ export default function RonderingMapSection({
       setNewCategory('rats')
     })
 
-    // Hämta regionpolygon
+    // Hämta regionpolygon — centrera kartan på polygonens bbox
     supabase
       .from('customer_regions')
       .select('geojson_polygon, color')
@@ -144,6 +141,10 @@ export default function RonderingMapSection({
           map: mapRef.current,
           clickable: false,
         })
+        // Centrera kartan på polygonens faktiska yta
+        const polyBounds = new google.maps.LatLngBounds()
+        paths.forEach(p => polyBounds.extend(p))
+        mapRef.current!.fitBounds(polyBounds, 40)
       })
   }, [isLoaded, customerId])
 
@@ -266,6 +267,7 @@ export default function RonderingMapSection({
     trackPolylineRef.current = null
     trackPointsRef.current = []
     setIsTracking(false)
+    setGpsAccuracy(null)
   }, [])
 
   const startTracking = useCallback(() => {
@@ -274,7 +276,9 @@ export default function RonderingMapSection({
       return
     }
     setIsTracking(true)
+    setGpsAccuracy(null)
     trackPointsRef.current = []
+    toast('GPS startat — precisionen förbättras inom 10–30 sekunder utomhus', { icon: '📍', duration: 4000 })
 
     trackPolylineRef.current = new google.maps.Polyline({
       path: [],
@@ -303,12 +307,13 @@ export default function RonderingMapSection({
         }
         trackPointsRef.current = [...trackPointsRef.current, latLng]
         trackPolylineRef.current?.setPath(trackPointsRef.current)
+        setGpsAccuracy(Math.round(pos.coords.accuracy))
       },
       (err) => {
         console.warn('GPS-fel:', err)
         if (err.code === 1) toast.error('Tillstånd för plats nekades')
       },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     )
   }, [])
 
@@ -357,20 +362,30 @@ export default function RonderingMapSection({
           Avvikelsekarta
           <span className="text-xs font-normal text-slate-500 ml-1">Klicka på kartan för att markera ett fel</span>
         </h3>
-        <button
-          type="button"
-          onClick={isTracking ? stopTracking : startTracking}
-          disabled={!isLoaded}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
-            isTracking
-              ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
-              : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
-          }`}
-          title={isTracking ? 'Stoppa GPS-spårning' : 'Starta GPS-spårning — visar din position på kartan'}
-        >
-          <Navigation className={`w-3.5 h-3.5 ${isTracking ? 'animate-pulse' : ''}`} />
-          {isTracking ? 'Stoppa GPS' : 'Starta GPS'}
-        </button>
+        <div className="flex items-center gap-2">
+          {isTracking && gpsAccuracy !== null && (
+            <span className={`text-xs font-medium ${
+              gpsAccuracy < 20 ? 'text-emerald-400' :
+              gpsAccuracy < 50 ? 'text-amber-400' : 'text-red-400'
+            }`} title="GPS-precision">
+              ±{gpsAccuracy}m
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={isTracking ? stopTracking : startTracking}
+            disabled={!isLoaded}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+              isTracking
+                ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
+                : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+            }`}
+            title={isTracking ? 'Stoppa GPS-spårning' : 'Starta GPS-spårning — visar din position på kartan'}
+          >
+            <Navigation className={`w-3.5 h-3.5 ${isTracking ? 'animate-pulse' : ''}`} />
+            {isTracking ? 'Stoppa GPS' : 'Starta GPS'}
+          </button>
+        </div>
       </div>
 
       {/* Karta */}
