@@ -28,8 +28,9 @@ import { CaseType } from '../../types/communication'
 import RevisitContractModal from './RevisitContractModal'
 import VisitHistoryPanel from './VisitHistoryPanel'
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
-import { RonderingService, RonderingStationLog, RonderingStationStatus } from '../../services/ronderingService'
+import { RonderingService, RonderingStationLog, RonderingStationStatus, RonderingAnnotation } from '../../services/ronderingService'
 import { EquipmentService } from '../../services/equipmentService'
+import RonderingMapSection from './RonderingMapSection'
 
 registerLocale('sv', sv)
 
@@ -105,8 +106,10 @@ export default function RonderingCaseModal({
   const [technicians, setTechnicians] = useState<any[]>([])
   const [stations, setStations] = useState<Station[]>([])
   const [stationLogs, setStationLogs] = useState<RonderingStationLog[]>([])
+  const [annotations, setAnnotations] = useState<RonderingAnnotation[]>([])
   const [loadingStations, setLoadingStations] = useState(false)
   const [stationSearch, setStationSearch] = useState('')
+  const stationListRef = useRef<HTMLDivElement>(null)
 
   // Förhindra dubbelklick — håller reda på vilka stationer som håller på att processas
   const [pendingStations, setPendingStations] = useState<Set<string>>(new Set())
@@ -212,9 +215,13 @@ export default function RonderingCaseModal({
         setLoadingStations(false)
       }
 
-      // Befintliga avbockningar
-      const logs = await RonderingService.getLogsForCase(caseData.id)
+      // Befintliga avbockningar och annotationer (parallellt)
+      const [logs, anns] = await Promise.all([
+        RonderingService.getLogsForCase(caseData.id),
+        RonderingService.getAnnotationsForCase(caseData.id),
+      ])
       setStationLogs(logs)
+      setAnnotations(anns)
     }
 
     load()
@@ -568,7 +575,7 @@ export default function RonderingCaseModal({
             </div>
 
             {/* Stationslista */}
-            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+            <div ref={stationListRef} className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-sky-400" />
@@ -615,6 +622,7 @@ export default function RonderingCaseModal({
                       return (
                         <div
                           key={station.id}
+                          data-station-id={station.id}
                           className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isChecked ? 'bg-slate-800/60' : 'hover:bg-slate-800/40'}`}
                         >
                           {/* Checkbox */}
@@ -681,6 +689,25 @@ export default function RonderingCaseModal({
                 </div>
               )}
             </div>
+
+            {/* Avvikelsekarta */}
+            {caseData?.id && caseData?.customer_id && (
+              <RonderingMapSection
+                stations={stations}
+                stationLogs={stationLogs}
+                annotations={annotations}
+                caseId={caseData.id}
+                customerId={caseData.customer_id}
+                technicianName={formData.primary_technician_name || profile?.full_name || null}
+                onAnnotationAdded={ann => setAnnotations(prev => [...prev, ann])}
+                onAnnotationDeleted={id => setAnnotations(prev => prev.filter(a => a.id !== id))}
+                onStationClick={stationId => {
+                  // Scrolla stationslistan till rätt rad
+                  const el = stationListRef.current?.querySelector(`[data-station-id="${stationId}"]`)
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                }}
+              />
+            )}
 
             {/* Arbetsrapport */}
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">

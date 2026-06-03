@@ -14,6 +14,28 @@ export interface RonderingStationLog {
 
 export type RonderingStationStatus = 'ok' | 'action_required' | 'missing'
 
+export type RonderingAnnotationCategory = 'rats' | 'birds' | 'insects' | 'sanitation' | 'other'
+
+export interface RonderingAnnotation {
+  id: string
+  case_id: string
+  station_id: string | null
+  latitude: number
+  longitude: number
+  category: RonderingAnnotationCategory
+  note: string | null
+  technician_name: string | null
+  created_at: string
+}
+
+export const ANNOTATION_CATEGORIES: Record<RonderingAnnotationCategory, { label: string; color: string; emoji: string }> = {
+  rats:       { label: 'Råttaktivitet',    color: '#ef4444', emoji: '🐀' },
+  birds:      { label: 'Fågelspillning',   color: '#f97316', emoji: '🐦' },
+  insects:    { label: 'Insektsangrepp',   color: '#eab308', emoji: '🪲' },
+  sanitation: { label: 'Sanitärt problem', color: '#a855f7', emoji: '⚠️' },
+  other:      { label: 'Övrigt',           color: '#6b7280', emoji: '📍' },
+}
+
 export class RonderingService {
   static async getLogsForCase(caseId: string): Promise<RonderingStationLog[]> {
     const { data, error } = await supabase
@@ -78,6 +100,46 @@ export class RonderingService {
       .delete()
       .eq('case_id', caseId)
       .eq('station_id', stationId)
+    if (error) throw new Error(error.message)
+  }
+
+  // ── Annotationer ────────────────────────────────────────────────────────────
+
+  static async getAnnotationsForCase(caseId: string): Promise<RonderingAnnotation[]> {
+    const { data, error } = await supabase
+      .from('rondering_annotations')
+      .select('*')
+      .eq('case_id', caseId)
+      .order('created_at', { ascending: true })
+    if (error) throw new Error(error.message)
+    return data ?? []
+  }
+
+  static async addAnnotation(
+    caseId: string,
+    latitude: number,
+    longitude: number,
+    category: RonderingAnnotationCategory,
+    note: string | null,
+    technicianName: string | null,
+    stationId?: string
+  ): Promise<RonderingAnnotation> {
+    const { data, error } = await supabase
+      .from('rondering_annotations')
+      .insert({ case_id: caseId, latitude, longitude, category, note, technician_name: technicianName, station_id: stationId ?? null })
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return data
+  }
+
+  static async updateAnnotation(id: string, patch: Partial<Pick<RonderingAnnotation, 'note' | 'category'>>): Promise<void> {
+    const { error } = await supabase.from('rondering_annotations').update(patch).eq('id', id)
+    if (error) throw new Error(error.message)
+  }
+
+  static async deleteAnnotation(id: string): Promise<void> {
+    const { error } = await supabase.from('rondering_annotations').delete().eq('id', id)
     if (error) throw new Error(error.message)
   }
 
