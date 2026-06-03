@@ -386,7 +386,9 @@ export default function RonderingRapportView({
     return lv < pv ? 'down' : lv > pv ? 'up' : 'flat'
   }
 
+  // Kartan visar bara stationer med 3+ månader i rad med Allt förbrukat
   const hotspots: Hotspot[] = highRiskStations.flatMap(s => {
+    if (consecutiveAll(s.station_id) < 3) return []
     const coord = stationCoordMap[s.station_id]
     return coord ? [{ station_id: s.station_id, serial_number: s.serial_number, lat: coord.lat, lng: coord.lng }] : []
   })
@@ -566,13 +568,14 @@ export default function RonderingRapportView({
                       <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tick={{ fill: '#94a3b8' }} />
                       <YAxis stroke="#94a3b8" fontSize={11} tick={{ fill: '#94a3b8' }} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                        contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
                         labelStyle={{ color: '#f1f5f9', fontWeight: 600 }}
-                        itemStyle={{ color: '#94a3b8' }}
+                        itemStyle={{ color: '#cbd5e1' }}
+                        cursor={{ fill: 'rgba(255,255,255,0.05)' }}
                       />
-                      <Bar dataKey="Allt" stackId="a" fill="#ef4444" radius={[0,0,0,0]} isAnimationActive={false} />
-                      <Bar dataKey="Delvis" stackId="a" fill="#f59e0b" isAnimationActive={false} />
-                      <Bar dataKey="Inget" stackId="a" fill="#22c55e" radius={[3,3,0,0]} isAnimationActive={false} />
+                      <Bar dataKey="Allt" fill="#ef4444" radius={[3,3,0,0]} isAnimationActive={false} />
+                      <Bar dataKey="Delvis" fill="#f59e0b" radius={[3,3,0,0]} isAnimationActive={false} />
+                      <Bar dataKey="Inget" fill="#22c55e" radius={[3,3,0,0]} isAnimationActive={false} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -610,8 +613,8 @@ export default function RonderingRapportView({
                 <div className="rounded-lg overflow-hidden border border-slate-700 text-xs">
                   <div className="grid grid-cols-5 bg-slate-900/60">
                     <div className="px-3 py-2 font-semibold text-slate-400">Station</div>
-                    <div className="px-3 py-2 font-semibold text-slate-400 text-center">Ggr Allt</div>
-                    <div className="px-3 py-2 font-semibold text-slate-400 text-center">I rad</div>
+                    <div className="px-3 py-2 font-semibold text-slate-400 text-center">Totalt</div>
+                    <div className="px-3 py-2 font-semibold text-slate-400 text-center">Månader i rad</div>
                     <div className="px-3 py-2 font-semibold text-slate-400 text-center">Senaste</div>
                     <div className="px-3 py-2 font-semibold text-slate-400">Trend</div>
                   </div>
@@ -624,7 +627,7 @@ export default function RonderingRapportView({
                         <div className="px-3 py-2 font-mono text-slate-200">{s.serial_number || s.station_id.slice(0, 8)}</div>
                         <div className="px-3 py-2 text-center text-red-300 font-semibold">{s.allCount}×</div>
                         <div className="px-3 py-2 text-center">
-                          {consec >= 2
+                          {consec >= 3
                             ? <span className="px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/30 text-red-300 font-semibold">{consec}×</span>
                             : <span className="text-slate-500">{consec > 0 ? `${consec}×` : '—'}</span>
                           }
