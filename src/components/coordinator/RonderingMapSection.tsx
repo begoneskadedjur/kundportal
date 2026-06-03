@@ -15,7 +15,8 @@ import {
   ANNOTATION_CATEGORIES,
   RonderingService,
 } from '../../services/ronderingService'
-import { CaseImageService } from '../../services/caseImageService'
+import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
+import ImageLightbox from '../shared/ImageLightbox'
 
 interface Station {
   id: string
@@ -77,6 +78,10 @@ export default function RonderingMapSection({
   const [newCategory, setNewCategory] = useState<RonderingAnnotationCategory>('rats')
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Bilder per annotation: annotationId → lista med bilder
+  const [annotationImages, setAnnotationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
+  const [lightbox, setLightbox] = useState<{ images: { url: string; alt: string }[]; index: number } | null>(null)
 
   // Fil-input refs per annotation (för bilduppladdning)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -239,6 +244,23 @@ export default function RonderingMapSection({
     }
   }, [onAnnotationDeleted])
 
+  const fetchAnnotationImages = useCallback(async (annotationId: string) => {
+    try {
+      const all = await CaseImageService.getCaseImages(caseId, 'contract')
+      const filtered = all.filter(img => img.description === `annotation:${annotationId}`)
+      setAnnotationImages(prev => ({ ...prev, [annotationId]: filtered }))
+    } catch { /* tyst fel */ }
+  }, [caseId])
+
+  // Ladda bilder för alla annotationer när de ändras
+  useEffect(() => {
+    annotations.forEach(ann => {
+      if (!annotationImages[ann.id]) {
+        fetchAnnotationImages(ann.id)
+      }
+    })
+  }, [annotations])
+
   const uploadImage = useCallback(async (annotationId: string, file: File) => {
     try {
       await CaseImageService.uploadCaseImage(
@@ -249,6 +271,8 @@ export default function RonderingMapSection({
         `annotation:${annotationId}`
       )
       toast.success('Bild uppladdad')
+      // Uppdatera bildlistan för denna annotation
+      fetchAnnotationImages(annotationId)
     } catch (e: any) {
       toast.error(e.message || 'Kunde inte ladda upp bild')
     }
@@ -333,47 +357,75 @@ export default function RonderingMapSection({
           <p className="text-xs font-medium text-slate-400">{annotations.length} avvikelse{annotations.length !== 1 ? 'r' : ''}</p>
           {annotations.map(ann => {
             const cat = ANNOTATION_CATEGORIES[ann.category]
+            const imgs = annotationImages[ann.id] || []
             return (
-              <div key={ann.id} className="flex items-start gap-2 px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
-                <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: cat.color }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium" style={{ color: cat.color }}>{cat.label}</p>
-                  {ann.note && <p className="text-xs text-slate-400 mt-0.5">{ann.note}</p>}
-                  <p className="text-[10px] text-slate-600 mt-0.5">
-                    {ann.technician_name} · {new Date(ann.created_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </p>
+              <div key={ann.id} className="flex flex-col gap-2 px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">
+                {/* Huvud-rad */}
+                <div className="flex items-start gap-2">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: cat.color }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium" style={{ color: cat.color }}>{cat.label}</p>
+                    {ann.note && <p className="text-xs text-slate-400 mt-0.5">{ann.note}</p>}
+                    <p className="text-[10px] text-slate-600 mt-0.5">
+                      {ann.technician_name} · {new Date(ann.created_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {/* Bilduppladdning */}
+                    <button
+                      type="button"
+                      title="Lägg till bild"
+                      onClick={() => fileInputRefs.current[ann.id]?.click()}
+                      className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 rounded transition-colors"
+                    >
+                      <Camera className="w-3.5 h-3.5" />
+                    </button>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      ref={el => { fileInputRefs.current[ann.id] = el }}
+                      onChange={e => {
+                        const file = e.target.files?.[0]
+                        if (file) uploadImage(ann.id, file)
+                        e.target.value = ''
+                      }}
+                    />
+                    {/* Radera */}
+                    <button
+                      type="button"
+                      title="Radera avvikelse"
+                      onClick={() => deleteAnnotation(ann.id)}
+                      className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {/* Bilduppladdning */}
-                  <button
-                    type="button"
-                    title="Lägg till bild"
-                    onClick={() => fileInputRefs.current[ann.id]?.click()}
-                    className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 rounded transition-colors"
-                  >
-                    <Camera className="w-3.5 h-3.5" />
-                  </button>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    ref={el => { fileInputRefs.current[ann.id] = el }}
-                    onChange={e => {
-                      const file = e.target.files?.[0]
-                      if (file) uploadImage(ann.id, file)
-                      e.target.value = ''
-                    }}
-                  />
-                  {/* Radera */}
-                  <button
-                    type="button"
-                    title="Radera avvikelse"
-                    onClick={() => deleteAnnotation(ann.id)}
-                    className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
+
+                {/* Thumbnails */}
+                {imgs.length > 0 && (
+                  <div className="flex gap-1.5 flex-wrap ml-4">
+                    {imgs.map((img, idx) => (
+                      <button
+                        key={img.id}
+                        type="button"
+                        onClick={() => setLightbox({
+                          images: imgs.map(i => ({ url: i.url, alt: i.file_name || '' })),
+                          index: idx,
+                        })}
+                        className="w-14 h-14 rounded-lg overflow-hidden border border-slate-600 hover:border-slate-400 transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.file_name || ''}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -382,6 +434,16 @@ export default function RonderingMapSection({
 
       {annotations.length === 0 && (
         <p className="text-xs text-slate-600 text-center py-1">Inga avvikelser markerade</p>
+      )}
+
+      {/* Lightbox */}
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images}
+          initialIndex={lightbox.index}
+          isOpen={true}
+          onClose={() => setLightbox(null)}
+        />
       )}
     </div>
   )
