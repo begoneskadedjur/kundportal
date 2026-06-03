@@ -68,6 +68,12 @@ const STATUS_BG: Record<RonderingStationStatus, string> = {
   missing: 'bg-red-500/20 border-red-500/30',
 }
 
+const BAIT_LABEL: Record<'all' | 'partial' | 'none', string> = {
+  all: 'Allt',
+  partial: 'Delvis',
+  none: 'Inget',
+}
+
 function formatDateTime(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }) +
@@ -117,6 +123,9 @@ export default function RonderingCaseModal({
   // Status-meny per station
   const [openStatusMenu, setOpenStatusMenu] = useState<string | null>(null)
   const [noteModal, setNoteModal] = useState<{ stationId: string; logId: string; currentNote: string } | null>(null)
+
+  // Beteåtgång-dialog — visas när tekniker bockar i en station
+  const [baitDialog, setBaitDialog] = useState<{ station: Station } | null>(null)
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
@@ -266,47 +275,59 @@ export default function RonderingCaseModal({
   // Bocka av / avbocka station
   const toggleStation = async (station: Station) => {
     if (pendingStations.has(station.id)) return
-    setPendingStations(prev => new Set(prev).add(station.id))
 
     const existing = stationLogs.find(l => l.station_id === station.id)
-    try {
-      if (existing) {
-        // Avbocka
-        setStationLogs(prev => prev.filter(l => l.station_id !== station.id))
-        try {
-          await RonderingService.removeLog(caseData.id, station.id)
-        } catch {
-          setStationLogs(prev => [...prev, existing])
-          toast.error('Kunde inte ta bort avbockning')
-        }
-      } else {
-        // Bocka av — optimistisk uppdatering
-        const optimistic: RonderingStationLog = {
-          id: `tmp-${station.id}`,
-          case_id: caseData.id,
-          station_id: station.id,
-          inspected_at: new Date().toISOString(),
-          technician_id: profile?.technician_id || null,
-          technician_name: profile?.full_name || null,
-          status: 'ok',
-          note: null,
-          created_at: new Date().toISOString(),
-        }
-        setStationLogs(prev => [...prev, optimistic])
-        try {
-          const real = await RonderingService.logStation(
-            caseData.id,
-            station.id,
-            profile?.technician_id || null,
-            profile?.full_name || null,
-            'ok'
-          )
-          setStationLogs(prev => prev.map(l => l.id === optimistic.id ? real : l))
-        } catch {
-          setStationLogs(prev => prev.filter(l => l.id !== optimistic.id))
-          toast.error('Kunde inte logga inspektion')
-        }
+    if (existing) {
+      // Avbocka — ta bort direkt utan dialog
+      setPendingStations(prev => new Set(prev).add(station.id))
+      setStationLogs(prev => prev.filter(l => l.station_id !== station.id))
+      try {
+        await RonderingService.removeLog(caseData.id, station.id)
+      } catch {
+        setStationLogs(prev => [...prev, existing])
+        toast.error('Kunde inte ta bort avbockning')
+      } finally {
+        setPendingStations(prev => { const next = new Set(prev); next.delete(station.id); return next })
       }
+    } else {
+      // Bocka av — öppna beteåtgång-dialog
+      setBaitDialog({ station })
+    }
+  }
+
+  // Bekräfta avbockning med beteåtgång
+  const confirmBait = async (baitConsumed: 'all' | 'partial' | 'none') => {
+    if (!baitDialog) return
+    const { station } = baitDialog
+    setBaitDialog(null)
+    setPendingStations(prev => new Set(prev).add(station.id))
+
+    const optimistic: RonderingStationLog = {
+      id: `tmp-${station.id}`,
+      case_id: caseData.id,
+      station_id: station.id,
+      inspected_at: new Date().toISOString(),
+      technician_id: profile?.technician_id || null,
+      technician_name: profile?.full_name || null,
+      status: 'ok',
+      bait_consumed: baitConsumed,
+      note: null,
+      created_at: new Date().toISOString(),
+    }
+    setStationLogs(prev => [...prev, optimistic])
+    try {
+      const real = await RonderingService.logStation(
+        caseData.id,
+        station.id,
+        profile?.technician_id || null,
+        profile?.full_name || null,
+        'ok',
+        baitConsumed
+      )
+      setStationLogs(prev => prev.map(l => l.id === optimistic.id ? real : l))
+    } catch {
+      setStationLogs(prev => prev.filter(l => l.id !== optimistic.id))
+      toast.error('Kunde inte logga inspektion')
     } finally {
       setPendingStations(prev => { const next = new Set(prev); next.delete(station.id); return next })
     }
@@ -655,6 +676,13 @@ export default function RonderingCaseModal({
                                 {log.technician_name && ` · ${log.technician_name.split(' ')[0]}`}
                               </span>
 
+                              {/* Beteåtgång */}
+                              {log.bait_consumed && (
+                                <span className="text-xs text-slate-400 font-medium">
+                                  {BAIT_LABEL[log.bait_consumed]}
+                                </span>
+                              )}
+
                               {/* Status-badge + dropdown */}
                               <div className="relative">
                                 <button
@@ -689,6 +717,35 @@ export default function RonderingCaseModal({
                 </div>
               )}
             </div>
+
+            {/* Beteåtgång-dialog — visas när tekniker bockar i en ny station */}
+            {baitDialog && (
+              <div className="p-3 bg-slate-800 border border-[#20c58f]/40 rounded-xl">
+                <p className="text-sm font-semibold text-white mb-1">
+                  Bete uppätet till — station {baitDialog.station.serial_number}
+                </p>
+                <p className="text-xs text-slate-400 mb-3">Välj hur mycket bete som förbrukats</p>
+                <div className="flex gap-2 flex-wrap">
+                  {(['all', 'partial', 'none'] as const).map(val => (
+                    <button
+                      key={val}
+                      type="button"
+                      onClick={() => confirmBait(val)}
+                      className="flex-1 min-w-[70px] px-3 py-2 rounded-lg border border-slate-600 bg-slate-700 hover:bg-slate-600 hover:border-[#20c58f]/50 text-sm font-medium text-white transition-colors"
+                    >
+                      {BAIT_LABEL[val]}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBaitDialog(null)}
+                  className="mt-2 w-full text-xs text-slate-500 hover:text-slate-300 transition-colors py-1"
+                >
+                  Avbryt
+                </button>
+              </div>
+            )}
 
             {/* Avvikelsekarta */}
             {caseData?.id && caseData?.customer_id && (

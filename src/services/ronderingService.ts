@@ -8,6 +8,7 @@ export interface RonderingStationLog {
   technician_id: string | null
   technician_name: string | null
   status: 'ok' | 'action_required' | 'missing'
+  bait_consumed: 'all' | 'partial' | 'none' | null
   note: string | null
   created_at: string
 }
@@ -53,6 +54,7 @@ export class RonderingService {
     technicianId: string | null,
     technicianName: string | null,
     status: RonderingStationStatus = 'ok',
+    baitConsumed?: 'all' | 'partial' | 'none',
     note?: string
   ): Promise<RonderingStationLog> {
     // INSERT utan .single() — hämta sedan raden explicit
@@ -64,6 +66,7 @@ export class RonderingService {
         technician_id: technicianId,
         technician_name: technicianName,
         status,
+        bait_consumed: baitConsumed ?? null,
         note: note ?? null,
       })
 

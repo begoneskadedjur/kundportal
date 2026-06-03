@@ -74,11 +74,11 @@ export default function RonderingMapSection({
   const polygonRef = useRef<google.maps.Polygon | null>(null)
 
   // GPS-spårning
-  const GPS_ACCURACY_THRESHOLD = 50 // meter — visa inte markör förrän precisionen är bättre än detta
+  const GPS_ACCURACY_THRESHOLD = 100 // meter — visa markör direkt och låt precisionen förbättras
   const positionMarkerRef = useRef<google.maps.Marker | null>(null)
   const trackPolylineRef = useRef<google.maps.Polyline | null>(null)
   const trackPointsRef = useRef<google.maps.LatLng[]>([])
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const watchIdRef = useRef<number | null>(null)
   const [isTracking, setIsTracking] = useState(false)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
   const [gpsLocked, setGpsLocked] = useState(false)
@@ -186,7 +186,7 @@ export default function RonderingMapSection({
         onStationClick(station.id)
         setPendingClick(null)
         // Om GPS-spårning är aktiv → öppna navigation i Google Maps
-        if (pollIntervalRef.current !== null) {
+        if (watchIdRef.current !== null) {
           window.open(`https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}&travelmode=walking`)
         }
       })
@@ -259,9 +259,9 @@ export default function RonderingMapSection({
   }, [onAnnotationDeleted])
 
   const stopTracking = useCallback(() => {
-    if (pollIntervalRef.current !== null) {
-      clearInterval(pollIntervalRef.current)
-      pollIntervalRef.current = null
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
     }
     positionMarkerRef.current?.setMap(null)
     positionMarkerRef.current = null
@@ -295,28 +295,17 @@ export default function RonderingMapSection({
     trackPolylineRef.current?.setPath(trackPointsRef.current)
   }, [])
 
-  const fetchGooglePosition = useCallback(async () => {
-    try {
-      const res = await fetch('/api/geolocate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      })
-      if (!res.ok) return
-      const { lat, lng, accuracy } = await res.json()
-      if (typeof lat === 'number' && typeof lng === 'number' && typeof accuracy === 'number') {
-        updatePosition(lat, lng, accuracy)
-      }
-    } catch { /* tyst — nätverksfel */ }
-  }, [updatePosition])
-
   const startTracking = useCallback(() => {
     if (!mapRef.current) return
+    if (!navigator.geolocation) {
+      toast.error('GPS stöds inte i denna webbläsare')
+      return
+    }
     setIsTracking(true)
     setGpsAccuracy(null)
     setGpsLocked(false)
     trackPointsRef.current = []
-    toast('GPS startat — markör visas när precisionen är under 50m', { icon: '📍', duration: 5000 })
+    toast('GPS startat — väntar på signal...', { icon: '📍', duration: 5000 })
 
     trackPolylineRef.current = new google.maps.Polyline({
       path: [],
@@ -328,9 +317,14 @@ export default function RonderingMapSection({
       map: mapRef.current,
     })
 
-    fetchGooglePosition()
-    pollIntervalRef.current = setInterval(fetchGooglePosition, 5000)
-  }, [fetchGooglePosition])
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => updatePosition(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) toast.error('Platsbehörighet nekad — tillåt plats i webbläsaren')
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+    )
+  }, [updatePosition])
 
   // Cleanup vid unmount
   useEffect(() => () => { stopTracking() }, [stopTracking])
