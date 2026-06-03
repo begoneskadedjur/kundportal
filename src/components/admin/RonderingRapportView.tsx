@@ -13,8 +13,8 @@ import { X, Map, AlertTriangle, MapPin, Calendar, User, AlertCircle, TrendingUp,
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer, Cell,
 } from 'recharts'
 
 export type StatusFilter = 'all' | 'active' | 'closed'
@@ -196,6 +196,7 @@ export default function RonderingRapportView({
   const [stationCoordMap, setStationCoordMap] = useState<Record<string, { lat: number; lng: number }>>({})
   const [annotationImages, setAnnotationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
   const [lightbox, setLightbox] = useState<{ images: { url: string; alt: string }[]; index: number } | null>(null)
+  const [tableFilter, setTableFilter] = useState<'all' | 'partial' | 'none' | 'all_bait'>('all_bait')
 
   useEffect(() => {
     if (mode === 'modal' && !isOpen) return
@@ -349,16 +350,30 @@ export default function RonderingRapportView({
   // ── Trend-data för högriskstationer ──────────────────────────────────────────
   const chronoCases = [...allCases].reverse() // äldst → nyast
 
-  // Bygg chartData: en rad per rondering-tillfälle, en kolumn per högriskstation
-  const chartData = chronoCases.map(c => {
-    const row: Record<string, any> = { date: formatDateShort(c.scheduled_start) }
-    for (const s of highRiskStations) {
-      const log = c.logs.find((l: any) => l.station_id === s.station_id)
-      const key = s.serial_number || s.station_id.slice(0, 8)
-      row[key] = log?.bait_consumed ? BAIT_VALUE[log.bait_consumed] ?? null : null
+  // Stacked bar: en stapel per rondering-tillfälle med Allt/Delvis/Inget per station
+  const barData = chronoCases.map(c => ({
+    date: formatDateShort(c.scheduled_start),
+    Allt: c.logs.filter((l: any) => l.bait_consumed === 'all').length,
+    Delvis: c.logs.filter((l: any) => l.bait_consumed === 'partial').length,
+    Inget: c.logs.filter((l: any) => l.bait_consumed === 'none').length,
+  }))
+
+  // Beräkna konsekutiva 'all' i rad (räknat bakifrån) per station
+  const consecutiveAll = (stationId: string): number => {
+    let count = 0
+    for (let i = chronoCases.length - 1; i >= 0; i--) {
+      const log = chronoCases[i].logs.find((l: any) => l.station_id === stationId)
+      if (log?.bait_consumed === 'all') count++
+      else break
     }
-    return row
-  })
+    return count
+  }
+
+  // Beräkna senaste beteåtgång per station
+  const latestBait = (stationId: string): string | null => {
+    const last = chronoCases[chronoCases.length - 1]?.logs.find((l: any) => l.station_id === stationId)
+    return last?.bait_consumed ?? null
+  }
 
   // Beräkna trend (senaste vs näst senaste) per station
   const stationTrendDir = (s: HighRiskStation): 'down' | 'flat' | 'up' => {
@@ -526,72 +541,110 @@ export default function RonderingRapportView({
             </div>
           )}
 
-          {/* ══ SEKTION 3: Beteåtgång-trend per högriskstation ══ */}
+          {/* ══ SEKTION 3: Beteåtgång-trend ══ */}
           {highRiskStations.length > 0 && (
             <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
               <div className="px-5 py-3 border-b border-slate-700">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-400" />
-                  Beteåtgång per station — aktivitetsutveckling
+                  Aktivitetsutveckling — beteåtgång över tid
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">Stationer med upprepad hög aktivitet. Nedåtgående trend indikerar lyckad bekämpning.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Minskande röd yta indikerar lyckad bekämpning.</p>
               </div>
 
+              {/* Stacked bar — aggregerad vy per tillfälle */}
               {chronoCases.length >= 2 ? (
                 <div className="px-4 pt-4 pb-2">
-                  <ResponsiveContainer width="100%" height={240}>
-                    <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <div className="flex items-center gap-4 mb-3 text-xs">
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-500 inline-block" />Allt förbrukat</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-500 inline-block" />Delvis</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" />Inget</span>
+                  </div>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={barData} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                       <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tick={{ fill: '#94a3b8' }} />
-                      <YAxis
-                        domain={[0.5, 3.5]}
-                        ticks={[1, 2, 3]}
-                        tickFormatter={(v: number) => v === 3 ? 'Allt' : v === 2 ? 'Delvis' : 'Inget'}
-                        stroke="#94a3b8" fontSize={11} width={52} tick={{ fill: '#94a3b8' }}
+                      <YAxis stroke="#94a3b8" fontSize={11} tick={{ fill: '#94a3b8' }} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
+                        labelStyle={{ color: '#f1f5f9', fontWeight: 600 }}
+                        itemStyle={{ color: '#94a3b8' }}
                       />
-                      <Tooltip content={<BaitTooltip />} />
-                      <Legend wrapperStyle={{ fontSize: 11, color: '#94a3b8' }} />
-                      {highRiskStations.map((s, i) => (
-                        <Line
-                          key={s.station_id}
-                          type="monotone"
-                          dataKey={s.serial_number || s.station_id.slice(0, 8)}
-                          stroke={TREND_COLORS[i % TREND_COLORS.length]}
-                          strokeWidth={2}
-                          dot={{ r: 3, fill: TREND_COLORS[i % TREND_COLORS.length] }}
-                          connectNulls={false}
-                          isAnimationActive={false}
-                        />
-                      ))}
-                    </LineChart>
+                      <Bar dataKey="Allt" stackId="a" fill="#ef4444" radius={[0,0,0,0]} isAnimationActive={false} />
+                      <Bar dataKey="Delvis" stackId="a" fill="#f59e0b" isAnimationActive={false} />
+                      <Bar dataKey="Inget" stackId="a" fill="#22c55e" radius={[3,3,0,0]} isAnimationActive={false} />
+                    </BarChart>
                   </ResponsiveContainer>
                 </div>
               ) : (
                 <p className="px-5 py-4 text-xs text-slate-500">Graf visas när minst 2 ronderingstillfällen finns.</p>
               )}
 
-              {/* Kompakt statuslista */}
-              <div className="px-4 pb-4">
-                <div className="grid grid-cols-4 gap-px bg-slate-700/30 rounded-lg overflow-hidden text-xs mt-2">
-                  <div className="bg-slate-900/50 px-3 py-1.5 font-semibold text-slate-400">Station</div>
-                  <div className="bg-slate-900/50 px-3 py-1.5 font-semibold text-slate-400">Ggr Allt</div>
-                  <div className="bg-slate-900/50 px-3 py-1.5 font-semibold text-slate-400">Senast</div>
-                  <div className="bg-slate-900/50 px-3 py-1.5 font-semibold text-slate-400">Trend</div>
-                  {highRiskStations.map(s => {
-                    const dir = stationTrendDir(s)
-                    return (
-                      <React.Fragment key={s.station_id}>
-                        <div className="bg-slate-900/30 px-3 py-2 font-mono text-slate-200">{s.serial_number || s.station_id.slice(0, 8)}</div>
-                        <div className="bg-slate-900/30 px-3 py-2 text-red-300 font-semibold">{s.allCount}×</div>
-                        <div className="bg-slate-900/30 px-3 py-2 text-slate-400">{formatDate(s.lastInspected)}</div>
-                        <div className="bg-slate-900/30 px-3 py-2">
+              {/* Stationstabellen med filter */}
+              <div className="px-4 pb-4 pt-2">
+                <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Stationer med hög aktivitet</p>
+                  <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0.5">
+                    {([
+                      { key: 'all_bait', label: 'Alla' },
+                      { key: 'all', label: 'Allt' },
+                      { key: 'partial', label: 'Delvis' },
+                      { key: 'none', label: 'Inget' },
+                    ] as { key: typeof tableFilter; label: string }[]).map(f => (
+                      <button
+                        key={f.key}
+                        type="button"
+                        onClick={() => setTableFilter(f.key)}
+                        className={`px-2.5 py-1 rounded-md text-xs transition-colors ${
+                          tableFilter === f.key
+                            ? 'bg-slate-600 text-white'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg overflow-hidden border border-slate-700 text-xs">
+                  <div className="grid grid-cols-5 bg-slate-900/60">
+                    <div className="px-3 py-2 font-semibold text-slate-400">Station</div>
+                    <div className="px-3 py-2 font-semibold text-slate-400 text-center">Ggr Allt</div>
+                    <div className="px-3 py-2 font-semibold text-slate-400 text-center">I rad</div>
+                    <div className="px-3 py-2 font-semibold text-slate-400 text-center">Senaste</div>
+                    <div className="px-3 py-2 font-semibold text-slate-400">Trend</div>
+                  </div>
+                  {highRiskStations
+                    .map(s => ({ s, consec: consecutiveAll(s.station_id), latest: latestBait(s.station_id), dir: stationTrendDir(s) }))
+                    .filter(({ latest }) => tableFilter === 'all_bait' || latest === tableFilter)
+                    .sort((a, b) => b.consec - a.consec || b.s.allCount - a.s.allCount)
+                    .map(({ s, consec, latest, dir }, i) => (
+                      <div key={s.station_id} className={`grid grid-cols-5 border-t border-slate-700/50 ${i % 2 === 0 ? 'bg-slate-900/20' : 'bg-slate-900/40'}`}>
+                        <div className="px-3 py-2 font-mono text-slate-200">{s.serial_number || s.station_id.slice(0, 8)}</div>
+                        <div className="px-3 py-2 text-center text-red-300 font-semibold">{s.allCount}×</div>
+                        <div className="px-3 py-2 text-center">
+                          {consec >= 2
+                            ? <span className="px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/30 text-red-300 font-semibold">{consec}×</span>
+                            : <span className="text-slate-500">{consec > 0 ? `${consec}×` : '—'}</span>
+                          }
+                        </div>
+                        <div className="px-3 py-2 text-center">
+                          {latest === 'all' && <span className="text-red-300 font-medium">Allt</span>}
+                          {latest === 'partial' && <span className="text-amber-300">Delvis</span>}
+                          {latest === 'none' && <span className="text-emerald-400">Inget</span>}
+                          {!latest && <span className="text-slate-500">—</span>}
+                        </div>
+                        <div className="px-3 py-2">
                           {dir === 'down' && <span className="text-emerald-400 flex items-center gap-1"><TrendingDown className="w-3.5 h-3.5" />Minskar</span>}
                           {dir === 'flat' && <span className="text-slate-400 flex items-center gap-1"><Minus className="w-3.5 h-3.5" />Oförändrad</span>}
                           {dir === 'up' && <span className="text-red-400 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5" />Ökar</span>}
                         </div>
-                      </React.Fragment>
-                    )
-                  })}
+                      </div>
+                    ))}
+                  {highRiskStations.filter(s => tableFilter === 'all_bait' || latestBait(s.station_id) === tableFilter).length === 0 && (
+                    <div className="px-3 py-4 text-center text-slate-500 border-t border-slate-700/50">Inga stationer med valt filter</div>
+                  )}
                 </div>
               </div>
             </div>
