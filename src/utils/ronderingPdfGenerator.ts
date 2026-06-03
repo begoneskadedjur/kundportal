@@ -260,8 +260,8 @@ export function generateRonderingPdf(
     // Info-rad
     fillRect(margin, y, contentW, 7, C.lightGray)
     setFont(7, 'normal', C.medGray)
-    doc.text(`📅 ${fmtDate(c.scheduled_start)}`, margin + 3, y + 4.5)
-    if (c.primary_technician_name) doc.text(`👤 ${c.primary_technician_name}`, margin + 45, y + 4.5)
+    doc.text(fmtDate(c.scheduled_start), margin + 3, y + 4.5)
+    if (c.primary_technician_name) doc.text(c.primary_technician_name, margin + 45, y + 4.5)
 
     // Progress-text
     const progressColor = pct === 100 ? C.success : (c.actionRequired > 0 ? C.warning : C.medGray)
@@ -313,7 +313,7 @@ export function generateRonderingPdf(
     if (c.annotations.length > 0) {
       fillRect(margin, y, contentW, 5, [255, 237, 213])
       setFont(6.5, 'bold', C.orange)
-      doc.text(`⚠ ${c.annotations.length} avvikelse${c.annotations.length !== 1 ? 'r' : ''}`, margin + 3, y + 3.5)
+      doc.text(`${c.annotations.length} avvikelse${c.annotations.length !== 1 ? 'r' : ''}`, margin + 3, y + 3.5)
       y += 5
 
       c.annotations.forEach((ann, ai) => {
@@ -321,7 +321,7 @@ export function generateRonderingPdf(
         const rowBg = ai % 2 === 0 ? [255, 247, 237] as [number,number,number] : [255, 251, 245] as [number,number,number]
         fillRect(margin, y, contentW, 7, rowBg)
         setFont(7, 'bold', C.orange)
-        doc.text(`${cat.emoji} ${cat.label}`, margin + 3, y + 4.5)
+        doc.text(cat.label, margin + 3, y + 4.5)
         if (ann.note) {
           setFont(7, 'normal', C.darkGray)
           const note = ann.note.length > 50 ? ann.note.slice(0, 50) + '…' : ann.note
