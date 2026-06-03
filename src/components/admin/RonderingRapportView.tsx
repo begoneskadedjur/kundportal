@@ -3,8 +3,10 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
-import { RonderingService, RonderingAnnotation, ANNOTATION_CATEGORIES, RonderingAnnotationCategory } from '../../services/ronderingService'
-import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
+import { RonderingService, ANNOTATION_CATEGORIES } from '../../services/ronderingService'
+import type { RonderingAnnotation, RonderingAnnotationCategory } from '../../services/ronderingService'
+import { CaseImageService } from '../../services/caseImageService'
+import type { CaseImageWithUrl } from '../../services/caseImageService'
 import ImageLightbox from '../shared/ImageLightbox'
 import { useGoogleMaps } from '../../hooks/useGoogleMaps'
 import { X, Map, AlertTriangle, MapPin, Calendar, User, AlertCircle, TrendingUp, TrendingDown, Minus } from 'lucide-react'
@@ -73,7 +75,6 @@ function formatDateShort(iso: string | null) {
   try { return format(new Date(iso), 'd MMM', { locale: sv }) } catch { return iso }
 }
 
-const BAIT_LABEL: Record<'all' | 'partial' | 'none', string> = { all: 'Allt', partial: 'Delvis', none: 'Inget' }
 const BAIT_VALUE: Record<string, number> = { all: 3, partial: 2, none: 1 }
 
 // Varma toner — röd/orange/gul/amber för högrisk-stationer
@@ -191,7 +192,7 @@ export default function RonderingRapportView({
   const [highRiskStations, setHighRiskStations] = useState<HighRiskStation[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
-  const [serialMap, setSerialMap] = useState<Record<string, string>>({})
+  const [_serialMap, setSerialMap] = useState<Record<string, string>>({})
   const [stationCoordMap, setStationCoordMap] = useState<Record<string, { lat: number; lng: number }>>({})
   const [annotationImages, setAnnotationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
   const [lightbox, setLightbox] = useState<{ images: { url: string; alt: string }[]; index: number } | null>(null)
@@ -346,7 +347,6 @@ export default function RonderingRapportView({
   const baitTotal = bait ? bait.all + bait.partial + bait.none : 0
 
   // ── Trend-data för högriskstationer ──────────────────────────────────────────
-  const highRiskIds = new Set(highRiskStations.map(s => s.station_id))
   const chronoCases = [...allCases].reverse() // äldst → nyast
 
   // Bygg chartData: en rad per rondering-tillfälle, en kolumn per högriskstation
@@ -586,7 +586,7 @@ export default function RonderingRapportView({
                         <div className="bg-slate-900/30 px-3 py-2 text-slate-400">{formatDate(s.lastInspected)}</div>
                         <div className="bg-slate-900/30 px-3 py-2">
                           {dir === 'down' && <span className="text-emerald-400 flex items-center gap-1"><TrendingDown className="w-3.5 h-3.5" />Minskar</span>}
-                          {dir === 'flat' && <span className="text-slate-400 flex items-center gap-1"><Minus className="w-3.5 h-3.5" />Stabil</span>}
+                          {dir === 'flat' && <span className="text-slate-400 flex items-center gap-1"><Minus className="w-3.5 h-3.5" />Oförändrad</span>}
                           {dir === 'up' && <span className="text-red-400 flex items-center gap-1"><TrendingUp className="w-3.5 h-3.5" />Ökar</span>}
                         </div>
                       </React.Fragment>
