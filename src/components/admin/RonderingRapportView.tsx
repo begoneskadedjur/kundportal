@@ -74,22 +74,32 @@ function Delta({ current, previous, invert = false }: { current: number; previou
   )
 }
 
-// Karta för avvikelser
-function AnnotationMap({ annotations, isLoaded }: { annotations: RonderingAnnotation[]; isLoaded: boolean }) {
+interface Hotspot {
+  station_id: string
+  serial_number: string | null
+  lat: number
+  lng: number
+}
+
+// Karta för avvikelser och högriskstationer
+function AnnotationMap({ annotations, hotspots, isLoaded }: { annotations: RonderingAnnotation[]; hotspots: Hotspot[]; isLoaded: boolean }) {
   const mapRef = useRef<HTMLDivElement>(null)
   const gMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
 
   useEffect(() => {
-    if (!isLoaded || !mapRef.current || annotations.length === 0) return
+    const hasContent = annotations.length > 0 || hotspots.length > 0
+    if (!isLoaded || !mapRef.current || !hasContent) return
 
-    // Rensa gamla markers
     markersRef.current.forEach(m => m.setMap(null))
     markersRef.current = []
 
-    // Beräkna centrum
-    const avgLat = annotations.reduce((s, a) => s + a.latitude, 0) / annotations.length
-    const avgLng = annotations.reduce((s, a) => s + a.longitude, 0) / annotations.length
+    const allPoints = [
+      ...annotations.map(a => ({ lat: a.latitude, lng: a.longitude })),
+      ...hotspots.map(h => ({ lat: h.lat, lng: h.lng })),
+    ]
+    const avgLat = allPoints.reduce((s, p) => s + p.lat, 0) / allPoints.length
+    const avgLng = allPoints.reduce((s, p) => s + p.lng, 0) / allPoints.length
 
     if (!gMapRef.current) {
       gMapRef.current = new google.maps.Map(mapRef.current, {
@@ -107,6 +117,7 @@ function AnnotationMap({ annotations, isLoaded }: { annotations: RonderingAnnota
 
     const bounds = new google.maps.LatLngBounds()
 
+    // Avvikelse-trianglar (orange)
     annotations.forEach(ann => {
       const cat = ANNOTATION_CATEGORIES[ann.category as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
       bounds.extend({ lat: ann.latitude, lng: ann.longitude })
@@ -115,14 +126,15 @@ function AnnotationMap({ annotations, isLoaded }: { annotations: RonderingAnnota
         position: { lat: ann.latitude, lng: ann.longitude },
         map: gMapRef.current!,
         icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 9,
+          path: 'M 0,-12 L 10,8 L -10,8 Z',
+          scale: 1.2,
           fillColor: '#f97316',
           fillOpacity: 1,
           strokeColor: '#ffffff',
           strokeWeight: 2,
         },
         title: cat.label,
+        zIndex: 10,
       })
 
       const infoContent = `
@@ -138,13 +150,44 @@ function AnnotationMap({ annotations, isLoaded }: { annotations: RonderingAnnota
       markersRef.current.push(marker)
     })
 
-    if (annotations.length > 1 && gMapRef.current) {
+    // Högriskstationer — röda cirklar
+    hotspots.forEach(h => {
+      bounds.extend({ lat: h.lat, lng: h.lng })
+
+      const marker = new google.maps.Marker({
+        position: { lat: h.lat, lng: h.lng },
+        map: gMapRef.current!,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 10,
+          fillColor: '#ef4444',
+          fillOpacity: 0.85,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+        },
+        title: `Station ${h.serial_number ?? h.station_id.slice(0, 8)} — Hög beteåtgång`,
+        zIndex: 5,
+      })
+
+      const infoContent = `
+        <div style="font-family:sans-serif;padding:4px;max-width:200px">
+          <div style="font-weight:600;font-size:13px;color:#ef4444;margin-bottom:2px">Högriskstation</div>
+          <div style="font-size:12px;color:#1e293b">Station ${h.serial_number ?? h.station_id.slice(0, 8)}</div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:2px">Hög beteåtgång vid flera tillfällen</div>
+        </div>
+      `
+      const infoWindow = new google.maps.InfoWindow({ content: infoContent })
+      marker.addListener('click', () => infoWindow.open(gMapRef.current!, marker))
+      markersRef.current.push(marker)
+    })
+
+    if (allPoints.length > 1 && gMapRef.current) {
       gMapRef.current.fitBounds(bounds, 60)
     }
-  }, [isLoaded, annotations])
+  }, [isLoaded, annotations, hotspots])
 
-  if (!isLoaded) return <div className="h-56 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta...</div>
-  return <div ref={mapRef} className="h-56 rounded-xl overflow-hidden" />
+  if (!isLoaded) return <div className="h-64 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta...</div>
+  return <div ref={mapRef} className="h-64 rounded-xl overflow-hidden" />
 }
 
 export default function RonderingRapportView({
@@ -162,6 +205,7 @@ export default function RonderingRapportView({
   const [loading, setLoading] = useState(false)
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null)
   const [serialMap, setSerialMap] = useState<Record<string, string>>({})
+  const [stationCoordMap, setStationCoordMap] = useState<Record<string, { lat: number; lng: number }>>({})
 
   useEffect(() => {
     if (mode === 'modal' && !isOpen) return
@@ -200,17 +244,20 @@ export default function RonderingRapportView({
 
         const { data: placements } = await supabase
           .from('equipment_placements')
-          .select('id, customer_id, serial_number')
+          .select('id, customer_id, serial_number, latitude, longitude')
           .in('customer_id', siteIds)
           .eq('status', 'active')
 
         const stationCountMap: Record<string, number> = {}
         const newSerialMap: Record<string, string> = {}
+        const newCoordMap: Record<string, { lat: number; lng: number }> = {}
         for (const p of placements || []) {
           stationCountMap[p.customer_id] = (stationCountMap[p.customer_id] || 0) + 1
           if (p.serial_number) newSerialMap[p.id] = p.serial_number
+          if (p.latitude && p.longitude) newCoordMap[p.id] = { lat: p.latitude, lng: p.longitude }
         }
         setSerialMap(newSerialMap)
+        setStationCoordMap(newCoordMap)
 
         const enriched: RonderingCase[] = await Promise.all(
           rawCases.map(async (c) => {
@@ -373,30 +420,51 @@ export default function RonderingRapportView({
                 <div className="flex items-center gap-3 mb-1.5">
                   {bait!.all > 0 && <span className="flex items-center gap-1.5 text-xs"><span className="w-2.5 h-2.5 rounded-sm bg-red-500 flex-shrink-0" />Allt: <strong className="text-red-300">{bait!.all}</strong></span>}
                   {bait!.partial > 0 && <span className="flex items-center gap-1.5 text-xs"><span className="w-2.5 h-2.5 rounded-sm bg-amber-500 flex-shrink-0" />Delvis: <strong className="text-amber-300">{bait!.partial}</strong></span>}
-                  {bait!.none > 0 && <span className="flex items-center gap-1.5 text-xs"><span className="w-2.5 h-2.5 rounded-sm bg-slate-500 flex-shrink-0" />Inget: <strong className="text-slate-400">{bait!.none}</strong></span>}
+                  {bait!.none > 0 && <span className="flex items-center gap-1.5 text-xs"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500 flex-shrink-0" />Inget: <strong className="text-emerald-300">{bait!.none}</strong></span>}
                 </div>
                 <div className="flex h-2.5 rounded-full overflow-hidden bg-slate-700 gap-px">
                   {bait!.all > 0 && <div className="bg-red-500" style={{ width: `${(bait!.all / baitTotal) * 100}%` }} />}
                   {bait!.partial > 0 && <div className="bg-amber-500" style={{ width: `${(bait!.partial / baitTotal) * 100}%` }} />}
-                  {bait!.none > 0 && <div className="bg-slate-500" style={{ width: `${(bait!.none / baitTotal) * 100}%` }} />}
+                  {bait!.none > 0 && <div className="bg-emerald-500" style={{ width: `${(bait!.none / baitTotal) * 100}%` }} />}
                 </div>
               </div>
             )}
           </div>
 
           {/* ══ SEKTION 2: Avvikelsekarta ══ */}
-          {selectedCase.annotations.length > 0 && (
+          {(selectedCase.annotations.length > 0 || highRiskStations.length > 0) && (
             <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-700">
+              <div className="px-5 py-3 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2">
                 <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                   <MapPin className="w-4 h-4 text-orange-400" />
-                  Avvikelser ({selectedCase.annotations.length})
+                  Karta — avvikelser &amp; riskzoner
                 </h3>
+                <div className="flex items-center gap-3 text-xs text-slate-400">
+                  {selectedCase.annotations.length > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-0 h-0 border-l-[5px] border-r-[5px] border-b-[9px] border-l-transparent border-r-transparent border-b-orange-500" />
+                      {selectedCase.annotations.length} avvikelse{selectedCase.annotations.length !== 1 ? 'r' : ''}
+                    </span>
+                  )}
+                  {highRiskStations.length > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
+                      {highRiskStations.length} högriskstation{highRiskStations.length !== 1 ? 'er' : ''}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Karta */}
               <div className="p-3">
-                <AnnotationMap annotations={selectedCase.annotations} isLoaded={mapsLoaded} />
+                <AnnotationMap
+                  annotations={selectedCase.annotations}
+                  hotspots={highRiskStations.flatMap(s => {
+                    const coord = stationCoordMap[s.station_id]
+                    return coord ? [{ station_id: s.station_id, serial_number: s.serial_number, lat: coord.lat, lng: coord.lng }] : []
+                  })}
+                  isLoaded={mapsLoaded}
+                />
               </div>
 
               {/* Lista utan emojis */}
@@ -406,7 +474,7 @@ export default function RonderingRapportView({
                   return (
                     <div key={ann.id} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm">
                       <span className="text-xs text-slate-500 font-mono w-4 flex-shrink-0 pt-0.5">{i + 1}</span>
-                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: cat.color }} />
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 bg-orange-500" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-white">{cat.label}</p>
                         {ann.note && <p className="text-slate-400 text-xs mt-0.5">{ann.note}</p>}
