@@ -74,11 +74,11 @@ export default function RonderingMapSection({
   const polygonRef = useRef<google.maps.Polygon | null>(null)
 
   // GPS-spårning
-  const GPS_ACCURACY_THRESHOLD = 50 // meter — ignorera nätverkspositioner sämre än detta
+  const GPS_ACCURACY_THRESHOLD = 50 // meter — visa inte markör förrän precisionen är bättre än detta
   const positionMarkerRef = useRef<google.maps.Marker | null>(null)
   const trackPolylineRef = useRef<google.maps.Polyline | null>(null)
   const trackPointsRef = useRef<google.maps.LatLng[]>([])
-  const watchIdRef = useRef<number | null>(null)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [isTracking, setIsTracking] = useState(false)
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
   const [gpsLocked, setGpsLocked] = useState(false)
@@ -186,7 +186,7 @@ export default function RonderingMapSection({
         onStationClick(station.id)
         setPendingClick(null)
         // Om GPS-spårning är aktiv → öppna navigation i Google Maps
-        if (watchIdRef.current !== null) {
+        if (pollIntervalRef.current !== null) {
           window.open(`https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}&travelmode=walking`)
         }
       })
@@ -259,9 +259,9 @@ export default function RonderingMapSection({
   }, [onAnnotationDeleted])
 
   const stopTracking = useCallback(() => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current)
-      watchIdRef.current = null
+    if (pollIntervalRef.current !== null) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
     }
     positionMarkerRef.current?.setMap(null)
     positionMarkerRef.current = null
@@ -273,13 +273,48 @@ export default function RonderingMapSection({
     setGpsLocked(false)
   }, [])
 
-  const startTracking = useCallback(() => {
-    if (!mapRef.current || !navigator.geolocation) {
-      toast.error('GPS ej tillgängligt på denna enhet')
-      return
+  const updatePosition = useCallback((lat: number, lng: number, accuracy: number) => {
+    if (!mapRef.current) return
+    setGpsAccuracy(Math.round(accuracy))
+    if (accuracy > GPS_ACCURACY_THRESHOLD) return
+    setGpsLocked(true)
+    const latLng = new google.maps.LatLng(lat, lng)
+    if (!positionMarkerRef.current) {
+      positionMarkerRef.current = new google.maps.Marker({
+        position: latLng,
+        map: mapRef.current,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#3b82f6', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2.5 },
+        title: 'Din position',
+        zIndex: 100,
+      })
+      mapRef.current.panTo(latLng)
+    } else {
+      positionMarkerRef.current.setPosition(latLng)
     }
+    trackPointsRef.current = [...trackPointsRef.current, latLng]
+    trackPolylineRef.current?.setPath(trackPointsRef.current)
+  }, [])
+
+  const fetchGooglePosition = useCallback(async () => {
+    try {
+      const res = await fetch('/api/geolocate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (!res.ok) return
+      const { lat, lng, accuracy } = await res.json()
+      if (typeof lat === 'number' && typeof lng === 'number' && typeof accuracy === 'number') {
+        updatePosition(lat, lng, accuracy)
+      }
+    } catch { /* tyst — nätverksfel */ }
+  }, [updatePosition])
+
+  const startTracking = useCallback(() => {
+    if (!mapRef.current) return
     setIsTracking(true)
     setGpsAccuracy(null)
+    setGpsLocked(false)
     trackPointsRef.current = []
     toast('GPS startat — markör visas när precisionen är under 50m', { icon: '📍', duration: 5000 })
 
@@ -293,38 +328,9 @@ export default function RonderingMapSection({
       map: mapRef.current,
     })
 
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (pos) => {
-        const accuracy = pos.coords.accuracy
-        setGpsAccuracy(Math.round(accuracy))
-
-        // Ignorera nätverkspositioner — vänta på riktig GPS-signal
-        if (accuracy > GPS_ACCURACY_THRESHOLD) return
-
-        setGpsLocked(true)
-        const latLng = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude)
-        if (!positionMarkerRef.current) {
-          positionMarkerRef.current = new google.maps.Marker({
-            position: latLng,
-            map: mapRef.current!,
-            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#3b82f6', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2.5 },
-            title: 'Din position',
-            zIndex: 100,
-          })
-          mapRef.current!.panTo(latLng)
-        } else {
-          positionMarkerRef.current.setPosition(latLng)
-        }
-        trackPointsRef.current = [...trackPointsRef.current, latLng]
-        trackPolylineRef.current?.setPath(trackPointsRef.current)
-      },
-      (err) => {
-        console.warn('GPS-fel:', err)
-        if (err.code === 1) toast.error('Tillstånd för plats nekades')
-      },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
-    )
-  }, [])
+    fetchGooglePosition()
+    pollIntervalRef.current = setInterval(fetchGooglePosition, 5000)
+  }, [fetchGooglePosition])
 
   // Cleanup vid unmount
   useEffect(() => () => { stopTracking() }, [stopTracking])
