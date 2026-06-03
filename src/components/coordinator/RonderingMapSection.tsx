@@ -5,7 +5,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
 import { useGoogleMaps } from '../../hooks/useGoogleMaps'
 import Select from '../ui/Select'
 import { supabase } from '../../lib/supabase'
-import { Camera, Trash2, MapPin, X, Check } from 'lucide-react'
+import { Camera, Trash2, MapPin, X, Check, Navigation } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
   RonderingAnnotation,
@@ -72,6 +72,13 @@ export default function RonderingMapSection({
   const markersRef = useRef<google.maps.Marker[]>([])
   const annotationMarkersRef = useRef<google.maps.Marker[]>([])
   const polygonRef = useRef<google.maps.Polygon | null>(null)
+
+  // GPS-spårning
+  const positionMarkerRef = useRef<google.maps.Marker | null>(null)
+  const trackPolylineRef = useRef<google.maps.Polyline | null>(null)
+  const trackPointsRef = useRef<google.maps.LatLng[]>([])
+  const watchIdRef = useRef<number | null>(null)
+  const [isTracking, setIsTracking] = useState(false)
 
   // Klick-dialog state
   const [pendingClick, setPendingClick] = useState<{ lat: number; lng: number } | null>(null)
@@ -174,7 +181,11 @@ export default function RonderingMapSection({
       marker.addListener('click', () => {
         infoWindow.open(mapRef.current!, marker)
         onStationClick(station.id)
-        setPendingClick(null) // stäng klick-dialog om öppen
+        setPendingClick(null)
+        // Om GPS-spårning är aktiv → öppna navigation i Google Maps
+        if (watchIdRef.current !== null) {
+          window.open(`https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}&travelmode=walking`)
+        }
       })
 
       markersRef.current.push(marker)
@@ -244,6 +255,66 @@ export default function RonderingMapSection({
     }
   }, [onAnnotationDeleted])
 
+  const stopTracking = useCallback(() => {
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current)
+      watchIdRef.current = null
+    }
+    positionMarkerRef.current?.setMap(null)
+    positionMarkerRef.current = null
+    trackPolylineRef.current?.setMap(null)
+    trackPolylineRef.current = null
+    trackPointsRef.current = []
+    setIsTracking(false)
+  }, [])
+
+  const startTracking = useCallback(() => {
+    if (!mapRef.current || !navigator.geolocation) {
+      toast.error('GPS ej tillgängligt på denna enhet')
+      return
+    }
+    setIsTracking(true)
+    trackPointsRef.current = []
+
+    trackPolylineRef.current = new google.maps.Polyline({
+      path: [],
+      geodesic: true,
+      strokeColor: '#3b82f6',
+      strokeOpacity: 0.8,
+      strokeWeight: 3,
+      icons: [{ icon: { path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, fillColor: '#3b82f6', fillOpacity: 1, strokeColor: '#3b82f6' }, repeat: '80px' }],
+      map: mapRef.current,
+    })
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        const latLng = new google.maps.LatLng(pos.coords.latitude, pos.coords.longitude)
+        if (!positionMarkerRef.current) {
+          positionMarkerRef.current = new google.maps.Marker({
+            position: latLng,
+            map: mapRef.current!,
+            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#3b82f6', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2.5 },
+            title: 'Din position',
+            zIndex: 100,
+          })
+          mapRef.current!.panTo(latLng)
+        } else {
+          positionMarkerRef.current.setPosition(latLng)
+        }
+        trackPointsRef.current = [...trackPointsRef.current, latLng]
+        trackPolylineRef.current?.setPath(trackPointsRef.current)
+      },
+      (err) => {
+        console.warn('GPS-fel:', err)
+        if (err.code === 1) toast.error('Tillstånd för plats nekades')
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    )
+  }, [])
+
+  // Cleanup vid unmount
+  useEffect(() => () => { stopTracking() }, [stopTracking])
+
   const fetchAnnotationImages = useCallback(async (annotationId: string) => {
     try {
       const all = await CaseImageService.getCaseImages(caseId, 'contract')
@@ -280,11 +351,27 @@ export default function RonderingMapSection({
 
   return (
     <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
-      <h3 className="text-sm font-semibold flex items-center gap-1.5">
-        <MapPin className="w-4 h-4 text-sky-400" />
-        Avvikelsekarta
-        <span className="text-xs font-normal text-slate-500 ml-1">Klicka på kartan för att markera ett fel</span>
-      </h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold flex items-center gap-1.5">
+          <MapPin className="w-4 h-4 text-sky-400" />
+          Avvikelsekarta
+          <span className="text-xs font-normal text-slate-500 ml-1">Klicka på kartan för att markera ett fel</span>
+        </h3>
+        <button
+          type="button"
+          onClick={isTracking ? stopTracking : startTracking}
+          disabled={!isLoaded}
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+            isTracking
+              ? 'bg-blue-500/20 border-blue-500/40 text-blue-300'
+              : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+          }`}
+          title={isTracking ? 'Stoppa GPS-spårning' : 'Starta GPS-spårning — visar din position på kartan'}
+        >
+          <Navigation className={`w-3.5 h-3.5 ${isTracking ? 'animate-pulse' : ''}`} />
+          {isTracking ? 'Stoppa GPS' : 'Starta GPS'}
+        </button>
+      </div>
 
       {/* Karta */}
       <div className="relative rounded-xl overflow-hidden" style={{ height: 320 }}>
