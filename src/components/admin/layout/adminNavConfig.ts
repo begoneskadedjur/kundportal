@@ -54,7 +54,7 @@ export const navGroups: NavGroup[] = [
     icon: Users,
     items: [
       { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder' },
-      { label: 'Rondering', icon: Map, path: '/admin/rondering' },
+      { label: 'Egenkontroller', icon: Map, path: '/admin/egenkontroll' },
       { label: 'Trafikljusöversikt', icon: Activity, path: '/admin/trafikljusoversikt' },
       { label: 'Kundprognos', icon: BarChart3, path: '/admin/kundprognos' },
       { label: 'Användarkonton (Kund)', icon: KeyRound, path: '/admin/anvandarkonton-kund' },
@@ -144,7 +144,7 @@ export const mobileBottomItems: NavItem[] = [
 export const breadcrumbMap: Record<string, string> = {
   '/admin/dashboard': 'Översikt',
   '/admin/befintliga-kunder': 'Befintliga kunder',
-  '/admin/rondering': 'Rondering Trafikkontoret',
+  '/admin/egenkontroll': 'Egenkontroller',
   '/admin/leads': 'Leads',
   '/admin/ekonomi': 'Ekonomisk översikt',
   '/admin/fakturering': 'Fakturering',
