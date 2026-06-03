@@ -85,7 +85,7 @@ export default function RonderingMapSection({
 
   // Klick-dialog state
   const [pendingClick, setPendingClick] = useState<{ lat: number; lng: number } | null>(null)
-  const [newCategory, setNewCategory] = useState<RonderingAnnotationCategory>('rats')
+  const [newCategory, setNewCategory] = useState<RonderingAnnotationCategory>('trash_bins')
   const [newNote, setNewNote] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -120,7 +120,7 @@ export default function RonderingMapSection({
       if (!e.latLng) return
       setPendingClick({ lat: e.latLng.lat(), lng: e.latLng.lng() })
       setNewNote('')
-      setNewCategory('rats')
+      setNewCategory('trash_bins')
     })
 
     // Hämta regionpolygon — centrera kartan på polygonens bbox
@@ -203,7 +203,7 @@ export default function RonderingMapSection({
     annotationMarkersRef.current = []
 
     annotations.forEach(ann => {
-      const cat = ANNOTATION_CATEGORIES[ann.category]
+      const cat = ANNOTATION_CATEGORIES[ann.category as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
       const marker = new google.maps.Marker({
         position: { lat: ann.latitude, lng: ann.longitude },
         map: mapRef.current!,
@@ -426,13 +426,7 @@ export default function RonderingMapSection({
               <Select
                 value={newCategory}
                 onChange={val => setNewCategory(val as RonderingAnnotationCategory)}
-                options={[
-                  { value: 'rats',       label: 'Råttaktivitet' },
-                  { value: 'birds',      label: 'Fågelspillning' },
-                  { value: 'insects',    label: 'Insektsangrepp' },
-                  { value: 'sanitation', label: 'Sanitärt problem' },
-                  { value: 'other',      label: 'Övrigt' },
-                ]}
+                options={Object.entries(ANNOTATION_CATEGORIES).map(([value, { label }]) => ({ value, label }))}
               />
             </div>
 
@@ -472,7 +466,7 @@ export default function RonderingMapSection({
         <div className="space-y-2">
           <p className="text-xs font-medium text-slate-400">{annotations.length} avvikelse{annotations.length !== 1 ? 'r' : ''}</p>
           {annotations.map(ann => {
-            const cat = ANNOTATION_CATEGORIES[ann.category]
+            const cat = ANNOTATION_CATEGORIES[ann.category as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
             const imgs = annotationImages[ann.id] || []
             return (
               <div key={ann.id} className="flex flex-col gap-2 px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg">

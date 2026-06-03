@@ -15,7 +15,7 @@ export interface RonderingStationLog {
 
 export type RonderingStationStatus = 'ok' | 'action_required' | 'missing'
 
-export type RonderingAnnotationCategory = 'rats' | 'birds' | 'insects' | 'sanitation' | 'other'
+export type RonderingAnnotationCategory = 'trash_bins' | 'littering' | 'vegetation' | 'rodent_holes' | 'attractants' | 'damage' | 'bird_feeding'
 
 export interface RonderingAnnotation {
   id: string
@@ -30,11 +30,13 @@ export interface RonderingAnnotation {
 }
 
 export const ANNOTATION_CATEGORIES: Record<RonderingAnnotationCategory, { label: string; color: string; emoji: string }> = {
-  rats:       { label: 'Råttaktivitet',    color: '#ef4444', emoji: '🐀' },
-  birds:      { label: 'Fågelspillning',   color: '#f97316', emoji: '🐦' },
-  insects:    { label: 'Insektsangrepp',   color: '#eab308', emoji: '🪲' },
-  sanitation: { label: 'Sanitärt problem', color: '#a855f7', emoji: '⚠️' },
-  other:      { label: 'Övrigt',           color: '#6b7280', emoji: '📍' },
+  trash_bins:   { label: 'Trasiga soptunnor',                       color: '#f97316', emoji: '🗑️' },
+  littering:    { label: 'Allmän nedskräpning',                     color: '#eab308', emoji: '🚮' },
+  vegetation:   { label: 'Buskar och träd som behöver beskäras',    color: '#22c55e', emoji: '🌿' },
+  rodent_holes: { label: 'Håligheter i jord relaterade till gnagare', color: '#ef4444', emoji: '🐀' },
+  attractants:  { label: 'Verksamheter som drar till sig gnagare',  color: '#f59e0b', emoji: '🏪' },
+  damage:       { label: 'Skador vid elskåp eller i fasader',       color: '#8b5cf6', emoji: '⚡' },
+  bird_feeding: { label: 'Fågelmatning',                            color: '#3b82f6', emoji: '🐦' },
 }
 
 export class RonderingService {
