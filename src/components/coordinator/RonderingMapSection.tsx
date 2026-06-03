@@ -210,7 +210,7 @@ export default function RonderingMapSection({
         title: cat.label,
         icon: {
           path: 'M 0,-12 L 10,8 L -10,8 Z', // triangel
-          fillColor: cat.color,
+          fillColor: '#f97316',
           fillOpacity: 1,
           strokeColor: '#ffffff',
           strokeWeight: 1.5,
