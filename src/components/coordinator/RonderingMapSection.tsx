@@ -209,13 +209,14 @@ export default function RonderingMapSection({
         map: mapRef.current!,
         title: cat.label,
         icon: {
-          path: 'M 0,-12 L 10,8 L -10,8 Z', // triangel
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 9,
           fillColor: '#f97316',
           fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 1.5,
-          scale: 1.2,
+          strokeColor: '#fff',
+          strokeWeight: 2.5,
         },
+        label: { text: '!', color: '#fff', fontSize: '11px', fontWeight: 'bold' },
         zIndex: 10,
       })
 
