@@ -9,7 +9,7 @@ import type { RonderingAnnotation, RonderingAnnotationCategory } from '../../ser
 import { ANNOTATION_CATEGORIES } from '../../services/ronderingService'
 import {
   Map, Building2, FileDown, ChevronLeft, ChevronRight,
-  AlertCircle, TrendingDown, CheckCircle, X,
+  AlertCircle, TrendingDown, CheckCircle, X, User, Calendar,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -25,12 +25,6 @@ import toast from 'react-hot-toast'
 interface RegionalOrg {
   organization_id: string
   name: string
-}
-
-interface RegionSite {
-  id: string
-  company_name: string
-  stationCount: number
 }
 
 interface RegionMonthData {
@@ -63,8 +57,8 @@ interface HotspotStation {
   serialNumber: string | null
   lat: number
   lng: number
-  consecutiveMonths: number   // 3+ = hotspot
-  improved: boolean           // tidigare hög, nu lägre
+  consecutiveMonths: number
+  improved: boolean
 }
 
 interface GeoCluster {
@@ -79,11 +73,27 @@ function fmtMonthYear(iso: string | null) {
   try { return format(new Date(iso), 'MMM yyyy', { locale: sv }) } catch { return iso }
 }
 
+function fmtDate(iso: string | null) {
+  if (!iso) return '—'
+  try { return format(new Date(iso), 'd MMM', { locale: sv }) } catch { return iso }
+}
+
 function toMonthKey(iso: string): string {
   return iso.slice(0, 7) // 'YYYY-MM'
 }
 
-// Haversine-avstånd i meter
+// Deduplicera: ett ärende per region per månad — senast genomförda vinner
+// (allCases är sorterat desc på scheduledStart, så första träff = senast)
+function latestPerRegionPerMonth(cases: RegionMonthData[]): RegionMonthData[] {
+  const seen = new Map<string, RegionMonthData>()
+  for (const c of cases) {
+    if (!c.scheduledStart) continue
+    const key = `${c.regionId}__${toMonthKey(c.scheduledStart)}`
+    if (!seen.has(key)) seen.set(key, c)
+  }
+  return Array.from(seen.values())
+}
+
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -92,7 +102,6 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-// Enkel DBSCAN-liknande klustring: grupper stationer inom maxDist meter
 function clusterStations(stations: StationCoord[], maxDist = 300, minSize = 3): GeoCluster[] {
   const visited = new Set<number>()
   const clusters: GeoCluster[] = []
@@ -150,7 +159,6 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
     const bounds = new google.maps.LatLngBounds()
     let hasPoints = false
 
-    // Hotspot-stationer (3+ månader i rad) — röda cirklar
     hotspots.filter(h => !h.improved).forEach(h => {
       bounds.extend({ lat: h.lat, lng: h.lng }); hasPoints = true
       const marker = new google.maps.Marker({
@@ -165,7 +173,6 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
       markersRef.current.push(marker)
     })
 
-    // Förbättrade stationer — gröna cirklar
     hotspots.filter(h => h.improved).forEach(h => {
       bounds.extend({ lat: h.lat, lng: h.lng }); hasPoints = true
       const marker = new google.maps.Marker({
@@ -180,7 +187,6 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
       markersRef.current.push(marker)
     })
 
-    // Geografiska kluster — stor röd ring
     geoClusters.forEach(cluster => {
       bounds.extend(cluster.center); hasPoints = true
       const marker = new google.maps.Marker({
@@ -195,7 +201,6 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
       markersRef.current.push(marker)
     })
 
-    // Avvikelser — orange trianglar
     annotations.forEach(ann => {
       const cat = ANNOTATION_CATEGORIES[ann.category as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
       bounds.extend({ lat: ann.latitude, lng: ann.longitude }); hasPoints = true
@@ -226,19 +231,17 @@ export default function RonderingPage() {
   const [selectedOrg, setSelectedOrg] = useState<RegionalOrg | null>(null)
   const [loadingOrgs, setLoadingOrgs] = useState(true)
 
-  // Månadsdata
-  const [availableMonths, setAvailableMonths] = useState<string[]>([]) // ['2026-06', '2026-05', ...]
+  const [availableMonths, setAvailableMonths] = useState<string[]>([])
   const [selectedMonth, setSelectedMonth] = useState<string>('')
-  const [monthData, setMonthData] = useState<RegionMonthData[]>([])  // ärenden för vald månad
+  const [allEnriched, setAllEnriched] = useState<RegionMonthData[]>([])
+  const [monthData, setMonthData] = useState<RegionMonthData[]>([])
   const [allMonthsAggregated, setAllMonthsAggregated] = useState<{ month: string; all: number; partial: number; none: number }[]>([])
   const [stationCoords, setStationCoords] = useState<StationCoord[]>([])
   const [loading, setLoading] = useState(false)
 
-  // Hotspots beräknade från alla månaders data
   const [hotspots, setHotspots] = useState<HotspotStation[]>([])
   const [geoClusters, setGeoClusters] = useState<GeoCluster[]>([])
 
-  // Detaljvy
   const [selectedRegion, setSelectedRegion] = useState<RegionMonthData | null>(null)
 
   const [exportingPdf, setExportingPdf] = useState(false)
@@ -277,13 +280,13 @@ export default function RonderingPage() {
     const load = async () => {
       setLoading(true)
       setMonthData([])
+      setAllEnriched([])
       setAllMonthsAggregated([])
       setHotspots([])
       setGeoClusters([])
       setSelectedRegion(null)
 
       try {
-        // 1. Hämta alla regioner för organisationen
         const { data: sites } = await supabase
           .from('customers')
           .select('id, company_name')
@@ -295,7 +298,6 @@ export default function RonderingPage() {
         const siteNameMap = Object.fromEntries((sites || []).map(s => [s.id, s.company_name]))
         if (siteIds.length === 0) { setLoading(false); return }
 
-        // 2. Hämta ALLA rondering-ärenden för organisationen
         const { data: allCases } = await supabase
           .from('cases')
           .select('id, case_number, title, customer_id, scheduled_start, status, primary_technician_name')
@@ -305,7 +307,6 @@ export default function RonderingPage() {
 
         if (!allCases || allCases.length === 0) { setLoading(false); return }
 
-        // 3. Stationer med koordinater
         const { data: placements } = await supabase
           .from('equipment_placements')
           .select('id, customer_id, serial_number, latitude, longitude')
@@ -322,7 +323,6 @@ export default function RonderingPage() {
         }
         setStationCoords(coords)
 
-        // 4. Enricha alla ärenden med logs + annotationer
         const enriched: RegionMonthData[] = await Promise.all(
           allCases.map(async (c) => {
             const [logs, annotations] = await Promise.all([
@@ -348,7 +348,6 @@ export default function RonderingPage() {
           })
         )
 
-        // 5. Unika månader (YYYY-MM) sorterat nyast först
         const monthKeys = [...new Set(enriched.map(c => c.scheduledStart ? toMonthKey(c.scheduledStart) : null).filter(Boolean) as string[])]
           .sort((a, b) => b.localeCompare(a))
         setAvailableMonths(monthKeys)
@@ -356,35 +355,30 @@ export default function RonderingPage() {
         const latestMonth = monthKeys[0] || ''
         setSelectedMonth(latestMonth)
 
-        // 6. Månadsvy för senaste månaden
-        const latestCases = enriched.filter(c => c.scheduledStart && toMonthKey(c.scheduledStart) === latestMonth)
-        setMonthData(latestCases)
+        // Spara alla enriched ärenden — monthData räknas om via useEffect nedan
+        setAllEnriched(enriched)
 
-        // 7. Aggregerad trenddata per månad (alla månader, nyast höger)
+        // Aggregerad trenddata per månad — deduplicerat
         const aggByMonth: Record<string, { all: number; partial: number; none: number }> = {}
-        for (const c of enriched) {
-          if (!c.scheduledStart) continue
-          const mk = toMonthKey(c.scheduledStart)
-          if (!aggByMonth[mk]) aggByMonth[mk] = { all: 0, partial: 0, none: 0 }
-          aggByMonth[mk].all += c.baitAll
-          aggByMonth[mk].partial += c.baitPartial
-          aggByMonth[mk].none += c.baitNone
+        const monthsSorted = [...monthKeys].reverse()
+        for (const mk of monthsSorted) {
+          const casesForMonth = latestPerRegionPerMonth(
+            enriched.filter(c => c.scheduledStart && toMonthKey(c.scheduledStart) === mk)
+          )
+          aggByMonth[mk] = casesForMonth.reduce(
+            (acc, c) => ({ all: acc.all + c.baitAll, partial: acc.partial + c.baitPartial, none: acc.none + c.baitNone }),
+            { all: 0, partial: 0, none: 0 }
+          )
         }
-        const aggregated = monthKeys
-          .slice()
-          .reverse()
-          .map(mk => ({
-            month: fmtMonthYear(mk + '-01'),
-            ...aggByMonth[mk],
-          }))
+        const aggregated = monthsSorted.map(mk => ({ month: fmtMonthYear(mk + '-01'), ...aggByMonth[mk] }))
         setAllMonthsAggregated(aggregated)
 
-        // 8. Hotspot-beräkning
-        // Bygg map: stationId → [bait_consumed per månad, sorterat äldst→nyast]
+        // Hotspot-beräkning — deduplicerat per månad
         const stationHistory: Record<string, (string | null)[]> = {}
-        const monthsSorted = [...monthKeys].reverse() // äldst→nyast
         for (const mk of monthsSorted) {
-          const casesForMonth = enriched.filter(c => c.scheduledStart && toMonthKey(c.scheduledStart) === mk)
+          const casesForMonth = latestPerRegionPerMonth(
+            enriched.filter(c => c.scheduledStart && toMonthKey(c.scheduledStart) === mk)
+          )
           for (const c of casesForMonth) {
             for (const log of c.logs) {
               if (!stationHistory[log.station_id]) stationHistory[log.station_id] = []
@@ -393,19 +387,15 @@ export default function RonderingPage() {
           }
         }
 
-        // Konsekutiva 'all' bakifrån + förbättrade
         const hotspotList: HotspotStation[] = []
         const highActivityStations: StationCoord[] = []
 
         for (const [stationId, history] of Object.entries(stationHistory)) {
-          // Konsekutiva 'all' bakifrån
           let consec = 0
           for (let i = history.length - 1; i >= 0; i--) {
             if (history[i] === 'all') consec++
             else break
           }
-
-          // Förbättrad: haft 'all' ≥2 gånger tidigare, senaste är 'partial' eller 'none'
           const allCount = history.filter(v => v === 'all').length
           const latest = history[history.length - 1]
           const improved = allCount >= 2 && (latest === 'partial' || latest === 'none')
@@ -413,18 +403,10 @@ export default function RonderingPage() {
           if (consec >= 3 || improved) {
             const coord = coords.find(c => c.stationId === stationId)
             if (coord) {
-              hotspotList.push({
-                stationId,
-                serialNumber: coord.serialNumber,
-                lat: coord.lat,
-                lng: coord.lng,
-                consecutiveMonths: consec,
-                improved,
-              })
+              hotspotList.push({ stationId, serialNumber: coord.serialNumber, lat: coord.lat, lng: coord.lng, consecutiveMonths: consec, improved })
             }
           }
 
-          // Stationer med 'all' senaste månaden för geo-klustring
           if (latest === 'all') {
             const coord = coords.find(c => c.stationId === stationId)
             if (coord) highActivityStations.push(coord)
@@ -440,20 +422,22 @@ export default function RonderingPage() {
     load()
   }, [selectedOrg])
 
-  // Byt månad → uppdatera monthData
+  // Räkna om monthData när vald månad ändras
+  useEffect(() => {
+    if (!selectedMonth || allEnriched.length === 0) return
+    const forMonth = allEnriched.filter(c => c.scheduledStart && toMonthKey(c.scheduledStart) === selectedMonth)
+    setMonthData(latestPerRegionPerMonth(forMonth))
+  }, [allEnriched, selectedMonth])
+
   const handleMonthChange = useCallback((mk: string) => {
     setSelectedMonth(mk)
     setSelectedRegion(null)
-    // monthData filtreras från allCases — vi behöver hålla alla enriched cases
-    // Enklast: trigga om hela laddningen är för dyrt; istället lagrar vi allEnriched
   }, [])
 
-  // Månadsnavigering
   const monthIdx = availableMonths.indexOf(selectedMonth)
   const canPrev = monthIdx < availableMonths.length - 1
   const canNext = monthIdx > 0
 
-  // Aggregat för vald månad
   const monthTotalAll = monthData.reduce((s, c) => s + c.baitAll, 0)
   const monthTotalPartial = monthData.reduce((s, c) => s + c.baitPartial, 0)
   const monthTotalNone = monthData.reduce((s, c) => s + c.baitNone, 0)
@@ -461,6 +445,18 @@ export default function RonderingPage() {
   const monthTotalStations = monthData.reduce((s, c) => s + c.total, 0)
   const monthTotalAnnotations = monthData.reduce((s, c) => s + c.annotations.length, 0)
   const allAnnotations = monthData.flatMap(c => c.annotations)
+  const activeHotspots = hotspots.filter(h => !h.improved)
+
+  // Bygg map caseId → regionName för avvikelsesektionen
+  const caseRegionMap = Object.fromEntries(monthData.map(c => [c.caseId, c.regionName]))
+
+  // Hotspot-regioner för denna månad (regionId-set)
+  const hotspotRegionIds = new Set(
+    hotspots.filter(h => !h.improved).map(h => {
+      const coord = stationCoords.find(s => s.stationId === h.stationId)
+      return coord?.customerId
+    }).filter(Boolean) as string[]
+  )
 
   const handleExportPdf = async () => {
     if (!selectedOrg) return
@@ -530,14 +526,13 @@ export default function RonderingPage() {
         ) : (
           <div className="p-5 space-y-5">
 
-            {/* ── Header: org + månadsväljare + PDF ── */}
+            {/* ── Header ── */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider mb-0.5">Egenkontroll</p>
                 <h1 className="text-xl font-semibold text-white">{selectedOrg.name}</h1>
               </div>
               <div className="flex items-center gap-3 flex-wrap">
-                {/* Månadsväljare */}
                 <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg px-1 py-1">
                   <button
                     type="button"
@@ -567,9 +562,9 @@ export default function RonderingPage() {
               </div>
             </div>
 
-            {/* ── Månadssammanfattning ── */}
+            {/* ── KPI-rad ── */}
             {monthData.length > 0 && (
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-5 gap-3">
                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Stationer kontrollerade</p>
                   <p className={`text-2xl font-bold ${monthTotalInspected === monthTotalStations ? 'text-emerald-400' : 'text-white'}`}>
@@ -580,7 +575,9 @@ export default function RonderingPage() {
                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Allt bete förbrukat</p>
                   <p className="text-2xl font-bold text-red-400">{monthTotalAll}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">stationer</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {monthTotalPartial > 0 ? `+ ${monthTotalPartial} delvis` : 'stationer'}
+                  </p>
                 </div>
                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Avvikelser</p>
@@ -591,6 +588,15 @@ export default function RonderingPage() {
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Regioner genomförda</p>
                   <p className="text-2xl font-bold text-white">{monthData.filter(c => c.inspected === c.total && c.total > 0).length}/{monthData.length}</p>
                   <p className="text-xs text-slate-500 mt-0.5">av {monthData.length} regioner</p>
+                </div>
+                <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Aktiva hotspots</p>
+                  <p className={`text-2xl font-bold ${activeHotspots.length > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {activeHotspots.length}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {hotspots.filter(h => h.improved).length > 0 ? `${hotspots.filter(h => h.improved).length} förbättrade` : '3+ månader i rad'}
+                  </p>
                 </div>
               </div>
             )}
@@ -604,6 +610,7 @@ export default function RonderingPage() {
                     const pct = c.total > 0 ? Math.round(c.inspected / c.total * 100) : 0
                     const baitTotal = c.baitAll + c.baitPartial + c.baitNone
                     const isSelected = selectedRegion?.caseId === c.caseId
+                    const hasHotspot = hotspotRegionIds.has(c.regionId)
                     return (
                       <button
                         key={c.caseId}
@@ -616,7 +623,10 @@ export default function RonderingPage() {
                         }`}
                       >
                         <div className="flex items-start justify-between mb-2">
-                          <p className="text-sm font-semibold text-white leading-tight">{c.regionName}</p>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {hasHotspot && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 mt-0.5" title="Aktiv hotspot" />}
+                            <p className="text-sm font-semibold text-white leading-tight truncate">{c.regionName}</p>
+                          </div>
                           <span className={`text-xs font-bold ml-2 flex-shrink-0 ${pct === 100 ? 'text-emerald-400' : 'text-slate-400'}`}>{pct}%</span>
                         </div>
                         <div className="h-1 bg-slate-700 rounded-full overflow-hidden mb-2">
@@ -624,20 +634,97 @@ export default function RonderingPage() {
                         </div>
                         <p className="text-xs text-slate-500 mb-2">{c.inspected}/{c.total} stationer</p>
                         {baitTotal > 0 && (
-                          <div className="flex h-1.5 rounded-full overflow-hidden bg-slate-700 gap-px">
+                          <div className="flex h-1.5 rounded-full overflow-hidden bg-slate-700 gap-px mb-2">
                             {c.baitAll > 0 && <div className="bg-red-500" style={{ width: `${c.baitAll / baitTotal * 100}%` }} />}
                             {c.baitPartial > 0 && <div className="bg-amber-500" style={{ width: `${c.baitPartial / baitTotal * 100}%` }} />}
                             {c.baitNone > 0 && <div className="bg-emerald-500" style={{ width: `${c.baitNone / baitTotal * 100}%` }} />}
                           </div>
                         )}
-                        <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-500">
+                        <div className="flex items-center gap-3 text-[11px] text-slate-500">
                           {c.baitAll > 0 && <span className="text-red-400">Allt: {c.baitAll}</span>}
                           {c.baitPartial > 0 && <span className="text-amber-400">Delvis: {c.baitPartial}</span>}
-                          {c.annotations.length > 0 && <span className="text-orange-400 ml-auto">{c.annotations.length} avvik.</span>}
+                          {c.annotations.length > 0 && <span className="text-orange-400">⚠ {c.annotations.length}</span>}
+                          {c.scheduledStart && (
+                            <span className="ml-auto flex items-center gap-1 text-slate-600">
+                              <Calendar className="w-3 h-3" />{fmtDate(c.scheduledStart)}
+                            </span>
+                          )}
                         </div>
+                        {c.technicianName && (
+                          <div className="flex items-center gap-1 mt-1.5 text-[11px] text-slate-600">
+                            <User className="w-3 h-3" />{c.technicianName}
+                          </div>
+                        )}
                       </button>
                     )
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* ── Detaljvy för vald region ── */}
+            {selectedRegion && (
+              <div className="bg-slate-800/50 border border-sky-500/30 rounded-xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-700 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">{selectedRegion.regionName}</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {selectedRegion.inspected}/{selectedRegion.total} stationer kontrollerade
+                      {selectedRegion.scheduledStart && ` · ${fmtDate(selectedRegion.scheduledStart)}`}
+                      {selectedRegion.technicianName && ` · ${selectedRegion.technicianName}`}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setSelectedRegion(null)} className="p-1 text-slate-500 hover:text-white"><X className="w-4 h-4" /></button>
+                </div>
+                <div className="p-4 space-y-4">
+                  {/* Beteåtgång */}
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Beteåtgång</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="px-3 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-center">
+                        <p className="text-lg font-bold text-red-400">{selectedRegion.baitAll}</p>
+                        <p className="text-[11px] text-slate-500">Allt förbrukat</p>
+                      </div>
+                      <div className="px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-center">
+                        <p className="text-lg font-bold text-amber-400">{selectedRegion.baitPartial}</p>
+                        <p className="text-[11px] text-slate-500">Delvis förbrukat</p>
+                      </div>
+                      <div className="px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-center">
+                        <p className="text-lg font-bold text-emerald-400">{selectedRegion.baitNone}</p>
+                        <p className="text-[11px] text-slate-500">Inget förbrukat</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Avvikelser för regionen */}
+                  {selectedRegion.annotations.length > 0 ? (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Avvikelser ({selectedRegion.annotations.length})</p>
+                      <div className="space-y-2">
+                        {selectedRegion.annotations.map(ann => {
+                          const cat = ANNOTATION_CATEGORIES[ann.category as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
+                          return (
+                            <div key={ann.id} className="flex items-start gap-3 px-3 py-2.5 bg-orange-500/10 border border-orange-500/20 rounded-lg text-xs">
+                              <span className="text-base leading-none mt-0.5">{cat.emoji}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-orange-300">{cat.label}</p>
+                                {ann.note && <p className="text-slate-400 mt-0.5">{ann.note}</p>}
+                                <p className="text-slate-600 mt-1">
+                                  {ann.technician_name && `${ann.technician_name} · `}
+                                  {ann.created_at ? fmtDate(ann.created_at) : ''}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-4 text-center text-xs text-slate-600">
+                      <CheckCircle className="w-5 h-5 mx-auto mb-1 text-emerald-600" />
+                      Inga avvikelser registrerade
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -668,6 +755,55 @@ export default function RonderingPage() {
                     <Bar dataKey="none" name="Inget" fill="#22c55e" radius={[3,3,0,0]} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+            )}
+
+            {/* ── Avvikelse-sektion ── */}
+            {allAnnotations.length > 0 && (
+              <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+                <div className="px-5 py-3 border-b border-slate-700">
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-orange-400" />
+                    Avvikelser — {fmtMonthYear(selectedMonth + '-01')}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">{allAnnotations.length} avvikelse{allAnnotations.length !== 1 ? 'r' : ''} registrerade under månaden</p>
+                </div>
+                <div className="p-4">
+                  {/* Gruppera per kategori */}
+                  {(Object.keys(ANNOTATION_CATEGORIES) as RonderingAnnotationCategory[]).map(catKey => {
+                    const catAnnotations = allAnnotations.filter(a => a.category === catKey)
+                    if (catAnnotations.length === 0) return null
+                    const cat = ANNOTATION_CATEGORIES[catKey]
+                    return (
+                      <div key={catKey} className="mb-4 last:mb-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-base">{cat.emoji}</span>
+                          <p className="text-xs font-semibold text-slate-300">{cat.label}</p>
+                          <span className="px-1.5 py-0.5 rounded bg-slate-700 text-[10px] text-slate-400">{catAnnotations.length}</span>
+                        </div>
+                        <div className="space-y-1.5 ml-6">
+                          {catAnnotations.map(ann => {
+                            const regionName = monthData.find(c => c.caseId === ann.case_id)?.regionName ?? caseRegionMap[ann.case_id] ?? '—'
+                            return (
+                              <div key={ann.id} className="flex items-start gap-3 px-3 py-2 bg-slate-900/40 border border-slate-700/50 rounded-lg text-xs">
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium text-slate-200">{regionName}</span>
+                                    {ann.note && <span className="text-slate-400">— {ann.note}</span>}
+                                  </div>
+                                  <p className="text-slate-600 mt-0.5">
+                                    {ann.technician_name && `${ann.technician_name} · `}
+                                    {ann.created_at ? fmtDate(ann.created_at) : ''}
+                                  </p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
 
