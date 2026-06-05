@@ -470,7 +470,7 @@ export default function RonderingPage() {
           const latest = history[history.length - 1]
           const improved = allCount >= 2 && (latest === 'partial' || latest === 'none')
 
-          if (consec >= 3 || improved) {
+          if (consec >= 2 || improved) {
             const coord = coords.find(c => c.stationId === stationId)
             if (coord) {
               hotspotList.push({ stationId, serialNumber: coord.serialNumber, lat: coord.lat, lng: coord.lng, consecutiveMonths: consec, improved })
@@ -716,12 +716,12 @@ export default function RonderingPage() {
                   <p className="text-xs text-slate-500 mt-0.5">av {monthData.length} regioner</p>
                 </div>
                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
-                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Aktiva hotspots</p>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Riskstationer</p>
                   <p className={`text-2xl font-bold ${activeHotspots.length > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                     {activeHotspots.length}
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {hotspots.filter(h => h.improved).length > 0 ? `${hotspots.filter(h => h.improved).length} förbättrade` : '3+ månader i rad'}
+                    {hotspots.filter(h => h.improved).length > 0 ? `${hotspots.filter(h => h.improved).length} förbättrade` : '2 månader i rad med hög beteåtgång'}
                   </p>
                 </div>
               </div>
@@ -977,7 +977,7 @@ export default function RonderingPage() {
                       <MapIcon className="w-4 h-4 text-orange-400" />
                       Hotspot-karta — alla regioner
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Avvikelser från {fmtMonthYear(selectedMonth + '-01')} + stationer med långvarig hög aktivitet</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Avvikelser från {fmtMonthYear(selectedMonth + '-01')} + stationer med hög aktivitet 2 månader i rad och geografiska riskzoner</p>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                     {hotspots.filter(h => !h.improved).length > 0 && (
@@ -987,7 +987,7 @@ export default function RonderingPage() {
                       <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />{hotspots.filter(h => h.improved).length} förbättrade</span>
                     )}
                     {geoClusters.length > 0 && (
-                      <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full border-2 border-red-500 inline-block opacity-60" />{geoClusters.length} kluster</span>
+                      <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full border-2 border-red-500 inline-block opacity-60" />{geoClusters.length} riskzon{geoClusters.length !== 1 ? 'er' : ''}</span>
                     )}
                     {allAnnotations.length > 0 && (
                       <span className="flex items-center gap-1.5">
@@ -1016,15 +1016,15 @@ export default function RonderingPage() {
                 <div className="px-5 py-3 border-b border-slate-700">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-amber-400" />
-                    Hotspots &amp; förbättrade stationer
+                    Riskstationer &amp; geografiska riskzoner
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Stationer med 3+ månader konsekutiv hög aktivitet, geografiska kluster, och stationer som förbättrats</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Stationer med hög beteåtgång 2 månader i rad, geografiska riskzoner med hög aktivitet senaste månaden, och stationer som förbättrats</p>
                 </div>
                 <div className="p-4 space-y-3">
                   {geoClusters.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                        Utsatta områden — {geoClusters.length} geografiska kluster
+                        Geografiska riskzoner — {geoClusters.length} kluster
                       </p>
                       <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
                         {geoClusters.sort((a, b) => b.stations.length - a.stations.length).map((cluster, i) => (
@@ -1047,7 +1047,7 @@ export default function RonderingPage() {
                   )}
                   {hotspots.filter(h => !h.improved).length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Ihållande hotspots (3+ månader i rad)</p>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Riskstationer — hög aktivitet 2 månader i rad</p>
                       <div className="rounded-lg overflow-hidden border border-slate-700 text-xs">
                         <div className="grid grid-cols-3 bg-slate-900/60">
                           <div className="px-3 py-2 font-semibold text-slate-400">Station</div>
