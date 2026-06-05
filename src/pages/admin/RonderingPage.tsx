@@ -961,7 +961,7 @@ export default function RonderingPage() {
                       <MapIcon className="w-4 h-4 text-orange-400" />
                       Hotspot-karta — alla regioner
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Avvikelser från {fmtMonthYear(selectedMonth + '-01')} + stationer med hög aktivitet 2 månader i rad och geografiska riskzoner</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Riskstationer, riskzoner och avvikelser — {fmtMonthYear(selectedMonth + '-01')}</p>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                     {hotspots.filter(h => !h.improved).length > 0 && (
@@ -993,7 +993,7 @@ export default function RonderingPage() {
                   <div className="mt-2 pt-2 border-t border-slate-700/50 flex flex-wrap gap-x-5 gap-y-1">
                     <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
                       <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
-                      <span><span className="text-slate-400 font-medium">Riskstation</span> — hög beteåtgång 2 månader i rad, kräver uppföljning</span>
+                      <span><span className="text-slate-400 font-medium">Riskstation</span> — hög beteåtgång 2 månader i rad</span>
                     </span>
                     <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
                       <span className="w-3 h-3 rounded-full border border-red-500 opacity-70 flex-shrink-0" />
