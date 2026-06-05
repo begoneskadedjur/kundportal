@@ -67,6 +67,7 @@ interface HotspotStation {
 interface GeoCluster {
   center: { lat: number; lng: number }
   stations: StationCoord[]
+  address?: string
 }
 
 // ── Hjälpfunktioner ───────────────────────────────────────────────────────────
@@ -136,12 +137,14 @@ interface OverviewMapProps {
   annotations: RonderingAnnotation[]
   isLoaded: boolean
   highlightRegionId: string | null
+  onClusterClick?: (center: { lat: number; lng: number }) => void
 }
 
-function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRegionId }: OverviewMapProps) {
+function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRegionId, onClusterClick }: OverviewMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const gMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
+  const circlesRef = useRef<google.maps.Circle[]>([])
 
   useEffect(() => {
     if (!isLoaded || !mapRef.current) return
@@ -158,6 +161,8 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
 
     markersRef.current.forEach(m => m.setMap(null))
     markersRef.current = []
+    circlesRef.current.forEach(c => c.setMap(null))
+    circlesRef.current = []
 
     const bounds = new google.maps.LatLngBounds()
     let hasPoints = false
@@ -190,18 +195,55 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
       markersRef.current.push(marker)
     })
 
+    // Kluster: täckningscirkel + individuella stationspunkter
     geoClusters.forEach(cluster => {
       bounds.extend(cluster.center); hasPoints = true
-      const marker = new google.maps.Marker({
-        position: cluster.center,
+
+      // Beräkna dynamisk radie = max avstånd från center till någon station
+      const radius = Math.max(
+        200,
+        ...cluster.stations.map(s => haversineMeters(cluster.center.lat, cluster.center.lng, s.lat, s.lng))
+      )
+
+      // Täckningscirkel för klustrets utbredning
+      const circle = new google.maps.Circle({
+        center: cluster.center,
+        radius,
         map: gMapRef.current!,
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 16, fillColor: '#ef4444', fillOpacity: 0.25, strokeColor: '#ef4444', strokeWeight: 2.5 },
-        title: `Kluster — ${cluster.stations.length} stationer`,
-        zIndex: 5,
+        fillColor: '#ef4444',
+        fillOpacity: 0.10,
+        strokeColor: '#ef4444',
+        strokeWeight: 1.5,
+        strokeOpacity: 0.6,
+        zIndex: 3,
+        clickable: true,
       })
-      const info = new google.maps.InfoWindow({ content: `<div style="font-family:sans-serif;padding:4px"><b style="color:#ef4444">Geografiskt kluster</b><br><span style="font-size:12px">${cluster.stations.length} stationer med hög aktivitet</span></div>` })
-      marker.addListener('click', () => info.open(gMapRef.current!, marker))
-      markersRef.current.push(marker)
+      const clusterInfo = new google.maps.InfoWindow({
+        content: `<div style="font-family:sans-serif;padding:4px"><b style="color:#ef4444">Utsatt område</b><br><span style="font-size:12px">${cluster.stations.length} stationer med hög aktivitet</span>${cluster.address ? `<br><span style="font-size:11px;color:#64748b">${cluster.address}</span>` : ''}</div>`
+      })
+      circle.addListener('click', () => {
+        clusterInfo.setPosition(cluster.center)
+        clusterInfo.open(gMapRef.current!)
+        onClusterClick?.(cluster.center)
+      })
+      circlesRef.current.push(circle)
+
+      // Individuella stationer i klustret
+      cluster.stations.forEach(s => {
+        bounds.extend({ lat: s.lat, lng: s.lng })
+        const dot = new google.maps.Marker({
+          position: { lat: s.lat, lng: s.lng },
+          map: gMapRef.current!,
+          icon: { path: google.maps.SymbolPath.CIRCLE, scale: 5, fillColor: '#ef4444', fillOpacity: 0.85, strokeColor: '#fff', strokeWeight: 1 },
+          title: `Station ${s.serialNumber ?? '?'} — hög aktivitet`,
+          zIndex: 6,
+        })
+        const dotInfo = new google.maps.InfoWindow({
+          content: `<div style="font-family:sans-serif;padding:4px"><span style="font-size:12px">Station ${s.serialNumber ?? s.stationId.slice(0, 8)}</span><br><span style="font-size:11px;color:#64748b">Hög beteåtgång senaste månaden</span></div>`
+        })
+        dot.addListener('click', () => dotInfo.open(gMapRef.current!, dot))
+        markersRef.current.push(dot)
+      })
     })
 
     annotations.forEach(ann => {
@@ -423,7 +465,7 @@ export default function RonderingPage() {
         }
 
         setHotspots(hotspotList)
-        setGeoClusters(clusterStations(highActivityStations, 300, 3))
+        setGeoClusters(clusterStations(highActivityStations, 600, 5))
       } finally {
         setLoading(false)
       }
@@ -471,6 +513,28 @@ export default function RonderingPage() {
       ).then(() => setAnnotationAddresses(addresses))
     }
   }, [allEnriched, selectedMonth])
+
+  // Geocoda klustercentra → adress för listan
+  useEffect(() => {
+    if (geoClusters.length === 0) return
+    if (typeof google === 'undefined' || !google.maps?.Geocoder) return
+    const geocoder = new google.maps.Geocoder()
+    Promise.allSettled(
+      geoClusters.map((cluster, i) =>
+        new Promise<{ i: number; address: string }>(resolve => {
+          geocoder.geocode({ location: cluster.center }, (results, status) => {
+            const address = status === 'OK' && results?.[0] ? results[0].formatted_address : ''
+            resolve({ i, address })
+          })
+        })
+      )
+    ).then(settled => {
+      setGeoClusters(prev => prev.map((c, i) => {
+        const result = settled.find(s => s.status === 'fulfilled' && (s as any).value.i === i)
+        return result && result.status === 'fulfilled' ? { ...c, address: (result as any).value.address } : c
+      }))
+    })
+  }, [geoClusters.length, mapsLoaded])
 
   const handleMonthChange = useCallback((mk: string) => {
     setSelectedMonth(mk)
@@ -921,6 +985,7 @@ export default function RonderingPage() {
                     annotations={allAnnotations}
                     isLoaded={mapsLoaded}
                     highlightRegionId={selectedRegion?.regionId ?? null}
+                    onClusterClick={_center => {/* kartan hanterar zoom internt via circle click */}}
                   />
                 </div>
               </div>
@@ -939,14 +1004,23 @@ export default function RonderingPage() {
                 <div className="p-4 space-y-3">
                   {geoClusters.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Geografiska kluster (300m-radie, 3+ stationer)</p>
-                      <div className="space-y-2">
-                        {geoClusters.map((cluster, i) => (
-                          <div key={i} className="flex items-center gap-3 px-3 py-2.5 bg-red-500/10 border border-red-500/20 rounded-lg text-xs">
-                            <span className="w-3 h-3 rounded-full border-2 border-red-400 opacity-80 flex-shrink-0" />
-                            <span className="text-red-300 font-semibold">Kluster {i + 1}</span>
-                            <span className="text-slate-400">{cluster.stations.length} stationer med hög aktivitet inom 300m</span>
-                            <span className="ml-auto text-slate-500">{cluster.center.lat.toFixed(4)}, {cluster.center.lng.toFixed(4)}</span>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                        Utsatta områden — {geoClusters.length} geografiska kluster
+                      </p>
+                      <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
+                        {geoClusters.sort((a, b) => b.stations.length - a.stations.length).map((cluster, i) => (
+                          <div key={i} className="px-3 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                              <span className="font-semibold text-red-300">
+                                {cluster.stations.length} stationer
+                              </span>
+                            </div>
+                            {cluster.address
+                              ? <p className="text-slate-300 leading-snug line-clamp-2">{cluster.address}</p>
+                              : <p className="text-slate-500 font-mono">{cluster.center.lat.toFixed(4)}, {cluster.center.lng.toFixed(4)}</p>
+                            }
+                            <p className="text-slate-600 font-mono text-[10px]">{cluster.center.lat.toFixed(4)}, {cluster.center.lng.toFixed(4)}</p>
                           </div>
                         ))}
                       </div>
