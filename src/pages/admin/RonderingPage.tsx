@@ -8,7 +8,7 @@ import { RonderingService } from '../../services/ronderingService'
 import type { RonderingAnnotation, RonderingAnnotationCategory } from '../../services/ronderingService'
 import { ANNOTATION_CATEGORIES } from '../../services/ronderingService'
 import {
-  Map, Building2, FileDown, ChevronLeft, ChevronRight,
+  Map as MapIcon, Building2, FileDown, ChevronLeft, ChevronRight,
   AlertCircle, TrendingDown, CheckCircle, X, User, Calendar,
 } from 'lucide-react'
 import { format } from 'date-fns'
@@ -519,7 +519,7 @@ export default function RonderingPage() {
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {!selectedOrg ? (
           <div className="flex-1 flex items-center justify-center text-slate-400">
-            <div className="text-center"><Map className="w-10 h-10 mx-auto mb-2 text-slate-600" /><p>Välj en kund</p></div>
+            <div className="text-center"><MapIcon className="w-10 h-10 mx-auto mb-2 text-slate-600" /><p>Välj en kund</p></div>
           </div>
         ) : loading ? (
           <div className="flex-1 flex items-center justify-center text-slate-400">Laddar ronderingsdata...</div>
@@ -813,7 +813,7 @@ export default function RonderingPage() {
                 <div className="px-5 py-3 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                      <Map className="w-4 h-4 text-orange-400" />
+                      <MapIcon className="w-4 h-4 text-orange-400" />
                       Hotspot-karta — alla regioner
                     </h3>
                     <p className="text-xs text-slate-500 mt-0.5">Avvikelser från {fmtMonthYear(selectedMonth + '-01')} + stationer med långvarig hög aktivitet</p>
@@ -918,7 +918,7 @@ export default function RonderingPage() {
 
             {monthData.length === 0 && !loading && (
               <div className="py-16 text-center">
-                <Map className="w-10 h-10 mx-auto mb-3 text-slate-600" />
+                <MapIcon className="w-10 h-10 mx-auto mb-3 text-slate-600" />
                 <p className="text-slate-400">Inga ronderingsärenden för {fmtMonthYear(selectedMonth + '-01')}</p>
               </div>
             )}
