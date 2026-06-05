@@ -157,16 +157,19 @@ interface OverviewMapProps {
   isLoaded: boolean
   highlightRegionId: string | null
   highlightStationId: string | null
+  highlightClusterIdx: number | null
+  highlightAnnotationId: string | null
   onClusterClick?: (center: { lat: number; lng: number }) => void
 }
 
-function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRegionId, highlightStationId, onClusterClick }: OverviewMapProps) {
+function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick }: OverviewMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const gMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
   const circlesRef = useRef<google.maps.Circle[]>([])
   const pulseRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pulseMarkerRef = useRef<google.maps.Marker | null>(null)
+  const pulseCircleRef = useRef<google.maps.Circle | null>(null)
 
   useEffect(() => {
     if (!isLoaded || !mapRef.current) return
@@ -255,13 +258,15 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
     annotations.forEach(ann => {
       const cat = ANNOTATION_CATEGORIES[ann.category as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
       bounds.extend({ lat: ann.latitude, lng: ann.longitude }); hasPoints = true
+      // Avvikelse-ikon: fylld cirkel med vit ring — tydligare än triangel
       const marker = new google.maps.Marker({
         position: { lat: ann.latitude, lng: ann.longitude },
         map: gMapRef.current!,
-        icon: { path: 'M 0,-12 L 10,8 L -10,8 Z', scale: 1.1, fillColor: '#f97316', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 1.5 },
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#f97316', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2.5 },
+        label: { text: '!', color: '#fff', fontSize: '11px', fontWeight: 'bold' },
         title: cat.label, zIndex: 15,
       })
-      const info = new google.maps.InfoWindow({ content: `<div style="font-family:sans-serif;padding:4px"><b>${cat.label}</b>${ann.note ? `<br><span style="font-size:12px">${ann.note}</span>` : ''}</div>` })
+      const info = new google.maps.InfoWindow({ content: `<div style="font-family:sans-serif;padding:4px"><b style="color:#f97316">${cat.label}</b>${ann.note ? `<br><span style="font-size:12px">${ann.note}</span>` : ''}${ann.technician_name ? `<br><span style="font-size:11px;color:#64748b">${ann.technician_name}</span>` : ''}</div>` })
       marker.addListener('click', () => info.open(gMapRef.current!, marker))
       markersRef.current.push(marker)
     })
@@ -301,6 +306,70 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
     }
   }, [highlightStationId, isLoaded, hotspots])
 
+  // Pulserande cirkel när en riskzon klickas
+  useEffect(() => {
+    if (pulseRef.current) { clearInterval(pulseRef.current); pulseRef.current = null }
+    if (pulseCircleRef.current) { pulseCircleRef.current.setMap(null); pulseCircleRef.current = null }
+    if (highlightClusterIdx === null || !isLoaded || !gMapRef.current) return
+    const cluster = geoClusters[highlightClusterIdx]
+    if (!cluster) return
+
+    gMapRef.current.panTo(cluster.center)
+    gMapRef.current.setZoom(14)
+
+    const radius = Math.max(200, ...cluster.stations.map(s => haversineMeters(cluster.center.lat, cluster.center.lng, s.lat, s.lng)))
+    const ring = new google.maps.Circle({
+      center: cluster.center, radius: radius * 1.3,
+      map: gMapRef.current,
+      fillColor: '#ef4444', fillOpacity: 0.15,
+      strokeColor: '#ef4444', strokeWeight: 3, strokeOpacity: 1,
+      zIndex: 20,
+    })
+    pulseCircleRef.current = ring
+
+    let thick = true
+    pulseRef.current = setInterval(() => {
+      thick = !thick
+      ring.setOptions({ strokeWeight: thick ? 3 : 1.5, fillOpacity: thick ? 0.15 : 0.05 })
+    }, 600)
+
+    return () => {
+      if (pulseRef.current) clearInterval(pulseRef.current)
+      ring.setMap(null)
+    }
+  }, [highlightClusterIdx, isLoaded, geoClusters])
+
+  // Pulserande markör när en avvikelse klickas
+  useEffect(() => {
+    if (pulseRef.current) { clearInterval(pulseRef.current); pulseRef.current = null }
+    if (pulseMarkerRef.current) { pulseMarkerRef.current.setMap(null); pulseMarkerRef.current = null }
+    if (!highlightAnnotationId || !isLoaded || !gMapRef.current) return
+    const ann = annotations.find(a => a.id === highlightAnnotationId)
+    if (!ann) return
+
+    gMapRef.current.panTo({ lat: ann.latitude, lng: ann.longitude })
+    gMapRef.current.setZoom(17)
+
+    const pulse = new google.maps.Marker({
+      position: { lat: ann.latitude, lng: ann.longitude },
+      map: gMapRef.current,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 16, fillColor: '#f97316', fillOpacity: 0.3, strokeColor: '#f97316', strokeWeight: 2.5 },
+      zIndex: 25,
+    })
+    pulseMarkerRef.current = pulse
+
+    let big = true
+    pulseRef.current = setInterval(() => {
+      big = !big
+      pulse.setIcon({ path: google.maps.SymbolPath.CIRCLE, scale: big ? 16 : 10, fillColor: '#f97316', fillOpacity: big ? 0.3 : 0.6, strokeColor: '#f97316', strokeWeight: 2.5 })
+    }, 500)
+
+    return () => {
+      if (pulseRef.current) clearInterval(pulseRef.current)
+      pulse.setMap(null)
+    }
+  }, [highlightAnnotationId, isLoaded, annotations])
+
   if (!isLoaded) return <div className="h-80 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta...</div>
   return <div ref={mapRef} className="h-80 rounded-xl overflow-hidden" />
 }
@@ -331,6 +400,8 @@ export default function RonderingPage() {
   const [annotationAddresses, setAnnotationAddresses] = useState<Record<string, string>>({})
   const [lightbox, setLightbox] = useState<{ images: { url: string; alt?: string }[]; index: number } | null>(null)
   const [highlightStationId, setHighlightStationId] = useState<string | null>(null)
+  const [highlightClusterIdx, setHighlightClusterIdx] = useState<number | null>(null)
+  const [highlightAnnotationId, setHighlightAnnotationId] = useState<string | null>(null)
 
   const [exportingPdf, setExportingPdf] = useState(false)
 
@@ -949,11 +1020,27 @@ export default function RonderingPage() {
                             const regionName = monthData.find(c => c.caseId === ann.case_id)?.regionName ?? caseRegionMap[ann.case_id] ?? '—'
                             const imgs = annotationImages[ann.id] ?? []
                             const address = annotationAddresses[ann.id]
+                            const isActive = highlightAnnotationId === ann.id
                             return (
-                              <div key={ann.id} className="px-3 py-2.5 bg-slate-900/40 border border-slate-700/50 rounded-lg text-xs space-y-1.5">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-medium text-slate-200">{regionName}</span>
-                                  {ann.note && <span className="text-slate-400">— {ann.note}</span>}
+                              <div key={ann.id} className={`px-3 py-2.5 rounded-lg border text-xs space-y-1.5 transition-all ${isActive ? 'bg-orange-500/15 border-orange-400/50' : 'bg-slate-900/40 border-slate-700/50'}`}>
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                    <span className="font-medium text-slate-200">{regionName}</span>
+                                    {ann.note && <span className="text-slate-400">— {ann.note}</span>}
+                                  </div>
+                                  <button
+                                    type="button"
+                                    title="Visa på karta"
+                                    onClick={() => {
+                                      setHighlightAnnotationId(isActive ? null : ann.id)
+                                      setHighlightStationId(null)
+                                      setHighlightClusterIdx(null)
+                                      if (!isActive) document.getElementById('hotspot-map-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                    }}
+                                    className={`flex-shrink-0 p-1 rounded transition-colors ${isActive ? 'text-orange-400' : 'text-slate-600 hover:text-orange-400'}`}
+                                  >
+                                    <MapIcon className="w-3.5 h-3.5" />
+                                  </button>
                                 </div>
                                 {address && <p className="text-slate-400 text-[11px]">{address}</p>}
                                 <p className="text-slate-600 font-mono text-[11px]">
@@ -1034,6 +1121,8 @@ export default function RonderingPage() {
                     isLoaded={mapsLoaded}
                     highlightRegionId={selectedRegion?.regionId ?? null}
                     highlightStationId={highlightStationId}
+                    highlightClusterIdx={highlightClusterIdx}
+                    highlightAnnotationId={highlightAnnotationId}
                     onClusterClick={_center => {/* kartan hanterar zoom internt via circle click */}}
                   />
                   <div className="mt-2 pt-2 border-t border-slate-700/50 flex flex-wrap gap-x-5 gap-y-1">
@@ -1077,21 +1166,38 @@ export default function RonderingPage() {
                         Geografiska riskzoner — {geoClusters.length} kluster
                       </p>
                       <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
-                        {geoClusters.sort((a, b) => b.stations.length - a.stations.length).map((cluster, i) => (
-                          <div key={i} className="px-3 py-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
-                              <span className="font-semibold text-red-300">
-                                {cluster.stations.length} stationer
-                              </span>
-                            </div>
-                            {cluster.address
-                              ? <p className="text-slate-300 leading-snug line-clamp-2">{cluster.address}</p>
-                              : <p className="text-slate-500 font-mono">{cluster.center.lat.toFixed(4)}, {cluster.center.lng.toFixed(4)}</p>
-                            }
-                            <p className="text-slate-600 font-mono text-[10px]">{cluster.center.lat.toFixed(4)}, {cluster.center.lng.toFixed(4)}</p>
-                          </div>
-                        ))}
+                        {geoClusters.slice().sort((a, b) => b.stations.length - a.stations.length).map((cluster, sortedIdx) => {
+                          const origIdx = geoClusters.indexOf(cluster)
+                          const isActive = highlightClusterIdx === origIdx
+                          return (
+                            <button
+                              key={origIdx}
+                              type="button"
+                              title="Klicka för att visa på kartan"
+                              onClick={() => {
+                                setHighlightClusterIdx(isActive ? null : origIdx)
+                                setHighlightStationId(null)
+                                setHighlightAnnotationId(null)
+                                if (!isActive) document.getElementById('hotspot-map-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                              }}
+                              className={`text-left px-3 py-3 rounded-xl border text-xs space-y-1 transition-all ${
+                                isActive
+                                  ? 'bg-red-500/20 border-red-400/60'
+                                  : 'bg-red-500/10 border-red-500/20 hover:border-red-400/40 hover:bg-red-500/15'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-red-400 animate-pulse' : 'bg-red-500'}`} />
+                                <span className="font-semibold text-red-300">{cluster.stations.length} stationer</span>
+                              </div>
+                              {cluster.address
+                                ? <p className={`leading-snug line-clamp-2 ${isActive ? 'text-white' : 'text-slate-300'}`}>{cluster.address}</p>
+                                : <p className="text-slate-500 font-mono">{cluster.center.lat.toFixed(4)}, {cluster.center.lng.toFixed(4)}</p>
+                              }
+                              <p className="text-slate-600 font-mono text-[10px]">{cluster.center.lat.toFixed(4)}, {cluster.center.lng.toFixed(4)}</p>
+                            </button>
+                          )
+                        })}
                       </div>
                     </div>
                   )}
