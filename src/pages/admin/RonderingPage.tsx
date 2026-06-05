@@ -156,14 +156,17 @@ interface OverviewMapProps {
   annotations: RonderingAnnotation[]
   isLoaded: boolean
   highlightRegionId: string | null
+  highlightStationId: string | null
   onClusterClick?: (center: { lat: number; lng: number }) => void
 }
 
-function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRegionId, onClusterClick }: OverviewMapProps) {
+function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRegionId, highlightStationId, onClusterClick }: OverviewMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const gMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
   const circlesRef = useRef<google.maps.Circle[]>([])
+  const pulseRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pulseMarkerRef = useRef<google.maps.Marker | null>(null)
 
   useEffect(() => {
     if (!isLoaded || !mapRef.current) return
@@ -266,6 +269,38 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
     if (hasPoints && gMapRef.current) gMapRef.current.fitBounds(bounds, 60)
   }, [isLoaded, hotspots, geoClusters, annotations])
 
+  // Pulserande markör när en riskstation klickas
+  useEffect(() => {
+    if (pulseRef.current) { clearInterval(pulseRef.current); pulseRef.current = null }
+    if (pulseMarkerRef.current) { pulseMarkerRef.current.setMap(null); pulseMarkerRef.current = null }
+    if (!highlightStationId || !isLoaded || !gMapRef.current) return
+
+    const h = hotspots.find(s => s.stationId === highlightStationId)
+    if (!h) return
+
+    gMapRef.current.panTo({ lat: h.lat, lng: h.lng })
+    gMapRef.current.setZoom(16)
+
+    const pulse = new google.maps.Marker({
+      position: { lat: h.lat, lng: h.lng },
+      map: gMapRef.current,
+      icon: { path: google.maps.SymbolPath.CIRCLE, scale: 14, fillColor: '#ef4444', fillOpacity: 0.4, strokeColor: '#ef4444', strokeWeight: 2 },
+      zIndex: 20,
+    })
+    pulseMarkerRef.current = pulse
+
+    let big = true
+    pulseRef.current = setInterval(() => {
+      big = !big
+      pulse.setIcon({ path: google.maps.SymbolPath.CIRCLE, scale: big ? 14 : 9, fillColor: '#ef4444', fillOpacity: big ? 0.4 : 0.8, strokeColor: '#ef4444', strokeWeight: 2 })
+    }, 500)
+
+    return () => {
+      if (pulseRef.current) clearInterval(pulseRef.current)
+      pulse.setMap(null)
+    }
+  }, [highlightStationId, isLoaded, hotspots])
+
   if (!isLoaded) return <div className="h-80 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta...</div>
   return <div ref={mapRef} className="h-80 rounded-xl overflow-hidden" />
 }
@@ -295,6 +330,7 @@ export default function RonderingPage() {
   const [annotationImages, setAnnotationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
   const [annotationAddresses, setAnnotationAddresses] = useState<Record<string, string>>({})
   const [lightbox, setLightbox] = useState<{ images: { url: string; alt?: string }[]; index: number } | null>(null)
+  const [highlightStationId, setHighlightStationId] = useState<string | null>(null)
 
   const [exportingPdf, setExportingPdf] = useState(false)
 
@@ -468,7 +504,7 @@ export default function RonderingPage() {
         }
 
         setHotspots(hotspotList)
-        setGeoClusters(dbscanCluster(highActivityStations, 400, 4))
+        setGeoClusters(dbscanCluster(highActivityStations, 250, 4))
       } finally {
         setLoading(false)
       }
@@ -954,7 +990,7 @@ export default function RonderingPage() {
 
             {/* ── Hotspot-karta ── */}
             {(hotspots.length > 0 || allAnnotations.length > 0 || geoClusters.length > 0) && (
-              <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+              <div id="hotspot-map-section" className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <h3 className="text-sm font-semibold text-white flex items-center gap-2">
@@ -997,6 +1033,7 @@ export default function RonderingPage() {
                     annotations={allAnnotations}
                     isLoaded={mapsLoaded}
                     highlightRegionId={selectedRegion?.regionId ?? null}
+                    highlightStationId={highlightStationId}
                     onClusterClick={_center => {/* kartan hanterar zoom internt via circle click */}}
                   />
                   <div className="mt-2 pt-2 border-t border-slate-700/50 flex flex-wrap gap-x-5 gap-y-1">
@@ -1031,7 +1068,7 @@ export default function RonderingPage() {
                     <AlertCircle className="w-4 h-4 text-amber-400" />
                     Riskstationer &amp; geografiska riskzoner
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Stationer med hög beteåtgång 2 månader i rad, geografiska riskzoner med hög aktivitet senaste månaden, och stationer som förbättrats</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Stationer med hög beteåtgång 2 månader i rad · Riskzoner: 4+ stationer inom 250m med hög aktivitet senaste månaden · Förbättrade stationer</p>
                 </div>
                 <div className="p-4 space-y-3">
                   {geoClusters.length > 0 && (
@@ -1060,21 +1097,39 @@ export default function RonderingPage() {
                   )}
                   {hotspots.filter(h => !h.improved).length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Riskstationer — hög aktivitet 2 månader i rad</p>
-                      <div className="rounded-lg overflow-hidden border border-slate-700 text-xs">
-                        <div className="grid grid-cols-3 bg-slate-900/60">
-                          <div className="px-3 py-2 font-semibold text-slate-400">Station</div>
-                          <div className="px-3 py-2 font-semibold text-slate-400 text-center">Månader i rad</div>
-                          <div className="px-3 py-2 font-semibold text-slate-400">Status</div>
-                        </div>
-                        {hotspots.filter(h => !h.improved).sort((a,b) => b.consecutiveMonths - a.consecutiveMonths).map((h, i) => (
-                          <div key={h.stationId} className={`grid grid-cols-3 border-t border-slate-700/50 ${i % 2 === 0 ? 'bg-slate-900/20' : 'bg-slate-900/40'}`}>
-                            <div className="px-3 py-2 font-mono text-slate-200">{h.serialNumber || h.stationId.slice(0, 8)}</div>
-                            <div className="px-3 py-2 text-center"><span className="px-1.5 py-0.5 rounded bg-red-500/20 border border-red-500/30 text-red-300 font-semibold">{h.consecutiveMonths}×</span></div>
-                            <div className="px-3 py-2 text-red-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" />Kräver åtgärd</div>
-                          </div>
-                        ))}
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+                        Riskstationer — hög aktivitet 2 månader i rad ({hotspots.filter(h => !h.improved).length} st)
+                      </p>
+                      <div className="grid grid-cols-2 xl:grid-cols-3 gap-1.5">
+                        {hotspots.filter(h => !h.improved).sort((a, b) => b.consecutiveMonths - a.consecutiveMonths).map(h => {
+                          const isActive = highlightStationId === h.stationId
+                          return (
+                            <button
+                              key={h.stationId}
+                              type="button"
+                              title="Klicka för att visa på kartan"
+                              onClick={() => {
+                                setHighlightStationId(isActive ? null : h.stationId)
+                                if (!isActive) document.getElementById('hotspot-map-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                              }}
+                              className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-all text-left ${
+                                isActive
+                                  ? 'bg-red-500/15 border-red-400/60 text-white'
+                                  : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'
+                              }`}
+                            >
+                              <span className="font-mono">{h.serialNumber || h.stationId.slice(0, 8)}</span>
+                              <span className={`text-[11px] ${isActive ? 'text-red-300' : 'text-slate-500'}`}>{h.consecutiveMonths}×</span>
+                            </button>
+                          )
+                        })}
                       </div>
+                      {highlightStationId && hotspots.find(h => h.stationId === highlightStationId && !h.improved) && (
+                        <p className="text-[11px] text-slate-500 mt-2 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+                          Visar station {hotspots.find(h => h.stationId === highlightStationId)?.serialNumber ?? ''} på kartan — klicka igen för att avmarkera
+                        </p>
+                      )}
                     </div>
                   )}
                   {hotspots.filter(h => h.improved).length > 0 && (
