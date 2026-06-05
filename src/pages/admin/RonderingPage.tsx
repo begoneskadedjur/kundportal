@@ -106,27 +106,46 @@ function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number)
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
 }
 
-function clusterStations(stations: StationCoord[], maxDist = 300, minSize = 3): GeoCluster[] {
-  const visited = new Set<number>()
-  const clusters: GeoCluster[] = []
-  for (let i = 0; i < stations.length; i++) {
-    if (visited.has(i)) continue
-    const neighbors: number[] = [i]
-    for (let j = 0; j < stations.length; j++) {
-      if (i === j) continue
-      if (haversineMeters(stations[i].lat, stations[i].lng, stations[j].lat, stations[j].lng) <= maxDist) {
-        neighbors.push(j)
-      }
+// DBSCAN: korrekt täthetbaserad klustring — expanderar rekursivt från kärnpunkter
+// Undviker "pärlbandskluster" som uppstår när man bara kollar avstånd från ursprungsstationen
+function dbscanCluster(stations: StationCoord[], eps = 400, minPts = 4): GeoCluster[] {
+  const n = stations.length
+  const labels = new Array<number>(n).fill(-2)  // -2 = ej besökt, -1 = noise
+  let clusterId = 0
+
+  const getNeighbors = (idx: number): number[] =>
+    stations.reduce<number[]>((acc, _, j) => {
+      if (idx !== j && haversineMeters(stations[idx].lat, stations[idx].lng, stations[j].lat, stations[j].lng) <= eps)
+        acc.push(j)
+      return acc
+    }, [])
+
+  for (let i = 0; i < n; i++) {
+    if (labels[i] !== -2) continue
+    const nb = getNeighbors(i)
+    if (nb.length < minPts - 1) { labels[i] = -1; continue }
+    labels[i] = clusterId
+    const queue = [...nb]
+    while (queue.length) {
+      const q = queue.shift()!
+      if (labels[q] === -1) labels[q] = clusterId
+      if (labels[q] !== -2) continue
+      labels[q] = clusterId
+      const qnb = getNeighbors(q)
+      if (qnb.length >= minPts - 1) queue.push(...qnb)
     }
-    if (neighbors.length >= minSize) {
-      neighbors.forEach(n => visited.add(n))
-      const clusterStations = neighbors.map(n => stations[n])
-      const centerLat = clusterStations.reduce((s, c) => s + c.lat, 0) / clusterStations.length
-      const centerLng = clusterStations.reduce((s, c) => s + c.lng, 0) / clusterStations.length
-      clusters.push({ center: { lat: centerLat, lng: centerLng }, stations: clusterStations })
-    }
+    clusterId++
   }
-  return clusters
+
+  const result: GeoCluster[] = []
+  for (let c = 0; c < clusterId; c++) {
+    const members = stations.filter((_, i) => labels[i] === c)
+    if (members.length === 0) continue
+    const centerLat = members.reduce((s, m) => s + m.lat, 0) / members.length
+    const centerLng = members.reduce((s, m) => s + m.lng, 0) / members.length
+    result.push({ center: { lat: centerLat, lng: centerLng }, stations: members })
+  }
+  return result.sort((a, b) => b.stations.length - a.stations.length)
 }
 
 // ── Kartan ────────────────────────────────────────────────────────────────────
@@ -465,7 +484,7 @@ export default function RonderingPage() {
         }
 
         setHotspots(hotspotList)
-        setGeoClusters(clusterStations(highActivityStations, 600, 5))
+        setGeoClusters(dbscanCluster(highActivityStations, 400, 4))
       } finally {
         setLoading(false)
       }
