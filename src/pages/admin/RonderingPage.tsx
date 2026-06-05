@@ -14,10 +14,13 @@ import {
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer,
 } from 'recharts'
 import { generateRonderingPdf } from '../../utils/ronderingPdfGenerator'
+import { CaseImageService } from '../../services/caseImageService'
+import type { CaseImageWithUrl } from '../../services/caseImageService'
+import ImageLightbox from '../../components/shared/ImageLightbox'
 import toast from 'react-hot-toast'
 
 // ── Typer ────────────────────────────────────────────────────────────────────
@@ -244,6 +247,9 @@ export default function RonderingPage() {
 
   const [selectedRegion, setSelectedRegion] = useState<RegionMonthData | null>(null)
 
+  const [annotationImages, setAnnotationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
+  const [lightbox, setLightbox] = useState<{ images: { url: string; alt?: string }[]; index: number } | null>(null)
+
   const [exportingPdf, setExportingPdf] = useState(false)
 
   // ── Ladda organisationer ──────────────────────────────────────────────────
@@ -285,6 +291,7 @@ export default function RonderingPage() {
       setHotspots([])
       setGeoClusters([])
       setSelectedRegion(null)
+      setAnnotationImages({})
 
       try {
         const { data: sites } = await supabase
@@ -426,7 +433,23 @@ export default function RonderingPage() {
   useEffect(() => {
     if (!selectedMonth || allEnriched.length === 0) return
     const forMonth = allEnriched.filter(c => c.scheduledStart && toMonthKey(c.scheduledStart) === selectedMonth)
-    setMonthData(latestPerRegionPerMonth(forMonth))
+    const deduped = latestPerRegionPerMonth(forMonth)
+    setMonthData(deduped)
+
+    // Hämta bilder för alla avvikelser i denna månad
+    const allAnns = deduped.flatMap(c => c.annotations)
+    if (allAnns.length === 0) return
+    const uniqueCaseIds = [...new Set(allAnns.map(a => a.case_id))]
+    Promise.all(
+      uniqueCaseIds.map(caseId => CaseImageService.getCaseImages(caseId, 'contract'))
+    ).then(results => {
+      const allImgs = results.flat()
+      const byAnnotation: Record<string, CaseImageWithUrl[]> = {}
+      for (const ann of allAnns) {
+        byAnnotation[ann.id] = allImgs.filter(img => img.description === `annotation:${ann.id}`)
+      }
+      setAnnotationImages(byAnnotation)
+    }).catch(() => {/* bilder är inte kritiska */})
   }, [allEnriched, selectedMonth])
 
   const handleMonthChange = useCallback((mk: string) => {
@@ -703,17 +726,32 @@ export default function RonderingPage() {
                       <div className="space-y-2">
                         {selectedRegion.annotations.map(ann => {
                           const cat = ANNOTATION_CATEGORIES[ann.category as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
+                          const imgs = annotationImages[ann.id] ?? []
                           return (
-                            <div key={ann.id} className="flex items-start gap-3 px-3 py-2.5 bg-orange-500/10 border border-orange-500/20 rounded-lg text-xs">
-                              <span className="text-base leading-none mt-0.5">{cat.emoji}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-orange-300">{cat.label}</p>
-                                {ann.note && <p className="text-slate-400 mt-0.5">{ann.note}</p>}
-                                <p className="text-slate-600 mt-1">
-                                  {ann.technician_name && `${ann.technician_name} · `}
-                                  {ann.created_at ? fmtDate(ann.created_at) : ''}
-                                </p>
-                              </div>
+                            <div key={ann.id} className="px-3 py-2.5 bg-orange-500/10 border border-orange-500/20 rounded-lg text-xs space-y-1.5">
+                              <p className="font-semibold text-orange-300">{cat.label}</p>
+                              <p className="text-slate-500 font-mono text-[11px]">
+                                {ann.latitude.toFixed(5)}, {ann.longitude.toFixed(5)}
+                              </p>
+                              {ann.note && <p className="text-slate-400">{ann.note}</p>}
+                              <p className="text-slate-600">
+                                {ann.technician_name && `${ann.technician_name} · `}
+                                {ann.created_at ? fmtDate(ann.created_at) : ''}
+                              </p>
+                              {imgs.length > 0 && (
+                                <div className="flex gap-2 flex-wrap pt-1">
+                                  {imgs.map((img, idx) => (
+                                    <button
+                                      key={img.id}
+                                      type="button"
+                                      onClick={() => setLightbox({ images: imgs.map(i => ({ url: i.url, alt: i.file_name || '' })), index: idx })}
+                                      className="w-16 h-16 rounded-lg overflow-hidden border border-orange-500/30 hover:border-orange-400/60 flex-shrink-0 transition-colors"
+                                    >
+                                      <img src={img.url} alt={img.file_name || ''} className="w-full h-full object-cover" />
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           )
                         })}
@@ -740,7 +778,7 @@ export default function RonderingPage() {
                   <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block" />Inget</span>
                 </div>
                 <ResponsiveContainer width="100%" height={180}>
-                  <BarChart data={allMonthsAggregated} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
+                  <LineChart data={allMonthsAggregated} margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
                     <XAxis dataKey="month" stroke="#94a3b8" fontSize={11} tick={{ fill: '#94a3b8' }} />
                     <YAxis stroke="#94a3b8" fontSize={11} tick={{ fill: '#94a3b8' }} />
@@ -748,12 +786,12 @@ export default function RonderingPage() {
                       contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: 8, fontSize: 12 }}
                       labelStyle={{ color: '#f1f5f9', fontWeight: 600 }}
                       itemStyle={{ color: '#cbd5e1' }}
-                      cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                      cursor={{ stroke: 'rgba(255,255,255,0.1)' }}
                     />
-                    <Bar dataKey="all" name="Allt" fill="#ef4444" radius={[3,3,0,0]} isAnimationActive={false} />
-                    <Bar dataKey="partial" name="Delvis" fill="#f59e0b" radius={[3,3,0,0]} isAnimationActive={false} />
-                    <Bar dataKey="none" name="Inget" fill="#22c55e" radius={[3,3,0,0]} isAnimationActive={false} />
-                  </BarChart>
+                    <Line type="monotone" dataKey="all" name="Allt" stroke="#ef4444" strokeWidth={2} dot={{ r: 4, fill: '#ef4444' }} activeDot={{ r: 6 }} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="partial" name="Delvis" stroke="#f59e0b" strokeWidth={2} dot={{ r: 4, fill: '#f59e0b' }} activeDot={{ r: 6 }} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="none" name="Inget" stroke="#22c55e" strokeWidth={2} dot={{ r: 4, fill: '#22c55e' }} activeDot={{ r: 6 }} isAnimationActive={false} />
+                  </LineChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -769,7 +807,6 @@ export default function RonderingPage() {
                   <p className="text-xs text-slate-500 mt-0.5">{allAnnotations.length} avvikelse{allAnnotations.length !== 1 ? 'r' : ''} registrerade under månaden</p>
                 </div>
                 <div className="p-4">
-                  {/* Gruppera per kategori */}
                   {(Object.keys(ANNOTATION_CATEGORIES) as RonderingAnnotationCategory[]).map(catKey => {
                     const catAnnotations = allAnnotations.filter(a => a.category === catKey)
                     if (catAnnotations.length === 0) return null
@@ -777,25 +814,40 @@ export default function RonderingPage() {
                     return (
                       <div key={catKey} className="mb-4 last:mb-0">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="text-base">{cat.emoji}</span>
                           <p className="text-xs font-semibold text-slate-300">{cat.label}</p>
                           <span className="px-1.5 py-0.5 rounded bg-slate-700 text-[10px] text-slate-400">{catAnnotations.length}</span>
                         </div>
-                        <div className="space-y-1.5 ml-6">
+                        <div className="space-y-2 ml-2">
                           {catAnnotations.map(ann => {
                             const regionName = monthData.find(c => c.caseId === ann.case_id)?.regionName ?? caseRegionMap[ann.case_id] ?? '—'
+                            const imgs = annotationImages[ann.id] ?? []
                             return (
-                              <div key={ann.id} className="flex items-start gap-3 px-3 py-2 bg-slate-900/40 border border-slate-700/50 rounded-lg text-xs">
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="font-medium text-slate-200">{regionName}</span>
-                                    {ann.note && <span className="text-slate-400">— {ann.note}</span>}
-                                  </div>
-                                  <p className="text-slate-600 mt-0.5">
-                                    {ann.technician_name && `${ann.technician_name} · `}
-                                    {ann.created_at ? fmtDate(ann.created_at) : ''}
-                                  </p>
+                              <div key={ann.id} className="px-3 py-2.5 bg-slate-900/40 border border-slate-700/50 rounded-lg text-xs space-y-1.5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-medium text-slate-200">{regionName}</span>
+                                  {ann.note && <span className="text-slate-400">— {ann.note}</span>}
                                 </div>
+                                <p className="text-slate-500 font-mono text-[11px]">
+                                  {ann.latitude.toFixed(5)}, {ann.longitude.toFixed(5)}
+                                </p>
+                                <p className="text-slate-600">
+                                  {ann.technician_name && `${ann.technician_name} · `}
+                                  {ann.created_at ? fmtDate(ann.created_at) : ''}
+                                </p>
+                                {imgs.length > 0 && (
+                                  <div className="flex gap-2 flex-wrap pt-1">
+                                    {imgs.map((img, idx) => (
+                                      <button
+                                        key={img.id}
+                                        type="button"
+                                        onClick={() => setLightbox({ images: imgs.map(i => ({ url: i.url, alt: i.file_name || '' })), index: idx })}
+                                        className="w-16 h-16 rounded-lg overflow-hidden border border-slate-700 hover:border-slate-500 flex-shrink-0 transition-colors"
+                                      >
+                                        <img src={img.url} alt={img.file_name || ''} className="w-full h-full object-cover" />
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             )
                           })}
@@ -925,6 +977,15 @@ export default function RonderingPage() {
           </div>
         )}
       </div>
+
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images}
+          initialIndex={lightbox.index}
+          isOpen={true}
+          onClose={() => setLightbox(null)}
+        />
+      )}
     </div>
   )
 }
