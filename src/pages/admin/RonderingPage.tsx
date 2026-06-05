@@ -238,7 +238,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
         clickable: true,
       })
       const clusterInfo = new google.maps.InfoWindow({
-        content: `<div style="font-family:sans-serif;padding:4px"><b style="color:#ef4444">Utsatt område</b><br><span style="font-size:12px">${cluster.stations.length} stationer med hög aktivitet</span>${cluster.address ? `<br><span style="font-size:11px;color:#64748b">${cluster.address}</span>` : ''}</div>`
+        content: `<div style="font-family:sans-serif;padding:4px"><b style="color:#ef4444">Riskzon</b><br><span style="font-size:12px">${cluster.stations.length} stationer med hög aktivitet senaste månaden</span>${cluster.address ? `<br><span style="font-size:11px;color:#64748b">${cluster.address}</span>` : ''}</div>`
       })
       circle.addListener('click', () => {
         clusterInfo.setPosition(cluster.center)
@@ -246,23 +246,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
         onClusterClick?.(cluster.center)
       })
       circlesRef.current.push(circle)
-
-      // Individuella stationer i klustret
-      cluster.stations.forEach(s => {
-        bounds.extend({ lat: s.lat, lng: s.lng })
-        const dot = new google.maps.Marker({
-          position: { lat: s.lat, lng: s.lng },
-          map: gMapRef.current!,
-          icon: { path: google.maps.SymbolPath.CIRCLE, scale: 5, fillColor: '#ef4444', fillOpacity: 0.85, strokeColor: '#fff', strokeWeight: 1 },
-          title: `Station ${s.serialNumber ?? '?'} — hög aktivitet`,
-          zIndex: 6,
-        })
-        const dotInfo = new google.maps.InfoWindow({
-          content: `<div style="font-family:sans-serif;padding:4px"><span style="font-size:12px">Station ${s.serialNumber ?? s.stationId.slice(0, 8)}</span><br><span style="font-size:11px;color:#64748b">Hög beteåtgång senaste månaden</span></div>`
-        })
-        dot.addListener('click', () => dotInfo.open(gMapRef.current!, dot))
-        markersRef.current.push(dot)
-      })
+      // Stationspunkter inuti riskzoner visas inte — zonen som helhet är det viktiga
     })
 
     annotations.forEach(ann => {
@@ -981,7 +965,7 @@ export default function RonderingPage() {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                     {hotspots.filter(h => !h.improved).length > 0 && (
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-500 inline-block" />{hotspots.filter(h => !h.improved).length} hotspot{hotspots.filter(h => !h.improved).length !== 1 ? 's' : ''}</span>
+                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-500 inline-block" />{hotspots.filter(h => !h.improved).length} riskstation{hotspots.filter(h => !h.improved).length !== 1 ? 'er' : ''}</span>
                     )}
                     {hotspots.filter(h => h.improved).length > 0 && (
                       <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />{hotspots.filter(h => h.improved).length} förbättrade</span>
@@ -1006,6 +990,26 @@ export default function RonderingPage() {
                     highlightRegionId={selectedRegion?.regionId ?? null}
                     onClusterClick={_center => {/* kartan hanterar zoom internt via circle click */}}
                   />
+                  <div className="mt-2 pt-2 border-t border-slate-700/50 flex flex-wrap gap-x-5 gap-y-1">
+                    <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
+                      <span><span className="text-slate-400 font-medium">Riskstation</span> — hög beteåtgång 2 månader i rad, kräver uppföljning</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                      <span className="w-3 h-3 rounded-full border border-red-500 opacity-70 flex-shrink-0" />
+                      <span><span className="text-slate-400 font-medium">Riskzon</span> — geografisk koncentration av hög aktivitet senaste månaden, förhöjd gnagarnärvaro i området</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                      <span className="inline-block w-0 h-0 border-l-[4px] border-r-[4px] border-b-[7px] border-l-transparent border-r-transparent border-b-orange-500 flex-shrink-0" />
+                      <span><span className="text-slate-400 font-medium">Avvikelse</span> — registrerad avvikelse av tekniker under ronderingen</span>
+                    </span>
+                    {hotspots.filter(h => h.improved).length > 0 && (
+                      <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                        <span><span className="text-slate-400 font-medium">Förbättrad station</span> — tidigare hög aktivitet, senaste rondering visar lägre beteåtgång</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
