@@ -248,6 +248,7 @@ export default function RonderingPage() {
   const [selectedRegion, setSelectedRegion] = useState<RegionMonthData | null>(null)
 
   const [annotationImages, setAnnotationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
+  const [annotationAddresses, setAnnotationAddresses] = useState<Record<string, string>>({})
   const [lightbox, setLightbox] = useState<{ images: { url: string; alt?: string }[]; index: number } | null>(null)
 
   const [exportingPdf, setExportingPdf] = useState(false)
@@ -292,6 +293,7 @@ export default function RonderingPage() {
       setGeoClusters([])
       setSelectedRegion(null)
       setAnnotationImages({})
+      setAnnotationAddresses({})
 
       try {
         const { data: sites } = await supabase
@@ -450,6 +452,24 @@ export default function RonderingPage() {
       }
       setAnnotationImages(byAnnotation)
     }).catch(() => {/* bilder är inte kritiska */})
+
+    // Reverse geocoding för avvikelse-koordinater
+    if (typeof google !== 'undefined' && google.maps?.Geocoder) {
+      const geocoder = new google.maps.Geocoder()
+      const addresses: Record<string, string> = {}
+      Promise.allSettled(
+        allAnns.map(ann =>
+          new Promise<void>(resolve => {
+            geocoder.geocode({ location: { lat: ann.latitude, lng: ann.longitude } }, (results, status) => {
+              if (status === 'OK' && results && results[0]) {
+                addresses[ann.id] = results[0].formatted_address
+              }
+              resolve()
+            })
+          })
+        )
+      ).then(() => setAnnotationAddresses(addresses))
+    }
   }, [allEnriched, selectedMonth])
 
   const handleMonthChange = useCallback((mk: string) => {
@@ -727,10 +747,12 @@ export default function RonderingPage() {
                         {selectedRegion.annotations.map(ann => {
                           const cat = ANNOTATION_CATEGORIES[ann.category as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
                           const imgs = annotationImages[ann.id] ?? []
+                          const address = annotationAddresses[ann.id]
                           return (
                             <div key={ann.id} className="px-3 py-2.5 bg-orange-500/10 border border-orange-500/20 rounded-lg text-xs space-y-1.5">
                               <p className="font-semibold text-orange-300">{cat.label}</p>
-                              <p className="text-slate-500 font-mono text-[11px]">
+                              {address && <p className="text-slate-400 text-[11px]">{address}</p>}
+                              <p className="text-slate-600 font-mono text-[11px]">
                                 {ann.latitude.toFixed(5)}, {ann.longitude.toFixed(5)}
                               </p>
                               {ann.note && <p className="text-slate-400">{ann.note}</p>}
@@ -815,19 +837,23 @@ export default function RonderingPage() {
                       <div key={catKey} className="mb-4 last:mb-0">
                         <div className="flex items-center gap-2 mb-2">
                           <p className="text-xs font-semibold text-slate-300">{cat.label}</p>
-                          <span className="px-1.5 py-0.5 rounded bg-slate-700 text-[10px] text-slate-400">{catAnnotations.length}</span>
+                          {catAnnotations.length > 1 && (
+                            <span className="px-1.5 py-0.5 rounded bg-slate-700 text-[10px] text-slate-400">{catAnnotations.length}</span>
+                          )}
                         </div>
                         <div className="space-y-2 ml-2">
                           {catAnnotations.map(ann => {
                             const regionName = monthData.find(c => c.caseId === ann.case_id)?.regionName ?? caseRegionMap[ann.case_id] ?? '—'
                             const imgs = annotationImages[ann.id] ?? []
+                            const address = annotationAddresses[ann.id]
                             return (
                               <div key={ann.id} className="px-3 py-2.5 bg-slate-900/40 border border-slate-700/50 rounded-lg text-xs space-y-1.5">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-medium text-slate-200">{regionName}</span>
                                   {ann.note && <span className="text-slate-400">— {ann.note}</span>}
                                 </div>
-                                <p className="text-slate-500 font-mono text-[11px]">
+                                {address && <p className="text-slate-400 text-[11px]">{address}</p>}
+                                <p className="text-slate-600 font-mono text-[11px]">
                                   {ann.latitude.toFixed(5)}, {ann.longitude.toFixed(5)}
                                 </p>
                                 <p className="text-slate-600">
