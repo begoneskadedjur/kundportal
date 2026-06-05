@@ -965,16 +965,25 @@ export default function RonderingPage() {
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
                     {hotspots.filter(h => !h.improved).length > 0 && (
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-500 inline-block" />{hotspots.filter(h => !h.improved).length} riskstation{hotspots.filter(h => !h.improved).length !== 1 ? 'er' : ''}</span>
+                      <span title="Enskilda stationer där allt bete förbrukats 2 månader i rad. Indikerar ett ihållande gnagarproblem på just den platsen." className="flex items-center gap-1.5 cursor-help">
+                        <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
+                        {hotspots.filter(h => !h.improved).length} riskstation{hotspots.filter(h => !h.improved).length !== 1 ? 'er' : ''}
+                      </span>
                     )}
                     {hotspots.filter(h => h.improved).length > 0 && (
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />{hotspots.filter(h => h.improved).length} förbättrade</span>
+                      <span title="Stationer som tidigare haft hög beteåtgång 2+ månader men där senaste ronderingen visar lägre förbrukning — en positiv trend." className="flex items-center gap-1.5 cursor-help">
+                        <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
+                        {hotspots.filter(h => h.improved).length} förbättrade
+                      </span>
                     )}
                     {geoClusters.length > 0 && (
-                      <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded-full border-2 border-red-500 inline-block opacity-60" />{geoClusters.length} riskzon{geoClusters.length !== 1 ? 'er' : ''}</span>
+                      <span title="Geografiska områden där många stationer haft hög beteåtgång senaste månaden. Visar var gnagarnärvaron är koncentrerad — inget historikkrav." className="flex items-center gap-1.5 cursor-help">
+                        <span className="w-4 h-4 rounded-full border-2 border-red-500 inline-block opacity-60" />
+                        {geoClusters.length} riskzon{geoClusters.length !== 1 ? 'er' : ''}
+                      </span>
                     )}
                     {allAnnotations.length > 0 && (
-                      <span className="flex items-center gap-1.5">
+                      <span title="Platsspecifika observationer registrerade av tekniker under ronderingen — t.ex. nedskräpning, vegetation, skador eller verksamheter som drar till sig gnagare." className="flex items-center gap-1.5 cursor-help">
                         <span className="inline-block w-0 h-0 border-l-[5px] border-r-[5px] border-b-[9px] border-l-transparent border-r-transparent border-b-orange-500" />
                         {allAnnotations.length} avvikelse{allAnnotations.length !== 1 ? 'r' : ''}
                       </span>
