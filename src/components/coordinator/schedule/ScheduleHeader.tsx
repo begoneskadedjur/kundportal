@@ -11,7 +11,7 @@ import { ScheduleFilterPopover } from './ScheduleFilterPopover'
 import type { Technician } from '../../../types/database'
 
 export type ViewMode = 'day' | 'week' | 'month'
-export type CaseType = 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering'
+export type CaseType = 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | 'egenkontroll'
 
 interface ScheduleHeaderProps {
   currentDate: Date
@@ -309,6 +309,13 @@ export function ScheduleHeader({
               >
                 <Map className="w-4 h-4 text-sky-400" />
                 Rondering Trafikkontoret
+              </button>
+              <button
+                onClick={() => { onCreateCase('egenkontroll'); setCreateMenuOpen(false) }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
+              >
+                <ClipboardCheck className="w-4 h-4 text-emerald-400" />
+                Egenkontroll
               </button>
             </div>
           )}
