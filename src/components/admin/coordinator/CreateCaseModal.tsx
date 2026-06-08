@@ -1504,8 +1504,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 })()
               )}
 
-              {/* Region-väljare för rondering — regionalkunder är alltid multisite */}
-              {caseType === 'rondering' && selectedContractCustomer && (
+              {/* Region-väljare för rondering/egenkontroll — regionalkunder är alltid multisite */}
+              {(caseType === 'rondering' || caseType === 'egenkontroll') && selectedContractCustomer && (
                 (() => {
                   const selectedCustomer = contractCustomers.find(c => c.id === selectedContractCustomer);
                   if (selectedCustomer?.organization_id) {
@@ -1524,7 +1524,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           className="w-full"
                         />
                         <p className="text-xs text-slate-500 mt-1">
-                          Välj vilken region ronderingen gäller
+                          Välj vilken region {caseType === 'egenkontroll' ? 'egenkontrollen' : 'ronderingen'} gäller
                         </p>
                       </div>
                     );
@@ -1985,7 +1985,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3 flex flex-col">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Zap className="w-4 h-4 text-blue-400"/>Intelligent Bokning</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {caseType !== 'rondering' && (
+                    {caseType !== 'rondering' && caseType !== 'egenkontroll' && (
                       <AddressAutocomplete label="Adress *" value={typeof formData.adress === 'string' ? formData.adress : ''} onChange={handleAddressChange} placeholder="Fullständig adress..." required />
                     )}
                     <div>
