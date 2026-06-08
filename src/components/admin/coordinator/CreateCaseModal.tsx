@@ -1387,10 +1387,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               {error && (<div className="bg-red-500/20 border border-red-500/40 p-3 rounded-xl flex items-center gap-3"><AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" /><p className="text-sm text-red-400">{error}</p></div>)}
               
               {/* Avtalskund-väljare (för contract, inspection, establishment, rondering) — sökbar dropdown */}
-              {(caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering') && (
-                <div className={`p-3 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : caseType === 'establishment' ? 'bg-lime-500/10 border-lime-500/30' : caseType === 'rondering' ? 'bg-sky-500/10 border-sky-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-xl`}>
+              {(caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering' || caseType === 'egenkontroll') && (
+                <div className={`p-3 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : caseType === 'establishment' ? 'bg-lime-500/10 border-lime-500/30' : (caseType === 'rondering' || caseType === 'egenkontroll') ? 'bg-sky-500/10 border-sky-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-xl`}>
                   <label className="block text-xs font-medium text-slate-400 mb-1">
-                    {caseType === 'inspection' ? 'Välj kund med stationer *' : caseType === 'establishment' ? 'Välj avtalskund (nyetablering) *' : caseType === 'rondering' ? 'Välj regionalkund *' : 'Välj avtalskund *'}
+                    {caseType === 'inspection' ? 'Välj kund med stationer *' : caseType === 'establishment' ? 'Välj avtalskund (nyetablering) *' : (caseType === 'rondering' || caseType === 'egenkontroll') ? 'Välj regionalkund *' : 'Välj avtalskund *'}
                   </label>
                   <div ref={customerDropdownRef} className="relative">
                     <button
