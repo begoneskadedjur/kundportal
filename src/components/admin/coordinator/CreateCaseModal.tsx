@@ -687,7 +687,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       if (!searchAddress) {
         return toast.error('Kunden saknar adress. Ange adress manuellt.');
       }
-    } else if (caseType === 'rondering') {
+    } else if (caseType === 'rondering' || caseType === 'egenkontroll') {
       // Beräkna regionens centroid via polygon och reverse-geocoda till adress
       if (!selectedSiteId) return toast.error('Välj en region först.');
       const { data: regionRow } = await supabase
