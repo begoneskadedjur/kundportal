@@ -59,12 +59,12 @@ const getTeamEfficiencyInfo = (score: number): { label: string; color: string } 
 interface CreateCaseModalProps {
   isOpen: boolean; onClose: () => void; onSuccess: () => void;
   technicians: Technician[]; initialCaseData?: BeGoneCaseRow | null;
-  initialCaseType?: 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | null;
+  initialCaseType?: 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | 'egenkontroll' | null;
 }
 
 export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
-  const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | null>(null);
+  const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | 'egenkontroll' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
   const [serviceGroupId, setServiceGroupId] = useState<string | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
@@ -437,8 +437,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       // Om en site är vald för multisite-kund, använd sitens data där det finns
       let dataSource = customer;
       if (selectedSiteId) {
-        // Rondering: kontaktinfo alltid från HK (customer), inte region-siten
-        if (caseType === 'rondering') {
+        // Rondering/egenkontroll: kontaktinfo alltid från HK (customer), inte region-siten
+        if (caseType === 'rondering' || caseType === 'egenkontroll') {
           // dataSource förblir customer (HK) — inget att göra
         } else {
         const site = contractCustomers.find(c => c.id === selectedSiteId);
@@ -551,9 +551,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     };
   }, [customerDropdownOpen]);
 
-  // Förvälj tjänst "Återbesök / Uppföljning" under grupp "Övrigt" för inspection- och rondering-typ
+  // Förvälj tjänst "Återbesök / Uppföljning" under grupp "Övrigt" för inspection-, rondering- och egenkontroll-typ
   useEffect(() => {
-    if ((caseType === 'inspection' || caseType === 'rondering') && !serviceGroupId && !serviceId) {
+    if ((caseType === 'inspection' || caseType === 'rondering' || caseType === 'egenkontroll') && !serviceGroupId && !serviceId) {
       setServiceGroupId('43bda891-8b72-4d19-8dcd-5573ba71d84b');
       setServiceId('4d84758a-f98c-4980-a7e7-ee59a374934a');
     }
@@ -574,8 +574,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       .filter(c => {
         if (caseType === 'inspection') return customersWithStations.has(c.id);
         if (caseType === 'establishment') return !c.parent_customer_id;
-        // Rondering: visa bara regionalkunder (huvud-kunder med is_regional=true)
-        if (caseType === 'rondering') return c.is_regional === true && !c.parent_customer_id;
+        // Rondering/egenkontroll: visa bara regionalkunder (huvud-kunder med is_regional=true)
+        if (caseType === 'rondering' || caseType === 'egenkontroll') return c.is_regional === true && !c.parent_customer_id;
         if (c.parent_customer_id) return false;
         return true;
       })
@@ -591,7 +591,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
   // Account Manager: hitta vilken tekniker som är kundens AM
   const accountManagerTechId = useMemo(() => {
-    if (caseType !== 'contract' && caseType !== 'inspection' && caseType !== 'establishment' && caseType !== 'rondering') return null;
+    if (caseType !== 'contract' && caseType !== 'inspection' && caseType !== 'establishment' && caseType !== 'rondering' && caseType !== 'egenkontroll') return null;
     const siteCustomer = selectedSiteId ? contractCustomers.find(c => c.id === selectedSiteId) : null;
     const parentCustomer = selectedContractCustomer ? contractCustomers.find(c => c.id === selectedContractCustomer) : null;
     // account_manager_email lagrar @begone.se-email, kan vara slash-separerad
@@ -803,17 +803,17 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       return toast.error("Alla fält med * under 'Bokning & Detaljer' måste vara ifyllda.");
     }
 
-    if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering') && !selectedContractCustomer) {
+    if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering' || caseType === 'egenkontroll') && !selectedContractCustomer) {
       return toast.error('Du måste välja en avtalskund');
     }
 
     // Validera site för multisite-kunder
     const customer = contractCustomers.find(c => c.id === selectedContractCustomer);
-    if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering') && customer?.is_multisite && !selectedSiteId) {
+    if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering' || caseType === 'egenkontroll') && customer?.is_multisite && !selectedSiteId) {
       return toast.error('Du måste välja en region för denna kund');
     }
-    // Rondering kräver alltid en region (kunden är alltid multisite/regional)
-    if (caseType === 'rondering' && !selectedSiteId) {
+    // Rondering/egenkontroll kräver alltid en region (kunden är alltid multisite/regional)
+    if ((caseType === 'rondering' || caseType === 'egenkontroll') && !selectedSiteId) {
       return toast.error('Du måste välja en region');
     }
     
@@ -1020,6 +1020,35 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         if (error) throw error;
 
         toast.success(`Rondering inbokad för ${customerName}!`);
+
+      } else if (caseType === 'egenkontroll') {
+        // Egenkontroll Trafikkontoret: customer_id = vald region (selectedSiteId)
+        const regionCustomerId = selectedSiteId!;
+        const regionCustomer = contractCustomers.find(c => c.id === regionCustomerId);
+        const customerName = regionCustomer?.company_name || 'Okänd region';
+
+        const { error } = await supabase.from('cases').insert([{
+          customer_id: regionCustomerId,
+          site_id: regionCustomerId,
+          title: caseNumber,
+          description: formData.description || null,
+          status: 'Bokad',
+          service_type: 'egenkontroll_trafikkontoret',
+          scheduled_start: formData.start_date,
+          scheduled_end: formData.due_date,
+          primary_technician_id: formData.primary_assignee_id || null,
+          primary_technician_name: formData.primary_assignee_name || null,
+          secondary_technician_id: formData.secondary_assignee_id || null,
+          tertiary_technician_id: formData.tertiary_assignee_id || null,
+          contact_person: formData.kontaktperson || customer?.contact_person || null,
+          contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
+          contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
+          case_number: caseNumber,
+          service_id: serviceId || null,
+        }]);
+        if (error) throw error;
+
+        toast.success(`Egenkontroll inbokad för ${customerName}!`);
 
       } else if (caseType === 'contract') {
         // Hantera avtalskundärenden
@@ -1277,6 +1306,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       case 'inspection': return 'Ny stationskontroll';
       case 'establishment': return 'Ny etablering';
       case 'rondering': return 'Ny rondering: Trafikkontoret';
+      case 'egenkontroll': return 'Nytt egenkontrollärende';
       default: return 'Nytt ärende';
     }
   };
@@ -1339,6 +1369,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       <Map className="w-6 h-6 mx-auto mb-1.5 text-sky-400" />
                       <h3 className="text-sm font-semibold">Rondering Trafikkontoret</h3>
                       <p className="text-xs text-slate-400 mt-1">Egenkontrollprogram</p>
+                    </button>
+                    <button type="button" onClick={() => selectCaseType('egenkontroll')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
+                      <ClipboardCheck className="w-6 h-6 mx-auto mb-1.5 text-emerald-400" />
+                      <h3 className="text-sm font-semibold">Egenkontroll</h3>
+                      <p className="text-xs text-slate-400 mt-1">Stationsgranskning TK</p>
                     </button>
                   </div>
                 </div>

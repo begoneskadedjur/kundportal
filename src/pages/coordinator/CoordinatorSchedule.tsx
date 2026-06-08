@@ -21,6 +21,7 @@ import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
 import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal'
 import RonderingCaseModal from '../../components/coordinator/RonderingCaseModal'
+import EgenkontrollCaseModal from '../../components/coordinator/EgenkontrollCaseModal'
 import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal'
 import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsenceModal'
 import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetailsModal'
@@ -90,10 +91,12 @@ export default function CoordinatorSchedule() {
   const [selectedContractCase, setSelectedContractCase] = useState<Case | null>(null)
   const [selectedInspectionCase, setSelectedInspectionCase] = useState<Case | null>(null)
   const [selectedRonderingCase, setSelectedRonderingCase] = useState<Case | null>(null)
+  const [selectedEgenkontrollCase, setSelectedEgenkontrollCase] = useState<Case | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false)
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false)
   const [isRonderingModalOpen, setIsRonderingModalOpen] = useState(false)
+  const [isEgenkontrollModalOpen, setIsEgenkontrollModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [caseTypeForCreate, setCaseTypeForCreate] = useState<CaseType | null>(null)
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false)
@@ -138,6 +141,7 @@ export default function CoordinatorSchedule() {
         contractCase.service_type === 'establishment' ? 'establishment' :
         contractCase.service_type === 'inspection' ? 'inspection' :
         contractCase.service_type === 'rondering_trafikkontoret' ? 'rondering' :
+        contractCase.service_type === 'egenkontroll_trafikkontoret' ? 'egenkontroll' :
         'contract'
       ) as any,
       description: contractCase.description,
@@ -339,13 +343,15 @@ export default function CoordinatorSchedule() {
   // ─── Modal-hantering ───
 
   const handleOpenCaseModal = useCallback((caseData: BeGoneCaseRow) => {
-    if (caseData.case_type === 'contract' || caseData.case_type === 'establishment' || caseData.case_type === 'inspection' || (caseData as any).case_type === 'rondering') {
+    if (caseData.case_type === 'contract' || caseData.case_type === 'establishment' || caseData.case_type === 'inspection' || (caseData as any).case_type === 'rondering' || (caseData as any).case_type === 'egenkontroll') {
       const cc = contractCases.find(c => c.id === caseData.id)
       if (cc) {
         if (cc.service_type === 'inspection') {
           setSelectedInspectionCase(cc); setIsInspectionModalOpen(true)
         } else if (cc.service_type === 'rondering_trafikkontoret') {
           setSelectedRonderingCase(cc); setIsRonderingModalOpen(true)
+        } else if (cc.service_type === 'egenkontroll_trafikkontoret') {
+          setSelectedEgenkontrollCase(cc); setIsEgenkontrollModalOpen(true)
         } else {
           setSelectedContractCase(cc); setIsEditContractModalOpen(true)
         }
@@ -565,6 +571,12 @@ export default function CoordinatorSchedule() {
         onClose={() => { setIsRonderingModalOpen(false); setSelectedRonderingCase(null) }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedRonderingCase}
+      />
+      <EgenkontrollCaseModal
+        isOpen={isEgenkontrollModalOpen}
+        onClose={() => { setIsEgenkontrollModalOpen(false); setSelectedEgenkontrollCase(null) }}
+        onSuccess={handleUpdateSuccess}
+        caseData={selectedEgenkontrollCase}
       />
       <CreateCaseModal
         isOpen={isCreateModalOpen}

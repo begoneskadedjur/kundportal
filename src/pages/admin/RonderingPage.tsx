@@ -9,8 +9,11 @@ import type { RonderingAnnotation, RonderingAnnotationCategory } from '../../ser
 import { ANNOTATION_CATEGORIES } from '../../services/ronderingService'
 import {
   Map as MapIcon, Building2, FileDown, ChevronLeft, ChevronRight,
-  AlertCircle, TrendingDown, CheckCircle, X, User, Calendar,
+  AlertCircle, TrendingDown, CheckCircle, X, User, Calendar, ClipboardCheck,
+  ChevronDown, ChevronRight as ChevronRightIcon,
 } from 'lucide-react'
+import { EgenkontrollService, EGENKONTROLL_ITEMS } from '../../services/egenkontrollService'
+import type { EgenkontrollStationReview } from '../../services/egenkontrollService'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import {
@@ -405,6 +408,15 @@ export default function RonderingPage() {
 
   const [exportingPdf, setExportingPdf] = useState(false)
 
+  // Egenkontroll
+  const [egenkontrollCases, setEgenkontrollCases] = useState<Array<{
+    id: string; caseNumber: string | null; regionId: string; regionName: string
+    scheduledStart: string | null; status: string; technicianName: string | null
+    reviews: EgenkontrollStationReview[]
+  }>>([])
+  const [expandedEgenkontroll, setExpandedEgenkontroll] = useState<string | null>(null)
+  const [expandedEgenkontrollStation, setExpandedEgenkontrollStation] = useState<string | null>(null)
+
   // ── Ladda organisationer ──────────────────────────────────────────────────
 
   useEffect(() => {
@@ -576,6 +588,35 @@ export default function RonderingPage() {
 
         setHotspots(hotspotList)
         setGeoClusters(dbscanCluster(highActivityStations, 250, 4))
+
+        // Ladda egenkontrollärenden för samma organisation parallellt
+        const { data: ekCases } = await supabase
+          .from('cases')
+          .select('id, case_number, customer_id, scheduled_start, status, primary_technician_name')
+          .eq('service_type', 'egenkontroll_trafikkontoret')
+          .in('customer_id', siteIds)
+          .order('scheduled_start', { ascending: false })
+
+        if (ekCases && ekCases.length > 0) {
+          const ekEnriched = await Promise.all(
+            ekCases.map(async (c) => {
+              const reviews = await EgenkontrollService.getReviews(c.id)
+              return {
+                id: c.id,
+                caseNumber: c.case_number,
+                regionId: c.customer_id,
+                regionName: siteNameMap[c.customer_id] || c.customer_id,
+                scheduledStart: c.scheduled_start,
+                status: c.status,
+                technicianName: c.primary_technician_name,
+                reviews,
+              }
+            })
+          )
+          setEgenkontrollCases(ekEnriched)
+        } else {
+          setEgenkontrollCases([])
+        }
       } finally {
         setLoading(false)
       }
@@ -1267,6 +1308,117 @@ export default function RonderingPage() {
                 <p className="text-slate-400">Inga ronderingsärenden för {fmtMonthYear(selectedMonth + '-01')}</p>
               </div>
             )}
+
+            {/* ── Egenkontroller ──────────────────────────────────────── */}
+            {(() => {
+              const monthEk = egenkontrollCases.filter(ek =>
+                ek.scheduledStart && toMonthKey(ek.scheduledStart) === selectedMonth
+              )
+              if (monthEk.length === 0) return null
+              return (
+                <div className="mt-4 p-4 bg-slate-800/20 border border-emerald-500/20 rounded-xl">
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <ClipboardCheck className="w-4 h-4 text-emerald-400" />
+                    Egenkontrollen {fmtMonthYear(selectedMonth + '-01')}
+                    <span className="text-xs text-slate-400 font-normal">({monthEk.length} besök)</span>
+                  </h3>
+                  <div className="space-y-2">
+                    {monthEk.map(ek => {
+                      const isExp = expandedEgenkontroll === ek.id
+                      const totalReviews = ek.reviews.length
+                      const fullyReviewed = ek.reviews.filter(r => EgenkontrollService.countChecked(r) === EGENKONTROLL_ITEMS.length).length
+                      const partialReviewed = ek.reviews.filter(r => EgenkontrollService.countChecked(r) > 0 && EgenkontrollService.countChecked(r) < EGENKONTROLL_ITEMS.length).length
+                      return (
+                        <div key={ek.id} className="bg-slate-800/40 border border-slate-700/50 rounded-xl overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => setExpandedEgenkontroll(isExp ? null : ek.id)}
+                            className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-slate-700/30 transition-colors text-left"
+                          >
+                            {isExp
+                              ? <ChevronDown className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                              : <ChevronRightIcon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                            }
+                            <span className="text-sm font-medium text-white">{ek.regionName}</span>
+                            {ek.scheduledStart && (
+                              <span className="text-xs text-slate-400">{fmtDate(ek.scheduledStart)}</span>
+                            )}
+                            {ek.technicianName && (
+                              <span className="text-xs text-slate-400">{ek.technicianName}</span>
+                            )}
+                            <div className="ml-auto flex items-center gap-2 text-xs">
+                              {totalReviews > 0 ? (
+                                <>
+                                  <span className="text-emerald-400">{fullyReviewed} godkända</span>
+                                  {partialReviewed > 0 && <span className="text-amber-400">{partialReviewed} delvis</span>}
+                                  <span className="text-slate-400">{totalReviewed} stationer</span>
+                                </>
+                              ) : (
+                                <span className="text-slate-500">Inga stationer valda</span>
+                              )}
+                            </div>
+                          </button>
+                          {isExp && ek.reviews.length > 0 && (
+                            <div className="border-t border-slate-700/50 divide-y divide-slate-700/30">
+                              {ek.reviews.map(rev => {
+                                const checkedCount = EgenkontrollService.countChecked(rev)
+                                const isStationExp = expandedEgenkontrollStation === rev.station_id
+                                return (
+                                  <div key={rev.station_id}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedEgenkontrollStation(isStationExp ? null : rev.station_id)}
+                                      className="w-full flex items-center gap-2 px-4 py-2 hover:bg-slate-700/20 transition-colors text-left"
+                                    >
+                                      {isStationExp
+                                        ? <ChevronDown className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                                        : <ChevronRightIcon className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                                      }
+                                      <span className="text-xs text-slate-200 font-mono">Station {rev.station_id.slice(0, 8)}</span>
+                                      <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${
+                                        checkedCount === EGENKONTROLL_ITEMS.length
+                                          ? 'bg-emerald-500/20 text-emerald-300'
+                                          : checkedCount > 0
+                                          ? 'bg-amber-500/20 text-amber-300'
+                                          : 'bg-slate-700/50 text-slate-400'
+                                      }`}>
+                                        {checkedCount}/{EGENKONTROLL_ITEMS.length}
+                                      </span>
+                                    </button>
+                                    {isStationExp && (
+                                      <div className="px-5 pb-3 pt-1 space-y-1">
+                                        {EGENKONTROLL_ITEMS.map(item => (
+                                          <div key={item.key} className="flex items-start gap-2 text-xs">
+                                            {rev[item.key] ? (
+                                              <CheckCircle className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                                            ) : (
+                                              <AlertCircle className="w-3.5 h-3.5 text-slate-600 mt-0.5 flex-shrink-0" />
+                                            )}
+                                            <span className={rev[item.key] ? 'text-slate-300' : 'text-slate-500'}>{item.label}</span>
+                                          </div>
+                                        ))}
+                                        {rev.note && (
+                                          <p className="text-xs text-amber-300 italic mt-2 pl-5">"{rev.note}"</p>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                          {isExp && ek.reviews.length === 0 && (
+                            <p className="px-4 py-3 text-xs text-slate-500 border-t border-slate-700/50">
+                              Inga stationer valda för detta kontrollbesök ännu.
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
       </div>
