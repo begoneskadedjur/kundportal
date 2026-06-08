@@ -688,13 +688,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         return toast.error('Kunden saknar adress. Ange adress manuellt.');
       }
     } else if (caseType === 'rondering' || caseType === 'egenkontroll') {
-      // Beräkna regionens centroid via polygon och reverse-geocoda till adress
+      // Beräkna regionens centroid via polygon
       if (!selectedSiteId) return toast.error('Välj en region först.');
       const { data: regionRow } = await supabase
         .from('customer_regions')
         .select('geojson_polygon')
         .eq('customer_id', selectedSiteId)
-        .single();
+        .maybeSingle();
       if (regionRow?.geojson_polygon) {
         const poly = regionRow.geojson_polygon;
         const ring: number[][] = poly.type === 'Polygon'
@@ -702,10 +702,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           : poly.coordinates[0][0];
         const lat = ring.reduce((s: number, c: number[]) => s + c[1], 0) / ring.length;
         const lng = ring.reduce((s: number, c: number[]) => s + c[0], 0) / ring.length;
-        searchAddress = await reverseGeocode(lat, lng) ?? '';
+        // reverseGeocode kan misslyckas (CORS/nyckel) — koordinater fungerar direkt med Distance Matrix API
+        searchAddress = await reverseGeocode(lat, lng) ?? `${lat.toFixed(6)},${lng.toFixed(6)}`;
       }
       if (!searchAddress) {
-        return toast.error('Kunde inte hämta adress för regionen. Rita om polygonen i Hantera regioner.');
+        return toast.error('Regionen saknar polygon. Rita om polygonen i Hantera regioner.');
       }
       searchPestType = selectedService?.name || null;
     } else {
