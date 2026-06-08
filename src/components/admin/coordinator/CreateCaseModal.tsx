@@ -702,8 +702,18 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           : poly.coordinates[0][0];
         const lat = ring.reduce((s: number, c: number[]) => s + c[1], 0) / ring.length;
         const lng = ring.reduce((s: number, c: number[]) => s + c[0], 0) / ring.length;
-        // reverseGeocode kan misslyckas (CORS/nyckel) — koordinater fungerar direkt med Distance Matrix API
-        searchAddress = await reverseGeocode(lat, lng) ?? `${lat.toFixed(6)},${lng.toFixed(6)}`;
+        // Server-side reverse geocode (undviker CORS) — fallback på koordinater
+        try {
+          const geoRes = await fetch('/api/reverse-geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lng })
+          })
+          const geoData = await geoRes.json()
+          searchAddress = geoData.address ?? `${lat.toFixed(6)},${lng.toFixed(6)}`
+        } catch {
+          searchAddress = `${lat.toFixed(6)},${lng.toFixed(6)}`
+        }
       }
       if (!searchAddress) {
         return toast.error('Regionen saknar polygon. Rita om polygonen i Hantera regioner.');
