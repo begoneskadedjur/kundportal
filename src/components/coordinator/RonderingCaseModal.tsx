@@ -831,10 +831,9 @@ export default function RonderingCaseModal({
       {/* Besökshistorik */}
       {showVisitHistoryPanel && caseData?.id && (
         <VisitHistoryPanel
-          isOpen={showVisitHistoryPanel}
-          onClose={() => setShowVisitHistoryPanel(false)}
           caseId={caseData.id}
-          customerId={caseData.customer_id}
+          caseTitle={formData.case_number || caseData?.title || 'Rondering'}
+          onClose={() => setShowVisitHistoryPanel(false)}
         />
       )}
 

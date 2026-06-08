@@ -923,12 +923,13 @@ export default function EgenkontrollCaseModal({
       />
 
       {/* Besökshistorik */}
-      <VisitHistoryPanel
-        isOpen={showVisitHistoryPanel}
-        onClose={() => setShowVisitHistoryPanel(false)}
-        caseId={caseData?.id}
-        caseType="contract"
-      />
+      {showVisitHistoryPanel && caseData?.id && (
+        <VisitHistoryPanel
+          caseId={caseData.id}
+          caseTitle={formData.case_number || caseData?.title || 'Egenkontroll'}
+          onClose={() => setShowVisitHistoryPanel(false)}
+        />
+      )}
 
       {/* Återbesök */}
       {showActionDialog && caseData && (
