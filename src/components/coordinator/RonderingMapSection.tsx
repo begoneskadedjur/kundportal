@@ -459,7 +459,7 @@ export default function RonderingMapSection({
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: STATUS_COLOR.action_required }} />Åtgärd krävs</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: STATUS_COLOR.missing }} />Saknas</span>
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block" style={{ background: STATUS_COLOR.none }} />Ej inspekterad</span>
-        <span className="flex items-center gap-1"><span className="inline-block text-red-400">▲</span>Avvikelse</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-flex items-center justify-center text-white font-bold flex-shrink-0" style={{ background: '#f97316', fontSize: '8px' }}>!</span>Avvikelse</span>
       </div>
 
       {/* Avvikelse-lista */}

@@ -2,7 +2,7 @@
 // Modal för "Egenkontroll Trafikkontoret" — avtalsansvarig granskar stationer
 // mot ISY-ROAD-checklistan och kan lägga till egna avvikelser.
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -141,6 +141,9 @@ export default function EgenkontrollCaseModal({
   const [showActionDialog, setShowActionDialog] = useState(false)
   const [annotations, setAnnotations] = useState<RonderingAnnotation[]>([])
 
+  // Memoizad för att undvika att RonderingMapSection re-renderar markörer vid varje knapptryckning
+  const stationLogsForMap = useMemo(() => Array.from(latestLogs.values()), [latestLogs])
+
   const handleClose = useCallback(() => {
     onClose()
   }, [onClose])
@@ -253,7 +256,7 @@ export default function EgenkontrollCaseModal({
       setStationImages(newMap)
     }
     loadImages()
-  }, [caseData?.id, reviews])
+  }, [caseData?.id, reviews.map(r => r.station_id).join(',')])
 
   const handleSubmit = async () => {
     setLoading(true)
@@ -860,7 +863,7 @@ export default function EgenkontrollCaseModal({
                   caseId={caseData.id}
                   customerId={caseData.customer_id}
                   stations={allStations}
-                  stationLogs={[]}
+                  stationLogs={stationLogsForMap}
                   annotations={annotations}
                   onAnnotationAdded={ann => setAnnotations(prev => [...prev, ann])}
                   onAnnotationDeleted={id => setAnnotations(prev => prev.filter(a => a.id !== id))}
