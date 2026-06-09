@@ -153,6 +153,12 @@ function dbscanCluster(stations: StationCoord[], eps = 400, minPts = 4): GeoClus
 
 // ── Kartan ────────────────────────────────────────────────────────────────────
 
+interface RegionStation {
+  lat: number; lng: number
+  bait: 'all' | 'partial' | 'none' | null
+  serialNumber: string | null
+}
+
 interface OverviewMapProps {
   hotspots: HotspotStation[]
   geoClusters: GeoCluster[]
@@ -164,9 +170,12 @@ interface OverviewMapProps {
   highlightClusterIdx: number | null
   highlightAnnotationId: string | null
   onClusterClick?: (center: { lat: number; lng: number }) => void
+  regionPolygon: Array<{ lat: number; lng: number }> | null
+  regionStations: RegionStation[] | null
+  regionAnnotations: RonderingAnnotation[] | null
 }
 
-function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses = {}, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick }: OverviewMapProps) {
+function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses = {}, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick, regionPolygon, regionStations, regionAnnotations }: OverviewMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const gMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
@@ -178,9 +187,20 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
   const annotationPulseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const annotationPulseMarkerRef = useRef<google.maps.Marker | null>(null)
   const clusterStationMarkersRef = useRef<google.maps.Marker[]>([])
+  const regionPolygonRef = useRef<google.maps.Polygon | null>(null)
+  const regionStationMarkersRef = useRef<google.maps.Marker[]>([])
+  const regionAnnotationMarkersRef = useRef<google.maps.Marker[]>([])
 
   useEffect(() => {
     if (!isLoaded || !mapRef.current) return
+    // Dölj default-markörer när region-vy är aktiv
+    if (regionPolygon) {
+      markersRef.current.forEach(m => m.setMap(null))
+      markersRef.current = []
+      circlesRef.current.forEach(c => c.setMap(null))
+      circlesRef.current = []
+      return
+    }
     if (!gMapRef.current) {
       gMapRef.current = new google.maps.Map(mapRef.current, {
         center: { lat: 59.33, lng: 18.07 },
@@ -281,7 +301,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
     })
 
     if (hasPoints && gMapRef.current) gMapRef.current.fitBounds(bounds, 60)
-  }, [isLoaded, hotspots, geoClusters, annotations])
+  }, [isLoaded, hotspots, geoClusters, annotations, regionPolygon])
 
   // Pulserande markör när en riskstation klickas
   useEffect(() => {
@@ -399,6 +419,62 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
     }
   }, [highlightAnnotationId, isLoaded, annotations])
 
+  // Region-highlight: polygon + färgkodade stationer + avvikelser
+  useEffect(() => {
+    // Cleanup
+    if (regionPolygonRef.current) { regionPolygonRef.current.setMap(null); regionPolygonRef.current = null }
+    regionStationMarkersRef.current.forEach(m => m.setMap(null)); regionStationMarkersRef.current = []
+    regionAnnotationMarkersRef.current.forEach(m => m.setMap(null)); regionAnnotationMarkersRef.current = []
+    if (!regionPolygon || !isLoaded || !gMapRef.current) return
+
+    // Rita polygon
+    const poly = new google.maps.Polygon({
+      paths: regionPolygon,
+      map: gMapRef.current,
+      fillColor: '#3b82f6', fillOpacity: 0.08,
+      strokeColor: '#60a5fa', strokeWeight: 2, strokeOpacity: 0.8,
+      zIndex: 5,
+    })
+    regionPolygonRef.current = poly
+
+    // Zooma till polygon
+    const bounds = new google.maps.LatLngBounds()
+    regionPolygon.forEach(p => bounds.extend(p))
+    gMapRef.current.fitBounds(bounds, 40)
+
+    // Rita stationer med beteåtgångs-färg
+    const baitColor: Record<string, string> = { all: '#ef4444', partial: '#f59e0b', none: '#22c55e' }
+    regionStationMarkersRef.current = (regionStations || []).map(s => {
+      const color = s.bait ? baitColor[s.bait] : '#64748b'
+      const scale = s.bait ? 7 : 5
+      const m = new google.maps.Marker({
+        position: { lat: s.lat, lng: s.lng },
+        map: gMapRef.current!,
+        title: s.serialNumber ? `#${s.serialNumber}` : undefined,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale, fillColor: color, fillOpacity: 0.9, strokeColor: '#fff', strokeWeight: 1.5 },
+        zIndex: 10,
+      })
+      return m
+    })
+
+    // Rita avvikelse-markörer
+    regionAnnotationMarkersRef.current = (regionAnnotations || []).map(ann => {
+      const m = new google.maps.Marker({
+        position: { lat: ann.latitude, lng: ann.longitude },
+        map: gMapRef.current!,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#f97316', fillOpacity: 0.85, strokeColor: '#fff', strokeWeight: 1.5 },
+        zIndex: 15,
+      })
+      return m
+    })
+
+    return () => {
+      if (regionPolygonRef.current) { regionPolygonRef.current.setMap(null); regionPolygonRef.current = null }
+      regionStationMarkersRef.current.forEach(m => m.setMap(null)); regionStationMarkersRef.current = []
+      regionAnnotationMarkersRef.current.forEach(m => m.setMap(null)); regionAnnotationMarkersRef.current = []
+    }
+  }, [regionPolygon, regionStations, regionAnnotations, isLoaded])
+
   if (!isLoaded) return <div className="h-full min-h-[300px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta...</div>
   return <div ref={mapRef} className="h-full min-h-[300px] rounded-xl overflow-hidden" />
 }
@@ -418,6 +494,7 @@ export default function RonderingPage() {
   const [monthData, setMonthData] = useState<RegionMonthData[]>([])
   const [allMonthsAggregated, setAllMonthsAggregated] = useState<{ month: string; all: number; partial: number; none: number }[]>([])
   const [stationCoords, setStationCoords] = useState<StationCoord[]>([])
+  const [regionPolygons, setRegionPolygons] = useState<Record<string, Array<{ lat: number; lng: number }>>>({})
   const [loading, setLoading] = useState(false)
 
   const [hotspots, setHotspots] = useState<HotspotStation[]>([])
@@ -490,6 +567,7 @@ export default function RonderingPage() {
       setHotspots([])
       setGeoClusters([])
       setSelectedRegion(null)
+      setRegionPolygons({})
       setAnnotationImages({})
       setAnnotationAddresses({})
 
@@ -532,6 +610,20 @@ export default function RonderingPage() {
           }
         }
         setStationCoords(coords)
+
+        // Hämta polygon-data för regioner
+        const { data: polyData } = await supabase
+          .from('customer_regions')
+          .select('customer_id, geojson_polygon')
+          .in('customer_id', siteIds)
+        if (polyData) {
+          const polyMap: Record<string, Array<{ lat: number; lng: number }>> = {}
+          polyData.forEach(p => {
+            const raw: number[][] = p.geojson_polygon?.coordinates?.[0] || []
+            polyMap[p.customer_id] = raw.map(([lng, lat]) => ({ lat, lng }))
+          })
+          setRegionPolygons(polyMap)
+        }
 
         const enriched: RegionMonthData[] = await Promise.all(
           allCases.map(async (c) => {
@@ -1611,6 +1703,14 @@ export default function RonderingPage() {
                     highlightClusterIdx={highlightClusterIdx}
                     highlightAnnotationId={highlightAnnotationId}
                     onClusterClick={_center => {}}
+                    regionPolygon={selectedRegion ? (regionPolygons[selectedRegion.regionId] ?? null) : null}
+                    regionStations={selectedRegion ? stationCoords
+                      .filter(s => s.customerId === selectedRegion.regionId)
+                      .map(s => {
+                        const log = (selectedRegion.logs as any[]).find(l => l.station_id === s.stationId)
+                        return { lat: s.lat, lng: s.lng, bait: (log?.bait_consumed ?? null) as 'all' | 'partial' | 'none' | null, serialNumber: s.serialNumber }
+                      }) : null}
+                    regionAnnotations={selectedRegion ? selectedRegion.annotations : null}
                   />
                 </div>
                 <div className="flex-shrink-0 flex flex-wrap gap-x-4 gap-y-1">
