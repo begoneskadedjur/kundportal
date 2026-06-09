@@ -1,7 +1,7 @@
 // src/pages/admin/RonderingPage.tsx
 // Egenkontroll-översikt — månadsvy över alla regioner för en organisation
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useGoogleMaps } from '../../hooks/useGoogleMaps'
 import { RonderingService } from '../../services/ronderingService'
@@ -175,9 +175,9 @@ interface OverviewMapProps {
   regionAnnotations: RonderingAnnotation[] | null
 }
 
-const OverviewMap = React.forwardRef<HTMLDivElement, OverviewMapProps>(function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses = {}, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick, regionPolygon, regionStations, regionAnnotations }: OverviewMapProps, forwardedRef) {
+const OverviewMap = forwardRef<HTMLDivElement, OverviewMapProps>(function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses = {}, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick, regionPolygon, regionStations, regionAnnotations }: OverviewMapProps, forwardedRef) {
   const mapRef = useRef<HTMLDivElement>(null)
-  React.useImperativeHandle(forwardedRef, () => mapRef.current!)
+  useImperativeHandle(forwardedRef, () => mapRef.current!)
   const gMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
   const circlesRef = useRef<google.maps.Circle[]>([])
