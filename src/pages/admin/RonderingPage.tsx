@@ -171,9 +171,12 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
   const gMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
   const circlesRef = useRef<google.maps.Circle[]>([])
-  const pulseRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pulseMarkerRef = useRef<google.maps.Marker | null>(null)
-  const pulseCircleRef = useRef<google.maps.Circle | null>(null)
+  const stationPulseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const stationPulseMarkerRef = useRef<google.maps.Marker | null>(null)
+  const clusterPulseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const clusterPulseCircleRef = useRef<google.maps.Circle | null>(null)
+  const annotationPulseIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const annotationPulseMarkerRef = useRef<google.maps.Marker | null>(null)
   const clusterStationMarkersRef = useRef<google.maps.Marker[]>([])
 
   useEffect(() => {
@@ -282,8 +285,8 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
 
   // Pulserande markör när en riskstation klickas
   useEffect(() => {
-    if (pulseRef.current) { clearInterval(pulseRef.current); pulseRef.current = null }
-    if (pulseMarkerRef.current) { pulseMarkerRef.current.setMap(null); pulseMarkerRef.current = null }
+    if (stationPulseIntervalRef.current) { clearInterval(stationPulseIntervalRef.current); stationPulseIntervalRef.current = null }
+    if (stationPulseMarkerRef.current) { stationPulseMarkerRef.current.setMap(null); stationPulseMarkerRef.current = null }
     if (!highlightStationId || !isLoaded || !gMapRef.current) return
 
     const h = hotspots.find(s => s.stationId === highlightStationId)
@@ -298,25 +301,24 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
       icon: { path: google.maps.SymbolPath.CIRCLE, scale: 14, fillColor: '#ef4444', fillOpacity: 0.4, strokeColor: '#ef4444', strokeWeight: 2 },
       zIndex: 20,
     })
-    pulseMarkerRef.current = pulse
+    stationPulseMarkerRef.current = pulse
 
     let big = true
-    pulseRef.current = setInterval(() => {
+    stationPulseIntervalRef.current = setInterval(() => {
       big = !big
       pulse.setIcon({ path: google.maps.SymbolPath.CIRCLE, scale: big ? 14 : 9, fillColor: '#ef4444', fillOpacity: big ? 0.4 : 0.8, strokeColor: '#ef4444', strokeWeight: 2 })
     }, 500)
 
     return () => {
-      if (pulseRef.current) clearInterval(pulseRef.current)
+      if (stationPulseIntervalRef.current) clearInterval(stationPulseIntervalRef.current)
       pulse.setMap(null)
     }
   }, [highlightStationId, isLoaded, hotspots])
 
   // Pulserande cirkel + stationsmarkörer när en riskzon klickas
   useEffect(() => {
-    if (pulseRef.current) { clearInterval(pulseRef.current); pulseRef.current = null }
-    if (pulseMarkerRef.current) { pulseMarkerRef.current.setMap(null); pulseMarkerRef.current = null }
-    if (pulseCircleRef.current) { pulseCircleRef.current.setMap(null); pulseCircleRef.current = null }
+    if (clusterPulseIntervalRef.current) { clearInterval(clusterPulseIntervalRef.current); clusterPulseIntervalRef.current = null }
+    if (clusterPulseCircleRef.current) { clusterPulseCircleRef.current.setMap(null); clusterPulseCircleRef.current = null }
     clusterStationMarkersRef.current.forEach(m => m.setMap(null))
     clusterStationMarkersRef.current = []
     if (highlightClusterIdx === null || !isLoaded || !gMapRef.current) return
@@ -334,7 +336,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
       strokeColor: '#ef4444', strokeWeight: 3, strokeOpacity: 1,
       zIndex: 20,
     })
-    pulseCircleRef.current = ring
+    clusterPulseCircleRef.current = ring
 
     // Visa stationerna i klustret som röda prickar
     clusterStationMarkersRef.current = cluster.stations.map(s => new google.maps.Marker({
@@ -353,14 +355,13 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
     }))
 
     let thick = true
-    pulseRef.current = setInterval(() => {
+    clusterPulseIntervalRef.current = setInterval(() => {
       thick = !thick
       ring.setOptions({ strokeWeight: thick ? 3 : 1.5, fillOpacity: thick ? 0.15 : 0.05 })
     }, 600)
 
     return () => {
-      if (pulseRef.current) clearInterval(pulseRef.current)
-      if (pulseMarkerRef.current) { pulseMarkerRef.current.setMap(null); pulseMarkerRef.current = null }
+      if (clusterPulseIntervalRef.current) clearInterval(clusterPulseIntervalRef.current)
       ring.setMap(null)
       clusterStationMarkersRef.current.forEach(m => m.setMap(null))
       clusterStationMarkersRef.current = []
@@ -369,8 +370,8 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
 
   // Pulserande markör när en avvikelse klickas
   useEffect(() => {
-    if (pulseRef.current) { clearInterval(pulseRef.current); pulseRef.current = null }
-    if (pulseMarkerRef.current) { pulseMarkerRef.current.setMap(null); pulseMarkerRef.current = null }
+    if (annotationPulseIntervalRef.current) { clearInterval(annotationPulseIntervalRef.current); annotationPulseIntervalRef.current = null }
+    if (annotationPulseMarkerRef.current) { annotationPulseMarkerRef.current.setMap(null); annotationPulseMarkerRef.current = null }
     if (!highlightAnnotationId || !isLoaded || !gMapRef.current) return
     const ann = annotations.find(a => a.id === highlightAnnotationId)
     if (!ann) return
@@ -384,16 +385,16 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
       icon: { path: google.maps.SymbolPath.CIRCLE, scale: 16, fillColor: '#f97316', fillOpacity: 0.3, strokeColor: '#f97316', strokeWeight: 2.5 },
       zIndex: 25,
     })
-    pulseMarkerRef.current = pulse
+    annotationPulseMarkerRef.current = pulse
 
     let big = true
-    pulseRef.current = setInterval(() => {
+    annotationPulseIntervalRef.current = setInterval(() => {
       big = !big
       pulse.setIcon({ path: google.maps.SymbolPath.CIRCLE, scale: big ? 16 : 10, fillColor: '#f97316', fillOpacity: big ? 0.3 : 0.6, strokeColor: '#f97316', strokeWeight: 2.5 })
     }, 500)
 
     return () => {
-      if (pulseRef.current) clearInterval(pulseRef.current)
+      if (annotationPulseIntervalRef.current) clearInterval(annotationPulseIntervalRef.current)
       pulse.setMap(null)
     }
   }, [highlightAnnotationId, isLoaded, annotations])
