@@ -981,14 +981,10 @@ export default function RonderingPage() {
       let mapDataUrl: string | undefined
       if (apiKey) {
         const params = new URLSearchParams({ size: '800x400', scale: '2', maptype: 'roadmap', key: apiKey })
-        // Riskstationer — röda (ef4444), storlek small
+        // Riskstationer — röda prickar (som OverviewMap)
         for (const h of hotspots.filter(h => !h.improved)) params.append('markers', `size:small|color:0xef4444|${h.lat},${h.lng}`)
-        // Förbättrade stationer — gröna
-        for (const h of hotspots.filter(h => h.improved)) params.append('markers', `size:small|color:0x22c55e|${h.lat},${h.lng}`)
-        // Riskzoners centrum — orangeröd cirkel
-        for (const cl of geoClusters) params.append('markers', `size:mid|color:0xef4444|label:Z|${cl.center.lat},${cl.center.lng}`)
-        // Avvikelser — orange (f97316)
-        for (const a of combinedAnnotations) params.append('markers', `size:small|color:0xf97316|${a.latitude},${a.longitude}`)
+        // Avvikelser (rondering + egenkontroll) — orange med utropstecken
+        for (const a of combinedAnnotations) params.append('markers', `size:small|color:0xf97316|label:!|${a.latitude},${a.longitude}`)
         if (hotspots.length === 0 && geoClusters.length === 0 && combinedAnnotations.length === 0) {
           params.set('center', '59.33,18.07'); params.set('zoom', '11')
         }
@@ -1788,10 +1784,10 @@ export default function RonderingPage() {
                         {geoClusters.length} zon{geoClusters.length !== 1 ? 'er' : ''}
                       </span>
                     )}
-                    {allAnnotations.length > 0 && (
+                    {combinedAnnotations.length > 0 && (
                       <span title="Avvikelser registrerade av tekniker." className="flex items-center gap-1 cursor-help">
                         <span className="inline-block w-0 h-0 border-l-[4px] border-r-[4px] border-b-[7px] border-l-transparent border-r-transparent border-b-orange-500" />
-                        {allAnnotations.length} avv
+                        {combinedAnnotations.length} avv
                       </span>
                     )}
                   </div>
