@@ -48,7 +48,7 @@ export interface RonderingPdfEkVisit {
     serialNumber: string | null
     checkedItems: number
     note: string | null
-    imageCount: number
+    imageUrls: string[]
   }>
 }
 
@@ -250,11 +250,22 @@ export function generateRonderingPdf(
           const note = st.note.length > 55 ? st.note.slice(0, 55) + '…' : st.note
           doc.text(note, margin + 75, y + 4.5)
         }
-        if (st.imageCount > 0) {
-          setFont(6, 'normal', C.accent)
-          doc.text(`${st.imageCount} bild${st.imageCount !== 1 ? 'er' : ''}`, W - margin - 3, y + 4.5, { align: 'right' })
-        }
         y += 7
+        if (st.imageUrls.length > 0) {
+          st.imageUrls.forEach((url, ui) => {
+            checkPageBreak(5)
+            const linkLabel = `Bild ${ui + 1}`
+            setFont(6, 'normal', C.accent)
+            const textW = doc.getTextWidth(linkLabel)
+            const lx = W - margin - 3 - textW
+            doc.text(linkLabel, W - margin - 3, y + 3.5, { align: 'right' })
+            doc.setDrawColor(...C.accent)
+            doc.setLineWidth(0.2)
+            doc.line(lx, y + 4, W - margin - 3, y + 4)
+            doc.link(lx, y, textW, 5, { url })
+            y += 5
+          })
+        }
       })
       y += 5
     })
@@ -418,7 +429,7 @@ export function generateRonderingPdf(
     fillRect(margin, y, contentW, 7, C.charcoal)
     setFont(7, 'bold', C.white)
     doc.text('Station', margin + 3, y + 4.5)
-    doc.text('Antal ggr Allt', margin + 50, y + 4.5)
+    doc.text('Månader i rad, allt förbrukat', margin + 50, y + 4.5)
     doc.text('Senast inspekterad', margin + 100, y + 4.5)
     y += 7
 

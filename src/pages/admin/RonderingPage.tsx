@@ -973,7 +973,7 @@ export default function RonderingPage() {
           serialNumber: ek.placementSerialMap[rev.station_id] ?? null,
           checkedItems: EgenkontrollService.countChecked(rev),
           note: rev.note,
-          imageCount: (ekStationImages[rev.station_id] || []).length,
+          imageUrls: (ekStationImages[rev.station_id] || []).map(img => img.url),
         })),
       }))
       const pdfOrgName = selectedOrg.name.split(' — ')[0].trim()
