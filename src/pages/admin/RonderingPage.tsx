@@ -1293,7 +1293,7 @@ export default function RonderingPage() {
                             return (
                               <div
                                 key={ann.id}
-                                className={`flex items-start gap-3 px-4 py-3 border-b border-slate-700/40 last:border-0 transition-colors cursor-pointer group ${
+                                className={`flex items-start gap-3 px-4 py-3 border-b border-slate-700/60 last:border-0 transition-colors cursor-pointer group ${
                                   isActive ? 'bg-orange-500/5 border-l-2 border-l-orange-400/70' : 'hover:bg-slate-800/40'
                                 }`}
                                 onClick={() => {
@@ -1302,8 +1302,7 @@ export default function RonderingPage() {
                                   setHighlightClusterIdx(null)
                                 }}
                               >
-                                <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: ANNOTATION_CATEGORIES[ann.category]?.color || '#f97316' }} />
-                                <div className="flex-1 min-w-0">
+                                <div className="flex-1 min-w-0 pl-1">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     {ann.note
                                       ? <span className="text-xs font-medium text-slate-200">{ann.note}</span>
