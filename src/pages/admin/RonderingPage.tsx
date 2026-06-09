@@ -1254,14 +1254,14 @@ export default function RonderingPage() {
                 <button
                   type="button"
                   onClick={() => toggleSection('annotations')}
-                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-700/20 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/20 transition-colors text-left"
                 >
-                  <div>
-                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-orange-400" />
-                      Avvikelser — {fmtMonthYear(selectedMonth + '-01')}
-                      <span className="text-xs font-normal text-slate-400">{combinedAnnotations.length} st</span>
-                    </h3>
+                  <div className="flex items-center gap-2.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-orange-400 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-white">Avvikelser — {fmtMonthYear(selectedMonth + '-01')}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-orange-500/15 border border-orange-500/25 text-[10px] font-medium text-orange-300 tabular-nums">
+                      {combinedAnnotations.length} st
+                    </span>
                   </div>
                   {collapsedSections.has('annotations')
                     ? <ChevronRightIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
@@ -1274,10 +1274,14 @@ export default function RonderingPage() {
                     const cat = ANNOTATION_CATEGORIES[catKey]
                     return (
                       <div key={catKey}>
-                        <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-700/60 bg-slate-800/30">
-                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{cat.label}</p>
+                        <div
+                          className="flex items-center gap-2 px-4 py-2 border-b border-slate-700/50"
+                          style={{ borderLeftWidth: 3, borderLeftColor: cat.color, background: `${cat.color}0d` }}
+                        >
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: cat.color }} />
+                          <span className="text-xs font-semibold text-slate-300">{cat.label}</span>
                           {catAnnotations.length > 1 && (
-                            <span className="px-1.5 py-0.5 rounded bg-slate-700 text-[10px] text-slate-400">{catAnnotations.length}</span>
+                            <span className="ml-auto text-[10px] font-medium text-slate-500 tabular-nums">{catAnnotations.length}</span>
                           )}
                         </div>
                         <div>
@@ -1287,30 +1291,51 @@ export default function RonderingPage() {
                             const address = annotationAddresses[ann.id]
                             const isActive = highlightAnnotationId === ann.id
                             return (
-                              <div key={ann.id} className={`flex items-start gap-3 px-4 py-2.5 border-b border-slate-700/40 last:border-0 transition-colors ${isActive ? 'bg-orange-500/8' : 'hover:bg-slate-800/40'}`}>
-                                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: ANNOTATION_CATEGORIES[ann.category]?.color || '#f97316' }} />
+                              <div
+                                key={ann.id}
+                                className={`flex items-start gap-3 px-4 py-3 border-b border-slate-700/40 last:border-0 transition-colors cursor-pointer group ${
+                                  isActive ? 'bg-orange-500/5 border-l-2 border-l-orange-400/70' : 'hover:bg-slate-800/40'
+                                }`}
+                                onClick={() => {
+                                  setHighlightAnnotationId(isActive ? null : ann.id)
+                                  setHighlightStationId(null)
+                                  setHighlightClusterIdx(null)
+                                }}
+                              >
+                                <span className="w-2 h-2 rounded-full flex-shrink-0 mt-1.5" style={{ background: ANNOTATION_CATEGORIES[ann.category]?.color || '#f97316' }} />
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
                                     {ann.note
-                                      ? <span className="text-xs text-slate-200">{ann.note}</span>
-                                      : <span className="text-xs text-slate-400 italic">Ingen notering</span>
+                                      ? <span className="text-xs font-medium text-slate-200">{ann.note}</span>
+                                      : <span className="text-xs text-slate-500 italic">Ingen notering</span>
                                     }
                                     {(ann as AnnotationWithSource).source === 'egenkontroll' && (
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex-shrink-0">EK</span>
+                                      <span
+                                        className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-medium flex-shrink-0"
+                                        title="Tillagd under avtalsansvarigs egenkontroll — ej under ursprunglig rondering"
+                                      >
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                                        Egenkontroll
+                                      </span>
                                     )}
                                   </div>
-                                  <p className="text-[11px] text-slate-500 mt-0.5">
+                                  <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
                                     {regionName}
-                                    {address && <> · {address}</>}
+                                    {address && <> · <span className="text-slate-400">{address}</span></>}
                                     {ann.technician_name && <> · {ann.technician_name}</>}
                                     {ann.created_at && <> · {fmtDate(ann.created_at)}</>}
                                   </p>
                                   {imgs.length > 0 && (
-                                    <div className="flex gap-1.5 mt-1.5">
+                                    <div className="flex gap-1.5 mt-2">
                                       {imgs.map((img, idx) => (
-                                        <button key={img.id} type="button"
-                                          onClick={() => setLightbox({ images: imgs.map(i => ({ url: i.url, alt: i.file_name || '' })), index: idx })}
-                                          className="w-10 h-10 rounded overflow-hidden border border-slate-700 hover:border-slate-500 flex-shrink-0 transition-colors"
+                                        <button
+                                          key={img.id}
+                                          type="button"
+                                          onClick={e => {
+                                            e.stopPropagation()
+                                            setLightbox({ images: imgs.map(i => ({ url: i.url, alt: i.file_name || '' })), index: idx })
+                                          }}
+                                          className="w-10 h-10 rounded-lg overflow-hidden border border-slate-700 hover:border-slate-500 flex-shrink-0 transition-colors"
                                         >
                                           <img src={img.url} alt={img.file_name || ''} className="w-full h-full object-cover" />
                                         </button>
@@ -1318,13 +1343,20 @@ export default function RonderingPage() {
                                     </div>
                                   )}
                                 </div>
-                                <button type="button" title="Visa på karta"
-                                  onClick={() => {
+                                <button
+                                  type="button"
+                                  title={isActive ? 'Avmarkera på kartan' : 'Visa på kartan'}
+                                  onClick={e => {
+                                    e.stopPropagation()
                                     setHighlightAnnotationId(isActive ? null : ann.id)
                                     setHighlightStationId(null)
                                     setHighlightClusterIdx(null)
                                   }}
-                                  className={`flex-shrink-0 p-1 rounded transition-colors ${isActive ? 'text-orange-400' : 'text-slate-600 hover:text-orange-400'}`}
+                                  className={`flex-shrink-0 p-1.5 rounded-lg transition-all ${
+                                    isActive
+                                      ? 'text-orange-400 bg-orange-500/15 border border-orange-500/30'
+                                      : 'text-slate-600 opacity-0 group-hover:opacity-100 hover:text-orange-400 hover:bg-orange-500/10'
+                                  }`}
                                 >
                                   <MapIcon className="w-3.5 h-3.5" />
                                 </button>
