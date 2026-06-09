@@ -229,7 +229,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
         title: `Station ${h.serialNumber ?? '?'} — ${h.consecutiveMonths} månader i rad`,
         zIndex: 10,
       })
-      const info = new google.maps.InfoWindow({ content: `<div style="font-family:sans-serif;padding:4px"><b style="color:#ef4444">Hotspot</b><br><span style="font-size:12px">Station ${h.serialNumber ?? h.stationId.slice(0,8)}</span><br><span style="font-size:11px;color:#64748b">${h.consecutiveMonths} månader i rad</span></div>` })
+      const info = new google.maps.InfoWindow({ content: `<div style="font-family:sans-serif;padding:4px;color:#1e293b"><b style="color:#ef4444">Hotspot</b><br><span style="font-size:12px">Station ${h.serialNumber ?? h.stationId.slice(0,8)}</span><br><span style="font-size:11px;color:#64748b">${h.consecutiveMonths} månader i rad</span></div>` })
       marker.addListener('click', () => info.open(gMapRef.current!, marker))
       markersRef.current.push(marker)
     })
@@ -243,7 +243,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
         title: `Station ${h.serialNumber ?? '?'} — förbättrad`,
         zIndex: 8,
       })
-      const info = new google.maps.InfoWindow({ content: `<div style="font-family:sans-serif;padding:4px"><b style="color:#22c55e">Förbättrad</b><br><span style="font-size:12px">Station ${h.serialNumber ?? h.stationId.slice(0,8)}</span></div>` })
+      const info = new google.maps.InfoWindow({ content: `<div style="font-family:sans-serif;padding:4px;color:#1e293b"><b style="color:#22c55e">Förbättrad</b><br><span style="font-size:12px">Station ${h.serialNumber ?? h.stationId.slice(0,8)}</span></div>` })
       marker.addListener('click', () => info.open(gMapRef.current!, marker))
       markersRef.current.push(marker)
     })
@@ -272,7 +272,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
         clickable: true,
       })
       const clusterInfo = new google.maps.InfoWindow({
-        content: `<div style="font-family:sans-serif;padding:4px"><b style="color:#ef4444">Riskzon</b><br><span style="font-size:12px">${cluster.stations.length} stationer med hög aktivitet senaste månaden</span>${cluster.address ? `<br><span style="font-size:11px;color:#64748b">${cluster.address}</span>` : ''}</div>`
+        content: `<div style="font-family:sans-serif;padding:4px;color:#1e293b"><b style="color:#ef4444">Riskzon</b><br><span style="font-size:12px">${cluster.stations.length} stationer med hög aktivitet senaste månaden</span>${cluster.address ? `<br><span style="font-size:11px;color:#64748b">${cluster.address}</span>` : ''}</div>`
       })
       circle.addListener('click', () => {
         clusterInfo.setPosition(cluster.center)
