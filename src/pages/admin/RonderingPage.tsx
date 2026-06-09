@@ -933,7 +933,18 @@ export default function RonderingPage() {
         actionRequired: 0,
         missing: 0,
         baitSummary: { all: c.baitAll, partial: c.baitPartial, none: c.baitNone },
-        annotations: c.annotations.map(a => ({ category: a.category, note: a.note, technician_name: a.technician_name, created_at: a.created_at })),
+        annotations: [
+          ...c.annotations.map(a => ({
+            category: a.category, note: a.note, technician_name: a.technician_name, created_at: a.created_at,
+            latitude: a.latitude, longitude: a.longitude, address: annotationAddresses[a.id] ?? null, source: 'rondering',
+          })),
+          ...monthEkForMap.filter(ek => ek.regionId === c.regionId).flatMap(ek =>
+            ek.annotations.map(a => ({
+              category: a.category, note: a.note, technician_name: a.technician_name, created_at: a.created_at,
+              latitude: a.latitude, longitude: a.longitude, address: annotationAddresses[a.id] ?? null, source: 'egenkontroll',
+            }))
+          ),
+        ],
       }))
       const highRisk = hotspots.filter(h => !h.improved).map(h => ({
         station_id: h.stationId, serial_number: h.serialNumber, allCount: h.consecutiveMonths, lastInspected: null,

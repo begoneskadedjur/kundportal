@@ -34,7 +34,7 @@ export interface RonderingPdfCase {
   actionRequired: number
   missing: number
   baitSummary: { all: number; partial: number; none: number }
-  annotations: { category: string; note: string | null; technician_name: string | null; created_at: string }[]
+  annotations: { category: string; note: string | null; technician_name: string | null; created_at: string; latitude?: number | null; longitude?: number | null; address?: string | null; source?: string }[]
 }
 
 export interface RonderingPdfHighRisk {
@@ -160,7 +160,7 @@ export function generateRonderingPdf(
     fillRect(x, summaryY, col - 2, 28, [20, 30, 55])
     doc.setFontSize(18)
     doc.setFont('helvetica', 'bold')
-    doc.setTextColor(...C.accent)
+    doc.setTextColor(...C.white)
     doc.text(item.value, x + (col - 2) / 2, summaryY + 14, { align: 'center' })
     doc.setFontSize(7)
     doc.setFont('helvetica', 'normal')
@@ -171,7 +171,7 @@ export function generateRonderingPdf(
   // BeGone-footer
   doc.setFontSize(8)
   doc.setTextColor(...C.slate)
-  doc.text('BeGone Skadedjurskontroll', margin + 8, H - 15)
+  doc.text('Begone Skadedjur', margin + 8, H - 15)
   doc.text('Konfidentiellt dokument', W - margin - 8, H - 15, { align: 'right' })
 
   // ── SIDA 2+: INNEHÅLL ─────────────────────────────────────────────────────
@@ -192,42 +192,6 @@ export function generateRonderingPdf(
 
   drawPageHeader()
 
-  // ── Högriskstationer ─────────────────────────────────────────────────────────
-  if (highRiskStations.length > 0) {
-    checkPageBreak(20 + highRiskStations.length * 8 + 10)
-
-    setFont(11, 'bold', C.primary)
-    doc.text('Högriskstationer', margin, y)
-    y += 4
-
-    setFont(8, 'normal', C.medGray)
-    doc.text('Stationer med "Allt" beteåtgång vid 2 eller fler inspektionstillfällen', margin, y)
-    y += 5
-
-    // Tabell-header
-    fillRect(margin, y, contentW, 7, C.charcoal)
-    setFont(7, 'bold', C.white)
-    doc.text('Station', margin + 3, y + 4.5)
-    doc.text('Antal ggr Allt', margin + 50, y + 4.5)
-    doc.text('Senast inspekterad', margin + 100, y + 4.5)
-    y += 7
-
-    highRiskStations.forEach((s, i) => {
-      const rowColor = i % 2 === 0 ? C.lightGray : C.white
-      fillRect(margin, y, contentW, 7, rowColor)
-      setFont(7, 'normal', C.darkGray)
-      doc.text(s.serial_number || s.station_id.slice(0, 8), margin + 3, y + 4.5)
-      setFont(7, 'bold', C.error)
-      doc.text(`${s.allCount}×`, margin + 50, y + 4.5)
-      setFont(7, 'normal', C.darkGray)
-      doc.text(fmtDate(s.lastInspected), margin + 100, y + 4.5)
-      y += 7
-    })
-    y += 8
-
-    drawRect(margin, 18, contentW, y - 18, C.border, 0.2)
-  }
-
   // ── Ärenderapport ─────────────────────────────────────────────────────────────
   checkPageBreak(14)
   setFont(11, 'bold', C.primary)
@@ -239,7 +203,7 @@ export function generateRonderingPdf(
 
   cases.forEach((c) => {
     const pct = c.total > 0 ? Math.round((c.inspected / c.total) * 100) : 0
-    const caseH = 10 + (c.annotations.length > 0 ? 6 + c.annotations.length * 7 : 0)
+    const caseH = 10 + (c.annotations.length > 0 ? 6 + c.annotations.length * 13 : 0)
     checkPageBreak(caseH + 4)
 
     if (y > 18 && y < margin + 1) drawPageHeader()
@@ -251,7 +215,7 @@ export function generateRonderingPdf(
 
     // Status-badge
     const isClosed = c.status.toLowerCase().includes('avslutat')
-    const badgeColor = isClosed ? C.success : C.accent
+    const badgeColor = isClosed ? C.slate : C.slate
     fillRect(W - margin - 30, y + 1.5, 28, 6, badgeColor)
     setFont(6, 'bold', C.white)
     doc.text(c.status, W - margin - 16, y + 5.5, { align: 'center' })
@@ -264,7 +228,7 @@ export function generateRonderingPdf(
     if (c.primary_technician_name) doc.text(c.primary_technician_name, margin + 45, y + 4.5)
 
     // Progress-text
-    const progressColor = pct === 100 ? C.success : (c.actionRequired > 0 ? C.warning : C.medGray)
+    const progressColor = c.actionRequired > 0 ? C.warning : C.medGray
     doc.setTextColor(...progressColor)
     doc.setFont('helvetica', 'bold')
     doc.text(`${c.inspected}/${c.total} stationer (${pct}%)`, W - margin - 3, y + 4.5, { align: 'right' })
@@ -319,17 +283,32 @@ export function generateRonderingPdf(
       c.annotations.forEach((ann, ai) => {
         const cat = ANNOTATION_CATEGORIES[ann.category as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
         const rowBg = ai % 2 === 0 ? [255, 247, 237] as [number,number,number] : [255, 251, 245] as [number,number,number]
-        fillRect(margin, y, contentW, 7, rowBg)
+        fillRect(margin, y, contentW, 13, rowBg)
+        // Rad 1: kategori + source-label + notering + datum
         setFont(7, 'bold', C.orange)
         doc.text(cat.label, margin + 3, y + 4.5)
+        if (ann.source === 'egenkontroll') {
+          setFont(6, 'normal', C.slate)
+          doc.text('(Egenkontroll)', margin + 3 + doc.getTextWidth(cat.label) + 2, y + 4.5)
+        }
         if (ann.note) {
           setFont(7, 'normal', C.darkGray)
-          const note = ann.note.length > 50 ? ann.note.slice(0, 50) + '…' : ann.note
-          doc.text(note, margin + 65, y + 4.5)
+          const note = ann.note.length > 45 ? ann.note.slice(0, 45) + '…' : ann.note
+          doc.text(note, margin + 60, y + 4.5)
         }
         setFont(6, 'normal', C.medGray)
         doc.text(fmtDateShort(ann.created_at), W - margin - 3, y + 4.5, { align: 'right' })
-        y += 7
+        // Rad 2: adress (primärt) + koordinater (höger)
+        if (ann.address) {
+          setFont(6.5, 'normal', C.darkGray)
+          const addr = ann.address.length > 65 ? ann.address.slice(0, 65) + '…' : ann.address
+          doc.text(addr, margin + 3, y + 9.5)
+        }
+        if (ann.latitude && ann.longitude) {
+          setFont(6, 'normal', C.medGray)
+          doc.text(`${ann.latitude.toFixed(5)}, ${ann.longitude.toFixed(5)}`, W - margin - 3, y + 9.5, { align: 'right' })
+        }
+        y += 13
       })
     }
 
@@ -337,11 +316,44 @@ export function generateRonderingPdf(
     y += 4
   })
 
+  // ── Högriskstationer ─────────────────────────────────────────────────────────
+  if (highRiskStations.length > 0) {
+    checkPageBreak(20 + highRiskStations.length * 8 + 10)
+
+    setFont(11, 'bold', C.primary)
+    doc.text('Högriskstationer', margin, y)
+    y += 4
+
+    setFont(8, 'normal', C.medGray)
+    doc.text('Stationer med "Allt" beteåtgång vid 2 eller fler inspektionstillfällen', margin, y)
+    y += 5
+
+    fillRect(margin, y, contentW, 7, C.charcoal)
+    setFont(7, 'bold', C.white)
+    doc.text('Station', margin + 3, y + 4.5)
+    doc.text('Antal ggr Allt', margin + 50, y + 4.5)
+    doc.text('Senast inspekterad', margin + 100, y + 4.5)
+    y += 7
+
+    highRiskStations.forEach((s, i) => {
+      const rowColor = i % 2 === 0 ? C.lightGray : C.white
+      fillRect(margin, y, contentW, 7, rowColor)
+      setFont(7, 'normal', C.darkGray)
+      doc.text(s.serial_number || s.station_id.slice(0, 8), margin + 3, y + 4.5)
+      setFont(7, 'bold', C.error)
+      doc.text(`${s.allCount}×`, margin + 50, y + 4.5)
+      setFont(7, 'normal', C.darkGray)
+      doc.text(fmtDate(s.lastInspected), margin + 100, y + 4.5)
+      y += 7
+    })
+    y += 8
+  }
+
   // ── Sidfot sista sida ────────────────────────────────────────────────────────
   doc.setFontSize(7)
   doc.setTextColor(...C.medGray)
   doc.text(
-    `Rapport genererad ${fmtDate(new Date().toISOString())} av BeGone Skadedjurskontroll`,
+    `Rapport genererad ${fmtDate(new Date().toISOString())} av Begone Skadedjur`,
     W / 2, H - 8, { align: 'center' }
   )
 
