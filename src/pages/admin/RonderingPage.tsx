@@ -174,6 +174,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
   const pulseRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pulseMarkerRef = useRef<google.maps.Marker | null>(null)
   const pulseCircleRef = useRef<google.maps.Circle | null>(null)
+  const clusterStationMarkersRef = useRef<google.maps.Marker[]>([])
 
   useEffect(() => {
     if (!isLoaded || !mapRef.current) return
@@ -311,10 +312,12 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
     }
   }, [highlightStationId, isLoaded, hotspots])
 
-  // Pulserande cirkel när en riskzon klickas
+  // Pulserande cirkel + stationsmarkörer när en riskzon klickas
   useEffect(() => {
     if (pulseRef.current) { clearInterval(pulseRef.current); pulseRef.current = null }
     if (pulseCircleRef.current) { pulseCircleRef.current.setMap(null); pulseCircleRef.current = null }
+    clusterStationMarkersRef.current.forEach(m => m.setMap(null))
+    clusterStationMarkersRef.current = []
     if (highlightClusterIdx === null || !isLoaded || !gMapRef.current) return
     const cluster = geoClusters[highlightClusterIdx]
     if (!cluster) return
@@ -332,6 +335,22 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
     })
     pulseCircleRef.current = ring
 
+    // Visa stationerna i klustret som röda prickar
+    clusterStationMarkersRef.current = cluster.stations.map(s => new google.maps.Marker({
+      position: { lat: s.lat, lng: s.lng },
+      map: gMapRef.current!,
+      title: s.serialNumber ? `#${s.serialNumber}` : undefined,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 5,
+        fillColor: '#ef4444',
+        fillOpacity: 0.8,
+        strokeColor: '#fff',
+        strokeWeight: 1.5,
+      },
+      zIndex: 21,
+    }))
+
     let thick = true
     pulseRef.current = setInterval(() => {
       thick = !thick
@@ -341,6 +360,8 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
     return () => {
       if (pulseRef.current) clearInterval(pulseRef.current)
       ring.setMap(null)
+      clusterStationMarkersRef.current.forEach(m => m.setMap(null))
+      clusterStationMarkersRef.current = []
     }
   }, [highlightClusterIdx, isLoaded, geoClusters])
 
