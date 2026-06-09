@@ -1351,7 +1351,7 @@ export default function RonderingPage() {
                                 <>
                                   <span className="text-emerald-400">{fullyReviewed} godkända</span>
                                   {partialReviewed > 0 && <span className="text-amber-400">{partialReviewed} delvis</span>}
-                                  <span className="text-slate-400">{totalReviewed} stationer</span>
+                                  <span className="text-slate-400">{totalReviews} stationer</span>
                                 </>
                               ) : (
                                 <span className="text-slate-500">Inga stationer valda</span>
