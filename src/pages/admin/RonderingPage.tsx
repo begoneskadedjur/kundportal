@@ -1345,29 +1345,34 @@ export default function RonderingPage() {
                 <button
                   type="button"
                   onClick={() => toggleSection('hotspots')}
-                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-700/20 transition-colors text-left"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/20 transition-colors text-left"
                 >
-                  <div>
-                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-amber-400" />
-                      Riskstationer &amp; riskzoner
-                      <span className="text-xs font-normal text-slate-400">
-                        {hotspots.filter(h => !h.improved).length > 0 && `${hotspots.filter(h => !h.improved).length} stationer`}
-                        {geoClusters.length > 0 && ` · ${geoClusters.length} zoner`}
+                  <div className="flex items-center gap-2.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-white">Riskstationer &amp; riskzoner</span>
+                    {hotspots.filter(h => !h.improved).length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-red-500/15 border border-red-500/25 text-[10px] font-medium text-red-300 tabular-nums">
+                        {hotspots.filter(h => !h.improved).length} st
                       </span>
-                    </h3>
+                    )}
+                    {geoClusters.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded bg-slate-700 border border-slate-600 text-[10px] font-medium text-slate-400 tabular-nums">
+                        {geoClusters.length} zoner
+                      </span>
+                    )}
                   </div>
                   {collapsedSections.has('hotspots')
                     ? <ChevronRightIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
                     : <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />}
                 </button>
-                {!collapsedSections.has('hotspots') && <div className="p-4 space-y-3 border-t border-slate-700">
+                {!collapsedSections.has('hotspots') && <div className="p-4 space-y-4 border-t border-slate-700">
                   {geoClusters.length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
-                        Geografiska riskzoner — {geoClusters.length} kluster
-                      </p>
-                      <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest">Geografiska riskzoner</span>
+                        <span className="text-[11px] text-slate-600">{geoClusters.length} kluster</span>
+                      </div>
+                      <div className="grid grid-cols-2 xl:grid-cols-3 gap-1.5">
                         {geoClusters.slice().sort((a, b) => b.stations.length - a.stations.length).map((cluster, sortedIdx) => {
                           const origIdx = geoClusters.indexOf(cluster)
                           const isActive = highlightClusterIdx === origIdx
@@ -1380,23 +1385,21 @@ export default function RonderingPage() {
                                 setHighlightClusterIdx(isActive ? null : origIdx)
                                 setHighlightStationId(null)
                                 setHighlightAnnotationId(null)
-                                if (!isActive) document.getElementById('hotspot-map-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                               }}
-                              className={`text-left px-3 py-3 rounded-xl border text-xs space-y-1 transition-all ${
+                              className={`group text-left px-3 py-2.5 rounded-lg border text-xs transition-all duration-200 ${
                                 isActive
-                                  ? 'bg-red-500/20 border-red-400/60'
-                                  : 'bg-red-500/10 border-red-500/20 hover:border-red-400/40 hover:bg-red-500/15'
+                                  ? 'bg-red-500/20 border-red-400/60 shadow-sm shadow-red-500/20'
+                                  : 'bg-red-500/8 border-red-500/20 hover:border-red-400/50 hover:bg-red-500/12 hover:shadow-sm hover:shadow-red-500/10'
                               }`}
                             >
-                              <div className="flex items-center gap-2">
-                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-red-400 animate-pulse' : 'bg-red-500'}`} />
-                                <span className="font-semibold text-red-300">{cluster.stations.length} stationer</span>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? 'bg-red-400 animate-pulse' : 'bg-red-500'}`} />
+                                <span className="font-semibold text-red-300 tabular-nums flex-shrink-0">{cluster.stations.length}</span>
+                                <span className="text-slate-500 text-[11px] flex-shrink-0">st</span>
+                                <span className={`truncate ${isActive ? 'text-white' : 'text-slate-400'}`}>
+                                  {cluster.address ? cluster.address.split(',')[0] : `${cluster.center.lat.toFixed(3)}, ${cluster.center.lng.toFixed(3)}`}
+                                </span>
                               </div>
-                              {cluster.address
-                                ? <p className={`leading-snug line-clamp-2 ${isActive ? 'text-white' : 'text-slate-300'}`}>{cluster.address}</p>
-                                : <p className="text-slate-500 font-mono">{cluster.center.lat.toFixed(4)}, {cluster.center.lng.toFixed(4)}</p>
-                              }
-                              <p className="text-slate-600 font-mono text-[10px]">{cluster.center.lat.toFixed(4)}, {cluster.center.lng.toFixed(4)}</p>
                             </button>
                           )
                         })}
@@ -1405,12 +1408,18 @@ export default function RonderingPage() {
                   )}
                   {hotspots.filter(h => !h.improved).length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                        Riskstationer — hög aktivitet 2 månader i rad ({hotspots.filter(h => !h.improved).length} st)
-                      </p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest">Riskstationer</span>
+                        <span className="text-[11px] text-slate-600">hög aktivitet 2+ månader i rad</span>
+                      </div>
                       <div className="grid grid-cols-2 xl:grid-cols-3 gap-1.5">
                         {hotspots.filter(h => !h.improved).sort((a, b) => b.consecutiveMonths - a.consecutiveMonths).map(h => {
                           const isActive = highlightStationId === h.stationId
+                          const riskBadge = h.consecutiveMonths >= 4
+                            ? 'bg-red-500/15 text-red-300 border-red-500/30'
+                            : h.consecutiveMonths === 3
+                              ? 'bg-orange-500/15 text-orange-300 border-orange-500/30'
+                              : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
                           return (
                             <button
                               key={h.stationId}
@@ -1420,16 +1429,19 @@ export default function RonderingPage() {
                                 setHighlightStationId(isActive ? null : h.stationId)
                                 setHighlightClusterIdx(null)
                                 setHighlightAnnotationId(null)
-                                if (!isActive) document.getElementById('hotspot-map-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                               }}
-                              className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-all text-left ${
+                              className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-all duration-150 text-left ${
                                 isActive
-                                  ? 'bg-red-500/15 border-red-400/60 text-white'
-                                  : 'bg-slate-800/50 border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'
+                                  ? 'bg-red-500/15 border-red-400/60 text-white shadow-sm shadow-red-500/10'
+                                  : 'bg-slate-800/50 border-slate-700/60 text-slate-300 hover:border-slate-500 hover:bg-slate-800 hover:text-white'
                               }`}
                             >
                               <span className="font-mono">{h.serialNumber || h.stationId.slice(0, 8)}</span>
-                              <span className={`text-[11px] ${isActive ? 'text-red-300' : 'text-slate-500'}`}>{h.consecutiveMonths}×</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-medium tabular-nums ${
+                                isActive ? 'bg-red-500/20 text-red-200 border-red-400/40' : riskBadge
+                              }`}>
+                                {h.consecutiveMonths}×
+                              </span>
                             </button>
                           )
                         })}
@@ -1444,19 +1456,15 @@ export default function RonderingPage() {
                   )}
                   {hotspots.filter(h => h.improved).length > 0 && (
                     <div>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Förbättrade stationer</p>
-                      <div className="rounded-lg overflow-hidden border border-slate-700 text-xs">
-                        <div className="grid grid-cols-3 bg-slate-900/60">
-                          <div className="px-3 py-2 font-semibold text-slate-400">Station</div>
-                          <div className="px-3 py-2 font-semibold text-slate-400 text-center">Historik (allt förbrukat)</div>
-                          <div className="px-3 py-2 font-semibold text-slate-400">Status</div>
-                        </div>
-                        {hotspots.filter(h => h.improved).map((h, i) => (
-                          <div key={h.stationId} className={`grid grid-cols-3 border-t border-slate-700/50 ${i % 2 === 0 ? 'bg-slate-900/20' : 'bg-slate-900/40'}`}>
-                            <div className="px-3 py-2 font-mono text-slate-200">{h.serialNumber || h.stationId.slice(0, 8)}</div>
-                            <div className="px-3 py-2 text-center text-slate-400">2+ månader</div>
-                            <div className="px-3 py-2 text-emerald-400 flex items-center gap-1"><TrendingDown className="w-3 h-3" />Förbättrad</div>
-                          </div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest">Förbättrade stationer</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {hotspots.filter(h => h.improved).map(h => (
+                          <span key={h.stationId} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300">
+                            <TrendingDown className="w-3 h-3" />
+                            {h.serialNumber || h.stationId.slice(0, 8)}
+                          </span>
                         ))}
                       </div>
                     </div>
