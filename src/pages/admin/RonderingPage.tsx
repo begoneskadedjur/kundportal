@@ -175,8 +175,9 @@ interface OverviewMapProps {
   regionAnnotations: RonderingAnnotation[] | null
 }
 
-function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses = {}, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick, regionPolygon, regionStations, regionAnnotations }: OverviewMapProps) {
+const OverviewMap = React.forwardRef<HTMLDivElement, OverviewMapProps>(function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses = {}, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick, regionPolygon, regionStations, regionAnnotations }: OverviewMapProps, forwardedRef) {
   const mapRef = useRef<HTMLDivElement>(null)
+  React.useImperativeHandle(forwardedRef, () => mapRef.current!)
   const gMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
   const circlesRef = useRef<google.maps.Circle[]>([])
@@ -477,7 +478,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
 
   if (!isLoaded) return <div className="h-full min-h-[300px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta...</div>
   return <div ref={mapRef} className="h-full min-h-[300px] rounded-xl overflow-hidden" />
-}
+})
 
 // ── Huvudkomponent ────────────────────────────────────────────────────────────
 
@@ -510,6 +511,7 @@ export default function RonderingPage() {
   const [highlightAnnotationId, setHighlightAnnotationId] = useState<string | null>(null)
 
   const [exportingPdf, setExportingPdf] = useState(false)
+  const overviewMapRef = useRef<HTMLDivElement>(null)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     () => new Set(['annotations', 'hotspots', 'egenkontroll'])
   )
@@ -976,27 +978,16 @@ export default function RonderingPage() {
           imageUrls: (ekStationImages[rev.station_id] || []).map(img => img.url),
         })),
       }))
-      // Bygg Google Maps Static API karta
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
+      // Ta screenshot av faktisk OverviewMap via canvas-element
       let mapDataUrl: string | undefined
-      if (apiKey) {
-        const params = new URLSearchParams({ size: '800x400', scale: '2', maptype: 'roadmap', key: apiKey })
-        // Riskstationer — röda prickar (som OverviewMap)
-        for (const h of hotspots.filter(h => !h.improved)) params.append('markers', `size:small|color:0xef4444|${h.lat},${h.lng}`)
-        // Avvikelser (rondering + egenkontroll) — orange med utropstecken
-        for (const a of combinedAnnotations) params.append('markers', `size:small|color:0xf97316|label:!|${a.latitude},${a.longitude}`)
-        if (hotspots.length === 0 && geoClusters.length === 0 && combinedAnnotations.length === 0) {
-          params.set('center', '59.33,18.07'); params.set('zoom', '11')
+      const mapDiv = overviewMapRef.current
+      if (mapDiv) {
+        const canvas = mapDiv.querySelector('canvas') as HTMLCanvasElement | null
+        if (canvas) {
+          try {
+            mapDataUrl = canvas.toDataURL('image/png')
+          } catch { /* cross-origin blockerat — fortsätt utan karta */ }
         }
-        try {
-          const resp = await fetch(`https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`)
-          const blob = await resp.blob()
-          mapDataUrl = await new Promise<string>(resolve => {
-            const reader = new FileReader()
-            reader.onload = () => resolve(reader.result as string)
-            reader.readAsDataURL(blob)
-          })
-        } catch { /* karta är inte kritisk */ }
       }
 
       const pdfOrgName = selectedOrg.name.split(' — ')[0].trim()
@@ -1794,6 +1785,7 @@ export default function RonderingPage() {
                 </div>
                 <div className="flex-1 min-h-0 rounded-xl overflow-hidden">
                   <OverviewMap
+                    ref={overviewMapRef}
                     hotspots={hotspots}
                     geoClusters={geoClusters}
                     annotations={combinedAnnotations}
