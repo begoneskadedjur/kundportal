@@ -157,6 +157,7 @@ interface OverviewMapProps {
   hotspots: HotspotStation[]
   geoClusters: GeoCluster[]
   annotations: RonderingAnnotation[]
+  annotationAddresses?: Record<string, string>
   isLoaded: boolean
   highlightRegionId: string | null
   highlightStationId: string | null
@@ -165,7 +166,7 @@ interface OverviewMapProps {
   onClusterClick?: (center: { lat: number; lng: number }) => void
 }
 
-function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick }: OverviewMapProps) {
+function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses = {}, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick }: OverviewMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const gMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
@@ -269,7 +270,8 @@ function OverviewMap({ hotspots, geoClusters, annotations, isLoaded, highlightRe
         label: { text: '!', color: '#fff', fontSize: '11px', fontWeight: 'bold' },
         title: cat.label, zIndex: 15,
       })
-      const info = new google.maps.InfoWindow({ content: `<div style="font-family:sans-serif;padding:4px"><b style="color:#f97316">${cat.label}</b>${ann.note ? `<br><span style="font-size:12px">${ann.note}</span>` : ''}${ann.technician_name ? `<br><span style="font-size:11px;color:#64748b">${ann.technician_name}</span>` : ''}</div>` })
+      const addr = annotationAddresses[ann.id]
+      const info = new google.maps.InfoWindow({ content: `<div style="font-family:sans-serif;padding:4px;color:#1e293b"><b style="color:#f97316">${cat.label}</b>${ann.note ? `<br><span style="font-size:12px;color:#334155">${ann.note}</span>` : ''}${addr ? `<br><span style="font-size:11px;color:#64748b">${addr}</span>` : ''}${ann.technician_name ? `<br><span style="font-size:11px;color:#94a3b8">${ann.technician_name}</span>` : ''}</div>` })
       marker.addListener('click', () => info.open(gMapRef.current!, marker))
       markersRef.current.push(marker)
     })
@@ -904,8 +906,14 @@ export default function RonderingPage() {
                 </div>
                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Avvikelser</p>
-                  <p className={`text-2xl font-bold ${monthTotalAnnotations > 0 ? 'text-orange-400' : 'text-emerald-400'}`}>{monthTotalAnnotations}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">registrerade</p>
+                  <p className={`text-2xl font-bold ${combinedAnnotations.length > 0 ? 'text-orange-400' : 'text-emerald-400'}`}>{monthTotalAnnotations}</p>
+                  {ekAnnotations.length > 0 ? (
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      registrerade <span className="text-emerald-400">+{ekAnnotations.length} egenkontroll</span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-slate-500 mt-0.5">registrerade</p>
+                  )}
                 </div>
                 <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
                   <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Regioner genomförda</p>
@@ -1229,6 +1237,7 @@ export default function RonderingPage() {
                     hotspots={hotspots}
                     geoClusters={geoClusters}
                     annotations={combinedAnnotations}
+                    annotationAddresses={annotationAddresses}
                     isLoaded={mapsLoaded}
                     highlightRegionId={selectedRegion?.regionId ?? null}
                     highlightStationId={highlightStationId}
