@@ -976,8 +976,30 @@ export default function RonderingPage() {
           imageUrls: (ekStationImages[rev.station_id] || []).map(img => img.url),
         })),
       }))
+      // Bygg Google Maps Static API karta
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
+      let mapDataUrl: string | undefined
+      if (apiKey) {
+        const params = new URLSearchParams({ size: '800x400', scale: '2', maptype: 'roadmap', key: apiKey })
+        for (const h of hotspots.filter(h => !h.improved)) params.append('markers', `color:red|${h.lat},${h.lng}`)
+        for (const cl of geoClusters) params.append('markers', `color:orange|${cl.center.lat},${cl.center.lng}`)
+        for (const a of combinedAnnotations) params.append('markers', `color:purple|${a.latitude},${a.longitude}`)
+        if (hotspots.length === 0 && geoClusters.length === 0 && combinedAnnotations.length === 0) {
+          params.set('center', '59.33,18.07'); params.set('zoom', '11')
+        }
+        try {
+          const resp = await fetch(`https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`)
+          const blob = await resp.blob()
+          mapDataUrl = await new Promise<string>(resolve => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(blob)
+          })
+        } catch { /* karta är inte kritisk */ }
+      }
+
       const pdfOrgName = selectedOrg.name.split(' — ')[0].trim()
-      generateRonderingPdf(pdfOrgName, pdfCases, highRisk, fmtMonthYear(selectedMonth + '-01'), ekVisitsForPdf)
+      generateRonderingPdf(pdfOrgName, pdfCases, highRisk, fmtMonthYear(selectedMonth + '-01'), ekVisitsForPdf, mapDataUrl)
     } catch (e: any) {
       toast.error(e.message || 'Kunde inte generera PDF')
     } finally {
