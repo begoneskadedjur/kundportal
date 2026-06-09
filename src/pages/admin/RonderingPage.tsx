@@ -2,6 +2,7 @@
 // Egenkontroll-översikt — månadsvy över alla regioner för en organisation
 
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
+import html2canvas from 'html2canvas'
 import { supabase } from '../../lib/supabase'
 import { useGoogleMaps } from '../../hooks/useGoogleMaps'
 import { RonderingService } from '../../services/ronderingService'
@@ -978,16 +979,19 @@ export default function RonderingPage() {
           imageUrls: (ekStationImages[rev.station_id] || []).map(img => img.url),
         })),
       }))
-      // Ta screenshot av faktisk OverviewMap via canvas-element
+      // Screenshot av OverviewMap via html2canvas
       let mapDataUrl: string | undefined
       const mapDiv = overviewMapRef.current
       if (mapDiv) {
-        const canvas = mapDiv.querySelector('canvas') as HTMLCanvasElement | null
-        if (canvas) {
-          try {
-            mapDataUrl = canvas.toDataURL('image/png')
-          } catch { /* cross-origin blockerat — fortsätt utan karta */ }
-        }
+        try {
+          const canvas = await html2canvas(mapDiv, {
+            useCORS: true,
+            allowTaint: true,
+            scale: 1.5,
+            logging: false,
+          })
+          mapDataUrl = canvas.toDataURL('image/png')
+        } catch { /* karta är inte kritisk */ }
       }
 
       const pdfOrgName = selectedOrg.name.split(' — ')[0].trim()
