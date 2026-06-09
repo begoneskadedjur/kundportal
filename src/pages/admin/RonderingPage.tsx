@@ -315,6 +315,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
   // Pulserande cirkel + stationsmarkörer när en riskzon klickas
   useEffect(() => {
     if (pulseRef.current) { clearInterval(pulseRef.current); pulseRef.current = null }
+    if (pulseMarkerRef.current) { pulseMarkerRef.current.setMap(null); pulseMarkerRef.current = null }
     if (pulseCircleRef.current) { pulseCircleRef.current.setMap(null); pulseCircleRef.current = null }
     clusterStationMarkersRef.current.forEach(m => m.setMap(null))
     clusterStationMarkersRef.current = []
@@ -359,6 +360,7 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
 
     return () => {
       if (pulseRef.current) clearInterval(pulseRef.current)
+      if (pulseMarkerRef.current) { pulseMarkerRef.current.setMap(null); pulseMarkerRef.current = null }
       ring.setMap(null)
       clusterStationMarkersRef.current.forEach(m => m.setMap(null))
       clusterStationMarkersRef.current = []
@@ -1357,6 +1359,8 @@ export default function RonderingPage() {
                               title="Klicka för att visa på kartan"
                               onClick={() => {
                                 setHighlightStationId(isActive ? null : h.stationId)
+                                setHighlightClusterIdx(null)
+                                setHighlightAnnotationId(null)
                                 if (!isActive) document.getElementById('hotspot-map-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                               }}
                               className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs transition-all text-left ${
