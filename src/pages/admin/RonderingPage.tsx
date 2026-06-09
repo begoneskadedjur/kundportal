@@ -18,7 +18,7 @@ import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
+  ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
 import { generateRonderingPdf } from '../../utils/ronderingPdfGenerator'
 import { CaseImageService } from '../../services/caseImageService'
@@ -991,45 +991,47 @@ export default function RonderingPage() {
                         key={c.caseId}
                         type="button"
                         onClick={() => setSelectedRegion(isSelected ? null : c)}
-                        className={`text-left p-3 rounded-xl border transition-all ${
+                        className={`text-left px-3 py-2.5 rounded-xl border transition-all ${
                           isSelected
                             ? 'bg-sky-500/10 border-sky-500/40'
                             : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
                         }`}
                       >
-                        <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            {hasHotspot && <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 mt-0.5" title="Aktiv hotspot" />}
-                            <p className="text-sm font-semibold text-white leading-tight truncate">{c.regionName}</p>
+                            {hasHotspot && <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Aktiv hotspot" />}
+                            <p className="text-xs font-semibold text-white leading-tight truncate">{c.regionName}</p>
                           </div>
-                          <span className={`text-xs font-bold ml-2 flex-shrink-0 ${pct === 100 ? 'text-emerald-400' : 'text-slate-400'}`}>{pct}%</span>
+                          <span className={`text-[11px] font-bold flex-shrink-0 ${pct === 100 ? 'text-emerald-400' : 'text-slate-400'}`}>{pct}%</span>
                         </div>
-                        <div className="h-1 bg-slate-700 rounded-full overflow-hidden mb-2">
+                        <div className="h-0.5 bg-slate-700 rounded-full overflow-hidden mb-2">
                           <div className={`h-full rounded-full ${pct === 100 ? 'bg-emerald-500' : 'bg-sky-500'}`} style={{ width: `${pct}%` }} />
                         </div>
-                        <p className="text-xs text-slate-500 mb-2">{c.inspected}/{c.total} stationer</p>
-                        {baitTotal > 0 && (
-                          <div className="flex h-1.5 rounded-full overflow-hidden bg-slate-700 gap-px mb-2">
-                            {c.baitAll > 0 && <div className="bg-red-500" style={{ width: `${c.baitAll / baitTotal * 100}%` }} />}
-                            {c.baitPartial > 0 && <div className="bg-amber-500" style={{ width: `${c.baitPartial / baitTotal * 100}%` }} />}
-                            {c.baitNone > 0 && <div className="bg-emerald-500" style={{ width: `${c.baitNone / baitTotal * 100}%` }} />}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-3 text-[11px] text-slate-500">
-                          {c.baitAll > 0 && <span className="text-red-400">Allt: {c.baitAll}</span>}
-                          {c.baitPartial > 0 && <span className="text-amber-400">Delvis: {c.baitPartial}</span>}
-                          {c.annotations.length > 0 && <span className="text-orange-400">⚠ {c.annotations.length}</span>}
-                          {c.scheduledStart && (
-                            <span className="ml-auto flex items-center gap-1 text-slate-600">
-                              <Calendar className="w-3 h-3" />{fmtDate(c.scheduledStart)}
-                            </span>
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                          <span className="text-slate-400">{c.inspected}/{c.total}</span>
+                          {baitTotal > 0 && (
+                            <PieChart width={20} height={20}>
+                              <Pie data={[{ value: c.baitAll }, { value: c.baitPartial }, { value: c.baitNone }]} dataKey="value" innerRadius={5} outerRadius={10} strokeWidth={0} isAnimationActive={false}>
+                                <Cell fill="#ef4444" /><Cell fill="#f59e0b" /><Cell fill="#22c55e" />
+                              </Pie>
+                            </PieChart>
                           )}
+                          {c.baitAll > 0 && <span className="text-red-400">{c.baitAll}×</span>}
+                          {c.baitPartial > 0 && <span className="text-amber-400">{c.baitPartial}△</span>}
+                          {c.annotations.length > 0 && <span className="text-orange-400">⚠{c.annotations.length}</span>}
+                          <span className="ml-auto flex items-center gap-2 text-slate-600">
+                            {c.technicianName && (
+                              <span className="flex items-center gap-1">
+                                <User className="w-2.5 h-2.5" />{c.technicianName.split(' ')[0]}
+                              </span>
+                            )}
+                            {c.scheduledStart && (
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-2.5 h-2.5" />{fmtDate(c.scheduledStart)}
+                              </span>
+                            )}
+                          </span>
                         </div>
-                        {c.technicianName && (
-                          <div className="flex items-center gap-1 mt-1.5 text-[11px] text-slate-600">
-                            <User className="w-3 h-3" />{c.technicianName}
-                          </div>
-                        )}
                       </button>
                     )
                   })}
@@ -1169,72 +1171,67 @@ export default function RonderingPage() {
                     ? <ChevronRightIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
                     : <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />}
                 </button>
-                {!collapsedSections.has('annotations') && <div className="p-4 border-t border-slate-700">
+                {!collapsedSections.has('annotations') && <div className="border-t border-slate-700">
                   {(Object.keys(ANNOTATION_CATEGORIES) as RonderingAnnotationCategory[]).map(catKey => {
                     const catAnnotations = combinedAnnotations.filter(a => a.category === catKey)
                     if (catAnnotations.length === 0) return null
                     const cat = ANNOTATION_CATEGORIES[catKey]
                     return (
-                      <div key={catKey} className="mb-4 last:mb-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <p className="text-xs font-semibold text-slate-300">{cat.label}</p>
+                      <div key={catKey}>
+                        <div className="flex items-center gap-2 px-4 py-2 border-b border-slate-700/60 bg-slate-800/30">
+                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">{cat.label}</p>
                           {catAnnotations.length > 1 && (
                             <span className="px-1.5 py-0.5 rounded bg-slate-700 text-[10px] text-slate-400">{catAnnotations.length}</span>
                           )}
                         </div>
-                        <div className="space-y-2 ml-2">
+                        <div>
                           {catAnnotations.map(ann => {
                             const regionName = monthData.find(c => c.caseId === ann.case_id)?.regionName ?? caseRegionMap[ann.case_id] ?? '—'
                             const imgs = annotationImages[ann.id] ?? []
                             const address = annotationAddresses[ann.id]
                             const isActive = highlightAnnotationId === ann.id
                             return (
-                              <div key={ann.id} className={`px-3 py-2.5 rounded-lg border text-xs space-y-1.5 transition-all ${isActive ? 'bg-orange-500/15 border-orange-400/50' : 'bg-slate-900/40 border-slate-700/50'}`}>
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex items-center gap-2 flex-wrap min-w-0">
-                                    <span className="font-medium text-slate-200">{regionName}</span>
+                              <div key={ann.id} className={`flex items-start gap-3 px-4 py-2.5 border-b border-slate-700/40 last:border-0 transition-colors ${isActive ? 'bg-orange-500/8' : 'hover:bg-slate-800/40'}`}>
+                                <span className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: ANNOTATION_CATEGORIES[ann.category]?.color || '#f97316' }} />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    {ann.note
+                                      ? <span className="text-xs text-slate-200">{ann.note}</span>
+                                      : <span className="text-xs text-slate-400 italic">Ingen notering</span>
+                                    }
                                     {(ann as AnnotationWithSource).source === 'egenkontroll' && (
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex-shrink-0">
-                                        Tillagd under egenkontroll
-                                      </span>
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex-shrink-0">EK</span>
                                     )}
-                                    {ann.note && <span className="text-slate-400">— {ann.note}</span>}
                                   </div>
-                                  <button
-                                    type="button"
-                                    title="Visa på karta"
-                                    onClick={() => {
-                                      setHighlightAnnotationId(isActive ? null : ann.id)
-                                      setHighlightStationId(null)
-                                      setHighlightClusterIdx(null)
-                                    }}
-                                    className={`flex-shrink-0 p-1 rounded transition-colors ${isActive ? 'text-orange-400' : 'text-slate-600 hover:text-orange-400'}`}
-                                  >
-                                    <MapIcon className="w-3.5 h-3.5" />
-                                  </button>
+                                  <p className="text-[11px] text-slate-500 mt-0.5">
+                                    {regionName}
+                                    {address && <> · {address}</>}
+                                    {ann.technician_name && <> · {ann.technician_name}</>}
+                                    {ann.created_at && <> · {fmtDate(ann.created_at)}</>}
+                                  </p>
+                                  {imgs.length > 0 && (
+                                    <div className="flex gap-1.5 mt-1.5">
+                                      {imgs.map((img, idx) => (
+                                        <button key={img.id} type="button"
+                                          onClick={() => setLightbox({ images: imgs.map(i => ({ url: i.url, alt: i.file_name || '' })), index: idx })}
+                                          className="w-10 h-10 rounded overflow-hidden border border-slate-700 hover:border-slate-500 flex-shrink-0 transition-colors"
+                                        >
+                                          <img src={img.url} alt={img.file_name || ''} className="w-full h-full object-cover" />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
-                                {address && <p className="text-slate-400 text-[11px]">{address}</p>}
-                                <p className="text-slate-600 font-mono text-[11px]">
-                                  {ann.latitude.toFixed(5)}, {ann.longitude.toFixed(5)}
-                                </p>
-                                <p className="text-slate-600">
-                                  {ann.technician_name && `${ann.technician_name} · `}
-                                  {ann.created_at ? fmtDate(ann.created_at) : ''}
-                                </p>
-                                {imgs.length > 0 && (
-                                  <div className="flex gap-2 flex-wrap pt-1">
-                                    {imgs.map((img, idx) => (
-                                      <button
-                                        key={img.id}
-                                        type="button"
-                                        onClick={() => setLightbox({ images: imgs.map(i => ({ url: i.url, alt: i.file_name || '' })), index: idx })}
-                                        className="w-16 h-16 rounded-lg overflow-hidden border border-slate-700 hover:border-slate-500 flex-shrink-0 transition-colors"
-                                      >
-                                        <img src={img.url} alt={img.file_name || ''} className="w-full h-full object-cover" />
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
+                                <button type="button" title="Visa på karta"
+                                  onClick={() => {
+                                    setHighlightAnnotationId(isActive ? null : ann.id)
+                                    setHighlightStationId(null)
+                                    setHighlightClusterIdx(null)
+                                  }}
+                                  className={`flex-shrink-0 p-1 rounded transition-colors ${isActive ? 'text-orange-400' : 'text-slate-600 hover:text-orange-400'}`}
+                                >
+                                  <MapIcon className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             )
                           })}
