@@ -399,8 +399,8 @@ function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses =
     }
   }, [highlightAnnotationId, isLoaded, annotations])
 
-  if (!isLoaded) return <div className="h-80 bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta...</div>
-  return <div ref={mapRef} className="h-80 rounded-xl overflow-hidden" />
+  if (!isLoaded) return <div className="h-full min-h-[300px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta...</div>
+  return <div ref={mapRef} className="h-full min-h-[300px] rounded-xl overflow-hidden" />
 }
 
 // ── Huvudkomponent ────────────────────────────────────────────────────────────
@@ -433,6 +433,11 @@ export default function RonderingPage() {
   const [highlightAnnotationId, setHighlightAnnotationId] = useState<string | null>(null)
 
   const [exportingPdf, setExportingPdf] = useState(false)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+    () => new Set(['annotations', 'hotspots', 'egenkontroll'])
+  )
+  const toggleSection = (key: string) =>
+    setCollapsedSections(prev => { const s = new Set(prev); s.has(key) ? s.delete(key) : s.add(key); return s })
 
   // Egenkontroll
   const [egenkontrollCases, setEgenkontrollCases] = useState<Array<{
@@ -445,6 +450,18 @@ export default function RonderingPage() {
   const [expandedEgenkontroll, setExpandedEgenkontroll] = useState<string | null>(null)
   const [expandedEgenkontrollStation, setExpandedEgenkontrollStation] = useState<string | null>(null)
   const [ekStationImages, setEkStationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
+
+  // Auto-expandera sektioner när data laddas
+  useEffect(() => {
+    setCollapsedSections(prev => {
+      const s = new Set(prev)
+      if (combinedAnnotations.length > 0) s.delete('annotations')
+      else s.add('annotations')
+      if (hotspots.length > 0 || geoClusters.length > 0) s.delete('hotspots')
+      else s.add('hotspots')
+      return s
+    })
+  }, [combinedAnnotations.length, hotspots.length, geoClusters.length])
 
   // ── Ladda organisationer ──────────────────────────────────────────────────
 
@@ -873,7 +890,9 @@ export default function RonderingPage() {
         ) : loading ? (
           <div className="flex-1 flex items-center justify-center text-slate-400">Laddar ronderingsdata...</div>
         ) : (
-          <div className="p-5 space-y-5">
+          <div className="flex min-h-0 h-full">
+            {/* ── Vänster scrollbar innehållskolumn ── */}
+            <div className="flex-1 min-w-0 overflow-y-auto p-5 space-y-4">
 
             {/* ── Header ── */}
             <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -960,7 +979,7 @@ export default function RonderingPage() {
             {monthData.length > 0 && (
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Regioner — {fmtMonthYear(selectedMonth + '-01')}</p>
-                <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
                   {monthData.map(c => {
                     const pct = c.total > 0 ? Math.round(c.inspected / c.total * 100) : 0
                     const baitTotal = c.baitAll + c.baitPartial + c.baitNone
@@ -971,7 +990,7 @@ export default function RonderingPage() {
                         key={c.caseId}
                         type="button"
                         onClick={() => setSelectedRegion(isSelected ? null : c)}
-                        className={`text-left p-4 rounded-xl border transition-all ${
+                        className={`text-left p-3 rounded-xl border transition-all ${
                           isSelected
                             ? 'bg-sky-500/10 border-sky-500/40'
                             : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
@@ -1133,14 +1152,23 @@ export default function RonderingPage() {
             {/* ── Avvikelse-sektion ── */}
             {combinedAnnotations.length > 0 && (
               <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-700">
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-orange-400" />
-                    Avvikelser — {fmtMonthYear(selectedMonth + '-01')}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">{combinedAnnotations.length} avvikelse{combinedAnnotations.length !== 1 ? 'r' : ''} registrerade under månaden</p>
-                </div>
-                <div className="p-4">
+                <button
+                  type="button"
+                  onClick={() => toggleSection('annotations')}
+                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-700/20 transition-colors text-left"
+                >
+                  <div>
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-orange-400" />
+                      Avvikelser — {fmtMonthYear(selectedMonth + '-01')}
+                      <span className="text-xs font-normal text-slate-400">{combinedAnnotations.length} st</span>
+                    </h3>
+                  </div>
+                  {collapsedSections.has('annotations')
+                    ? <ChevronRightIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                    : <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />}
+                </button>
+                {!collapsedSections.has('annotations') && <div className="p-4 border-t border-slate-700">
                   {(Object.keys(ANNOTATION_CATEGORIES) as RonderingAnnotationCategory[]).map(catKey => {
                     const catAnnotations = combinedAnnotations.filter(a => a.category === catKey)
                     if (catAnnotations.length === 0) return null
@@ -1178,7 +1206,6 @@ export default function RonderingPage() {
                                       setHighlightAnnotationId(isActive ? null : ann.id)
                                       setHighlightStationId(null)
                                       setHighlightClusterIdx(null)
-                                      if (!isActive) document.getElementById('hotspot-map-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
                                     }}
                                     className={`flex-shrink-0 p-1 rounded transition-colors ${isActive ? 'text-orange-400' : 'text-slate-600 hover:text-orange-400'}`}
                                   >
@@ -1214,96 +1241,33 @@ export default function RonderingPage() {
                       </div>
                     )
                   })}
-                </div>
-              </div>
-            )}
-
-            {/* ── Hotspot-karta ── */}
-            {(hotspots.length > 0 || combinedAnnotations.length > 0 || geoClusters.length > 0) && (
-              <div id="hotspot-map-section" className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                      <MapIcon className="w-4 h-4 text-orange-400" />
-                      Hotspot-karta — alla regioner
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Riskstationer, riskzoner och avvikelser — {fmtMonthYear(selectedMonth + '-01')}</p>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
-                    {hotspots.filter(h => !h.improved).length > 0 && (
-                      <span title="Enskilda stationer där allt bete förbrukats 2 månader i rad. Indikerar ett ihållande gnagarproblem på just den platsen." className="flex items-center gap-1.5 cursor-help">
-                        <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
-                        {hotspots.filter(h => !h.improved).length} riskstation{hotspots.filter(h => !h.improved).length !== 1 ? 'er' : ''}
-                      </span>
-                    )}
-                    {hotspots.filter(h => h.improved).length > 0 && (
-                      <span title="Stationer som tidigare haft hög beteåtgång 2+ månader men där senaste ronderingen visar lägre förbrukning — en positiv trend." className="flex items-center gap-1.5 cursor-help">
-                        <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
-                        {hotspots.filter(h => h.improved).length} förbättrade
-                      </span>
-                    )}
-                    {geoClusters.length > 0 && (
-                      <span title="Geografiska områden där många stationer haft hög beteåtgång senaste månaden. Visar var gnagarnärvaron är koncentrerad — inget historikkrav." className="flex items-center gap-1.5 cursor-help">
-                        <span className="w-4 h-4 rounded-full border-2 border-red-500 inline-block opacity-60" />
-                        {geoClusters.length} riskzon{geoClusters.length !== 1 ? 'er' : ''}
-                      </span>
-                    )}
-                    {allAnnotations.length > 0 && (
-                      <span title="Platsspecifika observationer registrerade av tekniker under ronderingen — t.ex. nedskräpning, vegetation, skador eller verksamheter som drar till sig gnagare." className="flex items-center gap-1.5 cursor-help">
-                        <span className="inline-block w-0 h-0 border-l-[5px] border-r-[5px] border-b-[9px] border-l-transparent border-r-transparent border-b-orange-500" />
-                        {allAnnotations.length} avvikelse{allAnnotations.length !== 1 ? 'r' : ''}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="p-3">
-                  <OverviewMap
-                    hotspots={hotspots}
-                    geoClusters={geoClusters}
-                    annotations={combinedAnnotations}
-                    annotationAddresses={annotationAddresses}
-                    isLoaded={mapsLoaded}
-                    highlightRegionId={selectedRegion?.regionId ?? null}
-                    highlightStationId={highlightStationId}
-                    highlightClusterIdx={highlightClusterIdx}
-                    highlightAnnotationId={highlightAnnotationId}
-                    onClusterClick={_center => {/* kartan hanterar zoom internt via circle click */}}
-                  />
-                  <div className="mt-2 pt-2 border-t border-slate-700/50 flex flex-wrap gap-x-5 gap-y-1">
-                    <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0" />
-                      <span><span className="text-slate-400 font-medium">Riskstation</span> — hög beteåtgång 2 månader i rad</span>
-                    </span>
-                    <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                      <span className="w-3 h-3 rounded-full border border-red-500 opacity-70 flex-shrink-0" />
-                      <span><span className="text-slate-400 font-medium">Riskzon</span> — geografisk koncentration av hög aktivitet senaste månaden, förhöjd gnagarnärvaro i området</span>
-                    </span>
-                    <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                      <span className="inline-block w-0 h-0 border-l-[4px] border-r-[4px] border-b-[7px] border-l-transparent border-r-transparent border-b-orange-500 flex-shrink-0" />
-                      <span><span className="text-slate-400 font-medium">Avvikelse</span> — registrerad avvikelse av tekniker under ronderingen</span>
-                    </span>
-                    {hotspots.filter(h => h.improved).length > 0 && (
-                      <span className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                        <span><span className="text-slate-400 font-medium">Förbättrad station</span> — tidigare hög aktivitet, senaste rondering visar lägre beteåtgång</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
+                </div>}
               </div>
             )}
 
             {/* ── Hotspot-lista ── */}
             {(hotspots.length > 0 || geoClusters.length > 0) && (
               <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
-                <div className="px-5 py-3 border-b border-slate-700">
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-amber-400" />
-                    Riskstationer &amp; geografiska riskzoner
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Stationer med hög beteåtgång 2 månader i rad · Riskzoner: 4+ stationer inom 250m med hög aktivitet senaste månaden · Förbättrade stationer</p>
-                </div>
-                <div className="p-4 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => toggleSection('hotspots')}
+                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-700/20 transition-colors text-left"
+                >
+                  <div>
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400" />
+                      Riskstationer &amp; riskzoner
+                      <span className="text-xs font-normal text-slate-400">
+                        {hotspots.filter(h => !h.improved).length > 0 && `${hotspots.filter(h => !h.improved).length} stationer`}
+                        {geoClusters.length > 0 && ` · ${geoClusters.length} zoner`}
+                      </span>
+                    </h3>
+                  </div>
+                  {collapsedSections.has('hotspots')
+                    ? <ChevronRightIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                    : <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />}
+                </button>
+                {!collapsedSections.has('hotspots') && <div className="p-4 space-y-3 border-t border-slate-700">
                   {geoClusters.length > 0 && (
                     <div>
                       <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
@@ -1403,7 +1367,7 @@ export default function RonderingPage() {
                       </div>
                     </div>
                   )}
-                </div>
+                </div>}
               </div>
             )}
 
@@ -1421,13 +1385,22 @@ export default function RonderingPage() {
               )
               if (monthEk.length === 0) return null
               return (
-                <div className="mt-4 p-4 bg-slate-800/20 border border-emerald-500/20 rounded-xl">
-                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                    <ClipboardCheck className="w-4 h-4 text-emerald-400" />
-                    Egenkontrollen {fmtMonthYear(selectedMonth + '-01')}
-                    <span className="text-xs text-slate-400 font-normal">({monthEk.length} besök)</span>
-                  </h3>
-                  <div className="space-y-2">
+                <div className="bg-slate-800/20 border border-emerald-500/20 rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection('egenkontroll')}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-700/20 transition-colors text-left"
+                  >
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <ClipboardCheck className="w-4 h-4 text-emerald-400" />
+                      Egenkontrollen {fmtMonthYear(selectedMonth + '-01')}
+                      <span className="text-xs text-slate-400 font-normal">({monthEk.length} besök)</span>
+                    </h3>
+                    {collapsedSections.has('egenkontroll')
+                      ? <ChevronRightIcon className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                      : <ChevronDown className="w-4 h-4 text-slate-500 flex-shrink-0" />}
+                  </button>
+                  {!collapsedSections.has('egenkontroll') && <div className="p-4 pt-0 space-y-2 border-t border-emerald-500/10">
                     {monthEk.map(ek => {
                       const isExp = expandedEgenkontroll === ek.id
                       const totalReviews = ek.reviews.length
@@ -1586,10 +1559,80 @@ export default function RonderingPage() {
                         </div>
                       )
                     })}
-                  </div>
+                  </div>}
                 </div>
               )
             })()}
+            </div>
+
+            {/* ── Höger sticky kartkolumn ── */}
+            {(hotspots.length > 0 || combinedAnnotations.length > 0 || geoClusters.length > 0) && (
+              <div id="hotspot-map-section" className="w-[400px] xl:w-[460px] flex-shrink-0 sticky top-0 self-start h-screen flex flex-col p-5 gap-3 border-l border-slate-700/50">
+                <div className="flex items-center justify-between flex-wrap gap-2 flex-shrink-0">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <MapIcon className="w-4 h-4 text-orange-400" />
+                      Hotspot-karta
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">{fmtMonthYear(selectedMonth + '-01')}</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+                    {hotspots.filter(h => !h.improved).length > 0 && (
+                      <span title="Enskilda stationer där allt bete förbrukats 2 månader i rad." className="flex items-center gap-1 cursor-help">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" />
+                        {hotspots.filter(h => !h.improved).length} risk
+                      </span>
+                    )}
+                    {geoClusters.length > 0 && (
+                      <span title="Geografiska riskzoner." className="flex items-center gap-1 cursor-help">
+                        <span className="w-3 h-3 rounded-full border-2 border-red-500 inline-block opacity-60" />
+                        {geoClusters.length} zon{geoClusters.length !== 1 ? 'er' : ''}
+                      </span>
+                    )}
+                    {allAnnotations.length > 0 && (
+                      <span title="Avvikelser registrerade av tekniker." className="flex items-center gap-1 cursor-help">
+                        <span className="inline-block w-0 h-0 border-l-[4px] border-r-[4px] border-b-[7px] border-l-transparent border-r-transparent border-b-orange-500" />
+                        {allAnnotations.length} avv
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1 min-h-0 rounded-xl overflow-hidden">
+                  <OverviewMap
+                    hotspots={hotspots}
+                    geoClusters={geoClusters}
+                    annotations={combinedAnnotations}
+                    annotationAddresses={annotationAddresses}
+                    isLoaded={mapsLoaded}
+                    highlightRegionId={selectedRegion?.regionId ?? null}
+                    highlightStationId={highlightStationId}
+                    highlightClusterIdx={highlightClusterIdx}
+                    highlightAnnotationId={highlightAnnotationId}
+                    onClusterClick={_center => {}}
+                  />
+                </div>
+                <div className="flex-shrink-0 flex flex-wrap gap-x-4 gap-y-1">
+                  <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                    <span className="text-slate-400 font-medium">Riskstation</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <span className="w-2.5 h-2.5 rounded-full border border-red-500 opacity-70 flex-shrink-0" />
+                    <span className="text-slate-400 font-medium">Riskzon</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <span className="inline-block w-0 h-0 border-l-[3px] border-r-[3px] border-b-[6px] border-l-transparent border-r-transparent border-b-orange-500 flex-shrink-0" />
+                    <span className="text-slate-400 font-medium">Avvikelse</span>
+                  </span>
+                  {hotspots.filter(h => h.improved).length > 0 && (
+                    <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                      <span className="text-slate-400 font-medium">Förbättrad</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
