@@ -757,8 +757,21 @@ export default function RonderingPage() {
   const allAnnotations = monthData.flatMap(c => c.annotations)
   const activeHotspots = hotspots.filter(h => !h.improved)
 
-  // Bygg map caseId → regionName för avvikelsesektionen
-  const caseRegionMap = Object.fromEntries(monthData.map(c => [c.caseId, c.regionName]))
+  // Egenkontroll-avvikelser för vald månad — kombineras med rondering-avvikelser
+  type AnnotationWithSource = RonderingAnnotation & { source: 'rondering' | 'egenkontroll' }
+  const monthEkForMap = egenkontrollCases.filter(ek =>
+    ek.scheduledStart && toMonthKey(ek.scheduledStart) === selectedMonth
+  )
+  const ekAnnotations = monthEkForMap.flatMap(ek => ek.annotations)
+  const taggedRondering: AnnotationWithSource[] = allAnnotations.map(a => ({ ...a, source: 'rondering' as const }))
+  const taggedEgenkontroll: AnnotationWithSource[] = ekAnnotations.map(a => ({ ...a, source: 'egenkontroll' as const }))
+  const combinedAnnotations: AnnotationWithSource[] = [...taggedRondering, ...taggedEgenkontroll]
+
+  // Bygg map caseId → regionName för avvikelsesektionen (inkl. egenkontroll)
+  const caseRegionMap = {
+    ...Object.fromEntries(monthData.map(c => [c.caseId, c.regionName])),
+    ...Object.fromEntries(monthEkForMap.map(ek => [ek.id, ek.regionName])),
+  }
 
   // Hotspot-regioner för denna månad (regionId-set)
   const hotspotRegionIds = new Set(
@@ -1086,18 +1099,18 @@ export default function RonderingPage() {
             )}
 
             {/* ── Avvikelse-sektion ── */}
-            {allAnnotations.length > 0 && (
+            {combinedAnnotations.length > 0 && (
               <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-slate-700">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-orange-400" />
                     Avvikelser — {fmtMonthYear(selectedMonth + '-01')}
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">{allAnnotations.length} avvikelse{allAnnotations.length !== 1 ? 'r' : ''} registrerade under månaden</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{combinedAnnotations.length} avvikelse{combinedAnnotations.length !== 1 ? 'r' : ''} registrerade under månaden</p>
                 </div>
                 <div className="p-4">
                   {(Object.keys(ANNOTATION_CATEGORIES) as RonderingAnnotationCategory[]).map(catKey => {
-                    const catAnnotations = allAnnotations.filter(a => a.category === catKey)
+                    const catAnnotations = combinedAnnotations.filter(a => a.category === catKey)
                     if (catAnnotations.length === 0) return null
                     const cat = ANNOTATION_CATEGORIES[catKey]
                     return (
@@ -1119,6 +1132,11 @@ export default function RonderingPage() {
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="flex items-center gap-2 flex-wrap min-w-0">
                                     <span className="font-medium text-slate-200">{regionName}</span>
+                                    {(ann as AnnotationWithSource).source === 'egenkontroll' && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex-shrink-0">
+                                        Tillagd under egenkontroll
+                                      </span>
+                                    )}
                                     {ann.note && <span className="text-slate-400">— {ann.note}</span>}
                                   </div>
                                   <button
@@ -1169,7 +1187,7 @@ export default function RonderingPage() {
             )}
 
             {/* ── Hotspot-karta ── */}
-            {(hotspots.length > 0 || allAnnotations.length > 0 || geoClusters.length > 0) && (
+            {(hotspots.length > 0 || combinedAnnotations.length > 0 || geoClusters.length > 0) && (
               <div id="hotspot-map-section" className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
                 <div className="px-5 py-3 border-b border-slate-700 flex items-center justify-between flex-wrap gap-2">
                   <div>
@@ -1210,7 +1228,7 @@ export default function RonderingPage() {
                   <OverviewMap
                     hotspots={hotspots}
                     geoClusters={geoClusters}
-                    annotations={allAnnotations}
+                    annotations={combinedAnnotations}
                     isLoaded={mapsLoaded}
                     highlightRegionId={selectedRegion?.regionId ?? null}
                     highlightStationId={highlightStationId}
@@ -1468,6 +1486,13 @@ export default function RonderingPage() {
                                         })}
                                         {rev.note && (
                                           <p className="text-xs text-amber-300 italic mt-2 pl-5">"{rev.note}"</p>
+                                        )}
+                                        {rev.reviewed_at && (
+                                          <p className="text-[11px] text-slate-500 mt-1.5 pl-5 flex items-center gap-1">
+                                            <Calendar className="w-3 h-3" />
+                                            Kontrollerad {format(new Date(rev.reviewed_at), 'd MMM yyyy HH:mm', { locale: sv })}
+                                            {ek.technicianName && <span className="ml-1">· {ek.technicianName}</span>}
+                                          </p>
                                         )}
                                         {/* Bilder per station */}
                                         {stationImgs.length > 0 && (
