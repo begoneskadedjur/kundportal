@@ -949,7 +949,21 @@ export default function RonderingPage() {
       const highRisk = hotspots.filter(h => !h.improved).map(h => ({
         station_id: h.stationId, serial_number: h.serialNumber, allCount: h.consecutiveMonths, lastInspected: null,
       }))
-      generateRonderingPdf(selectedOrg.name, pdfCases, highRisk, fmtMonthYear(selectedMonth + '-01'))
+      const ekVisitsForPdf = monthEkForMap.map(ek => ({
+        regionName: ek.regionName,
+        scheduledStart: ek.scheduledStart,
+        technicianName: ek.technicianName,
+        totalStations: ek.reviews.length,
+        checkedCount: ek.reviews.reduce((s, r) => s + EgenkontrollService.countChecked(r), 0),
+        maxCount: ek.reviews.length * EGENKONTROLL_ITEMS.length,
+        stationResults: ek.reviews.map(rev => ({
+          serialNumber: ek.placementSerialMap[rev.station_id] ?? null,
+          checkedItems: EgenkontrollService.countChecked(rev),
+          note: rev.note,
+          imageCount: (ekStationImages[rev.station_id] || []).length,
+        })),
+      }))
+      generateRonderingPdf(selectedOrg.name, pdfCases, highRisk, fmtMonthYear(selectedMonth + '-01'), ekVisitsForPdf)
     } catch (e: any) {
       toast.error(e.message || 'Kunde inte generera PDF')
     } finally {

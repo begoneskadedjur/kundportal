@@ -37,6 +37,21 @@ export interface RonderingPdfCase {
   annotations: { category: string; note: string | null; technician_name: string | null; created_at: string; latitude?: number | null; longitude?: number | null; address?: string | null; source?: string }[]
 }
 
+export interface RonderingPdfEkVisit {
+  regionName: string
+  scheduledStart: string | null
+  technicianName: string | null
+  totalStations: number
+  checkedCount: number
+  maxCount: number
+  stationResults: Array<{
+    serialNumber: string | null
+    checkedItems: number
+    note: string | null
+    imageCount: number
+  }>
+}
+
 export interface RonderingPdfHighRisk {
   serial_number: string | null
   station_id: string
@@ -64,7 +79,8 @@ export function generateRonderingPdf(
   organizationName: string,
   cases: RonderingPdfCase[],
   highRiskStations: RonderingPdfHighRisk[],
-  statusFilterLabel: string
+  statusFilterLabel: string,
+  ekVisits: RonderingPdfEkVisit[] = []
 ): void {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
@@ -203,7 +219,7 @@ export function generateRonderingPdf(
 
   cases.forEach((c) => {
     const pct = c.total > 0 ? Math.round((c.inspected / c.total) * 100) : 0
-    const caseH = 10 + (c.annotations.length > 0 ? 6 + c.annotations.length * 13 : 0)
+    const caseH = 10
     checkPageBreak(caseH + 4)
 
     if (y > 18 && y < margin + 1) drawPageHeader()
@@ -211,7 +227,7 @@ export function generateRonderingPdf(
     // Ärende-header
     fillRect(margin, y, contentW, 9, C.charcoal)
     setFont(8, 'bold', C.white)
-    doc.text(`${c.customer_name || '—'} · ${c.case_number || c.title}`, margin + 3, y + 5.5)
+    doc.text(`${c.title}${c.case_number ? ' · ' + c.case_number : ''}`, margin + 3, y + 5.5)
 
     // Status-badge
     const isClosed = c.status.toLowerCase().includes('avslutat')
@@ -255,7 +271,7 @@ export function generateRonderingPdf(
         bx += 26
       }
       if (bait.none > 0) {
-        doc.setTextColor(...C.slate)
+        doc.setTextColor(...C.success)
         doc.setFont('helvetica', 'bold')
         doc.text(`Inget: ${bait.none}`, bx, y + 4)
       }
@@ -268,41 +284,116 @@ export function generateRonderingPdf(
       if (baitTotal > 0) {
         if (bait.all > 0) { fillRect(bxBar, y + 1.5, (bait.all / baitTotal) * barW, 3, C.error); bxBar += (bait.all / baitTotal) * barW }
         if (bait.partial > 0) { fillRect(bxBar, y + 1.5, (bait.partial / baitTotal) * barW, 3, C.amber); bxBar += (bait.partial / baitTotal) * barW }
-        if (bait.none > 0) { fillRect(bxBar, y + 1.5, (bait.none / baitTotal) * barW, 3, C.slate) }
+        if (bait.none > 0) { fillRect(bxBar, y + 1.5, (bait.none / baitTotal) * barW, 3, C.success) }
       }
       y += 6
     }
 
-    // Avvikelser
-    if (c.annotations.length > 0) {
-      fillRect(margin, y, contentW, 5, [255, 237, 213])
-      setFont(6.5, 'bold', C.orange)
-      doc.text(`${c.annotations.length} avvikelse${c.annotations.length !== 1 ? 'r' : ''}`, margin + 3, y + 3.5)
-      y += 5
+    y += 4
+  })
 
-      c.annotations.forEach((ann, ai) => {
-        const cat = ANNOTATION_CATEGORIES[ann.category as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
-        const rowBg = ai % 2 === 0 ? [255, 247, 237] as [number,number,number] : [255, 251, 245] as [number,number,number]
-        fillRect(margin, y, contentW, 13, rowBg)
-        // Rad 1: kategori + source-label + notering + datum
-        setFont(7, 'bold', C.orange)
-        doc.text(cat.label, margin + 3, y + 4.5)
-        if (ann.source === 'egenkontroll') {
-          setFont(6, 'normal', C.slate)
-          doc.text('(Egenkontroll)', margin + 3 + doc.getTextWidth(cat.label) + 2, y + 4.5)
+  // ── Egenkontroll ─────────────────────────────────────────────────────────────
+  if (ekVisits.length > 0) {
+    checkPageBreak(14)
+    setFont(11, 'bold', C.primary)
+    doc.text('Egenkontroll', margin, y); y += 4
+    setFont(8, 'normal', C.medGray)
+    doc.text(`${ekVisits.length} besök`, margin, y); y += 7
+
+    ekVisits.forEach(visit => {
+      checkPageBreak(14 + visit.stationResults.length * 7)
+      // Besöks-header
+      fillRect(margin, y, contentW, 8, C.charcoal)
+      setFont(8, 'bold', C.white)
+      doc.text(visit.regionName, margin + 3, y + 5)
+      if (visit.scheduledStart) {
+        setFont(7, 'normal', C.medGray)
+        doc.text(fmtDate(visit.scheduledStart), margin + 100, y + 5)
+      }
+      if (visit.technicianName) {
+        setFont(7, 'normal', C.medGray)
+        doc.text(visit.technicianName, W - margin - 3, y + 5, { align: 'right' })
+      }
+      y += 8
+      // Sammanfattningsrad
+      const pct = visit.maxCount > 0 ? Math.round(visit.checkedCount / visit.maxCount * 100) : 0
+      fillRect(margin, y, contentW, 6, C.lightGray)
+      setFont(7, 'normal', C.medGray)
+      doc.text(`${visit.totalStations} stationer kontrollerade`, margin + 3, y + 4)
+      setFont(7, 'bold', C.darkGray)
+      doc.text(`${pct}% godkänt`, W - margin - 3, y + 4, { align: 'right' })
+      y += 6
+      // Per station
+      visit.stationResults.forEach((st, si) => {
+        checkPageBreak(7)
+        const rowBg: [number,number,number] = si % 2 === 0 ? C.lightGray : C.white
+        fillRect(margin, y, contentW, 7, rowBg)
+        setFont(7, 'normal', C.darkGray)
+        doc.text(st.serialNumber ? `#${st.serialNumber}` : '—', margin + 3, y + 4.5)
+        setFont(7, 'normal', C.medGray)
+        doc.text(`${st.checkedItems}/9 godkända`, margin + 30, y + 4.5)
+        if (st.note) {
+          setFont(6.5, 'normal', C.slate)
+          const note = st.note.length > 55 ? st.note.slice(0, 55) + '…' : st.note
+          doc.text(note, margin + 75, y + 4.5)
         }
+        if (st.imageCount > 0) {
+          setFont(6, 'normal', C.accent)
+          doc.text(`${st.imageCount} bild${st.imageCount !== 1 ? 'er' : ''}`, W - margin - 3, y + 4.5, { align: 'right' })
+        }
+        y += 7
+      })
+      y += 5
+    })
+    y += 3
+  }
+
+  // ── Avvikelser ────────────────────────────────────────────────────────────────
+  const allAnnotationsForPdf = cases.flatMap(c =>
+    c.annotations.map(a => ({ ...a, regionName: c.title }))
+  )
+  if (allAnnotationsForPdf.length > 0) {
+    checkPageBreak(14)
+    setFont(11, 'bold', C.primary)
+    doc.text('Avvikelser', margin, y); y += 4
+    setFont(8, 'normal', C.medGray)
+    doc.text(`${allAnnotationsForPdf.length} avvikelse${allAnnotationsForPdf.length !== 1 ? 'r' : ''} registrerade`, margin, y); y += 7
+
+    const catKeys = [...new Set(allAnnotationsForPdf.map(a => a.category))]
+    catKeys.forEach(catKey => {
+      const catAnns = allAnnotationsForPdf.filter(a => a.category === catKey)
+      const cat = ANNOTATION_CATEGORIES[catKey as RonderingAnnotationCategory] ?? ANNOTATION_CATEGORIES['trash_bins']
+      checkPageBreak(6 + catAnns.length * 13)
+      // Kategori-header
+      fillRect(margin, y, contentW, 6, C.charcoal)
+      setFont(7, 'bold', C.white)
+      doc.text(cat.label, margin + 3, y + 4)
+      setFont(6, 'normal', C.medGray)
+      doc.text(`${catAnns.length} st`, W - margin - 3, y + 4, { align: 'right' })
+      y += 6
+      // Rader
+      catAnns.forEach((ann, ai) => {
+        checkPageBreak(13)
+        const rowBg: [number,number,number] = ai % 2 === 0 ? [255,247,237] : [255,251,245]
+        fillRect(margin, y, contentW, 13, rowBg)
+        // Rad 1: regionnamn + notering + EK-label + datum
+        setFont(6.5, 'bold', C.darkGray)
+        doc.text(ann.regionName, margin + 3, y + 4.5)
         if (ann.note) {
           setFont(7, 'normal', C.darkGray)
           const note = ann.note.length > 45 ? ann.note.slice(0, 45) + '…' : ann.note
-          doc.text(note, margin + 60, y + 4.5)
+          doc.text(note, margin + 55, y + 4.5)
+        }
+        if (ann.source === 'egenkontroll') {
+          setFont(6, 'normal', C.slate)
+          doc.text('(Egenkontroll)', W - margin - 30, y + 4.5)
         }
         setFont(6, 'normal', C.medGray)
         doc.text(fmtDateShort(ann.created_at), W - margin - 3, y + 4.5, { align: 'right' })
-        // Rad 2: adress (primärt) + koordinater (höger)
+        // Rad 2: adress + koordinater
         if (ann.address) {
           setFont(6.5, 'normal', C.darkGray)
-          const addr = ann.address.length > 65 ? ann.address.slice(0, 65) + '…' : ann.address
-          doc.text(addr, margin + 3, y + 9.5)
+          doc.text(ann.address.length > 65 ? ann.address.slice(0, 65) + '…' : ann.address, margin + 3, y + 9.5)
         }
         if (ann.latitude && ann.longitude) {
           setFont(6, 'normal', C.medGray)
@@ -310,11 +401,10 @@ export function generateRonderingPdf(
         }
         y += 13
       })
-    }
-
-    drawRect(margin, y - caseH - (baitTotal > 0 ? 6 : 0), contentW, caseH + (baitTotal > 0 ? 6 : 0), C.border, 0.15)
-    y += 4
-  })
+      y += 3
+    })
+    y += 5
+  }
 
   // ── Högriskstationer ─────────────────────────────────────────────────────────
   if (highRiskStations.length > 0) {
