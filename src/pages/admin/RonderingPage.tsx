@@ -1,8 +1,7 @@
 // src/pages/admin/RonderingPage.tsx
 // Egenkontroll-översikt — månadsvy över alla regioner för en organisation
 
-import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react'
-import html2canvas from 'html2canvas'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useGoogleMaps } from '../../hooks/useGoogleMaps'
 import { RonderingService } from '../../services/ronderingService'
@@ -176,9 +175,8 @@ interface OverviewMapProps {
   regionAnnotations: RonderingAnnotation[] | null
 }
 
-const OverviewMap = forwardRef<HTMLDivElement, OverviewMapProps>(function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses = {}, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick, regionPolygon, regionStations, regionAnnotations }: OverviewMapProps, forwardedRef) {
+function OverviewMap({ hotspots, geoClusters, annotations, annotationAddresses = {}, isLoaded, highlightRegionId, highlightStationId, highlightClusterIdx, highlightAnnotationId, onClusterClick, regionPolygon, regionStations, regionAnnotations }: OverviewMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
-  useImperativeHandle(forwardedRef, () => mapRef.current!)
   const gMapRef = useRef<google.maps.Map | null>(null)
   const markersRef = useRef<google.maps.Marker[]>([])
   const circlesRef = useRef<google.maps.Circle[]>([])
@@ -479,7 +477,7 @@ const OverviewMap = forwardRef<HTMLDivElement, OverviewMapProps>(function Overvi
 
   if (!isLoaded) return <div className="h-full min-h-[300px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta...</div>
   return <div ref={mapRef} className="h-full min-h-[300px] rounded-xl overflow-hidden" />
-})
+}
 
 // ── Huvudkomponent ────────────────────────────────────────────────────────────
 
@@ -512,7 +510,6 @@ export default function RonderingPage() {
   const [highlightAnnotationId, setHighlightAnnotationId] = useState<string | null>(null)
 
   const [exportingPdf, setExportingPdf] = useState(false)
-  const overviewMapRef = useRef<HTMLDivElement>(null)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     () => new Set(['annotations', 'hotspots', 'egenkontroll'])
   )
@@ -979,23 +976,8 @@ export default function RonderingPage() {
           imageUrls: (ekStationImages[rev.station_id] || []).map(img => img.url),
         })),
       }))
-      // Screenshot av OverviewMap via html2canvas
-      let mapDataUrl: string | undefined
-      const mapDiv = overviewMapRef.current
-      if (mapDiv) {
-        try {
-          const canvas = await html2canvas(mapDiv, {
-            useCORS: true,
-            allowTaint: true,
-            scale: 1.5,
-            logging: false,
-          })
-          mapDataUrl = canvas.toDataURL('image/png')
-        } catch { /* karta är inte kritisk */ }
-      }
-
       const pdfOrgName = selectedOrg.name.split(' — ')[0].trim()
-      generateRonderingPdf(pdfOrgName, pdfCases, highRisk, fmtMonthYear(selectedMonth + '-01'), ekVisitsForPdf, mapDataUrl)
+      generateRonderingPdf(pdfOrgName, pdfCases, highRisk, fmtMonthYear(selectedMonth + '-01'), ekVisitsForPdf)
     } catch (e: any) {
       toast.error(e.message || 'Kunde inte generera PDF')
     } finally {
@@ -1789,7 +1771,6 @@ export default function RonderingPage() {
                 </div>
                 <div className="flex-1 min-h-0 rounded-xl overflow-hidden">
                   <OverviewMap
-                    ref={overviewMapRef}
                     hotspots={hotspots}
                     geoClusters={geoClusters}
                     annotations={combinedAnnotations}

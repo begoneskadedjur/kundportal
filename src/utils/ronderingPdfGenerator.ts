@@ -80,8 +80,7 @@ export function generateRonderingPdf(
   cases: RonderingPdfCase[],
   highRiskStations: RonderingPdfHighRisk[],
   statusFilterLabel: string,
-  ekVisits: RonderingPdfEkVisit[] = [],
-  mapImageDataUrl?: string
+  ekVisits: RonderingPdfEkVisit[] = []
 ): void {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
@@ -271,14 +270,6 @@ export function generateRonderingPdf(
       y += 5
     })
     y += 3
-  }
-
-  // ── Karta ─────────────────────────────────────────────────────────────────────
-  if (mapImageDataUrl) {
-    const imgH = 82
-    checkPageBreak(imgH + 8)
-    doc.addImage(mapImageDataUrl, 'PNG', margin, y, contentW, imgH)
-    y += imgH + 8
   }
 
   // ── Ärenderapport ─────────────────────────────────────────────────────────────
