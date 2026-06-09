@@ -413,9 +413,12 @@ export default function RonderingPage() {
     id: string; caseNumber: string | null; regionId: string; regionName: string
     scheduledStart: string | null; status: string; technicianName: string | null
     reviews: EgenkontrollStationReview[]
+    annotations: RonderingAnnotation[]
+    placementSerialMap: Record<string, string | null>
   }>>([])
   const [expandedEgenkontroll, setExpandedEgenkontroll] = useState<string | null>(null)
   const [expandedEgenkontrollStation, setExpandedEgenkontrollStation] = useState<string | null>(null)
+  const [ekStationImages, setEkStationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
 
   // ── Ladda organisationer ──────────────────────────────────────────────────
 
@@ -488,8 +491,11 @@ export default function RonderingPage() {
 
         const stationCountMap: Record<string, number> = {}
         const coords: StationCoord[] = []
+        // station_id → serial_number (används för egenkontroll-visning)
+        const placementSerialMap: Record<string, string | null> = {}
         for (const p of placements || []) {
           stationCountMap[p.customer_id] = (stationCountMap[p.customer_id] || 0) + 1
+          placementSerialMap[p.id] = p.serial_number
           if (p.latitude && p.longitude) {
             coords.push({ stationId: p.id, serialNumber: p.serial_number, lat: p.latitude, lng: p.longitude, customerId: p.customer_id })
           }
@@ -600,7 +606,10 @@ export default function RonderingPage() {
         if (ekCases && ekCases.length > 0) {
           const ekEnriched = await Promise.all(
             ekCases.map(async (c) => {
-              const reviews = await EgenkontrollService.getReviews(c.id)
+              const [reviews, annotations] = await Promise.all([
+                EgenkontrollService.getReviews(c.id),
+                RonderingService.getAnnotationsForCase(c.id),
+              ])
               return {
                 id: c.id,
                 caseNumber: c.case_number,
@@ -610,6 +619,8 @@ export default function RonderingPage() {
                 status: c.status,
                 technicianName: c.primary_technician_name,
                 reviews,
+                annotations,
+                placementSerialMap,
               }
             })
           )
@@ -623,6 +634,31 @@ export default function RonderingPage() {
     }
     load()
   }, [selectedOrg])
+
+  // Ladda bilder för egenkontroll-stationer (körs när egenkontrollCases eller månad ändras)
+  useEffect(() => {
+    if (egenkontrollCases.length === 0 || !selectedMonth) return
+    const monthEk = egenkontrollCases.filter(ek =>
+      ek.scheduledStart && toMonthKey(ek.scheduledStart) === selectedMonth
+    )
+    if (monthEk.length === 0) return
+    const load = async () => {
+      const newMap: Record<string, CaseImageWithUrl[]> = {}
+      await Promise.all(
+        monthEk.map(async (ek) => {
+          if (ek.reviews.length === 0) return
+          const allImgs = await CaseImageService.getCaseImages(ek.id, 'contract')
+          for (const rev of ek.reviews) {
+            newMap[rev.station_id] = allImgs.filter(
+              img => img.description === `egenkontroll:${rev.station_id}`
+            )
+          }
+        })
+      )
+      setEkStationImages(prev => ({ ...prev, ...newMap }))
+    }
+    load()
+  }, [egenkontrollCases, selectedMonth])
 
   // Räkna om monthData när vald månad ändras
   useEffect(() => {
@@ -1326,6 +1362,9 @@ export default function RonderingPage() {
                     {monthEk.map(ek => {
                       const isExp = expandedEgenkontroll === ek.id
                       const totalReviews = ek.reviews.length
+                      const totalChecked = ek.reviews.reduce((s, r) => s + EgenkontrollService.countChecked(r), 0)
+                      const maxChecked = totalReviews * EGENKONTROLL_ITEMS.length
+                      const overallPct = maxChecked > 0 ? Math.round(totalChecked / maxChecked * 100) : 0
                       const fullyReviewed = ek.reviews.filter(r => EgenkontrollService.countChecked(r) === EGENKONTROLL_ITEMS.length).length
                       const partialReviewed = ek.reviews.filter(r => EgenkontrollService.countChecked(r) > 0 && EgenkontrollService.countChecked(r) < EGENKONTROLL_ITEMS.length).length
                       return (
@@ -1349,9 +1388,15 @@ export default function RonderingPage() {
                             <div className="ml-auto flex items-center gap-2 text-xs">
                               {totalReviews > 0 ? (
                                 <>
+                                  <span className={overallPct === 100 ? 'text-emerald-400 font-semibold' : overallPct >= 50 ? 'text-amber-400' : 'text-red-400'}>
+                                    {overallPct}%
+                                  </span>
                                   <span className="text-emerald-400">{fullyReviewed} godkända</span>
                                   {partialReviewed > 0 && <span className="text-amber-400">{partialReviewed} delvis</span>}
                                   <span className="text-slate-400">{totalReviews} stationer</span>
+                                  {ek.annotations.length > 0 && (
+                                    <span className="text-orange-400">{ek.annotations.length} avv.</span>
+                                  )}
                                 </>
                               ) : (
                                 <span className="text-slate-500">Inga stationer valda</span>
@@ -1362,7 +1407,11 @@ export default function RonderingPage() {
                             <div className="border-t border-slate-700/50 divide-y divide-slate-700/30">
                               {ek.reviews.map(rev => {
                                 const checkedCount = EgenkontrollService.countChecked(rev)
+                                const stationPct = Math.round(checkedCount / EGENKONTROLL_ITEMS.length * 100)
                                 const isStationExp = expandedEgenkontrollStation === rev.station_id
+                                const serialNumber = ek.placementSerialMap[rev.station_id]
+                                const stationLabel = serialNumber ? `#${serialNumber}` : `Station ${rev.station_id.slice(0, 8)}`
+                                const stationImgs = ekStationImages[rev.station_id] || []
                                 return (
                                   <div key={rev.station_id}>
                                     <button
@@ -1374,7 +1423,10 @@ export default function RonderingPage() {
                                         ? <ChevronDown className="w-3 h-3 text-slate-500 flex-shrink-0" />
                                         : <ChevronRightIcon className="w-3 h-3 text-slate-500 flex-shrink-0" />
                                       }
-                                      <span className="text-xs text-slate-200 font-mono">Station {rev.station_id.slice(0, 8)}</span>
+                                      <span className="text-xs text-slate-200 font-mono">{stationLabel}</span>
+                                      {stationImgs.length > 0 && (
+                                        <span className="text-xs text-slate-500">{stationImgs.length} bild{stationImgs.length !== 1 ? 'er' : ''}</span>
+                                      )}
                                       <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${
                                         checkedCount === EGENKONTROLL_ITEMS.length
                                           ? 'bg-emerald-500/20 text-emerald-300'
@@ -1382,7 +1434,7 @@ export default function RonderingPage() {
                                           ? 'bg-amber-500/20 text-amber-300'
                                           : 'bg-slate-700/50 text-slate-400'
                                       }`}>
-                                        {checkedCount}/{EGENKONTROLL_ITEMS.length}
+                                        {checkedCount}/{EGENKONTROLL_ITEMS.length} · {stationPct}%
                                       </span>
                                     </button>
                                     {isStationExp && (
@@ -1400,11 +1452,45 @@ export default function RonderingPage() {
                                         {rev.note && (
                                           <p className="text-xs text-amber-300 italic mt-2 pl-5">"{rev.note}"</p>
                                         )}
+                                        {/* Bilder per station */}
+                                        {stationImgs.length > 0 && (
+                                          <div className="flex gap-2 flex-wrap mt-2 pl-5">
+                                            {stationImgs.map((img, idx) => (
+                                              <button
+                                                key={img.id}
+                                                type="button"
+                                                onClick={() => setLightbox({
+                                                  images: stationImgs.map(i => ({ url: i.url, alt: stationLabel })),
+                                                  index: idx,
+                                                })}
+                                                className="w-14 h-14 rounded-lg overflow-hidden border border-slate-600 hover:border-[#20c58f]/50 transition-colors flex-shrink-0"
+                                              >
+                                                <img src={img.url} alt="" className="w-full h-full object-cover" />
+                                              </button>
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                     )}
                                   </div>
                                 )
                               })}
+                            </div>
+                          )}
+                          {/* Avvikelser från egenkontrollen */}
+                          {isExp && ek.annotations.length > 0 && (
+                            <div className="border-t border-slate-700/50 px-4 py-2.5">
+                              <p className="text-xs font-semibold text-orange-400 mb-1.5 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3" />
+                                {ek.annotations.length} avvikelse{ek.annotations.length !== 1 ? 'r' : ''} registrerade
+                              </p>
+                              {ek.annotations.map(ann => (
+                                <div key={ann.id} className="flex items-start gap-2 text-xs text-slate-400 mb-1">
+                                  <span className="w-2 h-2 rounded-full mt-1 flex-shrink-0" style={{ background: ANNOTATION_CATEGORIES[ann.category]?.color || '#f97316' }} />
+                                  <span className="text-slate-300">{ANNOTATION_CATEGORIES[ann.category]?.label || ann.category}</span>
+                                  {ann.note && <span className="text-slate-500 italic">— {ann.note}</span>}
+                                </div>
+                              ))}
                             </div>
                           )}
                           {isExp && ek.reviews.length === 0 && (
