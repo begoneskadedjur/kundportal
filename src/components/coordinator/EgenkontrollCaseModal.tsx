@@ -170,7 +170,7 @@ export default function EgenkontrollCaseModal({
       if (caseData.customer_id) {
         const { data: customer } = await supabase
           .from('customers')
-          .select('*, parent:customers!customers_parent_customer_id_fkey(company_name)')
+          .select('*')
           .eq('id', caseData.customer_id)
           .single()
         setCustomerData(customer)
@@ -459,9 +459,6 @@ export default function EgenkontrollCaseModal({
                   <div>
                     <label className="block text-xs font-medium text-emerald-300 mb-1">Region</label>
                     <p className="text-white font-medium">{customerData.company_name}</p>
-                    {customerData.parent?.company_name && (
-                      <p className="text-xs text-emerald-300 mt-0.5">Del av: {customerData.parent.company_name}</p>
-                    )}
                   </div>
                   <div className="space-y-1 text-sm">
                     {formData.contact_person && (
