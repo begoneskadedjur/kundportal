@@ -18,7 +18,7 @@ import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell,
+  ResponsiveContainer,
 } from 'recharts'
 import { generateRonderingPdf } from '../../utils/ronderingPdfGenerator'
 import { CaseImageService } from '../../services/caseImageService'
@@ -1009,16 +1009,20 @@ export default function RonderingPage() {
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-slate-500">
                           <span className="text-slate-400">{c.inspected}/{c.total}</span>
-                          {baitTotal > 0 && (
-                            <PieChart width={20} height={20}>
-                              <Pie data={[{ value: c.baitAll }, { value: c.baitPartial }, { value: c.baitNone }]} dataKey="value" innerRadius={5} outerRadius={10} strokeWidth={0} isAnimationActive={false}>
-                                <Cell fill="#ef4444" /><Cell fill="#f59e0b" /><Cell fill="#22c55e" />
-                              </Pie>
-                            </PieChart>
+                          <span className="flex items-center gap-1 text-red-400" title="Allt bete förbrukat">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />{c.baitAll}
+                          </span>
+                          <span className="flex items-center gap-1 text-amber-400" title="Delvis förbrukat">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />{c.baitPartial}
+                          </span>
+                          <span className="flex items-center gap-1 text-emerald-400" title="Inget förbrukat">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />{c.baitNone}
+                          </span>
+                          {c.annotations.length > 0 && (
+                            <span className="flex items-center gap-1 text-orange-400" title="Avvikelser">
+                              <AlertCircle className="w-3 h-3" />{c.annotations.length}
+                            </span>
                           )}
-                          {c.baitAll > 0 && <span className="text-red-400">{c.baitAll}×</span>}
-                          {c.baitPartial > 0 && <span className="text-amber-400">{c.baitPartial}△</span>}
-                          {c.annotations.length > 0 && <span className="text-orange-400">⚠{c.annotations.length}</span>}
                           <span className="ml-auto flex items-center gap-2 text-slate-600">
                             {c.technicianName && (
                               <span className="flex items-center gap-1">
