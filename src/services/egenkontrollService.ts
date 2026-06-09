@@ -4,15 +4,15 @@ export interface EgenkontrollStationReview {
   id: string
   case_id: string
   station_id: string
-  varningsanslag: boolean
-  markning_tydlig: boolean
-  rodenticid_loggad: boolean
-  atgard_loggad_isyroad: boolean
-  bedomning_loggad: boolean
-  sarskilda_risker: boolean
-  dokumenterat_isyroad: boolean
-  station_vilande: boolean
-  antal_avklarmarkat: boolean
+  varningsanslag: boolean | null
+  markning_tydlig: boolean | null
+  rodenticid_loggad: boolean | null
+  atgard_loggad_isyroad: boolean | null
+  bedomning_loggad: boolean | null
+  sarskilda_risker: boolean | null
+  dokumenterat_isyroad: boolean | null
+  station_vilande: boolean | null
+  antal_avklarmarkat: boolean | null
   note: string | null
   reviewed_at: string | null
   created_at: string
@@ -91,7 +91,13 @@ export class EgenkontrollService {
     if (error) throw new Error(error.message)
   }
 
+  // Räknar godkända (true) — null och false räknas inte
   static countChecked(review: EgenkontrollStationReview): number {
-    return EGENKONTROLL_ITEMS.filter(item => review[item.key]).length
+    return EGENKONTROLL_ITEMS.filter(item => review[item.key] === true).length
+  }
+
+  // Räknar ej godkända (false)
+  static countFailed(review: EgenkontrollStationReview): number {
+    return EGENKONTROLL_ITEMS.filter(item => review[item.key] === false).length
   }
 }

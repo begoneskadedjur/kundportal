@@ -9,7 +9,7 @@ import type { RonderingAnnotation, RonderingAnnotationCategory } from '../../ser
 import { ANNOTATION_CATEGORIES } from '../../services/ronderingService'
 import {
   Map as MapIcon, Building2, FileDown, ChevronLeft, ChevronRight,
-  AlertCircle, TrendingDown, CheckCircle, X, User, Calendar, ClipboardCheck,
+  AlertCircle, TrendingDown, CheckCircle, XCircle, X, User, Calendar, ClipboardCheck,
   ChevronDown, ChevronRight as ChevronRightIcon,
 } from 'lucide-react'
 import { EgenkontrollService, EGENKONTROLL_ITEMS } from '../../services/egenkontrollService'
@@ -656,6 +656,22 @@ export default function RonderingPage() {
         })
       )
       setEkStationImages(prev => ({ ...prev, ...newMap }))
+
+      // Geocoda egenkontroll-avvikelser (lägg till i samma annotationAddresses-state som rondering)
+      const allAnns = monthEk.flatMap(ek => ek.annotations)
+      if (allAnns.length > 0 && typeof google !== 'undefined' && google.maps?.Geocoder) {
+        const geocoder = new google.maps.Geocoder()
+        const addresses: Record<string, string> = {}
+        await Promise.allSettled(
+          allAnns.map(ann => new Promise<void>(resolve => {
+            geocoder.geocode({ location: { lat: ann.latitude, lng: ann.longitude } }, (results, status) => {
+              if (status === 'OK' && results?.[0]) addresses[ann.id] = results[0].formatted_address
+              resolve()
+            })
+          }))
+        )
+        setAnnotationAddresses(prev => ({ ...prev, ...addresses }))
+      }
     }
     load()
   }, [egenkontrollCases, selectedMonth])
@@ -1439,16 +1455,17 @@ export default function RonderingPage() {
                                     </button>
                                     {isStationExp && (
                                       <div className="px-5 pb-3 pt-1 space-y-1">
-                                        {EGENKONTROLL_ITEMS.map(item => (
-                                          <div key={item.key} className="flex items-start gap-2 text-xs">
-                                            {rev[item.key] ? (
-                                              <CheckCircle className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                                            ) : (
-                                              <AlertCircle className="w-3.5 h-3.5 text-slate-600 mt-0.5 flex-shrink-0" />
-                                            )}
-                                            <span className={rev[item.key] ? 'text-slate-300' : 'text-slate-500'}>{item.label}</span>
-                                          </div>
-                                        ))}
+                                        {EGENKONTROLL_ITEMS.map(item => {
+                                          const val = rev[item.key]
+                                          return (
+                                            <div key={item.key} className="flex items-start gap-2 text-xs">
+                                              {val === true  && <CheckCircle className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />}
+                                              {val === false && <XCircle className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />}
+                                              {val === null  && <AlertCircle className="w-3.5 h-3.5 text-slate-600 mt-0.5 flex-shrink-0" />}
+                                              <span className={val === true ? 'text-slate-300' : val === false ? 'text-red-300' : 'text-slate-500'}>{item.label}</span>
+                                            </div>
+                                          )
+                                        })}
                                         {rev.note && (
                                           <p className="text-xs text-amber-300 italic mt-2 pl-5">"{rev.note}"</p>
                                         )}
@@ -1485,10 +1502,18 @@ export default function RonderingPage() {
                                 {ek.annotations.length} avvikelse{ek.annotations.length !== 1 ? 'r' : ''} registrerade
                               </p>
                               {ek.annotations.map(ann => (
-                                <div key={ann.id} className="flex items-start gap-2 text-xs text-slate-400 mb-1">
-                                  <span className="w-2 h-2 rounded-full mt-1 flex-shrink-0" style={{ background: ANNOTATION_CATEGORIES[ann.category]?.color || '#f97316' }} />
-                                  <span className="text-slate-300">{ANNOTATION_CATEGORIES[ann.category]?.label || ann.category}</span>
-                                  {ann.note && <span className="text-slate-500 italic">— {ann.note}</span>}
+                                <div key={ann.id} className="mb-2 last:mb-0">
+                                  <div className="flex items-start gap-2 text-xs text-slate-400">
+                                    <span className="w-2 h-2 rounded-full mt-1 flex-shrink-0" style={{ background: ANNOTATION_CATEGORIES[ann.category]?.color || '#f97316' }} />
+                                    <div>
+                                      <span className="text-slate-300">{ANNOTATION_CATEGORIES[ann.category]?.label || ann.category}</span>
+                                      {ann.note && <span className="text-slate-500 italic"> — {ann.note}</span>}
+                                      <div className="text-[11px] text-slate-500 mt-0.5">
+                                        {annotationAddresses[ann.id] && <span>{annotationAddresses[ann.id]}</span>}
+                                        <span className="ml-2 font-mono">{ann.latitude.toFixed(5)}, {ann.longitude.toFixed(5)}</span>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
                               ))}
                             </div>

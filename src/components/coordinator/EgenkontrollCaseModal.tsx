@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   X, Building, Calendar, Save, Check, MapPin,
-  CheckSquare, Square, MessageSquare, History,
+  CheckSquare, Square, XSquare, MessageSquare, History,
   Trash2, Users, User, Phone, Mail, ChevronDown,
   Footprints, Plus, Search, Image as ImageIcon, ClipboardCheck,
   ChevronRight, AlertTriangle, Eye
@@ -314,9 +314,10 @@ export default function EgenkontrollCaseModal({
     }
   }
 
-  // Uppdatera checklistepunkt
-  const toggleCheckItem = async (stationId: string, key: keyof EgenkontrollStationReview, currentVal: boolean) => {
-    const patch = { [key]: !currentVal } as any
+  // Uppdatera checklistepunkt — cyklar null → true → false → null
+  const toggleCheckItem = async (stationId: string, key: keyof EgenkontrollStationReview, currentVal: boolean | null) => {
+    const nextVal = currentVal === null ? true : currentVal === true ? false : null
+    const patch = { [key]: nextVal } as any
     setReviews(prev => prev.map(r => r.station_id === stationId ? { ...r, ...patch } : r))
     try {
       await EgenkontrollService.upsertReview(caseData.id, stationId, patch)
@@ -752,23 +753,22 @@ export default function EgenkontrollCaseModal({
                               </p>
                               <div className="space-y-1.5">
                                 {EGENKONTROLL_ITEMS.map(item => {
-                                  const checked = review[item.key] as boolean
+                                  const checked = review[item.key] as boolean | null
                                   return (
                                     <label
                                       key={item.key}
                                       className="flex items-start gap-2 cursor-pointer group"
+                                      title={checked === true ? 'Godkänd — klicka för ej godkänd' : checked === false ? 'Ej godkänd — klicka för att återställa' : 'Ej kontrollerad — klicka för godkänd'}
                                     >
                                       <div
                                         onClick={() => toggleCheckItem(review.station_id, item.key as keyof EgenkontrollStationReview, checked)}
                                         className="mt-0.5 flex-shrink-0"
                                       >
-                                        {checked ? (
-                                          <CheckSquare className="w-4 h-4 text-[#20c58f]" />
-                                        ) : (
-                                          <Square className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />
-                                        )}
+                                        {checked === true  && <CheckSquare className="w-4 h-4 text-[#20c58f]" />}
+                                        {checked === false && <XSquare className="w-4 h-4 text-red-400" />}
+                                        {checked === null  && <Square className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />}
                                       </div>
-                                      <span className={`text-xs leading-relaxed ${checked ? 'text-slate-300' : 'text-slate-400'}`}>
+                                      <span className={`text-xs leading-relaxed ${checked === true ? 'text-slate-300' : checked === false ? 'text-red-300' : 'text-slate-400'}`}>
                                         {item.label}
                                       </span>
                                     </label>

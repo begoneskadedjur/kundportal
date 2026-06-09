@@ -1,0 +1,20 @@
+-- Gör checklistefälten nullable (null = ej kontrollerad, true = godkänd, false = ej godkänd)
+ALTER TABLE egenkontroll_station_reviews
+  ALTER COLUMN varningsanslag DROP NOT NULL,
+  ALTER COLUMN varningsanslag SET DEFAULT NULL,
+  ALTER COLUMN markning_tydlig DROP NOT NULL,
+  ALTER COLUMN markning_tydlig SET DEFAULT NULL,
+  ALTER COLUMN rodenticid_loggad DROP NOT NULL,
+  ALTER COLUMN rodenticid_loggad SET DEFAULT NULL,
+  ALTER COLUMN atgard_loggad_isyroad DROP NOT NULL,
+  ALTER COLUMN atgard_loggad_isyroad SET DEFAULT NULL,
+  ALTER COLUMN bedomning_loggad DROP NOT NULL,
+  ALTER COLUMN bedomning_loggad SET DEFAULT NULL,
+  ALTER COLUMN sarskilda_risker DROP NOT NULL,
+  ALTER COLUMN sarskilda_risker SET DEFAULT NULL,
+  ALTER COLUMN dokumenterat_isyroad DROP NOT NULL,
+  ALTER COLUMN dokumenterat_isyroad SET DEFAULT NULL,
+  ALTER COLUMN station_vilande DROP NOT NULL,
+  ALTER COLUMN station_vilande SET DEFAULT NULL,
+  ALTER COLUMN antal_avklarmarkat DROP NOT NULL,
+  ALTER COLUMN antal_avklarmarkat SET DEFAULT NULL;
