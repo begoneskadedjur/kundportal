@@ -451,18 +451,6 @@ export default function RonderingPage() {
   const [expandedEgenkontrollStation, setExpandedEgenkontrollStation] = useState<string | null>(null)
   const [ekStationImages, setEkStationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
 
-  // Auto-expandera sektioner när data laddas
-  useEffect(() => {
-    setCollapsedSections(prev => {
-      const s = new Set(prev)
-      if (combinedAnnotations.length > 0) s.delete('annotations')
-      else s.add('annotations')
-      if (hotspots.length > 0 || geoClusters.length > 0) s.delete('hotspots')
-      else s.add('hotspots')
-      return s
-    })
-  }, [combinedAnnotations.length, hotspots.length, geoClusters.length])
-
   // ── Ladda organisationer ──────────────────────────────────────────────────
 
   useEffect(() => {
@@ -809,6 +797,19 @@ export default function RonderingPage() {
   const taggedRondering: AnnotationWithSource[] = allAnnotations.map(a => ({ ...a, source: 'rondering' as const }))
   const taggedEgenkontroll: AnnotationWithSource[] = ekAnnotations.map(a => ({ ...a, source: 'egenkontroll' as const }))
   const combinedAnnotations: AnnotationWithSource[] = [...taggedRondering, ...taggedEgenkontroll]
+
+  // Auto-expandera sektioner när data laddas
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setCollapsedSections(prev => {
+      const s = new Set(prev)
+      if (combinedAnnotations.length > 0) s.delete('annotations')
+      else s.add('annotations')
+      if (hotspots.length > 0 || geoClusters.length > 0) s.delete('hotspots')
+      else s.add('hotspots')
+      return s
+    })
+  }, [combinedAnnotations.length, hotspots.length, geoClusters.length])
 
   // Bygg map caseId → regionName för avvikelsesektionen (inkl. egenkontroll)
   const caseRegionMap = {
