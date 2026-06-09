@@ -836,7 +836,7 @@ export default function RonderingPage() {
             })
           })
         )
-      ).then(() => setAnnotationAddresses(addresses))
+      ).then(() => setAnnotationAddresses(prev => ({ ...prev, ...addresses })))
     }
   }, [allEnriched, selectedMonth])
 
@@ -946,8 +946,21 @@ export default function RonderingPage() {
           ),
         ],
       }))
+      // Bygg en map station_id → senaste inspektionsdatum från logs i monthData
+      const stationLastInspected: Record<string, string | null> = {}
+      for (const region of monthData) {
+        for (const log of (region.logs as any[])) {
+          if (log.station_id && region.scheduledStart) {
+            const existing = stationLastInspected[log.station_id]
+            if (!existing || region.scheduledStart > existing) {
+              stationLastInspected[log.station_id] = region.scheduledStart
+            }
+          }
+        }
+      }
       const highRisk = hotspots.filter(h => !h.improved).map(h => ({
-        station_id: h.stationId, serial_number: h.serialNumber, allCount: h.consecutiveMonths, lastInspected: null,
+        station_id: h.stationId, serial_number: h.serialNumber, allCount: h.consecutiveMonths,
+        lastInspected: stationLastInspected[h.stationId] ?? null,
       }))
       const ekVisitsForPdf = monthEkForMap.map(ek => ({
         regionName: ek.regionName,
@@ -963,7 +976,8 @@ export default function RonderingPage() {
           imageCount: (ekStationImages[rev.station_id] || []).length,
         })),
       }))
-      generateRonderingPdf(selectedOrg.name, pdfCases, highRisk, fmtMonthYear(selectedMonth + '-01'), ekVisitsForPdf)
+      const pdfOrgName = selectedOrg.name.split(' — ')[0].trim()
+      generateRonderingPdf(pdfOrgName, pdfCases, highRisk, fmtMonthYear(selectedMonth + '-01'), ekVisitsForPdf)
     } catch (e: any) {
       toast.error(e.message || 'Kunde inte generera PDF')
     } finally {

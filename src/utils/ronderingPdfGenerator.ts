@@ -208,6 +208,59 @@ export function generateRonderingPdf(
 
   drawPageHeader()
 
+  // ── Egenkontroll (FÖRE rondering) ────────────────────────────────────────────
+  if (ekVisits.length > 0) {
+    checkPageBreak(14)
+    setFont(11, 'bold', C.primary)
+    doc.text('Egenkontroll', margin, y); y += 4
+    setFont(8, 'normal', C.medGray)
+    doc.text(`${ekVisits.length} besök`, margin, y); y += 7
+
+    ekVisits.forEach(visit => {
+      checkPageBreak(14 + visit.stationResults.length * 7)
+      fillRect(margin, y, contentW, 8, C.charcoal)
+      setFont(8, 'bold', C.white)
+      doc.text(visit.regionName, margin + 3, y + 5)
+      if (visit.scheduledStart) {
+        setFont(7, 'normal', C.medGray)
+        doc.text(fmtDate(visit.scheduledStart), margin + 100, y + 5)
+      }
+      if (visit.technicianName) {
+        setFont(7, 'normal', C.medGray)
+        doc.text(visit.technicianName, W - margin - 3, y + 5, { align: 'right' })
+      }
+      y += 8
+      const pct = visit.maxCount > 0 ? Math.round(visit.checkedCount / visit.maxCount * 100) : 0
+      fillRect(margin, y, contentW, 6, C.lightGray)
+      setFont(7, 'normal', C.medGray)
+      doc.text(`${visit.totalStations} stationer kontrollerade`, margin + 3, y + 4)
+      setFont(7, 'bold', C.darkGray)
+      doc.text(`${pct}% godkänt`, W - margin - 3, y + 4, { align: 'right' })
+      y += 6
+      visit.stationResults.forEach((st, si) => {
+        checkPageBreak(7)
+        const rowBg: [number,number,number] = si % 2 === 0 ? C.lightGray : C.white
+        fillRect(margin, y, contentW, 7, rowBg)
+        setFont(7, 'normal', C.darkGray)
+        doc.text(st.serialNumber ? `#${st.serialNumber}` : '—', margin + 3, y + 4.5)
+        setFont(7, 'normal', C.medGray)
+        doc.text(`${st.checkedItems}/9 godkända`, margin + 30, y + 4.5)
+        if (st.note) {
+          setFont(6.5, 'normal', C.slate)
+          const note = st.note.length > 55 ? st.note.slice(0, 55) + '…' : st.note
+          doc.text(note, margin + 75, y + 4.5)
+        }
+        if (st.imageCount > 0) {
+          setFont(6, 'normal', C.accent)
+          doc.text(`${st.imageCount} bild${st.imageCount !== 1 ? 'er' : ''}`, W - margin - 3, y + 4.5, { align: 'right' })
+        }
+        y += 7
+      })
+      y += 5
+    })
+    y += 3
+  }
+
   // ── Ärenderapport ─────────────────────────────────────────────────────────────
   checkPageBreak(14)
   setFont(11, 'bold', C.primary)
@@ -291,62 +344,6 @@ export function generateRonderingPdf(
 
     y += 4
   })
-
-  // ── Egenkontroll ─────────────────────────────────────────────────────────────
-  if (ekVisits.length > 0) {
-    checkPageBreak(14)
-    setFont(11, 'bold', C.primary)
-    doc.text('Egenkontroll', margin, y); y += 4
-    setFont(8, 'normal', C.medGray)
-    doc.text(`${ekVisits.length} besök`, margin, y); y += 7
-
-    ekVisits.forEach(visit => {
-      checkPageBreak(14 + visit.stationResults.length * 7)
-      // Besöks-header
-      fillRect(margin, y, contentW, 8, C.charcoal)
-      setFont(8, 'bold', C.white)
-      doc.text(visit.regionName, margin + 3, y + 5)
-      if (visit.scheduledStart) {
-        setFont(7, 'normal', C.medGray)
-        doc.text(fmtDate(visit.scheduledStart), margin + 100, y + 5)
-      }
-      if (visit.technicianName) {
-        setFont(7, 'normal', C.medGray)
-        doc.text(visit.technicianName, W - margin - 3, y + 5, { align: 'right' })
-      }
-      y += 8
-      // Sammanfattningsrad
-      const pct = visit.maxCount > 0 ? Math.round(visit.checkedCount / visit.maxCount * 100) : 0
-      fillRect(margin, y, contentW, 6, C.lightGray)
-      setFont(7, 'normal', C.medGray)
-      doc.text(`${visit.totalStations} stationer kontrollerade`, margin + 3, y + 4)
-      setFont(7, 'bold', C.darkGray)
-      doc.text(`${pct}% godkänt`, W - margin - 3, y + 4, { align: 'right' })
-      y += 6
-      // Per station
-      visit.stationResults.forEach((st, si) => {
-        checkPageBreak(7)
-        const rowBg: [number,number,number] = si % 2 === 0 ? C.lightGray : C.white
-        fillRect(margin, y, contentW, 7, rowBg)
-        setFont(7, 'normal', C.darkGray)
-        doc.text(st.serialNumber ? `#${st.serialNumber}` : '—', margin + 3, y + 4.5)
-        setFont(7, 'normal', C.medGray)
-        doc.text(`${st.checkedItems}/9 godkända`, margin + 30, y + 4.5)
-        if (st.note) {
-          setFont(6.5, 'normal', C.slate)
-          const note = st.note.length > 55 ? st.note.slice(0, 55) + '…' : st.note
-          doc.text(note, margin + 75, y + 4.5)
-        }
-        if (st.imageCount > 0) {
-          setFont(6, 'normal', C.accent)
-          doc.text(`${st.imageCount} bild${st.imageCount !== 1 ? 'er' : ''}`, W - margin - 3, y + 4.5, { align: 'right' })
-        }
-        y += 7
-      })
-      y += 5
-    })
-    y += 3
-  }
 
   // ── Avvikelser ────────────────────────────────────────────────────────────────
   const allAnnotationsForPdf = cases.flatMap(c =>
