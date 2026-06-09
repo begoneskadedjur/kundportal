@@ -859,8 +859,12 @@ export default function EgenkontrollCaseModal({
                 <RonderingMapSection
                   caseId={caseData.id}
                   customerId={caseData.customer_id}
+                  stations={allStations}
+                  stationLogs={[]}
                   annotations={annotations}
-                  onAnnotationsChange={setAnnotations}
+                  onAnnotationAdded={ann => setAnnotations(prev => [...prev, ann])}
+                  onAnnotationDeleted={id => setAnnotations(prev => prev.filter(a => a.id !== id))}
+                  onStationClick={() => {}}
                   technicianName={formData.primary_technician_name || profile?.full_name || null}
                 />
               )}
