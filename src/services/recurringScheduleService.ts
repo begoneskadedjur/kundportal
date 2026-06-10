@@ -159,13 +159,29 @@ export async function cancelRecurringSchedule(id: string): Promise<boolean> {
   const result = await updateRecurringSchedule(id, { status: 'cancelled' })
   if (!result) return false
 
-  // Also cancel all future scheduled sessions for this schedule
+  const now = new Date().toISOString()
+
+  // Fetch future scheduled sessions to get their case_ids
+  const { data: sessions } = await supabase
+    .from('station_inspection_sessions')
+    .select('id, case_id')
+    .eq('recurring_schedule_id', id)
+    .eq('status', 'scheduled')
+    .gt('scheduled_at', now)
+
+  // Mark linked cases as 'Borttaget' so they disappear from coordinator/technician schedules
+  const caseIds = (sessions || []).map(s => s.case_id).filter(Boolean) as string[]
+  if (caseIds.length > 0) {
+    await supabase.from('cases').update({ status: 'Borttaget' }).in('id', caseIds)
+  }
+
+  // Cancel the sessions themselves
   const { error } = await supabase
     .from('station_inspection_sessions')
     .update({ status: 'cancelled' })
     .eq('recurring_schedule_id', id)
     .eq('status', 'scheduled')
-    .gt('scheduled_at', new Date().toISOString())
+    .gt('scheduled_at', now)
 
   if (error) {
     console.error('Error cancelling future sessions:', error)

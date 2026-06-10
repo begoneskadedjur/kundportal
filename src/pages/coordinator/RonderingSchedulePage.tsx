@@ -317,6 +317,71 @@ function NewScheduleSelector({ onClose, onConfirm, prefilledCustomerId }: NewSch
 }
 
 // ============================================================
+// CANCEL CONFIRM MODAL
+// ============================================================
+
+interface CancelConfirmModalProps {
+  customerName: string
+  sessionCount: number
+  onClose: () => void
+  onConfirm: () => void
+  loading: boolean
+}
+
+function CancelConfirmModal({ customerName, sessionCount, onClose, onConfirm, loading }: CancelConfirmModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+          <div className="flex items-center gap-2">
+            <Trash2 className="w-5 h-5 text-red-400" />
+            <h2 className="text-base font-semibold text-white">Avboka schema</h2>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <p className="text-sm text-slate-300">
+            Du håller på att avboka schemat för <span className="font-semibold text-white">{customerName}</span>.
+          </p>
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl space-y-1">
+            <p className="text-xs text-red-400 font-medium">Detta kommer att:</p>
+            <ul className="text-xs text-red-300 space-y-0.5 list-disc list-inside">
+              <li>Ta bort schemat permanent</li>
+              {sessionCount > 0 && (
+                <li>Sätta {sessionCount} framtida bokade ärende{sessionCount !== 1 ? 'n' : ''} som borttagna</li>
+              )}
+            </ul>
+          </div>
+          <p className="text-xs text-slate-500">Åtgärden kan inte ångras. Redan genomförda ärenden påverkas inte.</p>
+        </div>
+
+        <div className="px-4 py-2.5 border-t border-slate-700/50 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={loading}
+            className="px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-40"
+          >
+            Avbryt
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            Avboka och ta bort ärenden
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
 // SCHEDULE CARD
 // ============================================================
 
@@ -324,7 +389,7 @@ interface ScheduleCardProps {
   schedule: RecurringScheduleWithRelations
   onPause: () => void
   onResume: () => void
-  onCancel: () => void
+  onCancel: (sessionCount: number) => void
   onEdit: () => void
   actionLoading: string | null
 }
@@ -489,7 +554,7 @@ function ScheduleCard({ schedule, onPause, onResume, onCancel, onEdit, actionLoa
               </button>
             )}
             <button
-              onClick={onCancel}
+              onClick={() => onCancel(sessions.length)}
               disabled={loading}
               title="Avboka schema"
               className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-700 transition-colors disabled:opacity-40"
@@ -677,7 +742,7 @@ interface OrgGroupCardProps {
   actionLoading: string | null
   onPause: (id: string) => void
   onResume: (id: string) => void
-  onCancel: (id: string, name: string) => void
+  onCancel: (id: string, name: string, sessionCount: number) => void
   onEdit: (id: string) => void
   onAddUnit: (unit: UnitRow) => void
   onScheduleAll: () => void
@@ -752,7 +817,7 @@ function OrgGroupCard({
                       schedule={s}
                       onPause={() => onPause(s.id)}
                       onResume={() => onResume(s.id)}
-                      onCancel={() => onCancel(s.id, unit.siteName)}
+                      onCancel={(sessionCount) => onCancel(s.id, unit.siteName, sessionCount)}
                       onEdit={() => onEdit(s.id)}
                       actionLoading={actionLoading}
                     />
@@ -792,6 +857,7 @@ export function RonderingSchedulePage() {
     batchUnits?: BatchScheduleUnit[]
   } | null>(null)
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<{ id: string; customerName: string; sessionCount: number } | null>(null)
 
   const loadSchedules = useCallback(async () => {
     setLoading(true)
@@ -881,11 +947,16 @@ export function RonderingSchedulePage() {
     setActionLoading(null)
   }
 
-  const handleCancel = async (id: string, customerName: string) => {
-    if (!confirm(`Avboka schemat för ${customerName}? Alla framtida tillfällen tas bort.`)) return
-    setActionLoading(id)
-    const ok = await cancelRecurringSchedule(id)
-    if (ok) { toast.success('Schema avbokat'); loadSchedules() }
+  const handleCancel = (id: string, customerName: string, sessionCount: number) => {
+    setCancelTarget({ id, customerName, sessionCount })
+  }
+
+  const handleCancelConfirm = async () => {
+    if (!cancelTarget) return
+    setActionLoading(cancelTarget.id)
+    const ok = await cancelRecurringSchedule(cancelTarget.id)
+    setCancelTarget(null)
+    if (ok) { toast.success('Schema avbokat och ärenden borttagna'); loadSchedules() }
     else toast.error('Kunde inte avboka schemat')
     setActionLoading(null)
   }
@@ -1025,7 +1096,7 @@ export function RonderingSchedulePage() {
                   schedule={s}
                   onPause={() => handlePause(s.id)}
                   onResume={() => handleResume(s.id)}
-                  onCancel={() => handleCancel(s.id, s.customer?.company_name || 'kunden')}
+                  onCancel={(sessionCount) => handleCancel(s.id, s.customer?.company_name || 'kunden', sessionCount)}
                   onEdit={() => setEditScheduleId(s.id)}
                   actionLoading={actionLoading}
                 />
@@ -1067,6 +1138,16 @@ export function RonderingSchedulePage() {
           group={orgBatchTarget}
           onClose={() => setOrgBatchTarget(null)}
           onConfirm={handleOrgBatchConfirm}
+        />
+      )}
+
+      {cancelTarget && (
+        <CancelConfirmModal
+          customerName={cancelTarget.customerName}
+          sessionCount={cancelTarget.sessionCount}
+          onClose={() => setCancelTarget(null)}
+          onConfirm={handleCancelConfirm}
+          loading={actionLoading === cancelTarget.id}
         />
       )}
 
