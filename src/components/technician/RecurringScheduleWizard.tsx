@@ -49,6 +49,7 @@ interface RecurringScheduleWizardProps {
   contractEndDate?: string | null
   serviceFrequency?: string | null
   batchUnits?: BatchScheduleUnit[]
+  serviceType?: string
 }
 
 interface BatchPreviewResult {
@@ -104,7 +105,8 @@ export function RecurringScheduleWizard({
   contractStartDate,
   contractEndDate,
   serviceFrequency,
-  batchUnits
+  batchUnits,
+  serviceType
 }: RecurringScheduleWizardProps) {
   const { profile } = useAuth()
   const [step, setStep] = useState<WizardStep>(1)
@@ -378,7 +380,8 @@ export function RecurringScheduleWizard({
             contract_end_date: contractEndDate || undefined,
             is_auto_renewing: true,
             created_by: profile?.id,
-            custom_frequency_config: resolvedCustomConfig
+            custom_frequency_config: resolvedCustomConfig,
+            service_type: serviceType
           }
 
           const res = await createScheduleWithSessions(input, includedDates)
@@ -407,7 +410,8 @@ export function RecurringScheduleWizard({
           contract_end_date: contractEndDate || undefined,
           is_auto_renewing: true,
           created_by: profile?.id,
-          custom_frequency_config: resolvedCustomConfig
+          custom_frequency_config: resolvedCustomConfig,
+          service_type: serviceType
         }
 
         const result = await createScheduleWithSessions(input, filteredDates)

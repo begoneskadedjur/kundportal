@@ -436,10 +436,12 @@ interface SessionCreationContext {
   } | null
   outdoorCount: number
   indoorCount: number
+  service_type?: string
 }
 
 async function fetchSessionCreationContext(
-  schedule: RecurringSchedule
+  schedule: RecurringSchedule,
+  service_type?: string
 ): Promise<SessionCreationContext> {
   const { data: techData } = await supabase
     .from('technicians')
@@ -477,7 +479,8 @@ async function fetchSessionCreationContext(
     technicianName: techData?.name || null,
     customerData,
     outdoorCount: outdoorResult.count || 0,
-    indoorCount: indoorResult.count || 0
+    indoorCount: indoorResult.count || 0,
+    service_type
   }
 }
 
@@ -485,7 +488,7 @@ async function createCaseAndSession(
   ctx: SessionCreationContext,
   d: GeneratedInspectionDate
 ): Promise<{ success: boolean; error?: string }> {
-  const { schedule, technicianName, customerData, outdoorCount, indoorCount } = ctx
+  const { schedule, technicianName, customerData, outdoorCount, indoorCount, service_type } = ctx
 
   const caseNumber = await CaseNumberService.generateUniqueCaseNumber()
 
@@ -497,7 +500,7 @@ async function createCaseAndSession(
       description: 'Schemalagd stationskontroll',
       status: 'Bokad',
       priority: 'normal',
-      service_type: 'inspection',
+      service_type: ctx.service_type ?? 'inspection',
       pest_type: null,
       scheduled_start: d.date.toISOString(),
       scheduled_end: d.endDate.toISOString(),
@@ -567,7 +570,7 @@ export async function createScheduleWithSessions(
     return { schedule, sessionsCreated: 0, errors: [] }
   }
 
-  const ctx = await fetchSessionCreationContext(schedule)
+  const ctx = await fetchSessionCreationContext(schedule, input.service_type)
   let sessionsCreated = 0
 
   for (const d of generatedDates) {
@@ -783,6 +786,39 @@ export async function getFutureSessionsForSchedule(
 // ============================================
 // ON-DEMAND SCHEDULE INFO
 // ============================================
+
+/**
+ * Get all recurring schedules, optionally filtered by customer or status.
+ */
+export async function getAllRecurringSchedules(
+  filters?: { customerId?: string; status?: string }
+): Promise<RecurringScheduleWithRelations[]> {
+  let query = supabase
+    .from('recurring_schedules')
+    .select(`
+      *,
+      customer:customers(id, company_name, contact_address, service_frequency, contract_start_date, contract_end_date, contract_status, effective_end_date),
+      technician:technicians(id, name, work_schedule)
+    `)
+
+  if (filters?.customerId) {
+    query = query.eq('customer_id', filters.customerId)
+  }
+  if (filters?.status) {
+    query = query.eq('status', filters.status)
+  } else {
+    query = query.neq('status', 'cancelled')
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error fetching all recurring schedules:', error)
+    return []
+  }
+
+  return (data || []) as RecurringScheduleWithRelations[]
+}
 
 /**
  * Get aggregated schedule info for a customer (on-demand).

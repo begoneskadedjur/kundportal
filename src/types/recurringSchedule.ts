@@ -197,6 +197,7 @@ export interface CreateRecurringScheduleInput {
   notes?: string
   created_by?: string
   custom_frequency_config?: CustomFrequencyConfig
+  service_type?: string
 }
 
 export interface UpdateRecurringScheduleInput {

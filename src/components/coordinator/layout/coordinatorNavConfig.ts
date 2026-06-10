@@ -5,6 +5,7 @@
 import {
   Home,
   CalendarDays,
+  CalendarRange,
   Wand2,
   Target,
   FileSignature,
@@ -35,6 +36,7 @@ export const navGroups: NavGroup[] = [
     pinned: true,
     items: [
       { label: 'Ärenden', icon: ClipboardList, path: '/koordinator/arenden' },
+      { label: 'Rondering & Schema', icon: CalendarRange, path: '/koordinator/rondering-schema' },
       { label: 'Schemaoptimerare', icon: Wand2, path: '/koordinator/booking-assistant' },
       { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets' },
     ],
@@ -120,6 +122,7 @@ export const breadcrumbMap: Record<string, string> = {
 
   // Planering (koordinator-specifik)
   '/koordinator/schema': 'Schema & Planering',
+  '/koordinator/rondering-schema': 'Rondering & Schema',
   '/koordinator/booking-assistant': 'Schemaoptimerare',
 
   // Ärenden (koordinator-specifik)

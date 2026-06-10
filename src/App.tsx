@@ -46,6 +46,7 @@ import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import CustomerAnalytics from './pages/admin/CustomerAnalytics';
 import RonderingPage from './pages/admin/RonderingPage';
+import { RonderingSchedulePage } from './pages/coordinator/RonderingSchedulePage';
 import MonthlyReport from './pages/admin/MonthlyReport';
 import ImageBank from './pages/admin/ImageBank';
 import TeamChat from './pages/admin/TeamChat';
@@ -147,6 +148,7 @@ function App() {
               <Route path="befintliga-kunder" element={<ProtectedRoute requiredRole="admin"><Customers /></ProtectedRoute>} />
               <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="admin"><CustomerDetails /></ProtectedRoute>} />
               <Route path="egenkontroll" element={<ProtectedRoute requiredRole="admin"><RonderingPage /></ProtectedRoute>} />
+              <Route path="rondering-schema" element={<ProtectedRoute requiredRole="admin"><RonderingSchedulePage /></ProtectedRoute>} />
               <Route path="kundprognos" element={<ProtectedRoute requiredRole="admin"><CustomerAnalytics /></ProtectedRoute>} />
               <Route path="manadsrapport" element={<ProtectedRoute requiredRole="admin"><MonthlyReport /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><Leads /></ProtectedRoute>} />
@@ -259,6 +261,7 @@ function App() {
 
               {/* Planering (koordinator-specifik) */}
               <Route path="schema" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorSchedule /></ProtectedRoute>} />
+              <Route path="rondering-schema" element={<ProtectedRoute requiredRole="koordinator"><RonderingSchedulePage /></ProtectedRoute>} />
               <Route path="booking-assistant" element={<ProtectedRoute requiredRole="koordinator"><ScheduleOptimizer /></ProtectedRoute>} />
 
               {/* Ärenden (koordinator-specifik) */}

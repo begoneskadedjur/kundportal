@@ -29,6 +29,7 @@ import {
   Bug,
   Calendar,
   Map,
+  CalendarRange,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -55,6 +56,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder' },
       { label: 'Egenkontroller', icon: Map, path: '/admin/egenkontroll' },
+      { label: 'Rondering & Schema', icon: CalendarRange, path: '/admin/rondering-schema' },
       { label: 'Trafikljusöversikt', icon: Activity, path: '/admin/trafikljusoversikt' },
       { label: 'Kundprognos', icon: BarChart3, path: '/admin/kundprognos' },
       { label: 'Användarkonton (Kund)', icon: KeyRound, path: '/admin/anvandarkonton-kund' },
@@ -145,6 +147,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/dashboard': 'Översikt',
   '/admin/befintliga-kunder': 'Befintliga kunder',
   '/admin/egenkontroll': 'Egenkontroller',
+  '/admin/rondering-schema': 'Rondering & Schema',
   '/admin/leads': 'Leads',
   '/admin/ekonomi': 'Ekonomisk översikt',
   '/admin/fakturering': 'Fakturering',
