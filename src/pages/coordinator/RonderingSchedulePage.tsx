@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   CalendarRange, Plus, Pause, Play, Trash2, Edit3,
   Loader2, Search, ChevronDown, ChevronUp, X,
-  Calendar, Clock, User, ExternalLink
+  Calendar, Clock, User, ExternalLink, Building2
 } from 'lucide-react'
 import { format, differenceInMonths } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -24,7 +24,7 @@ import { EditScheduleModal } from '../../components/technician/EditScheduleModal
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
 import RonderingCaseModal from '../../components/coordinator/RonderingCaseModal'
 import { FREQUENCY_CONFIG, DAY_PATTERN_CONFIG } from '../../types/recurringSchedule'
-import type { RecurringScheduleWithRelations, RecurringFrequency } from '../../types/recurringSchedule'
+import type { RecurringScheduleWithRelations, RecurringFrequency, BatchScheduleUnit } from '../../types/recurringSchedule'
 
 // ============================================================
 // TYPES
@@ -38,6 +38,37 @@ interface Customer {
   contact_address: string | null
   contract_start_date: string | null
   contract_end_date: string | null
+}
+
+interface MultisiteCustomer {
+  id: string
+  company_name: string
+  site_name: string | null
+  site_type: string | null
+  parent_customer_id: string | null
+  organization_id: string | null
+  is_multisite: boolean
+  is_regional: boolean
+  region: string | null
+  contact_address: string | null
+  contract_end_date: string | null
+}
+
+interface UnitRow {
+  customerId: string
+  siteName: string
+  region: string | null
+  contractEndDate: string | null
+  address: string | null
+  schedules: RecurringScheduleWithRelations[]
+}
+
+interface OrgGroup {
+  organizationId: string
+  parentName: string
+  parentId: string
+  isRegional: boolean
+  units: UnitRow[]
 }
 
 interface Technician {
@@ -98,6 +129,7 @@ function periodRemainingLabel(contractEndDate: string | null): string {
 interface NewScheduleSelectorProps {
   onClose: () => void
   onConfirm: (customerId: string, customerName: string, technicianId: string, serviceType: string, contractEndDate: string | null) => void
+  prefilledCustomerId?: string | null
 }
 
 const SERVICE_TYPE_OPTIONS = [
@@ -106,7 +138,7 @@ const SERVICE_TYPE_OPTIONS = [
   { value: 'egenkontroll_trafikkontoret', label: 'Egenkontroll' },
 ]
 
-function NewScheduleSelector({ onClose, onConfirm }: NewScheduleSelectorProps) {
+function NewScheduleSelector({ onClose, onConfirm, prefilledCustomerId }: NewScheduleSelectorProps) {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [technicians, setTechnicians] = useState<Technician[]>([])
   const [loadingData, setLoadingData] = useState(true)
@@ -130,12 +162,17 @@ function NewScheduleSelector({ onClose, onConfirm }: NewScheduleSelectorProps) {
           .select('id, name')
           .order('name')
       ])
-      setCustomers((custResult.data || []) as Customer[])
+      const customerList = (custResult.data || []) as Customer[]
+      setCustomers(customerList)
       setTechnicians((techResult.data || []) as Technician[])
+      if (prefilledCustomerId) {
+        const found = customerList.find(c => c.id === prefilledCustomerId)
+        if (found) setSelectedCustomer(found)
+      }
       setLoadingData(false)
     }
     loadData()
-  }, [])
+  }, [prefilledCustomerId])
 
   const filteredCustomers = customers.filter(c =>
     c.company_name.toLowerCase().includes(customerSearch.toLowerCase())
@@ -533,11 +570,210 @@ function ScheduleCard({ schedule, onPause, onResume, onCancel, onEdit, actionLoa
 }
 
 // ============================================================
+// ORG BATCH SELECTOR MODAL
+// ============================================================
+
+interface OrgBatchSelectorProps {
+  group: OrgGroup
+  onClose: () => void
+  onConfirm: (technicianId: string, serviceType: string) => void
+}
+
+function OrgBatchSelector({ group, onClose, onConfirm }: OrgBatchSelectorProps) {
+  const [technicians, setTechnicians] = useState<Technician[]>([])
+  const [loadingData, setLoadingData] = useState(true)
+  const [selectedTechnicianId, setSelectedTechnicianId] = useState('')
+  const [selectedServiceType, setSelectedServiceType] = useState('rondering_trafikkontoret')
+
+  const unitsWithoutSchedule = group.units.filter(u => u.schedules.length === 0)
+  const targetCount = unitsWithoutSchedule.length > 0 ? unitsWithoutSchedule.length : group.units.length
+
+  useEffect(() => {
+    supabase.from('technicians').select('id, name').order('name').then(({ data }) => {
+      setTechnicians((data || []) as Technician[])
+      setLoadingData(false)
+    })
+  }, [])
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+          <div className="flex items-center gap-2">
+            <Building2 className="w-5 h-5 text-[#20c58f]" />
+            <div>
+              <h2 className="text-base font-semibold text-white">Schemalägg hela organisationen</h2>
+              <p className="text-xs text-slate-400">{group.parentName} · {targetCount} {group.isRegional ? 'regioner' : 'enheter'}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          {loadingData ? (
+            <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-[#20c58f]" /></div>
+          ) : (
+            <>
+              {unitsWithoutSchedule.length > 0 && (
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                  <p className="text-xs text-blue-400">
+                    {unitsWithoutSchedule.length} av {group.units.length} {group.isRegional ? 'regioner' : 'enheter'} saknar schema — dessa schemaläggs nu.
+                  </p>
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Ärendetyp</label>
+                <select
+                  value={selectedServiceType}
+                  onChange={e => setSelectedServiceType(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                >
+                  {SERVICE_TYPE_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-400 mb-1 block">Ansvarig tekniker</label>
+                <select
+                  value={selectedTechnicianId}
+                  onChange={e => setSelectedTechnicianId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                >
+                  <option value="">Välj tekniker...</option>
+                  {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="px-4 py-2.5 border-t border-slate-700/50 flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors">
+            Avbryt
+          </button>
+          <button
+            onClick={() => onConfirm(selectedTechnicianId, selectedServiceType)}
+            disabled={!selectedTechnicianId}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#20c58f] hover:bg-[#1aaa7a] text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Fortsätt till schemaläggning
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// ORG GROUP CARD
+// ============================================================
+
+interface OrgGroupCardProps {
+  group: OrgGroup
+  actionLoading: string | null
+  onPause: (id: string) => void
+  onResume: (id: string) => void
+  onCancel: (id: string, name: string) => void
+  onEdit: (id: string) => void
+  onAddUnit: (unit: UnitRow) => void
+  onScheduleAll: () => void
+}
+
+function OrgGroupCard({
+  group, actionLoading, onPause, onResume, onCancel, onEdit, onAddUnit, onScheduleAll
+}: OrgGroupCardProps) {
+  const [expanded, setExpanded] = useState(true)
+
+  const totalSchedules = group.units.reduce((sum, u) => sum + u.schedules.length, 0)
+  const unitsWithout = group.units.filter(u => u.schedules.length === 0).length
+  const unitLabel = group.isRegional ? 'regioner' : 'enheter'
+
+  return (
+    <div className="bg-slate-800/20 border border-slate-700/60 rounded-xl overflow-hidden">
+      {/* Org header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-slate-800/40">
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+        >
+          <Building2 className="w-4 h-4 text-[#20c58f] shrink-0" />
+          <span className="text-sm font-semibold text-white truncate">{group.parentName}</span>
+          <span className="text-xs text-slate-500 shrink-0">
+            {group.units.length} {unitLabel} · {totalSchedules} schema{totalSchedules !== 1 ? 'n' : ''}
+          </span>
+          {unitsWithout > 0 && (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+              {unitsWithout} utan schema
+            </span>
+          )}
+          {expanded ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0 ml-auto" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 ml-auto" />}
+        </button>
+        {unitsWithout > 0 && (
+          <button
+            onClick={onScheduleAll}
+            className="ml-3 flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-[#20c58f] hover:bg-[#1aaa7a] rounded-lg transition-colors shrink-0"
+          >
+            <Plus className="w-3 h-3" />
+            Schemalägg alla
+          </button>
+        )}
+      </div>
+
+      {/* Units list */}
+      {expanded && (
+        <div className="divide-y divide-slate-700/30">
+          {group.units.map(unit => (
+            <div key={unit.customerId} className="px-4 py-3">
+              {unit.schedules.length === 0 ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">{unit.siteName}</p>
+                    {unit.region && <p className="text-xs text-slate-500">{unit.region}</p>}
+                    <p className="text-xs text-slate-600 mt-0.5">Inget schema</p>
+                  </div>
+                  <button
+                    onClick={() => onAddUnit(unit)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#20c58f] border border-[#20c58f]/40 hover:bg-[#20c58f]/10 rounded-lg transition-colors shrink-0"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Lägg till
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-white">{unit.siteName}</p>
+                  {unit.schedules.map(s => (
+                    <ScheduleCard
+                      key={s.id}
+                      schedule={s}
+                      onPause={() => onPause(s.id)}
+                      onResume={() => onResume(s.id)}
+                      onCancel={() => onCancel(s.id, unit.siteName)}
+                      onEdit={() => onEdit(s.id)}
+                      actionLoading={actionLoading}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
 // MAIN PAGE
 // ============================================================
 
 export function RonderingSchedulePage() {
   const [schedules, setSchedules] = useState<RecurringScheduleWithRelations[]>([])
+  const [orgGroups, setOrgGroups] = useState<OrgGroup[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
@@ -545,19 +781,72 @@ export function RonderingSchedulePage() {
   const [serviceTypeFilter, setServiceTypeFilter] = useState<ServiceTypeFilter>('all')
 
   const [showSelector, setShowSelector] = useState(false)
+  const [selectorPrefilledCustomerId, setSelectorPrefilledCustomerId] = useState<string | null>(null)
+  const [orgBatchTarget, setOrgBatchTarget] = useState<OrgGroup | null>(null)
   const [wizardConfig, setWizardConfig] = useState<{
     customerId: string
     customerName: string
     technicianId: string
     serviceType: string
     contractEndDate: string | null
+    batchUnits?: BatchScheduleUnit[]
   } | null>(null)
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
 
   const loadSchedules = useCallback(async () => {
     setLoading(true)
-    const data = await getAllRecurringSchedules()
-    setSchedules(data)
+    const [schedulesData, multisiteResult] = await Promise.all([
+      getAllRecurringSchedules(),
+      supabase
+        .from('customers')
+        .select('id, company_name, site_name, site_type, parent_customer_id, organization_id, is_multisite, is_regional, region, contact_address, contract_end_date')
+        .eq('is_multisite', true)
+    ])
+    setSchedules(schedulesData)
+
+    const multisiteCustomers = (multisiteResult.data || []) as MultisiteCustomer[]
+
+    // Build org groups: find all parents (site_type = 'huvudkontor' or no parent_customer_id but is_multisite)
+    const parentsMap = new Map<string, MultisiteCustomer>()
+    const unitsMap = new Map<string, MultisiteCustomer[]>()
+
+    for (const c of multisiteCustomers) {
+      if (c.site_type === 'huvudkontor' || !c.parent_customer_id) {
+        parentsMap.set(c.id, c)
+      }
+    }
+    for (const c of multisiteCustomers) {
+      if (c.parent_customer_id && parentsMap.has(c.parent_customer_id)) {
+        const arr = unitsMap.get(c.parent_customer_id) || []
+        arr.push(c)
+        unitsMap.set(c.parent_customer_id, arr)
+      }
+    }
+
+    const groups: OrgGroup[] = []
+    for (const [parentId, parent] of parentsMap.entries()) {
+      const units = unitsMap.get(parentId) || []
+      if (units.length === 0) continue
+
+      const unitRows: UnitRow[] = units.map(u => ({
+        customerId: u.id,
+        siteName: u.site_name || u.company_name,
+        region: u.region,
+        contractEndDate: u.contract_end_date,
+        address: u.contact_address,
+        schedules: schedulesData.filter(s => s.customer_id === u.id),
+      }))
+
+      groups.push({
+        organizationId: parent.organization_id || parentId,
+        parentName: parent.company_name,
+        parentId,
+        isRegional: units.some(u => u.is_regional),
+        units: unitRows,
+      })
+    }
+
+    setOrgGroups(groups)
     setLoading(false)
   }, [])
 
@@ -565,7 +854,11 @@ export function RonderingSchedulePage() {
     loadSchedules()
   }, [loadSchedules])
 
+  // IDs of customers that belong to an org group (to exclude from standalone list)
+  const multisiteCustomerIds = new Set(orgGroups.flatMap(g => g.units.map(u => u.customerId)))
+
   const filteredSchedules = schedules.filter(s => {
+    if (multisiteCustomerIds.has(s.customer_id)) return false
     const name = s.customer?.company_name?.toLowerCase() || ''
     const matchSearch = !searchQuery || name.includes(searchQuery.toLowerCase())
     const matchType = serviceTypeFilter === 'all'
@@ -602,10 +895,39 @@ export function RonderingSchedulePage() {
     customerName: string,
     technicianId: string,
     serviceType: string,
-    contractEndDate: string | null
+    contractEndDate: string | null,
+    batchUnits?: BatchScheduleUnit[]
   ) => {
     setShowSelector(false)
-    setWizardConfig({ customerId, customerName, technicianId, serviceType, contractEndDate })
+    setSelectorPrefilledCustomerId(null)
+    setWizardConfig({ customerId, customerName, technicianId, serviceType, contractEndDate, batchUnits })
+  }
+
+  const handleOpenSelectorForUnit = (unit: UnitRow) => {
+    setSelectorPrefilledCustomerId(unit.customerId)
+    setShowSelector(true)
+  }
+
+  const handleOrgBatchConfirm = (technicianId: string, serviceType: string) => {
+    if (!orgBatchTarget) return
+    const group = orgBatchTarget
+    setOrgBatchTarget(null)
+    const unitsWithoutSchedule = group.units.filter(u => u.schedules.length === 0)
+    const targetUnits = unitsWithoutSchedule.length > 0 ? unitsWithoutSchedule : group.units
+    const batchUnits: BatchScheduleUnit[] = targetUnits.map(u => ({
+      customerId: u.customerId,
+      customerName: u.siteName,
+      address: u.address,
+      durationMinutes: 60,
+    }))
+    setWizardConfig({
+      customerId: targetUnits[0].customerId,
+      customerName: targetUnits[0].siteName,
+      technicianId,
+      serviceType,
+      contractEndDate: targetUnits[0].contractEndDate,
+      batchUnits,
+    })
   }
 
   return (
@@ -664,49 +986,87 @@ export function RonderingSchedulePage() {
         </div>
       </div>
 
-      {/* Schedule list */}
+      {/* Content */}
       {loading ? (
         <div className="flex justify-center py-16">
           <Loader2 className="w-6 h-6 animate-spin text-[#20c58f]" />
         </div>
-      ) : filteredSchedules.length === 0 ? (
-        <div className="flex flex-col items-center py-16 text-center">
-          <CalendarRange className="w-10 h-10 text-slate-600 mb-3" />
-          <p className="text-sm font-medium text-slate-400">
-            {searchQuery || serviceTypeFilter !== 'all'
-              ? 'Inga scheman matchar sökningen'
-              : 'Inga aktiva scheman ännu'}
-          </p>
-          {!searchQuery && serviceTypeFilter === 'all' && (
-            <button
-              onClick={() => setShowSelector(true)}
-              className="mt-3 text-xs text-[#20c58f] hover:underline"
-            >
-              Skapa det första schemat
-            </button>
-          )}
-        </div>
       ) : (
-        <div className="space-y-2">
-          <p className="text-xs text-slate-500">{filteredSchedules.length} schema{filteredSchedules.length !== 1 ? 'n' : ''}</p>
-          {filteredSchedules.map(s => (
-            <ScheduleCard
-              key={s.id}
-              schedule={s}
-              onPause={() => handlePause(s.id)}
-              onResume={() => handleResume(s.id)}
-              onCancel={() => handleCancel(s.id, s.customer?.company_name || 'kunden')}
-              onEdit={() => setEditScheduleId(s.id)}
-              actionLoading={actionLoading}
-            />
-          ))}
+        <div className="space-y-4">
+          {/* Org groups */}
+          {orgGroups.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Organisationer</p>
+              {orgGroups.map(group => (
+                <OrgGroupCard
+                  key={group.organizationId}
+                  group={group}
+                  actionLoading={actionLoading}
+                  onPause={handlePause}
+                  onResume={handleResume}
+                  onCancel={handleCancel}
+                  onEdit={id => setEditScheduleId(id)}
+                  onAddUnit={handleOpenSelectorForUnit}
+                  onScheduleAll={() => setOrgBatchTarget(group)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Standalone schedules */}
+          {filteredSchedules.length > 0 && (
+            <div className="space-y-2">
+              {orgGroups.length > 0 && (
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Övriga kunder</p>
+              )}
+              {filteredSchedules.map(s => (
+                <ScheduleCard
+                  key={s.id}
+                  schedule={s}
+                  onPause={() => handlePause(s.id)}
+                  onResume={() => handleResume(s.id)}
+                  onCancel={() => handleCancel(s.id, s.customer?.company_name || 'kunden')}
+                  onEdit={() => setEditScheduleId(s.id)}
+                  actionLoading={actionLoading}
+                />
+              ))}
+            </div>
+          )}
+
+          {orgGroups.length === 0 && filteredSchedules.length === 0 && (
+            <div className="flex flex-col items-center py-16 text-center">
+              <CalendarRange className="w-10 h-10 text-slate-600 mb-3" />
+              <p className="text-sm font-medium text-slate-400">
+                {searchQuery || serviceTypeFilter !== 'all'
+                  ? 'Inga scheman matchar sökningen'
+                  : 'Inga aktiva scheman ännu'}
+              </p>
+              {!searchQuery && serviceTypeFilter === 'all' && (
+                <button
+                  onClick={() => setShowSelector(true)}
+                  className="mt-3 text-xs text-[#20c58f] hover:underline"
+                >
+                  Skapa det första schemat
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
       {showSelector && (
         <NewScheduleSelector
-          onClose={() => setShowSelector(false)}
+          onClose={() => { setShowSelector(false); setSelectorPrefilledCustomerId(null) }}
           onConfirm={handleSelectorConfirm}
+          prefilledCustomerId={selectorPrefilledCustomerId}
+        />
+      )}
+
+      {orgBatchTarget && (
+        <OrgBatchSelector
+          group={orgBatchTarget}
+          onClose={() => setOrgBatchTarget(null)}
+          onConfirm={handleOrgBatchConfirm}
         />
       )}
 
@@ -720,6 +1080,7 @@ export function RonderingSchedulePage() {
           technicianId={wizardConfig.technicianId}
           contractEndDate={wizardConfig.contractEndDate}
           serviceType={wizardConfig.serviceType}
+          batchUnits={wizardConfig.batchUnits && wizardConfig.batchUnits.length > 1 ? wizardConfig.batchUnits : undefined}
         />
       )}
 
