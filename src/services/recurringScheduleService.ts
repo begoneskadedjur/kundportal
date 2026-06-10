@@ -767,10 +767,10 @@ export async function getNextScheduledSession(
  */
 export async function getFutureSessionsForSchedule(
   scheduleId: string
-): Promise<{ id: string; scheduled_at: string; scheduled_end: string | null; status: string; notes: string | null }[]> {
+): Promise<{ id: string; scheduled_at: string; scheduled_end: string | null; status: string; notes: string | null; case_id: string | null }[]> {
   const { data, error } = await supabase
     .from('station_inspection_sessions')
-    .select('id, scheduled_at, scheduled_end, status, notes')
+    .select('id, scheduled_at, scheduled_end, status, notes, case_id')
     .eq('recurring_schedule_id', scheduleId)
     .gt('scheduled_at', new Date().toISOString())
     .order('scheduled_at', { ascending: true })

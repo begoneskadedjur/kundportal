@@ -5,10 +5,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import {
   CalendarRange, Plus, Pause, Play, Trash2, Edit3,
-  Loader2, Search, ChevronDown, ChevronUp, X, AlertTriangle,
-  Calendar, Clock, User, Building2, Filter
+  Loader2, Search, ChevronDown, ChevronUp, X,
+  Calendar, Clock, User, ExternalLink
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, differenceInMonths } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
@@ -21,8 +21,10 @@ import {
 } from '../../services/recurringScheduleService'
 import { RecurringScheduleWizard } from '../../components/technician/RecurringScheduleWizard'
 import { EditScheduleModal } from '../../components/technician/EditScheduleModal'
+import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
+import RonderingCaseModal from '../../components/coordinator/RonderingCaseModal'
 import { FREQUENCY_CONFIG, DAY_PATTERN_CONFIG } from '../../types/recurringSchedule'
-import type { RecurringScheduleWithRelations } from '../../types/recurringSchedule'
+import type { RecurringScheduleWithRelations, RecurringFrequency } from '../../types/recurringSchedule'
 
 // ============================================================
 // TYPES
@@ -41,6 +43,52 @@ interface Customer {
 interface Technician {
   id: string
   name: string
+}
+
+interface FutureSession {
+  id: string
+  scheduled_at: string
+  scheduled_end: string | null
+  status: string
+  case_id: string | null
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function serviceTypeLabel(type: string | null | undefined): string {
+  switch (type) {
+    case 'rondering_trafikkontoret': return 'Rondering Trafikkontoret'
+    case 'egenkontroll_trafikkontoret': return 'Egenkontroll'
+    case 'inspection': return 'Stationskontroll'
+    default: return 'Stationskontroll'
+  }
+}
+
+function serviceTypeBadge(type: string | null | undefined): string {
+  switch (type) {
+    case 'rondering_trafikkontoret': return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+    case 'egenkontroll_trafikkontoret': return 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+    default: return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+  }
+}
+
+function visitsPerPeriodLabel(frequency: RecurringFrequency): string {
+  return FREQUENCY_CONFIG[frequency]?.description || frequency
+}
+
+function periodRemainingLabel(contractEndDate: string | null): string {
+  if (!contractEndDate) return 'Avtalsslut ej satt'
+  const end = new Date(contractEndDate)
+  const now = new Date()
+  if (end <= now) return 'Avtal utgånget'
+  const months = differenceInMonths(end, now)
+  if (months < 1) return 'Slutar snart'
+  if (months < 12) return `${months} mån kvar`
+  const years = Math.floor(months / 12)
+  const rem = months % 12
+  return rem > 0 ? `${years} år ${rem} mån kvar` : `${years} år kvar`
 }
 
 // ============================================================
@@ -99,7 +147,6 @@ function NewScheduleSelector({ onClose, onConfirm }: NewScheduleSelectorProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg">
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
           <div className="flex items-center gap-2">
             <CalendarRange className="w-5 h-5 text-[#20c58f]" />
@@ -117,7 +164,6 @@ function NewScheduleSelector({ onClose, onConfirm }: NewScheduleSelectorProps) {
             </div>
           ) : (
             <>
-              {/* Kund */}
               <div>
                 <label className="text-xs font-medium text-slate-400 mb-1 block">Kund</label>
                 <div className="relative">
@@ -174,7 +220,6 @@ function NewScheduleSelector({ onClose, onConfirm }: NewScheduleSelectorProps) {
                 </div>
               </div>
 
-              {/* Ärendetyp */}
               <div>
                 <label className="text-xs font-medium text-slate-400 mb-1 block">Ärendetyp</label>
                 <select
@@ -188,7 +233,6 @@ function NewScheduleSelector({ onClose, onConfirm }: NewScheduleSelectorProps) {
                 </select>
               </div>
 
-              {/* Tekniker */}
               <div>
                 <label className="text-xs font-medium text-slate-400 mb-1 block">Ansvarig tekniker</label>
                 <select
@@ -206,7 +250,6 @@ function NewScheduleSelector({ onClose, onConfirm }: NewScheduleSelectorProps) {
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-4 py-2.5 border-t border-slate-700/50 flex justify-end gap-2">
           <button
             onClick={onClose}
@@ -237,36 +280,8 @@ function NewScheduleSelector({ onClose, onConfirm }: NewScheduleSelectorProps) {
 }
 
 // ============================================================
-// SERVICE TYPE LABEL
-// ============================================================
-
-function serviceTypeLabel(type: string | null | undefined): string {
-  switch (type) {
-    case 'rondering_trafikkontoret': return 'Rondering Trafikkontoret'
-    case 'egenkontroll_trafikkontoret': return 'Egenkontroll'
-    case 'inspection': return 'Stationskontroll'
-    default: return 'Stationskontroll'
-  }
-}
-
-function serviceTypeBadge(type: string | null | undefined): string {
-  switch (type) {
-    case 'rondering_trafikkontoret': return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-    case 'egenkontroll_trafikkontoret': return 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-    default: return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-  }
-}
-
-// ============================================================
 // SCHEDULE CARD
 // ============================================================
-
-interface FutureSession {
-  id: string
-  scheduled_at: string
-  scheduled_end: string | null
-  status: string
-}
 
 interface ScheduleCardProps {
   schedule: RecurringScheduleWithRelations
@@ -281,31 +296,72 @@ function ScheduleCard({ schedule, onPause, onResume, onCancel, onEdit, actionLoa
   const [expanded, setExpanded] = useState(false)
   const [sessions, setSessions] = useState<FutureSession[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false)
+  const [sessionsLoaded, setSessionsLoaded] = useState(false)
 
-  const loadSessions = async () => {
-    if (sessions.length > 0) return
+  // Modal state for opening individual cases
+  const [openCaseData, setOpenCaseData] = useState<{ data: any; type: 'rondering' | 'contract' } | null>(null)
+  const [loadingCaseId, setLoadingCaseId] = useState<string | null>(null)
+
+  const loadSessions = useCallback(async () => {
+    if (sessionsLoaded) return
     setLoadingSessions(true)
     const data = await getFutureSessionsForSchedule(schedule.id)
     setSessions(data as FutureSession[])
     setLoadingSessions(false)
-  }
+    setSessionsLoaded(true)
+  }, [schedule.id, sessionsLoaded])
+
+  // Load session count lazily on mount (for the summary chip)
+  useEffect(() => {
+    loadSessions()
+  }, [loadSessions])
 
   const handleToggle = () => {
-    if (!expanded) loadSessions()
     setExpanded(v => !v)
+  }
+
+  const handleOpenCase = async (session: FutureSession) => {
+    if (!session.case_id) {
+      toast.error('Ärende saknas för detta tillfälle')
+      return
+    }
+    setLoadingCaseId(session.id)
+    const { data, error } = await supabase
+      .from('cases')
+      .select('*')
+      .eq('id', session.case_id)
+      .single()
+    setLoadingCaseId(null)
+    if (error || !data) {
+      toast.error('Kunde inte ladda ärendet')
+      return
+    }
+    const type = data.service_type === 'rondering_trafikkontoret' ? 'rondering' : 'contract'
+    setOpenCaseData({ data, type })
   }
 
   const freqLabel = FREQUENCY_CONFIG[schedule.frequency]?.label || schedule.frequency
   const dayLabel = DAY_PATTERN_CONFIG[schedule.day_pattern]?.label || schedule.day_pattern
+  const visitsLabel = visitsPerPeriodLabel(schedule.frequency)
+  const remainingLabel = periodRemainingLabel(schedule.contract_end_date)
   const isActive = schedule.status === 'active'
   const isPaused = schedule.status === 'paused'
   const loading = actionLoading === schedule.id
+
+  // Period display: start → end
+  const startStr = schedule.schedule_start_date
+    ? format(new Date(schedule.schedule_start_date), 'MMM yyyy', { locale: sv })
+    : null
+  const endStr = schedule.contract_end_date
+    ? format(new Date(schedule.contract_end_date), 'MMM yyyy', { locale: sv })
+    : null
 
   return (
     <div className="bg-slate-800/40 border border-slate-700 rounded-xl overflow-hidden">
       <div className="p-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
+            {/* Name + badges */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-semibold text-white truncate">
                 {schedule.customer?.company_name || '—'}
@@ -319,23 +375,53 @@ function ScheduleCard({ schedule, onPause, onResume, onCancel, onEdit, actionLoa
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
-              <span className="flex items-center gap-1 text-xs text-slate-400">
-                <Calendar className="w-3 h-3" />
+
+            {/* Row 1: frekvens, tid, tekniker */}
+            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+              <span className="flex items-center gap-1 text-xs text-slate-300 font-medium">
+                <Calendar className="w-3 h-3 text-slate-400" />
                 {freqLabel}
               </span>
+              <span className="text-xs text-slate-500">·</span>
+              <span className="text-xs text-slate-400">{visitsLabel}</span>
+              <span className="text-xs text-slate-500">·</span>
               <span className="flex items-center gap-1 text-xs text-slate-400">
                 <Clock className="w-3 h-3" />
-                {schedule.preferred_time}
+                {schedule.preferred_time} ({schedule.estimated_duration_minutes} min)
               </span>
+              <span className="text-xs text-slate-500">·</span>
               <span className="flex items-center gap-1 text-xs text-slate-400">
                 <User className="w-3 h-3" />
                 {schedule.technician?.name || '—'}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">{dayLabel}</p>
+
+            {/* Row 2: period + sessions count */}
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+              <span className="text-xs text-slate-500">{dayLabel}</span>
+              {(startStr || endStr) && (
+                <>
+                  <span className="text-xs text-slate-600">·</span>
+                  <span className="text-xs text-slate-500">
+                    {startStr && endStr ? `${startStr} – ${endStr}` : startStr || endStr}
+                    {' '}
+                    <span className="text-slate-600">({remainingLabel})</span>
+                  </span>
+                </>
+              )}
+              {sessionsLoaded && sessions.length > 0 && (
+                <>
+                  <span className="text-xs text-slate-600">·</span>
+                  <span className="text-xs text-[#20c58f] font-medium">{sessions.length} tillfällen kvar</span>
+                </>
+              )}
+              {loadingSessions && !sessionsLoaded && (
+                <Loader2 className="w-3 h-3 animate-spin text-slate-500" />
+              )}
+            </div>
           </div>
 
+          {/* Action buttons */}
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={onEdit}
@@ -383,6 +469,7 @@ function ScheduleCard({ schedule, onPause, onResume, onCancel, onEdit, actionLoa
         </div>
       </div>
 
+      {/* Expanded: session list */}
       {expanded && (
         <div className="border-t border-slate-700/50 px-3 py-2">
           {loadingSessions ? (
@@ -394,27 +481,52 @@ function ScheduleCard({ schedule, onPause, onResume, onCancel, onEdit, actionLoa
           ) : (
             <div>
               <p className="text-xs font-medium text-slate-400 mb-1.5">Kommande tillfällen ({sessions.length} st)</p>
-              <div className="space-y-1 max-h-40 overflow-y-auto">
-                {sessions.slice(0, 12).map(s => (
-                  <div key={s.id} className="flex items-center justify-between text-xs py-1 px-2 bg-slate-800/50 rounded-lg">
-                    <span className="text-slate-300">
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {sessions.map(s => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleOpenCase(s)}
+                    disabled={!s.case_id || loadingCaseId === s.id}
+                    className="w-full flex items-center justify-between text-xs py-1.5 px-2 bg-slate-800/50 rounded-lg hover:bg-slate-700/60 transition-colors group disabled:opacity-50 disabled:cursor-default"
+                  >
+                    <span className="text-slate-300 group-hover:text-white transition-colors">
                       {format(new Date(s.scheduled_at), 'd MMM yyyy', { locale: sv })}
                     </span>
-                    <span className="text-slate-400">
-                      {format(new Date(s.scheduled_at), 'HH:mm')}
-                      {s.scheduled_end ? ` – ${format(new Date(s.scheduled_end), 'HH:mm')}` : ''}
-                    </span>
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">
+                        {format(new Date(s.scheduled_at), 'HH:mm')}
+                        {s.scheduled_end ? ` – ${format(new Date(s.scheduled_end), 'HH:mm')}` : ''}
+                      </span>
+                      {loadingCaseId === s.id ? (
+                        <Loader2 className="w-3 h-3 animate-spin text-slate-400" />
+                      ) : s.case_id ? (
+                        <ExternalLink className="w-3 h-3 text-slate-600 group-hover:text-[#20c58f] transition-colors" />
+                      ) : null}
+                    </div>
+                  </button>
                 ))}
-                {sessions.length > 12 && (
-                  <p className="text-xs text-slate-500 text-center py-1">
-                    + {sessions.length - 12} fler tillfällen
-                  </p>
-                )}
               </div>
             </div>
           )}
         </div>
+      )}
+
+      {/* Case modals */}
+      {openCaseData?.type === 'contract' && (
+        <EditContractCaseModal
+          isOpen={true}
+          onClose={() => setOpenCaseData(null)}
+          onSuccess={() => setOpenCaseData(null)}
+          caseData={openCaseData.data}
+        />
+      )}
+      {openCaseData?.type === 'rondering' && (
+        <RonderingCaseModal
+          isOpen={true}
+          onClose={() => setOpenCaseData(null)}
+          onSuccess={() => setOpenCaseData(null)}
+          caseData={openCaseData.data}
+        />
       )}
     </div>
   )
@@ -429,11 +541,9 @@ export function RonderingSchedulePage() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  // Filters
   const [searchQuery, setSearchQuery] = useState('')
   const [serviceTypeFilter, setServiceTypeFilter] = useState<ServiceTypeFilter>('all')
 
-  // Modals
   const [showSelector, setShowSelector] = useState(false)
   const [wizardConfig, setWizardConfig] = useState<{
     customerId: string
@@ -465,24 +575,16 @@ export function RonderingSchedulePage() {
   const handlePause = async (id: string) => {
     setActionLoading(id)
     const ok = await pauseRecurringSchedule(id)
-    if (ok) {
-      toast.success('Schema pausat')
-      loadSchedules()
-    } else {
-      toast.error('Kunde inte pausa schemat')
-    }
+    if (ok) { toast.success('Schema pausat'); loadSchedules() }
+    else toast.error('Kunde inte pausa schemat')
     setActionLoading(null)
   }
 
   const handleResume = async (id: string) => {
     setActionLoading(id)
     const ok = await resumeRecurringSchedule(id)
-    if (ok) {
-      toast.success('Schema återupptat')
-      loadSchedules()
-    } else {
-      toast.error('Kunde inte återuppta schemat')
-    }
+    if (ok) { toast.success('Schema återupptat'); loadSchedules() }
+    else toast.error('Kunde inte återuppta schemat')
     setActionLoading(null)
   }
 
@@ -490,12 +592,8 @@ export function RonderingSchedulePage() {
     if (!confirm(`Avboka schemat för ${customerName}? Alla framtida tillfällen tas bort.`)) return
     setActionLoading(id)
     const ok = await cancelRecurringSchedule(id)
-    if (ok) {
-      toast.success('Schema avbokat')
-      loadSchedules()
-    } else {
-      toast.error('Kunde inte avboka schemat')
-    }
+    if (ok) { toast.success('Schema avbokat'); loadSchedules() }
+    else toast.error('Kunde inte avboka schemat')
     setActionLoading(null)
   }
 
@@ -605,7 +703,6 @@ export function RonderingSchedulePage() {
         </div>
       )}
 
-      {/* New schedule selector */}
       {showSelector && (
         <NewScheduleSelector
           onClose={() => setShowSelector(false)}
@@ -613,15 +710,11 @@ export function RonderingSchedulePage() {
         />
       )}
 
-      {/* Recurring schedule wizard */}
       {wizardConfig && (
         <RecurringScheduleWizard
           isOpen={true}
           onClose={() => setWizardConfig(null)}
-          onComplete={() => {
-            setWizardConfig(null)
-            loadSchedules()
-          }}
+          onComplete={() => { setWizardConfig(null); loadSchedules() }}
           customerId={wizardConfig.customerId}
           customerName={wizardConfig.customerName}
           technicianId={wizardConfig.technicianId}
@@ -630,15 +723,11 @@ export function RonderingSchedulePage() {
         />
       )}
 
-      {/* Edit schedule modal */}
       {editScheduleId && (
         <EditScheduleModal
           isOpen={true}
           onClose={() => setEditScheduleId(null)}
-          onUpdated={() => {
-            setEditScheduleId(null)
-            loadSchedules()
-          }}
+          onUpdated={() => { setEditScheduleId(null); loadSchedules() }}
           scheduleId={editScheduleId}
         />
       )}
