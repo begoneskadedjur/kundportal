@@ -1075,7 +1075,7 @@ export default function RonderingCaseModal({
                 stations={stations}
                 stationLogs={stationLogs}
                 annotations={annotations}
-                caseId={caseData.id}
+                caseId={logCaseId ?? caseData.id}
                 customerId={caseData.customer_id}
                 technicianName={formData.primary_technician_name || profile?.full_name || null}
                 onAnnotationAdded={ann => setAnnotations(prev => [...prev, ann])}
