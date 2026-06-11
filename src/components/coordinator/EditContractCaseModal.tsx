@@ -1045,8 +1045,8 @@ export default function EditContractCaseModal({
         primary_technician_name: formData.primary_technician_name || null,
         secondary_technician_name: formData.secondary_technician_name || null,
         tertiary_technician_name: formData.tertiary_technician_name || null,
-        scheduled_start: formData.scheduled_start ? toSwedishISOString(formData.scheduled_start) : null,
-        scheduled_end: formData.scheduled_end ? toSwedishISOString(formData.scheduled_end) : null,
+        scheduled_start: formData.scheduled_start ? formData.scheduled_start.toISOString() : null,
+        scheduled_end: formData.scheduled_end ? formData.scheduled_end.toISOString() : null,
         // 🚦 Traffic Light System
         pest_level: formData.pest_level !== undefined ? formData.pest_level : null,
         problem_rating: formData.problem_rating !== undefined ? formData.problem_rating : null,
