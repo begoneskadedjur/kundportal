@@ -17,6 +17,7 @@ import {
 } from '../../services/ronderingService'
 import { CaseImageService, CaseImageWithUrl } from '../../services/caseImageService'
 import ImageLightbox from '../shared/ImageLightbox'
+import { reverseGeocode } from '../../services/geocoding'
 
 interface Station {
   id: string
@@ -91,7 +92,7 @@ export default function RonderingMapSection({
 
   // Bilder per annotation: annotationId → lista med bilder
   const [annotationImages, setAnnotationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
-  const [lightbox, setLightbox] = useState<{ images: { url: string; alt: string }[]; index: number } | null>(null)
+  const [lightbox, setLightbox] = useState<{ images: { url: string; alt: string }[]; index: number; title?: string } | null>(null)
 
   // Fil-input refs per annotation (för bilduppladdning)
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -233,13 +234,16 @@ export default function RonderingMapSection({
     if (!pendingClick) return
     setSaving(true)
     try {
+      const address = await reverseGeocode(pendingClick.lat, pendingClick.lng)
       const ann = await RonderingService.addAnnotation(
         caseId,
         pendingClick.lat,
         pendingClick.lng,
         newCategory,
         newNote.trim() || null,
-        technicianName
+        technicianName,
+        undefined,
+        address
       )
       onAnnotationAdded(ann)
       setPendingClick(null)
@@ -524,6 +528,7 @@ export default function RonderingMapSection({
                         onClick={() => setLightbox({
                           images: imgs.map(i => ({ url: i.url, alt: i.file_name || '' })),
                           index: idx,
+                          title: ann.address ? `Avvikelse — ${ann.address}` : 'Avvikelse',
                         })}
                         className="w-14 h-14 rounded-lg overflow-hidden border border-slate-600 hover:border-slate-400 transition-colors flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                       >
@@ -553,6 +558,7 @@ export default function RonderingMapSection({
           images={lightbox.images}
           initialIndex={lightbox.index}
           isOpen={true}
+          title={lightbox.title}
           onClose={() => setLightbox(null)}
         />
       )}

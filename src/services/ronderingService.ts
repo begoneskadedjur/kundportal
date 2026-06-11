@@ -26,6 +26,7 @@ export interface RonderingAnnotation {
   category: RonderingAnnotationCategory
   note: string | null
   technician_name: string | null
+  address: string | null
   created_at: string
 }
 
@@ -127,11 +128,12 @@ export class RonderingService {
     category: RonderingAnnotationCategory,
     note: string | null,
     technicianName: string | null,
-    stationId?: string
+    stationId?: string,
+    address?: string | null
   ): Promise<RonderingAnnotation> {
     const { data, error } = await supabase
       .from('rondering_annotations')
-      .insert({ case_id: caseId, latitude, longitude, category, note, technician_name: technicianName, station_id: stationId ?? null })
+      .insert({ case_id: caseId, latitude, longitude, category, note, technician_name: technicianName, station_id: stationId ?? null, address: address ?? null })
       .select()
       .single()
     if (error) throw new Error(error.message)

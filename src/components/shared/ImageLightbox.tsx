@@ -9,13 +9,15 @@ interface ImageLightboxProps {
   initialIndex: number
   isOpen: boolean
   onClose: () => void
+  title?: string
 }
 
 export default function ImageLightbox({
   images,
   initialIndex,
   isOpen,
-  onClose
+  onClose,
+  title
 }: ImageLightboxProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex)
   const [zoom, setZoom] = useState(1)
@@ -120,7 +122,7 @@ export default function ImageLightbox({
       >
         <div className="flex items-center gap-4">
           <span className="text-white font-medium">
-            Bild från kund
+            {title ?? 'Bild från kund'}
           </span>
           {images.length > 1 && (
             <span className="text-slate-400 text-sm">
