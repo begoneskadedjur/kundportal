@@ -26,7 +26,7 @@ import type { Service } from '../../types/services'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
-import { toSwedishISOString } from '../../utils/dateHelpers'
+import { toSwedishISOString, fromDatabaseDate } from '../../utils/dateHelpers'
 import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGallery'
 import CasePreparationsSection from '../shared/CasePreparationsSection'
 import CaseServiceSelector from '../shared/CaseServiceSelector'
@@ -372,8 +372,8 @@ export default function EditContractCaseModal({
         other_pest_type: caseData.other_pest_type || caseData.annat_skadedjur || '',
         service_id: caseData.service_id || null,
         service_group_id: null,
-        scheduled_start: caseData.scheduled_start ? new Date(caseData.scheduled_start) : null,
-        scheduled_end: caseData.scheduled_end ? new Date(caseData.scheduled_end) : null,
+        scheduled_start: fromDatabaseDate(caseData.scheduled_start),
+        scheduled_end: fromDatabaseDate(caseData.scheduled_end),
         primary_technician_id: caseData.primary_technician_id || '',
         primary_technician_name: caseData.primary_technician_name || '',
         secondary_technician_id: caseData.secondary_technician_id || '',

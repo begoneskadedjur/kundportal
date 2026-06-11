@@ -21,7 +21,7 @@ import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { DROPDOWN_STATUSES } from '../../types/database'
-import { toSwedishISOString } from '../../utils/dateHelpers'
+import { toSwedishISOString, fromDatabaseDate } from '../../utils/dateHelpers'
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
 
 registerLocale('sv', sv)
@@ -170,8 +170,8 @@ export default function InspectionCaseModal({
         contact_phone: caseData.contact_phone || '',
         contact_email: caseData.contact_email || '',
         address: caseData.address?.formatted_address || caseData.address || '',
-        scheduled_start: caseData.scheduled_start ? new Date(caseData.scheduled_start) : null,
-        scheduled_end: caseData.scheduled_end ? new Date(caseData.scheduled_end) : null,
+        scheduled_start: fromDatabaseDate(caseData.scheduled_start),
+        scheduled_end: fromDatabaseDate(caseData.scheduled_end),
         primary_technician_id: caseData.primary_technician_id || '',
         primary_technician_name: caseData.primary_technician_name || '',
         secondary_technician_id: caseData.secondary_technician_id || '',
