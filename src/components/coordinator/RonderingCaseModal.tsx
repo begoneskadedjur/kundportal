@@ -1053,7 +1053,7 @@ export default function RonderingCaseModal({
 
       {/* Rondering action dialog */}
       {showActionDialog && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowActionDialog(false)} />
           <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
