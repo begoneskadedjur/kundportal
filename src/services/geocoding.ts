@@ -31,7 +31,7 @@ const geocodeCache = new Map<string, GeocodeResult>()
  * Reverse-geocoda koordinater till en formatterad adress
  */
 export async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
-  const key = import.meta.env.VITE_GOOGLE_GEOCODING
+  const key = import.meta.env.VITE_GOOGLE_GEOCODING || import.meta.env.VITE_GOOGLE_MAPS_API_KEY
   if (!key) return null
   const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${key}&language=sv`
   try {
@@ -71,12 +71,12 @@ export async function geocodeAddress(address: string): Promise<GeocodingResponse
   try {
     // Använd specifik geocoding API-nyckel
     // I browser context används VITE_, i server context används vanlig env var
-    const apiKey = typeof window !== 'undefined' 
-      ? import.meta.env.VITE_GOOGLE_GEOCODING 
-      : process.env.GOOGLE_GEOCODING
-    
+    const apiKey = typeof window !== 'undefined'
+      ? (import.meta.env.VITE_GOOGLE_GEOCODING || import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
+      : (process.env.GOOGLE_GEOCODING || process.env.GOOGLE_MAPS_API_KEY)
+
     if (!apiKey) {
-      console.warn('[Geocoding] Google Geocoding API key missing. Add VITE_GOOGLE_GEOCODING to environment variables.')
+      console.warn('[Geocoding] Google Geocoding API key missing. Add VITE_GOOGLE_MAPS_API_KEY to environment variables.')
       return {
         success: false,
         error: 'Google Geocoding API-nyckel saknas. Lägg till VITE_GOOGLE_GEOCODING i miljövariabler.',
@@ -167,8 +167,8 @@ export async function searchAddresses(query: string, maxResults = 5): Promise<{
 
   try {
     const apiKey = typeof window !== 'undefined'
-      ? import.meta.env.VITE_GOOGLE_GEOCODING
-      : process.env.GOOGLE_GEOCODING
+      ? (import.meta.env.VITE_GOOGLE_GEOCODING || import.meta.env.VITE_GOOGLE_MAPS_API_KEY)
+      : (process.env.GOOGLE_GEOCODING || process.env.GOOGLE_MAPS_API_KEY)
 
     if (!apiKey) {
       return { success: false, results: [], error: 'Google Geocoding API-nyckel saknas' }
