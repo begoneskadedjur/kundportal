@@ -376,6 +376,7 @@ export default function RonderingCaseModal({
 
   // Om detta är ett delbesök skrivs stationsloggar mot parent_case_id
   const logCaseId = caseData?.parent_case_id ?? caseData?.id
+  const [parentCaseNumber, setParentCaseNumber] = useState<string | null>(null)
   const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
   const [hasPendingImageChanges, setHasPendingImageChanges] = useState(false)
   const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
@@ -477,6 +478,16 @@ export default function RonderingCaseModal({
       ])
       setStationLogs(logs)
       setAnnotations(anns)
+
+      // Hämta förälderns case_number om detta är ett delbesök
+      if (caseData.parent_case_id) {
+        const { data: parent } = await supabase
+          .from('cases')
+          .select('case_number')
+          .eq('id', caseData.parent_case_id)
+          .single()
+        setParentCaseNumber(parent?.case_number ?? null)
+      }
 
       // Ladda delbesök (bara för originalärenden)
       if (!caseData.parent_case_id) {
@@ -614,9 +625,13 @@ export default function RonderingCaseModal({
     )
   })
 
+  const isSubVisit = !!caseData?.parent_case_id
   const modalTitle = (
     <div className="flex items-center gap-2">
-      <span>Ärende: {formData.case_number || 'Laddar...'}</span>
+      {isSubVisit
+        ? <span>{parentCaseNumber ?? '...'} – Delbesök</span>
+        : <span>Ärende: {formData.case_number || 'Laddar...'}</span>
+      }
       <span className="text-xs px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 flex items-center gap-1">
         <Map className="w-3 h-3" />
         Rondering Trafikkontoret
@@ -1097,7 +1112,7 @@ export default function RonderingCaseModal({
                 </h3>
                 <CaseImageGallery
                   ref={imageGalleryRef}
-                  caseId={caseData.id}
+                  caseId={logCaseId ?? caseData.id}
                   canDelete={true}
                   canEdit={true}
                   refreshTrigger={imageRefreshTrigger}
