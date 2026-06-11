@@ -95,15 +95,47 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
   const [technicianId, setTechnicianId] = useState('')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const [conflicts, setConflicts] = useState<{ title: string; scheduled_start: string; scheduled_end: string }[]>([])
+  const [loadingConflicts, setLoadingConflicts] = useState(false)
 
   const selectedTech = technicians.find(t => t.id === technicianId)
   const workSchedule = selectedTech?.work_schedule as Record<string, { start: string; end: string; active: boolean }> | null | undefined
 
+  const JS_TO_DAY = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
   const DAY_LABELS: Record<string, string> = {
     monday: 'Mån', tuesday: 'Tis', wednesday: 'Ons',
     thursday: 'Tor', friday: 'Fre', saturday: 'Lör', sunday: 'Sön',
   }
   const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+
+  const dayKey = startDate ? JS_TO_DAY[startDate.getDay()] : null
+  const daySchedule = dayKey ? workSchedule?.[dayKey] : null
+  const isWorkingDay = daySchedule?.active ?? false
+
+  const toTimeDate = (hhmm: string) => {
+    const [h, m] = hhmm.split(':').map(Number)
+    const d = new Date(); d.setHours(h, m, 0, 0); return d
+  }
+  const minTime = isWorkingDay ? toTimeDate(daySchedule!.start) : toTimeDate('00:00')
+  const maxTime = isWorkingDay ? toTimeDate(daySchedule!.end) : toTimeDate('23:59')
+
+  useEffect(() => {
+    if (!technicianId || !startDate) { setConflicts([]); return }
+    const dayStart = new Date(startDate); dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(startDate); dayEnd.setHours(23, 59, 59, 999)
+    setLoadingConflicts(true)
+    supabase
+      .from('cases')
+      .select('title, scheduled_start, scheduled_end')
+      .eq('primary_technician_id', technicianId)
+      .gte('scheduled_start', dayStart.toISOString())
+      .lte('scheduled_start', dayEnd.toISOString())
+      .not('status', 'in', '("Avslutat","Borttaget")')
+      .then(({ data }) => {
+        setConflicts((data || []).filter(c => c.scheduled_start && c.scheduled_end))
+        setLoadingConflicts(false)
+      })
+  }, [technicianId, startDate?.toDateString()])
 
   const handleSave = async () => {
     if (!startDate) {
@@ -168,6 +200,8 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
                 dateFormat="yyyy-MM-dd HH:mm"
                 locale="sv"
                 placeholderText="Välj datum och tid"
+                minTime={selectedTech ? minTime : undefined}
+                maxTime={selectedTech ? maxTime : undefined}
                 className="w-full px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-[#20c58f]"
               />
             </div>
@@ -181,6 +215,8 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
                 locale="sv"
                 placeholderText="Valfritt"
                 minDate={startDate || undefined}
+                minTime={selectedTech ? minTime : undefined}
+                maxTime={selectedTech ? maxTime : undefined}
                 className="w-full px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-[#20c58f]"
               />
             </div>
@@ -223,6 +259,30 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
               </div>
             )}
           </div>
+
+          {startDate && selectedTech && !isWorkingDay && (
+            <div className="flex items-start gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+              <span className="text-xs text-amber-300">
+                {DAY_LABELS[dayKey!]} är inte en arbetsdag för {selectedTech.name}
+              </span>
+            </div>
+          )}
+          {!loadingConflicts && conflicts.length > 0 && (
+            <div className="px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-1">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span className="text-xs text-amber-300 font-medium">
+                  {selectedTech?.name} har {conflicts.length} bokning{conflicts.length > 1 ? 'ar' : ''} denna dag
+                </span>
+              </div>
+              {conflicts.map((c, i) => (
+                <div key={i} className="ml-5 text-xs text-amber-400/80">
+                  {c.title} — {new Date(c.scheduled_start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}–{new Date(c.scheduled_end).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div>
             <label className="text-xs font-medium text-slate-400 mb-1 block">Anteckning</label>
