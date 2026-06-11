@@ -96,6 +96,15 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const selectedTech = technicians.find(t => t.id === technicianId)
+  const workSchedule = selectedTech?.work_schedule as Record<string, { start: string; end: string; active: boolean }> | null | undefined
+
+  const DAY_LABELS: Record<string, string> = {
+    monday: 'Mån', tuesday: 'Tis', wednesday: 'Ons',
+    thursday: 'Tor', friday: 'Fre', saturday: 'Lör', sunday: 'Sön',
+  }
+  const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+
   const handleSave = async () => {
     if (!startDate) {
       toast.error('Välj ett startdatum')
@@ -104,7 +113,6 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
 
     setSaving(true)
     try {
-      const selectedTech = technicians.find(t => t.id === technicianId)
       const caseNumber = `RON-DEL-${Date.now().toString(36).toUpperCase()}`
 
       const { data, error } = await supabase
@@ -190,6 +198,30 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
             </select>
+            {selectedTech && (
+              <div className="mt-1.5 grid grid-cols-7 gap-1">
+                {DAY_ORDER.map(day => {
+                  const d = workSchedule?.[day]
+                  const active = d?.active ?? false
+                  return (
+                    <div key={day} className={`flex flex-col items-center px-1 py-1.5 rounded-lg text-center ${
+                      active ? 'bg-[#20c58f]/10 border border-[#20c58f]/30' : 'bg-slate-800/30 border border-slate-700/30'
+                    }`}>
+                      <span className={`text-[10px] font-medium ${active ? 'text-[#20c58f]' : 'text-slate-500'}`}>
+                        {DAY_LABELS[day]}
+                      </span>
+                      {active ? (
+                        <span className="text-[9px] text-slate-300 leading-tight mt-0.5">
+                          {d!.start}<br />{d!.end}
+                        </span>
+                      ) : (
+                        <span className="text-[9px] text-slate-600 mt-0.5">—</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           <div>
