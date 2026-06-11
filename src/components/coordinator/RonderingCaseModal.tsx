@@ -8,7 +8,7 @@ import {
   X, Building, Building2, Calendar, Save, Check, Map, MapPin,
   CheckSquare, Square, AlertTriangle, MessageSquare, History,
   Trash2, FileText, Users, User, Phone, Mail, ChevronDown,
-  Footprints, Clock, Plus
+  Footprints, Clock, Plus, ExternalLink
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -25,7 +25,6 @@ import { toSwedishISOString } from '../../utils/dateHelpers'
 import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGallery'
 import CommunicationSlidePanel from '../communication/CommunicationSlidePanel'
 import { CaseType } from '../../types/communication'
-import RevisitContractModal from './RevisitContractModal'
 import VisitHistoryPanel from './VisitHistoryPanel'
 import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
 import { RonderingService, RonderingStationLog, RonderingStationStatus, RonderingAnnotation } from '../../services/ronderingService'
@@ -80,6 +79,153 @@ function formatDateTime(iso: string): string {
     ' ' + d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
 }
 
+// ─── AddSubVisitModal ────────────────────────────────────────────────────────
+
+interface AddSubVisitModalProps {
+  parentCase: any
+  technicians: any[]
+  onClose: () => void
+  onCreated: (newCase: any) => void
+}
+
+function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSubVisitModalProps) {
+  const [startDate, setStartDate] = useState<Date | null>(null)
+  const [endDate, setEndDate] = useState<Date | null>(null)
+  const [technicianId, setTechnicianId] = useState('')
+  const [note, setNote] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!startDate) {
+      toast.error('Välj ett startdatum')
+      return
+    }
+
+    setSaving(true)
+    try {
+      const selectedTech = technicians.find(t => t.id === technicianId)
+      const caseNumber = `RON-DEL-${Date.now().toString(36).toUpperCase()}`
+
+      const { data, error } = await supabase
+        .from('cases')
+        .insert({
+          customer_id: parentCase.customer_id,
+          service_type: parentCase.service_type || 'rondering_trafikkontoret',
+          parent_case_id: parentCase.id,
+          status: 'Bokad',
+          scheduled_start: toSwedishISOString(startDate),
+          scheduled_end: endDate ? toSwedishISOString(endDate) : null,
+          primary_technician_id: selectedTech?.id || null,
+          primary_technician_name: selectedTech?.name || null,
+          title: `${parentCase.title || 'Rondering'} – Delbesök`,
+          case_number: caseNumber,
+          description: note || null,
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      toast.success('Delbesök skapat')
+      onCreated(data)
+    } catch (err: any) {
+      toast.error(err.message || 'Kunde inte skapa delbesök')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md mx-4">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+          <h2 className="text-base font-semibold flex items-center gap-2">
+            <Footprints className="w-4 h-4 text-[#20c58f]" />
+            Lägg till delbesök
+          </h2>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-400 mb-1 block">Startdatum och tid *</label>
+              <DatePicker
+                selected={startDate}
+                onChange={setStartDate}
+                showTimeSelect
+                dateFormat="yyyy-MM-dd HH:mm"
+                locale="sv"
+                placeholderText="Välj datum och tid"
+                className="w-full px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-[#20c58f]"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-400 mb-1 block">Sluttid</label>
+              <DatePicker
+                selected={endDate}
+                onChange={setEndDate}
+                showTimeSelect
+                dateFormat="yyyy-MM-dd HH:mm"
+                locale="sv"
+                placeholderText="Valfritt"
+                minDate={startDate || undefined}
+                className="w-full px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-[#20c58f]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1 block">Tekniker</label>
+            <select
+              value={technicianId}
+              onChange={e => setTechnicianId(e.target.value)}
+              className="w-full px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-[#20c58f]"
+            >
+              <option value="">— Välj tekniker —</option>
+              {technicians.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1 block">Anteckning</label>
+            <textarea
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              rows={2}
+              placeholder="Valfri anteckning om delbesöket..."
+              className="w-full px-3 py-1.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white resize-none focus:outline-none focus:border-[#20c58f]"
+            />
+          </div>
+        </div>
+
+        <div className="px-4 py-2.5 border-t border-slate-700/50 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+          >
+            Avbryt
+          </button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleSave}
+            disabled={saving || !startDate}
+          >
+            {saving ? 'Sparar...' : 'Skapa delbesök'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function RonderingCaseModal({
   isOpen,
   onClose,
@@ -131,6 +277,12 @@ export default function RonderingCaseModal({
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
   const [showVisitHistoryPanel, setShowVisitHistoryPanel] = useState(false)
   const [showActionDialog, setShowActionDialog] = useState(false)
+  const [showAddSubVisit, setShowAddSubVisit] = useState(false)
+  const [subVisits, setSubVisits] = useState<any[]>([])
+  const [nestedSubVisit, setNestedSubVisit] = useState<any | null>(null)
+
+  // Om detta är ett delbesök skrivs stationsloggar mot parent_case_id
+  const logCaseId = caseData?.parent_case_id ?? caseData?.id
   const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
   const [hasPendingImageChanges, setHasPendingImageChanges] = useState(false)
   const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
@@ -224,13 +376,24 @@ export default function RonderingCaseModal({
         setLoadingStations(false)
       }
 
-      // Befintliga avbockningar och annotationer (parallellt)
+      // Loggar och annotationer hämtas från logCaseId (parent om delbesök, annars eget id)
+      const effectiveLogCaseId = caseData.parent_case_id ?? caseData.id
       const [logs, anns] = await Promise.all([
-        RonderingService.getLogsForCase(caseData.id),
-        RonderingService.getAnnotationsForCase(caseData.id),
+        RonderingService.getLogsForCase(effectiveLogCaseId),
+        RonderingService.getAnnotationsForCase(effectiveLogCaseId),
       ])
       setStationLogs(logs)
       setAnnotations(anns)
+
+      // Ladda delbesök (bara för originalärenden)
+      if (!caseData.parent_case_id) {
+        const { data: subs } = await supabase
+          .from('cases')
+          .select('id, title, scheduled_start, scheduled_end, status, primary_technician_name')
+          .eq('parent_case_id', caseData.id)
+          .order('scheduled_start')
+        setSubVisits(subs || [])
+      }
     }
 
     load()
@@ -282,7 +445,7 @@ export default function RonderingCaseModal({
       setPendingStations(prev => new Set(prev).add(station.id))
       setStationLogs(prev => prev.filter(l => l.station_id !== station.id))
       try {
-        await RonderingService.removeLog(caseData.id, station.id)
+        await RonderingService.removeLog(logCaseId, station.id)
       } catch {
         setStationLogs(prev => [...prev, existing])
         toast.error('Kunde inte ta bort avbockning')
@@ -304,7 +467,7 @@ export default function RonderingCaseModal({
 
     const optimistic: RonderingStationLog = {
       id: `tmp-${station.id}`,
-      case_id: caseData.id,
+      case_id: logCaseId,
       station_id: station.id,
       inspected_at: new Date().toISOString(),
       technician_id: profile?.technician_id || null,
@@ -317,7 +480,7 @@ export default function RonderingCaseModal({
     setStationLogs(prev => [...prev, optimistic])
     try {
       const real = await RonderingService.logStation(
-        caseData.id,
+        logCaseId,
         station.id,
         profile?.technician_id || null,
         profile?.full_name || null,
@@ -595,6 +758,57 @@ export default function RonderingCaseModal({
               </div>
             </div>
 
+            {/* Delbesök — visas bara på originalärenden (ej på delbesök) */}
+            {!caseData?.parent_case_id && (
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                    <Footprints className="w-4 h-4 text-[#20c58f]" />
+                    Planerade besök
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSubVisit(true)}
+                    className="flex items-center gap-1 px-2 py-1 text-xs text-[#20c58f] hover:bg-[#20c58f]/10 rounded-lg transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Lägg till besök
+                  </button>
+                </div>
+                {subVisits.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-1">Inga delbesök — hela ronderingen görs i detta ärende.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {subVisits.map(sv => (
+                      <div key={sv.id} className="flex items-center justify-between px-3 py-2 bg-slate-800/50 rounded-lg">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-300 font-medium">
+                              {sv.scheduled_start
+                                ? new Date(sv.scheduled_start).toLocaleString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                : '—'}
+                              {sv.scheduled_end
+                                ? ` – ${new Date(sv.scheduled_end).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`
+                                : ''}
+                            </span>
+                            <span className="text-xs text-slate-500">{sv.primary_technician_name || '—'}</span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setNestedSubVisit(sv)}
+                          className="p-1.5 text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 rounded-lg transition-colors"
+                          title="Öppna delbesök"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Stationslista */}
             <div ref={stationListRef} className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
               <div className="flex items-center justify-between mb-2">
@@ -837,16 +1051,70 @@ export default function RonderingCaseModal({
         />
       )}
 
-      {/* Återbesök */}
-      {showActionDialog && caseData?.id && (
-        <RevisitContractModal
-          isOpen={showActionDialog}
-          onClose={() => setShowActionDialog(false)}
+      {/* Rondering action dialog */}
+      {showActionDialog && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowActionDialog(false)} />
+          <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+              <h2 className="text-base font-semibold text-white">Vad vill du göra?</h2>
+              <button onClick={() => setShowActionDialog(false)} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-3 space-y-2">
+              <button
+                onClick={() => { setShowActionDialog(false); setShowAddSubVisit(true) }}
+                className="w-full flex items-start gap-3 p-3 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 hover:border-[#20c58f]/40 rounded-xl text-left transition-colors"
+              >
+                <Footprints className="w-5 h-5 text-[#20c58f] shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-white">Lägg till delbesök</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Boka in en tekniker på ett eget datum — loggar stationer mot detta ärende</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setShowActionDialog(false); setShowVisitHistoryPanel(true) }}
+                className="w-full flex items-start gap-3 p-3 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 rounded-xl text-left transition-colors"
+              >
+                <History className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-white">Besökshistorik</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Se alla genomförda besök och loggade åtgärder</p>
+                </div>
+              </button>
+            </div>
+            <div className="px-4 py-2.5 border-t border-slate-700/50">
+              <button onClick={() => setShowActionDialog(false)} className="w-full py-2 text-sm text-slate-400 hover:text-white transition-colors">
+                Avbryt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lägg till delbesök */}
+      {showAddSubVisit && caseData?.id && (
+        <AddSubVisitModal
           parentCase={caseData}
-          onSuccess={() => {
-            setShowActionDialog(false)
-            onSuccess?.()
+          technicians={technicians}
+          onClose={() => setShowAddSubVisit(false)}
+          onCreated={(newCase) => {
+            setShowAddSubVisit(false)
+            setSubVisits(prev => [...prev, newCase].sort((a, b) =>
+              (a.scheduled_start || '').localeCompare(b.scheduled_start || '')
+            ))
           }}
+        />
+      )}
+
+      {/* Nested delbesök-modal */}
+      {nestedSubVisit && (
+        <RonderingCaseModal
+          isOpen={true}
+          onClose={() => setNestedSubVisit(null)}
+          onSuccess={() => setNestedSubVisit(null)}
+          caseData={nestedSubVisit}
         />
       )}
     </>

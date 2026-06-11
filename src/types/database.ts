@@ -240,6 +240,7 @@ export type Database = {
           // (synth-fallback i runtime). Möjliggör scoping "Vad vi gjort mot
           // avtal X" via WHERE contract_id = ?.
           contract_id: string | null
+          parent_case_id: string | null
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>
