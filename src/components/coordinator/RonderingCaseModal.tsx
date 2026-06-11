@@ -2,6 +2,7 @@
 // Modal för "Rondering Trafikkontoret" — egenkontrollprogram med stationsavbockning
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -135,7 +136,7 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+    <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 10001, pointerEvents: 'auto' }}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md mx-4">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
@@ -1052,8 +1053,8 @@ export default function RonderingCaseModal({
       )}
 
       {/* Rondering action dialog */}
-      {showActionDialog && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+      {showActionDialog && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10001, pointerEvents: 'auto' }}>
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowActionDialog(false)} />
           <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-sm">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
@@ -1090,11 +1091,12 @@ export default function RonderingCaseModal({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.getElementById('modal-root') ?? document.body
       )}
 
       {/* Lägg till delbesök */}
-      {showAddSubVisit && caseData?.id && (
+      {showAddSubVisit && caseData?.id && createPortal(
         <AddSubVisitModal
           parentCase={caseData}
           technicians={technicians}
@@ -1105,7 +1107,8 @@ export default function RonderingCaseModal({
               (a.scheduled_start || '').localeCompare(b.scheduled_start || '')
             ))
           }}
-        />
+        />,
+        document.getElementById('modal-root') ?? document.body
       )}
 
       {/* Nested delbesök-modal */}
