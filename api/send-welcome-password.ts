@@ -130,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({
         from: 'BeGone Kundportal <noreply@begone.se>',
         to: [email],
-        subject: 'Välkommen till BeGone Kundportal – dina inloggningsuppgifter',
+        subject: organizationName ? `${organizationName} — Välkommen till BeGone Kundportal` : 'Välkommen till BeGone Kundportal',
         html: emailHtml
       }),
     })
@@ -194,22 +194,20 @@ function getWelcomeEmailTemplate({
   const hiddenCount = sites.length - visibleSites.length
 
   const sitesSection = sites.length > 0 ? `
-    <div style="margin: 20px 0;">
-      <p style="margin: 0 0 10px; font-size: 13px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em;">
-        ${isVerksamhetschef ? 'Tillgång till hela organisationen' : 'Dina anläggningar'}
-        ${roleLabel ? `<span style="margin-left: 8px; background: rgba(32,197,143,0.15); color: #20c58f; font-size: 11px; padding: 2px 8px; border-radius: 20px; text-transform: none; letter-spacing: 0;">${roleLabel}</span>` : ''}
-      </p>
-      <div style="background: #0f172a; border: 1px solid #1e3a2a; border-radius: 8px; overflow: hidden;">
-        ${visibleSites.map((s, i) => `
-        <div style="display: flex; align-items: center; padding: 9px 14px; ${i < visibleSites.length - 1 ? 'border-bottom: 1px solid #1e293b;' : ''}">
-          <span style="width: 6px; height: 6px; border-radius: 50%; background: #20c58f; display: inline-block; margin-right: 10px; flex-shrink: 0;"></span>
-          <span style="font-size: 13px; color: #e2e8f0; flex: 1;">${s.name}</span>
-          ${s.region ? `<span style="font-size: 11px; color: #475569; margin-left: 8px;">${s.region}</span>` : ''}
-        </div>`).join('')}
-        ${hiddenCount > 0 ? `
-        <div style="padding: 8px 14px; border-top: 1px solid #1e293b;">
-          <span style="font-size: 12px; color: #475569;">... och ${hiddenCount} till</span>
-        </div>` : ''}
+    <div style="margin: 0 0 24px 0;">
+      <div style="font-size: 11px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px;">
+        ${isVerksamhetschef ? 'Tillgång till hela organisationen' : 'Dina anläggningar'}${roleLabel ? ` &nbsp;<span style="font-weight: 400; text-transform: none; letter-spacing: 0; color: #20c58f;">${roleLabel}</span>` : ''}
+      </div>
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden;">
+        <table style="width: 100%; border-collapse: collapse;">
+          ${visibleSites.map((s, i) => `<tr>
+            <td style="padding: 9px 16px; font-size: 13px; color: #374151; ${i < visibleSites.length - 1 ? 'border-bottom: 1px solid #e2e8f0;' : ''}">
+              <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #20c58f; margin-right: 10px; vertical-align: middle;"></span>${s.name}
+              ${s.region ? `<span style="float: right; font-size: 11px; color: #9CA3AF;">${s.region}</span>` : ''}
+            </td>
+          </tr>`).join('')}
+          ${hiddenCount > 0 ? `<tr><td style="padding: 8px 16px; font-size: 12px; color: #9CA3AF; border-top: 1px solid #e2e8f0;">... och ${hiddenCount} till</td></tr>` : ''}
+        </table>
       </div>
     </div>` : ''
 
@@ -220,70 +218,73 @@ function getWelcomeEmailTemplate({
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Välkommen till BeGone Kundportal</title>
 </head>
-<body style="margin: 0; padding: 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #070f1a;">
-  <div style="max-width: 560px; margin: 0 auto;">
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #f1f5f9;">
+  <!-- Preheader -->
+  <div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#f1f5f9;">Ditt konto hos BeGone Kundportal är aktiverat. Logga in med uppgifterna nedan.</div>
+
+  <div style="max-width: 560px; margin: 32px auto; box-shadow: 0 2px 12px rgba(0,0,0,0.10);">
 
     <!-- Header -->
-    <div style="background: linear-gradient(160deg, #0d3524 0%, #061810 100%); border-radius: 12px 12px 0 0; padding: 32px 36px 28px; text-align: center; border-bottom: 2px solid #20c58f;">
-      <div style="font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -0.03em; line-height: 1;">BeGone</div>
-      <div style="font-size: 10px; color: #20c58f; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; margin-top: 4px;">Skadedjur &amp; Sanering</div>
-      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(32,197,143,0.18);">
-        <div style="font-size: 20px; font-weight: 700; color: #fff;">Välkommen till kundportalen</div>
-        ${organizationName ? `<div style="font-size: 13px; color: #20c58f; margin-top: 4px;">${organizationName}</div>` : ''}
+    <div style="background: linear-gradient(160deg, #0d2a1c 0%, #071610 100%); border-radius: 8px 8px 0 0; padding: 32px 36px 28px; text-align: center; border-bottom: 2px solid #20c58f;">
+      <div style="font-size: 28px; font-weight: 800; color: #ffffff; letter-spacing: -0.03em; line-height: 1;">BeGone</div>
+      <div style="font-size: 10px; color: #20c58f; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; margin-top: 5px;">Skadedjur &amp; Sanering</div>
+      <div style="margin-top: 22px; padding-top: 22px; border-top: 1px solid rgba(32,197,143,0.15);">
+        <div style="font-size: 20px; font-weight: 700; color: #ffffff;">Välkommen till kundportalen</div>
+        ${organizationName ? `<div style="font-size: 13px; color: #20c58f; margin-top: 5px; font-weight: 500;">${organizationName}</div>` : ''}
       </div>
     </div>
 
     <!-- Body -->
-    <div style="background: #111827; border-radius: 0 0 12px 12px; padding: 28px 36px 32px;">
+    <div style="background: #ffffff; padding: 32px 36px;">
 
-      <p style="font-size: 16px; font-weight: 600; color: #f1f5f9; margin: 0 0 8px;">Hej ${firstName},</p>
-      <p style="font-size: 14px; color: #94a3b8; margin: 0 0 24px; line-height: 1.6;">
-        Ditt konto är nu aktiverat. Logga in med uppgifterna nedan och byt lösenord vid första tillfället.
+      <p style="font-size: 18px; font-weight: 600; color: #111827; margin: 0 0 6px;">Hej ${firstName},</p>
+      <p style="font-size: 15px; color: #4B5563; margin: 0 0 24px; line-height: 1.7;">
+        Ditt konto i BeGone Kundportal är nu aktiverat. Nedan hittar du dina inloggningsuppgifter.
       </p>
 
       <!-- Inloggningsuppgifter -->
-      <div style="background: #0b1220; border: 1px solid #1e293b; border-radius: 8px; padding: 16px 18px; margin-bottom: 16px;">
-        <div style="font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px;">Inloggningsuppgifter</div>
+      <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px 24px; margin: 0 0 24px 0;">
+        <div style="font-size: 11px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px;">Inloggningsuppgifter</div>
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
-            <td style="font-size: 12px; color: #475569; padding: 4px 0; width: 72px; vertical-align: top;">E-post</td>
-            <td style="font-size: 13px; color: #cbd5e1; padding: 4px 0; font-family: 'Courier New', monospace;">${email}</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 11px; color: #9CA3AF; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; width: 130px;">E-postadress</td>
+            <td style="padding: 8px 0; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #111827; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;">${email}</td>
           </tr>
           <tr>
-            <td style="font-size: 12px; color: #475569; padding: 4px 0; vertical-align: top;">Lösenord</td>
-            <td style="font-size: 15px; color: #20c58f; padding: 4px 0; font-family: 'Courier New', monospace; font-weight: 700; letter-spacing: 0.04em;">${newPassword}</td>
+            <td style="padding: 8px 0; font-size: 11px; color: #9CA3AF; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;">Lösenord</td>
+            <td style="padding: 8px 0; font-size: 14px; color: #111827; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; letter-spacing: 0.04em;">${newPassword}</td>
           </tr>
         </table>
       </div>
 
-      <!-- Byt lösenord-notis -->
-      <div style="border-left: 3px solid #d97706; background: rgba(92,55,0,0.35); border-radius: 0 6px 6px 0; padding: 10px 14px; margin-bottom: 24px;">
-        <p style="font-size: 13px; color: #fbbf24; margin: 0; line-height: 1.5;">
-          <strong>Byt lösenord</strong> — gå till kontoinställningarna och välj ett eget lösenord vid första inloggning.
-        </p>
-      </div>
-
       ${sitesSection}
 
+      <!-- Amber-varning -->
+      <div style="border-left: 3px solid #F59E0B; background-color: #FFFBEB; border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 0 0 28px 0;">
+        <p style="font-size: 13px; font-weight: 600; color: #92400E; margin: 0 0 3px 0;">Byt lösenord vid första inloggning</p>
+        <p style="font-size: 13px; color: #92400E; margin: 0; line-height: 1.5;">Gå till profil-ikonen i sidomenyn och välj ett eget lösenord.</p>
+      </div>
+
       <!-- CTA -->
-      <div style="text-align: center; margin: 24px 0 20px;">
+      <div style="text-align: center; margin: 0 0 8px 0;">
         <a href="${loginLink}"
-           style="display: inline-block; background-color: #20c58f; color: #071811; font-size: 14px; font-weight: 700; text-decoration: none; padding: 12px 36px; border-radius: 7px; letter-spacing: 0.01em;">
+           style="display: inline-block; background-color: #20c58f; color: #071610; font-size: 15px; font-weight: 700; text-decoration: none; padding: 13px 40px; border-radius: 6px; letter-spacing: 0.01em;">
           Logga in nu
         </a>
       </div>
 
-      <!-- Footer -->
-      <div style="border-top: 1px solid #1e293b; padding-top: 20px; text-align: center;">
-        <p style="font-size: 12px; color: #374151; margin: 0 0 4px;">
-          Frågor? <a href="mailto:support@begone.se" style="color: #20c58f; text-decoration: none;">support@begone.se</a>
-        </p>
-        <p style="font-size: 12px; color: #374151; margin: 0;">
-          BeGone Skadedjur &amp; Sanering AB
-        </p>
-      </div>
-
     </div>
+
+    <!-- Footer -->
+    <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 8px 8px; padding: 24px 36px; text-align: center;">
+      <p style="font-size: 13px; font-weight: 600; color: #374151; margin: 0 0 6px 0;">BeGone Skadedjur &amp; Sanering AB</p>
+      <p style="font-size: 12px; color: #9CA3AF; margin: 0 0 16px 0;">
+        Org.nr: 559378-9208 &nbsp;&middot;&nbsp; 010 280 44 10 &nbsp;&middot;&nbsp;
+        <a href="mailto:info@begone.se" style="color: #20c58f; text-decoration: none;">info@begone.se</a>
+      </p>
+      <p style="font-size: 11px; color: #D1D5DB; margin: 0;">Detta är ett automatiserat meddelande. Vänligen svara inte på detta mail.</p>
+    </div>
+
   </div>
 </body>
 </html>`
