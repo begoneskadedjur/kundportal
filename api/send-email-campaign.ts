@@ -2,6 +2,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node'
 import nodemailer from 'nodemailer'
 import { customEmailTemplate } from './email-templates'
+import { requireAuth } from './_lib/auth'
 
 interface CampaignRecipient {
   id: string
@@ -21,6 +22,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Massutskick till kunder - endast personal.
+  // 'säljare' ingår: de når Kunder-sidan med kampanjmodalen.
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
 
   try {
     const { recipients, subject, message, loginLink } = req.body as CampaignRequest

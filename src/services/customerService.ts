@@ -1,5 +1,5 @@
 // src/services/customerService.ts - Utökad med getAllCustomers och deleteCustomer
-import { supabase } from '../lib/supabase'
+import { supabase, getAuthHeaders } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import { calculateTotalContractValue } from '../utils/contractLength'
 
@@ -48,9 +48,7 @@ export const customerService = {
       // Anropa API route med utökad data
       const response = await fetch('/api/create-customer', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify(customerData) // Skicka direkt utan wrapping
       })
       

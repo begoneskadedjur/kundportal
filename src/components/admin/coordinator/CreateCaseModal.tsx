@@ -2,7 +2,7 @@
 // ⭐ VERSION 4.0 - STÖD FÖR AVTALSKUNDER OCH TRE KUNDTYPER ⭐
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { supabase } from '../../../lib/supabase';
+import { supabase, getAuthHeaders } from '../../../lib/supabase';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
 import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus, ShoppingCart, Map } from 'lucide-react';
@@ -1255,7 +1255,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           try {
             const smsRes = await fetch('/api/send-sms', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: await getAuthHeaders(),
               body: JSON.stringify({ to: phoneNumber, templateSlug, variables })
             })
             if (smsRes.ok) {

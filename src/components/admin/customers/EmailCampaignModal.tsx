@@ -9,6 +9,7 @@ import Input from '../../ui/Input'
 import Card from '../../ui/Card'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import toast from 'react-hot-toast'
+import { getAuthHeaders } from '../../../lib/supabase'
 
 interface EmailCampaignModalProps {
   isOpen: boolean
@@ -100,9 +101,7 @@ export default function EmailCampaignModal({
     try {
       const response = await fetch('/api/send-email-campaign', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           recipients: selectedCustomerData.map(customer => ({
             id: customer.id,

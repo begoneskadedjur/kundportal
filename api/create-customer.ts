@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
 import { getWelcomeEmailTemplate, getAccessEmailTemplate } from './email-templates'
+import { requireAuth } from './_lib/auth'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -23,6 +24,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Skapar kunder + portalkonton - endast personal.
+  // 'säljare' ingår: de når Kunder-sidan (/saljare/befintliga-kunder) med portal-inbjudan.
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -303,7 +309,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const { data: newAuthUser, error: authError } = await supabase.auth.admin.createUser({
         email: customerData.contact_email,
-        password: tempPassword,
+        password: tempPassword as string,
         email_confirm: true,
         user_metadata: {
           company_name: customerData.company_name,

@@ -4,6 +4,7 @@ import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
 import toast from 'react-hot-toast'
+import { getAuthHeaders } from '../../../lib/supabase'
 
 interface CreatePortalAccountModalProps {
   isOpen: boolean
@@ -59,7 +60,7 @@ export default function CreatePortalAccountModal({
     try {
       const response = await fetch('/api/create-customer', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           company_name: organization.name,
           contact_person: organization.contact_person,

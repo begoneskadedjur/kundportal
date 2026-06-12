@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from './_lib/auth'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
@@ -25,6 +26,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  // SMS kostar pengar per utskick - endast personal får skicka
+  const auth = await requireAuth(req, res, ['admin', 'koordinator'])
+  if (!auth) return
 
   try {
     const { to, templateSlug, variables, body: directBody } = req.body

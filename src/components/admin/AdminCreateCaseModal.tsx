@@ -8,6 +8,7 @@ import Select from '../ui/Select'
 import AddressAutocomplete from '../ui/AddressAutocomplete'
 import type { GeocodeResult } from '../../services/geocoding'
 import TechnicianDropdown from './TechnicianDropdown'
+import { getAuthHeaders } from '../../lib/supabase'
 import ServiceArticleSelector from '../shared/ServiceArticleSelector'
 
 interface Customer {
@@ -69,9 +70,7 @@ export default function AdminCreateCaseModal({
     try {
       const response = await fetch('/api/create-case', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           customer_id: customer.id,
           ...formData,

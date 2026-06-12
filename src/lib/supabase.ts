@@ -15,13 +15,13 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     // FIX 1: Förhindra automatisk refresh av tokens i bakgrunden
     // som kan orsaka oändliga loops
     autoRefreshToken: true,
-    
+
     // FIX 2: Håll session persistent mellan browser refreshes
     persistSession: true,
-    
+
     // FIX 3: Använd mer konservativ session detection
     detectSessionInUrl: false,
-    
+
     // FIX 4: Optimera storage för bättre kompatibilitet
     storage: {
       getItem: (key) => {
@@ -54,6 +54,18 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     },
   },
 })
+
+// Headers med Supabase-JWT för anrop till skyddade /api-endpoints
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    throw new Error('Du är inte inloggad')
+  }
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${session.access_token}`
+  }
+}
 
 // 🔧 GÖR SUPABASE TILLGÄNGLIGT GLOBALT FÖR DEBUGGING
 if (typeof window !== 'undefined') {

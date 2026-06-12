@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { supabase } from '../../../lib/supabase'
+import { supabase, getAuthHeaders } from '../../../lib/supabase'
 import { 
   MultisiteOrganization, 
   OrganizationSite,
@@ -294,9 +294,7 @@ export default function OrganizationManagement() {
       // Använd befintlig API för kundregistrering
       const response = await fetch('/api/create-customer', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           email: org.primary_contact_email,
           customerData: {

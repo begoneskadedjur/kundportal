@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../../lib/supabase'
+import { supabase, getAuthHeaders } from '../../../lib/supabase'
 import Button from '../../../components/ui/Button'
 import Select from '../../../components/ui/Select'
 import toast from 'react-hot-toast'
@@ -949,7 +949,7 @@ export default function OrganizationsPage() {
         try {
           const response = await fetch('/api/create-customer', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: await getAuthHeaders(),
             body: JSON.stringify({
               company_name: org.name,
               contact_person: org.contact_person,

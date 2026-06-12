@@ -1,5 +1,6 @@
 // api/create-admin-user.ts - API för att skapa admin-användare
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from './_lib/auth'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY! // Service role key
@@ -16,6 +17,10 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Endast inloggade admins får skapa admin-användare
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   try {
     const { email, password, display_name, sendWelcomeEmail } = req.body

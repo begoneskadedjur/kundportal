@@ -1,6 +1,7 @@
 // api/create-case.ts - FIXAD VERSION som tar bort felaktiga custom fields
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from './_lib/auth'
 
 // Supabase admin client
 const supabaseUrl = process.env.VITE_SUPABASE_URL!
@@ -24,6 +25,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only POST allowed
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
+  }
+
+  // Personal får skapa ärenden för alla kunder; kunder endast för sig själva
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'customer'])
+  if (!auth) return
+
+  if (!auth.isAdmin && auth.role !== 'koordinator' && auth.customerId !== req.body?.customer_id) {
+    return res.status(403).json({ error: 'Du kan bara skapa ärenden för din egen kund' })
   }
 
   console.log('=== CREATE CASE API START ===')

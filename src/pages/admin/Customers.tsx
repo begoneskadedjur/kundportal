@@ -40,7 +40,7 @@ import {
   formatContractPeriod,
   getContractProgress 
 } from '../../utils/customerMetrics'
-import { supabase } from '../../lib/supabase'
+import { supabase, getAuthHeaders } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { PriceListService } from '../../services/priceListService'
 import type { PriceList, PriceListItemWithArticle } from '../../types/articles'
@@ -725,7 +725,7 @@ export default function Customers() {
         const singleCustomer = organization.sites[0]
         const response = await fetch('/api/create-customer', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await getAuthHeaders(),
           body: JSON.stringify({
             company_name: singleCustomer.company_name,
             contact_person: singleCustomer.contact_person,
