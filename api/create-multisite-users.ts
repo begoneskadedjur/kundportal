@@ -74,7 +74,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const organizationName = orgData.company_name
 
-    const results = {
+    const results: {
+      success: { email: any; userId: string; message: string }[]
+      errors: { email: any; error: any }[]
+    } = {
       success: [],
       errors: []
     }

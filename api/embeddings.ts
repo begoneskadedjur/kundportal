@@ -24,7 +24,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
   const result = await model.embedContent({
     content: { parts: [{ text }] },
     taskType: 'RETRIEVAL_DOCUMENT' as any,
-  });
+  } as any);
 
   return result.embedding.values;
 }
@@ -36,7 +36,7 @@ async function generateQueryEmbedding(query: string): Promise<number[]> {
   const result = await model.embedContent({
     content: { parts: [{ text: query }] },
     taskType: 'RETRIEVAL_QUERY' as any,
-  });
+  } as any);
 
   return result.embedding.values;
 }

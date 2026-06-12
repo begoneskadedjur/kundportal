@@ -10,7 +10,7 @@ const setCorsHeaders = (res: VercelResponse) => {
 }
 
 // Centraliserad funktion för Oneflow API-anrop
-const oneflowFetch = async (endpoint: string, token: string, method: 'GET' | 'POST' = 'GET', body?: any) => {
+const oneflowFetch = async (endpoint: string, token: string, method: 'GET' | 'POST' | 'DELETE' = 'GET', body?: any) => {
   const API_URL = process.env.ONEFLOW_API_URL || 'https://api.oneflow.com/v1'
   const url = `${API_URL}${endpoint}`
   

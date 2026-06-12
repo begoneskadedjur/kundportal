@@ -579,7 +579,7 @@ function filterCasesByMethod(cases: any[], message: string) {
   const lowerMessage = message.toLowerCase();
   
   // Identifiera metoder från meddelandet
-  const methods = [];
+  const methods: string[] = [];
   if (lowerMessage.includes('kisel')) methods.push('kisel');
   if (lowerMessage.includes('värmetält') || lowerMessage.includes('värme tält')) methods.push('värmetält');
   if (lowerMessage.includes('sanering')) methods.push('sanering');
@@ -648,7 +648,7 @@ function filterCasesByMethod(cases: any[], message: string) {
  * Extraherar nyckelord från meddelandet
  */
 function extractKeywords(message: string): string[] {
-  const keywords = [];
+  const keywords: string[] = [];
   const lowerMessage = message.toLowerCase();
   
   // Skadedjurstyper

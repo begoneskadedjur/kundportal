@@ -11,15 +11,20 @@
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
+    // verbatimModuleSyntax avstängd: kodbasen skrevs utan `import type`-konvention
+    // (451 befintliga TS1484-fel). isolatedModules ger samma esbuild/Vite-säkerhet.
+    "verbatimModuleSyntax": false,
+    "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
 
     /* Linting */
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    // noUnusedLocals/Parameters avstängda: 812 befintliga TS6133 (stil, ej typsäkerhet).
+    // Slå på igen när skulden i scripts/type-check-baseline.json är avbetald.
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true

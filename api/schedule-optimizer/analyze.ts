@@ -17,7 +17,7 @@ interface TechnicianSchedule {
     start_time: string;
     end_time: string;
     duration_minutes: number;
-    address: string;
+    address: string | null;
     title: string;
   }>;
   available_gaps: Array<{
@@ -621,13 +621,13 @@ function optimizeAssignments(cases: any[], technicians: any[], distanceMatrix: M
 }
 
 // Beräkna optimal rutt för en tekniker
-function calculateOptimalRoute(startAddress: string, addresses: string[], distanceMatrix: Map<string, any>) {
+function calculateOptimalRoute(startAddress: string, addresses: (string | null)[], distanceMatrix: Map<string, any>) {
   if (addresses.length === 0) {
     return { total_distance: 0, total_duration: 0 };
   }
   
   // Enkel nearest-neighbor algoritm
-  let currentAddress = startAddress;
+  let currentAddress: string | null = startAddress;
   let totalDistance = 0;
   let totalDuration = 0;
   const unvisited = [...addresses];
@@ -814,7 +814,7 @@ function generateDetailedChangeReason(caseItem: any, fromTech: any, toTech: any,
 }
 
 // Hämta rutt-kontext för en tekniker
-function getRouteContextForTechnician(technician: any, currentCase: any, caseAddress: string): any {
+function getRouteContextForTechnician(technician: any, currentCase: any, caseAddress: string | null): any {
   // Simulera kontextuell information (i framtiden från riktiga scheman)
   const caseTime = new Date(currentCase.start_date);
   const caseHour = caseTime.getHours();
@@ -930,7 +930,7 @@ function generateContextualExplanation(fromTech: any, toTech: any, caseItem: any
 }
 
 // Generera närliggande adresser för simulering
-function generateNearbyAddress(baseAddress: string): string {
+function generateNearbyAddress(baseAddress: string | null): string {
   const stockholmAreas = [
     "Södermalm", "Östermalm", "Vasastan", "Gamla Stan", "Norrmalm",
     "Kungsholmen", "Djurgården", "Bromma", "Vällingby", "Rinkeby"
@@ -950,7 +950,7 @@ function formatTime(hour: number): string {
 }
 
 // Beräkna ungefärlig distans för visualisering
-function calculateDistanceEstimate(fromAddress: string, toAddress: string): number {
+function calculateDistanceEstimate(fromAddress: string | null, toAddress: string | null): number {
   // Enkel fallback-beräkning baserad på adress-likheter
   if (!fromAddress || !toAddress) return 25; // Default 25km
   
@@ -2180,7 +2180,7 @@ function calculateRouteEfficiencyImprovement(technician: any, currentCase: any, 
 }
 
 // Extrahera område från adress för geografisk analys
-function extractAreaFromAddress(address: string): string {
+function extractAreaFromAddress(address: string | null): string {
   if (!address) return 'Okänt';
   
   // Söker efter svenska stadsdel-mönster

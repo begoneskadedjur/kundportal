@@ -829,9 +829,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Starta browser FÖRE HTML-generering — behövs för satellitkartan
     const browser = await puppeteer.launch({
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
+      defaultViewport: (chromium as any).defaultViewport,
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      headless: (chromium as any).headless,
     })
 
     const html = await generateInspectionReportHTML({

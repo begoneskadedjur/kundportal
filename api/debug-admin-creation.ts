@@ -1,5 +1,5 @@
 // api/debug-admin-creation.ts - DEBUG ENDPOINT för att isolera admin creation problem
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type AuthError } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -16,7 +16,12 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const debugResults = {
+  const debugResults: {
+    timestamp: string
+    steps: string[]
+    finalStatus: string
+    error: AuthError | string | null
+  } = {
     timestamp: new Date().toISOString(),
     steps: [],
     finalStatus: 'unknown',

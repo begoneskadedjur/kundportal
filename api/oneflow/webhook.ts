@@ -71,14 +71,17 @@ interface OneflowContractDetails {
   parties: Array<{
     type: 'company' | 'individual'
     name?: string
+    country?: string
     identification_number?: string
     participants: Array<{
       name: string
       email: string
       signatory: boolean
+      phone_number?: string
     }>
   }>
   product_groups?: Array<{
+    name?: string
     products: Array<{
       name: string
       description: string
@@ -98,22 +101,22 @@ interface ContractInsertData {
   type: 'contract' | 'offer'
   status: 'pending' | 'signed' | 'declined' | 'active' | 'ended' | 'overdue'
   template_id: string
-  begone_employee_name?: string
-  begone_employee_email?: string
-  contract_length?: string
-  start_date?: string
-  contact_person?: string
-  contact_email?: string
-  contact_phone?: string
-  contact_address?: string
-  company_name?: string
-  organization_number?: string
-  agreement_text?: string
-  total_value?: number
+  begone_employee_name?: string | null
+  begone_employee_email?: string | null
+  contract_length?: string | null
+  start_date?: string | null
+  contact_person?: string | null
+  contact_email?: string | null
+  contact_phone?: string | null
+  contact_address?: string | null
+  company_name?: string | null
+  organization_number?: string | null
+  agreement_text?: string | null
+  total_value?: number | null
   selected_products?: any
-  billing_email?: string
-  billing_address?: string
-  customer_id?: string
+  billing_email?: string | null
+  billing_address?: string | null
+  customer_id?: string | null
 }
 
 // Inaktivera Vercels body parser för att hantera raw body

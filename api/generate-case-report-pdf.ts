@@ -80,8 +80,8 @@ const getTrafficLightStatus = (pest_level: number | null, problem_rating: number
   }
   
   if ((pest_level && pest_level >= 3) || (problem_rating && problem_rating >= 4)) {
-    const activityLevel = pest_level >= 3 ? `Nivå ${pest_level} av 3\n\nHög nivå - Kräver omedelbar åtgärd` : `Nivå ${pest_level || 0} av 3\n\nMedium nivå - Bör åtgärdas`
-    const situationRating = problem_rating >= 4 ? `${problem_rating} av 5\n\nAllvarligt - Åtgärd krävs` : `${problem_rating || 0} av 5\n\nMedium - Övervakning rekommenderas`
+    const activityLevel = pest_level! >= 3 ? `Nivå ${pest_level} av 3\n\nHög nivå - Kräver omedelbar åtgärd` : `Nivå ${pest_level || 0} av 3\n\nMedium nivå - Bör åtgärdas`
+    const situationRating = problem_rating! >= 4 ? `${problem_rating} av 5\n\nAllvarligt - Åtgärd krävs` : `${problem_rating || 0} av 5\n\nMedium - Övervakning rekommenderas`
     
     return { 
       color: '#EF4444', 
@@ -1049,9 +1049,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Launch Puppeteer
     const browser = await puppeteer.launch({
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
+      defaultViewport: (chromium as any).defaultViewport,
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      headless: (chromium as any).headless,
     })
 
     const page = await browser.newPage()

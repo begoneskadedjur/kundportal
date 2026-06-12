@@ -24,7 +24,7 @@ async function generateEmbedding(text: string): Promise<number[]> {
   const result = await model.embedContent({
     content: { parts: [{ text }] },
     taskType: 'RETRIEVAL_DOCUMENT' as any,
-  });
+  } as any);
 
   return result.embedding.values;
 }

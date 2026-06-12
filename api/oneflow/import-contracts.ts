@@ -233,6 +233,16 @@ interface OneflowProduct {
     amount: string
     currency: string
   }
+  price_1?: {
+    amount?: {
+      amount?: string
+    }
+  }
+  price_2?: {
+    amount?: {
+      amount?: string
+    }
+  }
 }
 
 // Komplett kontraktsdata från alla endpoints
@@ -326,7 +336,7 @@ interface ContractInsertData {
   begone_employee_name?: string
   begone_employee_email?: string
   contract_length?: string
-  start_date?: string
+  start_date?: string | null
   contact_person?: string
   contact_email?: string
   contact_phone?: string
@@ -334,7 +344,7 @@ interface ContractInsertData {
   company_name?: string
   organization_number?: string
   agreement_text?: string
-  total_value?: number
+  total_value?: number | null
   selected_products?: any
   customer_id: null
 }

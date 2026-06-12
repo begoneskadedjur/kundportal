@@ -219,7 +219,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       generationConfig: {
         maxOutputTokens: 8192,
         responseMimeType: 'application/json',
-        responseSchema: analysisSchema,
+        responseSchema: analysisSchema as any,
       },
     });
 

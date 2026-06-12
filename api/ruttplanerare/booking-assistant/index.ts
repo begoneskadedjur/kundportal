@@ -24,7 +24,7 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
   const suggestions: Suggestion[] = [];
   const lastPossibleStartForJob = subMinutes(daySchedule.workEnd, timeSlotDuration);
   const virtualStartEvent: EventSlot = { start: subMinutes(daySchedule.workStart, 1), end: daySchedule.workStart, type: 'case', title: 'Hemadress', address: daySchedule.technician.address };
-  const allEvents = [ virtualStartEvent, ...daySchedule.existingCases, ...daySchedule.absences.map(a => ({ start: a.start, end: a.end, type: 'absence' as const, title: 'Frånvaro' })) ].sort((a, b) => a.start.getTime() - b.start.getTime());
+  const allEvents: EventSlot[] = [ virtualStartEvent, ...daySchedule.existingCases, ...daySchedule.absences.map(a => ({ start: a.start, end: a.end, type: 'absence' as const, title: 'Frånvaro' })) ].sort((a, b) => a.start.getTime() - b.start.getTime());
 
   // Kontrollera om detta är dagens datum och sätt minimum starttid
   const now = new Date();

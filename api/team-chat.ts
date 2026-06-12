@@ -609,7 +609,7 @@ async function searchCasesInDb(args: Record<string, unknown>) {
   };
 
   // Hämta från relevanta tabeller baserat på caseType
-  const queries: Promise<unknown>[] = [];
+  const queries: PromiseLike<unknown>[] = [];
 
   if (!caseType || caseType === 'private') {
     queries.push(
@@ -704,7 +704,7 @@ async function generateCaseReport(args: Record<string, unknown>) {
   const shouldQueryContract = caseTypeFilter === 'all' || caseTypeFilter === 'contract';
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const queries: Promise<any[]>[] = [];
+  const queries: PromiseLike<any[]>[] = [];
 
   if (shouldQueryPrivate) {
     let query = supabase
@@ -1552,7 +1552,8 @@ OBS: Varje ärende kan ha upp till 3 tekniker som arbetar tillsammans - alla des
     let result = await ai.models.generateContent({
       model: modelName,
       contents: contents,
-      config: generateConfig,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      config: generateConfig as any,
     });
 
     // Hantera function calls - loop tills modellen är klar
@@ -1599,7 +1600,8 @@ OBS: Varje ärende kan ha upp till 3 tekniker som arbetar tillsammans - alla des
       result = await ai.models.generateContent({
         model: modelName,
         contents: contents,
-        config: generateConfig,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        config: generateConfig as any,
       });
     }
 

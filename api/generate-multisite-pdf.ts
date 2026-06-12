@@ -151,7 +151,7 @@ const generateMultisitePDFHTML = (data: any) => {
     '6m': 'Senaste 6 månaderna',
     '1y': 'Senaste året',
     'all': 'Hela tiden'
-  }[period] || period
+  }[period as '30d' | '3m' | '6m' | '1y' | 'all'] || period
 
   // Get role description
   function getRoleDescription(role: string): string {
@@ -761,9 +761,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Launch Puppeteer with Chrome
     const browser = await puppeteer.launch({
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
+      defaultViewport: (chromium as any).defaultViewport,
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      headless: (chromium as any).headless,
     })
 
     const page = await browser.newPage()

@@ -1,4 +1,4 @@
-// src/utils/priorityMapper.ts
+// src/utils/priorityMapper.tsx
 // Prioritetsmappning med ClickUps exakta färger och svenska text
 
 export interface PriorityConfig {

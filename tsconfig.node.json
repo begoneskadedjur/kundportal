@@ -13,13 +13,16 @@
   },
   "include": [
     // Inkludera alla API-filer med rätt filändelse
-    "api/**/*.ts", 
-    
+    "api/**/*.ts",
+
     // Inkludera de lib-filer som servern använder
     "src/lib/clickup.ts",
     "src/lib/supabase-admin.ts",
-    
-    // Inkludera Vite-konfigurationen
-    "vite.config.ts"
+    "src/lib/pdf-generator.ts",
+    "src/types/database.ts"
+
+    // OBS: vite.config.ts kan inte typkollas här — Vite är ESM-only och detta
+    // projekt använder NodeNext utan "type": "module" i package.json.
+    // Vite validerar själv configen vid build.
   ]
 }

@@ -92,7 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Has reset_token_expires_at:', !!metadata.reset_token_expires_at)
     console.log('Debug - checking both metadata sources:')
     console.log('user_metadata:', userData.user_metadata)
-    console.log('raw_user_meta_data:', userData.raw_user_meta_data)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    console.log('raw_user_meta_data:', (userData as any).raw_user_meta_data)
 
     if (!metadata.reset_token_hash || !metadata.reset_token_expires_at) {
       console.log('No reset token found in user metadata')
@@ -145,7 +146,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       // Hantera specifika lösenordsproblem
       if (updateError.status === 422 && updateError.code === 'weak_password') {
-        if (updateError.reasons?.includes('pwned')) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((updateError as any).reasons?.includes('pwned')) {
           return res.status(422).json({ 
             error: 'Osäkert lösenord',
             type: 'weak_password_pwned',

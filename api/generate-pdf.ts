@@ -153,7 +153,7 @@ const generatePDFHTML = (data: any) => {
     '6m': 'Senaste 6 månaderna',
     '1y': 'Senaste året',
     'all': 'Hela tiden'
-  }[period] || period
+  }[period as '30d' | '3m' | '6m' | '1y' | 'all'] || period
 
   // Generate table rows - show more rows to utilize space better
   const tableRows = cases.slice(0, 20).map((caseItem: any) => `
@@ -697,9 +697,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Launch Puppeteer with Chrome
     const browser = await puppeteer.launch({
       args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
+      defaultViewport: (chromium as any).defaultViewport,
       executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+      headless: (chromium as any).headless,
     })
 
     const page = await browser.newPage()
@@ -734,7 +734,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('PDF buffer constructor:', pdf.constructor.name)
     
     // Debug: Check what pdf actually contains
-    if (pdf instanceof Uint8Array || pdf instanceof Buffer) {
+    if (pdf instanceof Uint8Array || (pdf as any) instanceof Buffer) {
       console.log('PDF is a valid buffer/array')
     } else {
       console.error('PDF is not a buffer/array, it is:', pdf)
