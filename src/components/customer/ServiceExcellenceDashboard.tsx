@@ -132,12 +132,12 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
       sub: nextInspDisplay.sub
     },
     {
-      label: 'Aktiva ärenden',
+      label: 'Ärenden utöver avtal',
       value: activeCasesCount,
       sub: activeCasesCount === 1 ? 'aktivt ärende' : 'aktiva ärenden'
     },
     {
-      label: 'Nästa besök',
+      label: 'Nästa besök utöver avtal',
       value: nextVisitDisplay.value,
       sub: nextVisitDisplay.sub
     }

@@ -338,12 +338,12 @@ function AllSitesDashboard({ sites, userRoleType, isRegional }: { sites: SiteOpt
                 sub: nextInspDisplay.sub
               },
               {
-                label: 'Aktiva ärenden',
+                label: 'Ärenden utöver avtal',
                 value: aggregated.activeCases,
                 sub: aggregated.activeCases === 1 ? 'aktivt ärende' : 'aktiva ärenden'
               },
               {
-                label: 'Nästa besök',
+                label: 'Nästa besök utöver avtal',
                 value: nextVisitDisplay.value,
                 sub: nextVisitDisplay.sub
               }
