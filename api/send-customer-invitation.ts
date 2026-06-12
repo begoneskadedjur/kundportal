@@ -64,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 4. Kontrollera om användaren redan existerar
     console.log('Checking for existing auth user...')
     const { data: { users } } = await supabase.auth.admin.listUsers()
-    const existingAuthUser = users.find(u => u.email === email)
+    const existingAuthUser = users.find((u: any) => u.email === email)
     
     let userId: string
     let tempPassword: string | null = null

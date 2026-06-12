@@ -69,7 +69,7 @@ export default async function handler(req: any, res: any) {
       debugResults.steps.push(`⚠️ Could not list auth users: ${listError.message}`)
       console.warn('Could not list auth users:', listError)
     } else {
-      const existingUser = existingUsers.users.find(u => u.email === testEmail)
+      const existingUser = existingUsers.users.find((u: any) => u.email === testEmail)
       if (existingUser) {
         debugResults.steps.push(`🚨 Email ${testEmail} already exists in auth.users: ${existingUser.id}`)
         console.error('Email already exists:', existingUser.id)

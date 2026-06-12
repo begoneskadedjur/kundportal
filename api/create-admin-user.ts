@@ -41,7 +41,7 @@ export default async function handler(req: any, res: any) {
     console.log('🔍 Checking if email already exists...')
     const { data: existingUsers, error: listError } = await supabaseAdmin.auth.admin.listUsers()
     if (!listError) {
-      const existingUser = existingUsers.users.find(u => u.email === email)
+      const existingUser = existingUsers.users.find((u: any) => u.email === email)
       if (existingUser) {
         return res.status(400).json({ 
           error: 'En användare med denna e-postadress finns redan'

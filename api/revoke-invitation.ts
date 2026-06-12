@@ -101,7 +101,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         // Hitta användare med denna email
         const { data: { users } } = await supabase.auth.admin.listUsers()
-        const user = users.find(u => u.email === email)
+        const user = users.find((u: any) => u.email === email)
         
         if (user) {
           // Kontrollera om användaren har andra aktiva kundrelationer
