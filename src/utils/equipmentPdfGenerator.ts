@@ -4,13 +4,27 @@ import {
   EquipmentPlacementWithRelations,
   EQUIPMENT_TYPE_CONFIG,
   EQUIPMENT_STATUS_CONFIG,
-  getEquipmentTypeLabel,
   getEquipmentStatusLabel
 } from '../types/database'
 
 interface EquipmentPdfOptions {
   customerName: string
   equipment: EquipmentPlacementWithRelations[]
+}
+
+// Typnamn/färg med fallback-kedja: dynamisk stationstyp (station_types-tabellen,
+// samma källa som UI:t) → legacy-config (engelska nycklar) → rådata med neutral grå.
+// equipment_type i databasen innehåller numera dynamiska svenska namn
+// ("Betongstation", "mekanisk_falla"...) som saknas i EQUIPMENT_TYPE_CONFIG.
+const resolveTypeDisplay = (item: EquipmentPlacementWithRelations): { label: string; color: string } => {
+  if (item.station_type_data) {
+    return { label: item.station_type_data.name, color: item.station_type_data.color }
+  }
+  const legacy = EQUIPMENT_TYPE_CONFIG[item.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]
+  if (legacy) {
+    return { label: legacy.label, color: legacy.color }
+  }
+  return { label: item.equipment_type || 'Okänd typ', color: '#6b7280' }
 }
 
 // BeGone Professional Color Palette (samma som pdfReportGenerator)
@@ -233,57 +247,37 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
     // === SAMMANFATTNING ===
     yPosition = drawSectionHeader(pdf, 'SAMMANFATTNING', margins.left, yPosition, contentWidth, 'accent')
 
-    // Beräkna statistik
-    const stats = {
-      total: equipment.length,
-      byType: {
-        mechanical_trap: equipment.filter((e) => e.equipment_type === 'mechanical_trap').length,
-        concrete_station: equipment.filter((e) => e.equipment_type === 'concrete_station').length,
-        bait_station: equipment.filter((e) => e.equipment_type === 'bait_station').length
-      },
-      byStatus: {
-        active: equipment.filter((e) => e.status === 'active').length,
-        removed: equipment.filter((e) => e.status === 'removed').length,
-        missing: equipment.filter((e) => e.status === 'missing').length
-      }
+    // Beräkna statistik - gruppera dynamiskt på typnamn (equipment_type i
+    // databasen innehåller dynamiska stationstyper, inte de tre legacy-nycklarna)
+    const typeGroups = new Map<string, { count: number; color: string }>()
+    for (const item of equipment) {
+      const { label, color } = resolveTypeDisplay(item)
+      const existing = typeGroups.get(label)
+      if (existing) existing.count++
+      else typeGroups.set(label, { count: 1, color })
     }
+    const topTypes = [...typeGroups.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 3)
 
-    // Rita statistik-rutor
+    const activeCount = equipment.filter((e) => e.status === 'active').length
+
+    // Rita statistik-rutor: de (upp till) tre största typgrupperna + Aktiva
     const statBoxWidth = (contentWidth - spacing.md * 3) / 4
     const statBoxHeight = 50
 
-    drawStatBox(
-      pdf,
-      margins.left,
-      yPosition,
-      statBoxWidth,
-      statBoxHeight,
-      EQUIPMENT_TYPE_CONFIG.mechanical_trap.labelPlural,
-      stats.byType.mechanical_trap,
-      EQUIPMENT_TYPE_CONFIG.mechanical_trap.color
-    )
-
-    drawStatBox(
-      pdf,
-      margins.left + statBoxWidth + spacing.md,
-      yPosition,
-      statBoxWidth,
-      statBoxHeight,
-      EQUIPMENT_TYPE_CONFIG.concrete_station.labelPlural,
-      stats.byType.concrete_station,
-      EQUIPMENT_TYPE_CONFIG.concrete_station.color
-    )
-
-    drawStatBox(
-      pdf,
-      margins.left + (statBoxWidth + spacing.md) * 2,
-      yPosition,
-      statBoxWidth,
-      statBoxHeight,
-      EQUIPMENT_TYPE_CONFIG.bait_station.labelPlural,
-      stats.byType.bait_station,
-      EQUIPMENT_TYPE_CONFIG.bait_station.color
-    )
+    topTypes.forEach(([label, group], index) => {
+      drawStatBox(
+        pdf,
+        margins.left + (statBoxWidth + spacing.md) * index,
+        yPosition,
+        statBoxWidth,
+        statBoxHeight,
+        label,
+        group.count,
+        group.color
+      )
+    })
 
     drawStatBox(
       pdf,
@@ -292,7 +286,7 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
       statBoxWidth,
       statBoxHeight,
       'Aktiva',
-      stats.byStatus.active,
+      activeCount,
       '#22c55e'
     )
 
@@ -390,17 +384,17 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
         colX = margins.left + spacing.xs
 
         // Typ med färgad prick
-        const typeConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type]
+        const typeDisplay = resolveTypeDisplay(item)
         const hexToRgb = (hex: string): [number, number, number] => {
           const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
           return result
             ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
             : [107, 114, 128]
         }
-        const typeRgb = hexToRgb(typeConfig.color)
+        const typeRgb = hexToRgb(typeDisplay.color)
         pdf.setFillColor(...typeRgb)
         pdf.circle(colX + 3, yPosition + 7, 2.5, 'F')
-        pdf.text(getEquipmentTypeLabel(item.equipment_type), colX + 8, yPosition + 9)
+        pdf.text(typeDisplay.label, colX + 8, yPosition + 9)
 
         colX += colWidths.type
         pdf.text(item.serial_number || '-', colX, yPosition + 9)
@@ -458,14 +452,14 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
         const infoX = margins.left + spacing.md
 
         // Typ med färgad prick
-        const typeConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type]
+        const typeDisplay = resolveTypeDisplay(item)
         const hexToRgb = (hex: string): [number, number, number] => {
           const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
           return result
             ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)]
             : [107, 114, 128]
         }
-        const typeRgb = hexToRgb(typeConfig.color)
+        const typeRgb = hexToRgb(typeDisplay.color)
 
         pdf.setFillColor(...typeRgb)
         pdf.circle(infoX + 4, yPosition + 12, 4, 'F')
@@ -473,7 +467,7 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
         pdf.setTextColor(...beGoneColors.darkGray)
         pdf.setFontSize(typography.subheader.size)
         pdf.setFont(undefined, 'bold')
-        pdf.text(getEquipmentTypeLabel(item.equipment_type), infoX + 12, yPosition + 14)
+        pdf.text(typeDisplay.label, infoX + 12, yPosition + 14)
 
         // Serienummer
         if (item.serial_number) {
