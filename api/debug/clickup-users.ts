@@ -144,9 +144,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Grundläggande säkerhet
+    // Grundläggande säkerhet - kräver att ADMIN_DEBUG_KEY är satt i miljön,
+    // ingen hårdkodad fallback (endpointen är avstängd tills env-varen finns)
     const adminKey = req.query.admin_key as string
-    if (adminKey !== process.env.ADMIN_DEBUG_KEY && adminKey !== 'begone_debug_2025') {
+    if (!process.env.ADMIN_DEBUG_KEY || adminKey !== process.env.ADMIN_DEBUG_KEY) {
       return res.status(401).json({ error: 'Unauthorized access' })
     }
 

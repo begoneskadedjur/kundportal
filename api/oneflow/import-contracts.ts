@@ -376,7 +376,7 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
     
     console.log(`🔍 Hämtar OneFlow-kontrakt, sida ${page}, limit ${limit}`)
     console.log(`🔐 Använder OneFlow email: info@begone.se`)
-    console.log(`🔑 API token finns: ${!!ONEFLOW_API_TOKEN} (längd: ${ONEFLOW_API_TOKEN?.length || 0})`)
+    console.log(`🔑 API token konfigurerad: ${!!ONEFLOW_API_TOKEN}`)
 
     // Hämta alla kontrakt - OneFlow API stöder inte template_id filtrering
     const offset = (page - 1) * limit

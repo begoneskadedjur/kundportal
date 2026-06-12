@@ -360,7 +360,7 @@ export default function EmailCampaignModal({
                   <div className="text-sm text-slate-300 space-y-2">
                     <div><strong>Ämne:</strong> {subject}</div>
                     <div className="border-t border-slate-700 pt-2">
-                      <div className="whitespace-pre-wrap text-slate-200" dangerouslySetInnerHTML={{ __html: message }} />
+                      <div className="whitespace-pre-wrap text-slate-200">{message}</div>
                     </div>
                   </div>
                 </Card>

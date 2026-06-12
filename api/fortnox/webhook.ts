@@ -18,6 +18,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // Valfri delad hemlighet (Fortnox skickar ingen HMAC-signatur):
+  // sätt FORTNOX_WEBHOOK_SECRET i Vercel och registrera webhook-URL:en i
+  // Fortnox developer-portal med ?secret=<värdet>. Tills env-varen är satt
+  // ändras ingenting (webhooken hämtar ändå alltid sanningen från Fortnox API).
+  const expectedSecret = process.env.FORTNOX_WEBHOOK_SECRET
+  if (expectedSecret && req.query.secret !== expectedSecret) {
+    return res.status(401).json({ error: 'Unauthorized' })
+  }
+
   const { Type, EntityId } = req.body || {}
 
   // Vi bryr oss bara om faktura-händelser

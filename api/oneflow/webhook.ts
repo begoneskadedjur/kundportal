@@ -147,8 +147,9 @@ const getRawBody = async (req: VercelRequest): Promise<string> => {
 // Verifiera Oneflow signatur
 const verifySignature = (payload: OneflowWebhookPayload): boolean => {
   if (!ONEFLOW_SIGN_KEY) {
-    console.warn('⚠️ VARNING: ONEFLOW_WEBHOOK_SECRET saknas - signaturverifiering hoppas över')
-    return true // Tillåt för testning utan nyckel
+    // Faila stängt: utan secret kan vi inte skilja äkta Oneflow-anrop från förfalskade
+    console.error('🚨 ONEFLOW_WEBHOOK_SECRET saknas - webhook avvisas (faila stängt)')
+    return false
   }
 
   const expectedSignature = crypto
