@@ -111,21 +111,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('Fetching user profile...')
     const { data: profile } = await supabase
       .from('profiles')
-      .select('name, organization_id, customers!inner(name)')
-      .eq('id', user.id)
+      .select('display_name, customer_id')
+      .eq('user_id', user.id)
       .single()
 
-    const userName = profile?.name || 'Användare'
-    const organizationName = (profile?.customers as any)?.[0]?.name || null
+    const firstName = (profile?.display_name || '').split(' ')[0] || 'Hej'
 
-    console.log('User details:', { userName, organizationName })
+    let organizationName: string | null = null
+    if (profile?.customer_id) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('company_name')
+        .eq('id', profile.customer_id)
+        .maybeSingle()
+      organizationName = customer?.company_name || null
+    }
+
+    console.log('User details:', { firstName, organizationName })
 
     // 7. Skapa återställningslänk
     const resetLink = `${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`
 
     // 8. Skapa snyggt HTML-mail
     const emailHtml = getPasswordResetEmailTemplate({
-      userName,
+      firstName,
       organizationName,
       resetLink,
       email
@@ -173,108 +182,76 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 function getPasswordResetEmailTemplate({
-  userName,
+  firstName,
   organizationName,
   resetLink,
   email
 }: {
-  userName: string
+  firstName: string
   organizationName: string | null
   resetLink: string
   email: string
 }) {
-  return `
-<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="sv">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Återställ ditt lösenord - BeGone Kundportal</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Återställ ditt lösenord - BeGone Kundportal</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #0f172a; color: #e2e8f0;">
-    <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+<body style="margin: 0; padding: 20px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #070f1a;">
+  <div style="max-width: 560px; margin: 0 auto;">
 
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #134e35 0%, #0a1f14 100%); padding: 2.5rem 2rem; text-align: center; border-bottom: 3px solid #20c58f;">
-            <div style="margin-bottom: 0.75rem;">
-                <span style="font-size: 2rem; font-weight: 700; color: #ffffff; letter-spacing: -0.02em;">BeGone</span>
-            </div>
-            <div style="font-size: 0.75rem; color: #20c58f; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600;">
-                Skadedjur &amp; Sanering
-            </div>
-            <div style="margin-top: 1.5rem; border-top: 1px solid rgba(32, 197, 143, 0.2); padding-top: 1.5rem;">
-                <h1 style="margin: 0; color: white; font-size: 1.5rem; font-weight: 700;">
-                    Återställ ditt lösenord
-                </h1>
-            </div>
-        </div>
-
-        <!-- Innehåll -->
-        <div style="padding: 2rem;">
-            <p style="font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem; color: #e2e8f0;">
-                Hej ${userName},
-            </p>
-
-            <p style="line-height: 1.6; margin-bottom: 1.5rem; color: #cbd5e1;">
-                Vi har mottagit en begäran om att återställa lösenordet för ditt konto${organizationName ? ` hos <strong style="color: #20c58f;">${organizationName}</strong>` : ''}.
-            </p>
-
-            <p style="line-height: 1.6; margin-bottom: 1.5rem; color: #cbd5e1;">
-                Klicka på knappen nedan för att skapa ett nytt lösenord. Länken är giltig i <strong style="color: #fbbf24;">1 timme</strong> av säkerhetsskäl.
-            </p>
-
-            <!-- CTA Button -->
-            <div style="text-align: center; margin: 2rem 0;">
-                <a href="${resetLink}"
-                   style="background-color: #20c58f;
-                          color: #0f172a;
-                          text-decoration: none;
-                          padding: 14px 32px;
-                          border-radius: 8px;
-                          font-weight: 700;
-                          display: inline-block;
-                          font-size: 1rem;">
-                    🔐 Återställ lösenord
-                </a>
-            </div>
-
-            <!-- Alternativ länk -->
-            <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1rem; margin: 1.5rem 0;">
-                <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 0.5rem;">
-                    Om knappen inte fungerar, kopiera och klistra in denna länk i din webbläsare:
-                </p>
-                <p style="color: #20c58f; font-size: 0.8rem; margin: 0; word-break: break-all; font-family: monospace;">
-                    ${resetLink}
-                </p>
-            </div>
-
-            <!-- Säkerhetsvarning -->
-            <div style="background-color: rgba(127, 29, 29, 0.5); border-left: 3px solid #ef4444; border-radius: 6px; padding: 1.25rem 1.5rem; margin: 1.5rem 0;">
-                <h3 style="color: #fca5a5; margin: 0 0 0.5rem; font-size: 0.95rem; font-weight: 700;">
-                    ⚠️ Säkerhetsnotis
-                </h3>
-                <p style="color: #fecaca; font-size: 0.9rem; margin: 0; line-height: 1.5;">
-                    <strong>Har du inte begärt denna återställning?</strong><br>
-                    Du kan ignorera detta e-postmeddelande. Ditt lösenord kommer inte att ändras om du inte klickar på länken ovan.
-                </p>
-            </div>
-
-            <!-- Kontoinformation -->
-            <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1rem; margin: 1.5rem 0;">
-                <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 0.25rem;">Ditt konto</p>
-                <p style="color: #e2e8f0; font-size: 0.9rem; margin: 0;">${email}</p>
-            </div>
-
-            <div style="border-top: 1px solid #334155; padding-top: 1.5rem; margin-top: 2rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
-                <p style="margin: 0 0 0.5rem;">Behöver du hjälp? Kontakta oss på <a href="mailto:support@begone.se" style="color: #20c58f; text-decoration: underline;">support@begone.se</a></p>
-                <p style="margin: 1rem 0 0;">
-                    Med vänliga hälsningar,<br>
-                    <strong style="color: #e2e8f0;">BeGone Skadedjur &amp; Sanering AB</strong>
-                </p>
-            </div>
-        </div>
+    <!-- Header -->
+    <div style="background: linear-gradient(160deg, #0d3524 0%, #061810 100%); border-radius: 12px 12px 0 0; padding: 32px 36px 28px; text-align: center; border-bottom: 2px solid #20c58f;">
+      <div style="font-size: 26px; font-weight: 800; color: #fff; letter-spacing: -0.03em; line-height: 1;">BeGone</div>
+      <div style="font-size: 10px; color: #20c58f; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; margin-top: 4px;">Skadedjur &amp; Sanering</div>
+      <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(32,197,143,0.18);">
+        <div style="font-size: 20px; font-weight: 700; color: #fff;">Återställ ditt lösenord</div>
+        ${organizationName ? `<div style="font-size: 13px; color: #20c58f; margin-top: 4px;">${organizationName}</div>` : ''}
+      </div>
     </div>
+
+    <!-- Body -->
+    <div style="background: #111827; border-radius: 0 0 12px 12px; padding: 28px 36px 32px;">
+
+      <p style="font-size: 16px; font-weight: 600; color: #f1f5f9; margin: 0 0 8px;">Hej ${firstName},</p>
+      <p style="font-size: 14px; color: #94a3b8; margin: 0 0 24px; line-height: 1.6;">
+        Vi har mottagit en begäran om att återställa lösenordet för <span style="color: #cbd5e1;">${email}</span>. Länken nedan är giltig i <strong style="color: #fbbf24;">1 timme</strong>.
+      </p>
+
+      <!-- CTA -->
+      <div style="text-align: center; margin: 0 0 24px;">
+        <a href="${resetLink}"
+           style="display: inline-block; background-color: #20c58f; color: #071811; font-size: 14px; font-weight: 700; text-decoration: none; padding: 12px 36px; border-radius: 7px; letter-spacing: 0.01em;">
+          Återställ lösenord
+        </a>
+      </div>
+
+      <!-- Länk-fallback -->
+      <div style="background: #0b1220; border: 1px solid #1e293b; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px;">
+        <div style="font-size: 11px; color: #475569; margin-bottom: 6px;">Om knappen inte fungerar, klistra in länken i webbläsaren:</div>
+        <div style="font-size: 11px; color: #20c58f; word-break: break-all; font-family: 'Courier New', monospace;">${resetLink}</div>
+      </div>
+
+      <!-- Säkerhetsnotis -->
+      <div style="border-left: 3px solid #ef4444; background: rgba(90,20,20,0.4); border-radius: 0 6px 6px 0; padding: 10px 14px; margin-bottom: 24px;">
+        <p style="font-size: 13px; color: #fca5a5; margin: 0 0 2px; font-weight: 600;">Begärde du inte detta?</p>
+        <p style="font-size: 13px; color: #f87171; margin: 0; line-height: 1.5;">Du kan ignorera detta mail. Ditt lösenord förblir oförändrat.</p>
+      </div>
+
+      <!-- Footer -->
+      <div style="border-top: 1px solid #1e293b; padding-top: 20px; text-align: center;">
+        <p style="font-size: 12px; color: #374151; margin: 0 0 4px;">
+          Frågor? <a href="mailto:support@begone.se" style="color: #20c58f; text-decoration: none;">support@begone.se</a>
+        </p>
+        <p style="font-size: 12px; color: #374151; margin: 0;">
+          BeGone Skadedjur &amp; Sanering AB
+        </p>
+      </div>
+
+    </div>
+  </div>
 </body>
-</html>
-  `
+</html>`
 }
