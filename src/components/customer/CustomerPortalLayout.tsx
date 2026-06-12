@@ -1,7 +1,7 @@
 // src/components/customer/CustomerPortalLayout.tsx
 // Modern layout med sidebar på desktop och bottom navigation på mobil
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Home,
   LogOut,
@@ -12,11 +12,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  X
+  X,
+  User
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
 import { useImpersonation } from '../../contexts/ImpersonationContext'
+import { supabase } from '../../lib/supabase'
+import CustomerSettingsModal from './CustomerSettingsModal'
 
 export type CustomerPortalView = 'dashboard' | 'stations' | 'inspections' | 'cases' | 'reports' | 'quotes'
 
@@ -85,11 +88,35 @@ export function CustomerPortalLayout({
   customerName,
   children
 }: CustomerPortalLayoutProps) {
-  const { signOut } = useAuth()
+  const { signOut, profile } = useAuth()
   const { userRole: multisiteRole, organization } = useMultisite()
   const { isImpersonating, impersonatedCustomerName, stopImpersonation } = useImpersonation()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [customerData, setCustomerData] = useState<{
+    id: string
+    company_name: string
+    org_number: string | null
+    contact_person: string
+    email: string
+    phone: string
+  } | null>(null)
+
+  const displayName = profile?.display_name || profile?.email || ''
+  const firstInitial = displayName[0]?.toUpperCase() || '?'
+
+  useEffect(() => {
+    if (!profileModalOpen || !profile?.customer_id) return
+    supabase
+      .from('customers')
+      .select('id, company_name, org_number, contact_person, email, phone')
+      .eq('id', profile.customer_id)
+      .single()
+      .then(({ data }) => {
+        if (data) setCustomerData(data)
+      })
+  }, [profileModalOpen, profile?.customer_id])
 
   const handleSignOut = async () => {
     await signOut()
@@ -190,6 +217,20 @@ export function CustomerPortalLayout({
 
         {/* Bottom Section */}
         <div className="p-3 border-t border-slate-700/50 space-y-2">
+          {/* Profile Button */}
+          <button
+            onClick={() => setProfileModalOpen(true)}
+            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}
+            title={sidebarCollapsed ? 'Min profil' : undefined}
+          >
+            <div className="w-7 h-7 rounded-full bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+              <span className="text-emerald-400 text-xs font-bold">{firstInitial}</span>
+            </div>
+            {!sidebarCollapsed && (
+              <span className="text-sm font-medium truncate">{displayName}</span>
+            )}
+          </button>
+
           {/* Collapse Toggle */}
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -248,6 +289,14 @@ export function CustomerPortalLayout({
             </a>
           )}
 
+          {/* Profile Button (mobile) */}
+          <button
+            onClick={() => setProfileModalOpen(true)}
+            className="w-8 h-8 rounded-full bg-emerald-500/15 flex items-center justify-center"
+          >
+            <span className="text-emerald-400 text-xs font-bold">{firstInitial}</span>
+          </button>
+
           {/* Menu Toggle */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -302,6 +351,17 @@ export function CustomerPortalLayout({
 
           {/* Divider */}
           <div className="h-px bg-slate-700/50 my-3" />
+
+          {/* Profile */}
+          <button
+            onClick={() => { setProfileModalOpen(true); setMobileMenuOpen(false) }}
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/50 transition-all"
+          >
+            <div className="w-7 h-7 rounded-full bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+              <span className="text-emerald-400 text-xs font-bold">{firstInitial}</span>
+            </div>
+            <span className="text-sm font-medium">{displayName || 'Min profil'}</span>
+          </button>
 
           {/* Sign Out */}
           <button
@@ -358,6 +418,16 @@ export function CustomerPortalLayout({
       >
         {children}
       </main>
+
+      {/* Profile Modal */}
+      {profileModalOpen && customerData && (
+        <CustomerSettingsModal
+          isOpen={profileModalOpen}
+          onClose={() => setProfileModalOpen(false)}
+          customer={customerData}
+          onUpdate={(updated) => setCustomerData(prev => prev ? { ...prev, ...updated } : prev)}
+        />
+      )}
     </div>
   )
 }
