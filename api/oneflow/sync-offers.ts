@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
+import { requireAuth } from '../_lib/auth'
 
 // Offer template IDs (samma som i offer-stats.ts)
 const OFFER_TEMPLATE_IDS = new Set(['8598798', '8919037', '8919012', '8919059'])
@@ -265,6 +266,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST' })
+
+  // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   if (!ONEFLOW_API_TOKEN) {
     return res.status(500).json({ error: 'ONEFLOW_API_TOKEN saknas' })

@@ -1,5 +1,6 @@
 // api/status-debug.ts - Hämta status-ID:n från ClickUp (fungerande version)
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { requireAuth } from './_lib/auth'
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
 
@@ -16,6 +17,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
   }
+
+  // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   if (!CLICKUP_API_TOKEN) {
     return res.status(500).json({ 

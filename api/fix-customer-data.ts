@@ -1,6 +1,7 @@
 // api/fix-customer-data.ts - Script för att fixa befintlig customer-data
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from './_lib/auth'
 
 // Miljövariabler
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -118,6 +119,10 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
+
   try {
     console.log('🔧 Startar uppdatering av customer-data...')
     

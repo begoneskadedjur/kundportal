@@ -3,6 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
 import { getWelcomeEmailTemplate, getAccessEmailTemplate, getReminderEmailTemplate } from './email-templates'
+import { requireAuth } from './_lib/auth'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -22,6 +23,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 

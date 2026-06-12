@@ -2,9 +2,14 @@
 // Proxy för Google Geolocation API — håller API-nyckeln server-side
 
 import { VercelRequest, VercelResponse } from '@vercel/node'
+import { requireAuth } from './_lib/auth'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST är tillåtet' })
+
+  // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   const body: Record<string, unknown> = { considerIp: true }
   if (req.body?.wifiAccessPoints) body.wifiAccessPoints = req.body.wifiAccessPoints

@@ -1,5 +1,6 @@
 // api/analyze-clickup-statuses.ts - Analysera era FAKTISKA ClickUp-statusar
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { requireAuth } from './_lib/auth'
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
 
@@ -26,6 +27,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Endast GET tillåtet' })
   }
+
+  // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   try {
     console.log('=== ANALYSERAR ERA FAKTISKA CLICKUP STATUSAR ===')

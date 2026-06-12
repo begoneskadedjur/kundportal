@@ -1,6 +1,7 @@
 // api/admin/cleanup-duplicate-contracts.ts - Rensa duplikatkontrakt från databasen
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../_lib/auth'
 
 // Miljövariabler
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -209,6 +210,10 @@ export default async function handler(
       error: 'Endast POST-anrop tillåtna'
     })
   }
+
+  // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   try {
     console.log('🧹 Startar cleanup av duplikatkontrakt och orphaned filer...')

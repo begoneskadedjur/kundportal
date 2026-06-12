@@ -1,5 +1,6 @@
 // api/clickup/task/[taskId].ts
 import { VercelRequest, VercelResponse } from '@vercel/node'
+import { requireAuth } from '../../_lib/auth'
 
 interface ClickUpCustomField {
   id: string
@@ -71,6 +72,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   const { taskId } = req.query
 

@@ -1,5 +1,6 @@
 // api/setup-webhook.ts - Skapa ClickUp webhook programmatiskt
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { requireAuth } from './_lib/auth'
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
 const TEAM_ID = '31641430' // Begone team ID
@@ -8,6 +9,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   try {
     console.log('🔧 Setting up ClickUp webhook...')

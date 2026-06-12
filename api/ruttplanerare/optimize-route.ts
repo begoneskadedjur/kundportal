@@ -6,6 +6,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
+import { requireAuth } from '../_lib/auth';
 
 // Använder de korrekta miljövariabel-namnen för ditt projekt
 const supabaseUrl = process.env.VITE_SUPABASE_URL!;
@@ -58,6 +59,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Endast POST är tillåtet' });
     }
+
+    // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
+    const auth = await requireAuth(req, res, ['admin']);
+    if (!auth) return;
 
     try {
         const { addresses, technicianId } = req.body;
