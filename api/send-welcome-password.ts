@@ -222,10 +222,10 @@ function getWelcomeEmailTemplate({
   <!-- Preheader -->
   <div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#f1f5f9;">Ditt konto hos BeGone Kundportal är aktiverat. Logga in med uppgifterna nedan.</div>
 
-  <div style="max-width: 560px; margin: 32px auto; box-shadow: 0 2px 12px rgba(0,0,0,0.10);">
+  <div style="max-width: 560px; margin: 32px auto; border: 1px solid #20c58f; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.10);">
 
     <!-- Header -->
-    <div style="background: linear-gradient(160deg, #0d2a1c 0%, #071610 100%); border-radius: 8px 8px 0 0; padding: 32px 36px 28px; text-align: center; border-bottom: 2px solid #20c58f;">
+    <div style="background-color: #0d2a1c; background: linear-gradient(160deg, #0d2a1c 0%, #071610 100%); border-radius: 8px 8px 0 0; padding: 32px 36px 28px; text-align: center; border-bottom: 2px solid #20c58f;">
       <div style="font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.02em; line-height: 1;">BeGone Skadedjur</div>
       <div style="margin-top: 16px;">
         <div style="font-size: 20px; font-weight: 700; color: #ffffff;">Välkommen till kundportalen</div>
@@ -275,7 +275,7 @@ function getWelcomeEmailTemplate({
     </div>
 
     <!-- Footer -->
-    <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; border-radius: 0 0 8px 8px; padding: 24px 36px; text-align: center;">
+    <div style="background-color: #edf2f7; border-top: 1px solid #cbd5e0; border-radius: 0 0 8px 8px; padding: 24px 36px; text-align: center;">
       <p style="font-size: 13px; font-weight: 600; color: #374151; margin: 0 0 6px 0;">BeGone Skadedjur &amp; Sanering AB</p>
       <p style="font-size: 12px; color: #9CA3AF; margin: 0 0 16px 0;">
         Org.nr: 559378-9208 &nbsp;&middot;&nbsp; 010 280 44 10 &nbsp;&middot;&nbsp;
