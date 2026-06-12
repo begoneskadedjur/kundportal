@@ -1,6 +1,7 @@
 // src/utils/statisticsUtils.ts - Utility functions for customer statistics processing
 import jsPDF from 'jspdf'
 import { isCompletedStatus, getCustomerStatusDisplay } from '../types/database'
+import { getAuthHeaders } from '../lib/supabase'
 
 // Font configuration for Swedish character support
 const configureSwedishFont = (doc: jsPDF) => {
@@ -161,9 +162,7 @@ export const exportStatisticsToPDF = async (
     // Call serverless function
     const response = await fetch('/api/generate-pdf', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getAuthHeaders(),
       body: JSON.stringify({
         customer,
         cases,

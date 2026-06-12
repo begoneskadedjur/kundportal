@@ -25,6 +25,34 @@ export interface AuthContext {
 }
 
 /**
+ * Verifierar enbart att anropet kommer från en inloggad användare (giltig
+ * Supabase-JWT) — ingen rollkontroll och inget krav på profilrad. Används för
+ * endpoints där skyddet gäller kostnad/missbruk snarare än databehörighet
+ * (t.ex. PDF-generering som bara renderar data anroparen redan har).
+ * Vid fel skickas 401-svar och null returneras.
+ */
+export async function requireAuthenticated(
+  req: VercelRequest,
+  res: VercelResponse
+): Promise<{ userId: string; email: string | undefined } | null> {
+  const authHeader = req.headers.authorization
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Ej inloggad' })
+    return null
+  }
+
+  const token = authHeader.slice('Bearer '.length)
+  const { data: { user }, error } = await supabaseAuth.auth.getUser(token)
+
+  if (error || !user) {
+    res.status(401).json({ error: 'Ogiltig eller utgången session' })
+    return null
+  }
+
+  return { userId: user.id, email: user.email }
+}
+
+/**
  * Verifierar att anropet kommer från en inloggad användare med någon av de
  * tillåtna rollerna. Vid fel skickas 401/403-svar och null returneras —
  * handlern ska då avbryta direkt:

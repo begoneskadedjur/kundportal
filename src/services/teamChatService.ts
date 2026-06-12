@@ -1,7 +1,7 @@
 // src/services/teamChatService.ts
 // Service för Team AI Chat - hanterar konversationer, meddelanden och användningsstatistik
 
-import { supabase } from '../lib/supabase';
+import { supabase, getAuthHeaders } from '../lib/supabase';
 
 export interface TeamChatMessage {
   id?: string;
@@ -69,7 +69,7 @@ export async function sendTeamChatMessage(
   try {
     const response = await fetch('/api/team-chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders(),
       body: JSON.stringify({
         message,
         conversationHistory: conversationHistory.map(m => ({
@@ -106,7 +106,7 @@ export async function generateImage(
   try {
     const response = await fetch('/api/team-chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders(),
       body: JSON.stringify({
         generateImage: true,
         imagePrompt: prompt,

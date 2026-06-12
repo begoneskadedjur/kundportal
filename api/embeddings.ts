@@ -3,6 +3,7 @@
 // Använder Google Gemini gemini-embedding-001 modell
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireAuth } from './_lib/auth';
 
 // Vercel function config - 5 minuters timeout för sync
 export const config = {
@@ -97,6 +98,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // RAG-sökning/sync över all kunddata - inga UI-anropare finns, endast admin
+  const auth = await requireAuth(req, res, ['admin']);
+  if (!auth) return;
 
   try {
     const { action, query, filter_type, limit = 10 } = req.body;

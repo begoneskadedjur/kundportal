@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
+import { requireAuthenticated } from './_lib/auth'
 
 // Helper function to format currency
 const formatCurrency = (amount: number) => {
@@ -683,6 +684,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Anropas av kunder OCH multisite-användare (statistikexport). Kräv giltig
+  // inloggning men ingen roll - PDF:en renderar bara data anroparen redan har,
+  // skyddet gäller Puppeteer-kostnad/missbruk, inte databehörighet.
+  const auth = await requireAuthenticated(req, res)
+  if (!auth) return
 
   try {
     const { customer, cases, statistics, period } = req.body

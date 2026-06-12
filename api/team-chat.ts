@@ -7,6 +7,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
+import { requireAuth } from './_lib/auth';
 
 // Vercel serverless config — Pro plan tillåter upp till 300s
 export const config = {
@@ -1348,6 +1349,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // AI-assistenten är intern: alla personalroller har den i sin meny
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'technician', 'säljare']);
+  if (!auth) return;
 
   try {
     const {
