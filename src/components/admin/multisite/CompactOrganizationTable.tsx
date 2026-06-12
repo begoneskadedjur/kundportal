@@ -115,6 +115,7 @@ interface CompactOrganizationTableProps {
   onEditUser: (org: Organization, user: OrganizationUser) => void
   onDeleteUser: (orgId: string, userId: string) => void
   onResetPassword: (email: string, userName: string) => void
+  onSendWelcome?: (email: string, userName: string) => void
   onAddSite: (org: Organization) => void
   onEditSite: (org: Organization, site: Site) => void
   onDeleteSite: (orgId: string, siteId: string) => void
@@ -142,6 +143,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   onEditUser,
   onDeleteUser,
   onResetPassword,
+  onSendWelcome,
   onAddSite,
   onEditSite,
   onDeleteSite,
@@ -888,10 +890,19 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                                 <button
                                   onClick={() => onResetPassword(user.email || '', user.name || '')}
                                   className="p-1 hover:bg-[#20c58f]/20 rounded transition-colors"
-                                  title="Återställ lösenord"
+                                  title="Återställ lösenord (länk, 1 timme)"
                                 >
                                   <Key className="w-3 h-3 text-[#20c58f]" />
                                 </button>
+                                {onSendWelcome && (
+                                  <button
+                                    onClick={() => onSendWelcome(user.email || '', user.name || '')}
+                                    className="p-1 hover:bg-blue-500/20 rounded transition-colors"
+                                    title="Skicka välkomstmail med nytt lösenord"
+                                  >
+                                    <Mail className="w-3 h-3 text-blue-400" />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => onEditUser(org, user)}
                                   className="p-1 hover:bg-slate-700 rounded transition-colors"

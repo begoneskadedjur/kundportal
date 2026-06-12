@@ -893,6 +893,38 @@ export default function OrganizationsPage() {
     })
   }
 
+  const handleSendWelcome = (email: string, userName: string) => {
+    setConfirmModal({
+      title: 'Skicka välkomstmail',
+      message: `Vill du sätta ett nytt lösenord och skicka välkomstmail till ${userName} (${email})? Det nuvarande lösenordet ersätts.`,
+      variant: 'default',
+      confirmLabel: 'Skicka välkomstmail',
+      onConfirm: async () => {
+        setConfirmLoading(true)
+        try {
+          const response = await fetch('/api/send-welcome-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+          })
+
+          if (!response.ok) {
+            const error = await response.json()
+            throw new Error(error.error || 'Kunde inte skicka välkomstmail')
+          }
+
+          toast.success(`Välkomstmail skickat till ${email}`)
+          setConfirmModal(null)
+        } catch (error: any) {
+          console.error('Error sending welcome email:', error)
+          toast.error(error.message || 'Kunde inte skicka välkomstmail')
+        } finally {
+          setConfirmLoading(false)
+        }
+      }
+    })
+  }
+
   const getRoleName = (roleType: string) => {
     const roleNames: Record<string, string> = {
       'verksamhetschef': 'Verksamhetschef',
@@ -1204,6 +1236,7 @@ export default function OrganizationsPage() {
           onEditUser={handleEditUser}
           onDeleteUser={handleDeleteUser}
           onResetPassword={handleResetPassword}
+          onSendWelcome={handleSendWelcome}
           onAddSite={handleAddSite}
           onEditSite={handleEditSite}
           onDeleteSite={handleDeleteSite}
