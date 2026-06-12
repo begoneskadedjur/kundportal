@@ -212,13 +212,13 @@ function getWelcomeEmailTemplate({
     </div>` : ''
 
   return `<!DOCTYPE html>
-<html lang="sv">
+<html lang="sv" style="color-scheme: light;">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Välkommen till BeGone Kundportal</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #f1f5f9;">
+<body style="margin: 0; padding: 32px 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; background-color: #f1f5f9;">
   <!-- Preheader -->
   <div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#f1f5f9;">Ditt konto hos BeGone Kundportal är aktiverat. Logga in med uppgifterna nedan.</div>
 
@@ -226,9 +226,8 @@ function getWelcomeEmailTemplate({
 
     <!-- Header -->
     <div style="background: linear-gradient(160deg, #0d2a1c 0%, #071610 100%); border-radius: 8px 8px 0 0; padding: 32px 36px 28px; text-align: center; border-bottom: 2px solid #20c58f;">
-      <div style="font-size: 28px; font-weight: 800; color: #ffffff; letter-spacing: -0.03em; line-height: 1;">BeGone</div>
-      <div style="font-size: 10px; color: #20c58f; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 600; margin-top: 5px;">Skadedjur &amp; Sanering</div>
-      <div style="margin-top: 22px; padding-top: 22px; border-top: 1px solid rgba(32,197,143,0.15);">
+      <div style="font-size: 22px; font-weight: 800; color: #ffffff; letter-spacing: -0.02em; line-height: 1;">BeGone Skadedjur</div>
+      <div style="margin-top: 16px;">
         <div style="font-size: 20px; font-weight: 700; color: #ffffff;">Välkommen till kundportalen</div>
         ${organizationName ? `<div style="font-size: 13px; color: #20c58f; margin-top: 5px; font-weight: 500;">${organizationName}</div>` : ''}
       </div>
