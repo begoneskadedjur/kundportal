@@ -6,7 +6,6 @@ import {
   MapPin,
   Shield,
   RefreshCw,
-  FileDown,
   Home,
   Camera,
   ExternalLink,
@@ -31,7 +30,6 @@ import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
 import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailSheet'
 import LoadingSpinner from '../shared/LoadingSpinner'
-import { generateEquipmentPdf } from '../../utils/equipmentPdfGenerator'
 import toast from 'react-hot-toast'
 
 interface CustomerEquipmentViewProps {
@@ -57,7 +55,6 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [exporting, setExporting] = useState(false)
 
   // Utomhus detail sheet
   const [selectedOutdoorStation, setSelectedOutdoorStation] = useState<EquipmentPlacementWithRelations | null>(null)
@@ -237,28 +234,6 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
     return format(new Date(dateStr), "d MMM yyyy", { locale: sv })
   }
 
-  // PDF-export
-  const handleExportPDF = async () => {
-    if (equipment.length === 0) {
-      toast.error('Ingen utrustning att exportera')
-      return
-    }
-
-    setExporting(true)
-    try {
-      await generateEquipmentPdf({
-        customerName: companyName,
-        equipment
-      })
-      toast.success('PDF exporterad!')
-    } catch (error) {
-      console.error('Fel vid PDF-export:', error)
-      toast.error('Kunde inte exportera PDF')
-    } finally {
-      setExporting(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -306,14 +281,6 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
             >
               <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
               Uppdatera
-            </button>
-            <button
-              onClick={handleExportPDF}
-              disabled={exporting || equipment.length === 0}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 border border-slate-700 hover:border-slate-600 text-emerald-400 hover:text-emerald-300 rounded-lg text-sm transition-colors disabled:opacity-50"
-            >
-              <FileDown className="w-3.5 h-3.5" />
-              {exporting ? 'Exporterar...' : 'PDF'}
             </button>
           </div>
         </div>

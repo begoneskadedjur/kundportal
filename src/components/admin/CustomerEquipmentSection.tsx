@@ -11,13 +11,11 @@ import {
 } from '../../types/database'
 import { EquipmentService } from '../../services/equipmentService'
 import { EquipmentMap, EquipmentList } from '../shared/equipment'
-import { generateEquipmentPdf } from '../../utils/equipmentPdfGenerator'
 import {
   MapPin,
   List,
   Map as MapIcon,
   Loader2,
-  FileDown,
   RefreshCw,
   Crosshair,
   Box,
@@ -46,7 +44,6 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
   const [stats, setStats] = useState<EquipmentStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
-  const [exporting, setExporting] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
 
@@ -96,27 +93,6 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
     }
   }
 
-  // Exportera PDF
-  const handleExportPdf = async () => {
-    if (equipment.length === 0) {
-      toast.error('Ingen utrustning att exportera')
-      return
-    }
-
-    setExporting(true)
-    try {
-      await generateEquipmentPdf({
-        customerName,
-        equipment
-      })
-      toast.success('PDF exporterad!')
-    } catch (error) {
-      console.error('Fel vid PDF-export:', error)
-      toast.error('Kunde inte exportera PDF')
-    } finally {
-      setExporting(false)
-    }
-  }
 
   // Visa ingenting om ingen utrustning och komprimerad
   if (!isExpanded && equipment.length === 0 && !loading) {
@@ -253,18 +229,6 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
                         className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
                       >
                         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                      </button>
-                      <button
-                        onClick={handleExportPdf}
-                        disabled={exporting}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-slate-700 rounded-lg text-sm text-white hover:bg-slate-600 transition-colors disabled:opacity-50"
-                      >
-                        {exporting ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <FileDown className="w-4 h-4" />
-                        )}
-                        PDF
                       </button>
                     </div>
                   </div>
