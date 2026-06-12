@@ -13,10 +13,12 @@ import {
   ChevronDown,
   Menu,
   X,
-  Building2
+  Building2,
+  UserCircle
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import Select from '../ui/Select'
+import UserProfileModal from './UserProfileModal'
 
 export type MultisitePortalView = 'dashboard' | 'stations' | 'inspections' | 'cases' | 'reports' | 'quotes'
 
@@ -103,10 +105,14 @@ export default function MultisitePortalLayout({
   children,
   isImpersonating = false
 }: MultisitePortalLayoutProps) {
-  const { signOut } = useAuth()
+  const { signOut, profile } = useAuth()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [siteDropdownOpen, setSiteDropdownOpen] = useState(false)
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
+
+  const displayName = profile?.display_name || profile?.email || ''
+  const firstInitial = displayName[0]?.toUpperCase() || '?'
 
   const handleSignOut = async () => {
     await signOut()
@@ -253,6 +259,24 @@ export default function MultisitePortalLayout({
 
         {/* Bottom Section */}
         <div className="p-3 border-t border-slate-700/50 space-y-2">
+          {/* Profil-knapp */}
+          <button
+            onClick={() => setProfileModalOpen(true)}
+            className={`
+              w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200
+              text-slate-400 hover:text-white hover:bg-slate-800/50
+              ${sidebarCollapsed ? 'justify-center' : ''}
+            `}
+            title={sidebarCollapsed ? 'Min profil' : undefined}
+          >
+            <div className="w-7 h-7 rounded-full bg-[#20c58f]/15 flex items-center justify-center flex-shrink-0">
+              <span className="text-[#20c58f] text-xs font-bold">{firstInitial}</span>
+            </div>
+            {!sidebarCollapsed && (
+              <span className="text-sm font-medium truncate">{displayName}</span>
+            )}
+          </button>
+
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
@@ -411,6 +435,8 @@ export default function MultisitePortalLayout({
       >
         {children}
       </main>
+
+      <UserProfileModal isOpen={profileModalOpen} onClose={() => setProfileModalOpen(false)} />
     </div>
   )
 }
