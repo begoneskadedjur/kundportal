@@ -172,7 +172,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 }
 
-// Snyggt HTML-mail template med gradient och styling
 function getPasswordResetEmailTemplate({
   userName,
   organizationName,
@@ -190,25 +189,24 @@ function getPasswordResetEmailTemplate({
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Återställ ditt lösenord - Begone Kundportal</title>
+    <title>Återställ ditt lösenord - BeGone Kundportal</title>
 </head>
 <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #0f172a; color: #e2e8f0;">
-    <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);">
-        
-        <!-- Header med gradient -->
-        <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 2rem; text-align: center;">
-            <div style="background-color: rgba(255, 255, 255, 0.1); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                    <path d="M7 11V7a5 5 0 0110 0v4"/>
-                </svg>
+    <div style="max-width: 600px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #134e35 0%, #0a1f14 100%); padding: 2.5rem 2rem; text-align: center; border-bottom: 3px solid #20c58f;">
+            <div style="margin-bottom: 0.75rem;">
+                <span style="font-size: 2rem; font-weight: 700; color: #ffffff; letter-spacing: -0.02em;">BeGone</span>
             </div>
-            <h1 style="margin: 0; color: white; font-size: 1.75rem; font-weight: bold;">
-                Återställ ditt lösenord
-            </h1>
-            <p style="margin: 0.5rem 0 0; color: rgba(255, 255, 255, 0.9); font-size: 1rem;">
-                Begone Kundportal
-            </p>
+            <div style="font-size: 0.75rem; color: #20c58f; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600;">
+                Skadedjur &amp; Sanering
+            </div>
+            <div style="margin-top: 1.5rem; border-top: 1px solid rgba(32, 197, 143, 0.2); padding-top: 1.5rem;">
+                <h1 style="margin: 0; color: white; font-size: 1.5rem; font-weight: 700;">
+                    Återställ ditt lösenord
+                </h1>
+            </div>
         </div>
 
         <!-- Innehåll -->
@@ -218,7 +216,7 @@ function getPasswordResetEmailTemplate({
             </p>
 
             <p style="line-height: 1.6; margin-bottom: 1.5rem; color: #cbd5e1;">
-                Vi har mottagit en begäran om att återställa lösenordet för ditt konto${organizationName ? ` hos <strong style="color: #a855f7;">${organizationName}</strong>` : ''}.
+                Vi har mottagit en begäran om att återställa lösenordet för ditt konto${organizationName ? ` hos <strong style="color: #20c58f;">${organizationName}</strong>` : ''}.
             </p>
 
             <p style="line-height: 1.6; margin-bottom: 1.5rem; color: #cbd5e1;">
@@ -227,33 +225,32 @@ function getPasswordResetEmailTemplate({
 
             <!-- CTA Button -->
             <div style="text-align: center; margin: 2rem 0;">
-                <a href="${resetLink}" 
-                   style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); 
-                          color: white; 
-                          text-decoration: none; 
-                          padding: 1rem 2rem; 
-                          border-radius: 8px; 
-                          font-weight: bold; 
-                          display: inline-block; 
-                          font-size: 1.1rem;
-                          box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);">
+                <a href="${resetLink}"
+                   style="background-color: #20c58f;
+                          color: #0f172a;
+                          text-decoration: none;
+                          padding: 14px 32px;
+                          border-radius: 8px;
+                          font-weight: 700;
+                          display: inline-block;
+                          font-size: 1rem;">
                     🔐 Återställ lösenord
                 </a>
             </div>
 
             <!-- Alternativ länk -->
-            <div style="background-color: #334155; border-radius: 8px; padding: 1rem; margin: 1.5rem 0;">
-                <p style="color: #94a3b8; font-size: 0.9rem; margin: 0 0 0.5rem;">
+            <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1rem; margin: 1.5rem 0;">
+                <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 0.5rem;">
                     Om knappen inte fungerar, kopiera och klistra in denna länk i din webbläsare:
                 </p>
-                <p style="color: #60a5fa; font-size: 0.85rem; margin: 0; word-break: break-all; font-family: monospace;">
+                <p style="color: #20c58f; font-size: 0.8rem; margin: 0; word-break: break-all; font-family: monospace;">
                     ${resetLink}
                 </p>
             </div>
 
             <!-- Säkerhetsvarning -->
-            <div style="background-color: #7f1d1d; border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;">
-                <h3 style="color: #fca5a5; margin: 0 0 0.5rem; font-size: 1rem; font-weight: bold;">
+            <div style="background-color: rgba(127, 29, 29, 0.5); border-left: 3px solid #ef4444; border-radius: 6px; padding: 1.25rem 1.5rem; margin: 1.5rem 0;">
+                <h3 style="color: #fca5a5; margin: 0 0 0.5rem; font-size: 0.95rem; font-weight: 700;">
                     ⚠️ Säkerhetsnotis
                 </h3>
                 <p style="color: #fecaca; font-size: 0.9rem; margin: 0; line-height: 1.5;">
@@ -263,17 +260,16 @@ function getPasswordResetEmailTemplate({
             </div>
 
             <!-- Kontoinformation -->
-            <div style="background-color: #334155; border-radius: 8px; padding: 1rem; margin: 1.5rem 0;">
-                <p style="color: #94a3b8; font-size: 0.9rem; margin: 0;">
-                    <strong>Ditt konto:</strong> ${email}
-                </p>
+            <div style="background-color: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 1rem; margin: 1.5rem 0;">
+                <p style="color: #94a3b8; font-size: 0.85rem; margin: 0 0 0.25rem;">Ditt konto</p>
+                <p style="color: #e2e8f0; font-size: 0.9rem; margin: 0;">${email}</p>
             </div>
 
-            <div style="border-top: 1px solid #475569; padding-top: 1.5rem; margin-top: 2rem; text-align: center; color: #94a3b8; font-size: 0.9rem;">
-                <p>Behöver du hjälp? Kontakta oss på <a href="mailto:support@begone.se" style="color: #a855f7;">support@begone.se</a></p>
-                <p style="margin-top: 1rem;">
+            <div style="border-top: 1px solid #334155; padding-top: 1.5rem; margin-top: 2rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+                <p style="margin: 0 0 0.5rem;">Behöver du hjälp? Kontakta oss på <a href="mailto:support@begone.se" style="color: #20c58f; text-decoration: underline;">support@begone.se</a></p>
+                <p style="margin: 1rem 0 0;">
                     Med vänliga hälsningar,<br>
-                    <strong style="color: #e2e8f0;">Begone Skadedjur & Sanering AB</strong>
+                    <strong style="color: #e2e8f0;">BeGone Skadedjur &amp; Sanering AB</strong>
                 </p>
             </div>
         </div>
