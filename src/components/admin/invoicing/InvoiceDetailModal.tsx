@@ -40,11 +40,12 @@ import { InvoiceService } from '../../../services/invoiceService'
 import { FortnoxService } from '../../../services/fortnoxService'
 import type { InvoiceWithItems, InvoiceStatus } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
-import { ROT_RUT_PERCENT, calculateMarginPercent } from '../../../types/caseBilling'
+import { ROT_RUT_PERCENT } from '../../../types/caseBilling'
 import { calculateRotRutSummary } from '../../../utils/rotRutConstants'
 import type { CaseBillingItem } from '../../../types/caseBilling'
 import { useCaseContext } from '../../../hooks/useCaseContext'
 import { formatSwedishDateTime } from '../../../types/database'
+import ServiceCostBreakdown from '../../shared/ServiceCostBreakdown'
 import CommentSection from '../../communication/CommentSection'
 import CaseContextImagePreview from '../../communication/CaseContextImagePreview'
 import EmbeddedMapPreview from '../../communication/EmbeddedMapPreview'
@@ -90,7 +91,6 @@ export default function InvoiceDetailModal({
   const [staleInfo, setStaleInfo] = useState<{ stale: boolean; reason?: string } | null>(null)
   const [regenerating, setRegenerating] = useState(false)
   const [caseBillingItems, setCaseBillingItems] = useState<CaseBillingItem[]>([])
-  const [expandedServices, setExpandedServices] = useState<Set<string>>(new Set())
   const [contractCustomer, setContractCustomer] = useState<{
     contact_person: string | null
     contact_email: string | null
@@ -149,8 +149,35 @@ export default function InvoiceDetailModal({
   useEffect(() => {
     if (!invoice) { setCaseBillingItems([]); return }
     const fetchCaseBilling = async () => {
-      // För avtalsfakturor: hämta från kundens importerade contract istället för invoice.case_id
-      if ((invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc') && invoice.customer_id) {
+      // Ad-hoc/merförsäljning: kostnaderna ligger på det avslutade ärendets case_billing_items.
+      // Vägen dit går via fakturans rader → contract_billing_items.case_id (det riktiga ärendet).
+      if (invoice.invoice_type === 'adhoc') {
+        const cbItemIds = (invoice.items || [])
+          .map(i => (i as { contract_billing_item_id?: string | null }).contract_billing_item_id)
+          .filter(Boolean) as string[]
+        if (cbItemIds.length === 0) { setCaseBillingItems([]); return }
+
+        const { data: cbItems } = await supabase
+          .from('contract_billing_items')
+          .select('case_id')
+          .in('id', cbItemIds)
+        const caseIds = Array.from(
+          new Set(((cbItems as { case_id: string | null }[] | null) || [])
+            .map(c => c.case_id)
+            .filter(Boolean) as string[])
+        )
+        if (caseIds.length === 0) { setCaseBillingItems([]); return }
+
+        const { data } = await supabase
+          .from('case_billing_items')
+          .select('*')
+          .in('case_id', caseIds)
+          .eq('case_type', 'contract')
+        setCaseBillingItems((data as CaseBillingItem[] | null) || [])
+        return
+      }
+      // Återkommande avtalsfaktura: hämta från kundens importerade contract.
+      if (invoice.invoice_type === 'contract' && invoice.customer_id) {
         const { data: contract } = await supabase
           .from('contracts')
           .select('id')
@@ -785,155 +812,36 @@ export default function InvoiceDetailModal({
 
                 {/* Kostnadsuppdelning per tjänst (från Prisguiden) */}
                 {(() => {
-                  const articleItems = caseBillingItems.filter(i => i.item_type === 'article')
-                  if (articleItems.length === 0) return null
-
-                  const serviceRows = invoice.items.filter(i => i.case_billing_item_id)
-                  if (serviceRows.length === 0) return null
-
-                  // Mappa artiklar per tjänst
-                  const articlesByService = new Map<string, CaseBillingItem[]>()
-                  const unmapped: CaseBillingItem[] = []
-                  for (const art of articleItems) {
-                    if (art.mapped_service_id && serviceRows.some(s => s.case_billing_item_id === art.mapped_service_id)) {
-                      const list = articlesByService.get(art.mapped_service_id) || []
-                      list.push(art)
-                      articlesByService.set(art.mapped_service_id, list)
-                    } else {
-                      unmapped.push(art)
-                    }
-                  }
-
-                  // Räkna total kostnad & total marginal — ALLTID på exkl.-basen (momsen är aldrig bolagets intäkt).
-                  const totalCost = articleItems.reduce((sum, a) => sum + a.total_price, 0)
-                  const totalRevenue = invoice.subtotal
-                  const totalMargin = calculateMarginPercent(totalRevenue, totalCost)
-
+                  // Tjänsteraderna som artiklarna mappas mot.
+                  // Privat/företag: fakturaraderna länkar direkt till case_billing_items via case_billing_item_id.
+                  // Ad-hoc/avtal: fakturaraderna länkar via contract_billing_item_id, så vi bygger istället
+                  // tjänsteraderna direkt från case_billing_items (vars id är det mapped_service_id pekar på).
+                  const isContractOrAdhoc = invoice.invoice_type === 'adhoc' || invoice.invoice_type === 'contract'
+                  const serviceRows = isContractOrAdhoc
+                    ? caseBillingItems
+                        .filter(i => i.item_type === 'service')
+                        .map(i => ({
+                          id: i.id,
+                          serviceItemId: i.id,
+                          name: i.service_name || i.article_name,
+                          revenue: i.total_price,
+                        }))
+                    : invoice.items
+                        .filter(i => i.case_billing_item_id)
+                        .map(i => ({
+                          id: i.id,
+                          serviceItemId: i.case_billing_item_id!,
+                          name: i.article_name,
+                          // total_price är exkl. moms för alla ärendetyper — samma bas som artikelkostnaderna.
+                          revenue: i.total_price,
+                        }))
                   return (
-                    <div className="bg-slate-800/50 rounded-lg overflow-hidden">
-                      <div className="px-3 py-2 border-b border-slate-700 flex items-center justify-between">
-                        <h3 className="text-xs font-medium text-slate-400">
-                          Kostnadsuppdelning per tjänst
-                          <span className="ml-2 text-slate-500 font-normal">
-                            — så här kalkylerade teknikern priset
-                          </span>
-                        </h3>
-                        <div className="flex items-center gap-3 text-xs">
-                          <span className="text-slate-400">
-                            Inköpskostnad: <span className="text-white font-medium">{formatInvoiceAmount(totalCost)}</span>
-                          </span>
-                          <span className={`font-semibold ${totalMargin >= 50 ? 'text-emerald-400' : totalMargin >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
-                            {totalMargin.toFixed(1)}% marginal
-                          </span>
-                        </div>
-                      </div>
-                      <div className="divide-y divide-slate-700/50">
-                        {serviceRows.map(serviceRow => {
-                          const svcId = serviceRow.case_billing_item_id!
-                          const mappedArticles = articlesByService.get(svcId) || []
-                          const svcCost = mappedArticles.reduce((sum, a) => sum + a.total_price, 0)
-                          // Marginal räknas på exkl.-basen — total_price är redan exkl. för alla ärendetyper.
-                          const svcRevenue = serviceRow.total_price
-                          const svcMargin = calculateMarginPercent(svcRevenue, svcCost)
-                          const isExpanded = expandedServices.has(svcId)
-
-                          if (mappedArticles.length === 0) {
-                            return (
-                              <div key={serviceRow.id} className="px-3 py-2 flex items-center justify-between text-sm">
-                                <span className="text-slate-300">{serviceRow.article_name}</span>
-                                <span className="text-xs text-slate-500">Inga interna kostnader tilldelade</span>
-                              </div>
-                            )
-                          }
-
-                          return (
-                            <div key={serviceRow.id}>
-                              <button
-                                onClick={() => {
-                                  const next = new Set(expandedServices)
-                                  if (next.has(svcId)) next.delete(svcId)
-                                  else next.add(svcId)
-                                  setExpandedServices(next)
-                                }}
-                                className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-700/30 transition-colors text-left"
-                              >
-                                <div className="flex items-center gap-2">
-                                  {isExpanded
-                                    ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
-                                    : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
-                                  <span className="text-sm text-white">{serviceRow.article_name}</span>
-                                  <span className="text-xs text-slate-500">
-                                    {mappedArticles.length} {mappedArticles.length === 1 ? 'kostnadspost' : 'kostnadsposter'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-4 text-xs">
-                                  <span className="text-slate-400">
-                                    Kostnad <span className="text-slate-200">{formatInvoiceAmount(svcCost)}</span>
-                                  </span>
-                                  <span className="text-slate-400">
-                                    Intäkt <span className="text-slate-200">{formatInvoiceAmount(svcRevenue)}</span>
-                                  </span>
-                                  <span className={`font-semibold min-w-[60px] text-right ${svcMargin >= 50 ? 'text-emerald-400' : svcMargin >= 30 ? 'text-amber-400' : 'text-red-400'}`}>
-                                    {svcMargin.toFixed(1)}%
-                                  </span>
-                                </div>
-                              </button>
-                              {isExpanded && (
-                                <div className="bg-slate-900/50 px-3 py-2">
-                                  <table className="w-full">
-                                    <thead>
-                                      <tr className="text-[10px] text-slate-500 uppercase">
-                                        <th className="text-left py-1 font-medium">Artikel</th>
-                                        <th className="text-right py-1 font-medium">À-pris</th>
-                                        <th className="text-right py-1 font-medium">Antal</th>
-                                        <th className="text-right py-1 font-medium">Summa</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {mappedArticles.map(art => (
-                                        <tr key={art.id} className="text-xs">
-                                          <td className="py-1 text-slate-300">
-                                            <span className="text-slate-500 mr-2">{art.article_code}</span>
-                                            {art.article_name}
-                                          </td>
-                                          <td className="py-1 text-right text-slate-400">
-                                            {formatInvoiceAmount(art.unit_price)}
-                                          </td>
-                                          <td className="py-1 text-right text-slate-400">
-                                            {art.quantity} st
-                                          </td>
-                                          <td className="py-1 text-right text-slate-200 font-medium">
-                                            {formatInvoiceAmount(art.total_price)}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                        {unmapped.length > 0 && (
-                          <div className="px-3 py-2 bg-slate-900/30">
-                            <div className="text-xs text-slate-500 mb-1">
-                              Ej tilldelade interna kostnader ({formatInvoiceAmount(unmapped.reduce((s, a) => s + a.total_price, 0))})
-                            </div>
-                            <div className="space-y-0.5">
-                              {unmapped.map(art => (
-                                <div key={art.id} className="flex justify-between text-xs text-slate-400">
-                                  <span>
-                                    <span className="text-slate-500 mr-2">{art.article_code}</span>
-                                    {art.article_name} × {art.quantity}
-                                  </span>
-                                  <span>{formatInvoiceAmount(art.total_price)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    <ServiceCostBreakdown
+                      serviceRows={serviceRows}
+                      articleItems={caseBillingItems.filter(i => i.item_type === 'article')}
+                      totalRevenue={invoice.subtotal}
+                      formatAmount={formatInvoiceAmount}
+                    />
                   )
                 })()}
 

@@ -14,6 +14,8 @@ import { FortnoxService } from '../../../services/fortnoxService'
 import { supabase } from '../../../lib/supabase'
 import type { ContractInvoice, BillingFrequency } from '../../../types/contractBilling'
 import { BILLING_ITEM_STATUS_CONFIG, BILLING_FREQUENCY_CONFIG, formatBillingAmount, formatBillingPeriod } from '../../../types/contractBilling'
+import ServiceCostBreakdown from '../../shared/ServiceCostBreakdown'
+import type { CaseBillingItem } from '../../../types/caseBilling'
 
 interface ContractInvoiceModalProps {
   isOpen: boolean
@@ -97,6 +99,8 @@ export function ContractInvoiceModal({
   const [generating, setGenerating] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [sendingToFortnox, setSendingToFortnox] = useState(false)
+  // Interna kostnader (case_billing_items) för ad-hoc-radernas ärenden — för marginalvyn.
+  const [caseBillingItems, setCaseBillingItems] = useState<CaseBillingItem[]>([])
 
   useEffect(() => {
     if (isOpen && customerId && periodStart && periodEnd) {
@@ -104,8 +108,33 @@ export function ContractInvoiceModal({
     } else {
       setInvoice(null)
       setCustomerName('')
+      setCaseBillingItems([])
     }
   }, [isOpen, customerId, periodStart, periodEnd])
+
+  // Hämta interna kostnader (case_billing_items) för ad-hoc-ärendena så marginalvyn
+  // kan visa hur teknikern kalkylerade priset. Artiklarna ligger på ärendets
+  // case_billing_items (case_type='contract'), nåbara via ad-hoc-radernas case_id.
+  useEffect(() => {
+    if (!invoice) { setCaseBillingItems([]); return }
+    const caseIds = Array.from(new Set(
+      invoice.items
+        .filter(i => i.item_type === 'ad_hoc' && i.case_id)
+        .map(i => i.case_id as string)
+    ))
+    if (caseIds.length === 0) { setCaseBillingItems([]); return }
+    let cancelled = false
+    const fetchCaseBilling = async () => {
+      const { data } = await supabase
+        .from('case_billing_items')
+        .select('*')
+        .in('case_id', caseIds)
+        .eq('case_type', 'contract')
+      if (!cancelled) setCaseBillingItems((data as CaseBillingItem[] | null) || [])
+    }
+    fetchCaseBilling()
+    return () => { cancelled = true }
+  }, [invoice])
 
   const loadInvoice = async () => {
     if (!customerId || !periodStart || !periodEnd) return
@@ -609,6 +638,22 @@ export function ContractInvoiceModal({
                   </div>
                 </div>
               </div>
+
+              {/* Kostnadsuppdelning per tjänst (från Prisguiden) — för ad-hoc/merförsäljning.
+                  Visar interna artikelkostnader och marginal; artiklarna faktureras aldrig. */}
+              <ServiceCostBreakdown
+                serviceRows={caseBillingItems
+                  .filter(i => i.item_type === 'service')
+                  .map(i => ({
+                    id: i.id,
+                    serviceItemId: i.id,
+                    name: i.service_name || i.article_name,
+                    revenue: i.total_price,
+                  }))}
+                articleItems={caseBillingItems.filter(i => i.item_type === 'article')}
+                totalRevenue={invoice.subtotal}
+                formatAmount={formatBillingAmount}
+              />
 
               {/* Betalningsinformation */}
               <div className="p-3 bg-slate-800/20 border border-slate-700/30 rounded-xl">

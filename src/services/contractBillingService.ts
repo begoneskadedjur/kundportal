@@ -356,7 +356,20 @@ export class ContractBillingService {
     completedAt: Date | string = new Date()
   ): Promise<{ created: number; totalAmount: number }> {
     // 1. Hämta case_billing_items för ärendet
-    const caseBillingItems = await CaseBillingService.getCaseBillingItems(caseId, 'contract')
+    const allCaseBillingItems = await CaseBillingService.getCaseBillingItems(caseId, 'contract')
+
+    if (allCaseBillingItems.length === 0) {
+      return { created: 0, totalAmount: 0 }
+    }
+
+    // Endast tjänsterader ska faktureras. Artiklar är interna kostnader (för
+    // marginalkalkyl) och ligger kvar i case_billing_items — de ska ALDRIG bli
+    // fakturarader. Samma filtrering som privat/företag (invoiceService.createInvoiceFromCase).
+    // Fallback: gamla ärenden utan tjänsterader faktureras på sina artikelrader (bakåtkompat).
+    const serviceItems = allCaseBillingItems.filter(i => i.item_type === 'service')
+    const caseBillingItems = serviceItems.length > 0
+      ? serviceItems
+      : allCaseBillingItems.filter(i => i.item_type === 'article' || !i.item_type)
 
     if (caseBillingItems.length === 0) {
       return { created: 0, totalAmount: 0 }
