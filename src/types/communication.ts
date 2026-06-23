@@ -15,7 +15,8 @@ export type SystemEventType =
   | 'case_created'
   | 'coordinator_acknowledged'
   | 'coordinator_contacted'
-  | 'coordinator_note_added';
+  | 'coordinator_note_added'
+  | 'invoice_paid';
 
 export type MentionType = 'user' | 'role' | 'all';
 
@@ -207,6 +208,9 @@ export const SYSTEM_EVENT_MESSAGES: Record<SystemEventType, (data: SystemComment
   coordinator_acknowledged: (data) => `Koordinator ${data.technicianName || ''} har mottagit ärendet`,
   coordinator_contacted: (data) => `Kontaktförsök via ${data.newValue || 'okänd metod'}`,
   coordinator_note_added: () => `Koordinatornotering tillagd`,
+  // Meddelandet sätts av DB-triggern (handle_invoice_paid) i content-fältet; denna
+  // fallback används bara om content saknas.
+  invoice_paid: () => `Faktura betald`,
 };
 
 // Ticket-status konfiguration
