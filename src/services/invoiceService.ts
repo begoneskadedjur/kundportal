@@ -825,6 +825,25 @@ export class InvoiceService {
   }
 
   /**
+   * Hämta faktura-id för ett ärende oavsett fakturatyp (privat/företag/adhoc).
+   * Används t.ex. från provisionsvyn för att öppna fakturamodalen från en
+   * commission_post som bara har case_id. Returnerar senaste icke-makulerade.
+   */
+  static async getInvoiceIdByCase(caseId: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('id')
+      .eq('case_id', caseId)
+      .neq('status', 'cancelled')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    return data?.id ?? null
+  }
+
+  /**
    * Hämta faktura för ärende
    */
   static async getInvoiceByCase(

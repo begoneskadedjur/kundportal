@@ -11,6 +11,8 @@ import { ProvisionExportService } from '../../services/provisionExportService'
 import { COMMISSION_STATUS_CONFIG, type CommissionStatus, type CommissionPost } from '../../types/provision'
 import type { MonthlyProvisionSummary, TechnicianPayoutEntry } from '../../types/provision'
 import ProvisionSettingsPanel from '../../components/admin/provisions/ProvisionSettingsPanel'
+import InvoiceDetailModal from '../../components/admin/invoicing/InvoiceDetailModal'
+import { InvoiceService } from '../../services/invoiceService'
 import toast from 'react-hot-toast'
 import Select from '../../components/ui/Select'
 
@@ -68,6 +70,27 @@ const TechnicianCommissions: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'payouts' | 'posts'>('payouts')
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set())
   const [expandedTechs, setExpandedTechs] = useState<Set<string>>(new Set())
+
+  // Fakturamodal — öppnas från en provisionspost via dess case_id
+  const [invoiceModalId, setInvoiceModalId] = useState<string | null>(null)
+  const [openingInvoiceCaseId, setOpeningInvoiceCaseId] = useState<string | null>(null)
+
+  const openInvoiceForCase = async (caseId: string | null | undefined) => {
+    if (!caseId) return
+    setOpeningInvoiceCaseId(caseId)
+    try {
+      const id = await InvoiceService.getInvoiceIdByCase(caseId)
+      if (!id) {
+        toast.error('Ingen faktura hittades för ärendet')
+        return
+      }
+      setInvoiceModalId(id)
+    } catch {
+      toast.error('Kunde inte öppna fakturan')
+    } finally {
+      setOpeningInvoiceCaseId(null)
+    }
+  }
 
   // Auto-expand current month on first render
   const currentMonthKey = useMemo(() => {
@@ -171,6 +194,14 @@ const TechnicianCommissions: React.FC = () => {
           />
         </div>
       )}
+
+      {/* Fakturamodal — öppnas från en provisionspost */}
+      <InvoiceDetailModal
+        isOpen={invoiceModalId !== null}
+        invoiceId={invoiceModalId}
+        onClose={() => setInvoiceModalId(null)}
+        onStatusChange={refreshData}
+      />
 
       {/* ═══ STATISTIKRAD ═══ */}
       <div className="flex items-center gap-4 mb-4 text-xs">
@@ -498,6 +529,8 @@ const TechnicianCommissions: React.FC = () => {
                                             post={post}
                                             selected={selectedIds.has(post.id)}
                                             onToggle={() => toggleSelect(post.id)}
+                                            onOpenInvoice={() => openInvoiceForCase(post.case_id)}
+                                            opening={openingInvoiceCaseId === post.case_id}
                                           />
                                         ))}
                                       </motion.div>
@@ -572,6 +605,8 @@ const TechnicianCommissions: React.FC = () => {
                         post={post}
                         selected={selectedIds.has(post.id)}
                         onToggle={() => toggleSelect(post.id)}
+                        onOpenInvoice={() => openInvoiceForCase(post.case_id)}
+                        opening={openingInvoiceCaseId === post.case_id}
                       />
                     ))}
                   </tbody>
@@ -597,20 +632,27 @@ const TechnicianCommissions: React.FC = () => {
 }
 
 // ─── Kompakt postrad i utbetalnings-accordion ─────────────────────
-function PayoutPostRow({ post, selected, onToggle }: {
+function PayoutPostRow({ post, selected, onToggle, onOpenInvoice, opening }: {
   post: CommissionPost
   selected: boolean
   onToggle: () => void
+  onOpenInvoice: () => void
+  opening: boolean
 }) {
   const typeBadge = caseTypeBadge[post.case_type] || caseTypeBadge.private
   const statusCfg = COMMISSION_STATUS_CONFIG[post.status]
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2 hover:bg-slate-700/20 transition-colors border-b border-slate-800/50 ml-12">
+    <div
+      onClick={onOpenInvoice}
+      className="flex items-center gap-3 px-4 py-2 hover:bg-slate-700/20 transition-colors border-b border-slate-800/50 ml-12 cursor-pointer group"
+      title="Öppna faktura"
+    >
       <input
         type="checkbox"
         checked={selected}
         onChange={onToggle}
+        onClick={(e) => e.stopPropagation()}
         className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f] flex-shrink-0"
       />
 
@@ -618,7 +660,7 @@ function PayoutPostRow({ post, selected, onToggle }: {
         {post.case_number || '—'}
       </span>
 
-      <span className="text-sm text-white truncate max-w-[200px]">
+      <span className="text-sm text-white truncate max-w-[200px] group-hover:text-[#20c58f] transition-colors">
         {post.case_title || '—'}
       </span>
 
@@ -653,26 +695,40 @@ function PayoutPostRow({ post, selected, onToggle }: {
       <span className={`px-2 py-0.5 text-xs rounded-full flex-shrink-0 ${statusCfg.bgClass} ${statusCfg.textClass}`}>
         {statusCfg.label}
       </span>
+
+      <button
+        onClick={(e) => { e.stopPropagation(); onOpenInvoice() }}
+        disabled={opening}
+        className="p-1 text-slate-500 hover:text-[#20c58f] hover:bg-slate-700 rounded transition-colors flex-shrink-0 disabled:opacity-50"
+        title="Öppna faktura"
+      >
+        {opening
+          ? <RefreshCw className="w-4 h-4 animate-spin" />
+          : <Eye className="w-4 h-4" />}
+      </button>
     </div>
   )
 }
 
 // ─── Tabell-rad (Alla poster-tabb) ────────────────────────────────
-function PostRow({ post, selected, onToggle }: {
+function PostRow({ post, selected, onToggle, onOpenInvoice, opening }: {
   post: CommissionPost
   selected: boolean
   onToggle: () => void
+  onOpenInvoice: () => void
+  opening: boolean
 }) {
   const typeBadge = caseTypeBadge[post.case_type] || caseTypeBadge.private
   const statusCfg = COMMISSION_STATUS_CONFIG[post.status]
 
   return (
-    <tr className="hover:bg-slate-700/30">
+    <tr className="hover:bg-slate-700/30 cursor-pointer group" onClick={onOpenInvoice} title="Öppna faktura">
       <td className="px-3 py-2">
         <input
           type="checkbox"
           checked={selected}
           onChange={onToggle}
+          onClick={(e) => e.stopPropagation()}
           className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
         />
       </td>
@@ -714,8 +770,15 @@ function PostRow({ post, selected, onToggle }: {
       </td>
       <td className="px-3 py-2">
         <div className="flex items-center justify-end gap-0.5">
-          <button className="p-1 text-slate-400 hover:bg-slate-700 rounded transition-colors" title="Visa detaljer">
-            <Eye className="w-4 h-4" />
+          <button
+            onClick={(e) => { e.stopPropagation(); onOpenInvoice() }}
+            disabled={opening}
+            className="p-1 text-slate-400 hover:text-[#20c58f] hover:bg-slate-700 rounded transition-colors disabled:opacity-50"
+            title="Öppna faktura"
+          >
+            {opening
+              ? <RefreshCw className="w-4 h-4 animate-spin" />
+              : <Eye className="w-4 h-4" />}
           </button>
         </div>
       </td>
