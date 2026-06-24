@@ -422,6 +422,7 @@ function App() {
 
           <Toaster
             position="top-right"
+            containerStyle={{ zIndex: 2147483647 }}
             toastOptions={{
               duration: 4000,
               style: {

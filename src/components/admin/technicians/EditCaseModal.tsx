@@ -396,6 +396,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [timeTrackingLoading, setTimeTrackingLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // True när spara/fakturering blockerats pga saknad fastighetsbeteckning vid ROT/RUT
+  const [rotRutFastighetError, setRotRutFastighetError] = useState(false)
   const [currentCase, setCurrentCase] = useState<TechnicianCase | null>(null)
   const [formData, setFormData] = useState<Partial<TechnicianCase>>({})
   const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
@@ -934,7 +936,31 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     e.preventDefault();
     const tableName = getTableName();
     if (!tableName || !currentCase) return;
-    
+
+    // ROT/RUT kräver fastighetsbeteckning (Skatteverket). Blockera spara om någon
+    // ROT/RUT-tjänsterad saknar beteckning. Gäller bara privatärenden (ROT/RUT är
+    // inte valbart för företag/avtal).
+    if (currentCase.case_type === 'private') {
+      try {
+        const missing = await CaseBillingService.getRotRutItemsMissingFastighet(
+          currentCase.id,
+          'private'
+        );
+        if (missing.length > 0) {
+          setRotRutFastighetError(true);
+          toast.error(
+            `Fastighetsbeteckning krävs för ROT/RUT på: ${missing.join(', ')}. Fyll i den innan du sparar.`,
+            { duration: 6000 }
+          );
+          return;
+        }
+        setRotRutFastighetError(false);
+      } catch (validationErr: any) {
+        toast.error(`Kunde inte validera ROT/RUT: ${validationErr.message}`);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
     
@@ -1926,6 +1952,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   primaryServiceId={formData.service_id}
                   articleGroupId={articleGroupId}
                   onChange={handleBillingSummaryChange}
+                  highlightMissingFastighet={rotRutFastighetError}
                 />
               </div>
             )}

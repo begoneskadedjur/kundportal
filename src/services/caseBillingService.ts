@@ -533,6 +533,32 @@ export class CaseBillingService {
   }
 
   /**
+   * Validera att alla ROT/RUT-tjänsterader har fastighetsbeteckning.
+   * ROT/RUT kräver fastighetsbeteckning (Skatteverket) — ett ärende får inte
+   * sparas/faktureras med ROT/RUT om beteckningen saknas.
+   *
+   * Returnerar listan med tjänstenamn som saknar beteckning (tom = allt OK).
+   */
+  static async getRotRutItemsMissingFastighet(
+    caseId: string,
+    caseType: BillableCaseType
+  ): Promise<string[]> {
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .select('service_name, article_name, rot_rut_type, fastighetsbeteckning')
+      .eq('case_id', caseId)
+      .eq('case_type', caseType)
+      .eq('item_type', 'service')
+      .not('rot_rut_type', 'is', null)
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+
+    return (data || [])
+      .filter(row => !row.fastighetsbeteckning || String(row.fastighetsbeteckning).trim() === '')
+      .map(row => row.service_name || row.article_name || 'Tjänst')
+  }
+
+  /**
    * Kontrollera om ett ärende har billing items
    */
   static async caseHasBillingItems(

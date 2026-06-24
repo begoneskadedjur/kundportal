@@ -72,6 +72,8 @@ interface CaseServiceSelectorProps {
   ) => void
   readOnly?: boolean
   className?: string
+  /** Markera tomma fastighetsbeteckning-fält rött (när spara/fakturering blockerats av ROT/RUT-validering) */
+  highlightMissingFastighet?: boolean
   /** Draft-läge: items sparas i lokal state istället för DB (används när inget caseId finns) */
   draftMode?: boolean
   /** För draft-läge: återhämta state från föräldern så att wizard-navigering inte nollställer komponenten */
@@ -117,6 +119,7 @@ export default function CaseServiceSelector({
   onChange,
   readOnly = false,
   className = '',
+  highlightMissingFastighet = false,
   draftMode = false,
   initialDraftItems,
   initialPriceAssignments,
@@ -1068,16 +1071,31 @@ export default function CaseServiceSelector({
                           </label>
                         )}
                       </div>
-                      {item.rot_rut_type && (
-                        <input
-                          type="text"
-                          value={editingFastighet[item.id] ?? item.fastighetsbeteckning ?? ''}
-                          onChange={e => setEditingFastighet(prev => ({ ...prev, [item.id]: e.target.value }))}
-                          onBlur={() => handleFastighetBlur(item.id)}
-                          placeholder="Fastighetsbeteckning"
-                          className="w-full px-2 py-1 text-xs bg-slate-800 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-                        />
-                      )}
+                      {item.rot_rut_type && (() => {
+                        const fastighetValue = editingFastighet[item.id] ?? item.fastighetsbeteckning ?? ''
+                        const isMissing = highlightMissingFastighet && String(fastighetValue).trim() === ''
+                        return (
+                          <div>
+                            <input
+                              type="text"
+                              value={fastighetValue}
+                              onChange={e => setEditingFastighet(prev => ({ ...prev, [item.id]: e.target.value }))}
+                              onBlur={() => handleFastighetBlur(item.id)}
+                              placeholder="Fastighetsbeteckning *"
+                              className={`w-full px-2 py-1 text-xs bg-slate-800 border rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 ${
+                                isMissing
+                                  ? 'border-red-500 focus:ring-red-500'
+                                  : 'border-slate-600 focus:ring-[#20c58f]'
+                              }`}
+                            />
+                            {isMissing && (
+                              <p className="text-[10px] text-red-400 mt-0.5">
+                                Fastighetsbeteckning krävs för ROT/RUT
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
                 </div>

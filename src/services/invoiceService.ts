@@ -86,6 +86,18 @@ export class InvoiceService {
       throw new Error('Inga fakturerbara tjänster på ärendet')
     }
 
+    // ROT/RUT kräver fastighetsbeteckning (Skatteverket). Blockera fakturering om någon
+    // ROT/RUT-rad saknar beteckning — annars skulle avdraget inte gå att skicka till Fortnox.
+    const missingFastighet = billingItems
+      .filter(i => i.rot_rut_type && (!i.fastighetsbeteckning || String(i.fastighetsbeteckning).trim() === ''))
+      .map(i => i.service_name || i.article_name || 'Tjänst')
+    if (missingFastighet.length > 0) {
+      throw new Error(
+        `Fastighetsbeteckning saknas för ROT/RUT på: ${missingFastighet.join(', ')}. ` +
+        `Fyll i fastighetsbeteckning innan ärendet faktureras.`
+      )
+    }
+
     // Kolla om anpassat pris finns
     const customPrice = await CaseBillingService.getCustomPrice(caseId, caseType)
 
