@@ -7,6 +7,7 @@ import {
   LogOut,
   FileText,
   ClipboardCheck,
+  ShieldCheck,
   MapPin,
   ChevronLeft,
   ChevronRight,
@@ -20,7 +21,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import Select from '../ui/Select'
 import UserProfileModal from './UserProfileModal'
 
-export type MultisitePortalView = 'dashboard' | 'stations' | 'inspections' | 'cases' | 'reports' | 'quotes'
+export type MultisitePortalView = 'dashboard' | 'stations' | 'inspections' | 'egenkontroll' | 'cases' | 'reports' | 'quotes'
 
 interface NavItem {
   id: MultisitePortalView
@@ -55,6 +56,14 @@ const navItems: NavItem[] = [
     icon: ClipboardCheck,
     activeColor: 'text-teal-400',
     activeBg: 'bg-teal-500/20'
+  },
+  {
+    id: 'egenkontroll',
+    label: 'Egenkontroll',
+    shortLabel: 'Egenkontroll',
+    icon: ShieldCheck,
+    activeColor: 'text-purple-400',
+    activeBg: 'bg-purple-500/20'
   },
   {
     id: 'cases',

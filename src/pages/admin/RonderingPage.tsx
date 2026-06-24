@@ -1005,6 +1005,19 @@ export default function RonderingPage() {
             checkedItems: EgenkontrollService.countChecked(rev, questions),
             note: rev.note,
             imageUrls: (ekStationImages[rev.station_id] || []).map(img => img.url),
+            // Värdetyp-svar formaterade som "fråga: svar" (yes_no summeras separat)
+            answerLines: questions
+              .filter(q => q.answer_type !== 'yes_no')
+              .map(q => {
+                const a = rev.answers[q.id]
+                let val: string | null = null
+                if (q.answer_type === 'percent') val = a?.value_percent != null ? `${a.value_percent}%` : null
+                else if (q.answer_type === 'text' || q.answer_type === 'choice') val = a?.value_text || null
+                else if (q.answer_type === 'number') val = a?.value_number != null ? `${a.value_number}${q.unit ? ' ' + q.unit : ''}` : null
+                else if (q.answer_type === 'rating') val = a?.value_number != null ? `${a.value_number}/${q.scale_max ?? 5}` : null
+                return val != null ? `${q.question_text}: ${val}` : null
+              })
+              .filter((l): l is string => l !== null),
           })),
         }
       })

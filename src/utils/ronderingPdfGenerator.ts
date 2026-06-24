@@ -50,6 +50,9 @@ export interface RonderingPdfEkVisit {
     checkedItems: number
     note: string | null
     imageUrls: string[]
+    // Förformaterade "fråga: svar"-rader för alla svarstyper (text/siffra/flerval/betyg/%).
+    // Yes_no sammanfattas separat som checkedItems/questionsPerStation.
+    answerLines?: string[]
   }>
 }
 
@@ -252,6 +255,16 @@ export function generateRonderingPdf(
           doc.text(note, margin + 75, y + 4.5)
         }
         y += 7
+        // Värdetyp-svar (text/siffra/flerval/betyg/%) — en rad per fråga
+        if (st.answerLines && st.answerLines.length > 0) {
+          st.answerLines.forEach(line => {
+            checkPageBreak(4.5)
+            setFont(6.5, 'normal', C.slate)
+            const txt = line.length > 95 ? line.slice(0, 95) + '…' : line
+            doc.text(txt, margin + 8, y + 3.2)
+            y += 4.5
+          })
+        }
         if (st.imageUrls.length > 0) {
           st.imageUrls.forEach((url, ui) => {
             checkPageBreak(5)

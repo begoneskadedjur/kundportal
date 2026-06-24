@@ -11,6 +11,7 @@ import MultisitePortalLayout, { MultisitePortalView } from '../../components/org
 import MultisiteDashboardView from '../../components/organisation/MultisiteDashboardView'
 import RegionalMapView from '../../components/organisation/RegionalMapView'
 import MultisiteInspectionsView from '../../components/organisation/MultisiteInspectionsView'
+import MultisiteEgenkontrollView from '../../components/organisation/MultisiteEgenkontrollView'
 import MultisiteCasesView from '../../components/organisation/MultisiteCasesView'
 import MultisiteReportsView from '../../components/organisation/MultisiteReportsView'
 import MultisiteQuotesView from '../../components/organisation/MultisiteQuotesView'
@@ -151,6 +152,14 @@ const RegionalPortal: React.FC = () => {
             organizationName={organization.organization_name}
             userRoleType={userRole.role_type}
             onNavigateToStation={handleNavigateToStation}
+          />
+        )}
+
+        {currentView === 'egenkontroll' && (
+          <MultisiteEgenkontrollView
+            selectedSiteId={selectedSiteId}
+            sites={siteOptions}
+            organizationName={organization.organization_name}
           />
         )}
 
