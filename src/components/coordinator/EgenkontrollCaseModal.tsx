@@ -328,15 +328,36 @@ export default function EgenkontrollCaseModal({
   }
 
   // Hjälpare: skriv ett svar i optimistisk state
-  const setAnswerInState = (stationId: string, questionId: string, value: Partial<{ value_bool: boolean | null; value_percent: number | null }>) => {
+  const setAnswerInState = (
+    stationId: string,
+    questionId: string,
+    value: Partial<{ value_bool: boolean | null; value_percent: number | null; value_text: string | null; value_number: number | null }>
+  ) => {
     setReviews(prev => prev.map(r => {
       if (r.station_id !== stationId) return r
-      const prevAns = r.answers[questionId] || { question_id: questionId, value_bool: null, value_percent: null }
+      const prevAns = r.answers[questionId] || { question_id: questionId, value_bool: null, value_percent: null, value_text: null, value_number: null }
       return {
         ...r,
         answers: { ...r.answers, [questionId]: { ...prevAns, ...value } },
       }
     }))
+  }
+
+  // Generisk svarsuppsert för text/number/choice/rating
+  const saveAnswer = async (
+    stationId: string,
+    questionId: string,
+    value: Partial<{ value_text: string | null; value_number: number | null }>,
+    rollback: Partial<{ value_text: string | null; value_number: number | null }>
+  ) => {
+    setAnswerInState(stationId, questionId, value)
+    try {
+      const reviewId = await EgenkontrollService.ensureReview(caseData.id, stationId)
+      await EgenkontrollService.upsertAnswer(reviewId, questionId, value)
+    } catch (e: any) {
+      setAnswerInState(stationId, questionId, rollback)
+      toast.error('Kunde inte spara')
+    }
   }
 
   // Uppdatera yes_no-checklistepunkt — cyklar null → true → false → null
@@ -821,6 +842,92 @@ export default function EgenkontrollCaseModal({
                                               className="w-16 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                                             />
                                             <span className="text-xs text-slate-400">%</span>
+                                          </div>
+                                        </div>
+                                      )
+                                    }
+                                    if (q.answer_type === 'text') {
+                                      const textVal = ans?.value_text ?? ''
+                                      return (
+                                        <div key={q.id} className="space-y-1">
+                                          <span className="text-xs leading-relaxed text-slate-300">{q.question_text}</span>
+                                          <input
+                                            type="text"
+                                            defaultValue={textVal}
+                                            key={`${review.station_id}-${q.id}-${textVal}`}
+                                            onBlur={e => saveAnswer(review.station_id, q.id, { value_text: e.target.value.trim() || null }, { value_text: ans?.value_text ?? null })}
+                                            placeholder="Skriv svar..."
+                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                                          />
+                                        </div>
+                                      )
+                                    }
+                                    if (q.answer_type === 'number') {
+                                      const numVal = ans?.value_number ?? null
+                                      return (
+                                        <div key={q.id} className="flex items-center gap-2">
+                                          <span className="text-xs leading-relaxed text-slate-300 flex-1">{q.question_text}</span>
+                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                            <input
+                                              type="number"
+                                              defaultValue={numVal ?? ''}
+                                              key={`${review.station_id}-${q.id}-${numVal ?? 'empty'}`}
+                                              onBlur={e => {
+                                                const n = e.target.value.trim() === '' ? null : parseFloat(e.target.value)
+                                                saveAnswer(review.station_id, q.id, { value_number: (n !== null && !isNaN(n)) ? n : null }, { value_number: numVal })
+                                              }}
+                                              className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                                            />
+                                            {q.unit && <span className="text-xs text-slate-400">{q.unit}</span>}
+                                          </div>
+                                        </div>
+                                      )
+                                    }
+                                    if (q.answer_type === 'choice') {
+                                      const choiceVal = ans?.value_text ?? null
+                                      return (
+                                        <div key={q.id} className="space-y-1">
+                                          <span className="text-xs leading-relaxed text-slate-300">{q.question_text}</span>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {(q.options ?? []).map(opt => (
+                                              <button
+                                                key={opt}
+                                                type="button"
+                                                onClick={() => saveAnswer(review.station_id, q.id, { value_text: choiceVal === opt ? null : opt }, { value_text: choiceVal })}
+                                                className={`px-2 py-1 text-xs rounded-lg border transition-colors ${
+                                                  choiceVal === opt
+                                                    ? 'bg-[#20c58f]/20 border-[#20c58f] text-[#20c58f]'
+                                                    : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-slate-500'
+                                                }`}
+                                              >
+                                                {opt}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )
+                                    }
+                                    if (q.answer_type === 'rating') {
+                                      const ratingVal = ans?.value_number ?? null
+                                      const max = q.scale_max ?? 5
+                                      return (
+                                        <div key={q.id} className="flex items-center gap-2">
+                                          <span className="text-xs leading-relaxed text-slate-300 flex-1">{q.question_text}</span>
+                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                            {Array.from({ length: max }, (_, i) => i + 1).map(n => (
+                                              <button
+                                                key={n}
+                                                type="button"
+                                                onClick={() => saveAnswer(review.station_id, q.id, { value_number: ratingVal === n ? null : n }, { value_number: ratingVal })}
+                                                className={`w-6 h-6 text-xs rounded border transition-colors ${
+                                                  ratingVal !== null && n <= ratingVal
+                                                    ? 'bg-[#20c58f]/20 border-[#20c58f] text-[#20c58f]'
+                                                    : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500'
+                                                }`}
+                                              >
+                                                {n}
+                                              </button>
+                                            ))}
                                           </div>
                                         </div>
                                       )

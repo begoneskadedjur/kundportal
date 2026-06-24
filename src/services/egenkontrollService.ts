@@ -4,7 +4,13 @@ import { supabase } from '../lib/supabase'
 // Typer
 // ─────────────────────────────────────────────────────────────
 
-export type EgenkontrollAnswerType = 'yes_no' | 'percent'
+export type EgenkontrollAnswerType =
+  | 'yes_no'   // value_bool
+  | 'percent'  // value_percent (0-100)
+  | 'text'     // value_text (fritext)
+  | 'number'   // value_number (+ valfri unit)
+  | 'choice'   // value_text (vald option ur options[])
+  | 'rating'   // value_number (1..scale_max)
 
 export interface EgenkontrollQuestion {
   id: string
@@ -13,6 +19,9 @@ export interface EgenkontrollQuestion {
   answer_type: EgenkontrollAnswerType
   sort_order: number
   active: boolean
+  options: string[] | null   // choice: alternativen
+  unit: string | null        // number: enhet
+  scale_max: number | null   // rating: skalans maxvärde
 }
 
 export interface EgenkontrollTemplate {
@@ -28,6 +37,8 @@ export interface EgenkontrollAnswer {
   question_id: string
   value_bool: boolean | null
   value_percent: number | null
+  value_text: string | null
+  value_number: number | null
 }
 
 export interface EgenkontrollStationReview {
@@ -143,6 +154,9 @@ export class EgenkontrollService {
         answer_type: q.answer_type,
         sort_order: q.sort_order,
         active: q.active,
+        options: q.options,
+        unit: q.unit,
+        scale_max: q.scale_max,
       }))
       await supabase.from('egenkontroll_questions').insert(rows)
     }
@@ -163,7 +177,14 @@ export class EgenkontrollService {
 
   static async addQuestion(
     templateId: string,
-    question: { question_text: string; answer_type: EgenkontrollAnswerType; sort_order: number }
+    question: {
+      question_text: string
+      answer_type: EgenkontrollAnswerType
+      sort_order: number
+      options?: string[] | null
+      unit?: string | null
+      scale_max?: number | null
+    }
   ): Promise<EgenkontrollQuestion> {
     const { data, error } = await supabase
       .from('egenkontroll_questions')
@@ -176,7 +197,7 @@ export class EgenkontrollService {
 
   static async updateQuestion(
     questionId: string,
-    patch: Partial<Pick<EgenkontrollQuestion, 'question_text' | 'answer_type' | 'sort_order' | 'active'>>
+    patch: Partial<Pick<EgenkontrollQuestion, 'question_text' | 'answer_type' | 'sort_order' | 'active' | 'options' | 'unit' | 'scale_max'>>
   ): Promise<void> {
     const { error } = await supabase
       .from('egenkontroll_questions')
@@ -211,7 +232,7 @@ export class EgenkontrollService {
   static async getReviews(caseId: string): Promise<EgenkontrollStationReview[]> {
     const { data, error } = await supabase
       .from('egenkontroll_station_reviews')
-      .select('id, case_id, station_id, note, reviewed_at, created_at, egenkontroll_review_answers(question_id, value_bool, value_percent)')
+      .select('id, case_id, station_id, note, reviewed_at, created_at, egenkontroll_review_answers(question_id, value_bool, value_percent, value_text, value_number)')
       .eq('case_id', caseId)
       .order('created_at', { ascending: true })
     if (error) throw new Error(error.message)
@@ -223,6 +244,8 @@ export class EgenkontrollService {
           question_id: a.question_id,
           value_bool: a.value_bool,
           value_percent: a.value_percent,
+          value_text: a.value_text,
+          value_number: a.value_number,
         }
       }
       return {
@@ -277,7 +300,12 @@ export class EgenkontrollService {
   static async upsertAnswer(
     reviewId: string,
     questionId: string,
-    value: { value_bool?: boolean | null; value_percent?: number | null }
+    value: {
+      value_bool?: boolean | null
+      value_percent?: number | null
+      value_text?: string | null
+      value_number?: number | null
+    }
   ): Promise<void> {
     const { error } = await supabase
       .from('egenkontroll_review_answers')
@@ -287,6 +315,8 @@ export class EgenkontrollService {
           question_id: questionId,
           value_bool: value.value_bool ?? null,
           value_percent: value.value_percent ?? null,
+          value_text: value.value_text ?? null,
+          value_number: value.value_number ?? null,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'review_id,question_id' }

@@ -1688,18 +1688,25 @@ export default function RonderingPage() {
                                     {isStationExp && (
                                       <div className="px-5 pb-3 pt-1 space-y-1">
                                         {questions.filter(q => q.active).map(q => {
-                                          if (q.answer_type === 'percent') {
-                                            const pctVal = rev.answers[q.id]?.value_percent ?? null
+                                          const a = rev.answers[q.id]
+                                          // Värdebaserade typer (percent/text/number/choice/rating) → badge + frågetext
+                                          if (q.answer_type !== 'yes_no') {
+                                            let display: string | null = null
+                                            if (q.answer_type === 'percent') display = a?.value_percent != null ? `${a.value_percent}%` : null
+                                            else if (q.answer_type === 'text') display = a?.value_text || null
+                                            else if (q.answer_type === 'choice') display = a?.value_text || null
+                                            else if (q.answer_type === 'number') display = a?.value_number != null ? `${a.value_number}${q.unit ? ' ' + q.unit : ''}` : null
+                                            else if (q.answer_type === 'rating') display = a?.value_number != null ? `${a.value_number}/${q.scale_max ?? 5}` : null
                                             return (
                                               <div key={q.id} className="flex items-start gap-2 text-xs">
-                                                <span className={`text-xs font-mono px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0 ${pctVal !== null ? 'bg-slate-700/50 text-slate-200' : 'bg-slate-800/50 text-slate-600'}`}>
-                                                  {pctVal !== null ? `${pctVal}%` : '—'}
+                                                <span className={`text-xs font-mono px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0 max-w-[160px] truncate ${display ? 'bg-slate-700/50 text-slate-200' : 'bg-slate-800/50 text-slate-600'}`}>
+                                                  {display ?? '—'}
                                                 </span>
-                                                <span className={pctVal !== null ? 'text-slate-300' : 'text-slate-500'}>{q.question_text}</span>
+                                                <span className={display ? 'text-slate-300' : 'text-slate-500'}>{q.question_text}</span>
                                               </div>
                                             )
                                           }
-                                          const val = rev.answers[q.id]?.value_bool ?? null
+                                          const val = a?.value_bool ?? null
                                           return (
                                             <div key={q.id} className="flex items-start gap-2 text-xs">
                                               {val === true  && <CheckCircle className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />}

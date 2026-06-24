@@ -25,6 +25,10 @@ interface RegionalOrg {
 const ANSWER_TYPE_OPTIONS = [
   { value: 'yes_no', label: 'Ja / Nej' },
   { value: 'percent', label: 'Procent (0–100%)' },
+  { value: 'text', label: 'Fritext' },
+  { value: 'number', label: 'Siffra / mätvärde' },
+  { value: 'choice', label: 'Flerval (lista)' },
+  { value: 'rating', label: 'Betyg / skala' },
 ]
 
 export default function EgenkontrollSettingsPage() {
@@ -130,7 +134,7 @@ export default function EgenkontrollSettingsPage() {
 
   const handleUpdateQuestion = async (
     q: EgenkontrollQuestion,
-    patch: Partial<Pick<EgenkontrollQuestion, 'question_text' | 'answer_type' | 'active'>>
+    patch: Partial<Pick<EgenkontrollQuestion, 'question_text' | 'answer_type' | 'active' | 'options' | 'unit' | 'scale_max'>>
   ) => {
     try {
       await EgenkontrollService.updateQuestion(q.id, patch)
@@ -290,6 +294,53 @@ export default function EgenkontrollSettingsPage() {
                       </label>
                     )}
                   </div>
+
+                  {/* Typ-specifik konfiguration */}
+                  {!isInherited && q.answer_type === 'number' && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-slate-400">Enhet:</label>
+                      <input
+                        type="text"
+                        defaultValue={q.unit ?? ''}
+                        onBlur={(e) => handleUpdateQuestion(q, { unit: e.target.value.trim() || null })}
+                        placeholder="t.ex. st, °C, kg"
+                        className="w-28 px-2 py-1 text-xs bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                      />
+                    </div>
+                  )}
+
+                  {!isInherited && q.answer_type === 'rating' && (
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-slate-400">Skala 1 till:</label>
+                      <input
+                        type="number"
+                        min={2}
+                        max={10}
+                        defaultValue={q.scale_max ?? 5}
+                        onBlur={(e) => {
+                          const n = parseInt(e.target.value, 10)
+                          handleUpdateQuestion(q, { scale_max: isNaN(n) ? 5 : Math.min(10, Math.max(2, n)) })
+                        }}
+                        className="w-20 px-2 py-1 text-xs bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                      />
+                    </div>
+                  )}
+
+                  {!isInherited && q.answer_type === 'choice' && (
+                    <div>
+                      <label className="text-xs text-slate-400 block mb-1">Alternativ (ett per rad):</label>
+                      <textarea
+                        defaultValue={(q.options ?? []).join('\n')}
+                        onBlur={(e) => {
+                          const opts = e.target.value.split('\n').map(s => s.trim()).filter(Boolean)
+                          handleUpdateQuestion(q, { options: opts.length > 0 ? opts : null })
+                        }}
+                        rows={3}
+                        placeholder={'OK\nÅtgärd krävs\nEj tillämpligt'}
+                        className="w-full px-2 py-1 text-xs bg-slate-800 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Ta bort */}
