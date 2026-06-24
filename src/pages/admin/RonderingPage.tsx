@@ -12,8 +12,8 @@ import {
   AlertCircle, TrendingDown, CheckCircle, XCircle, X, User, Calendar, ClipboardCheck,
   ChevronDown, ChevronRight as ChevronRightIcon,
 } from 'lucide-react'
-import { EgenkontrollService, EGENKONTROLL_ITEMS } from '../../services/egenkontrollService'
-import type { EgenkontrollStationReview } from '../../services/egenkontrollService'
+import { EgenkontrollService } from '../../services/egenkontrollService'
+import type { EgenkontrollStationReview, EgenkontrollQuestion } from '../../services/egenkontrollService'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import {
@@ -527,6 +527,8 @@ export default function RonderingPage() {
   const [expandedEgenkontroll, setExpandedEgenkontroll] = useState<string | null>(null)
   const [expandedEgenkontrollStation, setExpandedEgenkontrollStation] = useState<string | null>(null)
   const [ekStationImages, setEkStationImages] = useState<Record<string, CaseImageWithUrl[]>>({})
+  // Egenkontroll-mall (frågor) per region (customer_id) — laddas en gång per unik region (ingen N+1)
+  const [ekQuestionsByRegion, setEkQuestionsByRegion] = useState<Record<string, EgenkontrollQuestion[]>>({})
 
   // ── Ladda organisationer ──────────────────────────────────────────────────
 
@@ -799,6 +801,31 @@ export default function RonderingPage() {
     load()
   }, [egenkontrollCases, selectedMonth])
 
+  // Ladda egenkontroll-mallen (frågor) per unik region — en mall per region (ingen N+1)
+  useEffect(() => {
+    if (egenkontrollCases.length === 0) return
+    const uniqueRegionIds = [...new Set(egenkontrollCases.map(ek => ek.regionId))]
+    const missing = uniqueRegionIds.filter(id => !(id in ekQuestionsByRegion))
+    if (missing.length === 0) return
+    let cancelled = false
+    const load = async () => {
+      const entries = await Promise.all(
+        missing.map(async (regionId): Promise<[string, EgenkontrollQuestion[]]> => {
+          try {
+            const tpl = await EgenkontrollService.getTemplateForCustomer(regionId)
+            return [regionId, tpl?.questions ?? []]
+          } catch {
+            return [regionId, []]
+          }
+        })
+      )
+      if (cancelled) return
+      setEkQuestionsByRegion(prev => ({ ...prev, ...Object.fromEntries(entries) }))
+    }
+    load()
+    return () => { cancelled = true }
+  }, [egenkontrollCases, ekQuestionsByRegion])
+
   // Räkna om monthData när vald månad ändras
   useEffect(() => {
     if (!selectedMonth || allEnriched.length === 0) return
@@ -962,20 +989,25 @@ export default function RonderingPage() {
         station_id: h.stationId, serial_number: h.serialNumber, allCount: h.consecutiveMonths,
         lastInspected: stationLastInspected[h.stationId] ?? null,
       }))
-      const ekVisitsForPdf = monthEkForMap.map(ek => ({
-        regionName: ek.regionName,
-        scheduledStart: ek.scheduledStart,
-        technicianName: ek.technicianName,
-        totalStations: ek.reviews.length,
-        checkedCount: ek.reviews.reduce((s, r) => s + EgenkontrollService.countChecked(r), 0),
-        maxCount: ek.reviews.length * EGENKONTROLL_ITEMS.length,
-        stationResults: ek.reviews.map(rev => ({
-          serialNumber: ek.placementSerialMap[rev.station_id] ?? null,
-          checkedItems: EgenkontrollService.countChecked(rev),
-          note: rev.note,
-          imageUrls: (ekStationImages[rev.station_id] || []).map(img => img.url),
-        })),
-      }))
+      const ekVisitsForPdf = monthEkForMap.map(ek => {
+        const questions = ekQuestionsByRegion[ek.regionId] ?? []
+        const questionsPerStation = EgenkontrollService.yesNoQuestionCount(questions)
+        return {
+          regionName: ek.regionName,
+          scheduledStart: ek.scheduledStart,
+          technicianName: ek.technicianName,
+          totalStations: ek.reviews.length,
+          checkedCount: ek.reviews.reduce((s, r) => s + EgenkontrollService.countChecked(r, questions), 0),
+          maxCount: ek.reviews.length * questionsPerStation,
+          questionsPerStation,
+          stationResults: ek.reviews.map(rev => ({
+            serialNumber: ek.placementSerialMap[rev.station_id] ?? null,
+            checkedItems: EgenkontrollService.countChecked(rev, questions),
+            note: rev.note,
+            imageUrls: (ekStationImages[rev.station_id] || []).map(img => img.url),
+          })),
+        }
+      })
       const pdfOrgName = selectedOrg.name.split(' — ')[0].trim()
       generateRonderingPdf(pdfOrgName, pdfCases, highRisk, fmtMonthYear(selectedMonth + '-01'), ekVisitsForPdf)
     } catch (e: any) {
@@ -1575,12 +1607,14 @@ export default function RonderingPage() {
                   {!collapsedSections.has('egenkontroll') && <div className="p-4 pt-0 space-y-2 border-t border-emerald-500/10">
                     {monthEk.map(ek => {
                       const isExp = expandedEgenkontroll === ek.id
+                      const questions = ekQuestionsByRegion[ek.regionId] ?? []
+                      const yesNoCount = EgenkontrollService.yesNoQuestionCount(questions)
                       const totalReviews = ek.reviews.length
-                      const totalChecked = ek.reviews.reduce((s, r) => s + EgenkontrollService.countChecked(r), 0)
-                      const maxChecked = totalReviews * EGENKONTROLL_ITEMS.length
+                      const totalChecked = ek.reviews.reduce((s, r) => s + EgenkontrollService.countChecked(r, questions), 0)
+                      const maxChecked = totalReviews * yesNoCount
                       const overallPct = maxChecked > 0 ? Math.round(totalChecked / maxChecked * 100) : 0
-                      const fullyReviewed = ek.reviews.filter(r => EgenkontrollService.countChecked(r) === EGENKONTROLL_ITEMS.length).length
-                      const partialReviewed = ek.reviews.filter(r => EgenkontrollService.countChecked(r) > 0 && EgenkontrollService.countChecked(r) < EGENKONTROLL_ITEMS.length).length
+                      const fullyReviewed = ek.reviews.filter(r => yesNoCount > 0 && EgenkontrollService.countChecked(r, questions) === yesNoCount).length
+                      const partialReviewed = ek.reviews.filter(r => EgenkontrollService.countChecked(r, questions) > 0 && EgenkontrollService.countChecked(r, questions) < yesNoCount).length
                       return (
                         <div key={ek.id} className="bg-slate-800/40 border border-slate-700/50 rounded-xl overflow-hidden">
                           <button
@@ -1620,8 +1654,8 @@ export default function RonderingPage() {
                           {isExp && ek.reviews.length > 0 && (
                             <div className="border-t border-slate-700/50 divide-y divide-slate-700/30">
                               {ek.reviews.map(rev => {
-                                const checkedCount = EgenkontrollService.countChecked(rev)
-                                const stationPct = Math.round(checkedCount / EGENKONTROLL_ITEMS.length * 100)
+                                const checkedCount = EgenkontrollService.countChecked(rev, questions)
+                                const stationPct = yesNoCount > 0 ? Math.round(checkedCount / yesNoCount * 100) : 0
                                 const isStationExp = expandedEgenkontrollStation === rev.station_id
                                 const serialNumber = ek.placementSerialMap[rev.station_id]
                                 const stationLabel = serialNumber ? `#${serialNumber}` : `Station ${rev.station_id.slice(0, 8)}`
@@ -1642,25 +1676,36 @@ export default function RonderingPage() {
                                         <span className="text-xs text-slate-500">{stationImgs.length} bild{stationImgs.length !== 1 ? 'er' : ''}</span>
                                       )}
                                       <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${
-                                        checkedCount === EGENKONTROLL_ITEMS.length
+                                        yesNoCount > 0 && checkedCount === yesNoCount
                                           ? 'bg-emerald-500/20 text-emerald-300'
                                           : checkedCount > 0
                                           ? 'bg-amber-500/20 text-amber-300'
                                           : 'bg-slate-700/50 text-slate-400'
                                       }`}>
-                                        {checkedCount}/{EGENKONTROLL_ITEMS.length} · {stationPct}%
+                                        {checkedCount}/{yesNoCount} · {stationPct}%
                                       </span>
                                     </button>
                                     {isStationExp && (
                                       <div className="px-5 pb-3 pt-1 space-y-1">
-                                        {EGENKONTROLL_ITEMS.map(item => {
-                                          const val = rev[item.key]
+                                        {questions.filter(q => q.active).map(q => {
+                                          if (q.answer_type === 'percent') {
+                                            const pctVal = rev.answers[q.id]?.value_percent ?? null
+                                            return (
+                                              <div key={q.id} className="flex items-start gap-2 text-xs">
+                                                <span className={`text-xs font-mono px-1.5 py-0.5 rounded mt-0.5 flex-shrink-0 ${pctVal !== null ? 'bg-slate-700/50 text-slate-200' : 'bg-slate-800/50 text-slate-600'}`}>
+                                                  {pctVal !== null ? `${pctVal}%` : '—'}
+                                                </span>
+                                                <span className={pctVal !== null ? 'text-slate-300' : 'text-slate-500'}>{q.question_text}</span>
+                                              </div>
+                                            )
+                                          }
+                                          const val = rev.answers[q.id]?.value_bool ?? null
                                           return (
-                                            <div key={item.key} className="flex items-start gap-2 text-xs">
+                                            <div key={q.id} className="flex items-start gap-2 text-xs">
                                               {val === true  && <CheckCircle className="w-3.5 h-3.5 text-emerald-400 mt-0.5 flex-shrink-0" />}
                                               {val === false && <XCircle className="w-3.5 h-3.5 text-red-400 mt-0.5 flex-shrink-0" />}
                                               {val === null  && <AlertCircle className="w-3.5 h-3.5 text-slate-600 mt-0.5 flex-shrink-0" />}
-                                              <span className={val === true ? 'text-slate-300' : val === false ? 'text-red-300' : 'text-slate-500'}>{item.label}</span>
+                                              <span className={val === true ? 'text-slate-300' : val === false ? 'text-red-300' : 'text-slate-500'}>{q.question_text}</span>
                                             </div>
                                           )
                                         })}

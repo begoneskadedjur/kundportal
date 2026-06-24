@@ -44,6 +44,7 @@ export interface RonderingPdfEkVisit {
   totalStations: number
   checkedCount: number
   maxCount: number
+  questionsPerStation: number
   stationResults: Array<{
     serialNumber: string | null
     checkedItems: number
@@ -244,7 +245,7 @@ export function generateRonderingPdf(
         setFont(7, 'normal', C.darkGray)
         doc.text(st.serialNumber ? `#${st.serialNumber}` : '—', margin + 3, y + 4.5)
         setFont(7, 'normal', C.medGray)
-        doc.text(`${st.checkedItems}/9 godkända`, margin + 30, y + 4.5)
+        doc.text(`${st.checkedItems}/${visit.questionsPerStation} godkända`, margin + 30, y + 4.5)
         if (st.note) {
           setFont(6.5, 'normal', C.slate)
           const note = st.note.length > 55 ? st.note.slice(0, 55) + '…' : st.note

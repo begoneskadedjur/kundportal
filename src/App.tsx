@@ -46,6 +46,7 @@ import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import CustomerAnalytics from './pages/admin/CustomerAnalytics';
 import RonderingPage from './pages/admin/RonderingPage';
+import EgenkontrollPage from './pages/admin/EgenkontrollPage';
 import { RonderingSchedulePage } from './pages/coordinator/RonderingSchedulePage';
 import MonthlyReport from './pages/admin/MonthlyReport';
 import ImageBank from './pages/admin/ImageBank';
@@ -147,7 +148,7 @@ function App() {
               <Route path="dashboard-demo" element={<ProtectedRoute requiredRole="admin"><DashboardDemo /></ProtectedRoute>} />
               <Route path="befintliga-kunder" element={<ProtectedRoute requiredRole="admin"><Customers /></ProtectedRoute>} />
               <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="admin"><CustomerDetails /></ProtectedRoute>} />
-              <Route path="egenkontroll" element={<ProtectedRoute requiredRole="admin"><RonderingPage /></ProtectedRoute>} />
+              <Route path="egenkontroll" element={<ProtectedRoute requiredRole="admin"><EgenkontrollPage /></ProtectedRoute>} />
               <Route path="rondering-schema" element={<ProtectedRoute requiredRole="admin"><RonderingSchedulePage /></ProtectedRoute>} />
               <Route path="kundprognos" element={<ProtectedRoute requiredRole="admin"><CustomerAnalytics /></ProtectedRoute>} />
               <Route path="manadsrapport" element={<ProtectedRoute requiredRole="admin"><MonthlyReport /></ProtectedRoute>} />

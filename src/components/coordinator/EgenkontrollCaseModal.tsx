@@ -30,7 +30,7 @@ import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
 import { RonderingService, RonderingStationLog, RonderingAnnotation } from '../../services/ronderingService'
 import { EquipmentService } from '../../services/equipmentService'
 import RonderingMapSection from './RonderingMapSection'
-import { EgenkontrollService, EgenkontrollStationReview, EGENKONTROLL_ITEMS } from '../../services/egenkontrollService'
+import { EgenkontrollService, EgenkontrollStationReview, EgenkontrollQuestion } from '../../services/egenkontrollService'
 import { CaseImageService } from '../../services/caseImageService'
 import type { CaseImageWithUrl } from '../../services/caseImageService'
 import ImageLightbox from '../shared/ImageLightbox'
@@ -122,6 +122,10 @@ export default function EgenkontrollCaseModal({
   // Valda stationer (från egenkontroll_station_reviews)
   const [reviews, setReviews] = useState<EgenkontrollStationReview[]>([])
 
+  // Mallens frågor (dynamiska kontrollpunkter)
+  const [questions, setQuestions] = useState<EgenkontrollQuestion[]>([])
+  const [allowDeviations, setAllowDeviations] = useState(true)
+
   // Expanderade stationer i granskningstabellen
   const [expandedStation, setExpandedStation] = useState<string | null>(null)
 
@@ -177,6 +181,15 @@ export default function EgenkontrollCaseModal({
           .eq('id', caseData.customer_id)
           .single()
         setCustomerData(customer)
+
+        // Ladda kundens egenkontrollmall (frågor)
+        try {
+          const template = await EgenkontrollService.getTemplateForCustomer(caseData.customer_id)
+          setQuestions((template?.questions ?? []).filter(q => q.active))
+          setAllowDeviations(template?.allow_deviations ?? true)
+        } catch (e) {
+          console.error('Kunde inte ladda egenkontrollmall:', e)
+        }
       }
 
       const { data: techs } = await supabase.from('technicians').select('*').eq('is_active', true).order('name')
@@ -314,15 +327,44 @@ export default function EgenkontrollCaseModal({
     }
   }
 
-  // Uppdatera checklistepunkt — cyklar null → true → false → null
-  const toggleCheckItem = async (stationId: string, key: keyof EgenkontrollStationReview, currentVal: boolean | null) => {
+  // Hjälpare: skriv ett svar i optimistisk state
+  const setAnswerInState = (stationId: string, questionId: string, value: Partial<{ value_bool: boolean | null; value_percent: number | null }>) => {
+    setReviews(prev => prev.map(r => {
+      if (r.station_id !== stationId) return r
+      const prevAns = r.answers[questionId] || { question_id: questionId, value_bool: null, value_percent: null }
+      return {
+        ...r,
+        answers: { ...r.answers, [questionId]: { ...prevAns, ...value } },
+      }
+    }))
+  }
+
+  // Uppdatera yes_no-checklistepunkt — cyklar null → true → false → null
+  const toggleCheckItem = async (stationId: string, questionId: string, currentVal: boolean | null) => {
     const nextVal = currentVal === null ? true : currentVal === true ? false : null
-    const patch = { [key]: nextVal } as any
-    setReviews(prev => prev.map(r => r.station_id === stationId ? { ...r, ...patch } : r))
+    setAnswerInState(stationId, questionId, { value_bool: nextVal })
     try {
-      await EgenkontrollService.upsertReview(caseData.id, stationId, patch)
+      const reviewId = await EgenkontrollService.ensureReview(caseData.id, stationId)
+      await EgenkontrollService.upsertAnswer(reviewId, questionId, { value_bool: nextVal })
     } catch (e: any) {
-      setReviews(prev => prev.map(r => r.station_id === stationId ? { ...r, [key]: currentVal } : r))
+      setAnswerInState(stationId, questionId, { value_bool: currentVal })
+      toast.error('Kunde inte spara')
+    }
+  }
+
+  // Uppdatera procent-svar
+  const setPercentAnswer = async (stationId: string, questionId: string, raw: string, prevVal: number | null) => {
+    let parsed: number | null = null
+    if (raw.trim() !== '') {
+      const n = parseInt(raw, 10)
+      if (!isNaN(n)) parsed = Math.max(0, Math.min(100, n))
+    }
+    setAnswerInState(stationId, questionId, { value_percent: parsed })
+    try {
+      const reviewId = await EgenkontrollService.ensureReview(caseData.id, stationId)
+      await EgenkontrollService.upsertAnswer(reviewId, questionId, { value_percent: parsed })
+    } catch (e: any) {
+      setAnswerInState(stationId, questionId, { value_percent: prevVal })
       toast.error('Kunde inte spara')
     }
   }
@@ -331,7 +373,7 @@ export default function EgenkontrollCaseModal({
   const updateNote = async (stationId: string, note: string) => {
     setReviews(prev => prev.map(r => r.station_id === stationId ? { ...r, note } : r))
     try {
-      await EgenkontrollService.upsertReview(caseData.id, stationId, { note: note || null })
+      await EgenkontrollService.upsertNote(caseData.id, stationId, note)
     } catch (e: any) {
       toast.error('Kunde inte spara notering')
     }
@@ -362,8 +404,10 @@ export default function EgenkontrollCaseModal({
   }
 
   const reviewedCount = reviews.filter(r => {
-    return EGENKONTROLL_ITEMS.some(item => r[item.key])
+    return EgenkontrollService.countChecked(r, questions) > 0
   }).length
+
+  const yesNoTotal = EgenkontrollService.yesNoQuestionCount(questions)
 
   const selectedStationIds = new Set(reviews.map(r => r.station_id))
 
@@ -652,7 +696,7 @@ export default function EgenkontrollCaseModal({
                   {reviews.map(review => {
                     const station = allStations.find(s => s.id === review.station_id)
                     const isExpanded = expandedStation === review.station_id
-                    const checkedCount = EgenkontrollService.countChecked(review)
+                    const checkedCount = EgenkontrollService.countChecked(review, questions)
                     const latestLog = latestLogs.get(review.station_id)
                     const stationAnns = latestAnnotations.filter(a => a.station_id === review.station_id)
                     const images = stationImages.get(review.station_id) || []
@@ -672,15 +716,17 @@ export default function EgenkontrollCaseModal({
                             <span className="text-xs text-slate-400 truncate flex-1">{station.comment}</span>
                           )}
                           {/* Checklista-progress */}
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${
-                            checkedCount === EGENKONTROLL_ITEMS.length
-                              ? 'bg-emerald-500/20 text-emerald-300'
-                              : checkedCount > 0
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-slate-700/50 text-slate-400'
-                          }`}>
-                            {checkedCount}/{EGENKONTROLL_ITEMS.length}
-                          </span>
+                          {yesNoTotal > 0 && (
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              checkedCount === yesNoTotal
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : checkedCount > 0
+                                ? 'bg-amber-500/20 text-amber-300'
+                                : 'bg-slate-700/50 text-slate-400'
+                            }`}>
+                              {checkedCount}/{yesNoTotal}
+                            </span>
+                          )}
                           {/* Senaste rondering-status */}
                           {latestLog && (
                             <span className={`text-xs ${STATUS_COLOR[latestLog.status] || 'text-slate-400'}`}>
@@ -749,42 +795,70 @@ export default function EgenkontrollCaseModal({
                             <div>
                               <p className="text-xs font-semibold text-white mb-2 flex items-center gap-1">
                                 <ClipboardCheck className="w-3 h-3 text-[#20c58f]" />
-                                ISY-ROAD kontrollpunkter
+                                Kontrollpunkter
                               </p>
-                              <div className="space-y-1.5">
-                                {EGENKONTROLL_ITEMS.map(item => {
-                                  const checked = review[item.key] as boolean | null
-                                  return (
-                                    <label
-                                      key={item.key}
-                                      className="flex items-start gap-2 cursor-pointer group"
-                                      title={checked === true ? 'Godkänd — klicka för ej godkänd' : checked === false ? 'Ej godkänd — klicka för att återställa' : 'Ej kontrollerad — klicka för godkänd'}
-                                    >
-                                      <div
-                                        onClick={() => toggleCheckItem(review.station_id, item.key as keyof EgenkontrollStationReview, checked)}
-                                        className="mt-0.5 flex-shrink-0"
+                              {questions.length === 0 ? (
+                                <p className="text-xs text-slate-500">Inga kontrollpunkter konfigurerade.</p>
+                              ) : (
+                                <div className="space-y-1.5">
+                                  {questions.map(q => {
+                                    const ans = review.answers[q.id]
+                                    if (q.answer_type === 'percent') {
+                                      const percentVal = ans?.value_percent ?? null
+                                      return (
+                                        <div key={q.id} className="flex items-center gap-2">
+                                          <span className="text-xs leading-relaxed text-slate-300 flex-1">
+                                            {q.question_text}
+                                          </span>
+                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              max={100}
+                                              defaultValue={percentVal ?? ''}
+                                              key={`${review.station_id}-${q.id}-${percentVal ?? 'empty'}`}
+                                              onBlur={e => setPercentAnswer(review.station_id, q.id, e.target.value, percentVal)}
+                                              className="w-16 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                                            />
+                                            <span className="text-xs text-slate-400">%</span>
+                                          </div>
+                                        </div>
+                                      )
+                                    }
+                                    // yes_no
+                                    const checked = ans?.value_bool ?? null
+                                    return (
+                                      <label
+                                        key={q.id}
+                                        className="flex items-start gap-2 cursor-pointer group"
+                                        title={checked === true ? 'Godkänd — klicka för ej godkänd' : checked === false ? 'Ej godkänd — klicka för att återställa' : 'Ej kontrollerad — klicka för godkänd'}
                                       >
-                                        {checked === true  && <CheckSquare className="w-4 h-4 text-[#20c58f]" />}
-                                        {checked === false && <XSquare className="w-4 h-4 text-red-400" />}
-                                        {checked === null  && <Square className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />}
-                                      </div>
-                                      <span className={`text-xs leading-relaxed ${checked === true ? 'text-slate-300' : checked === false ? 'text-red-300' : 'text-slate-400'}`}>
-                                        {item.label}
-                                      </span>
-                                    </label>
-                                  )
-                                })}
-                              </div>
+                                        <div
+                                          onClick={() => toggleCheckItem(review.station_id, q.id, checked)}
+                                          className="mt-0.5 flex-shrink-0"
+                                        >
+                                          {checked === true  && <CheckSquare className="w-4 h-4 text-[#20c58f]" />}
+                                          {checked === false && <XSquare className="w-4 h-4 text-red-400" />}
+                                          {checked === null  && <Square className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />}
+                                        </div>
+                                        <span className={`text-xs leading-relaxed ${checked === true ? 'text-slate-300' : checked === false ? 'text-red-300' : 'text-slate-400'}`}>
+                                          {q.question_text}
+                                        </span>
+                                      </label>
+                                    )
+                                  })}
+                                </div>
+                              )}
                             </div>
 
                             {/* Notering */}
                             <div>
-                              <label className="block text-xs font-medium text-slate-400 mb-1">Notering / avvikelse</label>
+                              <label className="block text-xs font-medium text-slate-400 mb-1">{allowDeviations ? 'Notering / avvikelse' : 'Notering'}</label>
                               <textarea
                                 value={review.note || ''}
                                 onChange={e => updateNote(review.station_id, e.target.value)}
                                 rows={2}
-                                placeholder="Skriv en notering eller beskriv avvikelse..."
+                                placeholder={allowDeviations ? 'Skriv en notering eller beskriv avvikelse...' : 'Skriv en notering...'}
                                 className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] resize-none"
                               />
                             </div>
@@ -845,9 +919,13 @@ export default function EgenkontrollCaseModal({
             {reviews.length > 0 && (
               <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
                 <p className="text-xs text-slate-400">
-                  <span className="text-white font-medium">{reviewedCount}</span> av <span className="text-white font-medium">{reviews.length}</span> stationer har minst en bockat checkpunkt
-                  {' · '}
-                  <span className="text-white font-medium">{reviews.filter(r => EgenkontrollService.countChecked(r) === EGENKONTROLL_ITEMS.length).length}</span> helt godkända
+                  <span className="text-white font-medium">{reviewedCount}</span> av <span className="text-white font-medium">{reviews.length}</span> stationer har minst en bockad checkpunkt
+                  {yesNoTotal > 0 && (
+                    <>
+                      {' · '}
+                      <span className="text-white font-medium">{reviews.filter(r => EgenkontrollService.countChecked(r, questions) === yesNoTotal).length}</span> helt godkända
+                    </>
+                  )}
                 </p>
               </div>
             )}
