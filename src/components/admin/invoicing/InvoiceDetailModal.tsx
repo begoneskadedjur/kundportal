@@ -408,13 +408,41 @@ export default function InvoiceDetailModal({
       )
 
       // 2c. Hämta ärende-metadata för berikning av Fortnox-payloaden
-      // (leveransdatum, teknikerns namn, ärendenummer för spårbarhet)
-      const caseTable = invoice.case_type === 'private' ? 'private_cases' : 'business_cases'
-      const { data: caseMeta } = await supabase
-        .from(caseTable)
-        .select('case_number, completed_date, start_date, primary_assignee_name')
-        .eq('id', invoice.case_id)
-        .maybeSingle()
+      // (leveransdatum, teknikerns namn, ärendenummer för spårbarhet).
+      // Ad-hoc/avtalsfakturor (case_type=null) ligger i 'cases' (contract) med ANDRA
+      // kolumnnamn (scheduled_start/primary_technician_name) — normalisera till samma form.
+      let caseMeta: {
+        case_number?: string | null
+        completed_date?: string | null
+        start_date?: string | null
+        primary_assignee_name?: string | null
+      } | null = null
+      if (invoice.case_id) {
+        if (effectiveCaseType === 'contract') {
+          const { data } = await supabase
+            .from('cases')
+            .select('case_number, completed_date, scheduled_start, primary_technician_name')
+            .eq('id', invoice.case_id)
+            .maybeSingle()
+          if (data) {
+            const d = data as any
+            caseMeta = {
+              case_number: d.case_number,
+              completed_date: d.completed_date,
+              start_date: d.scheduled_start,
+              primary_assignee_name: d.primary_technician_name,
+            }
+          }
+        } else {
+          const caseTable = invoice.case_type === 'private' ? 'private_cases' : 'business_cases'
+          const { data } = await supabase
+            .from(caseTable)
+            .select('case_number, completed_date, start_date, primary_assignee_name')
+            .eq('id', invoice.case_id)
+            .maybeSingle()
+          caseMeta = (data as any) || null
+        }
+      }
 
       // 3. Bygg fakturarader
       const invoiceRows = invoice.items.map(item => ({
@@ -553,6 +581,13 @@ export default function InvoiceDetailModal({
   const statusConfig = invoice ? INVOICE_STATUS_CONFIG[invoice.status] : null
   // Privat = visa pris inkl. moms i UI. Företag/avtal = exkl. moms. (Lagring/Fortnox påverkas inte.)
   const isPrivate = invoice?.case_type === 'private'
+  // Ad-hoc/avtalsfakturor har case_type = null (constraint tillåter bara null/private/business),
+  // men deras ärende är ett contract-ärende. Härled 'contract' så kommunikationspanelen kan
+  // matcha case_comments (som triggern handle_invoice_paid skriver med case_type='contract').
+  const effectiveCaseType: CaseType | null = invoice
+    ? (invoice.case_type as CaseType | null) ??
+      ((invoice.invoice_type === 'adhoc' || invoice.invoice_type === 'contract') ? 'contract' : null)
+    : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -1260,7 +1295,7 @@ export default function InvoiceDetailModal({
                 </div>
 
                 {/* Kommunikation — endast för fakturor med case-koppling */}
-                {invoice.case_id && invoice.case_type && (
+                {invoice.case_id && effectiveCaseType && (
                   <div className="flex-1 min-h-0 flex flex-col">
                     <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700 bg-slate-800/30">
                       <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
@@ -1269,7 +1304,7 @@ export default function InvoiceDetailModal({
                     <div className="flex-1 min-h-0 flex flex-col px-3 py-2">
                       <CommentSection
                         caseId={invoice.case_id}
-                        caseType={invoice.case_type as CaseType}
+                        caseType={effectiveCaseType}
                         caseTitle={caseContext?.title || invoice.customer_name}
                         compact={true}
                       />
@@ -1351,11 +1386,11 @@ export default function InvoiceDetailModal({
                     )}
 
                     {/* Kommunikation — endast för fakturor med case-koppling */}
-                    {invoice.case_id && invoice.case_type && (
+                    {invoice.case_id && effectiveCaseType && (
                       <div className="min-h-[200px]">
                         <CommentSection
                           caseId={invoice.case_id}
-                          caseType={invoice.case_type as CaseType}
+                          caseType={effectiveCaseType}
                           caseTitle={caseContext?.title || invoice.customer_name}
                           compact={true}
                         />
