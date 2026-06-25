@@ -14,8 +14,11 @@ import {
   type EgenkontrollQuestion,
   type EgenkontrollStationReview,
 } from '../../services/egenkontrollService'
+import { RonderingService, ANNOTATION_CATEGORIES, type RonderingAnnotation } from '../../services/ronderingService'
+import { CaseImageService, type CaseImageWithUrl } from '../../services/caseImageService'
 import { formatDistanceToNow } from '../../utils/dateUtils'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import ImageLightbox from '../shared/ImageLightbox'
 
 interface SiteOption {
   id: string
@@ -36,6 +39,9 @@ interface Occasion {
   reviews: EgenkontrollStationReview[]
   reviewedStations: number
   deviations: number
+  annotations: RonderingAnnotation[]            // kartmarkerade avvikelser
+  imagesByAnnotation: Record<string, CaseImageWithUrl[]>  // annotation_id → bilder
+  imagesByStation: Record<string, CaseImageWithUrl[]>     // station_id → bilder
 }
 
 interface RegionHistory {
@@ -56,6 +62,7 @@ export default function MultisiteEgenkontrollView({ selectedSiteId, sites }: Pro
   const [stationNames, setStationNames] = useState<Record<string, { label: string; location: string | null }>>({})
   const [expandedOccasion, setExpandedOccasion] = useState<string | null>(null)
   const [expandedStation, setExpandedStation] = useState<string | null>(null)
+  const [lightbox, setLightbox] = useState<{ images: CaseImageWithUrl[]; index: number } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -90,7 +97,32 @@ export default function MultisiteEgenkontrollView({ selectedSiteId, sites }: Pro
 
       // 4. batch-reviews för alla ärenden
       const cases = casesRes.data ?? []
-      const reviewsByCase = await EgenkontrollService.getReviewsForCases(cases.map((c: any) => c.id))
+      const caseIds = cases.map((c: any) => c.id)
+      const reviewsByCase = await EgenkontrollService.getReviewsForCases(caseIds)
+
+      // 4b. avvikelser + bilder per ärende (parallellt)
+      const annoAndImgs = await Promise.all(
+        caseIds.map(async (cid: string) => {
+          const [annotations, images] = await Promise.all([
+            RonderingService.getAnnotationsForCase(cid).catch(() => [] as RonderingAnnotation[]),
+            CaseImageService.getCaseImages(cid, 'contract').catch(() => [] as CaseImageWithUrl[]),
+          ])
+          const imagesByAnnotation: Record<string, CaseImageWithUrl[]> = {}
+          const imagesByStation: Record<string, CaseImageWithUrl[]> = {}
+          for (const img of images) {
+            const d = img.description || ''
+            if (d.startsWith('annotation:')) {
+              const id = d.slice('annotation:'.length)
+              ;(imagesByAnnotation[id] ||= []).push(img)
+            } else if (d.startsWith('egenkontroll:')) {
+              const id = d.slice('egenkontroll:'.length)
+              ;(imagesByStation[id] ||= []).push(img)
+            }
+          }
+          return { cid, annotations, imagesByAnnotation, imagesByStation }
+        })
+      )
+      const dataByCase = new Map(annoAndImgs.map(x => [x.cid, x]))
 
       // 5. gruppera per region → occasions
       const result: RegionHistory[] = siteIds.map(siteId => {
@@ -100,7 +132,13 @@ export default function MultisiteEgenkontrollView({ selectedSiteId, sites }: Pro
           const reviews = reviewsByCase.get(c.id) ?? []
           const reviewedStations = reviews.filter(r => Object.keys(r.answers).length > 0).length
           const deviations = reviews.reduce((s, r) => s + EgenkontrollService.countFailed(r, activeQuestions), 0)
-          return { caseId: c.id, scheduledStart: c.scheduled_start, reviews, reviewedStations, deviations }
+          const extra = dataByCase.get(c.id)
+          return {
+            caseId: c.id, scheduledStart: c.scheduled_start, reviews, reviewedStations, deviations,
+            annotations: extra?.annotations ?? [],
+            imagesByAnnotation: extra?.imagesByAnnotation ?? {},
+            imagesByStation: extra?.imagesByStation ?? {},
+          }
         })
         return { site, occasions, totalDeviations: occasions.reduce((s, o) => s + o.deviations, 0) }
       })
@@ -265,6 +303,49 @@ export default function MultisiteEgenkontrollView({ selectedSiteId, sites }: Pro
                           </div>
                         </button>
 
+                        {/* Kartmarkerade avvikelser (expanderat) */}
+                        {occExpanded && occ.annotations.length > 0 && (
+                          <div className="border-t border-slate-700/50 px-3 py-2.5 bg-amber-500/5">
+                            <div className="flex items-center gap-1.5 mb-2">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                              <span className="text-xs font-semibold text-amber-300">
+                                Rapporterade avvikelser ({occ.annotations.length})
+                              </span>
+                            </div>
+                            <div className="space-y-2">
+                              {occ.annotations.map(ann => {
+                                const cat = ANNOTATION_CATEGORIES[ann.category as keyof typeof ANNOTATION_CATEGORIES]
+                                const annImgs = occ.imagesByAnnotation[ann.id] ?? []
+                                return (
+                                  <div key={ann.id} className="flex items-start gap-2 text-xs">
+                                    <span className="mt-0.5">{cat?.emoji ?? '📍'}</span>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-slate-200">
+                                        <span style={{ color: cat?.color }}>{cat?.label ?? ann.category}</span>
+                                        {ann.note && <span className="text-slate-300"> — {ann.note}</span>}
+                                      </div>
+                                      {ann.address && <div className="text-slate-500">{ann.address}</div>}
+                                      <div className="text-slate-600">
+                                        {ann.technician_name && `${ann.technician_name} · `}{fmtDate(ann.created_at)}
+                                      </div>
+                                      {annImgs.length > 0 && (
+                                        <div className="flex gap-1.5 mt-1.5">
+                                          {annImgs.map((img, i) => (
+                                            <button key={img.id} onClick={() => setLightbox({ images: annImgs, index: i })}
+                                              className="w-12 h-12 rounded-lg overflow-hidden border border-slate-600 hover:border-[#20c58f] transition-colors">
+                                              <img src={img.url} alt="" className="w-full h-full object-cover" />
+                                            </button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
                         {/* Stationer (expanderat) */}
                         {occExpanded && (
                           <div className="border-t border-slate-700/50 divide-y divide-slate-800/50">
@@ -358,6 +439,17 @@ export default function MultisiteEgenkontrollView({ selectedSiteId, sites }: Pro
                                             )
                                           })}
                                           {rev.note && <p className="text-xs text-amber-300 italic mt-2">"{rev.note}"</p>}
+                                          {/* Stationsbilder */}
+                                          {(occ.imagesByStation[rev.station_id] ?? []).length > 0 && (
+                                            <div className="flex gap-1.5 mt-2 flex-wrap">
+                                              {occ.imagesByStation[rev.station_id].map((img, i) => (
+                                                <button key={img.id} onClick={() => setLightbox({ images: occ.imagesByStation[rev.station_id], index: i })}
+                                                  className="w-14 h-14 rounded-lg overflow-hidden border border-slate-600 hover:border-[#20c58f] transition-colors">
+                                                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                                                </button>
+                                              ))}
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                     </div>
@@ -374,6 +466,16 @@ export default function MultisiteEgenkontrollView({ selectedSiteId, sites }: Pro
             </div>
           ))}
         </div>
+      )}
+
+      {/* Bild-lightbox */}
+      {lightbox && (
+        <ImageLightbox
+          images={lightbox.images.map(img => ({ url: img.url, alt: img.description || '' }))}
+          initialIndex={lightbox.index}
+          isOpen={true}
+          onClose={() => setLightbox(null)}
+        />
       )}
     </div>
   )
