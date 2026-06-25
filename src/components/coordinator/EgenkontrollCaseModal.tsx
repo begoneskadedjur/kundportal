@@ -91,7 +91,6 @@ export default function EgenkontrollCaseModal({
 }: EgenkontrollCaseModalProps) {
   const { profile } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [showSaveSuccess, setShowSaveSuccess] = useState(false)
   const [customerData, setCustomerData] = useState<any>(null)
 
   const [formData, setFormData] = useState({
@@ -294,9 +293,9 @@ export default function EgenkontrollCaseModal({
 
       if (error) throw error
 
-      setShowSaveSuccess(true)
-      setTimeout(() => setShowSaveSuccess(false), 2000)
+      toast.success('Egenkontrollen sparad')
       onSuccess?.()
+      onClose()
     } catch (e: any) {
       toast.error(e.message || 'Kunde inte spara')
     } finally {
@@ -461,14 +460,8 @@ export default function EgenkontrollCaseModal({
       )}
       <div className="ml-auto flex items-center gap-2">
         <Button onClick={handleClose} variant="secondary" size="sm">Stäng</Button>
-        <Button
-          onClick={handleSubmit}
-          size="sm"
-          loading={loading}
-          disabled={showSaveSuccess}
-          className={`${showSaveSuccess ? 'bg-green-500 hover:bg-green-500' : ''} transition-colors duration-300`}
-        >
-          {showSaveSuccess ? <><Check className="w-4 h-4 mr-1" />Sparat!</> : <><Save className="w-4 h-4 mr-1" />Spara</>}
+        <Button onClick={handleSubmit} size="sm" loading={loading}>
+          <Save className="w-4 h-4 mr-1" />Spara
         </Button>
       </div>
     </div>
@@ -827,21 +820,21 @@ export default function EgenkontrollCaseModal({
                                     if (q.answer_type === 'percent') {
                                       const percentVal = ans?.value_percent ?? null
                                       return (
-                                        <div key={q.id} className="flex items-center gap-2">
-                                          <span className="text-xs leading-relaxed text-slate-300 flex-1">
-                                            {q.question_text}
-                                          </span>
-                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                        <div key={q.id} className="p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg space-y-1.5">
+                                          <span className="text-xs leading-relaxed text-slate-300 block">{q.question_text}</span>
+                                          <div className="flex items-center gap-1.5">
                                             <input
                                               type="number"
+                                              inputMode="numeric"
                                               min={0}
                                               max={100}
                                               defaultValue={percentVal ?? ''}
                                               key={`${review.station_id}-${q.id}-${percentVal ?? 'empty'}`}
                                               onBlur={e => setPercentAnswer(review.station_id, q.id, e.target.value, percentVal)}
-                                              className="w-16 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                                              placeholder="0–100"
+                                              className="w-24 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                                             />
-                                            <span className="text-xs text-slate-400">%</span>
+                                            <span className="text-sm text-slate-400">%</span>
                                           </div>
                                         </div>
                                       )
@@ -849,15 +842,15 @@ export default function EgenkontrollCaseModal({
                                     if (q.answer_type === 'text') {
                                       const textVal = ans?.value_text ?? ''
                                       return (
-                                        <div key={q.id} className="space-y-1">
-                                          <span className="text-xs leading-relaxed text-slate-300">{q.question_text}</span>
+                                        <div key={q.id} className="p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg space-y-1.5">
+                                          <span className="text-xs leading-relaxed text-slate-300 block">{q.question_text}</span>
                                           <input
                                             type="text"
                                             defaultValue={textVal}
                                             key={`${review.station_id}-${q.id}-${textVal}`}
                                             onBlur={e => saveAnswer(review.station_id, q.id, { value_text: e.target.value.trim() || null }, { value_text: ans?.value_text ?? null })}
                                             placeholder="Skriv svar..."
-                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                                            className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                                           />
                                         </div>
                                       )
@@ -865,20 +858,22 @@ export default function EgenkontrollCaseModal({
                                     if (q.answer_type === 'number') {
                                       const numVal = ans?.value_number ?? null
                                       return (
-                                        <div key={q.id} className="flex items-center gap-2">
-                                          <span className="text-xs leading-relaxed text-slate-300 flex-1">{q.question_text}</span>
-                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                        <div key={q.id} className="p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg space-y-1.5">
+                                          <span className="text-xs leading-relaxed text-slate-300 block">{q.question_text}</span>
+                                          <div className="flex items-center gap-1.5">
                                             <input
                                               type="number"
+                                              inputMode="decimal"
                                               defaultValue={numVal ?? ''}
                                               key={`${review.station_id}-${q.id}-${numVal ?? 'empty'}`}
                                               onBlur={e => {
                                                 const n = e.target.value.trim() === '' ? null : parseFloat(e.target.value)
                                                 saveAnswer(review.station_id, q.id, { value_number: (n !== null && !isNaN(n)) ? n : null }, { value_number: numVal })
                                               }}
-                                              className="w-20 bg-slate-800 border border-slate-600 rounded-lg px-2 py-1 text-xs text-white text-right focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                                              placeholder="Värde"
+                                              className="w-28 bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                                             />
-                                            {q.unit && <span className="text-xs text-slate-400">{q.unit}</span>}
+                                            {q.unit && <span className="text-sm text-slate-400">{q.unit}</span>}
                                           </div>
                                         </div>
                                       )
@@ -886,15 +881,15 @@ export default function EgenkontrollCaseModal({
                                     if (q.answer_type === 'choice') {
                                       const choiceVal = ans?.value_text ?? null
                                       return (
-                                        <div key={q.id} className="space-y-1">
-                                          <span className="text-xs leading-relaxed text-slate-300">{q.question_text}</span>
+                                        <div key={q.id} className="p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg space-y-1.5">
+                                          <span className="text-xs leading-relaxed text-slate-300 block">{q.question_text}</span>
                                           <div className="flex flex-wrap gap-1.5">
                                             {(q.options ?? []).map(opt => (
                                               <button
                                                 key={opt}
                                                 type="button"
                                                 onClick={() => saveAnswer(review.station_id, q.id, { value_text: choiceVal === opt ? null : opt }, { value_text: choiceVal })}
-                                                className={`px-2 py-1 text-xs rounded-lg border transition-colors ${
+                                                className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
                                                   choiceVal === opt
                                                     ? 'bg-[#20c58f]/20 border-[#20c58f] text-[#20c58f]'
                                                     : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-slate-500'
@@ -911,15 +906,15 @@ export default function EgenkontrollCaseModal({
                                       const ratingVal = ans?.value_number ?? null
                                       const max = q.scale_max ?? 5
                                       return (
-                                        <div key={q.id} className="flex items-center gap-2">
-                                          <span className="text-xs leading-relaxed text-slate-300 flex-1">{q.question_text}</span>
-                                          <div className="flex items-center gap-1 flex-shrink-0">
+                                        <div key={q.id} className="p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg space-y-1.5">
+                                          <span className="text-xs leading-relaxed text-slate-300 block">{q.question_text}</span>
+                                          <div className="flex flex-wrap items-center gap-1.5">
                                             {Array.from({ length: max }, (_, i) => i + 1).map(n => (
                                               <button
                                                 key={n}
                                                 type="button"
                                                 onClick={() => saveAnswer(review.station_id, q.id, { value_number: ratingVal === n ? null : n }, { value_number: ratingVal })}
-                                                className={`w-6 h-6 text-xs rounded border transition-colors ${
+                                                className={`w-9 h-9 text-sm rounded-lg border transition-colors ${
                                                   ratingVal !== null && n <= ratingVal
                                                     ? 'bg-[#20c58f]/20 border-[#20c58f] text-[#20c58f]'
                                                     : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500'
@@ -937,18 +932,16 @@ export default function EgenkontrollCaseModal({
                                     return (
                                       <label
                                         key={q.id}
-                                        className="flex items-start gap-2 cursor-pointer group"
+                                        onClick={() => toggleCheckItem(review.station_id, q.id, checked)}
+                                        className="flex items-start gap-2.5 cursor-pointer group px-2 py-2 rounded-lg hover:bg-slate-800/30 transition-colors active:bg-slate-800/50"
                                         title={checked === true ? 'Godkänd — klicka för ej godkänd' : checked === false ? 'Ej godkänd — klicka för att återställa' : 'Ej kontrollerad — klicka för godkänd'}
                                       >
-                                        <div
-                                          onClick={() => toggleCheckItem(review.station_id, q.id, checked)}
-                                          className="mt-0.5 flex-shrink-0"
-                                        >
-                                          {checked === true  && <CheckSquare className="w-4 h-4 text-[#20c58f]" />}
-                                          {checked === false && <XSquare className="w-4 h-4 text-red-400" />}
-                                          {checked === null  && <Square className="w-4 h-4 text-slate-500 group-hover:text-slate-300 transition-colors" />}
+                                        <div className="mt-0.5 flex-shrink-0">
+                                          {checked === true  && <CheckSquare className="w-5 h-5 text-[#20c58f]" />}
+                                          {checked === false && <XSquare className="w-5 h-5 text-red-400" />}
+                                          {checked === null  && <Square className="w-5 h-5 text-slate-500 group-hover:text-slate-300 transition-colors" />}
                                         </div>
-                                        <span className={`text-xs leading-relaxed ${checked === true ? 'text-slate-300' : checked === false ? 'text-red-300' : 'text-slate-400'}`}>
+                                        <span className={`text-sm leading-relaxed ${checked === true ? 'text-slate-300' : checked === false ? 'text-red-300' : 'text-slate-400'}`}>
                                           {q.question_text}
                                         </span>
                                       </label>

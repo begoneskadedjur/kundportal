@@ -23,7 +23,7 @@ interface RegionalOrg {
 }
 
 const ANSWER_TYPE_OPTIONS = [
-  { value: 'yes_no', label: 'Ja / Nej' },
+  { value: 'yes_no', label: 'Checkbox (godkänd / ej godkänd)' },
   { value: 'percent', label: 'Procent (0–100%)' },
   { value: 'text', label: 'Fritext' },
   { value: 'number', label: 'Siffra / mätvärde' },
