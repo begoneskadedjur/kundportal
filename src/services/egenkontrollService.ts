@@ -260,6 +260,42 @@ export class EgenkontrollService {
     })
   }
 
+  /**
+   * Batch-variant av getReviews för historik: hämtar reviews + svar för FLERA
+   * ärenden i en query (ingen N+1). Returnerar Map<case_id, reviews[]>.
+   */
+  static async getReviewsForCases(caseIds: string[]): Promise<Map<string, EgenkontrollStationReview[]>> {
+    const byCase = new Map<string, EgenkontrollStationReview[]>()
+    if (caseIds.length === 0) return byCase
+
+    const { data, error } = await supabase
+      .from('egenkontroll_station_reviews')
+      .select('id, case_id, station_id, note, reviewed_at, created_at, egenkontroll_review_answers(question_id, value_bool, value_percent, value_text, value_number)')
+      .in('case_id', caseIds)
+      .order('created_at', { ascending: true })
+    if (error) throw new Error(error.message)
+
+    for (const row of (data ?? []) as any[]) {
+      const answers: Record<string, EgenkontrollAnswer> = {}
+      for (const a of (row.egenkontroll_review_answers ?? [])) {
+        answers[a.question_id] = {
+          question_id: a.question_id,
+          value_bool: a.value_bool,
+          value_percent: a.value_percent,
+          value_text: a.value_text,
+          value_number: a.value_number,
+        }
+      }
+      const rev: EgenkontrollStationReview = {
+        id: row.id, case_id: row.case_id, station_id: row.station_id,
+        note: row.note, reviewed_at: row.reviewed_at, created_at: row.created_at, answers,
+      }
+      if (!byCase.has(row.case_id)) byCase.set(row.case_id, [])
+      byCase.get(row.case_id)!.push(rev)
+    }
+    return byCase
+  }
+
   /** Eager-skapa review-raden för en station (måste finnas innan svar skrivs). */
   static async addStation(caseId: string, stationId: string): Promise<EgenkontrollStationReview> {
     const { data, error } = await supabase
