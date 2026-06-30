@@ -169,6 +169,55 @@ const AgendaCaseItem = ({ caseData, onOpen }: { caseData: ScheduleCaseType, onOp
     );
 };
 
+// Resultatlista vid sökning — visar matchande egna ärenden oavsett datum,
+// grupperade per dag med svensk datumrubrik.
+const SearchResultsList = ({ results, query, onOpen, onClear }: { results: ScheduleCaseType[], query: string, onOpen: (c: ScheduleCaseType) => void, onClear: () => void }) => {
+    // Gruppera per dag (start_date), behåller stigande ordning från results
+    const groups: { day: string; label: string; items: ScheduleCaseType[] }[] = [];
+    for (const c of results) {
+        const d = new Date(c.start_date!.replace(' ', 'T'));
+        const day = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        let group = groups.find(g => g.day === day);
+        if (!group) {
+            group = { day, label: d.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }), items: [] };
+            groups.push(group);
+        }
+        group.items.push(c);
+    }
+
+    return (
+        <div>
+            <header className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">
+                    {results.length} {results.length === 1 ? 'träff' : 'träffar'}
+                    <span className="text-slate-500 font-normal text-base ml-2">för "{query}"</span>
+                </h2>
+                <Button variant="secondary" size="sm" onClick={onClear}><X className="w-4 h-4 mr-1" /> Rensa</Button>
+            </header>
+            {results.length === 0 ? (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700">
+                    <Search className="mx-auto w-12 h-12 text-slate-600 mb-2" />
+                    <h3 className="text-lg font-semibold text-slate-300">Inga träffar</h3>
+                    <p className="text-slate-500">Inga av dina ärenden matchar sökningen.</p>
+                </motion.div>
+            ) : (
+                <div className="space-y-6">
+                    {groups.map(group => (
+                        <div key={group.day}>
+                            <h3 className="text-sm font-semibold text-slate-400 capitalize mb-2 sticky top-[68px] bg-slate-950/80 backdrop-blur-sm py-1 z-10">{group.label}</h3>
+                            <div className="space-y-3">
+                                {group.items.map(caseData => (
+                                    <AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={onOpen} />
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 type TechnicianAbsence = { id: string; technician_id: string; start_date: string; end_date: string; reason: string; notes: string | null };
 
 const DAY_KEYS: (keyof WorkSchedule)[] = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
@@ -213,6 +262,9 @@ export default function TechnicianSchedule() {
   const [loading, setLoading] = useState(true);
   const [cases, setCases] = useState<ScheduleCaseType[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(toDateString(new Date()));
+  // Vald dag (selectedDate) styr agendan; viewDate styr vilken månad kalendern visar.
+  // Separerade så att man kan bläddra månad/år utan att byta vald dag.
+  const userNavigatedRef = useRef(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false);
   const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
@@ -346,8 +398,31 @@ export default function TechnicianSchedule() {
     }
   }, [searchParams, cases, loading]);
 
-  const filteredCases = useMemo(() => cases.filter(c => { const matchesStatus = activeStatuses.has(c.status); const query = searchQuery.toLowerCase(); const matchesSearch = !query || c.title.toLowerCase().includes(query) || (c.kontaktperson && c.kontaktperson.toLowerCase().includes(query)) || formatAddress(c.adress).toLowerCase().includes(query); return matchesStatus && matchesSearch; }), [cases, activeStatuses, searchQuery]);
-  
+  const filteredCases = useMemo(() => cases.filter(c => {
+    const matchesStatus = activeStatuses.has(c.status);
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch = !query || [
+      c.title,
+      c.kontaktperson,
+      (c as any).bestallare,            // företagsnamn (avtalsärenden)
+      (c as any).company_name,
+      c.case_number,
+      c.skadedjur,
+      c.telefon_kontaktperson,
+      formatAddress(c.adress),
+    ].some(field => field && String(field).toLowerCase().includes(query));
+    return matchesStatus && matchesSearch;
+  }), [cases, activeStatuses, searchQuery]);
+
+  // Sökning aktiv = visa egen resultatlista över ALLA datum (närmast i tid först)
+  const isSearchActive = searchQuery.trim().length >= 2;
+  const searchResults = useMemo(() => {
+    if (!isSearchActive) return [];
+    return [...filteredCases]
+      .filter(c => c.start_date)
+      .sort((a, b) => new Date(a.start_date!).getTime() - new Date(b.start_date!).getTime());
+  }, [filteredCases, isSearchActive]);
+
   const casesForSelectedDay = useMemo(() => {
     // Använd alltid filteredCases som redan respekterar activeStatuses
     return filteredCases
@@ -428,8 +503,24 @@ export default function TechnicianSchedule() {
     }
   };
   
-  const handleDateClick = (clickInfo: DateClickArg) => { setSelectedDate(clickInfo.dateStr); };
-  const handleDayChange = (offset: number) => { const currentDate = new Date(selectedDate); currentDate.setUTCHours(12); currentDate.setDate(currentDate.getDate() + offset); setSelectedDate(toDateString(currentDate)); };
+  const handleDateClick = (clickInfo: DateClickArg) => { userNavigatedRef.current = true; setSelectedDate(clickInfo.dateStr); };
+  const handleDayChange = (offset: number) => { userNavigatedRef.current = true; const currentDate = new Date(selectedDate); currentDate.setUTCHours(12); currentDate.setDate(currentDate.getDate() + offset); setSelectedDate(toDateString(currentDate)); };
+  // Tillåt fri månads-/årsbläddring i kalendern utan att vald dag flyttas.
+  // datesSet körs när FullCalendar byter visad period (prev/next/prevYear/nextYear);
+  // återställ dag-markeringen efter omritning så vald dag förblir markerad om den syns.
+  const handleDatesSet = () => {
+    document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected'));
+    const dayElement = document.querySelector(`td[data-date="${selectedDate}"]`);
+    if (dayElement) dayElement.classList.add('day-selected');
+  };
+  const goToToday = () => {
+    userNavigatedRef.current = true;
+    const today = toDateString(new Date());
+    setSelectedDate(today);
+    const d = new Date(); d.setUTCHours(12);
+    calendarRef.current?.getApi().gotoDate(d);
+    mobileCalendarRef.current?.getApi().gotoDate(d);
+  };
   
   const getDayCapacityLevel = useCallback((dayString: string, d: Date): 'off' | 'empty' | 'low' | 'high' | 'full' => {
     const offDay = isOffDay(dayString, workSchedule);
@@ -500,7 +591,20 @@ export default function TechnicianSchedule() {
     );
   };
 
-  useEffect(() => { const dateObj = new Date(selectedDate); dateObj.setUTCHours(12); calendarRef.current?.getApi().gotoDate(dateObj); mobileCalendarRef.current?.getApi().gotoDate(dateObj); document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected')); const dayElement = document.querySelector(`td[data-date="${selectedDate}"]`); if (dayElement) dayElement.classList.add('day-selected'); }, [selectedDate]);
+  useEffect(() => {
+    // Flytta bara kalendervyn till vald dag när användaren AKTIVT valt en dag
+    // (klick/pil/Idag) — inte vid varje render. Annars studsar fri månadsbläddring tillbaka.
+    if (userNavigatedRef.current) {
+      const dateObj = new Date(selectedDate); dateObj.setUTCHours(12);
+      calendarRef.current?.getApi().gotoDate(dateObj);
+      mobileCalendarRef.current?.getApi().gotoDate(dateObj);
+      userNavigatedRef.current = false;
+    }
+    // Markera alltid vald dag visuellt (om den syns i nuvarande månadsvy).
+    document.querySelectorAll('.day-selected').forEach(el => el.classList.remove('day-selected'));
+    const dayElement = document.querySelector(`td[data-date="${selectedDate}"]`);
+    if (dayElement) dayElement.classList.add('day-selected');
+  }, [selectedDate]);
 
   const selectedDateObject = useMemo(() => { const d = new Date(selectedDate); d.setUTCHours(12); return d; }, [selectedDate]);
 
@@ -536,7 +640,7 @@ export default function TechnicianSchedule() {
         <div className="flex-grow max-w-screen-2xl mx-auto w-full p-2 sm:p-4 flex lg:flex-row flex-col gap-4">
           <aside className="hidden lg:block lg:w-1/3 xl:w-1/4 sticky top-[76px]">
             <Card className="p-0 bg-slate-900/50 border-slate-800">
-              <FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prev,next'}} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/>
+              <FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prevYear,prev,next,nextYear'}} height="auto" dateClick={handleDateClick} datesSet={handleDatesSet} dayCellContent={renderDayCellContent}/>
             </Card>
             <div className="flex flex-wrap gap-1.5 mt-2 px-1">
               {([
@@ -563,19 +667,29 @@ export default function TechnicianSchedule() {
           </aside>
           <main className="flex-grow w-full lg:w-2/3 xl:w-3/4">
             <div className="lg:hidden mb-4 p-1 bg-slate-800 rounded-lg flex gap-1">{(['agenda', 'month'] as const).map(view => (<Button key={view} variant={mobileView === view ? 'primary' : 'ghost'} onClick={() => setMobileView(view)} className="w-full">{view === 'agenda' ? 'Dagens Ärenden' : 'Månad'}</Button>))}</div>
-            <div className="mb-4 flex gap-2"><div className="flex-grow relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input type="text" placeholder="Sök på kund eller adress..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"/></div><Button variant="secondary" onClick={handleRefresh} disabled={isRefreshing} title="Uppdatera ärenden"><RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /></Button><Button variant="secondary" onClick={() => setIsReportModalOpen(true)} title="Rapport & Analys"><BarChart className="w-4 h-4" /></Button><Button variant="secondary" onClick={() => setIsFilterPanelOpen(true)} className="relative"><Filter className="w-4 h-4" />{filtersAreActive && <span className="absolute -top-1 -right-1 block h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-slate-800" />}</Button></div>
+            <div className="mb-4 flex gap-2"><div className="flex-grow relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" /><input type="text" placeholder="Sök kund, företag, adress, ärendenr..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"/></div><Button variant="secondary" onClick={handleRefresh} disabled={isRefreshing} title="Uppdatera ärenden"><RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /></Button><Button variant="secondary" onClick={() => setIsReportModalOpen(true)} title="Rapport & Analys"><BarChart className="w-4 h-4" /></Button><Button variant="secondary" onClick={() => setIsFilterPanelOpen(true)} className="relative"><Filter className="w-4 h-4" />{filtersAreActive && <span className="absolute -top-1 -right-1 block h-2.5 w-2.5 rounded-full bg-blue-500 border-2 border-slate-800" />}</Button></div>
             <AnimatePresence mode="wait"><motion.div key={mobileView} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="relative">
                 <div className={(mobileView === 'agenda' || window.innerWidth >= 1024) ? 'block' : 'hidden'}>
+                  {isSearchActive ? (
+                    <SearchResultsList results={searchResults} query={searchQuery.trim()} onOpen={handleOpenModal} onClear={() => setSearchQuery('')} />
+                  ) : (
+                  <>
                   <header className="flex items-center justify-between mb-4">
                     <div className="flex-1">
                       <h2 className="text-xl font-bold">{selectedDateObject.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
                     </div>
-                    <div className="flex items-center gap-1"><Button variant="secondary" size="icon" onClick={() => handleDayChange(-1)}><ChevronLeft className="w-5 h-5"/></Button><Button variant="secondary" size="sm" onClick={() => setSelectedDate(toDateString(new Date()))}>Idag</Button><Button variant="secondary" size="icon" onClick={() => handleDayChange(1)}><ChevronRight className="w-5 h-5"/></Button></div>
+                    <div className="flex items-center gap-1"><Button variant="secondary" size="icon" onClick={() => handleDayChange(-1)}><ChevronLeft className="w-5 h-5"/></Button><Button variant="secondary" size="sm" onClick={goToToday}>Idag</Button><Button variant="secondary" size="icon" onClick={() => handleDayChange(1)}><ChevronRight className="w-5 h-5"/></Button></div>
                   </header>
                   <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-12 h-12 text-slate-600 mb-2" /><h3 className="text-lg font-semibold text-slate-300">Inga ärenden</h3><p className="text-slate-500">Du har inga schemalagda ärenden för denna dag.</p></motion.div>)}</AnimatePresence></div>
+                  </>
+                  )}
                 </div>
                 <div className={(mobileView === 'month' && window.innerWidth < 1024) ? 'block' : 'hidden'}>
-                  <Card className="p-0 bg-slate-900/50 border-slate-800"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prev,next' }} height="auto" dateClick={handleDateClick} dayCellContent={renderDayCellContent}/></Card>
+                  {isSearchActive ? (
+                    <SearchResultsList results={searchResults} query={searchQuery.trim()} onOpen={handleOpenModal} onClear={() => setSearchQuery('')} />
+                  ) : (
+                  <>
+                  <Card className="p-0 bg-slate-900/50 border-slate-800"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prevYear,prev,next,nextYear' }} height="auto" dateClick={handleDateClick} datesSet={handleDatesSet} dayCellContent={renderDayCellContent}/></Card>
                   <div className="flex flex-wrap gap-1.5 mt-2 px-1">
                     {([
                       { key: 'off',   label: 'Ledig',          dotColor: 'bg-slate-500' },
@@ -602,6 +716,8 @@ export default function TechnicianSchedule() {
                     <h2 className="text-base font-semibold text-white mb-3">{selectedDateObject.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</h2>
                     <div className="space-y-3"><AnimatePresence>{casesForSelectedDay.length > 0 ? (casesForSelectedDay.map(caseData => (<AgendaCaseItem key={caseData.id} caseData={caseData} onOpen={handleOpenModal} />))) : (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-8 px-4 bg-slate-900/50 rounded-lg border border-dashed border-slate-700"><Calendar className="mx-auto w-8 h-8 text-slate-600 mb-2" /><p className="text-slate-500 text-sm">Inga ärenden denna dag.</p></motion.div>)}</AnimatePresence></div>
                   </div>
+                  </>
+                  )}
                 </div>
               </motion.div></AnimatePresence>
           </main>
