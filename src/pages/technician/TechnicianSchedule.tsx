@@ -639,7 +639,7 @@ export default function TechnicianSchedule() {
         </div>
         <div className="flex-grow max-w-screen-2xl mx-auto w-full p-2 sm:p-4 flex lg:flex-row flex-col gap-4">
           <aside className="hidden lg:block lg:w-1/3 xl:w-1/4 sticky top-[76px]">
-            <Card className="p-0 bg-slate-900/50 border-slate-800">
+            <Card className="p-0 bg-slate-900/50 border-slate-800 fc-show-toolbar-wrapper">
               <FullCalendar key="desktop-calendar" ref={calendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{left: 'title', center: '', right: 'prevYear,prev,next,nextYear'}} height="auto" dateClick={handleDateClick} datesSet={handleDatesSet} dayCellContent={renderDayCellContent}/>
             </Card>
             <div className="flex flex-wrap gap-1.5 mt-2 px-1">
@@ -689,7 +689,7 @@ export default function TechnicianSchedule() {
                     <SearchResultsList results={searchResults} query={searchQuery.trim()} onOpen={handleOpenModal} onClear={() => setSearchQuery('')} />
                   ) : (
                   <>
-                  <Card className="p-0 bg-slate-900/50 border-slate-800"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prevYear,prev,next,nextYear' }} height="auto" dateClick={handleDateClick} datesSet={handleDatesSet} dayCellContent={renderDayCellContent}/></Card>
+                  <Card className="p-0 bg-slate-900/50 border-slate-800 fc-show-toolbar-wrapper"><FullCalendar key="mobile-calendar" ref={mobileCalendarRef} plugins={[dayGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale={svLocale} headerToolbar={{ left: 'title', center: '', right: 'prevYear,prev,next,nextYear' }} height="auto" dateClick={handleDateClick} datesSet={handleDatesSet} dayCellContent={renderDayCellContent}/></Card>
                   <div className="flex flex-wrap gap-1.5 mt-2 px-1">
                     {([
                       { key: 'off',   label: 'Ledig',          dotColor: 'bg-slate-500' },
