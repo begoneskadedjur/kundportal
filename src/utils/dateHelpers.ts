@@ -16,6 +16,36 @@ export function toSwedishISOString(date: Date): string {
 }
 
 /**
+ * Konvertera ett Date-objekt till en ISO-sträng med EXPLICIT tidszon-offset,
+ * t.ex. "2026-06-11T09:22:53+02:00".
+ *
+ * Detta är mönstret som koordinatorschemat använder (CreateCaseModal) och det
+ * enda korrekta sättet att spara "den tid som visades för användaren" till en
+ * timestamptz-kolumn: databasen körs i UTC, så en sträng UTAN offset tolkas som
+ * UTC (fel), medan en sträng MED offset lagras entydigt rätt oavsett serverns tz.
+ *
+ * Använd detta i stället för `new Date().toISOString()` när tidpunkten motsvarar
+ * något som hände i användarens lokala (svenska) tid.
+ */
+export function toLocalISOStringWithOffset(date: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const year = date.getFullYear()
+  const month = pad(date.getMonth() + 1)
+  const day = pad(date.getDate())
+  const hours = pad(date.getHours())
+  const minutes = pad(date.getMinutes())
+  const seconds = pad(date.getSeconds())
+
+  // getTimezoneOffset() är minuter EFTER UTC negerat (UTC+2 ger -120)
+  const tzOffset = date.getTimezoneOffset()
+  const offsetSign = tzOffset <= 0 ? '+' : '-'
+  const offsetHours = pad(Math.floor(Math.abs(tzOffset) / 60))
+  const offsetMinutes = pad(Math.abs(tzOffset) % 60)
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}${offsetSign}${offsetHours}:${offsetMinutes}`
+}
+
+/**
  * Konvertera från databas ISO-sträng till Date-objekt
  * Hanterar både UTC och lokal tid korrekt
  */

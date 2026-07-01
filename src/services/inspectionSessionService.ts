@@ -3,6 +3,7 @@
 
 import { supabase } from '../lib/supabase'
 import { compressToWebP } from '../utils/imageUtils'
+import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
 import {
   StationInspectionSession,
   InspectionSessionWithRelations,
@@ -585,7 +586,7 @@ export async function startInspectionSession(
 ): Promise<StationInspectionSession | null> {
   return updateInspectionSession(sessionId, {
     status: 'in_progress',
-    started_at: new Date().toISOString()
+    started_at: toLocalISOStringWithOffset()
   })
 }
 
@@ -598,7 +599,7 @@ export async function completeInspectionSession(
 ): Promise<StationInspectionSession | null> {
   const updateData: UpdateInspectionSessionInput = {
     status: 'completed',
-    completed_at: new Date().toISOString()
+    completed_at: toLocalISOStringWithOffset()
   }
 
   if (notes) {
@@ -704,7 +705,8 @@ export async function createOutdoorInspection(
       measurement_value: input.measurement_value || null,
       measurement_unit: input.measurement_unit || null,
       preparation_id: input.preparation_id || null,
-      inspected_by: technicianId || null
+      inspected_by: technicianId || null,
+      inspected_at: toLocalISOStringWithOffset()
     }])
     .select()
     .single()
@@ -744,7 +746,7 @@ export async function upsertOutdoorInspection(
           measurement_unit: input.measurement_unit || null,
           preparation_id: input.preparation_id || null,
           inspected_by: technicianId || null,
-          inspected_at: new Date().toISOString()
+          inspected_at: toLocalISOStringWithOffset()
         })
         .eq('id', existing.id)
         .select()
@@ -935,7 +937,8 @@ export async function createIndoorInspection(
       measurement_value: input.measurement_value || null,
       measurement_unit: input.measurement_unit || null,
       preparation_id: input.preparation_id || null,
-      inspected_by: technicianId || null
+      inspected_by: technicianId || null,
+      inspected_at: toLocalISOStringWithOffset()
     }])
     .select()
     .single()
@@ -974,7 +977,7 @@ export async function upsertIndoorInspection(
           measurement_unit: input.measurement_unit || null,
           preparation_id: input.preparation_id || null,
           inspected_by: technicianId || null,
-          inspected_at: new Date().toISOString()
+          inspected_at: toLocalISOStringWithOffset()
         })
         .eq('id', existing.id)
         .select()

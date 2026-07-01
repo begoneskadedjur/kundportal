@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
 
 export interface RonderingStationLog {
   id: string
@@ -71,6 +72,7 @@ export class RonderingService {
         status,
         bait_consumed: baitConsumed ?? null,
         note: note ?? null,
+        inspected_at: toLocalISOStringWithOffset(),
       })
 
     if (error && error.code !== '23505') {

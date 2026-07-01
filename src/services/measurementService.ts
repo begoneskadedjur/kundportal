@@ -2,6 +2,7 @@
 // Service för hantering av stationsmätningar
 
 import { supabase } from '../lib/supabase'
+import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
 import {
   StationMeasurement,
   StationMeasurementWithRelations,
@@ -180,7 +181,7 @@ export class MeasurementService {
           note: input.note || null,
           photo_path: input.photo_path || null,
           measured_by: technicianId || null,
-          measured_at: new Date().toISOString()
+          measured_at: toLocalISOStringWithOffset()
         })
         .select()
         .single()
