@@ -32,6 +32,19 @@ dist-ssr
 # PDF files
 public/*.pdf
 
-# Claude files
-.claude/
+# Claude files (skills versionshanteras, resten är lokalt)
+.claude/*
+!.claude/skills/
+!.claude/settings.json
+!.claude/agents/
 tmpclaude-*
+
+# tsc-artefakter (från tsc-körning utan --noEmit)
+api/**/*.js
+api/**/*.d.ts
+!api/constants/oneflowTemplates.js
+src/lib/pdf-generator.js
+src/lib/pdf-generator.d.ts
+src/types/database.js
+src/types/database.d.ts
+*.tsbuildinfo
