@@ -52,7 +52,7 @@ Deploy sker via Vercel, styrd av `vercel.json`: `buildCommand: npm run build`, `
 1. Skapa `api/cron/<namn>.ts` (lägg till `export const config = { maxDuration: N }` om annat än default 300s behövs).
 2. Lägg till post i `vercel.json`s `crons`-array.
 3. Wrappa handlern med `withCronLog` från `api/_lib/cronLogger.ts` för observability i `cron_runs`-tabellen.
-4. Lägg till auth-kontroll (`CRON_SECRET`-header) - se Riktning nedan, praxis idag är inkonsekvent, kopiera inte ett oskyddat jobb som mall.
+4. Lägg `if (!requireCronSecret(req, res)) return` överst i handlern (`api/_lib/cronAuth.ts`) - obligatoriskt sedan 2026-07-03, alla sju befintliga jobb följer mönstret.
 
 **Lägga till en ny delad server-modul för `api/`:**
 1. Lägg den i `api/_lib/` med ett namn som inte matchar ett tänkt URL-mönster.
@@ -64,16 +64,16 @@ Deploy sker via Vercel, styrd av `vercel.json`: `buildCommand: npm run build`, `
 
 ## Fallgropar
 
-- `npm run lint` (`eslint .`) **kraschar just nu** med `SyntaxError: Cannot use import statement outside a module`, eftersom `eslint.config.js` använder ESM `import` men `package.json` saknar `"type": "module"`. Detta är inget att fixa i kod - verktyget startar inte alls. Kodbasen kör helt utan lint-skydd tills detta åtgärdas.
+- `npm run lint` är körbar sedan 2026-07-03 (`eslint.config.js` → `eslint.config.mjs`, commit `e31e2ae9`) men lint-skulden är stor och okartlagd - kör lint på filer du rör, inte hela repot, tills skulden är nedbetald.
 - `tsc` i `npm run build` (root-`tsconfig.json`, `files: []`) ser ut som ett typkontrollsteg men är en no-op. Lita aldrig på grön `npm run build` som bevis för typsäkerhet.
 - `scripts/type-check.mjs`s fingeravtryck är per `fil|TS-kod`, inte per rad. Om en fil redan har N kända fel av en viss kod och du introducerar exakt N nya (annan orsak, annan rad) men totalt oförändrat antal, upptäcks det **inte**. Var extra vaksam vid refaktorering av filer som redan har många baseline-fel.
 - Fallback-ordningen för service-nyckeln är inkonsekvent mellan filer: `api/_lib/auth.ts` gör `SUPABASE_SERVICE_KEY || SUPABASE_SERVICE_ROLE_KEY`, medan `api/_lib/cronLogger.ts` gör omvänd ordning. Om båda env-varen är satta med olika värden (t.ex. under nyckelrotation) kan olika filer använda olika nycklar samtidigt - felsök detta specifikt om behörighetsfel uppstår sporadiskt efter en rotation.
 - `vite.config.ts` exkluderas medvetet från `tsconfig.node.json` eftersom Vite är ESM-only och projektet kör NodeNext utan `"type": "module"` - rör inte detta utan att förstå konsekvensen för hela API-projektets modulupplösning.
-- Cron-auth är inkonsekvent: `api/cron/sync-embeddings.ts` och `api/cron/sync-oneflow.ts` kollar `CRON_SECRET` - men bara villkorligt: `sync-oneflow.ts:280` släpper igenom allt om env-varen inte är satt, och `sync-embeddings.ts:50` enforcar dessutom bara i production. `api/cron/cleanup-ai-images.ts` kollar bara `req.method !== 'GET'` (rad 13) och `extend-recurring-schedules.ts`, `reactivate-paused-billing.ts`, `monthly-customer-snapshot.ts`, `generate-continuing-contracts.ts` har ingen kontroll alls - kopiera aldrig ett av dessa fyra som mall för ett nytt jobb utan att lägga till auth.
+- Cron-auth är enhetlig sedan 2026-07-03 (`3d3a871d`): alla sju jobben kör `requireCronSecret` från `api/_lib/cronAuth.ts`, som är FAIL-CLOSED - saknas `CRON_SECRET` i Vercel-miljön svarar jobben 503 och INGENTING körs (nattsync, fakturering, snapshots). Vid "alla cron-jobb failar plötsligt": kolla env-varn först. Manuell körning kräver `Authorization: Bearer $CRON_SECRET`.
 
 ## Riktning
 
-1. **Lägg till `CRON_SECRET`-kontroll på alla sju cron-endpoints, inte bara två.** Idag saknar `cleanup-ai-images.ts` (bara metodkoll), `extend-recurring-schedules.ts`, `reactivate-paused-billing.ts`, `monthly-customer-snapshot.ts` och `generate-continuing-contracts.ts` helt auth-kontroll, trots att flera av dem kör faktureringslogik med full service-role-åtkomst och är publikt anropsbara av vem som helst som känner till URL:en. Extrahera de två snarlika (men inte identiska) kontrollerna från `sync-embeddings.ts`/`sync-oneflow.ts` till en delad hjälpfunktion i `api/_lib/`, applicera på alla sju - och gör den skarp även när `CRON_SECRET` saknas (idag är båda no-ops utan env-varen).
-2. **Gör `npm run lint` körbart.** Enklaste vägen: döp om `eslint.config.js` → `eslint.config.mjs` (kräver ingen ändring av `package.json` eller `tsconfig.node.json`s CJS/NodeNext-antaganden). Kodbasen har idag noll lint-skydd trots en genomtänkt config med react-hooks-regler.
+1. ~~**CRON_SECRET på alla sju cron-endpoints**~~ KLART 2026-07-03 (`3d3a871d`, fail-closed via `api/_lib/cronAuth.ts`).
+2. ~~**Gör `npm run lint` körbart**~~ KLART 2026-07-03 (`e31e2ae9`). Nästa steg: beta av lint-skulden fil för fil, sedan CI-steg som kör lint + type-check.
 3. **Minska huvud-bundlens storlek** (flera MB, en enda chunk som laddas av alla roller). Lägg till `build.rollupOptions.output.manualChunks` i `vite.config.ts` och städa blandade statiska/dynamiska importer (Vite flaggar dessa i sin egen build-logg) så att admin/koordinator/tekniker/kund-kod kan route-splittas separat.
 4. **Konsolidera `SUPABASE_SERVICE_KEY`/`SUPABASE_SERVICE_ROLE_KEY`-fallback-ordningen** till en delad `getServiceSupabaseClient()`-funktion i `api/_lib/`, så att nyckelrotationer inte kan ge olika filer olika nycklar samtidigt.
