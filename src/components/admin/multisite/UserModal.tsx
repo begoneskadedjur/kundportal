@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { supabase, getAuthHeaders } from '../../../lib/supabase'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import { X, User, Mail, Shield, MapPin, Loader2, Send, Building2, Eye } from 'lucide-react'
@@ -221,7 +221,7 @@ export default function UserModal({
         if (email !== (existingUser.email ?? '')) {
           const response = await fetch('/api/update-multisite-user-email', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: await getAuthHeaders(),
             body: JSON.stringify({ userId: existingUser.user_id, newEmail: email })
           })
           const result = await response.json()
@@ -238,7 +238,7 @@ export default function UserModal({
         const userId = crypto.randomUUID()
         const response = await fetch('/api/create-multisite-users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await getAuthHeaders(),
           body: JSON.stringify({
             organizationId: orgData.organization_id,
             sendEmail: sendInviteEmail,

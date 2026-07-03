@@ -1,6 +1,7 @@
 // api/send-multisite-invitation.ts - EMAIL INTEGRATION FÖR MULTISITE-ORGANISATIONER
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { getManagerContext, canManageOrganization } from './_lib/multisiteAuth'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -40,6 +41,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Ogiltig e-postadress' })
+    }
+
+    const ctx = await getManagerContext(req, res)
+    if (!ctx) return
+    if (!canManageOrganization(ctx, organizationId)) {
+      return res.status(403).json({ error: 'Behörighet saknas' })
     }
 
     // 3. Kontrollera om organisationen existerar

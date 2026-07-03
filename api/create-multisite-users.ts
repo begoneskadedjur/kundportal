@@ -1,6 +1,7 @@
 // api/create-multisite-users.ts - Skapa multisite-användare
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { getManagerContext, canManageOrganization } from './_lib/multisiteAuth'
 
 // Environment variables - Vercel uses different naming
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -50,9 +51,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Validate required data
     if (!organizationId || !users || !Array.isArray(users) || users.length === 0) {
-      return res.status(400).json({ 
-        error: 'Organization ID and users array are required' 
+      return res.status(400).json({
+        error: 'Organization ID and users array are required'
       })
+    }
+
+    const ctx = await getManagerContext(req, res)
+    if (!ctx) return
+    if (!canManageOrganization(ctx, organizationId)) {
+      return res.status(403).json({ error: 'Behörighet saknas' })
     }
 
     // Get organization details for invitation emails

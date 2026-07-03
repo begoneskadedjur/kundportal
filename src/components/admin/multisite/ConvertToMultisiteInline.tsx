@@ -24,7 +24,7 @@ import {
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
-import { supabase } from '../../../lib/supabase'
+import { supabase, getAuthHeaders } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 
 // ============================================
@@ -255,7 +255,7 @@ export default function ConvertToMultisiteInline({
 
         const response = await fetch('/api/create-multisite-users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await getAuthHeaders(),
           body: JSON.stringify({
             organizationId,
             users: apiUsers,

@@ -1,6 +1,7 @@
 // api/update-multisite-user-email.ts - Uppdatera e-post för befintlig multisite-användare
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { getManagerContext, canManageOrganization, getTargetUserOrganization } from './_lib/multisiteAuth'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -25,6 +26,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   if (!emailRegex.test(newEmail)) {
     return res.status(400).json({ error: 'Ogiltig e-postadress' })
+  }
+
+  const ctx = await getManagerContext(req, res)
+  if (!ctx) return
+
+  // Endpointen får bara ändra multisite-användare - aldrig admin-/tekniker-/kundkonton
+  const targetOrgId = await getTargetUserOrganization(userId)
+  if (!targetOrgId) {
+    return res.status(403).json({ error: 'Användaren är inte en multisite-användare' })
+  }
+  if (!canManageOrganization(ctx, targetOrgId)) {
+    return res.status(403).json({ error: 'Behörighet saknas' })
   }
 
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)

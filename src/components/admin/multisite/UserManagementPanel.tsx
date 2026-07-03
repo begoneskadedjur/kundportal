@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { supabase } from '../../../lib/supabase'
+import { supabase, getAuthHeaders } from '../../../lib/supabase'
 import { MultisiteUserRole, MultisiteUserRoleType } from '../../../types/multisite'
 import {
   Users,
@@ -201,9 +201,7 @@ export default function UserManagementPanel({
     try {
       const response = await fetch('/api/send-multisite-invitation', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           organizationId,
           organizationName,
@@ -249,9 +247,7 @@ export default function UserManagementPanel({
     try {
       const response = await fetch('/api/send-multisite-invitation', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           organizationId,
           organizationName,
