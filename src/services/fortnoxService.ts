@@ -1,7 +1,7 @@
 // Fortnox API-klient — anropar intern proxy som hanterar auth
 // Alla anrop går till /api/fortnox/proxy?path=...
 
-import { supabase } from '../lib/supabase'
+import { supabase, getAuthHeaders } from '../lib/supabase'
 
 async function fortnoxRequest<T>(
   path: string,
@@ -15,7 +15,7 @@ async function fortnoxRequest<T>(
     : `/api/fortnox/proxy?path=${encodeURIComponent(basePath)}`
   const res = await fetch(proxyUrl, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: await getAuthHeaders(),
     body: body ? JSON.stringify(body) : undefined,
   })
 
