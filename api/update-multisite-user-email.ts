@@ -18,6 +18,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Serverkonfiguration saknas' })
   }
 
+  const ctx = await getManagerContext(req, res)
+  if (!ctx) return
+
   const { userId, newEmail } = req.body
   if (!userId || !newEmail) {
     return res.status(400).json({ error: 'userId och newEmail krävs' })
@@ -27,9 +30,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!emailRegex.test(newEmail)) {
     return res.status(400).json({ error: 'Ogiltig e-postadress' })
   }
-
-  const ctx = await getManagerContext(req, res)
-  if (!ctx) return
 
   // Endpointen får bara ändra multisite-användare - aldrig admin-/tekniker-/kundkonton
   const targetOrgId = await getTargetUserOrganization(userId)

@@ -39,10 +39,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       hasServiceKey: !!SUPABASE_SERVICE_KEY,
       urlPrefix: SUPABASE_URL?.substring(0, 30)
     })
-    
+
+    const ctx = await getManagerContext(req, res)
+    if (!ctx) return
+
     const { organizationId, users, roleAssignments, sendEmail: sendEmailParam } = req.body
     const shouldSendEmail = sendEmailParam !== false
-    
+
     console.log('Request data:', {
       organizationId,
       userCount: users?.length,
@@ -56,8 +59,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     }
 
-    const ctx = await getManagerContext(req, res)
-    if (!ctx) return
     if (!canManageOrganization(ctx, organizationId)) {
       return res.status(403).json({ error: 'Behörighet saknas' })
     }

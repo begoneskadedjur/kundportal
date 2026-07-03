@@ -27,26 +27,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     console.log('=== SEND MULTISITE INVITATION API START ===')
     
+    const ctx = await getManagerContext(req, res)
+    if (!ctx) return
+
     const { organizationId, email, name, role, organizationName, siteIds } = req.body
     console.log('Multisite invitation request:', { organizationId, email, name, role, organizationName, siteIds })
 
     // 1. Validera inkommande data
     if (!organizationId || !email || !name || !role || !organizationName) {
-      return res.status(400).json({ 
-        error: 'Alla fält är obligatoriska: organizationId, email, name, role, organizationName' 
+      return res.status(400).json({
+        error: 'Alla fält är obligatoriska: organizationId, email, name, role, organizationName'
       })
+    }
+
+    if (!canManageOrganization(ctx, organizationId)) {
+      return res.status(403).json({ error: 'Behörighet saknas' })
     }
 
     // 2. Validera e-post format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Ogiltig e-postadress' })
-    }
-
-    const ctx = await getManagerContext(req, res)
-    if (!ctx) return
-    if (!canManageOrganization(ctx, organizationId)) {
-      return res.status(403).json({ error: 'Behörighet saknas' })
     }
 
     // 3. Kontrollera om organisationen existerar
