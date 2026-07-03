@@ -4,6 +4,7 @@
 // Körs automatiskt varje natt kl 03:00 via Vercel Cron
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { requireCronSecret } from '../_lib/cronAuth'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
 
@@ -274,12 +275,8 @@ function mapToInsertData(detail: OneFlowContractDetail, listItem: OneFlowContrac
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Auth: acceptera Vercel cron header eller manuell POST
-  const authHeader = req.headers.authorization
-  const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
+  // Auth: Vercel cron-header eller manuellt anrop med samma Bearer-token (fail-closed)
+  if (!requireCronSecret(req, res)) return
 
   if (!ONEFLOW_API_TOKEN) {
     return res.status(500).json({ error: 'ONEFLOW_API_TOKEN saknas' })

@@ -3,6 +3,7 @@
 // Körs automatiskt varje natt kl 02:00 via Vercel Cron
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { requireCronSecret } from '../_lib/cronAuth';
 
 // Vercel function config - 5 minuters timeout för cron
 export const config = {
@@ -43,14 +44,8 @@ function formatTechnician(tech: any): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Verifiera att det är ett cron-anrop (Vercel sätter denna header)
-  const authHeader = req.headers.authorization;
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-    // Tillåt även manuella anrop utan CRON_SECRET i dev
-    if (process.env.NODE_ENV === 'production' && process.env.CRON_SECRET) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  }
+  // Verifiera att det är ett cron-anrop (Vercel sätter headern) - fail-closed
+  if (!requireCronSecret(req, res)) return;
 
   console.log('[Cron] Starting embeddings sync at', new Date().toISOString());
 

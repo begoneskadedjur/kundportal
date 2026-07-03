@@ -12,6 +12,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { withCronLog } from '../_lib/cronLogger'
+import { requireCronSecret } from '../_lib/cronAuth'
 
 export const config = { maxDuration: 60 }
 
@@ -194,6 +195,8 @@ export async function buildSnapshot(snapshotMonth: Date): Promise<Record<string,
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!requireCronSecret(req, res)) return
+
   const result = await withCronLog('monthly-customer-snapshot', async () => {
     // Stöd för manuell trigger via ?month=YYYY-MM-01 (för backfill)
     const monthParam = req.query?.month as string | undefined

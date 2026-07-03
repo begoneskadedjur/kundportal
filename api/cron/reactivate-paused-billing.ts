@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { withCronLog } from '../_lib/cronLogger'
+import { requireCronSecret } from '../_lib/cronAuth'
 
 export const config = { maxDuration: 60 }
 
@@ -21,7 +22,9 @@ function todayLocalIso(): string {
   return `${y}-${m}-${d}`
 }
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!requireCronSecret(req, res)) return
+
   const result = await withCronLog('reactivate-paused-billing', async () => {
     const today = todayLocalIso()
 

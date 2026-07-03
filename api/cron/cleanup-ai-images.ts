@@ -4,6 +4,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { requireCronSecret } from '../_lib/cronAuth';
 
 export const config = {
   maxDuration: 60,
@@ -13,6 +14,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  if (!requireCronSecret(req, res)) return;
 
   const supabase = createClient(
     process.env.SUPABASE_URL!,

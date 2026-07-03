@@ -5,6 +5,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { requireCronSecret } from '../_lib/cronAuth'
 import { addMonths, addMinutes, format } from 'date-fns'
 
 export const config = { maxDuration: 120 }
@@ -18,6 +19,8 @@ const EXTENSION_THRESHOLD_DAYS = 60
 const EXTENSION_MONTHS = 2
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!requireCronSecret(req, res)) return
+
   console.log('[extend-schedules] Starting recurring schedule extension check...')
 
   try {

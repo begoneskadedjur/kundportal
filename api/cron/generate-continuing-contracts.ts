@@ -6,6 +6,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { requireCronSecret } from '../_lib/cronAuth'
 
 export const config = { maxDuration: 300 }
 
@@ -291,7 +292,9 @@ async function generateInvoiceNumber(): Promise<string> {
 
 import { withCronLog } from '../_lib/cronLogger'
 
-export default async function handler(_req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (!requireCronSecret(req, res)) return
+
   const result = await withCronLog('generate-continuing-contracts', async () => {
     const today = toLocalIsoDate(todayLocal())
     const { data: customers, error } = await supabase
