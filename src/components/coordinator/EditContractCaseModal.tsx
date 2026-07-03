@@ -1168,6 +1168,9 @@ export default function EditContractCaseModal({
               )
               billingItemsCreated = result.created
               console.log('[EditContractCaseModal] Skapade', result.created, 'ad-hoc faktureringsrader, totalt:', result.totalAmount, 'kr')
+              if (result.invoiceError) {
+                toast.error(`Ärendet sparades men fakturan kunde inte skapas: ${result.invoiceError}. Raderna ligger kvar ofakturerade - kontakta admin.`, { duration: 10000 })
+              }
             }
           } catch (billingError: any) {
             console.warn('[EditContractCaseModal] Kunde inte skapa ad-hoc billing:', billingError)

@@ -680,7 +680,8 @@ export class ContractInvoiceGenerator {
       .select('*')
       .eq('id', customerId)
       .single()
-    if (cErr || !customer) return null
+    if (cErr) throw new Error(`Kunde inte hämta kund: ${cErr.message}`)
+    if (!customer) throw new Error('Kunden hittades inte')
 
     const completedDate = typeof completedAt === 'string' ? new Date(completedAt) : completedAt
     const y = completedDate.getFullYear()
@@ -703,7 +704,9 @@ export class ContractInvoiceGenerator {
     }
 
     const { data: items, error: iErr } = await q
-    if (iErr || !items || items.length === 0) return null
+    if (iErr) throw new Error(`Kunde inte hämta faktureringsrader: ${iErr.message}`)
+    // null = inget att fakturera (legitimt); fel kastas alltid
+    if (!items || items.length === 0) return null
 
     const subtotal = items.reduce((sum, i) => sum + Number(i.total_price), 0)
     const vatAmount = items.reduce((sum, i) => sum + Number(i.total_price) * (Number(i.vat_rate) / 100), 0)

@@ -354,12 +354,12 @@ export class ContractBillingService {
     caseId: string,
     customerId: string,
     completedAt: Date | string = new Date()
-  ): Promise<{ created: number; totalAmount: number }> {
+  ): Promise<{ created: number; totalAmount: number; invoiceId: string | null; invoiceError?: string }> {
     // 1. Hämta case_billing_items för ärendet
     const allCaseBillingItems = await CaseBillingService.getCaseBillingItems(caseId, 'contract')
 
     if (allCaseBillingItems.length === 0) {
-      return { created: 0, totalAmount: 0 }
+      return { created: 0, totalAmount: 0, invoiceId: null }
     }
 
     // Endast tjänsterader ska faktureras. Artiklar är interna kostnader (för
@@ -372,7 +372,7 @@ export class ContractBillingService {
       : allCaseBillingItems.filter(i => i.item_type === 'article' || !i.item_type)
 
     if (caseBillingItems.length === 0) {
-      return { created: 0, totalAmount: 0 }
+      return { created: 0, totalAmount: 0, invoiceId: null }
     }
 
     // 2. Normalisera completedAt till YYYY-MM-DD i svensk tid (inte UTC).
@@ -389,13 +389,12 @@ export class ContractBillingService {
     const lastDayOfMonth = new Date(y, m + 1, 0).getDate()
     const periodEnd = `${y}-${fmt(m + 1)}-${fmt(lastDayOfMonth)}`
 
-    let totalAmount = 0
-
-    // 3. Skapa contract_billing_items för varje case_billing_item
-    for (const item of caseBillingItems) {
+    // 3. Skapa contract_billing_items - EN insert för alla rader (allt eller inget).
+    //    En loop med per-rad-insert lämnar halva radsatsen vid fel, och omkörning
+    //    dubblar de redan skapade raderna.
+    const rows = caseBillingItems.map(item => {
       const requiresApproval = (item.discount_percent || 0) > 0
-
-      const { error } = await supabase.from('contract_billing_items').insert({
+      return {
         customer_id: customerId,
         article_id: item.article_id,
         article_code: item.article_code,
@@ -416,20 +415,25 @@ export class ContractBillingService {
         invoice_date: invoiceDate,
         status: requiresApproval ? 'pending' : 'approved',
         notes: item.notes || `Från ärende ${caseId}`
-      })
-
-      if (error) {
-        console.error('Kunde inte skapa ad-hoc item:', error)
-        throw new Error(`Kunde inte skapa ad-hoc faktureringspost: ${error.message}`)
       }
+    })
 
-      totalAmount += item.total_price
+    const { error } = await supabase.from('contract_billing_items').insert(rows)
+    if (error) {
+      console.error('Kunde inte skapa ad-hoc items:', error)
+      throw new Error(`Kunde inte skapa ad-hoc faktureringsposter: ${error.message}`)
     }
+
+    const totalAmount = caseBillingItems.reduce((sum, item) => sum + item.total_price, 0)
 
     // 4. Markera case_billing_items som 'billed'
     await CaseBillingService.updateCaseItemsStatus(caseId, 'contract', 'billed')
 
-    // 5. Generera adhoc-invoice enligt kundens grouping
+    // 5. Generera adhoc-invoice enligt kundens grouping. Fel sväljs INTE:
+    //    de returneras som invoiceError så anroparen kan varna användaren.
+    //    Raderna ovan är sanningen och kan faktureras i efterhand.
+    let invoiceId: string | null = null
+    let invoiceError: string | undefined
     try {
       const { data: customer } = await supabase
         .from('customers')
@@ -438,19 +442,22 @@ export class ContractBillingService {
         .single()
       const grouping = (customer?.adhoc_invoice_grouping ?? 'per_case') as 'per_case' | 'monthly_batch'
       const { ContractInvoiceGenerator } = await import('./contractInvoiceGenerator')
-      await ContractInvoiceGenerator.generateAdhocInvoiceForCase({
+      invoiceId = await ContractInvoiceGenerator.generateAdhocInvoiceForCase({
         customerId,
         caseId,
         completedAt: completedDate,
         grouping,
       })
     } catch (err) {
+      invoiceError = err instanceof Error ? err.message : String(err)
       console.error('Kunde inte skapa adhoc-invoice:', err)
     }
 
     return {
       created: caseBillingItems.length,
-      totalAmount
+      totalAmount,
+      invoiceId,
+      invoiceError
     }
   }
 

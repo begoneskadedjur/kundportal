@@ -224,12 +224,16 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
         // Delfakturering: kopiera service-items till contract_billing_items och markera som billed
         if (invoiceNow && caseData.customer_id && pendingBillingItems.length > 0) {
           try {
-            await ContractBillingService.createAdHocItemsFromCase(
+            const adhocResult = await ContractBillingService.createAdHocItemsFromCase(
               caseData.id,
               caseData.customer_id,
               new Date()
             )
-            toast.success(`${pendingBillingItems.length} artikel(er) skickade till fakturering.`)
+            if (adhocResult.invoiceError) {
+              toast.error(`Raderna sparades men fakturan kunde inte skapas: ${adhocResult.invoiceError}. Kontakta admin.`, { duration: 10000 })
+            } else {
+              toast.success(`${pendingBillingItems.length} artikel(er) skickade till fakturering.`)
+            }
           } catch (e: any) {
             console.error('[RevisitContractModal] Delfakturering misslyckades:', e)
             toast.error(`Delfakturering misslyckades: ${e.message}`)
