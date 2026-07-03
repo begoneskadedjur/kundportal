@@ -58,7 +58,7 @@ import { CommunicationSlidePanel } from '../../communication'
 import { CaseType } from '../../../types/communication'
 
 // Datum-hjälpfunktioner för svensk tidszon
-import { toSwedishISOString } from '../../../utils/dateHelpers'
+import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 
 // Skadedjurstyper för följeärenden
 import { PEST_TYPE_OPTIONS } from '../../../utils/clickupFieldMapper'
@@ -1020,7 +1020,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         updateData.price = formData.case_price;
         // Automatically set completed_date when status changes to "Avslutat"
         if (formData.status === 'Avslutat' && currentCase.status !== 'Avslutat') {
-          updateData.completed_date = toSwedishISOString(new Date());
+          updateData.completed_date = toLocalISOStringWithOffset(new Date());
         } else if (formData.status !== 'Avslutat') {
           updateData.completed_date = null;
         }

@@ -22,7 +22,7 @@ import toast from 'react-hot-toast'
 import { DROPDOWN_STATUSES } from '../../types/database'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
-import { toSwedishISOString, fromDatabaseDate } from '../../utils/dateHelpers'
+import { toLocalISOStringWithOffset, fromDatabaseDate } from '../../utils/dateHelpers'
 import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGallery'
 import CommunicationSlidePanel from '../communication/CommunicationSlidePanel'
 import { CaseType } from '../../types/communication'
@@ -154,8 +154,8 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
           service_type: parentCase.service_type || 'rondering_trafikkontoret',
           parent_case_id: parentCase.id,
           status: 'Bokad',
-          scheduled_start: toSwedishISOString(startDate),
-          scheduled_end: endDate ? toSwedishISOString(endDate) : null,
+          scheduled_start: toLocalISOStringWithOffset(startDate),
+          scheduled_end: endDate ? toLocalISOStringWithOffset(endDate) : null,
           primary_technician_id: selectedTech?.id || null,
           primary_technician_name: selectedTech?.name || null,
           title: `${parentCase.title || 'Rondering'} – Delbesök`,

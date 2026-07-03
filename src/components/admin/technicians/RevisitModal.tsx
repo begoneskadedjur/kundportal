@@ -23,7 +23,7 @@ import { format, addMinutes } from 'date-fns'
 import Button from '../../ui/Button'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
-import { toSwedishISOString } from '../../../utils/dateHelpers'
+import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSuggestionCard'
 import { InvoiceService } from '../../../services/invoiceService'
 import { CaseBillingService } from '../../../services/caseBillingService'
@@ -238,8 +238,8 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
           : 'cases'
       const billingCaseType = caseData.case_type === 'private' ? 'private' : 'business'
 
-      const newStartDate = toSwedishISOString(new Date(selectedSuggestion.start_time))
-      const newDueDate = toSwedishISOString(new Date(selectedSuggestion.end_time))
+      const newStartDate = toLocalISOStringWithOffset(new Date(selectedSuggestion.start_time))
+      const newDueDate = toLocalISOStringWithOffset(new Date(selectedSuggestion.end_time))
 
       // 1. Uppdatera ärendet med nya tider och status
       const { data: updatedCase, error } = await supabase

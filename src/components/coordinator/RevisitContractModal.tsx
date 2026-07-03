@@ -21,7 +21,7 @@ import { format } from 'date-fns'
 import Button from '../ui/Button'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { toSwedishISOString } from '../../utils/dateHelpers'
+import { toLocalISOStringWithOffset } from '../../utils/dateHelpers'
 import { ContractBillingService } from '../../services/contractBillingService'
 import { CaseBillingService } from '../../services/caseBillingService'
 import toast from 'react-hot-toast'
@@ -180,8 +180,8 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
     setLoading(true)
 
     try {
-      const newScheduledStart = toSwedishISOString(startDate)
-      const newScheduledEnd = endDate ? toSwedishISOString(endDate) : newScheduledStart
+      const newScheduledStart = toLocalISOStringWithOffset(startDate)
+      const newScheduledEnd = endDate ? toLocalISOStringWithOffset(endDate) : newScheduledStart
 
       // 0. Spara snapshot av nuvarande besök om det finns besöksdata
       const hasVisitData = caseData.work_report || caseData.time_spent_minutes ||

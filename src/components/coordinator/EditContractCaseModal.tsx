@@ -26,7 +26,7 @@ import type { Service } from '../../types/services'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
-import { toSwedishISOString, fromDatabaseDate } from '../../utils/dateHelpers'
+import { toLocalISOStringWithOffset, fromDatabaseDate } from '../../utils/dateHelpers'
 import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGallery'
 import CasePreparationsSection from '../shared/CasePreparationsSection'
 import CaseServiceSelector from '../shared/CaseServiceSelector'
@@ -1056,7 +1056,7 @@ export default function EditContractCaseModal({
           ? profile?.email || null : null,
         // Automatically set completed_date when status changes to "Avslutat"
         completed_date: (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat')
-          ? toSwedishISOString(new Date())
+          ? toLocalISOStringWithOffset(new Date())
           : (formData.status !== 'Avslutat' ? null : localCaseData.completed_date || null)
       }
 
