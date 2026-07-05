@@ -6,7 +6,7 @@
 // känner igen alla mallar oavsett is_active (trashing-skyddet).
 
 import { supabase } from '../lib/supabase'
-import { getTemplatesByType, type OneflowTemplate } from '../constants/oneflowTemplates'
+import { getTemplatesByType, ALLOWED_TEMPLATE_IDS, type OneflowTemplate } from '../constants/oneflowTemplates'
 
 export interface OneflowTemplateRow {
   id: string
@@ -65,6 +65,45 @@ export class OneflowTemplateService {
     } catch (err) {
       console.error('[OneflowTemplateService] DB-läsning misslyckades, använder hårdkodad fallback:', err)
       return getTemplatesByType(type)
+    }
+  }
+
+  /**
+   * ALLA mall-ID:n (även avaktiverade) - för igenkänning/filtrering av
+   * BEFINTLIGA avtal (contractService, statistik). Avaktiverad mall ska
+   * fortfarande kännas igen, annars försvinner historiska avtal ur vyerna.
+   * Fallback till hårdkodade listan vid DB-fel.
+   */
+  static async getAllTemplateIds(): Promise<Set<string>> {
+    try {
+      const { data, error } = await supabase
+        .from('oneflow_templates')
+        .select('oneflow_template_id')
+      if (error) throw error
+      const ids = new Set((data ?? []).map(r => (r as { oneflow_template_id: string }).oneflow_template_id))
+      // Tom tabell = trasigt tillstånd (seedad med 9) - behandla som fel
+      if (ids.size === 0) throw new Error('oneflow_templates är tom')
+      return ids
+    } catch (err) {
+      console.error('[OneflowTemplateService] DB-läsning misslyckades, använder hårdkodad fallback:', err)
+      return new Set(ALLOWED_TEMPLATE_IDS)
+    }
+  }
+
+  /** ALLA mall-ID:n av en typ (även avaktiverade) - för statistikfiltrering. */
+  static async getAllIdsByType(type: 'contract' | 'offer'): Promise<string[]> {
+    try {
+      const { data, error } = await supabase
+        .from('oneflow_templates')
+        .select('oneflow_template_id')
+        .eq('type', type)
+      if (error) throw error
+      const ids = ((data ?? []) as { oneflow_template_id: string }[]).map(r => r.oneflow_template_id)
+      if (ids.length === 0) throw new Error('oneflow_templates saknar rader för typen')
+      return ids
+    } catch (err) {
+      console.error('[OneflowTemplateService] DB-läsning misslyckades, använder hårdkodad fallback:', err)
+      return getTemplatesByType(type).map(t => t.id)
     }
   }
 

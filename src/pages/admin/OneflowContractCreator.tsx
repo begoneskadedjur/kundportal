@@ -17,7 +17,8 @@ import { SelectedProduct, CustomerType, SelectedArticleItem } from '../../types/
 import { convertServicesToOneflowProducts } from '../../utils/articlePricingCalculator'
 import { mapBillingItemsToPrefillServices, mapBillingItemsToSelectedArticles } from '../../utils/billingPrefill'
 import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
-import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
+import { OFFER_TEMPLATES, CONTRACT_TEMPLATES, type OneflowTemplate } from '../../constants/oneflowTemplates'
+import { OneflowTemplateService } from '../../services/oneflowTemplateService'
 import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
 import { supabase, getAuthHeaders } from '../../lib/supabase'
@@ -152,6 +153,16 @@ export default function OneflowContractCreator() {
   const [groupsError, setGroupsError] = useState<string | null>(null)
 
   // 🆕 DYNAMISK BEGONE INFO BASERAT PÅ INLOGGAD ANVÄNDARE
+  // Dynamiska mallar från oneflow_templates. Hårdkodade listan är initialvärde
+  // tills DB-läsningen är klar; servicen faller själv tillbaka på den vid DB-fel.
+  const [offerTemplates, setOfferTemplates] = useState<OneflowTemplate[]>(OFFER_TEMPLATES)
+  const [contractTemplates, setContractTemplates] = useState<OneflowTemplate[]>(CONTRACT_TEMPLATES)
+
+  useEffect(() => {
+    OneflowTemplateService.getActiveByType('offer').then(setOfferTemplates)
+    OneflowTemplateService.getActiveByType('contract').then(setContractTemplates)
+  }, [])
+
   const [wizardData, setWizardData] = useState<WizardData>({
     documentType: 'contract',
     selectedTemplate: '',
@@ -360,7 +371,7 @@ export default function OneflowContractCreator() {
       
       // Om vi väljer en offertmall, uppdatera automatiskt partyType baserat på mallens typ
       if (field === 'selectedTemplate' && updated.documentType === 'offer') {
-        const template = OFFER_TEMPLATES.find(t => t.id === value)
+        const template = offerTemplates.find(t => t.id === value)
         if (template && template.category) {
           updated.partyType = template.category as 'company' | 'individual'
         }
@@ -399,7 +410,7 @@ export default function OneflowContractCreator() {
       // Om vi är på steg 2 (mallval) och har valt en offertmall,
       // hoppa över steg 3 (avtalspart) eftersom den väljs automatiskt
       if (currentStep === 2 && wizardData.documentType === 'offer' && wizardData.selectedTemplate) {
-        const template = OFFER_TEMPLATES.find(t => t.id === wizardData.selectedTemplate)
+        const template = offerTemplates.find(t => t.id === wizardData.selectedTemplate)
         if (template && template.category) {
           setWizardData(prev => ({ ...prev, partyType: template.category as 'company' | 'individual' }))
         }
@@ -498,7 +509,7 @@ export default function OneflowContractCreator() {
   }
 
   // Hitta rätt mall baserat på dokumenttyp
-  const availableTemplates = wizardData.documentType === 'offer' ? OFFER_TEMPLATES : CONTRACT_TEMPLATES
+  const availableTemplates = wizardData.documentType === 'offer' ? offerTemplates : contractTemplates
   const selectedTemplate = availableTemplates.find(t => t.id === wizardData.selectedTemplate)
 
   const handleSubmit = async () => {

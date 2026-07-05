@@ -2,19 +2,18 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import type { OfferStats } from '../types/casePipeline'
-import { OFFER_TEMPLATES } from '../constants/oneflowTemplates'
-
-const OFFER_TEMPLATE_IDS = OFFER_TEMPLATES.map(t => t.id)
+import { OneflowTemplateService } from '../services/oneflowTemplateService'
 
 export function useOfferStats() {
   const [stats, setStats] = useState<OfferStats | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase
+    // Alla offertmallar (även avaktiverade) - historiska offerter ska räknas
+    OneflowTemplateService.getAllIdsByType('offer').then(offerTemplateIds => supabase
       .from('contracts')
       .select('status, total_value')
-      .in('template_id', OFFER_TEMPLATE_IDS)
+      .in('template_id', offerTemplateIds)
       .neq('status', 'draft')
       .neq('status', 'trashed')
       .then(({ data, error }) => {
@@ -65,7 +64,7 @@ export function useOfferStats() {
           last_synced_at: new Date().toISOString(),
         })
       })
-      .finally(() => setLoading(false))
+    ).finally(() => setLoading(false))
   }, [])
 
   return { stats, loading }

@@ -241,7 +241,6 @@
   "src/hooks/useCoordinatorAnalytics.ts|TS2339": 1,
   "src/hooks/useMentions.ts|TS2554": 1,
   "src/hooks/useModernWorkReportGeneration.ts|TS2367": 2,
-  "src/hooks/useOfferStats.ts|TS2339": 1,
   "src/hooks/useTickets.ts|TS2339": 2,
   "src/hooks/useTickets.ts|TS2345": 4,
   "src/hooks/useWorkReportGeneration.ts|TS2367": 2,

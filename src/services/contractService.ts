@@ -1,7 +1,7 @@
 // src/services/contractService.ts - Service för contracts CRUD-operationer
 import { supabase } from '../lib/supabase'
 import { Contract, ContractInsert, ContractUpdate, ContractWithBilling } from '../types/database'
-import { ALLOWED_TEMPLATE_IDS } from '../constants/oneflowTemplates'
+import { OneflowTemplateService } from './oneflowTemplateService'
 import toast from 'react-hot-toast'
 
 // Multi-kontrakt-refaktor (Fas 2): kolumner som getActiveContracts/getAllContracts
@@ -349,9 +349,9 @@ export class ContractService {
         `)
         .order('created_at', { ascending: false })
 
-      // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar  
+      // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
       query = query.neq('status', 'draft')
-      const allowedTemplates = Array.from(ALLOWED_TEMPLATE_IDS).concat(['no_template'])
+      const allowedTemplates = Array.from(await OneflowTemplateService.getAllTemplateIds()).concat(['no_template'])
       query = query.in('template_id', allowedTemplates)
 
       // Tillämpa filter
@@ -684,7 +684,7 @@ export class ContractService {
 
       // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
       query = query.neq('status', 'draft')
-      const allowedTemplates = Array.from(ALLOWED_TEMPLATE_IDS).concat(['no_template'])
+      const allowedTemplates = Array.from(await OneflowTemplateService.getAllTemplateIds()).concat(['no_template'])
       query = query.in('template_id', allowedTemplates)
 
       if (filters.date_from) {
@@ -1364,7 +1364,7 @@ export class ContractService {
     const cutoffISO = startDate.toISOString()
 
     // 2. Hämta kontraktsdata inom fönstret
-    const allowedTemplates = Array.from(ALLOWED_TEMPLATE_IDS).concat(['no_template'])
+    const allowedTemplates = Array.from(await OneflowTemplateService.getAllTemplateIds()).concat(['no_template'])
     const { data: contractsData, error: contractsError } = await supabase
       .from('contracts')
       .select(
