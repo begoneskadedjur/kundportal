@@ -1,7 +1,7 @@
 // src/hooks/useWorkReportGeneration.ts - Hook för saneringsrapport generation och email
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { supabase } from '../lib/supabase'
+import { supabase, getAuthHeaders } from '../lib/supabase'
 import { sanitationReportService, type SanitationReport } from '../services/sanitationReportService'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -422,9 +422,7 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       // Anropa Puppeteer-baserad PDF-generator
       const response = await fetch('/api/generate-work-report', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           taskDetails,
           customerInfo,
@@ -550,9 +548,7 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       
       const response = await fetch('/api/send-work-report', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           taskDetails,
           customerInfo,
@@ -621,9 +617,7 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       
       const response = await fetch('/api/send-work-report', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           taskDetails,
           customerInfo,

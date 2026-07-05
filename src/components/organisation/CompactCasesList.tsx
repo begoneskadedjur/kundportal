@@ -4,6 +4,7 @@
 import React from 'react'
 import { ChevronRight, Calendar, User, Coins, FileText } from 'lucide-react'
 import PDFExportButton from '../shared/PDFExportButton'
+import { getAuthHeaders } from '../../lib/supabase'
 
 interface CaseRowData {
   // Kärn-info
@@ -54,9 +55,7 @@ export default function CompactCasesList({
     try {
       const response = await fetch('/api/generate-case-report-pdf', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           reportType: 'multiple',
           cases: cases,
@@ -102,9 +101,7 @@ export default function CompactCasesList({
     try {
       const response = await fetch('/api/generate-case-report-pdf', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           reportType: 'single',
           caseData: caseItem,

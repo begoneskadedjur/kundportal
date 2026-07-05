@@ -1,7 +1,7 @@
 // src/hooks/useModernWorkReportGeneration.ts - Modern hook för saneringsrapport generation med trafikljussystem
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { supabase } from '../lib/supabase'
+import { supabase, getAuthHeaders } from '../lib/supabase'
 import { sanitationReportService, type SanitationReport } from '../services/sanitationReportService'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -305,9 +305,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       // Anropa modern Puppeteer-baserad PDF-generator med trafikljussystem
       const response = await fetch('/api/generate-case-report-pdf', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           reportType: 'single',
           caseData: modernCaseData,
@@ -411,9 +409,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       // Generera PDF först
       const pdfResponse = await fetch('/api/generate-case-report-pdf', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           reportType: 'single',
           caseData: modernCaseData,
@@ -434,9 +430,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       // Skicka email med PDF
       const emailResponse = await fetch('/api/send-work-report', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           pdf: pdfData.pdf,
           filename: pdfData.filename,
@@ -503,9 +497,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       // Generera PDF först
       const pdfResponse = await fetch('/api/generate-case-report-pdf', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           reportType: 'single',
           caseData: modernCaseData,
@@ -526,9 +518,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       // Skicka email med PDF
       const emailResponse = await fetch('/api/send-work-report', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           pdf: pdfData.pdf,
           filename: pdfData.filename,

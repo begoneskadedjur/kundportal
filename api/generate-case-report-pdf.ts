@@ -5,6 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuthenticated } from './_lib/auth'
 
 // BeGone Professional Color Palette
 const beGoneColors = {
@@ -977,6 +978,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Kostnads-/dataskydd: endpointen slår upp kunddata via service-role från
+  // case_id i bodyn - kräver inloggad användare (även kundportalen anropar hit)
+  const auth = await requireAuthenticated(req, res)
+  if (!auth) return
 
   try {
     const { reportType, caseData, cases, customerData, userRole, period } = req.body

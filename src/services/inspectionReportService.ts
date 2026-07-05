@@ -2,6 +2,7 @@
 // Generering av kontrollrapporter (PDF via Puppeteer + Excel via ExcelJS) för kundportalen
 
 import ExcelJS from 'exceljs'
+import { getAuthHeaders } from '../lib/supabase'
 import {
   getInspectionSession,
   getOutdoorInspectionsForSession,
@@ -101,7 +102,7 @@ export async function generateInspectionPDF(sessionId: string): Promise<void> {
 
   const response = await fetch('/api/generate-inspection-report-pdf', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: await getAuthHeaders(),
     body: JSON.stringify({
       session: {
         id: session.id,

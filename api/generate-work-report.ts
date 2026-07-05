@@ -1,12 +1,13 @@
 // api/generate-work-report.ts - Puppeteer-baserad saneringsrapport generator
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { generateWorkReportBase64, type TaskDetails, type CustomerInfo, type PreparationItem, type BillingItem } from '../src/lib/pdf-generator'
+import { requireAuthenticated } from './_lib/auth'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
@@ -15,6 +16,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  const auth = await requireAuthenticated(req, res)
+  if (!auth) return
 
   try {
     const { taskDetails, customerInfo, preparations = [], billingItems = [] } = req.body as {

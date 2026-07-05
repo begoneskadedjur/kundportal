@@ -24,7 +24,7 @@ import Button from '../ui/Button'
 import Card from '../ui/Card'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import PDFExportButton from '../shared/PDFExportButton'
-import { supabase } from '../../lib/supabase'
+import { supabase, getAuthHeaders } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 interface CustomerCaseDetailsModalProps {
@@ -59,9 +59,7 @@ export default function CustomerCaseDetailsModal({
     try {
       const response = await fetch('/api/generate-case-report-pdf', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           reportType: 'single',
           caseData: caseData,
