@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
+import { requireAuth } from '../_lib/auth'
 const { ALLOWED_TEMPLATE_IDS, getContractTypeFromTemplate } = require('../constants/oneflowTemplates')
 
 // Exakta fältmappningar baserat på OneFlow export-fält från OneflowContractCreator
@@ -870,6 +871,9 @@ export default async function handler(
   if (req.method === 'OPTIONS') {
     return res.status(204).end()
   }
+
+  const auth = await requireAuth(req, res, ['admin', 'koordinator'])
+  if (!auth) return
 
   // Läs och validera miljövariabler
   const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN

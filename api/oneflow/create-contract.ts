@@ -1,6 +1,7 @@
 // api/oneflow/create-contract.ts - KOMPLETT UPPDATERAD VERSION MED DYNAMISK ANVÄNDARE
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../_lib/auth'
 // Node.js 18+ har inbyggd fetch
 
 interface ContractRequestBody {
@@ -278,6 +279,9 @@ export default async function handler(
     return res.status(405).json({ message: 'Method not allowed' })
   }
 
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
+
   const {
     templateId,
     contractData,
@@ -313,7 +317,7 @@ export default async function handler(
   
   // 🔄 CENTRALISERAD AVSÄNDARE - Alltid info@begone.se
   const userEmail = 'info@begone.se' // Alltid skicka från info@begone.se
-  const creatorEmail = senderEmail || process.env.ONEFLOW_USER_EMAIL! // Spara vem som skapade
+  const creatorEmail = senderEmail || auth.email || process.env.ONEFLOW_USER_EMAIL! // Spara vem som skapade (sessionen som fallback)
   const creatorName = validatedUser?.displayName || senderName || 'BeGone Medarbetare'
   const creatorRole = validatedUser?.profile?.role || 'admin'
 

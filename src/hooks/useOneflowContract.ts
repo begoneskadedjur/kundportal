@@ -1,6 +1,7 @@
 // src/hooks/useOneflowContract.ts - UPPDATERAD MED ANVÄNDARKONTEXT
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext' // 🆕 ANVÄND AUTH CONTEXT
+import { getAuthHeaders } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
 interface ContractRecipient {
@@ -89,9 +90,7 @@ export function useOneflowContract(): UseOneflowContractReturn {
 
       const response = await fetch('/api/oneflow/create-contract', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json' 
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ 
           templateId, 
           contractData, 

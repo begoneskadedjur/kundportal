@@ -1,6 +1,7 @@
 // api/oneflow/extend-signing-period.ts - Förläng signeringsperioden för en offert/avtal i Oneflow
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../_lib/auth'
 
 interface ExtendSigningPeriodBody {
   contractId: string // Supabase UUID (contracts.id)
@@ -33,6 +34,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' })
   }
+
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
 
   const { contractId, expireDate } = (req.body || {}) as ExtendSigningPeriodBody
 

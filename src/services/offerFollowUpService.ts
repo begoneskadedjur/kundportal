@@ -1,5 +1,5 @@
 // src/services/offerFollowUpService.ts — Service för offertuppföljning med tekniker-koppling
-import { supabase } from '../lib/supabase'
+import { supabase, getAuthHeaders } from '../lib/supabase'
 import type { CaseBillingItemWithRelations } from '../types/caseBilling'
 import type { CoordinatorCaseAction } from '../types/casePipeline'
 
@@ -306,7 +306,9 @@ export class OfferFollowUpService {
 
   /** Hämta kommentarer för ett kontrakt (via API-proxy) */
   static async getComments(contractId: string): Promise<any> {
-    const response = await fetch(`/api/oneflow/comments?contractId=${contractId}`)
+    const response = await fetch(`/api/oneflow/comments?contractId=${contractId}`, {
+      headers: await getAuthHeaders(),
+    })
     if (!response.ok) throw new Error('Kunde inte hämta kommentarer')
     return response.json()
   }
@@ -315,7 +317,7 @@ export class OfferFollowUpService {
   static async deleteOffer(contractId: string): Promise<{ source_id: string | null; source_type: string | null; company_name: string | null }> {
     const response = await fetch('/api/oneflow/delete-offer', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ contractId }),
     })
     if (!response.ok) {
@@ -332,7 +334,7 @@ export class OfferFollowUpService {
   ): Promise<{ newStatus: string; expireDate: string }> {
     const response = await fetch('/api/oneflow/extend-signing-period', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await getAuthHeaders(),
       body: JSON.stringify({ contractId, expireDate }),
     })
     if (!response.ok) {
@@ -370,10 +372,8 @@ export class OfferFollowUpService {
   ): Promise<any> {
     const response = await fetch(`/api/oneflow/comments?contractId=${contractId}`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options?.senderEmail ? { 'x-sender-email': options.senderEmail } : {}),
-      },
+      // Avsändaren härleds server-side från sessionen (x-sender-email var spoofbar)
+      headers: await getAuthHeaders(),
       body: JSON.stringify({
         body,
         parentId: options?.parentId || null,

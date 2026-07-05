@@ -1,6 +1,7 @@
 // api/oneflow/webhook-config.ts - OneFlow Webhook Konfiguration Management
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import fetch from 'node-fetch'
+import { requireAuth } from '../_lib/auth'
 
 // Miljövariabler
 const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
@@ -149,6 +150,9 @@ const RECOMMENDED_EVENT_FILTERS: OneFlowWebhookFilter[] = [
 ]
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const auth = await requireAuth(req, res, ['admin', 'koordinator'])
+  if (!auth) return
+
   try {
     const { method } = req
 

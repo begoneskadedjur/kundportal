@@ -20,7 +20,7 @@ import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES } from '../../constants/oneflowTemplates'
 import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
-import { supabase } from '../../lib/supabase'
+import { supabase, getAuthHeaders } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 interface WizardData {
@@ -574,7 +574,7 @@ export default function OneflowContractCreator() {
       setCreationStep('Ansluter till Oneflow...')
       const response = await fetch('/api/oneflow/create-contract', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ 
           templateId: wizardData.selectedTemplate, 
           contractData, 

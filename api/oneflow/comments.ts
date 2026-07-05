@@ -1,10 +1,14 @@
 // api/oneflow/comments.ts — Proxy för Oneflow Comments API (GET + POST)
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { requireAuth } from '../_lib/auth'
 
 const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN!
 const ONEFLOW_USER_EMAIL = process.env.ONEFLOW_USER_EMAIL || 'info@begone.se'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
+
   const { contractId } = req.query
 
   if (!contractId || typeof contractId !== 'string') {
@@ -12,9 +16,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const baseUrl = `https://api.oneflow.com/v1/contracts/${contractId}/comments`
+  // Avsändaren härleds från sessionen - den gamla x-sender-email-headern
+  // var fritt spoofbar och togs bort 2026-07-05.
   const headers: Record<string, string> = {
     'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-    'x-oneflow-user-email': (req.headers['x-sender-email'] as string) || ONEFLOW_USER_EMAIL,
+    'x-oneflow-user-email': auth.email || ONEFLOW_USER_EMAIL,
     'Content-Type': 'application/json',
   }
 

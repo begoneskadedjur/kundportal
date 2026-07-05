@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { Settings, Webhook, CheckCircle, XCircle, AlertTriangle, RefreshCw, Play } from 'lucide-react'
 import Button from '../../components/ui/Button'
+import { getAuthHeaders } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 interface WebhookAnalysis {
@@ -34,7 +35,9 @@ export default function WebhookConfig() {
       setError(null)
 
       console.log('🔄 Hämtar webhook-konfiguration...')
-      const response = await fetch('/api/oneflow/webhook-config')
+      const response = await fetch('/api/oneflow/webhook-config', {
+        headers: await getAuthHeaders()
+      })
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -75,9 +78,7 @@ export default function WebhookConfig() {
 
       const response = await fetch('/api/oneflow/webhook-config', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           action: 'update_events',
           webhook_id: webhookId
@@ -137,9 +138,7 @@ export default function WebhookConfig() {
 
       const response = await fetch('/api/oneflow/webhook-config', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           action: 'fix_webhook_18000'
         })
@@ -170,9 +169,7 @@ export default function WebhookConfig() {
 
       const response = await fetch('/api/oneflow/webhook-config', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           action: 'auto_fix_webhook'
         })
@@ -203,9 +200,7 @@ export default function WebhookConfig() {
 
       const response = await fetch('/api/oneflow/webhook-config', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           action: 'create_webhook'
         })

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { X, Download, Upload, RefreshCw, CheckCircle, AlertCircle, ExternalLink, Filter } from 'lucide-react'
 import Button from '../../ui/Button'
 import Select from '../../ui/Select'
+import { getAuthHeaders } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 
 interface OneFlowContract {
@@ -65,7 +66,9 @@ export default function ContractImportModal({
   const loadContracts = async (page: number = 1) => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/oneflow/import-contracts?action=list&page=${page}&limit=50`)
+      const response = await fetch(`/api/oneflow/import-contracts?action=list&page=${page}&limit=50`, {
+        headers: await getAuthHeaders()
+      })
       const data = await response.json()
 
       if (!data.success) {
@@ -151,9 +154,7 @@ export default function ContractImportModal({
       
       const response = await fetch('/api/oneflow/import-contracts', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           action: 'import',
           contractIds

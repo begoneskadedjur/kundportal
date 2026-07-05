@@ -1,6 +1,7 @@
 // api/oneflow/delete-offer.ts - Radera offert/avtal från Oneflow + uppdatera DB
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../_lib/auth'
 
 interface DeleteOfferRequestBody {
   contractId: string // Supabase UUID (contracts.id)
@@ -13,6 +14,9 @@ export default async function handler(
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' })
   }
+
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
 
   const { contractId } = req.body as DeleteOfferRequestBody
 
