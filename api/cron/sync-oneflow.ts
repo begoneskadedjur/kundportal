@@ -5,6 +5,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireCronSecret } from '../_lib/cronAuth'
+import { withCronLog } from '../_lib/cronLogger'
+import { fetchTemplatesStrict, getKnownTemplateIds, getOfferTemplateIds } from '../_lib/oneflowTemplates'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
 
@@ -17,15 +19,9 @@ const ONEFLOW_USER_EMAIL = 'info@begone.se'
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-// Alla godkända mall-IDn (från api/constants/oneflowTemplates.js)
-const ALL_TEMPLATE_IDS = new Set([
-  '8598798', '8919037', '8919012', '8919059',  // offerter
-  '8486368', '9324573', '8465556', '8462854', '8732196'  // avtal
-])
-
-const OFFER_TEMPLATE_IDS = new Set([
-  '8598798', '8919037', '8919012', '8919059'
-])
+// Godkända mallar läses dynamiskt från oneflow_templates via fetchTemplatesStrict()
+// i handlern - STRIKT, utan fallback. En föråldrad/tom lista skulle trasha avtal
+// på mallar som lagts till efteråt, så vid läsfel avbryts hela syncen i stället.
 
 // Offert-fältmappning (från sync-offers.ts)
 const OFFER_FIELD_MAPPING: Record<string, string> = {
@@ -167,7 +163,7 @@ async function listAllContractIds(): Promise<OneFlowContract[]> {
         c._private_ownerside?.template_id?.toString() ||
         c.template?.id?.toString()
 
-      if (templateId && ALL_TEMPLATE_IDS.has(templateId)) {
+      if (templateId && getKnownTemplateIds().has(templateId)) {
         contracts.push(c)
       }
     }
@@ -213,7 +209,7 @@ function mapToInsertData(detail: OneFlowContractDetail, listItem: OneFlowContrac
     detail._private_ownerside?.template_id?.toString() ||
     (detail as any).template_id?.toString()
 
-  const isOffer = templateId ? OFFER_TEMPLATE_IDS.has(templateId) : false
+  const isOffer = templateId ? getOfferTemplateIds().has(templateId) : false
 
   // Extrahera data fields
   const dataFields: Record<string, string> = {}
@@ -282,9 +278,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'ONEFLOW_API_TOKEN saknas' })
   }
 
-  const stats = { trashed: 0, imported: 0, driftFixed: 0, errors: 0 }
+  const result = await withCronLog('sync-oneflow', async () => {
+    const stats = { trashed: 0, imported: 0, driftFixed: 0, errors: 0 }
 
-  try {
+    // TRASHING-SKYDD: mallistan MÅSTE läsas färskt från oneflow_templates.
+    // fetchTemplatesStrict kastar vid fel/tom tabell => hela körningen loggas
+    // som 'failed' i cron_runs och INGENTING trashas.
+    await fetchTemplatesStrict()
+    console.log(`[sync-oneflow] ${getKnownTemplateIds().size} godkända mallar lästa från DB`)
+
     console.log('[sync-oneflow] Startar nattlig synkronisering...')
 
     // 1. Lista alla kontrakt med godkända mallar från Oneflow
@@ -294,10 +296,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Säkerhetsspärr: om Oneflow returnerar 0 kontrakt → troligt API-fel
     if (oneflowContracts.length === 0) {
       console.error('[sync-oneflow] 0 kontrakt från Oneflow — troligt API-fel, avbryter')
-      return res.status(200).json({
-        success: false,
-        error: 'Inga kontrakt från Oneflow API — avbryter för att undvika falska positiver',
-      })
+      return {
+        status: 'failed' as const,
+        summary: { ...stats },
+        errorMessage: 'Inga kontrakt från Oneflow API — avbryter för att undvika falska positiver',
+      }
     }
 
     const oneflowIdSet = new Set(oneflowContracts.map(c => c.id.toString()))
@@ -412,21 +415,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const summary = {
-      success: true,
       oneflow_total: oneflowContracts.length,
       db_total: dbMap.size,
       ...stats,
     }
 
     console.log('[sync-oneflow] Klar:', JSON.stringify(summary))
-    return res.status(200).json(summary)
+    return {
+      status: stats.errors > 0 ? ('partial' as const) : ('success' as const),
+      summary,
+    }
+  })
 
-  } catch (error: any) {
-    console.error('[sync-oneflow] Oväntat fel:', error)
-    return res.status(500).json({
-      success: false,
-      error: error.message || 'Internt serverfel',
-      ...stats,
-    })
+  if (result.status === 'failed') {
+    console.error('[sync-oneflow] Körningen misslyckades:', result.errorMessage)
+    return res.status(500).json({ success: false, error: result.errorMessage, ...result.summary as object })
   }
+  return res.status(200).json({ success: true, ...(result.summary as object) })
 }
