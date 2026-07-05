@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import PrivateBusinessInvoicing from './PrivateBusinessInvoicing'
 import BillingSummaryLedge from '../../../components/admin/invoicing/BillingSummaryLedge'
+import UnbilledAdhocBanner from '../../../components/admin/invoicing/UnbilledAdhocBanner'
 
 type InvoicingTab = 'private-business' | 'contracts' | 'adhoc'
 
@@ -87,7 +88,12 @@ export default function InvoicingPage() {
       <div className="mt-4">
         {activeTab === 'private-business' && <PrivateBusinessInvoicing invoiceType="private-business" />}
         {activeTab === 'contracts' && <PrivateBusinessInvoicing invoiceType="contract" />}
-        {activeTab === 'adhoc' && <PrivateBusinessInvoicing invoiceType="adhoc" />}
+        {activeTab === 'adhoc' && (
+          <>
+            <UnbilledAdhocBanner />
+            <PrivateBusinessInvoicing invoiceType="adhoc" />
+          </>
+        )}
       </div>
     </div>
   )
