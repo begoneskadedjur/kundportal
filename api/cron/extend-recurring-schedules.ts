@@ -7,6 +7,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireCronSecret } from '../_lib/cronAuth'
 import { addMonths, addMinutes, format } from 'date-fns'
+import { fromZonedTime } from 'date-fns-tz'
 
 export const config = { maxDuration: 120 }
 
@@ -211,8 +212,12 @@ function generateDatesSimple(
       const isAbsent = absences.some(a => candidate >= a.start && candidate <= a.end)
       if (isAbsent) continue
 
-      // Set preferred time
-      const slotStart = new Date(candidate.getFullYear(), candidate.getMonth(), candidate.getDate(), prefH, prefM)
+      // Set preferred time - preferred_time är svensk väggtid. Servern kör UTC,
+      // så new Date(y,m,d,h,min) vore 1-2 h fel; bygg instanten via svensk tidszon
+      // (samma mönster som assistant-utils.buildDailySchedules).
+      const pad2 = (n: number) => String(n).padStart(2, '0')
+      const candidateDateStr = `${candidate.getFullYear()}-${pad2(candidate.getMonth() + 1)}-${pad2(candidate.getDate())}`
+      const slotStart = fromZonedTime(`${candidateDateStr} ${pad2(prefH)}:${pad2(prefM)}`, 'Europe/Stockholm')
       const slotEnd = addMinutes(slotStart, durationMinutes)
 
       // Check bookings for conflicts
@@ -226,9 +231,10 @@ function generateDatesSimple(
         break
       }
 
-      // Try later in the day
+      // Try later in the day - gränsen 17:00 gäller svensk tid, inte serverns UTC
+      const dayLimit = fromZonedTime(`${candidateDateStr} 17:00`, 'Europe/Stockholm')
       let tryStart = new Date(slotEnd)
-      while (tryStart.getHours() < 17) {
+      while (tryStart < dayLimit) {
         const tryEnd = addMinutes(tryStart, durationMinutes)
         const tryConflict = bookings.some(b => tryStart < b.end && tryEnd > b.start)
         if (!tryConflict) {
