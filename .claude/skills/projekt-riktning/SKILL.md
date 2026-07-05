@@ -16,18 +16,16 @@ Aggregerar Riktning-sektionerna från alla domänskills till en helhetsbild. Ran
 - ~~**Tyst intäktsläckage i adhoc-fakturering**~~ KLART 2026-07-05 (`ff11a923`, `74ec1f03`): atomära inserter, fel propageras med toast, Ofakturerat-banner med återkörning. DB-analys: inget historiskt läckage.
 - ~~**Tyst dataförlust i provisionsflödet**~~ KLART 2026-07-05 (`f46b5787`): validering före delete + partiellt unikt index (migration applicerad).
 - ~~**Auth på Oneflow-mutationsendpoints**~~ KLART 2026-07-05 (`b8b4759b`): sex endpoints skyddade, avsändarspoofing via x-sender-email stoppad. Fil-endpoints återstår (se externa-integrationer Riktning 2).
+- ~~**Auth på PDF-endpoints**~~ KLART 2026-07-05 (`9a8587ae`): requireAuthenticated på alla fyra rapport-endpoints inkl. mejlutskicket, nio anropare skickar Bearer.
+- ~~**Cronens tidszonsdrift**~~ KLART 2026-07-05 (`53410f86`): fromZonedTime i extend-recurring-schedules. Kvar: röda dagar-portning (produktbeslut) + städning av gamla felskrivna sessioner.
 
-## Topp 5, rangordnat efter nytta/insats
+## Topp 3, rangordnat efter nytta/insats
 
 1. **RLS på de öppna tabellerna** (supabase-databas + provisioner). Belägg: sex tabeller har RLS helt avstängd med anon-grants (`services`, `pricing_settings`, `fortnox_test_tokens` m.fl.), och `invoices`/`commission_posts` har allow-all för authenticated, dvs. kundkonton kan läsa/skriva fakturor och lönedata. Första steg: slå på RLS på de sex tabellerna med preparations-mönstret (`20260127_create_preparations_table.sql:27-53`), ta sedan `invoices`/`commission_posts` enligt detaljplanen i skill provisioner Riktning 2.
 
-2. **Tidszonsfix i cronens sessionsgenerering** (schemalaggning-tidszoner). De fem `toSwedishISOString`-skrivvägarna är fixade 2026-07-03 (`78463e1a`); kvar är cronens UTC-bygge (`extend-recurring-schedules.ts`, tidsbygget vid sessions-insert) som driftar besök 1-2 timmar - rättas med `fromZonedTime('Europe/Stockholm')`. Märk även `toSwedishISOString` som `@deprecated` för skrivning (läs-/API-användningar i ScheduleTimeline är avsiktliga).
+2. **Konsolidera Oneflow-mall-ID:na och gör nattsyncen ofarlig** (externa-integrationer). Belägg: mall-ID:n på 7+ ställen, och missas cron-kopian TRASHAR `sync-oneflow.ts:324-346` alla avtal på nya mallen natten efter. Första steg: exportera `ALL_TEMPLATE_IDS`/`OFFER_TEMPLATE_IDS` från `api/constants/oneflowTemplates.js` (behåll CJS) och importera i cron/sync-offers/offer-stats; wrappa samtidigt syncen i `withCronLog`.
 
-3. **Auth på PDF-endpoints** (pdf-rapporter). Belägg: `api/generate-case-report-pdf.ts` och `api/generate-inspection-report-pdf.ts` saknar auth och slår upp kunddata via service-role från okontrollerat `case_id`. Första steg: `requireAuthenticated` (samma nivå som `api/generate-pdf.ts`) + Authorization-header i de anropande hooksen, som egen testad PR.
-
-4. **Konsolidera Oneflow-mall-ID:na och gör nattsyncen ofarlig** (externa-integrationer). Belägg: mall-ID:n på 7+ ställen, och missas cron-kopian TRASHAR `sync-oneflow.ts:324-346` alla avtal på nya mallen natten efter. Första steg: exportera `ALL_TEMPLATE_IDS`/`OFFER_TEMPLATE_IDS` från `api/constants/oneflowTemplates.js` (behåll CJS) och importera i cron/sync-offers/offer-stats; wrappa samtidigt syncen i `withCronLog`.
-
-5. **Radera de döda generationerna, med ClickUp-token-kedjan först** (externa-integrationer, provisioner, multisite-organisation, fakturering-prislistor, pdf-rapporter). Belägg: `VITE_CLICKUP_API_TOKEN` ligger i publika frontend-bundlen (`clickupSync.ts:15`), gamla multisite-portalen har fel datamodell, provisionernas gen 1 lockar till fel fix, legacy-batch-UI:t kan skapa parallella faktureringsrader. Första steg: radera den döda ClickUp-frontendkedjan + rotera token (säkerhet och städning i ett), ta sedan en generation per commit enligt respektive skills Riktning.
+3. **Radera de döda generationerna, med ClickUp-token-kedjan först** (externa-integrationer, provisioner, multisite-organisation, fakturering-prislistor, pdf-rapporter). Belägg: `VITE_CLICKUP_API_TOKEN` ligger i publika frontend-bundlen (`clickupSync.ts:15`), gamla multisite-portalen har fel datamodell, provisionernas gen 1 lockar till fel fix, legacy-batch-UI:t kan skapa parallella faktureringsrader. Första steg: radera den döda ClickUp-frontendkedjan + rotera token (säkerhet och städning i ett), ta sedan en generation per commit enligt respektive skills Riktning.
 
 ## Principer
 
