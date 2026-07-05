@@ -18,14 +18,13 @@ Aggregerar Riktning-sektionerna från alla domänskills till en helhetsbild. Ran
 - ~~**Auth på Oneflow-mutationsendpoints**~~ KLART 2026-07-05 (`b8b4759b`): sex endpoints skyddade, avsändarspoofing via x-sender-email stoppad. Fil-endpoints återstår (se externa-integrationer Riktning 2).
 - ~~**Auth på PDF-endpoints**~~ KLART 2026-07-05 (`9a8587ae`): requireAuthenticated på alla fyra rapport-endpoints inkl. mejlutskicket, nio anropare skickar Bearer.
 - ~~**Cronens tidszonsdrift**~~ KLART 2026-07-05 (`53410f86`): fromZonedTime i extend-recurring-schedules. Kvar: röda dagar-portning (produktbeslut) + städning av gamla felskrivna sessioner.
+- ~~**Konsolidera Oneflow-mall-ID:na**~~ KLART 2026-07-05 (dynamiska mallar): tabell `oneflow_templates` + admin-sida `/admin/installningar/avtalsmallar`, alla 7 kopior ersatta, sync-oneflow strikt + withCronLog. Se externa-integrationer.
 
-## Topp 3, rangordnat efter nytta/insats
+## Topp 2, rangordnat efter nytta/insats
 
 1. **RLS på de öppna tabellerna** (supabase-databas + provisioner). Belägg: sex tabeller har RLS helt avstängd med anon-grants (`services`, `pricing_settings`, `fortnox_test_tokens` m.fl.), och `invoices`/`commission_posts` har allow-all för authenticated, dvs. kundkonton kan läsa/skriva fakturor och lönedata. Första steg: slå på RLS på de sex tabellerna med preparations-mönstret (`20260127_create_preparations_table.sql:27-53`), ta sedan `invoices`/`commission_posts` enligt detaljplanen i skill provisioner Riktning 2.
 
-2. **Konsolidera Oneflow-mall-ID:na och gör nattsyncen ofarlig** (externa-integrationer). Belägg: mall-ID:n på 7+ ställen, och missas cron-kopian TRASHAR `sync-oneflow.ts:324-346` alla avtal på nya mallen natten efter. Första steg: exportera `ALL_TEMPLATE_IDS`/`OFFER_TEMPLATE_IDS` från `api/constants/oneflowTemplates.js` (behåll CJS) och importera i cron/sync-offers/offer-stats; wrappa samtidigt syncen i `withCronLog`.
-
-3. **Radera de döda generationerna, med ClickUp-token-kedjan först** (externa-integrationer, provisioner, multisite-organisation, fakturering-prislistor, pdf-rapporter). Belägg: `VITE_CLICKUP_API_TOKEN` ligger i publika frontend-bundlen (`clickupSync.ts:15`), gamla multisite-portalen har fel datamodell, provisionernas gen 1 lockar till fel fix, legacy-batch-UI:t kan skapa parallella faktureringsrader. Första steg: radera den döda ClickUp-frontendkedjan + rotera token (säkerhet och städning i ett), ta sedan en generation per commit enligt respektive skills Riktning.
+2. **Radera de döda generationerna, med ClickUp-token-kedjan först** (externa-integrationer, provisioner, multisite-organisation, fakturering-prislistor, pdf-rapporter). Belägg: `VITE_CLICKUP_API_TOKEN` ligger i publika frontend-bundlen (`clickupSync.ts:15`), gamla multisite-portalen har fel datamodell, provisionernas gen 1 lockar till fel fix, legacy-batch-UI:t kan skapa parallella faktureringsrader. Första steg: radera den döda ClickUp-frontendkedjan + rotera token (säkerhet och städning i ett), ta sedan en generation per commit enligt respektive skills Riktning.
 
 ## Principer
 
@@ -33,7 +32,7 @@ Tvärgående mönster som återkommer i nästan varje domän. Väg in dem vid va
 
 - **Duplicerade generationer lever kvar.** Nya system byggs bredvid gamla utan att de gamla tas bort: provisioner gen 1/gen 2, tre fakturanummer-generatorer, tre schemagenerator-kopior, tre ärenderapportvägar, två portal-switchar, två permissions-matriser, tre tröskellogik-kopior. Bygg aldrig en fjärde variant; återanvänd eller ersätt och radera.
 - **Oskyddade service-role-endpoints.** Bara en bråkdel av ~210 api-filer har auth (Fortnox-proxy, multisite-användar-API:er och alla cron-jobb åtgärdade 2026-07-03). Varje ny endpoint ska ha `requireAuth`/`requireAuthenticated` eller `requireCronSecret` från start, aldrig "läggs till senare".
-- **Tyst felsväljning i pengaflöden.** console.error + fortsätt är mönstret bakom både intäktsläckaget (punkt 4) och provisionsförlusten (punkt 5). Fel som påverkar pengar ska upp till användaren och gå att köra om.
+- **Tyst felsväljning i pengaflöden.** console.error + fortsätt var mönstret bakom både adhoc-intäktsläckaget och provisionsförlusten (båda åtgärdade 2026-07-03/05, se Avklarat). Fel som påverkar pengar ska upp till användaren och gå att köra om.
 - **Klient-side orkestrering av serverjobb.** Raderingssekvenser, fakturaskapande och geocoding körs icke-transaktionellt i webbläsaren. Målbilden är SECURITY DEFINER-RPC:er eller serverless-endpoints för fleregsoperationer.
 - **RLS är inte säkerhetsgränsen i dag.** Nästan allt är `USING (true)` och avgränsningen sker i klientkod. Bygg aldrig säkerhet på klientfiltrering, och strama inte åt RLS piecemeal utan att läsa respektive skills invarianter.
 - **Migrationsmappen är inte schemakällan.** Flera tabeller finns bara i live-DB. Verifiera alltid mot `rfyufytjwvqiqwueinoj` via MCP innan migration, och skriv migrationsfil för varje ny DDL-ändring.
