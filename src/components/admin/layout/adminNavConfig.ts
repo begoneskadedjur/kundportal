@@ -23,6 +23,7 @@ import {
   Wrench,
   AlertCircle,
   ClipboardList,
+  FileText,
   AlertTriangle,
   GitBranch,
   Trash2,
@@ -120,6 +121,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Kundgrupper', icon: Users, path: '/admin/kundgrupper' },
       { label: 'Fortnox', icon: Building2, path: '/admin/installningar/fortnox' },
+      { label: 'Avtalsmallar', icon: FileText, path: '/admin/installningar/avtalsmallar' },
       { label: 'Betalningsvillkor', icon: Calendar, path: '/admin/installningar/betalningsvillkor' },
       { label: 'SMS Mallar', icon: MessageSquareText, path: '/admin/sms-mallar' },
       { label: 'Inspektionsstatus', icon: Activity, path: '/admin/inspektionsstatus' },
@@ -177,6 +179,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/prislistor': 'Prislistor',
   '/admin/kundgrupper': 'Kundgrupper',
   '/admin/installningar/fortnox': 'Fortnox',
+  '/admin/installningar/avtalsmallar': 'Avtalsmallar',
   '/admin/installningar/betalningsvillkor': 'Betalningsvillkor',
   '/admin/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/admin/bug-reports': 'Buggrapporter',

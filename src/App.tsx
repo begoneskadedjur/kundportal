@@ -38,6 +38,7 @@ import PriceListsPage from './pages/admin/settings/PriceListsPage';
 import ServiceCatalogPage from './pages/admin/settings/ServiceCatalogPage';
 import CustomerGroupsPage from './pages/admin/settings/CustomerGroupsPage';
 import FortnoxPage from './pages/admin/settings/FortnoxPage';
+import OneflowTemplatesPage from './pages/admin/settings/OneflowTemplatesPage';
 import SmsTemplatesPage from './pages/admin/settings/SmsTemplatesPage';
 import PaymentTermsPage from './pages/admin/settings/PaymentTermsPage';
 import InspectionStatusLabelsPage from './pages/admin/settings/InspectionStatusLabelsPage';
@@ -178,6 +179,7 @@ function App() {
               <Route path="webhook-config" element={<ProtectedRoute requiredRole="admin"><WebhookConfig /></ProtectedRoute>} />
               <Route path="kundgrupper" element={<ProtectedRoute requiredRole="admin"><CustomerGroupsPage /></ProtectedRoute>} />
               <Route path="installningar/fortnox" element={<ProtectedRoute requiredRole="admin"><FortnoxPage /></ProtectedRoute>} />
+              <Route path="installningar/avtalsmallar" element={<ProtectedRoute requiredRole="admin"><OneflowTemplatesPage /></ProtectedRoute>} />
               <Route path="installningar/betalningsvillkor" element={<ProtectedRoute requiredRole="admin"><PaymentTermsPage /></ProtectedRoute>} />
               <Route path="sms-mallar" element={<ProtectedRoute requiredRole="admin"><SmsTemplatesPage /></ProtectedRoute>} />
               <Route path="inspektionsstatus" element={<ProtectedRoute requiredRole="admin"><InspectionStatusLabelsPage /></ProtectedRoute>} />
