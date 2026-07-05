@@ -9,6 +9,7 @@ import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Select from '../../ui/Select'
 import toast from 'react-hot-toast'
+import { getAuthHeaders } from '../../../lib/supabase'
 import { ContractBillingService } from '../../../services/contractBillingService'
 import { ContractInvoiceGenerator } from '../../../services/contractInvoiceGenerator'
 import { CustomerGroupService } from '../../../services/customerGroupService'
@@ -229,7 +230,7 @@ export default function ImportCustomerByOrgnrModal({
     try {
       const res = await fetch('/api/import-customer-by-orgnr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ org_nr: trimmed }),
       })
       const data = await res.json()
@@ -320,7 +321,7 @@ export default function ImportCustomerByOrgnrModal({
 
       const res = await fetch('/api/import-customer-by-orgnr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           action: 'confirm',
           customer_data: customerPayload,

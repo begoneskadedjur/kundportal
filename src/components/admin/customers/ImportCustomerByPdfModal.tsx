@@ -15,7 +15,7 @@ import { ContractBillingService } from '../../../services/contractBillingService
 import { ContractInvoiceGenerator } from '../../../services/contractInvoiceGenerator'
 import { CustomerGroupService } from '../../../services/customerGroupService'
 import { PriceListService } from '../../../services/priceListService'
-import { supabase } from '../../../lib/supabase'
+import { supabase, getAuthHeaders } from '../../../lib/supabase'
 import type { PriceList } from '../../../types/articles'
 import type { CustomerGroup } from '../../../types/customerGroups'
 import { useContractTypeOptions } from '../../../hooks/useContractTypeOptions'
@@ -299,7 +299,7 @@ export default function ImportCustomerByPdfModal({
 
       const fortnoxRes = await fetch('/api/import-customer-by-orgnr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ org_nr: orgNr }),
       })
       const fortnoxData = await fortnoxRes.json()
@@ -417,7 +417,7 @@ export default function ImportCustomerByPdfModal({
 
       const res = await fetch('/api/import-customer-by-orgnr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           action: 'confirm',
           customer_data: customerPayload,

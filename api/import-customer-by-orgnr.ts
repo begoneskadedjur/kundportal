@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getValidAccessToken } from './fortnox/refresh'
 import fetch from 'node-fetch'
 import { refreshTemplates, templateNameOf } from './_lib/oneflowTemplates'
+import { requireAuth } from './_lib/auth'
 
 // Stöder både SUPABASE_SERVICE_KEY och SUPABASE_SERVICE_ROLE_KEY
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -363,6 +364,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res)
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Endast POST tillåtet' })
+
+  const auth = await requireAuth(req, res, ['admin', 'koordinator'])
+  if (!auth) return
 
   await refreshTemplates()
 
