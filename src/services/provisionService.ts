@@ -89,6 +89,36 @@ export class ProvisionService {
     return Math.round(netBase * (percentage / 100) * (sharePercentage / 100) * 100) / 100
   }
 
+  // ─── Validering av provisionsunderlag (inga sidoeffekter) ─
+  //
+  // Körs i upsertPostsForCase INNAN befintliga poster raderas - körs den
+  // efteråt blir en valideringsmiss (t.ex. pris sänkt under tröskeln)
+  // permanent förlust av intjänad provision.
+
+  private static async validatePostInput(
+    caseData: {
+      base_amount: number
+      is_rot_rut?: boolean
+      rot_rut_original_amount?: number
+    },
+    technicianShares: TechnicianShare[]
+  ): Promise<void> {
+    const settings = await this.getSettings()
+
+    const effectiveBase = caseData.is_rot_rut && caseData.rot_rut_original_amount
+      ? caseData.rot_rut_original_amount
+      : caseData.base_amount
+
+    if (effectiveBase < settings.min_commission_base) {
+      throw new Error(`Beloppet ${effectiveBase} kr understiger minsta provisionsgrundande belopp (${settings.min_commission_base} kr exkl moms)`)
+    }
+
+    const totalShare = technicianShares.reduce((sum, t) => sum + t.share_percentage, 0)
+    if (Math.abs(totalShare - 100) > 0.01) {
+      throw new Error(`Teknikerandelar summerar till ${totalShare}%, måste vara 100%`)
+    }
+  }
+
   // ─── Skapa poster vid ärendeavslut ───────────────────────
 
   static async createPostsForCase(
@@ -105,28 +135,19 @@ export class ProvisionService {
     deductions: number = 0,
     notes?: string
   ): Promise<CommissionPost[]> {
-    // Hämta inställningar
+    // Validering (tröskel + andelar) delas med upsertPostsForCase
+    await this.validatePostInput(caseData, technicianShares)
+
     const settings = await this.getSettings()
 
-    // Kontrollera tröskelvärde
     const effectiveBase = caseData.is_rot_rut && caseData.rot_rut_original_amount
       ? caseData.rot_rut_original_amount
       : caseData.base_amount
-
-    if (effectiveBase < settings.min_commission_base) {
-      throw new Error(`Beloppet ${effectiveBase} kr understiger minsta provisionsgrundande belopp (${settings.min_commission_base} kr exkl moms)`)
-    }
 
     // Kontrollera att poster inte redan finns (använd upsertPostsForCase för re-create-flödet)
     const existing = await this.getPostsByCase(caseData.case_id)
     if (existing.length > 0) {
       throw new Error('Provisionsposter finns redan för detta ärende')
-    }
-
-    // Validera att andelar summerar till 100%
-    const totalShare = technicianShares.reduce((sum, t) => sum + t.share_percentage, 0)
-    if (Math.abs(totalShare - 100) > 0.01) {
-      throw new Error(`Teknikerandelar summerar till ${totalShare}%, måste vara 100%`)
     }
 
     const percentage = settings.engangsjobb_percentage
@@ -177,6 +198,10 @@ export class ProvisionService {
     deductions: number = 0,
     notes?: string
   ): Promise<CommissionPost[]> {
+    // Validera FÖRE raderingen - kastar valideringen efter delete är
+    // intjänad provision borta (t.ex. pris sänkt under tröskeln).
+    await this.validatePostInput(caseData, technicianShares)
+
     const existing = await this.getPostsByCase(caseData.case_id)
 
     if (existing.length > 0) {
