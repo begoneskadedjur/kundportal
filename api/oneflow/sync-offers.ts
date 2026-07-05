@@ -3,9 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
 import { requireAuth } from '../_lib/auth'
-
-// Offer template IDs (samma som i offer-stats.ts)
-const OFFER_TEMPLATE_IDS = new Set(['8598798', '8919037', '8919012', '8919059'])
+import { refreshTemplates, getOfferTemplateIds } from '../_lib/oneflowTemplates'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
@@ -131,7 +129,7 @@ async function listAllOfferIds(): Promise<OneFlowContract[]> {
         c._private_ownerside?.template_id?.toString() ||
         c.template?.id?.toString()
 
-      if (templateId && OFFER_TEMPLATE_IDS.has(templateId)) {
+      if (templateId && getOfferTemplateIds().has(templateId)) {
         offers.push(c)
       }
     }
@@ -263,6 +261,7 @@ export const config = { maxDuration: 60 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res)
+  await refreshTemplates()
 
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Endast POST' })

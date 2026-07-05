@@ -3,9 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
 import { requireAuth } from '../_lib/auth'
-
-// Offer template IDs
-const OFFER_TEMPLATE_IDS = new Set(['8598798', '8919037', '8919012', '8919059'])
+import { refreshTemplates, getOfferTemplateIds } from '../_lib/oneflowTemplates'
 
 const CACHE_TTL_MS = 15 * 60 * 1000 // 15 minuter
 
@@ -68,7 +66,7 @@ async function fetchAllOffersFromOneflow(): Promise<OneFlowContract[]> {
         contract._private_ownerside?.template_id?.toString() ||
         contract.template?.id?.toString()
 
-      if (templateId && OFFER_TEMPLATE_IDS.has(templateId)) {
+      if (templateId && getOfferTemplateIds().has(templateId)) {
         allOffers.push(contract)
       }
     }
@@ -149,6 +147,7 @@ async function updateCache(period: string, stats: ReturnType<typeof calculateSta
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res)
+  await refreshTemplates()
 
   if (req.method === 'OPTIONS') {
     return res.status(204).end()

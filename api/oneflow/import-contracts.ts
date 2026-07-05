@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
 import { requireAuth } from '../_lib/auth'
-const { ALLOWED_TEMPLATE_IDS, getContractTypeFromTemplate } = require('../constants/oneflowTemplates')
+import { refreshTemplates, isKnownTemplate, contractTypeOf } from '../_lib/oneflowTemplates'
 
 // Exakta fältmappningar baserat på OneFlow export-fält från OneflowContractCreator
 const CONTRACT_FIELD_MAPPING = {
@@ -95,7 +95,7 @@ const calculateContractTotalValue = (baseValue: number, contractLength: string |
 
 // Smart fältmappning baserad på dokumenttyp
 const mapDataFieldsFromOneFlow = (dataFields: Record<string, string>, templateId: string) => {
-  const contractType = getContractTypeFromTemplate(templateId)
+  const contractType = contractTypeOf(templateId)
   const fieldMapping = contractType === 'offer' ? OFFER_FIELD_MAPPING : CONTRACT_FIELD_MAPPING
   
   const mappedData: Record<string, string> = {}
@@ -461,7 +461,7 @@ const fetchOneFlowContracts = async (page: number = 1, limit: number = 50): Prom
       
       // Filtrera på våra godkända template IDs
       const templateId = contract?._private_ownerside?.template_id || contract?.template?.id
-      if (templateId && !ALLOWED_TEMPLATE_IDS.has(templateId.toString())) {
+      if (templateId && !isKnownTemplate(templateId.toString())) {
         console.log(`🚫 Hoppar över kontrakt ${contract.id} med otillåten template ID: ${templateId}`)
         templateFiltered++
         return false
@@ -625,7 +625,7 @@ const parseContractDetailsToInsertData = (contractData: CompleteContractData): C
     templateId = basic.template_id.toString()
   }
   
-  const contractType = templateId !== 'no_template' ? getContractTypeFromTemplate(templateId) : null
+  const contractType = templateId !== 'no_template' ? contractTypeOf(templateId) : null
   const isOffer = contractType === 'offer'
   
   console.log(`🔍 Template ID sökning för ${basic.id}:`)
@@ -874,6 +874,9 @@ export default async function handler(
 
   const auth = await requireAuth(req, res, ['admin', 'koordinator'])
   if (!auth) return
+
+  // Ladda mall-snapshotet (dynamiska mallar; fallback till senast kända vid DB-fel)
+  await refreshTemplates()
 
   // Läs och validera miljövariabler
   const ONEFLOW_API_TOKEN = process.env.ONEFLOW_API_TOKEN

@@ -6,6 +6,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { getValidAccessToken } from './fortnox/refresh'
 import fetch from 'node-fetch'
+import { refreshTemplates, templateNameOf } from './_lib/oneflowTemplates'
 
 // Stöder både SUPABASE_SERVICE_KEY och SUPABASE_SERVICE_ROLE_KEY
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -167,13 +168,7 @@ async function fetchOneflowContractsByOrgNr(orgNr: string): Promise<Array<{ cont
   return results.filter((r): r is { contract: any; parties: any[] } => r !== null)
 }
 
-const CONTRACT_TYPE_MAP: Record<string, string> = {
-  '8486368': 'Skadedjursavtal',
-  '8462854': 'Avtal Mekaniska fällor',
-  '9324573': 'Avtal Betesstationer',
-  '8465556': 'Avtal Betongstationer',
-  '8732196': 'Avtal Indikationsfällor',
-}
+// Avtalstypnamn = mallens visningsnamn i oneflow_templates (dynamiskt sedan 2026-07-05)
 
 function parseContractLengthMonths(text: string | null): number {
   if (!text) return 36
@@ -232,7 +227,7 @@ function extractOneflowData(contractData: { contract: any; parties: any[] }) {
   const begoneParty = parties.find((p: any) => p.my_party)
 
   const templateId = String(contract.template?.id ?? contract.template_id ?? '')
-  const contract_type = CONTRACT_TYPE_MAP[templateId] || null
+  const contract_type = templateNameOf(templateId) || null
 
   const dataFields: Record<string, string> = {}
   const fields: any[] = Array.isArray(contract.data_fields) ? contract.data_fields : []
@@ -368,6 +363,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res)
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Endast POST tillåtet' })
+
+  await refreshTemplates()
 
   try {
     const { action, org_nr, customer_data, selected_contracts } = req.body

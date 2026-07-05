@@ -3,7 +3,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import fetch from 'node-fetch'
-const { ALLOWED_TEMPLATE_IDS, getContractTypeFromTemplate } = require('../constants/oneflowTemplates')
+import { refreshTemplates, isKnownTemplate, contractTypeOf, getKnownTemplateIds } from '../_lib/oneflowTemplates'
 
 // Miljövariabler
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -306,7 +306,7 @@ const shouldProcessContract = (details: OneflowContractDetails): boolean => {
   }
   
   // Hoppa över kontrakt som inte använder våra mallar
-  if (!ALLOWED_TEMPLATE_IDS.has(templateId.toString())) {
+  if (!isKnownTemplate(templateId.toString())) {
     console.log(`🚫 Hoppar över kontrakt med oanvänd mall ${templateId}: ${details.id}`)
     console.log(`📌 Mall namn: ${details.template?.name || 'Okänd'}`)
     return false
@@ -360,7 +360,7 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
   }
 
   // Bestäm typ baserat på template ID (mer tillförlitligt än namn)
-  const contractType = details.template?.id ? getContractTypeFromTemplate(details.template.id.toString()) : null
+  const contractType = details.template?.id ? contractTypeOf(details.template.id.toString()) : null
   const contractName = details.name || ''
   const templateName = details.template?.name || ''
   const isOffer = contractType === 'offer' || 
@@ -1379,7 +1379,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
     // Kontrollera om vi ska processa detta kontrakt
     if (contractDetails && !shouldProcessContract(contractDetails)) {
       console.log('ℹ️ Kontrakt använder inte godkänd mall - webhook-processering avbruten')
-      console.log(`📌 Mall ID: ${contractDetails.template?.id}, Godkända: ${Array.from(ALLOWED_TEMPLATE_IDS).join(', ')}`)
+      console.log(`📌 Mall ID: ${contractDetails.template?.id}, Godkända: ${Array.from(getKnownTemplateIds()).join(', ')}`)
       return
     }
   } else {
@@ -1876,6 +1876,9 @@ export default async function handler(
   if (req.method === 'OPTIONS') {
     return res.status(204).end()
   }
+
+  // Ladda mall-snapshotet (dynamiska mallar; fallback till senast kända vid DB-fel)
+  await refreshTemplates()
 
   // Acceptera endast POST
   if (req.method !== 'POST') {
