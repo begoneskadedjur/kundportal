@@ -898,7 +898,9 @@ export function RonderingSchedulePage() {
         customerId: u.id,
         siteName: u.site_name || u.company_name,
         region: u.region,
-        contractEndDate: u.contract_end_date,
+        // Enheter saknar egna avtalsdatum (går ej att sätta i "Redigera enhet"-modalen),
+        // så de ärver avtalsslutdatum från huvudkontoret.
+        contractEndDate: u.contract_end_date ?? parent.contract_end_date,
         address: u.contact_address,
         schedules: schedulesData.filter(s => s.customer_id === u.id),
       }))
