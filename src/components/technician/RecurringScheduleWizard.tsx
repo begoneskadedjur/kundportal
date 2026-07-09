@@ -17,7 +17,8 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
   previewScheduleDates,
-  createScheduleWithSessions
+  createScheduleWithSessions,
+  resolveContractEndDate
 } from '../../services/recurringScheduleService'
 import type {
   RecurringFrequency,
@@ -110,6 +111,28 @@ export function RecurringScheduleWizard({
 }: RecurringScheduleWizardProps) {
   const { profile } = useAuth()
   const [step, setStep] = useState<WizardStep>(1)
+
+  // Avtalsslutdatum med arv från huvudkontoret. Om proppen saknas (t.ex. enhet
+  // utan eget datum, eller anropare som inte skickar med det) slår vi upp
+  // kundens/huvudkontorets datum innan felvyn visas. null = fortfarande laddar.
+  const [resolvedEndDate, setResolvedEndDate] = useState<string | null | undefined>(contractEndDate)
+  // Starta i "löser upp"-läge om proppen saknas, så felvyn inte blinkar till
+  // innan uppslaget hunnit köra.
+  const [resolvingEndDate, setResolvingEndDate] = useState(!contractEndDate)
+
+  useEffect(() => {
+    let cancelled = false
+    if (contractEndDate) {
+      setResolvedEndDate(contractEndDate)
+      return
+    }
+    if (!isOpen || !customerId) return
+    setResolvingEndDate(true)
+    resolveContractEndDate(customerId, contractEndDate)
+      .then(resolved => { if (!cancelled) setResolvedEndDate(resolved) })
+      .finally(() => { if (!cancelled) setResolvingEndDate(false) })
+    return () => { cancelled = true }
+  }, [customerId, contractEndDate, isOpen])
 
   const isBatch = !!batchUnits && batchUnits.length > 1
 
@@ -269,7 +292,7 @@ export function RecurringScheduleWizard({
     if (!frequency || !dayPattern) return
     setLoadingPreview(true)
     try {
-      const previewEnd = contractEndDate ? new Date(contractEndDate) : addMonths(startDate, 14)
+      const previewEnd = resolvedEndDate ? new Date(resolvedEndDate) : addMonths(startDate, 14)
 
       const dates = await previewScheduleDates({
         technicianId,
@@ -298,7 +321,7 @@ export function RecurringScheduleWizard({
     if (!frequency || !dayPattern) return
     setLoadingPreview(true)
     try {
-      const previewEnd = contractEndDate ? new Date(contractEndDate) : addMonths(startDate, 14)
+      const previewEnd = resolvedEndDate ? new Date(resolvedEndDate) : addMonths(startDate, 14)
 
       // Generate dates for the FIRST unit using the full conflict-aware algorithm
       const firstUnit = effectiveUnits[0]
@@ -377,7 +400,7 @@ export function RecurringScheduleWizard({
             preferred_time: preferredTime,
             estimated_duration_minutes: result.unit.durationMinutes,
             schedule_start_date: format(startDate, 'yyyy-MM-dd'),
-            contract_end_date: contractEndDate || undefined,
+            contract_end_date: resolvedEndDate || undefined,
             is_auto_renewing: true,
             created_by: profile?.id,
             custom_frequency_config: resolvedCustomConfig,
@@ -407,7 +430,7 @@ export function RecurringScheduleWizard({
           preferred_time: preferredTime,
           estimated_duration_minutes: durationMinutes,
           schedule_start_date: format(startDate, 'yyyy-MM-dd'),
-          contract_end_date: contractEndDate || undefined,
+          contract_end_date: resolvedEndDate || undefined,
           is_auto_renewing: true,
           created_by: profile?.id,
           custom_frequency_config: resolvedCustomConfig,
@@ -476,7 +499,19 @@ export function RecurringScheduleWizard({
 
   if (!isOpen) return null
 
-  if (!contractEndDate) {
+  // Slår fortfarande upp (ev. ärvt) avtalsslutdatum – visa spinner, inte felvyn.
+  if (resolvingEndDate) {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full p-6 flex items-center justify-center gap-3">
+          <Loader2 className="w-5 h-5 animate-spin text-[#20c58f]" />
+          <span className="text-sm text-slate-300">Hämtar avtalsuppgifter...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!resolvedEndDate) {
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-md w-full p-6">

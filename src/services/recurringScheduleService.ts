@@ -16,6 +16,55 @@ import { generateInspectionDates } from '../utils/inspectionDateGenerator'
 import { CaseNumberService } from './caseNumberService'
 
 // ============================================
+// HELPERS
+// ============================================
+
+/**
+ * Löser upp avtalsslutdatum för en kund, med arv från huvudkontoret.
+ *
+ * Multisite-enheter (site_type = 'enhet') har inga egna avtalsdatum – de går
+ * inte ens att sätta i "Redigera enhet"-modalen – utan följer huvudkontorets
+ * avtal. Denna helper returnerar enhetens eget contract_end_date om det finns,
+ * annars huvudkontorets (via parent_customer_id). Returnerar null om varken
+ * enheten eller huvudkontoret har ett datum.
+ *
+ * Använd överallt där ett contract_end_date matas till RecurringScheduleWizard.
+ */
+export async function resolveContractEndDate(
+  customerId: string,
+  ownEndDate?: string | null
+): Promise<string | null> {
+  if (ownEndDate) return ownEndDate
+
+  const { data: customer, error } = await supabase
+    .from('customers')
+    .select('contract_end_date, parent_customer_id')
+    .eq('id', customerId)
+    .single()
+
+  if (error || !customer) {
+    console.error('resolveContractEndDate: kunde inte hämta kund', customerId, error)
+    return ownEndDate ?? null
+  }
+
+  if (customer.contract_end_date) return customer.contract_end_date
+  if (!customer.parent_customer_id) return null
+
+  const { data: parent, error: parentError } = await supabase
+    .from('customers')
+    .select('contract_end_date')
+    .eq('id', customer.parent_customer_id)
+    .single()
+
+  if (parentError || !parent) {
+    console.error('resolveContractEndDate: kunde inte hämta huvudkontor', customer.parent_customer_id, parentError)
+    return null
+  }
+
+  return parent.contract_end_date ?? null
+}
+
+// ============================================
 // CRUD OPERATIONS
 // ============================================
 
