@@ -19,6 +19,7 @@ type CustomerRow = {
   id: string
   company_name: string
   organization_number: string | null
+  parent_customer_id: string | null
   billing_email: string | null
   billing_address: string | null
   contact_email: string | null
@@ -33,6 +34,19 @@ type CustomerRow = {
   billing_anchor_month: number | null
   billing_active: boolean | null
   notice_period_months: number | null
+}
+
+// Multisite-enheter utan eget org.nr ärver huvudkontorets på fakturan
+// (samma regel som resolveOrganizationNumber i frontend-koden)
+async function resolveOrgNr(customer: CustomerRow): Promise<string | null> {
+  if (customer.organization_number) return customer.organization_number
+  if (!customer.parent_customer_id) return null
+  const { data: parent } = await supabase
+    .from('customers')
+    .select('organization_number')
+    .eq('id', customer.parent_customer_id)
+    .single()
+  return parent?.organization_number ?? null
 }
 
 // TZ-säker YYYY-MM-DD
@@ -202,6 +216,7 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
   let created = 0
   const totalN = intervals.length
   const today = new Date()
+  const orgNr = await resolveOrgNr(customer)
   for (let idx = 0; idx < intervals.length; idx++) {
     const { periodStart, periodEnd } = intervals[idx]
     const key = toLocalIsoDate(periodStart)
@@ -228,7 +243,7 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
         customer_email: customer.billing_email ?? customer.contact_email,
         customer_phone: customer.contact_phone,
         customer_address: customer.billing_address ?? customer.contact_address,
-        organization_number: customer.organization_number,
+        organization_number: orgNr,
         subtotal: perPeriod,
         vat_amount: vat,
         total_amount: perPeriod + vat,

@@ -20,6 +20,7 @@ import ProductsViewer from '../../components/admin/ProductsViewer'
 import { useTechnicians } from '../../hooks/useTechnicians'
 import { SERVICE_FREQUENCIES, CUSTOMER_SIZES, getIndustryCategory } from '../../constants/customerOptions'
 import { useContractTypeOptions } from '../../hooks/useContractTypeOptions'
+import { resolveOrganizationNumber } from '../../utils/multisiteHelpers'
 
 interface CustomerDetails {
   id: string
@@ -75,6 +76,8 @@ export default function CustomerDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [customer, setCustomer] = useState<CustomerDetails | null>(null)
+  // Org.nr ärvt från huvudkontoret när enheten saknar eget (multisite)
+  const [inheritedOrgNr, setInheritedOrgNr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { accountManagers, loading: techniciansLoading } = useTechnicians()
@@ -91,6 +94,12 @@ export default function CustomerDetails() {
       setLoading(true)
       const data = await customerService.getCustomer(id!)
       setCustomer(data)
+      // Multisite-enheter utan eget org.nr ärver huvudkontorets
+      if (data && !data.organization_number) {
+        setInheritedOrgNr(await resolveOrganizationNumber(data.id))
+      } else {
+        setInheritedOrgNr(null)
+      }
     } catch (error) {
       console.error('Error fetching customer details:', error)
       setError('Kunde inte hämta kunddetaljer')
@@ -247,7 +256,10 @@ export default function CustomerDetails() {
                 <Building2 className="w-5 h-5 text-green-500" />
                 <div>
                   <h1 className="text-xl font-semibold">{customer.company_name}</h1>
-                  <p className="text-sm text-slate-400">{customer.organization_number || 'Org.nr saknas'}</p>
+                  <p className="text-sm text-slate-400">
+                    {customer.organization_number
+                      || (inheritedOrgNr ? `${inheritedOrgNr} (ärvt från huvudkontor)` : 'Org.nr saknas')}
+                  </p>
                 </div>
               </div>
             </div>
@@ -304,7 +316,12 @@ export default function CustomerDetails() {
                 
                 <div>
                   <label className="block text-sm text-slate-400 mb-1">Organisationsnummer</label>
-                  <p className="text-white">{customer.organization_number || '-'}</p>
+                  <p className="text-white">
+                    {customer.organization_number || inheritedOrgNr || '-'}
+                    {!customer.organization_number && inheritedOrgNr && (
+                      <span className="text-xs text-slate-500 ml-2">(ärvt från huvudkontor)</span>
+                    )}
+                  </p>
                 </div>
                 
                 <EditableCustomerField

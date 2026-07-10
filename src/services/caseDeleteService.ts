@@ -47,6 +47,9 @@ function getTableName(caseType: DeleteableCaseType): string {
       return 'business_cases';
     case 'contract':
       return 'cases';
+    default:
+      // Faila högt istället för att tyst returnera undefined → supabase.from(undefined)
+      throw new Error(`getTableName: ogiltig caseType "${caseType}"`);
   }
 }
 

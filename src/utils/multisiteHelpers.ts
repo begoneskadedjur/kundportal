@@ -142,6 +142,60 @@ export async function isHuvudkontor(customerId: string): Promise<boolean> {
 }
 
 /**
+ * Löser upp organisationsnummer för en kund, med arv från huvudkontoret.
+ *
+ * Multisite-enheter saknar ofta eget organization_number och följer då
+ * huvudkontorets. Returnerar kundens eget org.nr om det finns, annars
+ * huvudkontorets (via parent_customer_id), annars null.
+ *
+ * Samma mönster som resolveContractEndDate i recurringScheduleService.
+ */
+export async function resolveOrganizationNumber(
+  customerId: string,
+  ownOrgNr?: string | null
+): Promise<string | null> {
+  if (ownOrgNr) return ownOrgNr
+
+  const { data: customer, error } = await supabase
+    .from('customers')
+    .select('organization_number, parent_customer_id')
+    .eq('id', customerId)
+    .single()
+
+  if (error || !customer) {
+    console.error('resolveOrganizationNumber: kunde inte hämta kund', customerId, error)
+    return ownOrgNr ?? null
+  }
+
+  if (customer.organization_number) return customer.organization_number
+  if (!customer.parent_customer_id) return null
+
+  const { data: parent, error: parentError } = await supabase
+    .from('customers')
+    .select('organization_number')
+    .eq('id', customer.parent_customer_id)
+    .single()
+
+  if (parentError || !parent) {
+    console.error('resolveOrganizationNumber: kunde inte hämta huvudkontor', customer.parent_customer_id, parentError)
+    return null
+  }
+
+  return parent.organization_number ?? null
+}
+
+/**
+ * Synkron variant av org.nr-arvet när både enheten och huvudkontoret
+ * redan finns i minnet (undviker extra DB-anrop).
+ */
+export function inheritOrgNr(
+  site: { organization_number?: string | null },
+  parent?: { organization_number?: string | null } | null
+): string | null {
+  return site.organization_number || parent?.organization_number || null
+}
+
+/**
  * Hämtar regioner för en organisation
  */
 export async function getOrganizationRegions(organizationId: string): Promise<string[]> {

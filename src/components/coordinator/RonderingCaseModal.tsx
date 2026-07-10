@@ -9,7 +9,7 @@ import {
   X, Building, Building2, Calendar, Save, Check, Map, MapPin,
   CheckSquare, Square, AlertTriangle, MessageSquare, History,
   Trash2, FileText, Users, User, Phone, Mail, ChevronDown,
-  Footprints, Clock, Plus, ExternalLink
+  Footprints, Clock, Plus, ExternalLink, Copy
 } from 'lucide-react'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
@@ -31,6 +31,17 @@ import DeleteCaseConfirmDialog from '../shared/DeleteCaseConfirmDialog'
 import { RonderingService, RonderingStationLog, RonderingStationStatus, RonderingAnnotation } from '../../services/ronderingService'
 import { EquipmentService } from '../../services/equipmentService'
 import RonderingMapSection from './RonderingMapSection'
+// Kopiera/duplicera ärende
+import DuplicateCaseDialog from '../shared/DuplicateCaseDialog'
+import { CaseNumberService } from '../../services/caseNumberService'
+// Fakturering + provision (samma flöde som EditContractCaseModal)
+import CaseServiceSelector from '../shared/CaseServiceSelector'
+import CommissionSection from '../shared/CommissionSection'
+import { ProvisionService } from '../../services/provisionService'
+import { CaseBillingService } from '../../services/caseBillingService'
+import { ContractBillingService } from '../../services/contractBillingService'
+import type { TechnicianShare } from '../../types/provision'
+import type { CaseBillingSummary } from '../../types/caseBilling'
 
 registerLocale('sv', sv)
 
@@ -374,6 +385,34 @@ export default function RonderingCaseModal({
   const [subVisits, setSubVisits] = useState<any[]>([])
   const [nestedSubVisit, setNestedSubVisit] = useState<any | null>(null)
 
+  // Kopiera (följeärende) + duplicera
+  const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
+  const [followUpLoading, setFollowUpLoading] = useState(false)
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
+
+  // Provision (samma mönster som EditContractCaseModal)
+  const [commissionEligible, setCommissionEligible] = useState(false)
+  const [billingSummary, setBillingSummary] = useState<CaseBillingSummary | null>(null)
+  const handleBillingSummaryChange = useCallback(
+    (_items: unknown, summary: CaseBillingSummary) => setBillingSummary(summary), []
+  )
+  const [commissionShares, setCommissionShares] = useState<TechnicianShare[]>([])
+  const [commissionDeductions, setCommissionDeductions] = useState(0)
+  const [commissionNotes, setCommissionNotes] = useState('')
+  const [existingCommissionPosts, setExistingCommissionPosts] = useState(0)
+  const [commissionPostsLocked, setCommissionPostsLocked] = useState(false)
+
+  // Ursprunglig status — skyddar mot dubbel billing/provision vid upprepade sparningar
+  // (modalen förblir öppen efter spara, caseData-proppen refreshas inte)
+  const originalStatusRef = useRef<string>(caseData?.status || 'Öppen')
+
+  // Auto-sätt avdrag från underleverantörsartiklar
+  useEffect(() => {
+    if (billingSummary && existingCommissionPosts === 0) {
+      setCommissionDeductions(billingSummary.subcontractor_total)
+    }
+  }, [billingSummary?.subcontractor_total, existingCommissionPosts])
+
   // Om detta är ett delbesök skrivs stationsloggar mot parent_case_id
   const logCaseId = caseData?.parent_case_id ?? caseData?.id
   const [parentCaseNumber, setParentCaseNumber] = useState<string | null>(null)
@@ -430,11 +469,28 @@ export default function RonderingCaseModal({
         work_report: caseData.work_report || '',
       })
 
+      // Provision-init (samma mönster som EditContractCaseModal)
+      originalStatusRef.current = caseData.status || 'Öppen'
+      setCommissionEligible(caseData.is_commission_eligible || false)
+      setCommissionShares([])
+      setCommissionDeductions(0)
+      setCommissionNotes('')
+      ProvisionService.getPostsByCase(caseData.id)
+        .then(posts => {
+          setExistingCommissionPosts(posts.length)
+          setCommissionPostsLocked(posts.some(p => p.status !== 'pending_invoice'))
+        })
+        .catch(() => {
+          setExistingCommissionPosts(0)
+          setCommissionPostsLocked(false)
+        })
+
       // Kunddata
       if (caseData.customer_id) {
+        // Hämta även huvudkontoret (parent) så enheter kan ärva org.nr när eget saknas
         const { data: customer } = await supabase
           .from('customers')
-          .select('*')
+          .select('*, parent:parent_customer_id(company_name, organization_number)')
           .eq('id', caseData.customer_id)
           .single()
         setCustomerData(customer)
@@ -489,12 +545,14 @@ export default function RonderingCaseModal({
         setParentCaseNumber(parent?.case_number ?? null)
       }
 
-      // Ladda delbesök (bara för originalärenden)
+      // Ladda delbesök (bara för originalärenden). Filtrera på RON-DEL-nummer
+      // så följeärenden/dubbletter (som också har parent_case_id) inte listas här.
       if (!caseData.parent_case_id) {
         const { data: subs } = await supabase
           .from('cases')
           .select('id, title, scheduled_start, scheduled_end, status, primary_technician_name')
           .eq('parent_case_id', caseData.id)
+          .like('case_number', 'RON-DEL-%')
           .order('scheduled_start')
         setSubVisits(subs || [])
       }
@@ -524,10 +582,72 @@ export default function RonderingCaseModal({
           tertiary_technician_id: formData.tertiary_technician_id || null,
           tertiary_technician_name: formData.tertiary_technician_name || null,
           work_report: formData.work_report || null,
+          is_commission_eligible: commissionEligible,
         })
         .eq('id', caseData.id)
 
       if (error) throw error
+
+      const justCompleted = formData.status === 'Avslutat' && originalStatusRef.current !== 'Avslutat'
+
+      // AD-HOC BILLING: kopiera artiklar till avtalsfakturering vid ärendeavslut
+      // (samma flöde som EditContractCaseModal)
+      let billingItemsCreated = 0
+      if (justCompleted && caseData.customer_id) {
+        try {
+          const hasBillingItems = await CaseBillingService.caseHasBillingItems(caseData.id, 'contract')
+          if (hasBillingItems) {
+            const result = await ContractBillingService.createAdHocItemsFromCase(
+              caseData.id,
+              caseData.customer_id,
+              new Date()
+            )
+            billingItemsCreated = result.created
+            if (result.invoiceError) {
+              toast.error(`Ärendet sparades men fakturan kunde inte skapas: ${result.invoiceError}. Raderna ligger kvar ofakturerade - kontakta admin.`, { duration: 10000 })
+            }
+          }
+        } catch (billingError: any) {
+          console.warn('[RonderingCaseModal] Kunde inte skapa ad-hoc billing:', billingError)
+          toast.error(`Ad-hoc fakturering misslyckades: ${billingError.message}`)
+        }
+      }
+
+      // PROVISION: skapa provisionsposter vid avslut om provisionsgrundande
+      let commissionCreated = false
+      if (justCompleted && commissionEligible && commissionShares.length > 0 && existingCommissionPosts === 0) {
+        try {
+          const casePrice = billingSummary?.subtotal || 0
+          await ProvisionService.createPostsForCase(
+            {
+              case_id: caseData.id,
+              case_type: 'contract',
+              case_title: formData.title || caseData.title,
+              case_number: formData.case_number || caseData.case_number,
+              base_amount: casePrice,
+            },
+            commissionShares,
+            commissionDeductions,
+            commissionNotes || undefined
+          )
+          commissionCreated = true
+          setExistingCommissionPosts(commissionShares.length)
+        } catch (commErr: any) {
+          console.warn('[RonderingCaseModal] Provision kunde inte skapas:', commErr)
+          toast.error(`Provision: ${commErr.message}`)
+        }
+      }
+
+      // Uppdatera ursprungsstatus så upprepade sparningar inte dubblerar billing/provision
+      originalStatusRef.current = formData.status
+
+      if (billingItemsCreated > 0 && commissionCreated) {
+        toast.success(`Ärende avslutat! ${billingItemsCreated} artikel(er) till fakturering + provision skapad.`)
+      } else if (billingItemsCreated > 0) {
+        toast.success(`Ärende avslutat! ${billingItemsCreated} artikel(er) skickade till fakturering.`)
+      } else if (commissionCreated) {
+        toast.success('Ärende avslutat och provision skapad!')
+      }
 
       setShowSaveSuccess(true)
       setTimeout(() => setShowSaveSuccess(false), 2000)
@@ -536,6 +656,48 @@ export default function RonderingCaseModal({
       toast.error(e.message || 'Kunde inte spara')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Skapa följeärende (kopiera till nytt ärende hos samma kund).
+  // OBS: ingen parent_case_id — i ronderingskontext betyder parent_case_id
+  // "delbesök" (delade stationsloggar), vilket ett följeärende inte är.
+  const handleCreateFollowUpCase = async () => {
+    setFollowUpLoading(true)
+    try {
+      const newCaseNumber = await CaseNumberService.generateCaseNumber()
+      const { error } = await supabase
+        .from('cases')
+        .insert({
+          case_number: newCaseNumber,
+          title: `Följeärende: ${customerData?.company_name || formData.contact_person || 'Kund'}`,
+          description: `Följeärende skapat från ${formData.case_number}.\n\nUrsprungligt ärende: ${formData.title || caseData?.title || 'Ej angivet'}`,
+          status: 'Bokad',
+          customer_id: caseData?.customer_id || null,
+          contact_person: formData.contact_person || null,
+          contact_phone: formData.contact_phone || null,
+          contact_email: formData.contact_email || null,
+          primary_technician_id: formData.primary_technician_id || null,
+          primary_technician_name: formData.primary_technician_name || null,
+          secondary_technician_id: formData.secondary_technician_id || null,
+          secondary_technician_name: formData.secondary_technician_name || null,
+          tertiary_technician_id: formData.tertiary_technician_id || null,
+          tertiary_technician_name: formData.tertiary_technician_name || null,
+          created_by_technician_id: profile?.technician_id || null,
+          created_by_technician_name: profile?.display_name || null,
+          created_date: new Date().toISOString(),
+        })
+
+      if (error) throw error
+
+      toast.success(`Följeärende ${newCaseNumber} skapat!`)
+      setShowFollowUpDialog(false)
+      onSuccess?.()
+    } catch (err: any) {
+      console.error('Kunde inte skapa följeärende:', err)
+      toast.error(err.message || 'Kunde inte skapa följeärende')
+    } finally {
+      setFollowUpLoading(false)
     }
   }
 
@@ -1103,6 +1265,54 @@ export default function RonderingCaseModal({
               />
             </div>
 
+            {/* Utförda tjänster/artiklar för fakturering */}
+            {caseData?.id && (
+              <div className="bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden p-1">
+                <CaseServiceSelector
+                  caseId={caseData.id}
+                  caseType="contract"
+                  customerId={caseData.customer_id || undefined}
+                  technicianId={formData.primary_technician_id || undefined}
+                  technicianName={formData.primary_technician_name || undefined}
+                  primaryServiceId={caseData.service_id || null}
+                  onChange={handleBillingSummaryChange}
+                />
+              </div>
+            )}
+
+            {/* Provision */}
+            {caseData?.id && (
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                <CommissionSection
+                  isEligible={commissionEligible}
+                  onEligibleChange={setCommissionEligible}
+                  assignedTechnicians={
+                    [
+                      formData.primary_technician_id && formData.primary_technician_name
+                        ? { id: formData.primary_technician_id, name: formData.primary_technician_name }
+                        : null,
+                      formData.secondary_technician_id && formData.secondary_technician_name
+                        ? { id: formData.secondary_technician_id, name: formData.secondary_technician_name }
+                        : null,
+                      formData.tertiary_technician_id && formData.tertiary_technician_name
+                        ? { id: formData.tertiary_technician_id, name: formData.tertiary_technician_name }
+                        : null,
+                    ].filter(Boolean) as { id: string; name: string }[]
+                  }
+                  technicianShares={commissionShares}
+                  onSharesChange={setCommissionShares}
+                  deductions={commissionDeductions}
+                  onDeductionsChange={setCommissionDeductions}
+                  notes={commissionNotes}
+                  onNotesChange={setCommissionNotes}
+                  baseAmount={billingSummary?.subtotal || 0}
+                  existingPostCount={existingCommissionPosts}
+                  postsLocked={commissionPostsLocked}
+                  subcontractorDeduction={billingSummary?.subcontractor_total || 0}
+                />
+              </div>
+            )}
+
             {/* Bilder */}
             {caseData?.id && (
               <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
@@ -1124,19 +1334,23 @@ export default function RonderingCaseModal({
         </div>
       </Modal>
 
-      {/* Radera-dialog */}
-      {showDeleteDialog && (
+      {/* Radera-dialog — renderas via portal så den hamnar ovanpå den portal-baserade
+          föräldramodalen (annars göms dialogen bakom och bara en svart backdrop syns).
+          caseType="contract" eftersom ronderingsärenden ligger i tabellen `cases`. */}
+      {showDeleteDialog && createPortal(
         <DeleteCaseConfirmDialog
           isOpen={showDeleteDialog}
           onClose={() => setShowDeleteDialog(false)}
-          caseId={caseData?.id}
-          caseNumber={formData.case_number}
+          caseId={caseData?.id || ''}
+          caseType="contract"
+          caseTitle={formData.case_number || caseData?.title || 'Rondering'}
           onDeleted={() => {
             setShowDeleteDialog(false)
             onSuccess?.()
             onClose()
           }}
-        />
+        />,
+        document.getElementById('modal-root') ?? document.body
       )}
 
       {/* Kommunikationspanel */}
@@ -1146,7 +1360,7 @@ export default function RonderingCaseModal({
           onClose={() => setShowCommunicationPanel(false)}
           caseId={caseData.id}
           caseType={'contract' as CaseType}
-          caseNumber={formData.case_number}
+          caseTitle={formData.case_number || caseData?.title || 'Rondering'}
         />
       )}
 
@@ -1179,6 +1393,26 @@ export default function RonderingCaseModal({
                 <div>
                   <p className="text-sm font-medium text-white">Lägg till delbesök</p>
                   <p className="text-xs text-slate-400 mt-0.5">Boka in en tekniker på ett eget datum — loggar stationer mot detta ärende</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setShowActionDialog(false); setShowFollowUpDialog(true) }}
+                className="w-full flex items-start gap-3 p-3 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 hover:border-amber-500/40 rounded-xl text-left transition-colors"
+              >
+                <Plus className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-white">Kopiera ärende</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Nytt ärende hos samma kund — kontakt och tekniker följer med</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setShowActionDialog(false); setShowDuplicateDialog(true) }}
+                className="w-full flex items-start gap-3 p-3 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 hover:border-[#20c58f]/40 rounded-xl text-left transition-colors"
+              >
+                <Copy className="w-5 h-5 text-[#20c58f] shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-white">Duplicera ärende</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Skapa en kopia och välj vad som följer med</p>
                 </div>
               </button>
               <button
@@ -1216,6 +1450,74 @@ export default function RonderingCaseModal({
           }}
         />,
         document.getElementById('modal-root') ?? document.body
+      )}
+
+      {/* Kopiera ärende (följeärende) */}
+      {showFollowUpDialog && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 10001, pointerEvents: 'auto' }}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !followUpLoading && setShowFollowUpDialog(false)} />
+          <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
+              <h2 className="text-base font-semibold text-white flex items-center gap-2">
+                <Plus className="w-4 h-4 text-amber-400" />
+                Kopiera ärende
+              </h2>
+              <button onClick={() => setShowFollowUpDialog(false)} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-sm text-slate-400">
+                Ett nytt ärende skapas hos samma kund. Kontaktuppgifter och tekniker kopieras automatiskt.
+              </p>
+              <div className="p-3 bg-slate-800/30 border border-slate-700/50 rounded-xl">
+                <p className="text-xs text-slate-400 mb-1">Ursprungsärende</p>
+                <p className="text-sm text-white font-medium">{formData.case_number} — {formData.title || caseData?.title || 'Rondering'}</p>
+              </div>
+            </div>
+            <div className="px-4 py-2.5 border-t border-slate-700/50 flex justify-end gap-2">
+              <button
+                onClick={() => setShowFollowUpDialog(false)}
+                disabled={followUpLoading}
+                className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Avbryt
+              </button>
+              <Button variant="primary" size="sm" onClick={handleCreateFollowUpCase} disabled={followUpLoading}>
+                {followUpLoading ? 'Skapar...' : 'Skapa ärende'}
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.getElementById('modal-root') ?? document.body
+      )}
+
+      {/* Duplicera-ärende-dialog (portalar sig själv till #modal-root) */}
+      {caseData?.id && (
+        <DuplicateCaseDialog
+          isOpen={showDuplicateDialog}
+          onClose={() => setShowDuplicateDialog(false)}
+          caseData={{
+            id: caseData.id,
+            case_type: 'contract',
+            title: formData.title ?? null,
+            case_number: formData.case_number ?? null,
+            startAt: formData.scheduled_start ? formData.scheduled_start.toISOString() : null,
+            endAt: formData.scheduled_end ? formData.scheduled_end.toISOString() : null,
+          }}
+          createdByTechnicianId={profile?.technician_id ?? null}
+          createdByTechnicianName={profile?.display_name ?? null}
+          onDuplicated={async (result) => {
+            setShowDuplicateDialog(false)
+            // Nollställ parent_case_id på kopian — i ronderingskontext betyder
+            // parent_case_id "delbesök" (kopian skulle annars dela stationsloggar
+            // med originalet och listas som delbesök).
+            if (result?.id) {
+              await supabase.from('cases').update({ parent_case_id: null }).eq('id', result.id)
+            }
+            onSuccess?.()
+          }}
+        />
       )}
 
       {/* Nested delbesök-modal */}

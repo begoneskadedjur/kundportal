@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { ImportedCustomerContractService } from './importedCustomerContractService'
 import { PaymentTermsService } from './paymentTermsService'
 import { ContractService, isSyntheticContract } from './contractService'
+import { resolveOrganizationNumber } from '../utils/multisiteHelpers'
 import type { ContractWithBilling } from '../types/database'
 
 interface ContractServiceItem {
@@ -566,6 +567,11 @@ export class ContractInvoiceGenerator {
       .single()
     if (cErr || !customer) throw new Error(`Kunde inte hämta kund: ${cErr?.message}`)
 
+    // Multisite-enheter utan eget org.nr ärver huvudkontorets på fakturan
+    customer.organization_number = await resolveOrganizationNumber(
+      customer.id, customer.organization_number
+    )
+
     const result: ApplyResult = {
       createdIds: [], updatedIds: [], deletedIds: [], historicalIds: [], skippedLocked: 0,
     }
@@ -682,6 +688,11 @@ export class ContractInvoiceGenerator {
       .single()
     if (cErr) throw new Error(`Kunde inte hämta kund: ${cErr.message}`)
     if (!customer) throw new Error('Kunden hittades inte')
+
+    // Multisite-enheter utan eget org.nr ärver huvudkontorets på fakturan
+    customer.organization_number = await resolveOrganizationNumber(
+      customer.id, customer.organization_number
+    )
 
     const completedDate = typeof completedAt === 'string' ? new Date(completedAt) : completedAt
     const y = completedDate.getFullYear()
