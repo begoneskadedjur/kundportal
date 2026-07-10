@@ -1346,8 +1346,8 @@ export default function EditContractCaseModal({
       )}
       {isInspection && (
         <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
-          <Calendar className="w-3 h-3" />
-          Avtalat servicebesök
+          <MapPin className="w-3 h-3" />
+          Stationskontroll
         </span>
       )}
       {visitNumber > 1 && (
@@ -1890,8 +1890,8 @@ export default function EditContractCaseModal({
                 />
               </div>
 
-              {/* Bilder sektion */}
-              {caseData?.id && (
+              {/* Bilder sektion — inte för stationskontroll (foton tas per station i kontrollrundan) */}
+              {caseData?.id && !isInspection && (
                 <div className="space-y-2 pt-3 border-t border-slate-700/50">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
                     <ImageIcon className="w-4 h-4 text-cyan-400" />
@@ -1913,8 +1913,8 @@ export default function EditContractCaseModal({
                 </div>
               )}
 
-              {/* Använda preparat - Visas INTE för Inspektion/kontrollrunda */}
-              {caseData?.id && serviceArticle?.name !== 'Inspektion' && formData.pest_type !== 'Inspektion' && (
+              {/* Använda preparat - Visas INTE för Inspektion/kontrollrunda eller stationskontroll */}
+              {caseData?.id && !isInspection && serviceArticle?.name !== 'Inspektion' && formData.pest_type !== 'Inspektion' && (
                 <CasePreparationsSection
                   caseId={caseData.id}
                   caseType="contract"
@@ -1976,8 +1976,9 @@ export default function EditContractCaseModal({
                 </div>
               )}
 
-              {/* Bedömning & Rekommendationer - Only for contract customers, not establishment */}
-              {caseData.customer_id && !isEstablishment && (
+              {/* Bedömning & Rekommendationer - inte för etablering eller stationskontroll
+                  (kontrollresultat rapporteras per station i kontrollrundan → /organisation) */}
+              {caseData.customer_id && !isEstablishment && !isInspection && (
                 <div className="space-y-2 pt-3 border-t border-slate-700/50">
                   <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
                     <AlertTriangle className="w-4 h-4 text-amber-400" />
