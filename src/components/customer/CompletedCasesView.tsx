@@ -561,7 +561,10 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
             customer_id: (selectedCase as any).customer_id,
             priority: selectedCase.priority,
             work_started_at: selectedCase.work_started_at,
-            files: selectedCase.files
+            files: selectedCase.files,
+            // 🏷️ Ärendemärkning
+            work_order_number: (selectedCase as any).work_order_number,
+            work_object: (selectedCase as any).work_object
           }}
         />
       )}

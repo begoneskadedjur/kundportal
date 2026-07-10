@@ -406,6 +406,18 @@ const generateSingleCaseHTML = (
             <div class="info-label">Ärendestatus</div>
             <div class="info-value">${caseData.status || 'Okänd status'}</div>
           </div>
+          ${caseData.work_order_number ? `
+          <div class="info-group">
+            <div class="info-label">Arbetsorder nr</div>
+            <div class="info-value">${caseData.work_order_number}</div>
+          </div>
+          ` : ''}
+          ${caseData.work_object ? `
+          <div class="info-group">
+            <div class="info-label">Objekt</div>
+            <div class="info-value">${caseData.work_object}</div>
+          </div>
+          ` : ''}
         </div>
         ${mapUrl ? `
         <div class="map-container">

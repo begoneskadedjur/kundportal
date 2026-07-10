@@ -145,6 +145,10 @@ export default function EditContractCaseModal({
     
     // Completion tracking
     completed_date: null as string | null,
+
+    // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+    work_order_number: '',
+    work_object: '',
   })
 
   const [technicians, setTechnicians] = useState<any[]>([])
@@ -399,6 +403,9 @@ export default function EditContractCaseModal({
         problem_rating: caseData.problem_rating !== null ? caseData.problem_rating : undefined,
         // Completion tracking
         completed_date: caseData.completed_date || null,
+        // 🏷️ Ärendemärkning
+        work_order_number: caseData.work_order_number || '',
+        work_object: caseData.work_object || '',
       })
       
       // Check if timer was running
@@ -551,22 +558,21 @@ export default function EditContractCaseModal({
       
       if (error) throw error
       
-      // Om det är en multisite-enhet utan eget org.nr, hämta från huvudkunden
+      // Multisite-enheter ärver org.nr, AM och ärendemärknings-flaggan från huvudkunden
       let finalCustomerData = data
-      if (data && data.is_multisite && data.parent_customer_id && !data.organization_number) {
-        // Hämta huvudkundens data för organisationsnummer
+      if (data && data.is_multisite && data.parent_customer_id) {
         const { data: parentData, error: parentError } = await supabase
           .from('customers')
-          .select('organization_number, company_name, assigned_account_manager')
+          .select('organization_number, company_name, assigned_account_manager, work_order_fields_enabled')
           .eq('id', data.parent_customer_id)
           .single()
 
         if (!parentError && parentData) {
-          // Använd huvudkundens org.nr om enheten inte har eget
           finalCustomerData = {
             ...data,
             organization_number: data.organization_number || parentData.organization_number,
             assigned_account_manager: data.assigned_account_manager || parentData.assigned_account_manager,
+            work_order_fields_enabled: data.work_order_fields_enabled || parentData.work_order_fields_enabled || false,
             parent_organization_number: parentData.organization_number,
             parent_company_name: parentData.company_name
           }
@@ -1061,7 +1067,10 @@ export default function EditContractCaseModal({
         // Automatically set completed_date when status changes to "Avslutat"
         completed_date: (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat')
           ? toLocalISOStringWithOffset(new Date())
-          : (formData.status !== 'Avslutat' ? null : localCaseData.completed_date || null)
+          : (formData.status !== 'Avslutat' ? null : localCaseData.completed_date || null),
+        // 🏷️ Ärendemärkning — spara null istället för tom sträng
+        work_order_number: formData.work_order_number?.trim() || null,
+        work_object: formData.work_object?.trim() || null
       }
 
       // Remove fields that don't exist in database
@@ -1683,6 +1692,31 @@ export default function EditContractCaseModal({
                   className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                   disabled={isCustomerView}
                 />
+                {/* 🏷️ Ärendemärkning — visas när kunden har inställningen eller värde redan finns */}
+                {(customerData?.work_order_fields_enabled || formData.work_order_number || formData.work_object) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Arbetsorder nr</label>
+                      <input
+                        type="text"
+                        value={formData.work_order_number}
+                        onChange={(e) => setFormData(prev => ({ ...prev, work_order_number: e.target.value }))}
+                        disabled={isCustomerView}
+                        className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Objekt</label>
+                      <input
+                        type="text"
+                        value={formData.work_object}
+                        onChange={(e) => setFormData(prev => ({ ...prev, work_object: e.target.value }))}
+                        disabled={isCustomerView}
+                        className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Tekniker / Status / Skadedjur - kompakt rad */}

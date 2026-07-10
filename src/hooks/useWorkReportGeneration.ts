@@ -34,6 +34,9 @@ interface TechnicianCase {
   created_date: string;
   start_date?: string;
   rapport?: string;
+  // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+  work_order_number?: string | null;
+  work_object?: string | null;
 }
 
 interface CustomerInfo {
@@ -210,6 +213,21 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
           type: 'text',
           value: caseData.case_type || 'private',
           has_value: !!(caseData.case_type)
+        },
+        // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+        {
+          id: 'work_order_number',
+          name: 'work_order_number',
+          type: 'text',
+          value: caseData.work_order_number || '',
+          has_value: !!(caseData.work_order_number)
+        },
+        {
+          id: 'work_object',
+          name: 'work_object',
+          type: 'text',
+          value: caseData.work_object || '',
+          has_value: !!(caseData.work_object)
         }
       ]
     }

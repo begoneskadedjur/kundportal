@@ -114,6 +114,9 @@ export type Database = {
 
           // 💰 Merförsäljning (ad-hoc från ärenden)
           adhoc_invoice_grouping: 'per_case' | 'monthly_batch'
+
+          // 🏷️ Ärendemärkning: obligatoriska Arbetsorder nr + Objekt på ärenden
+          work_order_fields_enabled: boolean
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
           contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
@@ -241,6 +244,9 @@ export type Database = {
           // avtal X" via WHERE contract_id = ?.
           contract_id: string | null
           parent_case_id: string | null
+          // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+          work_order_number: string | null
+          work_object: string | null
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>

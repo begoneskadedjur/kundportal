@@ -89,6 +89,10 @@ export interface Case {
   service_id: string | null
   service?: { name: string; group?: { name: string } } | null
   materials_used: string | null
+
+  // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+  work_order_number?: string | null
+  work_object?: string | null
 }
 
 // Create case input type (for customer requests)

@@ -161,6 +161,9 @@ const generateWorkReportHTML = (
   const startDateField = getFieldValue(taskDetails, 'start_date')
   const phoneField = getFieldValue(taskDetails, 'telefon_kontaktperson') || getFieldValue(taskDetails, 'telefon')
   const emailField = getFieldValue(taskDetails, 'e_post_kontaktperson') || getFieldValue(taskDetails, 'email')
+  // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+  const workOrderField = getFieldValue(taskDetails, 'work_order_number')
+  const workObjectField = getFieldValue(taskDetails, 'work_object')
 
   // Determine if it's a company or private person
   const isCompany = caseTypeField?.value === 'business'
@@ -635,6 +638,18 @@ const generateWorkReportHTML = (
             <div class="info-label">Ärendestatus</div>
             <div class="info-value">${taskDetails.task_info.status || 'Okänd status'}</div>
           </div>
+          ${workOrderField?.value ? `
+          <div class="info-group">
+            <div class="info-label">Arbetsorder nr</div>
+            <div class="info-value">${workOrderField.value}</div>
+          </div>
+          ` : ''}
+          ${workObjectField?.value ? `
+          <div class="info-group">
+            <div class="info-label">Objekt</div>
+            <div class="info-value">${workObjectField.value}</div>
+          </div>
+          ` : ''}
           ${taskDetails.task_info.description ? `
           <div class="info-group" style="grid-column: 1 / -1">
             <div class="info-label">Ärendebeskrivning</div>

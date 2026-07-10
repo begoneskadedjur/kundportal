@@ -444,7 +444,10 @@ const CustomerPortal: React.FC = () => {
             materials_used: selectedCaseForModal.materials_used,
             address: selectedCaseForModal.address,
             customer_id: (selectedCaseForModal as any).customer_id ?? effectiveCustomerId ?? undefined,
-            created_at: (selectedCaseForModal as any).created_at
+            created_at: (selectedCaseForModal as any).created_at,
+            // 🏷️ Ärendemärkning
+            work_order_number: (selectedCaseForModal as any).work_order_number,
+            work_object: (selectedCaseForModal as any).work_object
           }}
         />
       )}

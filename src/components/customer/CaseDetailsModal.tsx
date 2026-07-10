@@ -106,6 +106,9 @@ interface CaseDetailsModalProps {
     start_date?: string      // Privat/företag: timestamptz med tid
     due_date?: string        // Privat/företag: timestamptz med tid
     scheduled_date?: string  // Avtalskunder: endast datum
+    // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+    work_order_number?: string | null
+    work_object?: string | null
   }
 }
 
@@ -962,6 +965,24 @@ export default function CaseDetailsModal({
                   loading={acknowledgmentLoading}
                   onAcknowledge={handleAcknowledge}
                 />
+              )}
+
+              {/* 🏷️ Ärendemärkning: Arbetsorder nr + Objekt (kunder med inställningen) */}
+              {(fallbackData.work_order_number || fallbackData.work_object) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {fallbackData.work_order_number && (
+                    <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Arbetsorder nr</p>
+                      <p className="text-sm text-white font-medium">{fallbackData.work_order_number}</p>
+                    </div>
+                  )}
+                  {fallbackData.work_object && (
+                    <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Objekt</p>
+                      <p className="text-sm text-white font-medium">{fallbackData.work_object}</p>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Ärendebeskrivning — tidigt så kunden förstår ärendet direkt */}

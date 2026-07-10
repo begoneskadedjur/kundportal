@@ -77,6 +77,7 @@ interface Organization {
   portal_access_enabled?: boolean
   portal_notifications_enabled?: boolean
   portal_access_level?: string
+  work_order_fields_enabled?: boolean
 }
 
 interface OrganizationUser {
@@ -420,6 +421,7 @@ export default function OrganizationsPage() {
           portal_access_enabled: org.portal_access_enabled ?? true,
           portal_notifications_enabled: org.portal_notifications_enabled ?? true,
           portal_access_level: org.portal_access_level || 'full',
+          work_order_fields_enabled: org.work_order_fields_enabled ?? false,
         }
       }))
 
@@ -563,6 +565,7 @@ export default function OrganizationsPage() {
           portal_access_enabled: customer.portal_access_enabled ?? true,
           portal_notifications_enabled: customer.portal_notifications_enabled ?? true,
           portal_access_level: customer.portal_access_level || 'full',
+          work_order_fields_enabled: customer.work_order_fields_enabled ?? false,
         }
       }))
 
@@ -650,6 +653,26 @@ export default function OrganizationsPage() {
     } catch (error) {
       console.error('Error toggling organization:', error)
       toast.error('Kunde inte uppdatera organisation')
+    }
+  }
+
+  // Ärendemärkning: toggla obligatoriska Arbetsorder nr + Objekt på kundens ärenden.
+  // Flaggan sätts på huvudkontoret/den fristående kunden — enheter ärver vid läsning.
+  const handleToggleWorkOrderFields = async (org: Organization) => {
+    const newValue = !(org.work_order_fields_enabled ?? false)
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({ work_order_fields_enabled: newValue })
+        .eq('id', org.id)
+
+      if (error) throw error
+
+      toast.success(`Ärendemärkning ${newValue ? 'aktiverad' : 'avaktiverad'}`)
+      fetchOrganizations()
+    } catch (error) {
+      console.error('Error toggling work order fields:', error)
+      toast.error('Kunde inte uppdatera ärendemärkning')
     }
   }
 
@@ -1230,6 +1253,7 @@ export default function OrganizationsPage() {
           organizationSites={organizationSites}
           onToggleExpand={handleToggleExpand}
           onToggleActive={handleToggleActive}
+          onToggleWorkOrderFields={handleToggleWorkOrderFields}
           onEdit={handleEditOrganization}
           onDelete={handleDeleteOrganization}
           onAddUser={handleAddUser}
