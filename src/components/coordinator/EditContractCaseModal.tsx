@@ -1359,7 +1359,9 @@ export default function EditContractCaseModal({
   )
 
   // Header action buttons (for inside modal content) - MOBILANPASSAD
-  const headerActions = !isCustomerView && (
+  // Döljs för stationskontroll: offert är inte aktuellt och Rapport-knappen genererar
+  // saneringsrapporten — kontrollrapporten skapas från kontrollrundan/stationsdatan
+  const headerActions = !isCustomerView && !isInspection && (
     <div className="mb-6 -mt-6 -mx-6 px-4 sm:px-6 py-4 bg-slate-800/30 border-b border-slate-700">
       <div className="grid grid-cols-3 sm:flex sm:items-center sm:justify-end gap-2 sm:gap-3">
         {/* Quote dropdown */}
