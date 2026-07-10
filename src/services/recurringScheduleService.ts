@@ -502,7 +502,12 @@ interface SessionCreationContext {
   outdoorCount: number
   indoorCount: number
   service_type?: string
+  serviceId: string | null
 }
+
+// Tjänst som schemaskapade ärenden kopplas till (alla ärendetyper i
+// ronderingsschemat). Styr Tjänst-dropdownsen i EditContractCaseModal.
+const SCHEDULED_CASE_SERVICE_NAME = 'Återbesök / Uppföljning'
 
 async function fetchSessionCreationContext(
   schedule: RecurringSchedule,
@@ -513,6 +518,17 @@ async function fetchSessionCreationContext(
     .select('name')
     .eq('id', schedule.technician_id)
     .single()
+
+  // Slå upp tjänsten en gång per schema — sätts som service_id på varje ärende
+  const { data: serviceData } = await supabase
+    .from('services')
+    .select('id')
+    .eq('name', SCHEDULED_CASE_SERVICE_NAME)
+    .eq('is_active', true)
+    .maybeSingle()
+  if (!serviceData) {
+    console.warn(`fetchSessionCreationContext: tjänsten "${SCHEDULED_CASE_SERVICE_NAME}" hittades inte — ärenden skapas utan service_id`)
+  }
 
   const { data: customerData } = await supabase
     .from('customers')
@@ -545,7 +561,8 @@ async function fetchSessionCreationContext(
     customerData,
     outdoorCount: outdoorResult.count || 0,
     indoorCount: indoorResult.count || 0,
-    service_type
+    service_type,
+    serviceId: serviceData?.id ?? null
   }
 }
 
@@ -566,6 +583,7 @@ async function createCaseAndSession(
       status: 'Bokad',
       priority: 'normal',
       service_type: ctx.service_type ?? 'inspection',
+      service_id: ctx.serviceId,
       pest_type: null,
       scheduled_start: d.date.toISOString(),
       scheduled_end: d.endDate.toISOString(),
