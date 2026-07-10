@@ -795,20 +795,22 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     toast.success(`Team bokat för ${new Date(suggestion.start_time).toLocaleDateString('sv-SE')}`);
   };
 
-  // Ärendemärkning: kunder med work_order_fields_enabled kräver Arbetsorder nr + Objekt
+  // Ärendemärkning: separata per-kund-flaggor kräver Arbetsorder nr resp. Objekt
   // på Servicebesök (contract) och Avtalat servicebesök (inspection).
-  // Enheter ärver flaggan från huvudkontoret (parent_customer_id).
-  const workOrderFieldsRequired = (() => {
+  // Enheter ärver flaggorna från huvudkontoret (parent_customer_id).
+  const requiresWorkOrderFlag = (flag: 'work_order_number_enabled' | 'work_object_enabled') => {
     if (caseType !== 'contract' && caseType !== 'inspection') return false
     const cust = contractCustomers.find(c => c.id === selectedContractCustomer)
     if (!cust) return false
-    if (cust.work_order_fields_enabled) return true
+    if (cust[flag]) return true
     const site = selectedSiteId ? contractCustomers.find(c => c.id === selectedSiteId) : null
-    if (site?.work_order_fields_enabled) return true
+    if (site?.[flag]) return true
     const parentId = cust.parent_customer_id ?? site?.parent_customer_id
     const parent = parentId ? contractCustomers.find(c => c.id === parentId) : null
-    return parent?.work_order_fields_enabled === true
-  })()
+    return parent?.[flag] === true
+  }
+  const workOrderNumberRequired = requiresWorkOrderFlag('work_order_number_enabled')
+  const workObjectRequired = requiresWorkOrderFlag('work_object_enabled')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -843,9 +845,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       return toast.error('Du måste välja en region');
     }
 
-    // Ärendemärkning: obligatoriskt för kunder med work_order_fields_enabled
-    if (workOrderFieldsRequired && (!(formData as any).work_order_number?.trim() || !(formData as any).work_object?.trim())) {
-      return toast.error('Arbetsorder nr och Objekt måste anges för denna kund');
+    // Ärendemärkning: obligatoriska fält per kundinställning
+    if (workOrderNumberRequired && !(formData as any).work_order_number?.trim()) {
+      return toast.error('Arbetsorder nr måste anges för denna kund');
+    }
+    if (workObjectRequired && !(formData as any).work_object?.trim()) {
+      return toast.error('Objekt måste anges för denna kund');
     }
     
     setLoading(true);
@@ -901,7 +906,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           price: null,
           case_number: caseNumber,
           send_booking_confirmation: formData.skicka_bokningsbekraftelse === 'Ja',
-          // Ärendemärkning (kunder med work_order_fields_enabled)
+          // Ärendemärkning (kunder med aktiverad ärendemärkning)
           work_order_number: (formData as any).work_order_number?.trim() || null,
           work_object: (formData as any).work_object?.trim() || null
         };
@@ -1120,7 +1125,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           address: formData.adress ? { formatted_address: formData.adress } : null,
           price: formData.pris || null,
           case_number: caseNumber,
-          // Ärendemärkning (kunder med work_order_fields_enabled)
+          // Ärendemärkning (kunder med aktiverad ärendemärkning)
           work_order_number: (formData as any).work_order_number?.trim() || null,
           work_object: (formData as any).work_object?.trim() || null
         };
@@ -1841,22 +1846,26 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           onChange={handleChange}
                         />
                       </div>
-                      {workOrderFieldsRequired && (
+                      {(workOrderNumberRequired || workObjectRequired) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <Input
-                            label="Arbetsorder nr *"
-                            name="work_order_number"
-                            value={(formData as any).work_order_number || ''}
-                            onChange={handleChange}
-                            required
-                          />
-                          <Input
-                            label="Objekt *"
-                            name="work_object"
-                            value={(formData as any).work_object || ''}
-                            onChange={handleChange}
-                            required
-                          />
+                          {workOrderNumberRequired && (
+                            <Input
+                              label="Arbetsorder nr *"
+                              name="work_order_number"
+                              value={(formData as any).work_order_number || ''}
+                              onChange={handleChange}
+                              required
+                            />
+                          )}
+                          {workObjectRequired && (
+                            <Input
+                              label="Objekt *"
+                              name="work_object"
+                              value={(formData as any).work_object || ''}
+                              onChange={handleChange}
+                              required
+                            />
+                          )}
                         </div>
                       )}
                     </div>
@@ -2236,10 +2245,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               <Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />
                               <Input type="email" label="E-post Faktura" name="e_post_faktura" value={formData.e_post_faktura || ''} onChange={handleChange} />
                             </div>
-                            {workOrderFieldsRequired && (
+                            {(workOrderNumberRequired || workObjectRequired) && (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <Input label="Arbetsorder nr *" name="work_order_number" value={(formData as any).work_order_number || ''} onChange={handleChange} required />
-                                <Input label="Objekt *" name="work_object" value={(formData as any).work_object || ''} onChange={handleChange} required />
+                                {workOrderNumberRequired && (
+                                  <Input label="Arbetsorder nr *" name="work_order_number" value={(formData as any).work_order_number || ''} onChange={handleChange} required />
+                                )}
+                                {workObjectRequired && (
+                                  <Input label="Objekt *" name="work_object" value={(formData as any).work_object || ''} onChange={handleChange} required />
+                                )}
                               </div>
                             )}
                           </>

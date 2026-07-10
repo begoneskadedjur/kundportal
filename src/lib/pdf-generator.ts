@@ -161,7 +161,7 @@ const generateWorkReportHTML = (
   const startDateField = getFieldValue(taskDetails, 'start_date')
   const phoneField = getFieldValue(taskDetails, 'telefon_kontaktperson') || getFieldValue(taskDetails, 'telefon')
   const emailField = getFieldValue(taskDetails, 'e_post_kontaktperson') || getFieldValue(taskDetails, 'email')
-  // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+  // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
   const workOrderField = getFieldValue(taskDetails, 'work_order_number')
   const workObjectField = getFieldValue(taskDetails, 'work_object')
 

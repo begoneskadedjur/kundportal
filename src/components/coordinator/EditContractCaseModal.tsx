@@ -146,7 +146,7 @@ export default function EditContractCaseModal({
     // Completion tracking
     completed_date: null as string | null,
 
-    // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+    // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
     work_order_number: '',
     work_object: '',
   })
@@ -563,7 +563,7 @@ export default function EditContractCaseModal({
       if (data && data.is_multisite && data.parent_customer_id) {
         const { data: parentData, error: parentError } = await supabase
           .from('customers')
-          .select('organization_number, company_name, assigned_account_manager, work_order_fields_enabled')
+          .select('organization_number, company_name, assigned_account_manager, work_order_number_enabled, work_object_enabled')
           .eq('id', data.parent_customer_id)
           .single()
 
@@ -572,7 +572,8 @@ export default function EditContractCaseModal({
             ...data,
             organization_number: data.organization_number || parentData.organization_number,
             assigned_account_manager: data.assigned_account_manager || parentData.assigned_account_manager,
-            work_order_fields_enabled: data.work_order_fields_enabled || parentData.work_order_fields_enabled || false,
+            work_order_number_enabled: data.work_order_number_enabled || parentData.work_order_number_enabled || false,
+            work_object_enabled: data.work_object_enabled || parentData.work_object_enabled || false,
             parent_organization_number: parentData.organization_number,
             parent_company_name: parentData.company_name
           }
@@ -1692,29 +1693,34 @@ export default function EditContractCaseModal({
                   className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                   disabled={isCustomerView}
                 />
-                {/* 🏷️ Ärendemärkning — visas när kunden har inställningen eller värde redan finns */}
-                {(customerData?.work_order_fields_enabled || formData.work_order_number || formData.work_object) && (
+                {/* 🏷️ Ärendemärkning — separata fält, visas när kunden har inställningen eller värde redan finns */}
+                {((customerData?.work_order_number_enabled || formData.work_order_number)
+                  || (customerData?.work_object_enabled || formData.work_object)) && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Arbetsorder nr</label>
-                      <input
-                        type="text"
-                        value={formData.work_order_number}
-                        onChange={(e) => setFormData(prev => ({ ...prev, work_order_number: e.target.value }))}
-                        disabled={isCustomerView}
-                        className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Objekt</label>
-                      <input
-                        type="text"
-                        value={formData.work_object}
-                        onChange={(e) => setFormData(prev => ({ ...prev, work_object: e.target.value }))}
-                        disabled={isCustomerView}
-                        className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                      />
-                    </div>
+                    {(customerData?.work_order_number_enabled || formData.work_order_number) && (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Arbetsorder nr</label>
+                        <input
+                          type="text"
+                          value={formData.work_order_number}
+                          onChange={(e) => setFormData(prev => ({ ...prev, work_order_number: e.target.value }))}
+                          disabled={isCustomerView}
+                          className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                        />
+                      </div>
+                    )}
+                    {(customerData?.work_object_enabled || formData.work_object) && (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">Objekt</label>
+                        <input
+                          type="text"
+                          value={formData.work_object}
+                          onChange={(e) => setFormData(prev => ({ ...prev, work_object: e.target.value }))}
+                          disabled={isCustomerView}
+                          className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

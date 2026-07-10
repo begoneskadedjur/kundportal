@@ -74,7 +74,8 @@ interface Organization {
   portal_access_enabled?: boolean
   portal_notifications_enabled?: boolean
   portal_access_level?: string
-  work_order_fields_enabled?: boolean
+  work_order_number_enabled?: boolean
+  work_object_enabled?: boolean
   primary_contact_email?: string
   contact_email?: string
 }
@@ -110,7 +111,7 @@ interface CompactOrganizationTableProps {
   organizationSites: Record<string, Site[]>
   onToggleExpand: (org: Organization) => void
   onToggleActive: (org: Organization) => void
-  onToggleWorkOrderFields: (org: Organization) => void
+  onToggleWorkOrderField: (org: Organization, field: 'work_order_number_enabled' | 'work_object_enabled') => void
   onEdit: (org: Organization) => void
   onDelete: (org: Organization) => void
   onAddUser: (org: Organization) => void
@@ -139,7 +140,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   organizationSites,
   onToggleExpand,
   onToggleActive,
-  onToggleWorkOrderFields,
+  onToggleWorkOrderField,
   onEdit,
   onDelete,
   onAddUser,
@@ -750,25 +751,33 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     </div>
                   </div>
 
-                  {/* Ärendemärkning: Arbetsorder nr + Objekt på kundens ärenden */}
-                  <div className="mt-4 flex items-center justify-between px-3 py-2.5 bg-slate-800/40 border border-slate-700 rounded-lg">
+                  {/* Ärendemärkning: separata inställningar för Arbetsorder nr och Objekt */}
+                  <div className="mt-4 px-3 py-2.5 bg-slate-800/40 border border-slate-700 rounded-lg space-y-2.5">
                     <div>
-                      <p className="text-sm font-medium text-slate-300">Ärendemärkning: Arbetsorder nr &amp; Objekt</p>
+                      <p className="text-sm font-medium text-slate-300">Ärendemärkning</p>
                       <p className="text-xs text-slate-500 mt-0.5">
                         Obligatoriska fält vid ärendeskapande — visas i kundportalen och på rapporter
                       </p>
                     </div>
-                    <button
-                      onClick={() => onToggleWorkOrderFields(org)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
-                        org.work_order_fields_enabled ? 'bg-[#20c58f]' : 'bg-slate-600'
-                      }`}
-                      title={org.work_order_fields_enabled ? 'Avaktivera ärendemärkning' : 'Aktivera ärendemärkning'}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        org.work_order_fields_enabled ? 'translate-x-6' : 'translate-x-1'
-                      }`} />
-                    </button>
+                    {([
+                      { field: 'work_order_number_enabled' as const, label: 'Arbetsorder nr' },
+                      { field: 'work_object_enabled' as const, label: 'Objekt' },
+                    ]).map(({ field, label }) => (
+                      <div key={field} className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                        <span className="text-sm text-slate-400">{label}</span>
+                        <button
+                          onClick={() => onToggleWorkOrderField(org, field)}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${
+                            org[field] ? 'bg-[#20c58f]' : 'bg-slate-600'
+                          }`}
+                          title={org[field] ? `Avaktivera ${label}` : `Aktivera ${label}`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            org[field] ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+                    ))}
                   </div>
 
                   {/* Enheter — bara för vanliga multisite, inte regionalkunder */}

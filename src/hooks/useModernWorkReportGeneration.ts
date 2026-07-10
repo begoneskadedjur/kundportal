@@ -41,7 +41,7 @@ interface TechnicianCase {
   problem_rating?: number | null;
   // Rekommendationer från databasen
   recommendations?: string;
-  // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+  // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
   work_order_number?: string | null;
   work_object?: string | null;
 }
@@ -233,7 +233,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       org_number: caseData.org_nr,
       personnummer: caseData.personnummer,
       case_type: caseData.case_type,
-      // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+      // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
       work_order_number: caseData.work_order_number || null,
       work_object: caseData.work_object || null,
       visit_number: await (async () => {

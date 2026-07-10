@@ -90,7 +90,7 @@ export interface Case {
   service?: { name: string; group?: { name: string } } | null
   materials_used: string | null
 
-  // 🏷️ Ärendemärkning (kunder med work_order_fields_enabled)
+  // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
   work_order_number?: string | null
   work_object?: string | null
 }
