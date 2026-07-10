@@ -19,7 +19,6 @@ import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
-import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal'
 import RonderingCaseModal from '../../components/coordinator/RonderingCaseModal'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import ReportModal from '../../components/admin/technicians/ReportModal'
@@ -267,11 +266,9 @@ export default function TechnicianSchedule() {
   const userNavigatedRef = useRef(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false);
-  const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false);
   const [isEstablishmentModalOpen, setIsEstablishmentModalOpen] = useState(false);
   const [isRonderingModalOpen, setIsRonderingModalOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<ScheduleCaseType | null>(null);
-  const [selectedInspectionCase, setSelectedInspectionCase] = useState<ScheduleCaseType | null>(null);
   const [selectedEstablishmentCase, setSelectedEstablishmentCase] = useState<ScheduleCaseType | null>(null);
   const [selectedRonderingCase, setSelectedRonderingCase] = useState<ScheduleCaseType | null>(null);
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(new Set(DEFAULT_ACTIVE_STATUSES));
@@ -440,18 +437,17 @@ export default function TechnicianSchedule() {
   }, {} as Record<string, ScheduleCaseType[]>), [filteredCases]);
 
   const handleOpenModal = (caseData: ScheduleCaseType) => {
-    if (caseData.case_type === 'inspection') {
-      setSelectedInspectionCase(caseData);
-      setIsInspectionModalOpen(true);
+    // 'inspection' (avtalat servicebesök) öppnas i EditContractCaseModal
+    // (fullfjädrad modal med "Gå till inspektion"-knapp) — InspectionCaseModal är utfasad
+    if (caseData.case_type === 'inspection' || caseData.case_type === 'contract') {
+      setSelectedCase(caseData);
+      setIsEditContractModalOpen(true);
     } else if (caseData.case_type === 'establishment') {
       setSelectedEstablishmentCase(caseData);
       setIsEstablishmentModalOpen(true);
     } else if (caseData.case_type === 'rondering') {
       setSelectedRonderingCase(caseData);
       setIsRonderingModalOpen(true);
-    } else if (caseData.case_type === 'contract') {
-      setSelectedCase(caseData);
-      setIsEditContractModalOpen(true);
     } else {
       setSelectedCase(caseData);
       setIsEditModalOpen(true);
@@ -461,15 +457,13 @@ export default function TechnicianSchedule() {
   const handleUpdateSuccess = (updatedCase?: any) => {
     // Om inget updatedCase skickades = ärendet har raderats
     // Ta bort det från listan och stäng modalen
-    if (!updatedCase && (selectedCase || selectedInspectionCase || selectedEstablishmentCase || selectedRonderingCase)) {
-      const caseIdToRemove = selectedCase?.id || selectedInspectionCase?.id || selectedEstablishmentCase?.id || selectedRonderingCase?.id;
+    if (!updatedCase && (selectedCase || selectedEstablishmentCase || selectedRonderingCase)) {
+      const caseIdToRemove = selectedCase?.id || selectedEstablishmentCase?.id || selectedRonderingCase?.id;
       setCases(prevCases => prevCases.filter(c => c.id !== caseIdToRemove));
       setIsEditModalOpen(false);
       setIsEditContractModalOpen(false);
-      setIsInspectionModalOpen(false);
       setIsEstablishmentModalOpen(false);
       setSelectedCase(null);
-      setSelectedInspectionCase(null);
       setSelectedEstablishmentCase(null);
       return;
     }
@@ -744,17 +738,6 @@ export default function TechnicianSchedule() {
         }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedCase}
-      />
-
-      {/* Modal för stationskontroll-ärenden */}
-      <InspectionCaseModal
-        isOpen={isInspectionModalOpen}
-        onClose={() => {
-          setIsInspectionModalOpen(false);
-          setSelectedInspectionCase(null);
-        }}
-        onSuccess={handleUpdateSuccess}
-        caseData={selectedInspectionCase}
       />
 
       {/* Modal för etablering-ärenden — återanvänder EditContractCaseModal */}

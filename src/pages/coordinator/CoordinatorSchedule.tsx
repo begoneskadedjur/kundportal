@@ -19,7 +19,6 @@ import type { Absence } from '../../components/coordinator/schedule/AbsenceBlock
 // Befintliga modaler (återanvänds rakt av)
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
-import InspectionCaseModal from '../../components/coordinator/InspectionCaseModal'
 import RonderingCaseModal from '../../components/coordinator/RonderingCaseModal'
 import EgenkontrollCaseModal from '../../components/coordinator/EgenkontrollCaseModal'
 import CreateCaseModal from '../../components/admin/coordinator/CreateCaseModal'
@@ -89,12 +88,10 @@ export default function CoordinatorSchedule() {
   // Modal-state
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null)
   const [selectedContractCase, setSelectedContractCase] = useState<Case | null>(null)
-  const [selectedInspectionCase, setSelectedInspectionCase] = useState<Case | null>(null)
   const [selectedRonderingCase, setSelectedRonderingCase] = useState<Case | null>(null)
   const [selectedEgenkontrollCase, setSelectedEgenkontrollCase] = useState<Case | null>(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isEditContractModalOpen, setIsEditContractModalOpen] = useState(false)
-  const [isInspectionModalOpen, setIsInspectionModalOpen] = useState(false)
   const [isRonderingModalOpen, setIsRonderingModalOpen] = useState(false)
   const [isEgenkontrollModalOpen, setIsEgenkontrollModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -346,9 +343,9 @@ export default function CoordinatorSchedule() {
     if (caseData.case_type === 'contract' || caseData.case_type === 'establishment' || caseData.case_type === 'inspection' || (caseData as any).case_type === 'rondering' || (caseData as any).case_type === 'egenkontroll') {
       const cc = contractCases.find(c => c.id === caseData.id)
       if (cc) {
-        if (cc.service_type === 'inspection') {
-          setSelectedInspectionCase(cc); setIsInspectionModalOpen(true)
-        } else if (cc.service_type === 'rondering_trafikkontoret') {
+        // OBS: 'inspection' (avtalat servicebesök) går numera till EditContractCaseModal
+        // (fullfjädrad modal med "Gå till inspektion"-knapp) — InspectionCaseModal är utfasad
+        if (cc.service_type === 'rondering_trafikkontoret') {
           setSelectedRonderingCase(cc); setIsRonderingModalOpen(true)
         } else if (cc.service_type === 'egenkontroll_trafikkontoret') {
           setSelectedEgenkontrollCase(cc); setIsEgenkontrollModalOpen(true)
@@ -381,8 +378,6 @@ export default function CoordinatorSchedule() {
   const handleUpdateSuccess = () => {
     setIsEditModalOpen(false)
     setIsEditContractModalOpen(false)
-    setIsInspectionModalOpen(false)
-    setSelectedInspectionCase(null)
     fetchData()
   }
 
@@ -559,12 +554,6 @@ export default function CoordinatorSchedule() {
         onClose={() => { setIsEditContractModalOpen(false); setSelectedContractCase(null); setOpenCommunicationOnLoad(false) }}
         onSuccess={handleUpdateSuccess}
         caseData={selectedContractCase}
-      />
-      <InspectionCaseModal
-        isOpen={isInspectionModalOpen}
-        onClose={() => { setIsInspectionModalOpen(false); setSelectedInspectionCase(null) }}
-        onSuccess={handleUpdateSuccess}
-        caseData={selectedInspectionCase}
       />
       <RonderingCaseModal
         isOpen={isRonderingModalOpen}

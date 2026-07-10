@@ -244,6 +244,10 @@ export default function EditContractCaseModal({
   // Etableringsärende (service_type='establishment') — visas i denna modal men med lime-badge och låst billing
   const isEstablishment = caseData?.service_type === 'establishment'
 
+  // Avtalat servicebesök (service_type='inspection') — schemagenererad stationskontroll,
+  // visas i denna modal med cyan-badge och "Gå till inspektion"-knapp i footern
+  const isInspection = caseData?.service_type === 'inspection'
+
   // Multisite recipient logic
   const isMultisiteCustomer = customerData?.is_multisite === true
   
@@ -1340,6 +1344,12 @@ export default function EditContractCaseModal({
           Etablering
         </span>
       )}
+      {isInspection && (
+        <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
+          <Calendar className="w-3 h-3" />
+          Avtalat servicebesök
+        </span>
+      )}
       {visitNumber > 1 && (
         <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
           Besök {visitNumber}
@@ -1481,6 +1491,22 @@ export default function EditContractCaseModal({
           >
             <MapPin className="w-4 h-4" />
             Gå till utplacering
+          </Button>
+        )}
+        {/* Gå till inspektion — routen kräver technician-roll (admin har överåtkomst,
+            koordinator släpps inte in av ProtectedRoute och ska inte se knappen) */}
+        {isInspection && (profile?.role === 'technician' || profile?.role === 'admin' || profile?.is_admin) && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              navigate(`/technician/inspection/${caseData.id}`)
+              onClose()
+            }}
+            className="flex items-center gap-2"
+          >
+            <Play className="w-4 h-4" />
+            Gå till inspektion
           </Button>
         )}
         {!isCustomerView && (
