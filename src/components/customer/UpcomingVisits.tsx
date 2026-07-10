@@ -71,7 +71,7 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
               id: `inspection-${session.id}`,
               case_id: session.id,
               case_number: 'Kontroll',
-              case_title: 'Avtalat servicebesök',
+              case_title: 'Inspektion stationer',
               visit_date: session.scheduled_at,
               technician_name: tech?.name || 'Ej tilldelad',
               technician_phone: tech?.phone || undefined,

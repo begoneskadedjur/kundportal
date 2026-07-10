@@ -796,7 +796,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   };
 
   // Ärendemärkning: separata per-kund-flaggor kräver Arbetsorder nr resp. Objekt
-  // på Servicebesök (contract) och Avtalat servicebesök (inspection).
+  // på Servicebesök (contract) och Inspektion stationer (inspection).
   // Enheter ärver flaggorna från huvudkontoret (parent_customer_id).
   const requiresWorkOrderFlag = (flag: 'work_order_number_enabled' | 'work_object_enabled') => {
     if (caseType !== 'contract' && caseType !== 'inspection') return false
@@ -964,7 +964,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           // Fortsätt ändå - ärendet är skapat
         }
 
-        toast.success(`Avtalat servicebesök inbokat för ${customerName}!`);
+        toast.success(`Inspektion stationer inbokat för ${customerName}!`);
 
       } else if (caseType === 'establishment') {
         let actualCustomerId = selectedContractCustomer;
@@ -1393,7 +1393,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     </button>
                     <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
                       <ClipboardCheck className="w-6 h-6 mx-auto mb-1.5 text-cyan-400" />
-                      <h3 className="text-sm font-semibold">Avtalat servicebesök</h3>
+                      <h3 className="text-sm font-semibold">Inspektion stationer</h3>
                       <p className="text-xs text-slate-400 mt-1">Kontroll av fällor & stationer</p>
                       {contractCustomers.length > 0 && (
                         <p className="text-xs text-cyan-400 mt-1">{contractCustomers.length} kunder</p>

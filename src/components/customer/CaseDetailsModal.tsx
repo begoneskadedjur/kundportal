@@ -845,7 +845,7 @@ export default function CaseDetailsModal({
   const serviceTypeLabel = (t?: string | null) => {
     if (!t) return ''
     if (t === 'routine') return 'Servicebesök'
-    if (t === 'inspection') return 'Avtalat servicebesök'
+    if (t === 'inspection') return 'Inspektion stationer'
     if (t === 'establishment') return 'Etablering'
     if (t === 'acute') return 'Akut'
     return t

@@ -248,7 +248,7 @@ export default function EditContractCaseModal({
   // Etableringsärende (service_type='establishment') — visas i denna modal men med lime-badge och låst billing
   const isEstablishment = caseData?.service_type === 'establishment'
 
-  // Avtalat servicebesök (service_type='inspection') — schemagenererad stationskontroll,
+  // Inspektion stationer (service_type='inspection') — schemagenererad stationskontroll,
   // visas i denna modal med cyan-badge och "Gå till inspektion"-knapp i footern
   const isInspection = caseData?.service_type === 'inspection'
 
@@ -1357,7 +1357,7 @@ export default function EditContractCaseModal({
       {isInspection && (
         <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 flex items-center gap-1">
           <MapPin className="w-3 h-3" />
-          Stationskontroll
+          Inspektion stationer
         </span>
       )}
       {visitNumber > 1 && (

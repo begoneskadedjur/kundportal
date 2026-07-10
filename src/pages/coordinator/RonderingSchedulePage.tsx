@@ -92,8 +92,8 @@ function serviceTypeLabel(type: string | null | undefined): string {
   switch (type) {
     case 'rondering_trafikkontoret': return 'Rondering Trafikkontoret'
     case 'egenkontroll_trafikkontoret': return 'Egenkontroll'
-    case 'inspection': return 'Stationskontroll'
-    default: return 'Stationskontroll'
+    case 'inspection': return 'Inspektion stationer'
+    default: return 'Inspektion stationer'
   }
 }
 
@@ -133,7 +133,7 @@ interface NewScheduleSelectorProps {
 }
 
 const SERVICE_TYPE_OPTIONS = [
-  { value: 'inspection', label: 'Stationskontroll (inspektion)' },
+  { value: 'inspection', label: 'Inspektion stationer' },
   { value: 'rondering_trafikkontoret', label: 'Rondering Trafikkontoret' },
   { value: 'egenkontroll_trafikkontoret', label: 'Egenkontroll' },
 ]

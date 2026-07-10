@@ -334,7 +334,7 @@ export async function fetchTechnicianBookings(
       const end = new Date(s.scheduled_end)
       if (end.getTime() - start.getTime() > 0) {
         const customerName = (s.customer as any)?.company_name || ''
-        bookings.push({ start, end, title: `Avtalat servicebesök - ${customerName}` })
+        bookings.push({ start, end, title: `Inspektion stationer - ${customerName}` })
       }
     }
   })

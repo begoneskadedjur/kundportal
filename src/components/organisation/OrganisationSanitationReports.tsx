@@ -346,7 +346,7 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-medium text-white">Avtalat servicebesök</p>
+                        <p className="text-sm font-medium text-white">Inspektion stationer</p>
                         <span className="text-xs text-slate-500">
                           {sessionDate ? format(new Date(sessionDate), 'd MMM yyyy', { locale: sv }) : '—'}
                         </span>

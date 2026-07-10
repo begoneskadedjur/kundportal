@@ -39,7 +39,7 @@ const SERVICE_TYPE_LABEL: Record<string, string> = {
   routine: 'Rutinbesök',
   acute: 'Akut',
   other: 'Övrigt',
-  inspection: 'Avtalat servicebesök',
+  inspection: 'Inspektion stationer',
   establishment: 'Etablering',
 }
 
