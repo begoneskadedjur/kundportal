@@ -26,12 +26,15 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 const SETTLING_MINUTES = 2
 const MAX_ATTEMPTS = 5
 const BATCH_LIMIT = 500
+const APP_URL = process.env.VITE_APP_URL || 'https://kundportal.vercel.app'
 
 type QueueRow = {
   id: string
   technician_id: string
   event_type: 'assigned' | 'unassigned' | 'rescheduled'
   role: string
+  case_table: string
+  case_id: string | null
   case_number: string | null
   case_title: string | null
   customer_name: string | null
@@ -60,6 +63,13 @@ function formatTime(iso: string | null, withDate = true): string {
   return withDate ? `${date} kl ${time}` : time
 }
 
+function caseLink(r: QueueRow): string | null {
+  // Sessions utan ärende har ingen ärendevy att länka till.
+  // comm=0 → schemat öppnar ärendemodalen utan kommunikationsfliken.
+  if (!r.case_id || r.case_table === 'station_inspection_sessions') return null
+  return `${APP_URL}/technician/schedule?openCase=${r.case_id}&comm=0`
+}
+
 function rowHtml(r: QueueRow): string {
   const timespan = r.scheduled_end
     ? `${formatTime(r.scheduled_start)} – ${formatTime(r.scheduled_end, false)}`
@@ -68,11 +78,15 @@ function rowHtml(r: QueueRow): string {
     r.case_number ? `<strong>${r.case_number}</strong>` : null,
     r.case_title && r.case_title !== r.case_number ? r.case_title : null,
   ].filter(Boolean).join(' — ')
+  const link = caseLink(r)
+  const caseLine = link
+    ? `<a href="${link}" style="color: #0f766e; text-decoration: underline;">${parts || 'Öppna ärendet'}</a>`
+    : (parts || 'Ärende')
   return `
     <tr>
       <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #1e293b;">
         <div style="font-weight: 600;">${timespan}</div>
-        <div style="margin-top: 2px;">${parts || 'Ärende'}</div>
+        <div style="margin-top: 2px;">${caseLine}</div>
         <div style="color: #64748b; font-size: 13px; margin-top: 2px;">
           ${[r.customer_name, r.address].filter(Boolean).join(' · ') || ''}
           ${r.role !== 'Primär' ? ` · Roll: ${r.role}` : ''}
@@ -157,7 +171,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data: pending, error } = await supabase
       .from('technician_booking_notifications')
-      .select('id, technician_id, event_type, role, case_number, case_title, customer_name, scheduled_start, scheduled_end, address, attempts')
+      .select('id, technician_id, event_type, role, case_table, case_id, case_number, case_title, customer_name, scheduled_start, scheduled_end, address, attempts')
       .eq('status', 'pending')
       .lt('created_at', settledBefore)
       .order('created_at', { ascending: true })

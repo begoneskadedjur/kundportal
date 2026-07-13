@@ -60,8 +60,10 @@ export const baseTemplate = (content: string, title: string = 'Begone Skadedjur'
   <div class="email-body" style="background-color: #f7fafc; padding: 40px 0;">
     <div class="email-container" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);">
       
-      <!-- Header -->
-      <div style="background: linear-gradient(135deg, #0a1328 0%, #1e3a5f 100%); padding: 40px 30px; text-align: center;">
+      <!-- Header — solid background-color som fallback: vissa mailklienter
+           (bl.a. Gmail-varianter) strippar gradienter, vilket annars ger
+           vit rubriktext mot vit bakgrund -->
+      <div style="background-color: #0a1328; background: linear-gradient(135deg, #0a1328 0%, #1e3a5f 100%); padding: 40px 30px; text-align: center;">
         <div style="display: inline-block; padding: 12px 24px; background-color: rgba(255, 255, 255, 0.1); border-radius: 8px; backdrop-filter: blur(10px);">
           <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 600; letter-spacing: -0.5px;">
             Begone Skadedjur & Sanering AB

@@ -383,8 +383,11 @@ export default function TechnicianSchedule() {
     const foundCase = cases.find(c => c.id === openCaseId);
 
     if (foundCase) {
-      // Öppna modal med kommunikationsfliken
-      setOpenCommunicationOnLoad(true);
+      // comm=0 → öppna bara ärendet (länkar från bokningsmail);
+      // annars öppnas kommunikationsfliken (länkar från notiscentret)
+      if (searchParams.get('comm') !== '0') {
+        setOpenCommunicationOnLoad(true);
+      }
       handleOpenModal(foundCase);
 
       // Rensa URL-parametrar
