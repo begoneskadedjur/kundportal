@@ -12,6 +12,7 @@ import TechnicianAuthModal from '../../components/admin/technicians/management/T
 import TechnicianModal from '../../components/admin/technicians/management/TechnicianModal'
 import AbaxVehicleModal from '../../components/admin/technicians/management/AbaxVehicleModal'
 import WorkScheduleModal from '../../components/admin/technicians/management/WorkScheduleModal'
+import TechnicianNotificationModal from '../../components/admin/technicians/management/TechnicianNotificationModal'
 
 import { technicianManagementService, type Technician, type TechnicianStats } from '../../services/technicianManagementService'
 
@@ -47,6 +48,8 @@ export default function TechnicianManagement() {
   const [authTechnician, setAuthTechnician] = useState<Technician | undefined>()
   const [isWorkScheduleModalOpen, setIsWorkScheduleModalOpen] = useState(false)
   const [editingScheduleFor, setEditingScheduleFor] = useState<Technician | undefined>()
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false)
+  const [editingNotificationsFor, setEditingNotificationsFor] = useState<Technician | undefined>()
 
   useEffect(() => {
     fetchTechnicians()
@@ -121,6 +124,11 @@ export default function TechnicianManagement() {
   const handleManageWorkSchedule = (technician: Technician) => {
     setEditingScheduleFor(technician)
     setIsWorkScheduleModalOpen(true)
+  }
+
+  const handleManageNotifications = (technician: Technician) => {
+    setEditingNotificationsFor(technician)
+    setIsNotificationModalOpen(true)
   }
 
   const handleToggleStatus = async (id: string, isActive: boolean) => {
@@ -344,6 +352,7 @@ export default function TechnicianManagement() {
               onDelete={handleDeleteTechnician}
               onManageAuth={handleManageAuth}
               onManageWorkSchedule={handleManageWorkSchedule}
+              onManageNotifications={handleManageNotifications}
             />
           ))}
         </div>
@@ -387,6 +396,18 @@ export default function TechnicianManagement() {
             fetchTechnicians()
           }}
           technician={editingScheduleFor}
+        />
+      )}
+
+      {editingNotificationsFor && (
+        <TechnicianNotificationModal
+          isOpen={isNotificationModalOpen}
+          onClose={() => setIsNotificationModalOpen(false)}
+          onSuccess={() => {
+            setIsNotificationModalOpen(false)
+            fetchTechnicians()
+          }}
+          technician={editingNotificationsFor}
         />
       )}
     </div>

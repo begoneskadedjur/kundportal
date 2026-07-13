@@ -14,7 +14,8 @@ interface EmailTemplateParams {
 }
 
 // Bas HTML-mall med responsiv design och dark mode stöd
-const baseTemplate = (content: string, title: string = 'Begone Skadedjur') => `
+// Exporterad så nya utskick (t.ex. teknikernotiser) kan återanvända layouten
+export const baseTemplate = (content: string, title: string = 'Begone Skadedjur') => `
 <!DOCTYPE html>
 <html lang="sv">
 <head>

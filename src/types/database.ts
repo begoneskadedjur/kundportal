@@ -179,6 +179,10 @@ export type Database = {
           updated_at: string
           abax_vehicle_id: string | null
           work_schedule: WorkSchedule | null // 🆕 TILLAGD WORK_SCHEDULE JSONB
+          // 🔔 Mailnotiser (opt-in, hanteras i modal på anvandarkonton-personal)
+          notify_on_booking: boolean
+          notify_on_reschedule: boolean
+          notify_on_unassignment: boolean
         }
         Insert: Omit<Database['public']['Tables']['technicians']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['technicians']['Insert']>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react' // useEffect lades till för att hantera klick utanför
 import {
   User, Mail, Phone, MapPin, MoreVertical, Edit,
-  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield
+  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell
 } from 'lucide-react'
 import Button from '../../../ui/Button'
 import { technicianManagementService, type Technician } from '../../../../services/technicianManagementService'
@@ -13,6 +13,7 @@ type TechnicianCardProps = {
   onDelete: (id: string) => void
   onManageAuth: (technician: Technician) => void
   onManageWorkSchedule: (technician: Technician) => void
+  onManageNotifications: (technician: Technician) => void
 }
 
 export default function TechnicianCard({
@@ -21,7 +22,8 @@ export default function TechnicianCard({
   onToggleStatus,
   onDelete,
   onManageAuth,
-  onManageWorkSchedule
+  onManageWorkSchedule,
+  onManageNotifications
 }: TechnicianCardProps) {
   const [showDropdown, setShowDropdown] = useState(false)
 
@@ -120,6 +122,18 @@ export default function TechnicianCard({
               >
                 <Clock className="w-4 h-4" />
                 Hantera arbetstider
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onManageNotifications(technician)
+                  setShowDropdown(false)
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2"
+              >
+                <Bell className="w-4 h-4" />
+                Mailnotiser
               </button>
               
               <button
