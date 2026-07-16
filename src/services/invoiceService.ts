@@ -370,7 +370,7 @@ export class InvoiceService {
     }
 
     if (filters?.search) {
-      query = query.or(`customer_name.ilike.%${filters.search}%,invoice_number.ilike.%${filters.search}%`)
+      query = query.or(`customer_name.ilike.%${filters.search}%,invoice_number.ilike.%${filters.search}%,organization_number.ilike.%${filters.search}%`)
     }
 
     const { data, error } = await query

@@ -74,6 +74,8 @@ interface Customer {
   products?: any
   product_summary?: string | null
   service_details?: string | null
+  customer_number?: number | null
+  customer_group_id?: string | null
   
   // Multisite fields
   organization_id?: string | null
@@ -122,6 +124,15 @@ export interface CustomerSite extends Customer {
 }
 
 export type PortalAccessStatus = 'full' | 'partial' | 'none'
+
+// Multisite-hantering: ett kontrakt med referens till enheten (customers-raden)
+// det tillhör. Används av sidopanelen för att lista organisationens ALLA avtal
+// och scopa modaler (fakturering/intäkter) till rätt enhet.
+export interface OrgContractRef extends ContractWithBilling {
+  siteId: string
+  siteName: string | null
+  siteCompanyName: string
+}
 
 export interface ConsolidatedCustomer {
   id: string // organization_id for multisite, customer.id for single
@@ -189,6 +200,10 @@ export interface ConsolidatedCustomer {
   // Multi-kontrakt-refaktor (Fas 5): totalt antal aktiva kontrakt över alla sites.
   // > 1 indikerar att kunden har flera Oneflow-avtal som faktureras separat.
   contractCount: number
+
+  // Alla riktiga (icke-synth) kontrakt i organisationen med enhetsreferens.
+  // För multisite: HK + alla enheters kontrakt. För single: kundens kontrakt.
+  allContracts: OrgContractRef[]
   
   // Status flags
   is_active: boolean
@@ -654,6 +669,7 @@ export function useConsolidatedCustomers() {
             highestChurnRisk: { score: 0, risk: 'low' as const, color: '#10b981', factors: [], tooltip: 'Low risk' },
             averageRenewalProbability: 0,
             contractCount: 0,
+            allContracts: [],
 
             is_active: huvudkontor.is_active || false,
             isTerminated: false,
@@ -670,8 +686,14 @@ export function useConsolidatedCustomers() {
         }
         
         const org = consolidatedMap.get(orgId)!
-        org.sites.push(customer)
-        
+        // Huvudkontoret hålls utanför sites — "enheter" är just enheterna.
+        // HK:s egna värden räknas ändå in i aggregaten nedan (aggRows), så
+        // äldre multisite-orgar där avtalet bor på HK (t.ex. Maserfrakt)
+        // behåller samma siffror som tidigare.
+        if (customer.site_type !== 'huvudkontor') {
+          org.sites.push(customer)
+        }
+
       } else {
         // Single-site customer
         consolidatedMap.set(customer.id, {
@@ -742,6 +764,14 @@ export function useConsolidatedCustomers() {
             : customer.contractProgress.daysRemaining,
           earliestContractStartDate: customer.contract_start_date,
           contractCount: customer.contracts.length,
+          allContracts: (customer.contracts ?? [])
+            .filter(c => !c.id.startsWith('synth-'))
+            .map(c => ({
+              ...c,
+              siteId: customer.id,
+              siteName: customer.site_name ?? null,
+              siteCompanyName: customer.company_name,
+            })),
 
           is_active: customer.is_active || false,
           isTerminated: !!customer.terminated_at,
@@ -760,10 +790,36 @@ export function useConsolidatedCustomers() {
     // Beräkna aggregerade värden för multisite-organisationer
     consolidatedMap.forEach((org, orgId) => {
       if (org.organizationType === 'multisite') {
-        const sites = org.sites
-        
-        // Aggregera värden
-        org.totalSites = sites.length
+        // Stabil enhetsordning i alla listor/väljare
+        org.sites.sort((a, b) =>
+          (a.site_name ?? a.company_name ?? '').localeCompare(b.site_name ?? b.company_name ?? '', 'sv')
+        )
+
+        // HK ligger inte i org.sites men ska ingå i aggregaten (äldre orgar bär
+        // avtalsdata på HK-raden). Guard mot dubbelräkning när headquarterCustomer
+        // är fallback till en enhet (org utan riktig huvudkontor-rad).
+        const hk = org.headquarterCustomer as CustomerSite | null
+        const sites = hk && !org.sites.some(s => s.id === hk.id)
+          ? [hk, ...org.sites]
+          : org.sites
+
+        // Alla riktiga kontrakt i organisationen, med enhetsreferens
+        org.allContracts = sites.flatMap(site =>
+          ((site.contracts ?? []) as ContractWithBilling[])
+            .filter(c => !c.id.startsWith('synth-'))
+            .map(c => ({
+              ...c,
+              siteId: site.id,
+              siteName: site.site_name ?? null,
+              siteCompanyName: site.company_name,
+            }))
+        ).sort((a, b) =>
+          (a.siteName ?? a.siteCompanyName).localeCompare(b.siteName ?? b.siteCompanyName, 'sv')
+          || ((a as any).display_order ?? 0) - ((b as any).display_order ?? 0)
+        )
+
+        // Aggregera värden — "enheter" räknar bara enheterna, inte HK
+        org.totalSites = org.sites.length
         org.contractCount = sites.reduce((sum, site) => sum + (site.contracts?.length ?? 0), 0)
         // Avropsavtal per site → ackumulerad debitering; normalavtal → annual_value × avtalstid
         // Adderar casesValue per site (adhoc) så att totalContractValue = premie × tid + utöver avtal
@@ -812,34 +868,6 @@ export function useConsolidatedCustomers() {
         
         org.pendingInvitationsCount = sites.filter(site => site.invitationStatus === 'pending').length
         
-        // Health metrics
-        const avgHealth = sites.reduce((sum, site) => sum + site.healthScore.score, 0) / sites.length
-        const worstHealth = sites.reduce((worst, site) => 
-          site.healthScore.score < worst ? site.healthScore.score : worst, 100
-        )
-        org.overallHealthScore = {
-          score: Math.round(avgHealth),
-          level: worstHealth >= 80 ? 'excellent' : worstHealth >= 60 ? 'good' : worstHealth >= 40 ? 'fair' : 'poor',
-          color: worstHealth >= 80 ? '#10b981' : worstHealth >= 60 ? '#f59e0b' : worstHealth >= 40 ? '#f97316' : '#ef4444',
-          breakdown: {
-            contractAge: { value: 0, weight: 0.25, score: 0 },
-            communicationFrequency: { value: 0, weight: 0.25, score: 0 },
-            supportTickets: { value: 0, weight: 0.25, score: 0 },
-            paymentHistory: { value: 0, weight: 0.25, score: 0 }
-          },
-          tooltip: `Health Score: ${Math.round(avgHealth)}/100`
-        }
-        
-        // Churn risk
-        const highestRisk = sites.reduce((max, site) => 
-          site.churnRisk.score > max.score ? site.churnRisk : max, 
-          { score: 0, risk: 'low' as const, color: '#10b981', factors: [], tooltip: 'Low risk' }
-        )
-        org.highestChurnRisk = highestRisk
-        
-        // Renewal probability
-        org.averageRenewalProbability = sites.reduce((sum, site) => sum + site.renewalProbability.probability, 0) / sites.length
-        
         // Next renewal — prefer effective_end_date if terminated
         const nextRenewal = sites
           .filter(site => site.effective_end_date || site.contract_end_date)
@@ -865,7 +893,26 @@ export function useConsolidatedCustomers() {
         if (earliestStart) {
           org.earliestContractStartDate = earliestStart.contract_start_date
         }
-        
+
+        // Health/churn/förnyelse på ORG-AGGREGAT i stället för per enhet.
+        // Per-enhet-beräkning straffar multisite systematiskt: varje enhet får
+        // "lågt kontraktsvärde" (<50k) + "första kontraktsperioden" fast
+        // organisationen som helhet är stor och stabil. Aggregatet använder
+        // summerad årspremie + tidigaste start/nästa förnyelse.
+        const aggBase = hk ?? org.sites[0]
+        if (aggBase) {
+          const aggCustomer = {
+            ...aggBase,
+            annual_value: org.totalAnnualValue,
+            total_contract_value: org.totalContractValue,
+            contract_start_date: org.earliestContractStartDate ?? aggBase.contract_start_date,
+            contract_end_date: org.nextRenewalDate ?? aggBase.contract_end_date,
+          }
+          org.overallHealthScore = calculateHealthScore(aggCustomer as any)
+          org.highestChurnRisk = calculateChurnRisk(aggCustomer as any)
+          org.averageRenewalProbability = calculateRenewalProbability(aggCustomer as any).probability
+        }
+
         // Status flags
         org.hasExpiringSites = sites.some(site => site.contractProgress.daysRemaining <= 90)
         org.hasHighRiskSites = sites.some(site => site.churnRisk.risk === 'high')

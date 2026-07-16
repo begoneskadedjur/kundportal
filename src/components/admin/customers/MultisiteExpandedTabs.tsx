@@ -12,6 +12,9 @@ interface MultisiteExpandedTabsProps {
   organization: ConsolidatedCustomer
   colSpan?: number
   contacts?: ContactSummary[]
+  // Klick på en enhet i Enheter-fliken → öppna enheten (sidopanel med
+  // enhetens avtal förvalt). Utan callback är raderna rena visningsrader.
+  onSiteClick?: (site: ConsolidatedCustomer['sites'][number]) => void
 }
 
 type TabKey = 'kontakt' | 'enheter' | 'ekonomi' | 'halsa'
@@ -49,7 +52,10 @@ const getContactName = (contact_person: string | null, contact_email: string, mu
 
 // === TAB: Kontakt ===
 function KontaktTab({ organization, contacts = [] }: { organization: ConsolidatedCustomer; contacts?: ContactSummary[] }) {
-  const verksamhetschef = organization.sites.find(site => site.site_type === 'huvudkontor') || organization.sites[0]
+  // HK ligger inte längre i sites-arrayen — läs från headquarterCustomer
+  const verksamhetschef = (organization.headquarterCustomer as any)
+    || organization.sites.find(site => site.site_type === 'huvudkontor')
+    || organization.sites[0]
   const verksamhetschefFromUsers = organization.multisiteUsers?.find(user => user.role_type === 'verksamhetschef')
   const verksamhetschefName = verksamhetschefFromUsers?.display_name
     || getContactName(organization.contact_person, organization.contact_email, organization.multisiteUsers)
@@ -216,7 +222,7 @@ function KontaktTab({ organization, contacts = [] }: { organization: Consolidate
 }
 
 // === TAB: Enheter ===
-function EnheterTab({ organization }: { organization: ConsolidatedCustomer }) {
+function EnheterTab({ organization, onSiteClick }: { organization: ConsolidatedCustomer; onSiteClick?: (site: ConsolidatedCustomer['sites'][number]) => void }) {
   const unitsWithArenden = organization.sites.filter(site => site.casesCount > 0)
 
   return (
@@ -247,7 +253,14 @@ function EnheterTab({ organization }: { organization: ConsolidatedCustomer }) {
           ) || []
 
           return (
-            <div key={site.id} className="bg-slate-800/50 rounded p-3 border border-slate-700/50">
+            <div
+              key={site.id}
+              onClick={onSiteClick ? () => onSiteClick(site) : undefined}
+              className={`bg-slate-800/50 rounded p-3 border border-slate-700/50 ${
+                onSiteClick ? 'cursor-pointer hover:border-slate-500 hover:bg-slate-800/80 transition-colors' : ''
+              }`}
+              title={onSiteClick ? 'Öppna enheten' : undefined}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <MapPin className="w-3 h-3 text-slate-500" />
@@ -255,8 +268,14 @@ function EnheterTab({ organization }: { organization: ConsolidatedCustomer }) {
                     {site.site_name || site.company_name}
                   </span>
                   {site.site_code && <span className="text-xs text-slate-500">({site.site_code})</span>}
+                  {site.customer_number != null && (
+                    <span className="text-[10px] font-mono text-[#20c58f]/70">#{site.customer_number}</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
+                  {site.annual_value != null && site.annual_value > 0 && (
+                    <span className="text-xs text-slate-400 font-mono">{formatCurrency(site.annual_value)}/år</span>
+                  )}
                   {site.casesCount > 0 && (
                     <span className="text-xs text-blue-400">{site.casesCount} ärenden</span>
                   )}
@@ -464,7 +483,7 @@ function HalsaTab({ organization }: { organization: ConsolidatedCustomer }) {
 }
 
 // === MAIN COMPONENT ===
-export default function MultisiteExpandedTabs({ organization, colSpan = 10, contacts }: MultisiteExpandedTabsProps) {
+export default function MultisiteExpandedTabs({ organization, colSpan = 10, contacts, onSiteClick }: MultisiteExpandedTabsProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('kontakt')
 
   return (
@@ -491,7 +510,7 @@ export default function MultisiteExpandedTabs({ organization, colSpan = 10, cont
         {/* Tab content */}
         <div className="max-w-4xl">
           {activeTab === 'kontakt' && <KontaktTab organization={organization} contacts={contacts} />}
-          {activeTab === 'enheter' && <EnheterTab organization={organization} />}
+          {activeTab === 'enheter' && <EnheterTab organization={organization} onSiteClick={onSiteClick} />}
           {activeTab === 'ekonomi' && <EkonomiTab organization={organization} />}
           {activeTab === 'halsa' && <HalsaTab organization={organization} />}
         </div>

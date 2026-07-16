@@ -8,7 +8,7 @@ import {
   Edit3, TrendingUp, RefreshCw, XCircle, Receipt, ExternalLink,
   Calendar, Coins, Activity, AlertTriangle, FileSignature,
 } from 'lucide-react'
-import type { ConsolidatedCustomer, ContactSummary } from '../../../hooks/useConsolidatedCustomers'
+import type { ConsolidatedCustomer, ContactSummary, CustomerSite, OrgContractRef } from '../../../hooks/useConsolidatedCustomers'
 import type { ContractWithBilling } from '../../../types/database'
 import { PriceListService } from '../../../services/priceListService'
 import { ImportedCustomerContractService } from '../../../services/importedCustomerContractService'
@@ -32,13 +32,18 @@ interface Props {
   onViewFullDetails: (org: ConsolidatedCustomer) => void
   onEdit: (org: ConsolidatedCustomer) => void
   // Multi-kontrakt-refaktor (Fas 12 bug D): scopa Intäkter-modal till valt avtal.
-  onViewRevenue: (org: ConsolidatedCustomer, contractId?: string | null) => void
+  // Multisite: scopeSite = enheten vars data ska visas (null = hela organisationen).
+  onViewRevenue: (org: ConsolidatedCustomer, contractId?: string | null, scopeSite?: CustomerSite | null) => void
   onRenewal: (org: ConsolidatedCustomer) => void
   onTerminate: (org: ConsolidatedCustomer) => void
   // Multi-kontrakt-refaktor (Fas 9): contractId scopas till valt avtal när
   // kunden har flera. null = sidopanelens "primärt avtal"-läge (1-kontrakt-kund).
-  onBillingSettings: (org: ConsolidatedCustomer, contractId?: string | null) => void
+  // Multisite: scopeSite = enheten kontraktet tillhör → modalen öppnas
+  // enhet-scopad (egen kundrad, ingen HK-konsolidering/propagering).
+  onBillingSettings: (org: ConsolidatedCustomer, contractId?: string | null, scopeSite?: CustomerSite | null) => void
   onContacts: (org: ConsolidatedCustomer) => void
+  // Multisite: öppna redigering för en specifik enhets kundrad (kundnummer m.m.)
+  onEditSite?: (org: ConsolidatedCustomer, site: CustomerSite) => void
 }
 
 const fmtSEK = (n: number) =>
@@ -131,6 +136,7 @@ export default function CustomerDetailSidePanel({
   onTerminate,
   onBillingSettings,
   onContacts,
+  onEditSite,
 }: Props) {
   const [priceListData, setPriceListData] = useState<{
     priceList: PriceList | null
@@ -153,27 +159,46 @@ export default function CustomerDetailSidePanel({
   // Multi-kontrakt-refaktor (Fas 9): valt avtal i sidopanelen. Synth-rader
   // (id 'synth-*') filtreras bort — de finns inte i DB och ger inget värde
   // i väljaren. Single-kontrakt-kunder ser ingen väljare.
-  const realContracts = useMemo<ContractWithBilling[]>(
-    () => ((primarySite as any)?.contracts ?? []).filter(
-      (c: ContractWithBilling) => !c.id.startsWith('synth-')
-    ),
-    [primarySite]
-  )
+  // Multisite: ALLA organisationens kontrakt (via allContracts, med enhets-
+  // referens) — inte bara sites[0]:s, som tidigare visade fel enhets avtal på HK.
+  const realContracts = useMemo<OrgContractRef[]>(() => {
+    if (!organization) return []
+    if (isMultisite) return organization.allContracts ?? []
+    return (((primarySite as any)?.contracts ?? []) as ContractWithBilling[])
+      .filter(c => !c.id.startsWith('synth-'))
+      .map(c => ({
+        ...c,
+        siteId: primarySite!.id,
+        siteName: primarySite!.site_name ?? null,
+        siteCompanyName: primarySite!.company_name,
+      }))
+  }, [organization, primarySite, isMultisite])
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null)
   useEffect(() => {
     // När panelen öppnas: prioritera initialContractId från listvyns per-avtal-
-    // klick. Validera att det fortfarande finns bland realContracts (annars
-    // fallback till första). Single-kontrakt-kunder får null när inga finns.
+    // klick. Multisite defaultar till null = "Hela organisationen" (aggregat);
+    // single-kunder till första riktiga avtalet.
     if (initialContractId && realContracts.some(c => c.id === initialContractId)) {
       setSelectedContractId(initialContractId)
+    } else if (isMultisite) {
+      setSelectedContractId(null)
     } else {
       setSelectedContractId(realContracts[0]?.id ?? null)
     }
-  }, [organization?.id, initialContractId, realContracts])
-  const selectedContract = useMemo<ContractWithBilling | null>(
-    () => realContracts.find(c => c.id === selectedContractId) ?? realContracts[0] ?? null,
-    [realContracts, selectedContractId]
+  }, [organization?.id, initialContractId, realContracts, isMultisite])
+  const selectedContract = useMemo<OrgContractRef | null>(
+    () => realContracts.find(c => c.id === selectedContractId)
+      ?? (isMultisite ? null : (realContracts[0] ?? null)),
+    [realContracts, selectedContractId, isMultisite]
   )
+  // Enheten som valt kontrakt tillhör — styr enhet-scopade modaler
+  const selectedSite = useMemo<CustomerSite | null>(() => {
+    if (!organization || !selectedContract) return null
+    const inSites = organization.sites.find(s => s.id === selectedContract.siteId)
+    if (inSites) return inSites
+    const hk = organization.headquarterCustomer as CustomerSite | null | undefined
+    return hk && hk.id === selectedContract.siteId ? hk : null
+  }, [organization, selectedContract])
 
   // Close on Escape — men inte när en modal är öppen ovanpå (dimmed)
   useEffect(() => {
@@ -275,8 +300,15 @@ export default function CustomerDetailSidePanel({
     && selectedDaysRemaining <= 90
 
   // Multi-kontrakt: använd valt kontrakts oneflow-id när satt, annars fallback
-  // till customers-fältet (synth/legacy).
-  const oneflowContractId = selectedContract?.oneflow_contract_id ?? primarySite?.oneflow_contract_id
+  // till customers-fältet (synth/legacy). Multisite i aggregat-läge har inget
+  // enskilt avtal → ingen avtalsknapp.
+  const oneflowContractId = selectedContract?.oneflow_contract_id
+    ?? (isMultisite ? null : primarySite?.oneflow_contract_id)
+
+  // Multisite med enhetsavtal: Fakturering kräver ett valt avtal — utan val
+  // skulle modalen falla tillbaka på HK-konsolidering som propagerar datum
+  // till alla enheter (farligt när enheterna bär egna avtal).
+  const billingRequiresSelection = isMultisite && realContracts.length > 0 && !selectedContract
 
   return (
     <>
@@ -358,15 +390,21 @@ export default function CustomerDetailSidePanel({
             Redigera
           </button>
           <button
-            onClick={() => onViewRevenue(organization, selectedContract?.id ?? null)}
+            onClick={() => onViewRevenue(organization, selectedContract?.id ?? null, selectedSite)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-[#20c58f]/10 text-[#20c58f] hover:bg-[#20c58f]/20 transition-colors"
           >
             <TrendingUp className="w-3.5 h-3.5" />
             Intäkter
           </button>
           <button
-            onClick={() => onBillingSettings(organization, selectedContract?.id ?? null)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+            onClick={() => !billingRequiresSelection && onBillingSettings(organization, selectedContract?.id ?? null, selectedSite)}
+            disabled={billingRequiresSelection}
+            title={billingRequiresSelection ? 'Välj ett avtal/enhet nedan först' : undefined}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+              billingRequiresSelection
+                ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+            }`}
           >
             <Receipt className="w-3.5 h-3.5" />
             Fakturering
@@ -407,10 +445,11 @@ export default function CustomerDetailSidePanel({
           )}
         </div>
 
-        {/* Multi-kontrakt-väljare: visas bara när kunden har > 1 riktigt avtal.
-            Pills/segmented control — klick byter sidopanelens innehåll till
-            valt avtal. Single-kontrakt-kunder ser ingen extra rad. */}
-        {realContracts.length > 1 && (
+        {/* Multi-kontrakt-väljare: visas när kunden har > 1 riktigt avtal, eller
+            för multisite med minst ett enhetsavtal (då med "Hela organisationen"
+            som aggregat-läge). Klick byter sidopanelens innehåll till valt avtal.
+            Single-kontrakt-kunder ser ingen extra rad. */}
+        {(realContracts.length > 1 || (isMultisite && realContracts.length > 0)) && (
           <div className="px-4 py-2 border-b border-slate-800 bg-slate-900/50">
             <div className="flex items-center gap-1.5 mb-1.5">
               <FileSignature className="w-3.5 h-3.5 text-[#20c58f]" />
@@ -419,8 +458,21 @@ export default function CustomerDetailSidePanel({
               </span>
             </div>
             <div className="flex flex-wrap gap-1.5">
+              {isMultisite && (
+                <button
+                  onClick={() => setSelectedContractId(null)}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
+                    !selectedContract
+                      ? 'bg-[#20c58f] text-white'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  Hela organisationen
+                </button>
+              )}
               {realContracts.map(contract => {
-                const label = contract.address_label
+                const label = (isMultisite && (contract.siteName || contract.siteCompanyName))
+                  || contract.address_label
                   || contract.contact_address
                   || `#${contract.oneflow_contract_id}`
                 const isActive = contract.id === selectedContract?.id
@@ -433,7 +485,7 @@ export default function CustomerDetailSidePanel({
                         ? 'bg-[#20c58f] text-white'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     }`}
-                    title={label}
+                    title={contract.address_label || contract.contact_address || String(label)}
                   >
                     {label}
                   </button>
@@ -511,7 +563,19 @@ export default function CustomerDetailSidePanel({
                   : organization.totalContractValue
                 const startDate = selectedContract?.contract_start_date ?? organization.earliestContractStartDate
                 const endDate = selectedContract?.contract_end_date ?? organization.nextRenewalDate
-                const contractTypeLabel = selectedContract?.contract_type ?? (primarySite as any)?.contract_type ?? null
+                // Aggregat-läge (multisite utan valt avtal): visa avtalstyp + antal
+                // när alla avtal delar typ, annars bara antalet.
+                let contractTypeLabel: string | null = selectedContract?.contract_type ?? null
+                if (!contractTypeLabel) {
+                  if (isMultisite && realContracts.length > 0) {
+                    const types = [...new Set(realContracts.map(c => c.contract_type).filter(Boolean))]
+                    contractTypeLabel = types.length === 1
+                      ? `${types[0]} (${realContracts.length} avtal)`
+                      : `${realContracts.length} avtal`
+                  } else {
+                    contractTypeLabel = (primarySite as any)?.contract_type ?? null
+                  }
+                }
                 return (
                   <>
                     {contractTypeLabel && (
@@ -690,28 +754,69 @@ export default function CustomerDetailSidePanel({
             </SectionCard>
           )}
 
-          {/* Multisite-enheter */}
+          {/* Multisite-enheter — klickbar rad väljer enhetens avtal; ikonknappar
+              öppnar Redigera (kundnummer m.m.), Fakturering och Intäkter
+              scopat till enhetens egen kundrad. */}
           {isMultisite && organization.sites.length > 0 && (
             <SectionCard title={`Enheter (${organization.sites.length})`} icon={Building2}>
-              <div className="max-h-60 overflow-y-auto space-y-1">
-                {organization.sites.map(site => (
-                  <div
-                    key={site.id}
-                    className="px-2.5 py-2 rounded-lg bg-slate-800/40 border border-slate-700/50 flex items-center justify-between gap-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-white truncate">{site.site_name || site.company_name || 'Enhet'}</div>
-                      {site.contact_address && (
-                        <div className="text-xs text-slate-500 truncate">{site.contact_address}</div>
-                      )}
-                    </div>
-                    {site.annual_value != null && site.annual_value > 0 && (
-                      <div className="text-xs text-slate-400 font-mono shrink-0">
-                        {fmtSEK(site.annual_value)}/år
+              <div className="max-h-72 overflow-y-auto space-y-1">
+                {organization.sites.map(site => {
+                  const siteContract = realContracts.find(c => c.siteId === site.id) ?? null
+                  const isSelected = selectedContract?.siteId === site.id
+                  return (
+                    <div
+                      key={site.id}
+                      onClick={() => siteContract && setSelectedContractId(siteContract.id)}
+                      className={`px-2.5 py-2 rounded-lg border flex items-center justify-between gap-2 transition-colors ${
+                        isSelected
+                          ? 'bg-[#20c58f]/10 border-[#20c58f]/40'
+                          : 'bg-slate-800/40 border-slate-700/50'
+                      } ${siteContract ? 'cursor-pointer hover:border-slate-500' : ''}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-white truncate flex items-center gap-1.5">
+                          {site.site_name || site.company_name || 'Enhet'}
+                          {site.customer_number != null && (
+                            <span className="text-[10px] font-mono text-[#20c58f]/70">#{site.customer_number}</span>
+                          )}
+                        </div>
+                        {site.contact_address && (
+                          <div className="text-xs text-slate-500 truncate">{site.contact_address}</div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {site.annual_value != null && site.annual_value > 0 && (
+                        <div className="text-xs text-slate-400 font-mono shrink-0">
+                          {fmtSEK(site.annual_value)}/år
+                        </div>
+                      )}
+                      <div className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                        {onEditSite && (
+                          <button
+                            onClick={() => onEditSite(organization, site)}
+                            className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors"
+                            title="Redigera enhet (kundnummer, kontakt m.m.)"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onBillingSettings(organization, siteContract?.id ?? null, site)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors"
+                          title="Faktureringsinställningar för enheten"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onViewRevenue(organization, null, site)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-[#20c58f] hover:bg-slate-700 transition-colors"
+                          title="Intäkter för enheten"
+                        >
+                          <TrendingUp className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </SectionCard>
           )}

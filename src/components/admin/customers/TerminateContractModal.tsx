@@ -59,8 +59,14 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
     setSaving(true)
 
     try {
-      // Uppdatera alla sites i organisationen
-      const siteIds = organization.sites.map(s => s.id)
+      // Uppdatera alla sites i organisationen — inkl. huvudkontoret, som
+      // inte längre ligger i sites-arrayen (org.isTerminated kräver att
+      // ALLA rader, även HK, har terminated_at)
+      const hkId = (organization.headquarterCustomer as any)?.id as string | undefined
+      const siteIds = [...new Set([
+        ...organization.sites.map((s: any) => s.id),
+        ...(hkId ? [hkId] : []),
+      ])]
 
       const terminatedAtIso = new Date().toISOString()
 

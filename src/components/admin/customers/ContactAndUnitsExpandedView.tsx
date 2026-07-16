@@ -36,8 +36,10 @@ export const ContactAndUnitsExpandedView: React.FC<ContactAndUnitsExpandedViewPr
   organization,
   colSpan = 10
 }) => {
-  // Hitta verksamhetschef - använd först organisation-nivå data, sedan huvudkontor site
-  const verksamhetschef = organization.sites.find(site => site.site_type === 'huvudkontor') 
+  // Hitta verksamhetschef - använd först organisation-nivå data, sedan huvudkontor
+  // (HK ligger inte längre i sites-arrayen — läs från headquarterCustomer)
+  const verksamhetschef = (organization.headquarterCustomer as any)
+    || organization.sites.find(site => site.site_type === 'huvudkontor')
     || organization.sites[0]
 
   // Hitta namn för verksamhetschef (förbättrad version)

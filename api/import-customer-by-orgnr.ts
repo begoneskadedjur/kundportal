@@ -540,8 +540,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               service_id: service.id,
               service_name: service.name,
               service_code: service.code ?? null,
+              // article_name + discounted_price är NOT NULL utan default —
+              // utan dem failar inserten tyst (upptäckt 2026-07-16, Pelican-setup)
+              article_name: service.name,
+              article_code: service.code ?? null,
               quantity: 1,
               unit_price: annual,
+              discounted_price: annual,
               total_price: annual,
               vat_rate: 25,
               price_source: 'standard',

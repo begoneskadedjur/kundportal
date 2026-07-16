@@ -597,9 +597,12 @@ export default function Customers() {
     const targetId = searchParams.get('customerId')
     if (!targetId || loading || consolidatedCustomers.length === 0) return
 
-    // Matcha både på organization-id och site-id (multisite kan länkas via site)
+    // Matcha på organization-id, site-id och huvudkontorets id (HK ligger
+    // inte längre i sites-arrayen)
     const match = consolidatedCustomers.find(org =>
-      org.id === targetId || org.sites.some(s => s.id === targetId)
+      org.id === targetId
+      || org.sites.some(s => s.id === targetId)
+      || (org.headquarterCustomer as any)?.id === targetId
     )
     if (!match) {
       toast.error('Kunden kunde inte hittas i listan')
@@ -760,6 +763,27 @@ export default function Customers() {
     setEditModalOpen(true)
   }
 
+  // Multisite: redigera en specifik ENHETS kundrad (kundnummer, kontakt m.m.)
+  const handleEditSite = (org: any, site: any) => {
+    setEditingCustomer(site)
+    setEditingOrgId(org.id)
+    setEditModalOpen(true)
+  }
+
+  // Multisite: scopa en org till EN enhet — modalerna (fakturering/intäkter)
+  // behandlar då enheten som en fristående kund: egen kundrad, ingen HK-
+  // konsolidering och ingen datum-propagering till syskon-enheter.
+  const scopeOrgToSite = (org: any, site: any) => ({
+    ...org,
+    organizationType: 'single',
+    company_name: site.company_name,
+    organization_number: site.organization_number ?? org.organization_number,
+    contact_email: site.contact_email,
+    customer_number: site.customer_number ?? null,
+    sites: [site],
+    headquarterCustomer: null,
+  })
+
   const handleCustomerSaved = (updatedCustomer: any) => {
     // Refresh the data to show updated information
     refresh()
@@ -777,9 +801,9 @@ export default function Customers() {
     setSingleCustomerDetailOpen(true)
   }
 
-  // Handle revenue modal
-  const handleViewRevenue = (organization: any, contractId: string | null = null) => {
-    setRevenueCustomer(organization)
+  // Handle revenue modal — scopeSite = visa bara den enhetens fakturor (multisite)
+  const handleViewRevenue = (organization: any, contractId: string | null = null, scopeSite: any = null) => {
+    setRevenueCustomer(scopeSite ? scopeOrgToSite(organization, scopeSite) : organization)
     setRevenueContractId(contractId)
     setRevenueModalOpen(true)
   }
@@ -794,8 +818,10 @@ export default function Customers() {
     setTerminateModalOpen(true)
   }
 
-  const handleBillingSettings = (organization: any, contractId: string | null = null) => {
-    setBillingSettingsOrg(organization)
+  const handleBillingSettings = (organization: any, contractId: string | null = null, scopeSite: any = null) => {
+    // Multisite med enhetsavtal: öppna alltid enhet-scopad (aldrig HK-läget,
+    // vars spara-flöde propagerar avtalsdatum till ALLA enheter).
+    setBillingSettingsOrg(scopeSite ? scopeOrgToSite(organization, scopeSite) : organization)
     setBillingSettingsContractId(contractId)
     setBillingSettingsOpen(true)
   }
@@ -1524,7 +1550,18 @@ export default function Customers() {
 
                               {/* Multisite-enheter inline-expand */}
                               {isExpanded && organization.organizationType === 'multisite' && (
-                                <MultisiteExpandedTabs organization={organization} colSpan={groupColSpan} contacts={orgContacts} />
+                                <MultisiteExpandedTabs
+                                  organization={organization}
+                                  colSpan={groupColSpan}
+                                  contacts={orgContacts}
+                                  onSiteClick={(site) => {
+                                    // Öppna sidopanelen med enhetens avtal förvalt
+                                    const siteContract = (organization.allContracts ?? [])
+                                      .find((c: any) => c.siteId === site.id)
+                                    setSidePanelOrg(organization)
+                                    setSidePanelContractId(siteContract?.id ?? null)
+                                  }}
+                                />
                               )}
                             </React.Fragment>
                           )
@@ -1843,6 +1880,7 @@ export default function Customers() {
           else handleViewSingleCustomerDetails(org)
         }}
         onEdit={handleEditCustomer}
+        onEditSite={handleEditSite}
         onViewRevenue={handleViewRevenue}
         onRenewal={handleStartRenewal}
         onTerminate={handleTerminate}
