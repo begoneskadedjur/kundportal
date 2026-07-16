@@ -38,6 +38,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
 import { InvoiceService } from '../../../services/invoiceService'
 import { FortnoxService } from '../../../services/fortnoxService'
+import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerResolver'
 import type { InvoiceWithItems, InvoiceStatus } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
 import { ROT_RUT_PERCENT } from '../../../types/caseBilling'
@@ -371,13 +372,22 @@ export default function InvoiceDetailModal({
     if (!invoice) return
     setSendingToFortnox(true)
     try {
-      // 1. Hämta kundnummer via org.nr
+      // 1. Hämta kundnummer — primärt via fakturans customer_id (exakt rad,
+      // klarar multisite-enheter som delar org.nr), fallback via org.nr för
+      // äldre fakturor utan customer_id. Org.nr-uppslaget är deterministiskt
+      // (äldsta raden med kundnummer) eftersom org.nr inte längre är unikt.
       let customerNumber: number | null = null
-      if (invoice.organization_number) {
+      if (invoice.customer_id) {
+        customerNumber = await resolveFortnoxCustomerNumber(invoice.customer_id)
+      }
+      if (!customerNumber && invoice.organization_number) {
         const { data: customerData } = await supabase
           .from('customers')
           .select('customer_number')
           .eq('organization_number', invoice.organization_number)
+          .not('customer_number', 'is', null)
+          .order('created_at', { ascending: true })
+          .limit(1)
           .maybeSingle()
         customerNumber = (customerData as any)?.customer_number ?? null
       }

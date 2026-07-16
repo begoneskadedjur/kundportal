@@ -11,6 +11,7 @@ import {
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
 import { FortnoxService } from '../../../services/fortnoxService'
+import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerResolver'
 import { supabase } from '../../../lib/supabase'
 import type { ContractInvoice, BillingFrequency } from '../../../types/contractBilling'
 import { BILLING_ITEM_STATUS_CONFIG, BILLING_FREQUENCY_CONFIG, formatBillingAmount, formatBillingPeriod } from '../../../types/contractBilling'
@@ -290,15 +291,19 @@ export function ContractInvoiceModal({
     if (!invoice || !customerId) return
     setSendingToFortnox(true)
     try {
-      // Validera att kunden har kundnummer
-      if (!invoice.customer.customer_number) {
+      // Validera att kunden har kundnummer. Multisite-enheter kan sakna eget
+      // nummer och faktureras då mot sitt juridiska bolags Fortnox-kund
+      // (samma org.nr inom organisationen) via resolvern.
+      const resolvedCustomerNumber = invoice.customer.customer_number
+        ?? await resolveFortnoxCustomerNumber(customerId)
+      if (!resolvedCustomerNumber) {
         toast.error('Kunden saknar kundnummer — tilldela ett kundnummer på kundkortet innan du skapar utkast i Fortnox')
         return
       }
 
       // 1. Hämta eller skapa kund i Fortnox
       const fortnoxCustomerNumber = await FortnoxService.findOrCreateCustomer({
-        customer_number: invoice.customer.customer_number,
+        customer_number: resolvedCustomerNumber,
         company_name: invoice.customer.company_name,
         organization_number: invoice.customer.organization_number,
         billing_email: invoice.customer.billing_email,

@@ -878,28 +878,36 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
       console.log('✅ Kund finns redan med OneFlow contract ID:', existingCustomerId)
     }
     
-    // Om inte hittat och vi har org nummer, kolla org nummer
+    // Om inte hittat och vi har org nummer, kolla org nummer.
+    // Org.nr är inte unikt (multisite-enheter kan dela juridiskt bolag) —
+    // .single() felar tyst vid >1 träff. Välj deterministiskt: huvudkontor
+    // först, därefter äldsta raden.
     if (!existingCustomerId && contract.organization_number) {
-      const { data: existingByOrg } = await supabase
+      const { data: orgMatches } = await supabase
         .from('customers')
-        .select('id')
+        .select('id, site_type')
         .eq('organization_number', contract.organization_number)
-        .single()
-      
-      if (existingByOrg) {
-        existingCustomerId = existingByOrg.id
+        .order('created_at', { ascending: true })
+        .limit(10)
+
+      const preferred = (orgMatches ?? []).find(c => c.site_type === 'huvudkontor') ?? orgMatches?.[0]
+      if (preferred) {
+        existingCustomerId = preferred.id
         console.log('✅ Kund finns redan med org nummer:', existingCustomerId)
       }
     }
-    
-    // Om inte hittat, kolla email
+
+    // Om inte hittat, kolla email (samma delade kontaktperson kan finnas på
+    // flera rader — ta äldsta i stället för att fela tyst vid >1 träff)
     if (!existingCustomerId) {
       const { data: existingByEmail } = await supabase
         .from('customers')
         .select('id')
         .eq('contact_email', contract.contact_email)
-        .single()
-      
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+
       if (existingByEmail) {
         existingCustomerId = existingByEmail.id
         console.log('✅ Kund finns redan med email:', existingCustomerId)
@@ -1427,42 +1435,51 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               })
               
               // Sök efter befintlig kund
+              // Org.nr/email/namn är inte unika (multisite-enheter kan dela
+              // juridiskt bolag och kontaktperson) — .single() felar tyst vid
+              // >1 träff. Välj deterministiskt: huvudkontor först, sedan äldst.
               // 1. Baserat på organisationsnummer
               if (contractData.organization_number) {
-                const { data: customerByOrg } = await supabase
+                const { data: orgMatches } = await supabase
                   .from('customers')
-                  .select('id')
+                  .select('id, site_type')
                   .eq('organization_number', contractData.organization_number)
-                  .single()
-                
-                if (customerByOrg) {
-                  customerId = customerByOrg.id
+                  .order('created_at', { ascending: true })
+                  .limit(10)
+
+                const preferred = (orgMatches ?? []).find(c => c.site_type === 'huvudkontor') ?? orgMatches?.[0]
+                if (preferred) {
+                  customerId = preferred.id
                   console.log('✅ Kund hittad via org.nr:', customerId)
                 }
               }
-              
+
               // 2. Om inte hittat, sök på email
               if (!customerId && contractData.contact_email) {
                 const { data: customerByEmail } = await supabase
                   .from('customers')
                   .select('id')
                   .eq('contact_email', contractData.contact_email)
-                  .single()
-                
+                  .order('created_at', { ascending: true })
+                  .limit(1)
+                  .maybeSingle()
+
                 if (customerByEmail) {
                   customerId = customerByEmail.id
                   console.log('✅ Kund hittad via email:', customerId)
                 }
               }
-              
+
               // 3. Om inte hittat, sök på företagsnamn
               if (!customerId && contractData.company_name) {
                 const { data: customerByName } = await supabase
                   .from('customers')
                   .select('id')
                   .eq('company_name', contractData.company_name)
-                  .single()
-                
+                  .order('created_at', { ascending: true })
+                  .limit(1)
+                  .maybeSingle()
+
                 if (customerByName) {
                   customerId = customerByName.id
                   console.log('✅ Kund hittad via företagsnamn:', customerId)

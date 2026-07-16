@@ -381,11 +381,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const normalized = normalizeOrgNr(String(customer_data.organization_number || ''))
 
-      // Dublettkoll igen (säkerhet)
+      // Dublettkoll igen (säkerhet). limit(1) + order i stället för ren
+      // maybeSingle: org.nr är inte längre unikt (multisite-enheter kan dela
+      // juridiskt bolag) och maybeSingle felar tyst vid >1 träff, vilket
+      // skulle släppa igenom importen i stället för att blockera den.
       const { data: existing } = await supabase
         .from('customers')
         .select('id, company_name')
         .eq('organization_number', normalized)
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle()
 
       if (existing) {
@@ -570,11 +575,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('🔍 Preview för org.nr:', normalized)
 
-    // Dublettkoll
+    // Dublettkoll (limit(1): org.nr kan förekomma på flera rader — multisite)
     const { data: existing } = await supabase
       .from('customers')
       .select('id, company_name, customer_number')
       .eq('organization_number', normalized)
+      .order('created_at', { ascending: true })
+      .limit(1)
       .maybeSingle()
 
     if (existing) {
