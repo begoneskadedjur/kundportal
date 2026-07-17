@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
-import { FortnoxService } from '../../../services/fortnoxService'
+import { FortnoxService, isPersonnummer } from '../../../services/fortnoxService'
 import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerResolver'
 import { supabase } from '../../../lib/supabase'
 import type { ContractInvoice, BillingFrequency } from '../../../types/contractBilling'
@@ -301,13 +301,18 @@ export function ContractInvoiceModal({
         return
       }
 
-      // 1. Hämta eller skapa kund i Fortnox
+      // 1. Hämta eller skapa kund i Fortnox. Privatpersoner med avtal får
+      // Type=PRIVATE, 10 dagars villkor och priser inkl. moms på kundkortet.
+      const isPrivatePerson = isPersonnummer(invoice.customer.organization_number)
       const fortnoxCustomerNumber = await FortnoxService.findOrCreateCustomer({
         customer_number: resolvedCustomerNumber,
         company_name: invoice.customer.company_name,
         organization_number: invoice.customer.organization_number,
         billing_email: invoice.customer.billing_email,
         billing_address: invoice.customer.billing_address,
+        customer_type: isPrivatePerson ? 'PRIVATE' : 'COMPANY',
+        terms_of_payment: isPrivatePerson ? '10' : null,
+        show_price_vat_included: isPrivatePerson ? true : undefined,
       })
 
       // 2. Säkerställ att artiklar finns i Fortnox, bygg sedan fakturarader

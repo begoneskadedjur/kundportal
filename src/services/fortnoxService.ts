@@ -86,6 +86,40 @@ export interface FortnoxInvoice {
   FinalPayDate: string | null
 }
 
+/**
+ * Delar upp en svensk enradsadress ("Gatan 1, 123 45 Ort, Sverige") i
+ * Fortnox-fälten Address1 / ZipCode / City. Returnerar hela strängen som
+ * Address1 om postnummer inte kan hittas.
+ */
+export function parseSwedishAddress(address: string | null | undefined): {
+  address1: string | null
+  zipCode: string | null
+  city: string | null
+} {
+  if (!address) return { address1: null, zipCode: null, city: null }
+  const cleaned = address.replace(/,?\s*Sverige\s*$/i, '').trim()
+  const m = cleaned.match(/^(.*?),?\s*(\d{3}\s?\d{2})\s+(.+)$/)
+  if (!m) return { address1: cleaned || null, zipCode: null, city: null }
+  return {
+    address1: m[1].replace(/,\s*$/, '').trim() || null,
+    zipCode: m[2].replace(/\s+/, ' ').trim(),
+    city: m[3].replace(/,\s*$/, '').trim() || null,
+  }
+}
+
+/**
+ * Skiljer personnummer från organisationsnummer: i personnummer är
+ * månadssiffrorna (position 3-4) 01-12, i org.nr är mittparet alltid >= 20.
+ */
+export function isPersonnummer(nr: string | null | undefined): boolean {
+  if (!nr) return false
+  const digits = nr.replace(/\D/g, '')
+  const core = digits.length === 12 ? digits.slice(2) : digits
+  if (core.length !== 10) return false
+  const month = parseInt(core.slice(2, 4), 10)
+  return month >= 1 && month <= 12
+}
+
 export const FortnoxService = {
   // Anslutningsstatus
   async getConnectionStatus(): Promise<{ connected: boolean; companyName?: string }> {
@@ -155,13 +189,24 @@ export const FortnoxService = {
     await fortnoxRequest(`invoices/${documentNumber}/cancel`, 'PUT')
   },
 
-  // Hämta eller skapa kund i Fortnox baserat på vårt customer_number
+  // Hämta eller skapa kund i Fortnox baserat på vårt customer_number.
+  // Befintliga Fortnox-kunder lämnas orörda (ekonomi äger deras inställningar);
+  // de extra fälten används bara när kunden skapas.
   async findOrCreateCustomer(customer: {
     customer_number: number
     company_name: string
     organization_number?: string | null
     billing_email?: string | null
     billing_address?: string | null
+    phone?: string | null
+    // 'PRIVATE' | 'COMPANY'. Utelämnad → härleds från org-/personnummer.
+    customer_type?: 'PRIVATE' | 'COMPANY'
+    // Kod i Fortnox betalningsvillkor, t.ex. '10' | '20' | '30'
+    terms_of_payment?: string | null
+    // "Priser inkl. moms" på kundkortet (privatpersoner = true)
+    show_price_vat_included?: boolean
+    // Vår referens — teknikerns namn
+    our_reference?: string | null
   }): Promise<string> {
     const customerNumberStr = String(customer.customer_number)
 
@@ -177,17 +222,59 @@ export const FortnoxService = {
       // Kund finns inte — skapa ny
     }
 
+    // Härled kundtyp om den inte skickats in
+    const type = customer.customer_type
+      ?? (isPersonnummer(customer.organization_number) ? 'PRIVATE' : 'COMPANY')
+
+    // Dela upp fakturaadressen i gata/postnr/ort så Fortnox-kortet blir komplett
+    const addr = parseSwedishAddress(customer.billing_address)
+
     // Skapa ny kund i Fortnox med vårt kundnummer
     const newCustomer = await fortnoxRequest<{ Customer: FortnoxCustomer }>('customers', 'POST', {
       Customer: {
         CustomerNumber: customerNumberStr,
         Name: customer.company_name,
+        Type: type,
         ...(customer.organization_number ? { OrganisationNumber: customer.organization_number } : {}),
-        ...(customer.billing_email ? { EmailInvoice: customer.billing_email } : {}),
-        ...(customer.billing_address ? { Address1: customer.billing_address } : {}),
+        ...(customer.billing_email ? { EmailInvoice: customer.billing_email, Email: customer.billing_email } : {}),
+        ...(addr.address1 ? { Address1: addr.address1 } : {}),
+        ...(addr.zipCode ? { ZipCode: addr.zipCode } : {}),
+        ...(addr.city ? { City: addr.city } : {}),
+        ...(customer.phone ? { Phone1: customer.phone } : {}),
+        ...(customer.terms_of_payment ? { TermsOfPayment: customer.terms_of_payment } : {}),
+        ...(customer.show_price_vat_included != null ? { ShowPriceVATIncluded: customer.show_price_vat_included } : {}),
+        ...(customer.our_reference ? { OurReference: customer.our_reference } : {}),
       },
     })
     return newCustomer.Customer.CustomerNumber
+  },
+
+  // Registrera ROT/RUT-avdrag (fastighetsbeteckning + belopp) för en skapad
+  // faktura. Fortnox kräver detta som separat resurs — fakturan bär bara
+  // TaxReductionType + husarbetesflaggor per rad.
+  async createTaxReduction(reduction: {
+    asked_amount: number
+    customer_name: string
+    property_designation: string
+    document_number: string
+    social_security_number?: string | null
+    residence_association_org_nr?: string | null
+  }): Promise<void> {
+    await fortnoxRequest('taxreductions', 'POST', {
+      TaxReduction: {
+        AskedAmount: Math.round(reduction.asked_amount),
+        CustomerName: reduction.customer_name,
+        PropertyDesignation: reduction.property_designation,
+        ReferenceDocumentType: 'INVOICE',
+        ReferenceNumber: reduction.document_number,
+        ...(reduction.social_security_number
+          ? { SocialSecurityNumber: reduction.social_security_number }
+          : {}),
+        ...(reduction.residence_association_org_nr
+          ? { ResidenceAssociationOrganisationNumber: reduction.residence_association_org_nr }
+          : {}),
+      },
+    })
   },
 
   // Hämta eller skapa artikel i Fortnox baserat på vårt article_code

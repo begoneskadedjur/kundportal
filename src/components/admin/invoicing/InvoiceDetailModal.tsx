@@ -39,6 +39,7 @@ import { supabase } from '../../../lib/supabase'
 import { InvoiceService } from '../../../services/invoiceService'
 import { FortnoxService } from '../../../services/fortnoxService'
 import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerResolver'
+import { isPersonnummer } from '../../../services/fortnoxService'
 import type { InvoiceWithItems, InvoiceStatus } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
 import { ROT_RUT_PERCENT } from '../../../types/caseBilling'
@@ -397,31 +398,9 @@ export default function InvoiceDetailModal({
         return
       }
 
-      // 2. Hämta eller skapa kund i Fortnox
-      const fortnoxCustomerNumber = await FortnoxService.findOrCreateCustomer({
-        customer_number: customerNumber,
-        company_name: invoice.customer_name,
-        organization_number: invoice.organization_number,
-        billing_email: invoice.customer_email,
-        billing_address: invoice.customer_address,
-      })
-
-      // 2b. Säkerställ att alla artiklar/tjänster finns i Fortnox innan fakturan skickas.
-      // Vi använder våra interna service-/artikelkoder som ArticleNumber.
-      // Saknas artikeln i Fortnox skapas den (Type: SERVICE, med unit + VAT).
-      await FortnoxService.ensureArticlesExistForInvoiceItems(
-        invoice.items.map(i => ({
-          article_code: i.article_code,
-          article_name: i.article_name,
-          vat_rate: i.vat_rate,
-        }))
-      )
-
-      // 2c. Hämta ärende-metadata för berikning av Fortnox-payloaden
-      // (leveransdatum, teknikerns namn, ärendenummer för spårbarhet).
-      // Ad-hoc/avtalsfakturor (case_type=null) ligger i 'cases' (contract) med ANDRA
-      // kolumnnamn (scheduled_start/primary_technician_name) — normalisera till samma form.
-      let caseMeta: {
+      // 1b. Hämta ärende-metadata FÖRE kundskapandet — teknikerns namn ska in
+      // som Vår referens på både kundkortet och fakturan.
+      let caseMetaEarly: {
         case_number?: string | null
         completed_date?: string | null
         start_date?: string | null
@@ -436,7 +415,7 @@ export default function InvoiceDetailModal({
             .maybeSingle()
           if (data) {
             const d = data as any
-            caseMeta = {
+            caseMetaEarly = {
               case_number: d.case_number,
               completed_date: d.completed_date,
               start_date: d.scheduled_start,
@@ -450,11 +429,52 @@ export default function InvoiceDetailModal({
             .select('case_number, completed_date, start_date, primary_assignee_name')
             .eq('id', invoice.case_id)
             .maybeSingle()
-          caseMeta = (data as any) || null
+          caseMetaEarly = (data as any) || null
         }
       }
+      const technicianName = caseMetaEarly?.primary_assignee_name ?? null
 
-      // 3. Bygg fakturarader
+      // 2. Hämta eller skapa kund i Fortnox.
+      // Privatpersoner: Type=PRIVATE, 10 dagars betalningsvillkor, priser inkl.
+      // moms på kundkortet. Företag: Type=COMPANY. Teknikern sätts som Vår
+      // referens. Adressen delas upp i gata/postnr/ort i fortnoxService.
+      const isPrivatePerson = invoice.case_type === 'private'
+        || (invoice.case_type == null && isPersonnummer(invoice.organization_number))
+      const fortnoxCustomerNumber = await FortnoxService.findOrCreateCustomer({
+        customer_number: customerNumber,
+        company_name: invoice.customer_name,
+        organization_number: invoice.organization_number,
+        billing_email: invoice.customer_email,
+        billing_address: invoice.customer_address,
+        phone: invoice.customer_phone,
+        customer_type: isPrivatePerson ? 'PRIVATE' : 'COMPANY',
+        terms_of_payment: isPrivatePerson ? '10' : null,
+        show_price_vat_included: isPrivatePerson ? true : undefined,
+        our_reference: technicianName,
+      })
+
+      // 2b. Säkerställ att alla artiklar/tjänster finns i Fortnox innan fakturan skickas.
+      // Vi använder våra interna service-/artikelkoder som ArticleNumber.
+      // Saknas artikeln i Fortnox skapas den (Type: SERVICE, med unit + VAT).
+      await FortnoxService.ensureArticlesExistForInvoiceItems(
+        invoice.items.map(i => ({
+          article_code: i.article_code,
+          article_name: i.article_name,
+          vat_rate: i.vat_rate,
+        }))
+      )
+
+      // 2c. Ärende-metadata hämtades i steg 1b (behövdes redan för kundkortet)
+      const caseMeta = caseMetaEarly
+
+      // 3. Bygg fakturarader. ROT/RUT markeras PER RAD (HouseWork +
+      // HouseWorkType) — det är så Fortnox API:t fungerar; fakturanivåns
+      // TaxReductionType sätts i steg 4. HouseWorkType-kategorierna är
+      // Skatteverkets: ROT → CONSTRUCTION, RUT → CLEANING som standard.
+      const houseWorkTypeFor = (rotRut: string | null | undefined) =>
+        rotRut?.toUpperCase() === 'ROT' ? 'CONSTRUCTION'
+        : rotRut?.toUpperCase() === 'RUT' ? 'CLEANING'
+        : undefined
       const invoiceRows = invoice.items.map(item => ({
         ArticleNumber: item.article_code || undefined,
         Description: item.article_name,
@@ -462,6 +482,9 @@ export default function InvoiceDetailModal({
         Price: item.unit_price,
         VAT: item.vat_rate,
         ...(item.discount_percent > 0 ? { Discount: item.discount_percent, DiscountType: 'PERCENT' } : {}),
+        ...((item as any).rot_rut_type && invoice.fastighetsbeteckning
+          ? { HouseWork: true, HouseWorkType: houseWorkTypeFor((item as any).rot_rut_type) }
+          : {}),
       }))
 
       // 4. Skapa faktura i Fortnox
@@ -495,18 +518,35 @@ export default function InvoiceDetailModal({
       if (invoice.invoice_marking) fortnoxPayload.YourReference = invoice.invoice_marking
       if (invoice.notes) fortnoxPayload.Remarks = invoice.notes
 
-      // ROT/RUT
+      // ROT/RUT: fakturanivån bär bara typen ('rot'/'rut'); raderna är
+      // flaggade i steg 3, och fastighetsbeteckning + avdragsbelopp
+      // registreras via taxreductions-resursen efter att fakturan skapats.
       if (invoice.rot_rut_type && invoice.fastighetsbeteckning) {
-        const rotRutSummary = calculateRotRutSummary(invoice.items)
-        fortnoxPayload.HouseWork = true
-        fortnoxPayload.HouseWorkType = invoice.rot_rut_type.toUpperCase()
-        fortnoxPayload.Housework = {
-          HouseWorkType: invoice.rot_rut_type.toUpperCase(),
-          HouseWorkAmount: Math.round(rotRutSummary.totalDeduction),
-        }
+        fortnoxPayload.TaxReductionType = invoice.rot_rut_type.toLowerCase()
       }
 
       const fortnoxInvoice = await FortnoxService.createInvoice(fortnoxPayload)
+
+      // 4b. Registrera ROT/RUT-avdraget (fastighetsbeteckning) mot fakturan.
+      // Fel här får inte stoppa flödet — fakturan finns redan i Fortnox;
+      // admin kompletterar avdraget manuellt om registreringen misslyckas.
+      if (invoice.rot_rut_type && invoice.fastighetsbeteckning) {
+        try {
+          const rotRutSummary = calculateRotRutSummary(invoice.items)
+          await FortnoxService.createTaxReduction({
+            asked_amount: rotRutSummary.totalDeduction,
+            customer_name: invoice.customer_name,
+            property_designation: invoice.fastighetsbeteckning,
+            document_number: fortnoxInvoice.DocumentNumber,
+            social_security_number: isPrivatePerson ? invoice.organization_number : null,
+          })
+        } catch (trErr: any) {
+          console.error('TaxReduction-registrering misslyckades:', trErr)
+          toast.error(
+            `Fakturan skapades (nr ${fortnoxInvoice.DocumentNumber}) men ROT/RUT-avdraget kunde inte registreras automatiskt — komplettera fastighetsbeteckningen i Fortnox. (${trErr?.message ?? 'okänt fel'})`
+          )
+        }
+      }
 
       // 5. Spara DocumentNumber på fakturan
       await supabase
