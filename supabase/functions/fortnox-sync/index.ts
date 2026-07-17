@@ -194,6 +194,21 @@ async function syncFortnoxInvoice(documentNumber: string, accessToken: string): 
     }
   }
 
+  // Bokförd är ett faktum oberoende av pipelinesteg. När fakturan hunnit bli
+  // både bokförd och skickad mellan två synkar landar status direkt på
+  // sent/overdue/paid och booked_at sattes aldrig — fyll i den i efterhand
+  // (bara där den saknas, så en tidigare stämpel inte skrivs över).
+  if (invoice.Booked === true && targetStatus !== 'booked') {
+    await supabase.from('invoices')
+      .update({ booked_at: timestamp })
+      .eq('fortnox_document_number', documentNumber)
+      .is('booked_at', null)
+    await supabase.from('contract_billing_items')
+      .update({ booked_at: timestamp })
+      .eq('fortnox_document_number', documentNumber)
+      .is('booked_at', null)
+  }
+
   return { documentNumber, fortnoxStatus: targetStatus, invoicesUpdated, contractItemsUpdated }
 }
 
