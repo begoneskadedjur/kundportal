@@ -1,8 +1,9 @@
 // src/components/coordinator/layout/CoordinatorTopHeader.tsx
 import { useState, useEffect } from 'react'
-import { useLocation, Link, useNavigate } from 'react-router-dom'
-import { ChevronRight, Search, RefreshCw, Bell, Shield } from 'lucide-react'
+import { useLocation, Link } from 'react-router-dom'
+import { ChevronRight, Search, RefreshCw, Bell } from 'lucide-react'
 import { breadcrumbMap } from './coordinatorNavConfig'
+import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getTicketStats } from '../../../services/communicationService'
 
@@ -13,8 +14,7 @@ interface CoordinatorTopHeaderProps {
 
 export function CoordinatorTopHeader({ sidebarCollapsed, userName }: CoordinatorTopHeaderProps) {
   const location = useLocation()
-  const navigate = useNavigate()
-  const { profile, hasDualRole, setActiveView } = useAuth()
+  const { profile } = useAuth()
   const currentLabel = breadcrumbMap[location.pathname] || 'Översikt'
   const [ticketCount, setTicketCount] = useState(0)
 
@@ -63,16 +63,7 @@ export function CoordinatorTopHeader({ sidebarCollapsed, userName }: Coordinator
             </span>
           )}
         </Link>
-        {hasDualRole && (
-          <button
-            onClick={() => { setActiveView('admin'); navigate('/admin/dashboard') }}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-all"
-            title="Byt till Admin-vy"
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">Admin-vy</span>
-          </button>
-        )}
+        <ViewSwitcher currentView="koordinator" variant="header" />
         <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
           <span className="text-white text-xs font-bold">{userName.charAt(0).toUpperCase()}</span>
         </div>

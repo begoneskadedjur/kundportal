@@ -11,10 +11,37 @@ type Profile = {
   id: string; email: string; is_admin: boolean; is_active: boolean;
   customer_id: string | null; user_id: string; technician_id?: string | null;
   role?: 'admin' | 'customer' | 'technician' | 'koordinator' | 'säljare'; display_name?: string | null;
+  extra_roles?: string[] | null;
   technicians?: { name: string; role: string; email: string; } | null;
 };
 
-type ActiveView = 'admin' | 'technician';
+export type ActiveView = 'admin' | 'koordinator' | 'technician' | 'säljare';
+
+// Sökvägar till respektive portals startsida
+export const VIEW_PATHS: Record<ActiveView, string> = {
+  admin: '/admin/dashboard',
+  koordinator: '/koordinator/dashboard',
+  technician: '/technician/dashboard',
+  säljare: '/saljare/dashboard',
+};
+
+export const VIEW_LABELS: Record<ActiveView, string> = {
+  admin: 'Admin',
+  koordinator: 'Koordinator',
+  technician: 'Tekniker',
+  säljare: 'Säljare',
+};
+
+// Vilka portalvyer en profil har rätt till: primärroll + extra_roles (+ is_admin för bakåtkompat)
+function computeAvailableViews(p: Pick<Profile, 'role' | 'is_admin' | 'extra_roles'> | null): ActiveView[] {
+  if (!p) return [];
+  const effective = new Set<string>();
+  if (p.role) effective.add(p.role);
+  if (p.is_admin) effective.add('admin');
+  for (const r of p.extra_roles || []) effective.add(r);
+  const order: ActiveView[] = ['admin', 'koordinator', 'technician', 'säljare'];
+  return order.filter(v => effective.has(v));
+}
 
 type AuthContextType = {
   user: User | null; profile: Profile | null; loading: boolean;
@@ -26,6 +53,7 @@ type AuthContextType = {
   isKoordinator: boolean;
   isSäljare: boolean;
   hasDualRole: boolean;
+  availableViews: ActiveView[];
   activeView: ActiveView;
   setActiveView: (view: ActiveView) => void;
 };
@@ -71,20 +99,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let targetPath = '/login';
         switch (profileData.role) {
           case 'admin':
-            targetPath = '/admin/dashboard';
-            break;
           case 'koordinator':
-            targetPath = '/koordinator/dashboard';
+          case 'technician': {
+            // Landa i senast använda vy om användaren har flera portalvyer
+            const views = computeAvailableViews(profileData);
+            const savedView = localStorage.getItem('begone_active_view') as ActiveView | null;
+            const view = savedView && views.includes(savedView) ? savedView : views[0];
+            targetPath = VIEW_PATHS[view] || '/login';
+            if (view && view !== activeView) setActiveViewState(view);
             break;
-          case 'technician':
-            if (profileData.is_admin) {
-              // Dual-role: navigera baserat på sparad activeView
-              const savedView = localStorage.getItem('begone_active_view') || 'admin';
-              targetPath = savedView === 'technician' ? '/technician/dashboard' : '/admin/dashboard';
-            } else {
-              targetPath = '/technician/dashboard';
-            }
-            break;
+          }
           case 'customer':
             // Check if this is a multisite user (customer_id is null but has multisite role)
             if (profileData.customer_id) {
@@ -212,7 +236,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isCustomer = profile?.role === 'customer';
   const isKoordinator = profile?.role === 'koordinator';
   const isSäljare = profile?.role === 'säljare';
-  const hasDualRole = profile?.role === 'technician' && profile?.is_admin === true;
+  const availableViews = computeAvailableViews(profile);
+  const hasDualRole = availableViews.length > 1;
 
   const setActiveView = (view: ActiveView) => {
     setActiveViewState(view);
@@ -231,6 +256,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isKoordinator,
     isSäljare,
     hasDualRole,
+    availableViews,
     activeView,
     setActiveView,
   };

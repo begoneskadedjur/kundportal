@@ -7,7 +7,7 @@ import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
 import Select from '../../../ui/Select'
 
-import { technicianManagementService, type Technician, type TechnicianFormData } from '../../../../services/technicianManagementService'
+import { technicianManagementService, type Technician, type TechnicianFormData, type ExtraPortalRole } from '../../../../services/technicianManagementService'
 import toast from 'react-hot-toast'
 import { ServiceCatalogService } from '../../../../services/servicesCatalogService'
 import type { ServiceWithGroup } from '../../../../types/services'
@@ -29,6 +29,20 @@ const STAFF_ROLES = [
   'Säljare',
 ] as const
 
+// Primärrollen (technicians.role) mappad till portalvyn den redan ger
+const PRIMARY_ROLE_TO_PORTAL: Record<string, ExtraPortalRole | null> = {
+  'Skadedjurstekniker': 'technician',
+  'Koordinator': 'koordinator',
+  'Admin': 'admin',
+  'Säljare': null,
+}
+
+const EXTRA_ROLE_OPTIONS: { value: ExtraPortalRole; label: string; description: string }[] = [
+  { value: 'admin', label: 'Admin', description: 'Full åtkomst till admin-panelen' },
+  { value: 'koordinator', label: 'Koordinator', description: 'Schema, ärenden och planering' },
+  { value: 'technician', label: 'Tekniker', description: 'Teknikerportalen med egna ärenden' },
+]
+
 export default function TechnicianModal({ isOpen, onClose, onSuccess, technician, allTechnicians = [] }: TechnicianModalProps) {
   const [loading, setLoading] = useState(false)
   const [password, setPassword] = useState('')
@@ -36,7 +50,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
   const [selectedCompetencies, setSelectedCompetencies] = useState<Set<string>>(new Set())
   const [bookingServices, setBookingServices] = useState<ServiceWithGroup[]>([])
   const [copyFromId, setCopyFromId] = useState<string>('')
-  const [alsoAdmin, setAlsoAdmin] = useState(false)
+  const [extraRoles, setExtraRoles] = useState<Set<ExtraPortalRole>>(new Set())
   const [incidentTypes, setIncidentTypes] = useState<Set<IncidentType>>(new Set())
 
   useEffect(() => {
@@ -52,7 +66,10 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
           abax_vehicle_id: technician.abax_vehicle_id || '',
           display_name: technician.display_name || technician.name || ''
         });
-        setAlsoAdmin(technician.is_admin || false);
+        // extra_roles + is_admin för bakåtkompat (äldre dual-role utan extra_roles)
+        const roles = new Set<ExtraPortalRole>(technician.extra_roles || []);
+        if (technician.is_admin && technician.role !== 'Admin') roles.add('admin');
+        setExtraRoles(roles);
         setIncidentTypes(new Set(technician.incident_recipient_types || []));
         // Hämta och sätt befintliga kompetenser
         const currentCompetencies = await technicianManagementService.getCompetencies(technician.id);
@@ -61,7 +78,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
         // Återställ allt för en ny person
         setFormData({ name: '', role: 'Skadedjurstekniker', email: '', direct_phone: '', office_phone: '', address: '', abax_vehicle_id: '' });
         setSelectedCompetencies(new Set());
-        setAlsoAdmin(false);
+        setExtraRoles(new Set());
         setIncidentTypes(new Set());
       }
       setPassword('');
@@ -110,11 +127,15 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
         if (technician.has_login && formData.display_name && formData.display_name !== technician.display_name) {
           await technicianManagementService.updateDisplayName(technician.id, formData.display_name);
         }
-        // Synka admin-behörighet om den ändrats
+        // Synka extra portalroller (vyer) om ändrade
         if (technician.has_login) {
-          const shouldBeAdmin = formData.role === 'Admin' || alsoAdmin;
-          if (shouldBeAdmin !== (technician.is_admin || false)) {
-            await technicianManagementService.toggleAdminAccess(technician.id, shouldBeAdmin);
+          const primaryPortal = PRIMARY_ROLE_TO_PORTAL[formData.role || ''] || null;
+          const wanted = [...extraRoles].filter(r => r !== primaryPortal);
+          const current = new Set(technician.extra_roles || []);
+          const changed = wanted.length !== current.size || wanted.some(r => !current.has(r));
+          const primaryIsAdmin = formData.role === 'Admin';
+          if (changed || primaryIsAdmin !== (technician.role === 'Admin')) {
+            await technicianManagementService.updateExtraRoles(technician.id, wanted, primaryIsAdmin);
           }
         }
         // Synka mottagartyper för tillbud/olycka/avvikelse om ändrats
@@ -178,23 +199,52 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
               />
             </div>
           </div>
-          {/* Admin-behörighet checkbox - visas om personen har inloggning, primär roll inte redan är Admin, och inte Säljare */}
-          {technician?.has_login && formData.role !== 'Admin' && formData.role !== 'Säljare' && (
-            <label className="flex items-center gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl cursor-pointer hover:border-slate-600 transition-colors">
-              <input
-                type="checkbox"
-                checked={alsoAdmin}
-                onChange={(e) => setAlsoAdmin(e.target.checked)}
-                className="h-4 w-4 rounded bg-slate-700 border-slate-500 text-[#20c58f] focus:ring-[#20c58f]"
-              />
-              <div className="flex items-center gap-2">
+          {/* Extra portalroller - fritt kombinerbara vyer utöver primärrollen */}
+          {technician?.has_login && (
+            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+              <div className="flex items-center gap-2 mb-1">
                 <Shield className="w-4 h-4 text-purple-400" />
-                <div>
-                  <span className="text-sm font-medium text-slate-300">Även admin-behörighet</span>
-                  <p className="text-xs text-slate-500">Personen får tillgång till admin-panelen utöver sin primära roll</p>
-                </div>
+                <span className="text-sm font-medium text-slate-300">Fler roller & vyer</span>
               </div>
-            </label>
+              <p className="text-xs text-slate-500 mb-2">
+                Personen kan växla mellan sina vyer via menyn. Primärrollen ({formData.role}) ingår alltid.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {EXTRA_ROLE_OPTIONS
+                  .filter(opt => opt.value !== PRIMARY_ROLE_TO_PORTAL[formData.role || ''])
+                  .map(opt => {
+                    const checked = extraRoles.has(opt.value)
+                    return (
+                      <label
+                        key={opt.value}
+                        className={`flex items-start gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                          checked
+                            ? 'bg-purple-500/10 border-purple-500/30'
+                            : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            setExtraRoles(prev => {
+                              const next = new Set(prev)
+                              if (e.target.checked) next.add(opt.value)
+                              else next.delete(opt.value)
+                              return next
+                            })
+                          }}
+                          className="h-4 w-4 mt-0.5 rounded bg-slate-700 border-slate-500 text-[#20c58f] focus:ring-[#20c58f]"
+                        />
+                        <div>
+                          <span className={`block text-sm ${checked ? 'text-purple-300' : 'text-slate-300'}`}>{opt.label}</span>
+                          <span className="block text-xs text-slate-500">{opt.description}</span>
+                        </div>
+                      </label>
+                    )
+                  })}
+              </div>
+            </div>
           )}
           {/* Incidentmottagare - visas om personen har inloggning */}
           {technician?.has_login && (

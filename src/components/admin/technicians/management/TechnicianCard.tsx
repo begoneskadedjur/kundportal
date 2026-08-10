@@ -113,6 +113,18 @@ export default function TechnicianCard({
                   Admin
                 </span>
               )}
+              {(technician.extra_roles || []).includes('koordinator') && technician.role !== 'Koordinator' && (
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-500/20 text-green-400">
+                  <Shield className="w-3 h-3 mr-1" />
+                  Koordinator
+                </span>
+              )}
+              {(technician.extra_roles || []).includes('technician') && technician.role !== 'Skadedjurstekniker' && (
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-cyan-500/20 text-cyan-400">
+                  <Shield className="w-3 h-3 mr-1" />
+                  Tekniker
+                </span>
+              )}
               {technician.has_login && (
                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-500/20 text-green-400">
                   <Key className="w-3 h-3 mr-1" />

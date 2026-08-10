@@ -2,13 +2,14 @@
 // Global header med notifikationer för admin/koordinator/tekniker
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth, VIEW_PATHS, VIEW_LABELS, type ActiveView } from '../../contexts/AuthContext';
 import NotificationBell from '../communication/NotificationBell';
 import {
   LayoutDashboard,
   Search,
   MessageSquareText,
   Calendar,
+  CalendarDays,
   LogOut,
   ChevronDown,
   User,
@@ -19,6 +20,7 @@ import {
   Wrench,
   Check,
   FileSignature,
+  TrendingUp,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
@@ -27,6 +29,13 @@ interface NavItem {
   path: string;
   icon: React.ElementType;
 }
+
+const VIEW_ICONS: Record<ActiveView, React.ElementType> = {
+  admin: Shield,
+  koordinator: CalendarDays,
+  technician: Wrench,
+  säljare: TrendingUp,
+};
 
 // Navigation per roll
 const NAV_ITEMS: Record<string, NavItem[]> = {
@@ -55,7 +64,7 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
 };
 
 export function AppHeader() {
-  const { profile, signOut, hasDualRole, activeView, setActiveView } = useAuth();
+  const { profile, signOut, hasDualRole, availableViews, activeView, setActiveView } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -111,11 +120,11 @@ export function AppHeader() {
     }
   };
 
-  const handleSwitchView = (view: 'admin' | 'technician') => {
+  const handleSwitchView = (view: ActiveView) => {
     setActiveView(view);
     setUserMenuOpen(false);
     setMobileMenuOpen(false);
-    navigate(view === 'admin' ? '/admin/dashboard' : '/technician/dashboard');
+    navigate(VIEW_PATHS[view]);
   };
 
   return (
@@ -214,30 +223,24 @@ export function AppHeader() {
                   {hasDualRole && (
                     <div className="px-2 py-2 border-b border-slate-700">
                       <p className="text-[10px] text-slate-500 uppercase tracking-wider px-2 mb-1">Byt vy</p>
-                      <button
-                        onClick={() => handleSwitchView('admin')}
-                        className={`w-full px-3 py-1.5 rounded-md text-sm text-left flex items-center gap-2 ${
-                          activeView === 'admin'
-                            ? 'bg-[#20c58f]/10 text-[#20c58f]'
-                            : 'text-slate-300 hover:bg-slate-700/50'
-                        }`}
-                      >
-                        <Shield className="w-4 h-4" />
-                        Administratör
-                        {activeView === 'admin' && <Check className="w-3 h-3 ml-auto" />}
-                      </button>
-                      <button
-                        onClick={() => handleSwitchView('technician')}
-                        className={`w-full px-3 py-1.5 rounded-md text-sm text-left flex items-center gap-2 ${
-                          activeView === 'technician'
-                            ? 'bg-[#20c58f]/10 text-[#20c58f]'
-                            : 'text-slate-300 hover:bg-slate-700/50'
-                        }`}
-                      >
-                        <Wrench className="w-4 h-4" />
-                        Tekniker
-                        {activeView === 'technician' && <Check className="w-3 h-3 ml-auto" />}
-                      </button>
+                      {availableViews.map(view => {
+                        const Icon = VIEW_ICONS[view];
+                        return (
+                          <button
+                            key={view}
+                            onClick={() => handleSwitchView(view)}
+                            className={`w-full px-3 py-1.5 rounded-md text-sm text-left flex items-center gap-2 ${
+                              activeView === view
+                                ? 'bg-[#20c58f]/10 text-[#20c58f]'
+                                : 'text-slate-300 hover:bg-slate-700/50'
+                            }`}
+                          >
+                            <Icon className="w-4 h-4" />
+                            {VIEW_LABELS[view]}
+                            {activeView === view && <Check className="w-3 h-3 ml-auto" />}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                   <button
@@ -296,30 +299,24 @@ export function AppHeader() {
             {hasDualRole && (
               <>
                 <p className="text-[10px] text-slate-500 uppercase tracking-wider px-3 mb-1">Byt vy</p>
-                <button
-                  onClick={() => handleSwitchView('admin')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    activeView === 'admin'
-                      ? 'bg-[#20c58f]/10 text-[#20c58f]'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                  }`}
-                >
-                  <Shield className="w-5 h-5" />
-                  Administratör
-                  {activeView === 'admin' && <Check className="w-4 h-4 ml-auto" />}
-                </button>
-                <button
-                  onClick={() => handleSwitchView('technician')}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    activeView === 'technician'
-                      ? 'bg-[#20c58f]/10 text-[#20c58f]'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                  }`}
-                >
-                  <Wrench className="w-5 h-5" />
-                  Tekniker
-                  {activeView === 'technician' && <Check className="w-4 h-4 ml-auto" />}
-                </button>
+                {availableViews.map(view => {
+                  const Icon = VIEW_ICONS[view];
+                  return (
+                    <button
+                      key={view}
+                      onClick={() => handleSwitchView(view)}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        activeView === view
+                          ? 'bg-[#20c58f]/10 text-[#20c58f]'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <Icon className="w-5 h-5" />
+                      {VIEW_LABELS[view]}
+                      {activeView === view && <Check className="w-4 h-4 ml-auto" />}
+                    </button>
+                  );
+                })}
                 <div className="border-t border-slate-700 my-2" />
               </>
             )}

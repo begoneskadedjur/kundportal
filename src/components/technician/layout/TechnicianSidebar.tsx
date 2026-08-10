@@ -1,11 +1,11 @@
 // src/components/technician/layout/TechnicianSidebar.tsx
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { LogOut, Shield, Bug } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { LogOut, Bug } from 'lucide-react'
 import { BugReportModal } from '../../shared/BugReportModal'
+import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { topLevelItems, navGroups } from './technicianNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
-import { useAuth } from '../../../contexts/AuthContext'
 
 interface TechnicianSidebarProps {
   currentPath: string
@@ -14,14 +14,7 @@ interface TechnicianSidebarProps {
 }
 
 export function TechnicianSidebar({ currentPath, userName, onSignOut }: TechnicianSidebarProps) {
-  const { hasDualRole, setActiveView } = useAuth()
-  const navigate = useNavigate()
   const [showBugModal, setShowBugModal] = useState(false)
-
-  const handleSwitchToAdmin = () => {
-    setActiveView('admin')
-    navigate('/admin/dashboard')
-  }
 
   return (
     <>
@@ -39,18 +32,8 @@ export function TechnicianSidebar({ currentPath, userName, onSignOut }: Technici
         </div>
       </div>
 
-      {/* Dual-role switcher */}
-      {hasDualRole && (
-        <div className="px-3 py-2 border-b border-slate-700/50">
-          <button
-            onClick={handleSwitchToAdmin}
-            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-all"
-          >
-            <Shield className="w-4 h-4 flex-shrink-0" />
-            <span className="font-medium">Byt till Admin-vy</span>
-          </button>
-        </div>
-      )}
+      {/* Vy-växlare för användare med flera portalroller */}
+      <ViewSwitcher currentView="technician" />
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">

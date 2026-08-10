@@ -84,7 +84,7 @@ export async function requireAuth(
 
   const { data: profile, error: profileError } = await supabaseAuth
     .from('profiles')
-    .select('role, is_admin, customer_id')
+    .select('role, is_admin, customer_id, extra_roles')
     .eq('user_id', user.id)
     .single()
 
@@ -96,6 +96,9 @@ export async function requireAuth(
   const effectiveRoles = new Set<string>()
   if (profile.role) effectiveRoles.add(profile.role)
   if (profile.is_admin) effectiveRoles.add('admin')
+  for (const extraRole of (profile.extra_roles as string[] | null) || []) {
+    effectiveRoles.add(extraRole)
+  }
 
   if (!allowedRoles.some(role => effectiveRoles.has(role))) {
     res.status(403).json({ error: 'Behörighet saknas' })

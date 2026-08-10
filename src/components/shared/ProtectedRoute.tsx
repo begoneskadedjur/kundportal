@@ -45,55 +45,25 @@ export default function ProtectedRoute({ children, requiredRole }: ProtectedRout
     return <Navigate to="/organisation" replace />;
   }
 
-  // ✅ 4. UPPDATERAD LOGIK MED ADMIN-ÖVERÅTKOMST
+  // ✅ 4. EFFEKTIVA ROLLER: primärroll + extra_roles (+ is_admin för bakåtkompat)
+  // En användare kan ha valfri kombination av admin/koordinator/technician,
+  // tilldelat via Användarkonton (Personal). Admin har fortsatt full åtkomst.
+  const effectiveRoles = new Set<string>();
+  if (profile.role) effectiveRoles.add(profile.role);
+  if (profile.is_admin) effectiveRoles.add('admin');
+  for (const extraRole of profile.extra_roles || []) effectiveRoles.add(extraRole);
+
   let hasAccess = false;
 
   // Om ingen requiredRole är angiven, tillåt alla inloggade användare
   // (används för delade sidor som /larosate, /profile etc.)
   if (!requiredRole) {
     hasAccess = true;
+  } else if (effectiveRoles.has('admin')) {
+    // Admins har FULL åtkomst till ALLT (admin, koordinator, technician, customer)
+    hasAccess = true;
   } else {
-    switch (profile.role) {
-      case 'admin':
-        // Admins har FULL åtkomst till ALLT (admin, koordinator, technician, customer)
-        hasAccess = true;
-        break;
-
-      case 'koordinator':
-        // Koordinatorer har endast tillgång till koordinator-sidor
-        if (requiredRole === 'koordinator') {
-          hasAccess = true;
-        }
-        break;
-
-      case 'technician':
-        // Dual-role: tekniker med is_admin får full åtkomst (som admin)
-        if (profile.is_admin) {
-          hasAccess = true;
-        } else if (requiredRole === 'technician') {
-          hasAccess = true;
-        }
-        break;
-
-      case 'customer':
-        // Kunder har tillgång till kund-sidor
-        if (requiredRole === 'customer') {
-          hasAccess = true;
-        }
-        break;
-
-      case 'säljare':
-        // Säljare har endast tillgång till säljare-sidor
-        if (requiredRole === 'säljare') {
-          hasAccess = true;
-        }
-        break;
-
-      default:
-        // Om rollen är okänd, nekas alltid tillträde
-        hasAccess = false;
-        break;
-    }
+    hasAccess = effectiveRoles.has(requiredRole);
   }
   
   // 4. Returnera antingen barn-komponenten eller en omdirigering

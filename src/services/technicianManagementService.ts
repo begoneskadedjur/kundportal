@@ -2,6 +2,9 @@ import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import type { IncidentType } from '../types/caseIncidents'
 
+// Extra portalroller utöver primärrollen (fritt kombinerbara vyer)
+export type ExtraPortalRole = 'admin' | 'koordinator' | 'technician'
+
 // --- TYPDEFINITIONER ---
 
 // ✅ NYA TYPER FÖR DET FLEXIBLA ARBETSSCHEMAT
@@ -40,6 +43,7 @@ export type Technician = {
   user_id?: string | null
   display_name?: string | null
   is_admin?: boolean
+  extra_roles?: ExtraPortalRole[]
   incident_recipient_types?: IncidentType[]
 }
 
@@ -96,6 +100,26 @@ export const technicianManagementService = {
     } catch (error: any) {
       console.error('Error toggling admin access:', error)
       toast.error('Kunde inte uppdatera admin-behörighet')
+      throw error
+    }
+  },
+
+  // Sätter extra portalroller (vyer). is_admin hålls synkad eftersom
+  // befintliga RLS-policies och api/_lib/auth.ts läser den.
+  async updateExtraRoles(technicianId: string, extraRoles: ExtraPortalRole[], primaryIsAdmin: boolean): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          extra_roles: extraRoles,
+          is_admin: primaryIsAdmin || extraRoles.includes('admin')
+        })
+        .eq('technician_id', technicianId)
+
+      if (error) throw error
+    } catch (error: any) {
+      console.error('Error updating extra roles:', error)
+      toast.error('Kunde inte uppdatera behörigheter')
       throw error
     }
   },
@@ -158,7 +182,7 @@ export const technicianManagementService = {
     try {
       const [techniciansRes, profilesRes, recipientsRes] = await Promise.all([
         supabase.from('technicians').select('*').order('name', { ascending: true }),
-        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin'),
+        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, extra_roles'),
         supabase.from('incident_recipients').select('user_id, incident_type')
       ]);
       if (techniciansRes.error) throw techniciansRes.error;
@@ -186,6 +210,7 @@ export const technicianManagementService = {
           user_id: profile?.user_id || null,
           display_name: profile?.display_name || tech.name,
           is_admin: profile?.is_admin || false,
+          extra_roles: (profile?.extra_roles as ExtraPortalRole[] | null) || [],
           incident_recipient_types: profile?.user_id
             ? (recipientTypesByUserId.get(profile.user_id) || [])
             : []
@@ -439,7 +464,7 @@ export const technicianManagementService = {
 
   async getTechnicianById(id: string): Promise<Technician> {
     try {
-      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin)`).eq('id', id).single();
+      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, extra_roles)`).eq('id', id).single();
       if (error) throw error;
 
       // FK-join hittar profiler direkt (alla roller har nu technician_id)
@@ -460,6 +485,7 @@ export const technicianManagementService = {
         user_id: profile?.user_id || null,
         display_name: profile?.display_name || data.name,
         is_admin: profile?.is_admin || false,
+        extra_roles: (profile?.extra_roles as ExtraPortalRole[] | null) || [],
         incident_recipient_types: incidentRecipientTypes
       };
     } catch (error: any) {

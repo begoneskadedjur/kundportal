@@ -1,20 +1,18 @@
 // src/components/coordinator/layout/CoordinatorSidebar.tsx
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import {
   ChevronLeft,
-  ChevronRight,
   LogOut,
   Search,
   CalendarDays,
   HelpCircle,
-  Shield,
   Bug,
 } from 'lucide-react'
 import { BugReportModal } from '../../shared/BugReportModal'
+import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { topLevelItems, navGroups } from './coordinatorNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
-import { useAuth } from '../../../contexts/AuthContext'
 
 interface CoordinatorSidebarProps {
   collapsed: boolean
@@ -31,14 +29,7 @@ export function CoordinatorSidebar({
   userName,
   onSignOut,
 }: CoordinatorSidebarProps) {
-  const { hasDualRole, setActiveView } = useAuth()
-  const navigate = useNavigate()
   const [showBugModal, setShowBugModal] = useState(false)
-
-  const handleSwitchToAdmin = () => {
-    setActiveView('admin')
-    navigate('/admin/dashboard')
-  }
 
   return (
     <>
@@ -79,28 +70,8 @@ export function CoordinatorSidebar({
         )}
       </div>
 
-      {/* Vy-växlare för dual-role användare */}
-      {hasDualRole && (
-        <div className={`px-3 py-2 border-b border-slate-700/50 ${collapsed ? 'flex justify-center' : ''}`}>
-          {collapsed ? (
-            <button
-              onClick={handleSwitchToAdmin}
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-all"
-              title="Byt till Admin-vy"
-            >
-              <Shield className="w-5 h-5" />
-            </button>
-          ) : (
-            <button
-              onClick={handleSwitchToAdmin}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 transition-all"
-            >
-              <Shield className="w-4 h-4 flex-shrink-0" />
-              <span className="font-medium">Byt till Admin-vy</span>
-            </button>
-          )}
-        </div>
-      )}
+      {/* Vy-växlare för användare med flera portalroller */}
+      <ViewSwitcher currentView="koordinator" collapsed={collapsed} />
 
       {/* CTA Button */}
       <div className="px-3 pt-3">
