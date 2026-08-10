@@ -183,7 +183,7 @@ const IndividualTechnicianAnalysis: React.FC<IndividualTechnicianAnalysisProps> 
     const safeAllTechnicians = Array.isArray(allTechnicians) ? allTechnicians : []
     return (
       <Card className="p-6 bg-gradient-to-br from-orange-600/10 to-red-600/10 border-orange-500/20">
-         <div className="flex items-center gap-3 mb-6"><div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center"><Brain className="w-6 h-6 text-white" /></div><div><h2 className="text-xl font-semibold text-white flex items-center gap-2">AI-Driven Teknikeranalys<Sparkles className="w-5 h-5 text-yellow-400" /></h2><p className="text-sm text-slate-400">Välj en tekniker för en djupgående analys med personliga rekommendationer.</p></div></div>
+         <div className="flex items-center gap-3 mb-6"><div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center"><Brain className="w-6 h-6 text-[#fff]" /></div><div><h2 className="text-xl font-semibold text-[#fff] flex items-center gap-2">AI-Driven Teknikeranalys<Sparkles className="w-5 h-5 text-yellow-400" /></h2><p className="text-sm text-slate-400">Välj en tekniker för en djupgående analys med personliga rekommendationer.</p></div></div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {safeAllTechnicians.map((tech: TechnicianPerformance) => (
               <button key={tech.name} onClick={() => setSelectedTechnicianName(tech.name)} className="group text-left p-4 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700 hover:border-orange-500/50 rounded-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-orange-500/10"><div className="font-medium text-white group-hover:text-orange-300 transition-colors">{tech.name}</div><div className="text-xs text-slate-400 mt-1">{tech.role}</div><div className="text-xs text-green-400 mt-2">{formatCurrency(tech.total_revenue)}</div></button>
@@ -198,7 +198,7 @@ const IndividualTechnicianAnalysis: React.FC<IndividualTechnicianAnalysisProps> 
       <Card className="p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4"><User className="w-10 h-10 text-orange-400 flex-shrink-0" /><div><h2 className="text-2xl font-bold text-white">{technician.name}</h2><p className="text-slate-400">{technician.role} • Ranking #{technician.rank} av {allTechnicians?.length}</p></div></div>
-          <div className="flex items-center gap-3"><Button variant="secondary" size="sm" onClick={() => setSelectedTechnicianName(null)}>Byt Tekniker</Button><Button onClick={generateAIAnalysis} disabled={aiLoading} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 shadow-lg shadow-purple-600/20">{aiLoading ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Analyserar...</> : <><Sparkles className="w-4 h-4 mr-2" /> {aiAnalysis ? 'Kör Igen' : 'Starta AI-Analys'}</>}</Button></div>
+          <div className="flex items-center gap-3"><Button variant="secondary" size="sm" onClick={() => setSelectedTechnicianName(null)}>Byt Tekniker</Button><Button onClick={generateAIAnalysis} disabled={aiLoading} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-[#fff] px-6 shadow-lg shadow-purple-600/20">{aiLoading ? <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Analyserar...</> : <><Sparkles className="w-4 h-4 mr-2" /> {aiAnalysis ? 'Kör Igen' : 'Starta AI-Analys'}</>}</Button></div>
         </div>
       </Card>
       
@@ -222,10 +222,10 @@ const IndividualTechnicianAnalysis: React.FC<IndividualTechnicianAnalysisProps> 
       ) : (
         !aiLoading && (
             <Card className="p-8 text-center bg-gradient-to-br from-purple-600/10 to-blue-600/10 border-purple-500/20">
-              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><Brain className="w-8 h-8 text-white" /></div>
-              <h3 className="text-xl font-semibold text-white mb-2">Redo för en djupgående analys?</h3>
+              <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4"><Brain className="w-8 h-8 text-[#fff]" /></div>
+              <h3 className="text-xl font-semibold text-[#fff] mb-2">Redo för en djupgående analys?</h3>
               <p className="text-slate-400 mb-6 max-w-md mx-auto">Låt vår AI analysera {technician.name}s prestanda för att skapa en personlig utvecklingsplan.</p>
-              <Button onClick={generateAIAnalysis} disabled={aiLoading} className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3"><Sparkles className="w-5 h-5 mr-2" />Generera AI-Analys</Button>
+              <Button onClick={generateAIAnalysis} disabled={aiLoading} className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-[#fff] px-8 py-3"><Sparkles className="w-5 h-5 mr-2" />Generera AI-Analys</Button>
             </Card>
         )
       )}

@@ -126,7 +126,7 @@ export default function PaymentTermsSettings() {
                         type="button"
                         onClick={() => handleSave(cat.key)}
                         disabled={isSaving}
-                        className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07e] text-white text-sm rounded-lg transition-colors disabled:opacity-50"
+                        className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07e] text-[#fff] text-sm rounded-lg transition-colors disabled:opacity-50"
                       >
                         {isSaving ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />

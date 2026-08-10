@@ -225,7 +225,7 @@ const PendingRequestsPanel: React.FC<PendingRequestsPanelProps> = ({
                 {/* Action Button */}
                 <Button
                   onClick={() => onScheduleClick(caseItem)}
-                  className="w-full mt-3 bg-emerald-500 hover:bg-emerald-600 text-white"
+                  className="w-full mt-3 bg-emerald-500 hover:bg-emerald-600 text-[#fff]"
                   size="sm"
                 >
                   <Calendar className="w-4 h-4 mr-2" />

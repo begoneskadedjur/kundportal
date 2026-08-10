@@ -19,7 +19,7 @@ export function SäljareMobileNav({ currentPath, onSignOut }: SäljareMobileNavP
       <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 z-40 px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-teal-500/20">
-            <span className="text-white font-bold text-xs">BG</span>
+            <span className="text-[#fff] font-bold text-xs">BG</span>
           </div>
           <p className="text-white font-semibold text-sm">BeGone</p>
         </div>

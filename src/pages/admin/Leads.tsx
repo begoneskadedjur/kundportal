@@ -874,7 +874,7 @@ const Leads: React.FC = () => {
                         onClick={() => setCurrentPage(page)}
                         className={`w-8 h-8 rounded text-sm font-medium ${
                           page === currentPage
-                            ? 'bg-purple-600 text-white'
+                            ? 'bg-purple-600 text-[#fff]'
                             : 'text-slate-400 hover:text-white hover:bg-slate-700'
                         }`}
                       >

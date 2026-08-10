@@ -198,7 +198,7 @@ export function BugReportModal({ isOpen, onClose }: BugReportModalProps) {
               <button
                 onClick={handleSubmit}
                 disabled={loading || !title.trim() || !description.trim()}
-                className="flex items-center gap-2 px-4 py-1.5 bg-[#20c58f] hover:bg-[#1aad7d] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-1.5 bg-[#20c58f] hover:bg-[#1aad7d] disabled:opacity-50 disabled:cursor-not-allowed text-[#fff] text-sm font-medium rounded-lg transition-colors"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Skicka rapport

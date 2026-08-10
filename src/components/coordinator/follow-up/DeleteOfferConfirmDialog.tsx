@@ -197,7 +197,7 @@ export default function DeleteOfferConfirmDialog({
               disabled={!isConfirmValid || deleting}
               className={`flex-1 flex items-center justify-center gap-2 ${
                 isConfirmValid && !deleting
-                  ? 'bg-red-600 hover:bg-red-700 text-white'
+                  ? 'bg-red-600 hover:bg-red-700 text-[#fff]'
                   : 'bg-slate-700 text-slate-400 cursor-not-allowed'
               }`}
               size="sm"

@@ -114,7 +114,7 @@ export default function ProvisionSettingsPanel({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-[#20c58f] hover:bg-[#1ab37e] text-white rounded-lg transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium bg-[#20c58f] hover:bg-[#1ab37e] text-[#fff] rounded-lg transition-colors disabled:opacity-50"
         >
           <Save className="w-4 h-4" />
           {saving ? 'Sparar...' : 'Spara'}

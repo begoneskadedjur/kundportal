@@ -299,7 +299,7 @@ export default function OfferFollowUp() {
                 setSelectedTechnician(null)
                 document.getElementById('follow-up-table')?.scrollIntoView({ behavior: 'smooth' })
               }}
-              className="px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] text-white text-xs font-medium rounded-lg transition-colors flex-shrink-0"
+              className="px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] text-[#fff] text-xs font-medium rounded-lg transition-colors flex-shrink-0"
             >
               Visa prioriterade
             </button>
@@ -350,7 +350,7 @@ export default function OfferFollowUp() {
               onClick={() => setDocTypeFilter(f.key)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                 docTypeFilter === f.key
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-400 hover:text-white'
               }`}
             >

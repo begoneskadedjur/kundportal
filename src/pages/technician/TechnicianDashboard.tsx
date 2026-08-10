@@ -163,7 +163,7 @@ export default function TechnicianDashboard() {
         <p className="text-slate-400 text-sm mb-4 text-center">{error}</p>
         <button
           onClick={fetchDashboardData}
-          className="px-4 py-2 bg-[#20c58f] text-white rounded-lg text-sm font-medium hover:bg-[#1ab37e] transition-colors"
+          className="px-4 py-2 bg-[#20c58f] text-[#fff] rounded-lg text-sm font-medium hover:bg-[#1ab37e] transition-colors"
         >
           Försök igen
         </button>
@@ -180,7 +180,7 @@ export default function TechnicianDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500">
-            <LayoutDashboard className="w-6 h-6 text-white" />
+            <LayoutDashboard className="w-6 h-6 text-[#fff]" />
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-white">

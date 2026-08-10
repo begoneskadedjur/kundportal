@@ -339,7 +339,7 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
           </p>
           <button
             onClick={() => setModalType('upload')}
-            className="px-6 py-3 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded-xl transition-colors inline-flex items-center gap-2"
+            className="px-6 py-3 bg-teal-600 hover:bg-teal-500 text-[#fff] font-medium rounded-xl transition-colors inline-flex items-center gap-2"
           >
             <Upload className="w-5 h-5" />
             Ladda upp planritning
@@ -464,7 +464,7 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
       {placementMode === 'view' && selectedFloorPlan && (
         <button
           onClick={() => setModalType('station-type')}
-          className="fixed bottom-24 right-4 w-14 h-14 bg-teal-600 hover:bg-teal-500 text-white rounded-full shadow-lg shadow-teal-600/30 flex items-center justify-center transition-all hover:scale-105 z-30"
+          className="fixed bottom-24 right-4 w-14 h-14 bg-teal-600 hover:bg-teal-500 text-[#fff] rounded-full shadow-lg shadow-teal-600/30 flex items-center justify-center transition-all hover:scale-105 z-30"
         >
           <Plus className="w-6 h-6" />
         </button>

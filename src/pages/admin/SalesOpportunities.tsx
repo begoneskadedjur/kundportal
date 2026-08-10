@@ -426,7 +426,7 @@ const SalesOpportunities: React.FC = () => {
               onClick={() => setSelectedPeriod(period.key)}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                 selectedPeriod === period.key
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >

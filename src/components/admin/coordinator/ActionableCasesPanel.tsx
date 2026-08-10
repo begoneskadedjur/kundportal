@@ -70,7 +70,7 @@ const ActionableCaseItem: React.FC<ActionableCaseItemProps> = ({ caseData, onCli
             <button
               onClick={handleConfirmDismiss}
               disabled={isDismissing}
-              className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-white rounded transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-500 text-[#fff] rounded transition-colors disabled:opacity-50"
             >
               {isDismissing ? 'Tar bort...' : 'Bekräfta'}
             </button>

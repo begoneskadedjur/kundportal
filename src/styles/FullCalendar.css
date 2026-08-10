@@ -7,11 +7,11 @@
 
 :root {
   --fc-bg-color: transparent;
-  --fc-main-bg-color: #0f172a; /* slate-900 */
-  --fc-border-color: #1e293b; /* slate-800 */
+  --fc-main-bg-color: var(--color-slate-900);
+  --fc-border-color: var(--color-slate-800);
   --fc-today-bg-color: rgba(59, 130, 246, 0.1); /* blue-500/10 */
-  --fc-text-color: #94a3b8; /* slate-400 */
-  --fc-text-color-dark: #e2e8f0; /* slate-200 */
+  --fc-text-color: var(--color-slate-400);
+  --fc-text-color-dark: var(--color-slate-200);
   --fc-accent-color: #3b82f6; /* blue-500 */
 }
 
@@ -96,7 +96,7 @@
 /* Hover-effekt på dagar */
 .fc .fc-daygrid-day:not(.fc-day-other) .fc-daygrid-day-number:hover {
   background-color: rgba(148, 163, 184, 0.1); /* slate-400/10 */
-  color: white;
+  color: var(--color-white);
 }
 
 /* Idag-markering */
@@ -116,7 +116,7 @@
 
 /* Dagar från annan månad */
 .fc .fc-day-other .fc-daygrid-day-number {
-  color: #475569; /* slate-600 */
+  color: var(--color-slate-600);
 }
 
 /* Händelse-prickar (istället för block) */
@@ -187,6 +187,20 @@
 
 .event-slate-800\/50 { --fc-event-bg-color: rgba(30, 41, 59, 0.5); --fc-event-text-color: #94a3b8; }
 .border-slate-700\/50 { --fc-event-border-color: rgba(51, 65, 85, 0.5); }
+
+/* Ljust tema: event-färgerna byter till ljusa tintbakgrunder med mörk text */
+html[data-theme="light"] .event-blue-900\/50 { --fc-event-bg-color: rgba(59, 130, 246, 0.12); --fc-event-text-color: #1d4ed8; }
+html[data-theme="light"] .border-blue-700\/50 { --fc-event-border-color: rgba(29, 78, 216, 0.4); }
+html[data-theme="light"] .event-green-900\/50 { --fc-event-bg-color: rgba(34, 197, 94, 0.14); --fc-event-text-color: #15803d; }
+html[data-theme="light"] .border-green-700\/50 { --fc-event-border-color: rgba(21, 128, 61, 0.4); }
+html[data-theme="light"] .event-cyan-900\/50 { --fc-event-bg-color: rgba(6, 182, 212, 0.14); --fc-event-text-color: #0e7490; }
+html[data-theme="light"] .border-cyan-700\/50 { --fc-event-border-color: rgba(14, 116, 144, 0.4); }
+html[data-theme="light"] .event-yellow-900\/50 { --fc-event-bg-color: rgba(234, 179, 8, 0.16); --fc-event-text-color: #a16207; }
+html[data-theme="light"] .border-yellow-700\/50 { --fc-event-border-color: rgba(161, 98, 7, 0.4); }
+html[data-theme="light"] .event-purple-900\/50 { --fc-event-bg-color: rgba(168, 85, 247, 0.13); --fc-event-text-color: #7e22ce; }
+html[data-theme="light"] .border-purple-700\/50 { --fc-event-border-color: rgba(126, 34, 206, 0.4); }
+html[data-theme="light"] .event-slate-800\/50 { --fc-event-bg-color: rgba(100, 116, 139, 0.14); --fc-event-text-color: #475569; }
+html[data-theme="light"] .border-slate-700\/50 { --fc-event-border-color: rgba(71, 85, 105, 0.4); }
 
 /* Återställ standard-eventet för att kunna använda färgklasserna */
 .fc-daygrid-event, .fc-timegrid-event {
@@ -283,7 +297,7 @@
 /* Tydligare tidslabels */
 .fc-resource-timeline .fc-timeline-header-row th {
   font-weight: 600;
-  color: #cbd5e1;
+  color: var(--color-slate-300);
   font-size: 11px;
   border-bottom: 2px solid var(--fc-border-color);
 }
@@ -348,23 +362,23 @@
 /* --- MOBIL KALENDER TOOLBAR --- */
 .fc .fc-header-toolbar {
   margin-bottom: 1rem !important;
-  color: white;
+  color: var(--color-white);
 }
 .fc .fc-toolbar-title {
-  color: white !important;
+  color: var(--color-white) !important;
   font-size: 1.25rem !important;
   font-weight: 700 !important;
 }
 .fc .fc-button {
-  background: #1e293b !important;
-  border: 1px solid #334155 !important;
-  color: #cbd5e1 !important;
+  background: var(--color-slate-800) !important;
+  border: 1px solid var(--color-slate-700) !important;
+  color: var(--color-slate-300) !important;
   box-shadow: none !important;
   transition: all 0.2s ease;
 }
 .fc .fc-button:hover {
-  background: #334155 !important;
-  border-color: #475569 !important;
+  background: var(--color-slate-700) !important;
+  border-color: var(--color-slate-600) !important;
 }
 .fc .fc-button-primary:not(:disabled).fc-button-active {
   background: var(--fc-accent-color) !important;

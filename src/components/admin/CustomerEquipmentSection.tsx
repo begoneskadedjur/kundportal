@@ -187,7 +187,7 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
                       )}
                       <div className="bg-slate-800/50 rounded-lg p-3 text-center">
                         <div className="w-8 h-8 rounded-full mx-auto mb-2 flex items-center justify-center bg-green-500">
-                          <span className="text-white text-sm font-bold">{stats.byStatus.active}</span>
+                          <span className="text-[#fff] text-sm font-bold">{stats.byStatus.active}</span>
                         </div>
                         <p className="text-lg font-bold text-white">{stats.byStatus.active}</p>
                         <p className="text-xs text-slate-400">Aktiva</p>
@@ -202,7 +202,7 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
                         onClick={() => setViewMode('list')}
                         className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors text-sm ${
                           viewMode === 'list'
-                            ? 'bg-emerald-500 text-white'
+                            ? 'bg-emerald-500 text-[#fff]'
                             : 'text-slate-400 hover:text-white'
                         }`}
                       >
@@ -213,7 +213,7 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
                         onClick={() => setViewMode('map')}
                         className={`flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors text-sm ${
                           viewMode === 'map'
-                            ? 'bg-emerald-500 text-white'
+                            ? 'bg-emerald-500 text-[#fff]'
                             : 'text-slate-400 hover:text-white'
                         }`}
                       >
@@ -297,7 +297,7 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
                 </button>
                 <button
                   onClick={confirmDelete}
-                  className="flex-1 px-4 py-3 bg-red-500 rounded-lg text-white font-medium hover:bg-red-600 transition-colors"
+                  className="flex-1 px-4 py-3 bg-red-500 rounded-lg text-[#fff] font-medium hover:bg-red-600 transition-colors"
                 >
                   Ta bort
                 </button>

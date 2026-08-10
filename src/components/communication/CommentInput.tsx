@@ -308,7 +308,7 @@ export default function CommentInput({
             transition-all duration-150
             ${isSubmitting || (!content.trim() && attachments.length === 0)
               ? 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
-              : 'bg-[#20c58f] text-white hover:bg-[#1ab07f] shadow-sm'
+              : 'bg-[#20c58f] text-[#fff] hover:bg-[#1ab07f] shadow-sm'
             }
           `}
         >

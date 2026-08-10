@@ -340,7 +340,7 @@ export function MapLocationPicker({
         <button
           onClick={centerOnUserLocation}
           disabled={isLocating}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+          className="px-4 py-2 bg-blue-600 text-[#fff] rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
           title="Min position"
         >
           {isLocating ? (
@@ -394,7 +394,7 @@ export function MapLocationPicker({
           onPointerDown={(e) => e.stopPropagation()}
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
-          className="flex-1 px-4 py-3 bg-blue-600 rounded-lg text-white font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+          className="flex-1 px-4 py-3 bg-blue-600 rounded-lg text-[#fff] font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
         >
           <Check className="w-5 h-5" />
           Använd denna position

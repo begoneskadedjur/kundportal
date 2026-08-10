@@ -45,7 +45,7 @@ export default function PDFExportButton({
   }
 
   const buttonVariantClass = {
-    primary: 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600',
+    primary: 'bg-emerald-600 hover:bg-emerald-700 text-[#fff] border-emerald-600',
     secondary: 'bg-slate-700 hover:bg-slate-600 text-slate-200 border-slate-600',
     ghost: 'bg-transparent hover:bg-slate-700 text-slate-300 border-slate-600 hover:text-white'
   }[variant]

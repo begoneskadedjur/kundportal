@@ -329,7 +329,7 @@ const TechnicianCommissions: React.FC = () => {
 
           <button
             onClick={handleExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-[#fff] rounded-lg transition-colors"
           >
             <Download className="w-4 h-4" />
             Löneunderlag

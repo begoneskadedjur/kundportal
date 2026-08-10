@@ -199,7 +199,7 @@ const TrafficLightCaseList: React.FC<TrafficLightCaseListProps> = ({
               {/* Trendanalys-knapp */}
               <button
                 onClick={() => setShowTrendModal(true)}
-                className="bg-purple-600 hover:bg-purple-700 transition-colors px-4 py-2 rounded-lg text-white text-sm font-medium flex items-center gap-2"
+                className="bg-purple-600 hover:bg-purple-700 transition-colors px-4 py-2 rounded-lg text-[#fff] text-sm font-medium flex items-center gap-2"
               >
                 <TrendingUp className="w-4 h-4" />
                 Visa trendanalys

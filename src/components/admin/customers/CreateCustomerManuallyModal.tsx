@@ -251,7 +251,7 @@ export default function CreateCustomerManuallyModal({
               <React.Fragment key={s.id}>
                 <div className="flex items-center gap-2">
                   <div className={`w-7 h-7 rounded-full flex items-center justify-center border text-xs font-semibold transition-colors ${
-                    done ? 'bg-[#20c58f] border-[#20c58f] text-white' :
+                    done ? 'bg-[#20c58f] border-[#20c58f] text-[#fff]' :
                     active ? 'border-[#20c58f] text-[#20c58f] bg-[#20c58f]/10' :
                     'border-slate-700 text-slate-500 bg-slate-800/50'
                   }`}>

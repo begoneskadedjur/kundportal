@@ -173,7 +173,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
               size="sm"
               className={`text-xs transition-all duration-200 ${
                 filter.active 
-                  ? 'bg-[#20c58f] hover:bg-[#1ba876] text-white border-[#20c58f]'
+                  ? 'bg-[#20c58f] hover:bg-[#1ba876] text-[#fff] border-[#20c58f]'
                   : 'border-slate-600 text-slate-300 hover:text-white hover:border-slate-500'
               }`}
             >
@@ -191,7 +191,7 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
           <Filter className="w-4 h-4" />
           Avancerade filter
           {activeFilterCount > 0 && (
-            <span className="bg-[#20c58f] text-white text-xs rounded-full px-2 py-1">
+            <span className="bg-[#20c58f] text-[#fff] text-xs rounded-full px-2 py-1">
               {activeFilterCount}
             </span>
           )}

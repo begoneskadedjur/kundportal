@@ -103,7 +103,7 @@ const CriticalAcknowledgmentBanner: React.FC<CriticalAcknowledgmentBannerProps> 
         disabled={!isChecked || isSubmitting}
         className={`w-full justify-center transition-all duration-200 ${
           isChecked && !isSubmitting
-            ? 'bg-[#20c58f] hover:bg-[#1aad7d] text-white'
+            ? 'bg-[#20c58f] hover:bg-[#1aad7d] text-[#fff]'
             : 'bg-slate-700 text-slate-400 cursor-not-allowed'
         }`}
       >

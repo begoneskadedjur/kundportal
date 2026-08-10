@@ -170,7 +170,7 @@ export default function DeclineCaseConfirmDialog({
               disabled={!isConfirmValid || declining}
               className={`flex-1 flex items-center justify-center gap-2 ${
                 isConfirmValid && !declining
-                  ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                  ? 'bg-amber-600 hover:bg-amber-700 text-[#fff]'
                   : 'bg-slate-700 text-slate-400 cursor-not-allowed'
               }`}
               size="sm"

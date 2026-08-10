@@ -366,7 +366,7 @@ export default function CaseCard({
               <div className="flex items-center gap-2 pt-1">
                 <button
                   onClick={onEdit}
-                  className="flex-1 min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-white rounded-lg font-medium text-sm transition-colors"
+                  className="flex-1 min-h-[48px] flex items-center justify-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-[#fff] rounded-lg font-medium text-sm transition-colors"
                 >
                   <Edit className="w-4 h-4" />Öppna ärende
                 </button>

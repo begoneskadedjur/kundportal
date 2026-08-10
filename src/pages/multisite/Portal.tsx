@@ -155,7 +155,7 @@ const MultisitePortal: React.FC = () => {
               <p className="text-amber-300">Inga enheter hittades. Vill du skapa testdata?</p>
               <Button 
                 onClick={createTestSites}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
+                className="bg-amber-600 hover:bg-amber-700 text-[#fff]"
               >
                 Skapa testenheter
               </Button>

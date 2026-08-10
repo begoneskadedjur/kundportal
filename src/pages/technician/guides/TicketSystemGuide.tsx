@@ -180,11 +180,11 @@ const MockFilterTabs = ({
   const getColorClasses = (color: string, isActive: boolean) => {
     if (isActive) {
       switch (color) {
-        case 'red': return 'bg-red-600 text-white ring-2 ring-red-500/30'
-        case 'orange': return 'bg-orange-600 text-white ring-2 ring-orange-500/30'
-        case 'amber': return 'bg-amber-600 text-white ring-2 ring-amber-500/30'
-        case 'blue': return 'bg-blue-600 text-white ring-2 ring-blue-500/30'
-        case 'green': return 'bg-green-600 text-white ring-2 ring-green-500/30'
+        case 'red': return 'bg-red-600 text-[#fff] ring-2 ring-red-500/30'
+        case 'orange': return 'bg-orange-600 text-[#fff] ring-2 ring-orange-500/30'
+        case 'amber': return 'bg-amber-600 text-[#fff] ring-2 ring-amber-500/30'
+        case 'blue': return 'bg-blue-600 text-[#fff] ring-2 ring-blue-500/30'
+        case 'green': return 'bg-green-600 text-[#fff] ring-2 ring-green-500/30'
         default: return 'bg-slate-600 text-white ring-2 ring-slate-500/30'
       }
     }
@@ -243,7 +243,7 @@ const MockCommentInput = ({
       disabled={disabled || !value.trim()}
       className={`p-3 rounded-lg transition-all ${
         value.trim()
-          ? 'bg-cyan-500 hover:bg-cyan-400 text-white'
+          ? 'bg-cyan-500 hover:bg-cyan-400 text-[#fff]'
           : 'bg-slate-700 text-slate-500 cursor-not-allowed'
       }`}
       whileTap={value.trim() ? { scale: 0.95 } : {}}
@@ -1487,7 +1487,7 @@ export default function TicketSystemGuide() {
                       >
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
                           isActive
-                            ? 'bg-cyan-500 text-white'
+                            ? 'bg-cyan-500 text-[#fff]'
                             : isCompleted
                               ? 'bg-cyan-500/30 text-cyan-400'
                               : 'bg-slate-700 text-slate-400'
@@ -1522,7 +1522,7 @@ export default function TicketSystemGuide() {
                       onClick={() => goToStep(index)}
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                         isActive
-                          ? 'bg-cyan-500 text-white ring-4 ring-cyan-500/30'
+                          ? 'bg-cyan-500 text-[#fff] ring-4 ring-cyan-500/30'
                           : isCompleted
                             ? 'bg-cyan-500/30 text-cyan-400'
                             : 'bg-slate-800 text-slate-400'
@@ -1587,7 +1587,7 @@ export default function TicketSystemGuide() {
               {currentStep === guideSteps.length - 1 ? (
                 <Button
                   onClick={() => navigate(getTicketsPath())}
-                  className="flex items-center gap-2 py-4 px-6 text-lg bg-cyan-500 hover:bg-cyan-400 text-white"
+                  className="flex items-center gap-2 py-4 px-6 text-lg bg-cyan-500 hover:bg-cyan-400 text-[#fff]"
                 >
                   <Inbox className="w-5 h-5" />
                   Öppna Tickets
@@ -1595,7 +1595,7 @@ export default function TicketSystemGuide() {
               ) : (
                 <Button
                   onClick={goToNextStep}
-                  className="flex items-center gap-2 py-4 px-6 text-lg bg-cyan-500 hover:bg-cyan-400 text-white"
+                  className="flex items-center gap-2 py-4 px-6 text-lg bg-cyan-500 hover:bg-cyan-400 text-[#fff]"
                 >
                   <span>Nästa steg</span>
                   <ChevronRight className="w-5 h-5" />

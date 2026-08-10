@@ -706,7 +706,7 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
                 onClick={() => setActiveTab('cases')}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
                   activeTab === 'cases'
-                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+                    ? 'bg-purple-600 text-[#fff] shadow-lg shadow-purple-500/20'
                     : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
                 }`}
               >
@@ -717,7 +717,7 @@ const CustomerStatistics: React.FC<CustomerStatisticsProps> = ({ customer }) => 
                 onClick={() => setActiveTab('equipment')}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-all duration-200 ${
                   activeTab === 'equipment'
-                    ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
+                    ? 'bg-purple-600 text-[#fff] shadow-lg shadow-purple-500/20'
                     : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
                 }`}
               >

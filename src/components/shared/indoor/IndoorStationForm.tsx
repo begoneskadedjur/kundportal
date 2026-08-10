@@ -588,7 +588,7 @@ export function IndoorStationForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex-1 px-4 py-3 bg-[#20c58f] hover:bg-[#1ab07f] text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="flex-1 px-4 py-3 bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff] rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
             <>

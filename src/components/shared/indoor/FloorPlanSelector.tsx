@@ -136,7 +136,7 @@ export function FloorPlanSelector({
           className={`
             px-3 py-1.5 rounded-lg text-sm font-medium transition-all
             ${plan.id === selectedId
-              ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/20'
+              ? 'bg-teal-600 text-[#fff] shadow-lg shadow-teal-600/20'
               : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-white'
             }
           `}
@@ -184,7 +184,7 @@ export function FloorPlanChipSelector({
           className={`
             flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all whitespace-nowrap
             ${plan.id === selectedId
-              ? 'bg-teal-600 text-white'
+              ? 'bg-teal-600 text-[#fff]'
               : 'bg-slate-700/70 text-slate-300 hover:bg-slate-700'
             }
           `}

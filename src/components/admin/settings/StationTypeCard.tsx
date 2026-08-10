@@ -227,7 +227,7 @@ export function StationTypeCard({
                       onDelete()
                       setShowDeleteConfirm(false)
                     }}
-                    className="px-3 py-1.5 text-sm text-white bg-red-600 hover:bg-red-500 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-sm text-[#fff] bg-red-600 hover:bg-red-500 rounded-lg transition-colors"
                   >
                     Ta bort
                   </button>

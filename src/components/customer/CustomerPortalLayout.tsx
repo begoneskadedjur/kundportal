@@ -150,7 +150,7 @@ export function CustomerPortalLayout({
         <div className="p-4 border-b border-slate-700/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/20">
-              <span className="text-white font-bold text-sm">BG</span>
+              <span className="text-[#fff] font-bold text-sm">BG</span>
             </div>
             {!sidebarCollapsed && (
               <div className="overflow-hidden">
@@ -269,7 +269,7 @@ export function CustomerPortalLayout({
         {/* Logo & Company */}
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <span className="text-white font-bold text-xs">BG</span>
+            <span className="text-[#fff] font-bold text-xs">BG</span>
           </div>
           <div>
             <p className="text-white font-semibold text-sm leading-tight">BeGone</p>

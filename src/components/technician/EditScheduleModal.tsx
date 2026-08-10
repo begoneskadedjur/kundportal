@@ -284,7 +284,7 @@ export function EditScheduleModal({
                   <button
                     onClick={handleConfirm}
                     disabled={executing}
-                    className="flex-1 py-2 text-sm font-medium text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2 text-sm font-medium text-[#fff] bg-red-600 rounded-xl hover:bg-red-700 transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5"
                   >
                     {executing ? (
                       <>

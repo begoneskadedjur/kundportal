@@ -69,7 +69,7 @@ const PeriodSelector: React.FC<PeriodSelectorProps> = ({
           className={`
             px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
             ${selectedPeriod === period.key
-              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 scale-105'
+              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-[#fff] shadow-lg shadow-blue-500/25 scale-105'
               : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
             }
             ${compact ? 'px-2 py-1 text-xs' : ''}
@@ -150,7 +150,7 @@ const MonthNavigator: React.FC<MonthNavigatorProps> = ({
       {onGoToCurrent && !isCurrentMonth && (
         <button
           onClick={onGoToCurrent}
-          className="px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-white text-sm font-medium rounded-lg shadow-lg shadow-green-500/25 hover:scale-105 transition-all duration-200"
+          className="px-3 py-2 bg-gradient-to-r from-green-500 to-green-600 text-[#fff] text-sm font-medium rounded-lg shadow-lg shadow-green-500/25 hover:scale-105 transition-all duration-200"
         >
           Idag
         </button>
@@ -249,7 +249,7 @@ const CalendarWidget: React.FC<CalendarWidgetProps> = ({
                 key={day} 
                 className={`
                   text-center py-1 rounded cursor-pointer transition-all hover:bg-slate-700 text-slate-400
-                  ${isToday ? 'bg-blue-600 text-white font-bold shadow-lg' : ''}
+                  ${isToday ? 'bg-blue-600 text-[#fff] font-bold shadow-lg' : ''}
                   ${isHighlighted ? 'bg-green-600/50 text-green-200' : ''}
                 `}
               >

@@ -243,7 +243,7 @@ export default function TechnicianCustomerJourney() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500">
-              <GitBranch className="w-6 h-6 text-white" />
+              <GitBranch className="w-6 h-6 text-[#fff]" />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-white">Min Kundresa</h1>
@@ -271,7 +271,7 @@ export default function TechnicianCustomerJourney() {
               onClick={() => { setPeriod(p.key); setSelectedStageId(null) }}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 period === p.key
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}
             >
@@ -288,7 +288,7 @@ export default function TechnicianCustomerJourney() {
               onClick={() => { setCaseTypeFilter(f.key); setSelectedStageId(null) }}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 caseTypeFilter === f.key
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}
             >

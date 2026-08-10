@@ -518,7 +518,7 @@ export function StationTypeEditModal({
                     onClick={() => setMeasurementUnit(unit)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       measurementUnit === unit
-                        ? 'bg-emerald-500 text-white'
+                        ? 'bg-emerald-500 text-[#fff]'
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >
@@ -703,7 +703,7 @@ export function StationTypeEditModal({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-[#fff] font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />

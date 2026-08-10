@@ -686,7 +686,7 @@ export default function ImportCustomerByOrgnrModal({
                       onClick={() => setActiveContractTab(c.oneflow_contract_id)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors max-w-[260px] ${
                         isActive
-                          ? 'bg-[#20c58f] text-white'
+                          ? 'bg-[#20c58f] text-[#fff]'
                           : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
                       }`}
                       title={label}

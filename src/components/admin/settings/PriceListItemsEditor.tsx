@@ -529,7 +529,7 @@ export function PriceListItemsEditor({
               onClick={() => setBulkMode('percent')}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                 bulkMode === 'percent'
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -539,7 +539,7 @@ export function PriceListItemsEditor({
               onClick={() => setBulkMode('fixed')}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                 bulkMode === 'fixed'
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
@@ -556,7 +556,7 @@ export function PriceListItemsEditor({
                   onClick={() => setMarkupPercent(pct.toString())}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
                     markupPercent === pct.toString()
-                      ? 'bg-[#20c58f] text-white'
+                      ? 'bg-[#20c58f] text-[#fff]'
                       : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                   }`}
                 >
@@ -579,7 +579,7 @@ export function PriceListItemsEditor({
               <button
                 onClick={applyBulkMarkup}
                 disabled={markupPercent === ''}
-                className="px-4 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                className="px-4 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-[#fff] text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 <Percent className="w-3.5 h-3.5" />
                 Sätt pris
@@ -602,7 +602,7 @@ export function PriceListItemsEditor({
               <button
                 onClick={applyBulkFixedPrice}
                 disabled={bulkFixedPrice === ''}
-                className="px-4 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                className="px-4 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-[#fff] text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
               >
                 <Check className="w-3.5 h-3.5" />
                 Sätt pris
@@ -682,7 +682,7 @@ export function PriceListItemsEditor({
 
                       {isDirty && (
                         <div className="flex items-center gap-1">
-                          <button onClick={() => confirmPrice(service.id)} disabled={isSaving} className="p-2 rounded bg-[#20c58f] hover:bg-[#1ab07d] text-white min-h-[44px] min-w-[44px] flex items-center justify-center">
+                          <button onClick={() => confirmPrice(service.id)} disabled={isSaving} className="p-2 rounded bg-[#20c58f] hover:bg-[#1ab07d] text-[#fff] min-h-[44px] min-w-[44px] flex items-center justify-center">
                             {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                           </button>
                           <button onClick={() => resetPrice(service.id)} className="p-2 rounded bg-slate-600 hover:bg-slate-500 text-slate-300 min-h-[44px] min-w-[44px] flex items-center justify-center">
@@ -840,7 +840,7 @@ export function PriceListItemsEditor({
                               <button
                                 onClick={() => confirmPrice(service.id)}
                                 disabled={isSaving}
-                                className="p-1.5 rounded bg-[#20c58f] hover:bg-[#1ab07d] text-white transition-colors disabled:opacity-50"
+                                className="p-1.5 rounded bg-[#20c58f] hover:bg-[#1ab07d] text-[#fff] transition-colors disabled:opacity-50"
                                 title="Bekräfta (Enter)"
                               >
                                 {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
@@ -899,7 +899,7 @@ export function PriceListItemsEditor({
             <button
               onClick={confirmAllDirty}
               disabled={isBulkSaving}
-              className="px-3 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-white text-sm rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              className="px-3 py-1.5 bg-[#20c58f] hover:bg-[#1ab07d] text-[#fff] text-sm rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50"
             >
               {isBulkSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
               {isBulkSaving ? 'Sparar...' : 'Spara alla'}

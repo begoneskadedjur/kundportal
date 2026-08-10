@@ -2,10 +2,11 @@
 
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { MultisiteProvider } from './contexts/MultisiteContext';
 import { ImpersonationProvider, useImpersonation } from './contexts/ImpersonationContext';
 import { useAuth } from './contexts/AuthContext';
-import { Toaster } from 'react-hot-toast';
+import { ThemedToaster } from './components/shared/ThemedToaster';
 
 // Auth pages
 import Login from './pages/auth/Login';
@@ -131,6 +132,7 @@ function App() {
   return (
     <Router>
       <AuthProvider>
+        <ThemeProvider>
         <ImpersonationProvider>
         <MultisiteProvider>
           <AppLayout>
@@ -423,34 +425,12 @@ function App() {
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
 
-          <Toaster
-            position="top-right"
-            containerStyle={{ zIndex: 2147483647 }}
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: '#1e293b',
-                color: '#f8fafc',
-                border: '1px solid #475569',
-              },
-              success: {
-                iconTheme: {
-                  primary: '#22c55e',
-                  secondary: '#f8fafc',
-                },
-              },
-              error: {
-                iconTheme: {
-                  primary: '#ef4444',
-                  secondary: '#f8fafc',
-                },
-              },
-            }}
-          />
+          <ThemedToaster />
         </div>
         </AppLayout>
         </MultisiteProvider>
         </ImpersonationProvider>
+        </ThemeProvider>
       </AuthProvider>
     </Router>
   );

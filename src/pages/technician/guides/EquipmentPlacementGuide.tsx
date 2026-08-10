@@ -64,7 +64,7 @@ const MockCustomerChip = ({
     onClick={onClick}
     className={`px-4 py-2 rounded-full text-base font-medium transition-all whitespace-nowrap ${
       selected
-        ? 'bg-emerald-500 text-white'
+        ? 'bg-emerald-500 text-[#fff]'
         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
     }`}
     animate={animated ? {
@@ -101,7 +101,7 @@ const MockAddButton = ({
   return (
     <motion.button
       onClick={onClick}
-      className={`${sizeClasses} rounded-full bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center shadow-lg transition-all duration-200`}
+      className={`${sizeClasses} rounded-full bg-emerald-500 hover:bg-emerald-400 text-[#fff] flex items-center justify-center shadow-lg transition-all duration-200`}
       animate={animated ? {
         boxShadow: [
           '0 0 0 0 rgba(16, 185, 129, 0)',
@@ -1201,7 +1201,7 @@ const guideSteps: GuideStep[] = [
                   <span className="text-slate-400">Utrustning:</span>
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                    <span className="text-white font-medium">Mekanisk fälla</span>
+                    <span className="text-[#fff] font-medium">Mekanisk fälla</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
@@ -1224,7 +1224,7 @@ const guideSteps: GuideStep[] = [
                       ? 'bg-emerald-500/20 border-2 border-emerald-500/40 text-emerald-300'
                       : saving
                         ? 'bg-slate-700 text-slate-400'
-                        : 'bg-emerald-500 hover:bg-emerald-400 text-white'
+                        : 'bg-emerald-500 hover:bg-emerald-400 text-[#fff]'
                   }`}
                   whileTap={saving || saved ? {} : { scale: 0.98 }}
                 >
@@ -1565,7 +1565,7 @@ export default function EquipmentPlacementGuide() {
                       >
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
                           isActive
-                            ? 'bg-emerald-500 text-white'
+                            ? 'bg-emerald-500 text-[#fff]'
                             : isCompleted
                               ? 'bg-emerald-500/30 text-emerald-400'
                               : 'bg-slate-700 text-slate-400'
@@ -1600,7 +1600,7 @@ export default function EquipmentPlacementGuide() {
                       onClick={() => goToStep(index)}
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                         isActive
-                          ? 'bg-emerald-500 text-white ring-4 ring-emerald-500/30'
+                          ? 'bg-emerald-500 text-[#fff] ring-4 ring-emerald-500/30'
                           : isCompleted
                             ? 'bg-emerald-500/30 text-emerald-400'
                             : 'bg-slate-800 text-slate-400'
@@ -1665,7 +1665,7 @@ export default function EquipmentPlacementGuide() {
               {currentStep === guideSteps.length - 1 ? (
                 <Button
                   onClick={() => navigate('/technician/equipment')}
-                  className="flex items-center gap-2 py-4 px-6 text-lg bg-emerald-500 hover:bg-emerald-400 text-white"
+                  className="flex items-center gap-2 py-4 px-6 text-lg bg-emerald-500 hover:bg-emerald-400 text-[#fff]"
                 >
                   <MapPin className="w-5 h-5" />
                   Öppna Utrustning
@@ -1673,7 +1673,7 @@ export default function EquipmentPlacementGuide() {
               ) : (
                 <Button
                   onClick={goToNextStep}
-                  className="flex items-center gap-2 py-4 px-6 text-lg bg-emerald-500 hover:bg-emerald-400 text-white"
+                  className="flex items-center gap-2 py-4 px-6 text-lg bg-emerald-500 hover:bg-emerald-400 text-[#fff]"
                 >
                   <span>Nästa steg</span>
                   <ChevronRight className="w-5 h-5" />

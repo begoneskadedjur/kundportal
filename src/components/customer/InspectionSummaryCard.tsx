@@ -173,7 +173,7 @@ export function InspectionSummaryCard({
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                <span className="text-white font-medium text-sm">{statusCounts.ok}</span>
+                <span className="text-[#fff] font-medium text-sm">{statusCounts.ok}</span>
               </div>
               {statusCounts.activity > 0 && (
                 <div className="flex items-center gap-1">

@@ -140,7 +140,7 @@ export function CustomerEquipmentMap({ customerId, customerName }: CustomerEquip
             onClick={() => setViewMode('map')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
               viewMode === 'map'
-                ? 'bg-emerald-500 text-white'
+                ? 'bg-emerald-500 text-[#fff]'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
@@ -151,7 +151,7 @@ export function CustomerEquipmentMap({ customerId, customerName }: CustomerEquip
             onClick={() => setViewMode('list')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
               viewMode === 'list'
-                ? 'bg-emerald-500 text-white'
+                ? 'bg-emerald-500 text-[#fff]'
                 : 'text-slate-400 hover:text-white'
             }`}
           >

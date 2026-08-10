@@ -206,7 +206,7 @@ Vad kan jag hjälpa dig med idag?`,
       <div className="fixed bottom-24 right-6 z-50">
         <button
           onClick={() => setIsOpen(true)}
-          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-full p-4 shadow-lg transition-all duration-200 hover:scale-105 group"
+          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-[#fff] rounded-full p-4 shadow-lg transition-all duration-200 hover:scale-105 group"
           aria-label="Öppna koordinator AI-assistent"
         >
           <div className="relative">
@@ -319,7 +319,7 @@ Vad kan jag hjälpa dig med idag?`,
               <div className="flex justify-start">
                 <div className="flex gap-3 max-w-[85%]">
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">
-                    <Loader className="w-4 h-4 text-white animate-spin" />
+                    <Loader className="w-4 h-4 text-[#fff] animate-spin" />
                   </div>
                   <div className="bg-slate-800/50 border border-slate-600 rounded-lg px-4 py-3">
                     <div className="flex items-center gap-2 text-slate-300 text-sm">

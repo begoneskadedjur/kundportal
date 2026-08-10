@@ -456,7 +456,7 @@ export function ContractInvoiceModal({
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="flex items-center gap-2 px-5 py-2.5 bg-[#20c58f] hover:bg-[#1bb07e] text-white rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#20c58f] hover:bg-[#1bb07e] text-[#fff] rounded-xl font-medium text-sm transition-colors disabled:opacity-60"
               >
                 {generating ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
                 {generating ? 'Genererar...' : 'Generera fakturarader'}
@@ -762,7 +762,7 @@ export function ContractInvoiceModal({
                 <button
                   onClick={handleSendToFortnox}
                   disabled={sendingToFortnox}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#20c58f] hover:bg-[#1bb07e] text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#20c58f] hover:bg-[#1bb07e] text-[#fff] rounded-lg transition-colors disabled:opacity-50"
                 >
                   {sendingToFortnox
                     ? <RefreshCw className="w-4 h-4 animate-spin" />
@@ -774,7 +774,7 @@ export function ContractInvoiceModal({
                 <button
                   onClick={() => handleMarkStatus('booked', 'Faktura bokförd')}
                   disabled={updating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 text-[#fff] rounded-lg transition-colors disabled:opacity-50"
                 >
                   <BookCheck className="w-4 h-4" />
                   Bokför
@@ -784,7 +784,7 @@ export function ContractInvoiceModal({
                 <button
                   onClick={() => handleMarkStatus('sent', 'Faktura markerad som skickad')}
                   disabled={updating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-purple-600 hover:bg-purple-700 text-[#fff] rounded-lg transition-colors disabled:opacity-50"
                 >
                   <Send className="w-4 h-4" />
                   Markera skickad
@@ -794,7 +794,7 @@ export function ContractInvoiceModal({
                 <button
                   onClick={() => handleMarkStatus('paid', 'Faktura markerad som betald')}
                   disabled={updating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-[#fff] rounded-lg transition-colors disabled:opacity-50"
                 >
                   <DollarSign className="w-4 h-4" />
                   Markera betald
@@ -804,7 +804,7 @@ export function ContractInvoiceModal({
                 <button
                   onClick={handleResetForNewInvoice}
                   disabled={updating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#20c58f] hover:bg-[#1bb07e] text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[#20c58f] hover:bg-[#1bb07e] text-[#fff] rounded-lg transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className="w-4 h-4" />
                   Skapa ny faktura

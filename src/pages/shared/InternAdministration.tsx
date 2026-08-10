@@ -135,7 +135,7 @@ export default function InternAdministration() {
       count: stats?.unansweredMentions || 0,
       icon: AtSign,
       color: 'text-red-400',
-      activeColor: 'bg-red-600 text-white'
+      activeColor: 'bg-red-600 text-[#fff]'
     },
     {
       id: 'replies_to_me' as TicketFilter,
@@ -145,7 +145,7 @@ export default function InternAdministration() {
       count: stats?.repliesToMe || 0,
       icon: CornerDownRight,
       color: 'text-orange-400',
-      activeColor: 'bg-orange-600 text-white'
+      activeColor: 'bg-orange-600 text-[#fff]'
     },
     {
       id: 'replies' as TicketFilter,
@@ -155,7 +155,7 @@ export default function InternAdministration() {
       count: stats?.waitingForReplies || 0,
       icon: MessageCircle,
       color: 'text-amber-400',
-      activeColor: 'bg-amber-600 text-white'
+      activeColor: 'bg-amber-600 text-[#fff]'
     },
     {
       id: 'activity' as TicketFilter,
@@ -165,7 +165,7 @@ export default function InternAdministration() {
       count: stats?.newActivity || 0,
       icon: Bell,
       color: 'text-blue-400',
-      activeColor: 'bg-blue-600 text-white'
+      activeColor: 'bg-blue-600 text-[#fff]'
     },
     {
       id: 'all' as TicketFilter,
@@ -185,7 +185,7 @@ export default function InternAdministration() {
       count: stats?.resolvedTickets || 0,
       icon: Archive,
       color: 'text-green-400',
-      activeColor: 'bg-green-600 text-white'
+      activeColor: 'bg-green-600 text-[#fff]'
     }
   ];
 
@@ -231,7 +231,7 @@ export default function InternAdministration() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500">
-                <MessageSquareText className="w-6 h-6 text-white" />
+                <MessageSquareText className="w-6 h-6 text-[#fff]" />
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-white">Tickets</h1>

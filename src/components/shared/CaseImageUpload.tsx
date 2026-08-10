@@ -230,7 +230,7 @@ export default function CaseImageUpload({
               type="button"
               onClick={uploadAllFiles}
               disabled={isUploading}
-              className="px-3 py-1 text-sm bg-green-600 hover:bg-green-500 text-white rounded transition-colors disabled:opacity-50"
+              className="px-3 py-1 text-sm bg-green-600 hover:bg-green-500 text-[#fff] rounded transition-colors disabled:opacity-50"
             >
               {isUploading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
@@ -398,7 +398,7 @@ export default function CaseImageUpload({
             type="button"
             onClick={uploadAllFiles}
             disabled={isUploading || pendingFiles.length === 0}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-500 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-500 text-[#fff] font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isUploading ? (
               <>

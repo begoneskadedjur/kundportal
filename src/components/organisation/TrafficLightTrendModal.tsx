@@ -381,7 +381,7 @@ const TrafficLightTrendModal: React.FC<TrafficLightTrendModalProps> = ({
                     onClick={() => setTimeRange(key as '3m' | '6m' | '1y')}
                     className={`px-3 py-1 rounded text-sm transition-all ${
                       timeRange === key
-                        ? 'bg-purple-600 text-white'
+                        ? 'bg-purple-600 text-[#fff]'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >

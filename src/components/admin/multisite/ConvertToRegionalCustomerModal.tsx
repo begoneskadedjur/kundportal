@@ -286,7 +286,7 @@ export default function ConvertToRegionalCustomerModal({
               <div className="flex items-center gap-1.5">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition-colors ${
                   step === s.key
-                    ? 'bg-[#20c58f] text-white'
+                    ? 'bg-[#20c58f] text-[#fff]'
                     : stepIndex > i
                     ? 'bg-[#20c58f]/20 text-[#20c58f]'
                     : 'bg-slate-700 text-slate-400'

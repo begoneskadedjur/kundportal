@@ -1,6 +1,7 @@
 // src/components/customer/CustomerPortalNavigation.tsx - Navigation for Customer Portal
 import React from 'react'
 import { BarChart3, Home, LogOut, FileText, Building2, ClipboardCheck, MapPin } from 'lucide-react'
+import { ThemeToggle } from '../shared/ThemeToggle'
 import { useAuth } from '../../contexts/AuthContext'
 import { useMultisite } from '../../contexts/MultisiteContext'
 import Button from '../ui/Button'
@@ -34,7 +35,7 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">BG</span>
+                <span className="text-[#fff] font-bold text-sm">BG</span>
               </div>
               <span className="text-white font-semibold">BeGone</span>
             </div>
@@ -50,7 +51,7 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
             {multisiteRole && organization && (
               <a
                 href="/multisite"
-                className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg shadow-purple-500/25"
+                className="px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium bg-gradient-to-r from-purple-600 to-blue-600 text-[#fff] hover:from-purple-700 hover:to-blue-700 transition-all duration-200 shadow-lg shadow-purple-500/25"
               >
                 <Building2 className="w-4 h-4" />
                 Multisite-portal
@@ -66,7 +67,7 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
               className={`
                 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
                 ${currentView === 'dashboard'
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                  ? 'bg-emerald-500 text-[#fff] shadow-lg shadow-emerald-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }
               `}
@@ -80,7 +81,7 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
               className={`
                 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
                 ${currentView === 'stations'
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                  ? 'bg-emerald-500 text-[#fff] shadow-lg shadow-emerald-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }
               `}
@@ -94,7 +95,7 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
               className={`
                 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
                 ${currentView === 'inspections'
-                  ? 'bg-teal-500 text-white shadow-lg shadow-teal-500/25'
+                  ? 'bg-teal-500 text-[#fff] shadow-lg shadow-teal-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }
               `}
@@ -108,7 +109,7 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
               className={`
                 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
                 ${currentView === 'statistics'
-                  ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25'
+                  ? 'bg-purple-500 text-[#fff] shadow-lg shadow-purple-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }
               `}
@@ -122,7 +123,7 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
               className={`
                 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
                 ${currentView === 'reports'
-                  ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+                  ? 'bg-blue-500 text-[#fff] shadow-lg shadow-blue-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }
               `}
@@ -133,15 +134,18 @@ const CustomerPortalNavigation: React.FC<CustomerPortalNavigationProps> = ({
 
           </div>
 
-          {/* Sign Out */}
-          <Button
-            onClick={handleSignOut}
-            variant="secondary"
-            className="bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white border-slate-600 hover:border-slate-500"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Logga ut
-          </Button>
+          {/* Tema + Sign Out */}
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button
+              onClick={handleSignOut}
+              variant="secondary"
+              className="bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white border-slate-600 hover:border-slate-500"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Logga ut
+            </Button>
+          </div>
         </div>
       </div>
     </div>

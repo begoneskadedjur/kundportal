@@ -441,7 +441,7 @@ const EconomicInsightsChart: React.FC = () => {
           <p className="text-red-400 mb-4">{error}</p>
           <button 
             onClick={fetchInsightsData}
-            className="px-4 py-2 bg-[#20c58f] text-white rounded-lg hover:bg-[#1aa87a] transition-colors"
+            className="px-4 py-2 bg-[#20c58f] text-[#fff] rounded-lg hover:bg-[#1aa87a] transition-colors"
           >
             Försök igen
           </button>
@@ -464,7 +464,7 @@ const EconomicInsightsChart: React.FC = () => {
                 onClick={() => setSelectedView(view.key as any)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   selectedView === view.key
-                    ? 'bg-[#20c58f] text-white'
+                    ? 'bg-[#20c58f] text-[#fff]'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
@@ -485,7 +485,7 @@ const EconomicInsightsChart: React.FC = () => {
                 onClick={() => setSelectedPeriod(period.key)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   selectedPeriod === period.key
-                    ? 'bg-[#20c58f] text-white'
+                    ? 'bg-[#20c58f] text-[#fff]'
                     : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                 }`}
               >
@@ -519,7 +519,7 @@ const EconomicInsightsChart: React.FC = () => {
             {!isCurrentMonth() && (
               <button 
                 onClick={goToCurrentMonth}
-                className="ml-2 px-3 py-2 bg-[#20c58f] text-white rounded-lg hover:bg-[#1aa87a] transition-colors text-sm"
+                className="ml-2 px-3 py-2 bg-[#20c58f] text-[#fff] rounded-lg hover:bg-[#1aa87a] transition-colors text-sm"
               >
                 Idag
               </button>

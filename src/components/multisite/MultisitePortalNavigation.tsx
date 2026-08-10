@@ -50,7 +50,7 @@ const MultisitePortalNavigation: React.FC<MultisitePortalNavigationProps> = ({
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">BG</span>
+                <span className="text-[#fff] font-bold text-sm">BG</span>
               </div>
               <span className="text-white font-semibold">BeGone</span>
             </div>
@@ -84,7 +84,7 @@ const MultisitePortalNavigation: React.FC<MultisitePortalNavigationProps> = ({
               className={`
                 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
                 ${currentView === 'dashboard'
-                  ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+                  ? 'bg-emerald-500 text-[#fff] shadow-lg shadow-emerald-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }
               `}
@@ -98,7 +98,7 @@ const MultisitePortalNavigation: React.FC<MultisitePortalNavigationProps> = ({
               className={`
                 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
                 ${currentView === 'statistics'
-                  ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/25'
+                  ? 'bg-purple-500 text-[#fff] shadow-lg shadow-purple-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }
               `}
@@ -112,7 +112,7 @@ const MultisitePortalNavigation: React.FC<MultisitePortalNavigationProps> = ({
               className={`
                 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
                 ${currentView === 'reports'
-                  ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
+                  ? 'bg-blue-500 text-[#fff] shadow-lg shadow-blue-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }
               `}
@@ -126,7 +126,7 @@ const MultisitePortalNavigation: React.FC<MultisitePortalNavigationProps> = ({
               className={`
                 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-all duration-200
                 ${currentView === 'traffic-light'
-                  ? 'bg-yellow-500 text-white shadow-lg shadow-yellow-500/25'
+                  ? 'bg-yellow-500 text-[#fff] shadow-lg shadow-yellow-500/25'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }
               `}

@@ -198,7 +198,7 @@ const MultisiteReports: React.FC = () => {
         <div className="bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-green-500/20 rounded-2xl p-6 border border-slate-700/50 backdrop-blur">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
-              <FileText className="w-6 h-6 text-white" />
+              <FileText className="w-6 h-6 text-[#fff]" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-white">Rapporter</h1>

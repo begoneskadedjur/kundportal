@@ -934,7 +934,7 @@ export function EquipmentPlacementForm({
                 setFormData(prev => ({ ...prev, photo: null }))
                 setPhotoPreview(null)
               }}
-              className="absolute top-2 right-2 p-2 bg-red-500 rounded-full text-white hover:bg-red-600"
+              className="absolute top-2 right-2 p-2 bg-red-500 rounded-full text-[#fff] hover:bg-red-600"
             >
               <X className="w-4 h-4" />
             </button>
@@ -982,7 +982,7 @@ export function EquipmentPlacementForm({
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
           disabled={isSubmitting}
-          className="flex-1 px-4 py-3 bg-[#20c58f] rounded-lg text-white font-medium hover:bg-[#1ab07f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="flex-1 px-4 py-3 bg-[#20c58f] rounded-lg text-[#fff] font-medium hover:bg-[#1ab07f] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {isSubmitting ? (
             <>

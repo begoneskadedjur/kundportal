@@ -1756,7 +1756,7 @@ export default function StationInspectionModule() {
               onClick={() => setActiveTab('outdoor')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'outdoor'
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
@@ -1767,7 +1767,7 @@ export default function StationInspectionModule() {
               onClick={() => setActiveTab('indoor')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === 'indoor'
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
@@ -1837,7 +1837,7 @@ export default function StationInspectionModule() {
                 <div className="flex justify-end">
                   <button
                     onClick={startOutdoorWizard}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-white rounded-lg text-sm font-medium transition-colors"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-[#fff] rounded-lg text-sm font-medium transition-colors"
                   >
                     <Navigation className="w-4 h-4" />
                     Starta kontrollrunda
@@ -2012,7 +2012,7 @@ export default function StationInspectionModule() {
                     {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && filteredIndoorStations.some(s => !inspectedStationIds.has(s.id)) && (
                       <button
                         onClick={startIndoorWizard}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-white rounded-lg text-sm font-medium transition-colors"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-[#fff] rounded-lg text-sm font-medium transition-colors"
                       >
                         <Navigation className="w-4 h-4" />
                         Starta kontrollrunda
@@ -2221,7 +2221,7 @@ export default function StationInspectionModule() {
                 </button>
                 <button
                   onClick={confirmQuickOk}
-                  className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-[#fff] rounded-lg font-medium transition-colors"
                 >
                   OK
                 </button>
@@ -2336,7 +2336,7 @@ export default function StationInspectionModule() {
                     handleCompleteInspection()
                   }}
                   disabled={!progress || progress.inspectedStations < progress.totalStations}
-                  className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-[#fff] rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Ja, klarmarkera
                 </button>
@@ -2383,7 +2383,7 @@ export default function StationInspectionModule() {
                 </button>
                 <button
                   onClick={handleReopenInspection}
-                  className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-medium transition-colors"
+                  className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 text-[#fff] rounded-lg font-medium transition-colors"
                 >
                   Ja, lås upp
                 </button>
@@ -2697,7 +2697,7 @@ export default function StationInspectionModule() {
                     />
                     <button
                       onClick={handleRemovePhoto}
-                      className="absolute top-2 right-2 p-2 bg-red-500 rounded-full text-white hover:bg-red-600 transition-colors"
+                      className="absolute top-2 right-2 p-2 bg-red-500 rounded-full text-[#fff] hover:bg-red-600 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

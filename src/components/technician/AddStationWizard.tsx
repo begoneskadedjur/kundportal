@@ -510,7 +510,7 @@ export function AddStationWizard({
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
                       step < currentStep
-                        ? 'bg-emerald-500 text-white'
+                        ? 'bg-emerald-500 text-[#fff]'
                         : step === currentStep
                         ? 'bg-emerald-500/20 text-emerald-400 ring-2 ring-emerald-500'
                         : 'bg-slate-700 text-slate-400'
@@ -703,7 +703,7 @@ export function AddStationWizard({
                         </p>
                         <button
                           onClick={() => setShowUploadModal(true)}
-                          className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-xl transition-colors inline-flex items-center gap-2"
+                          className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 text-[#fff] font-medium rounded-xl transition-colors inline-flex items-center gap-2"
                         >
                           <Upload className="w-5 h-5" />
                           Ladda upp planritning
@@ -723,7 +723,7 @@ export function AddStationWizard({
                               className={`
                                 flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap
                                 ${plan.id === selectedFloorPlan?.id
-                                  ? 'bg-cyan-600 text-white'
+                                  ? 'bg-cyan-600 text-[#fff]'
                                   : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
                                 }
                               `}
@@ -831,7 +831,7 @@ export function AddStationWizard({
                         {placementMode === 'view' && selectedFloorPlan && (
                           <button
                             onClick={() => setShowTypeSelector(true)}
-                            className="absolute bottom-4 right-4 w-14 h-14 bg-cyan-600 hover:bg-cyan-500 text-white rounded-full shadow-lg shadow-cyan-600/30 flex items-center justify-center transition-all hover:scale-105 z-20"
+                            className="absolute bottom-4 right-4 w-14 h-14 bg-cyan-600 hover:bg-cyan-500 text-[#fff] rounded-full shadow-lg shadow-cyan-600/30 flex items-center justify-center transition-all hover:scale-105 z-20"
                           >
                             <Plus className="w-6 h-6" />
                           </button>
@@ -856,7 +856,7 @@ export function AddStationWizard({
                           <div className="flex flex-col gap-2">
                             <button
                               onClick={() => setShowTypeSelector(true)}
-                              className="w-full px-3 py-2 text-sm bg-[#20c58f] hover:bg-[#1ab07f] text-white rounded-lg transition-colors flex items-center justify-center gap-1.5 font-medium"
+                              className="w-full px-3 py-2 text-sm bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff] rounded-lg transition-colors flex items-center justify-center gap-1.5 font-medium"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               Placera fler stationer

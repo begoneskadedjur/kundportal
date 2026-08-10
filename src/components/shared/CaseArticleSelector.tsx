@@ -595,7 +595,7 @@ export default function CaseArticleSelector({
           <button
             type="button"
             onClick={() => setShowArticleList(!showArticleList)}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-[#20c58f] hover:bg-[#1bb07e] text-white rounded-lg transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-[#20c58f] hover:bg-[#1bb07e] text-[#fff] rounded-lg transition-colors"
           >
             {showArticleList ? (
               <ChevronDown className="w-3.5 h-3.5" />
@@ -639,7 +639,7 @@ export default function CaseArticleSelector({
               onClick={() => setCategoryFilter('all')}
               className={`px-2 py-0.5 text-xs rounded-md transition-colors ${
                 categoryFilter === 'all'
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'bg-slate-700/50 text-slate-400 hover:text-white'
               }`}
             >
@@ -656,7 +656,7 @@ export default function CaseArticleSelector({
                   onClick={() => setCategoryFilter(cat)}
                   className={`px-2 py-0.5 text-xs rounded-md transition-colors ${
                     categoryFilter === cat
-                      ? 'bg-[#20c58f] text-white'
+                      ? 'bg-[#20c58f] text-[#fff]'
                       : 'bg-slate-700/50 text-slate-400 hover:text-white'
                   }`}
                 >

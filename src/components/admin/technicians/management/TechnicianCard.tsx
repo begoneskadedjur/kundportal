@@ -151,7 +151,7 @@ export default function TechnicianCard({
             {/* Login Status Indicator */}
             {technician.has_login && (
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                <Key className="w-2.5 h-2.5 text-white" />
+                <Key className="w-2.5 h-2.5 text-[#fff]" />
               </div>
             )}
           </div>

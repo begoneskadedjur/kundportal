@@ -140,7 +140,7 @@ export function AppHeader() {
             >
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="w-5 h-5 text-[#fff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <circle cx="12" cy="12" r="10" />
                     <path d="M8 12l2 2 4-4" />
                   </svg>
@@ -194,7 +194,7 @@ export function AppHeader() {
                 `}
               >
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">
+                  <span className="text-[#fff] text-xs font-bold">
                     {getUserDisplayName().charAt(0).toUpperCase()}
                   </span>
                 </div>

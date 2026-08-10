@@ -997,13 +997,13 @@ export default function OneflowContractCreator() {
                   whileTap={{ scale: 0.98 }}
                 >
                   {template.popular && (
-                    <div className="absolute -top-2 -right-2 bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                    <div className="absolute -top-2 -right-2 bg-orange-500 text-[#fff] text-xs px-2 py-1 rounded-full font-medium">
                       Populär
                     </div>
                   )}
                   
                   {wizardData.documentType === 'offer' && template.category && (
-                    <div className="absolute -top-2 -left-2 bg-blue-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                    <div className="absolute -top-2 -left-2 bg-blue-500 text-[#fff] text-xs px-2 py-1 rounded-full font-medium">
                       {template.category === 'company' ? 'Företag' : 'Privatperson'}
                     </div>
                   )}

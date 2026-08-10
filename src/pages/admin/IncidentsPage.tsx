@@ -348,7 +348,7 @@ export default function IncidentsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500">
-            <AlertTriangle className="w-6 h-6 text-white" />
+            <AlertTriangle className="w-6 h-6 text-[#fff]" />
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-white">Tillbud & Avvikelser</h1>
@@ -358,7 +358,7 @@ export default function IncidentsPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-[#20c58f] hover:bg-[#1bb07f] rounded-lg text-sm text-white font-medium transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-[#20c58f] hover:bg-[#1bb07f] rounded-lg text-sm text-[#fff] font-medium transition-colors"
           >
             <Plus className="w-4 h-4" />
             Rapportera händelse
@@ -619,7 +619,7 @@ export default function IncidentsPage() {
               type="button"
               onClick={handleSubmit}
               disabled={saving || !formDescription.trim() || selectedEmployees.length === 0}
-              className="flex items-center gap-2 px-4 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] rounded-lg text-sm text-white font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] rounded-lg text-sm text-[#fff] font-medium transition-colors disabled:opacity-50"
             >
               {saving && <RefreshCw className="w-3 h-3 animate-spin" />}
               Skicka rapport
@@ -1177,7 +1177,7 @@ function IncidentManageModal({
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] rounded-lg text-sm text-white font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] rounded-lg text-sm text-[#fff] font-medium transition-colors disabled:opacity-50"
           >
             {saving && <RefreshCw className="w-3 h-3 animate-spin" />}
             {status === 'avslutad' ? 'Spara & avsluta' : 'Spara'}

@@ -125,7 +125,7 @@ export default function CommunicationSlidePanel({
               onClick={() => setActiveTab('internal')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'internal'
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'bg-slate-800/50 text-slate-400 hover:text-slate-300'
               }`}
             >
@@ -136,7 +136,7 @@ export default function CommunicationSlidePanel({
               onClick={() => setActiveTab('oneflow')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'oneflow'
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'bg-slate-800/50 text-slate-400 hover:text-slate-300'
               }`}
             >

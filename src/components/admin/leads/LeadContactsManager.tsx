@@ -293,7 +293,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
         <Button
           onClick={() => setShowForm(!showForm)}
           size="sm"
-          className="bg-green-600 hover:bg-green-700 text-white"
+          className="bg-green-600 hover:bg-green-700 text-[#fff]"
         >
           <Plus className="w-4 h-4 mr-2" />
           Lägg till
@@ -538,7 +538,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
               <Button
                 type="submit"
                 disabled={loading}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                className="bg-green-600 hover:bg-green-700 text-[#fff]"
               >
                 {loading ? (
                   <>

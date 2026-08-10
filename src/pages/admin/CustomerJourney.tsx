@@ -311,7 +311,7 @@ export default function CustomerJourney() {
               onClick={() => { setPeriod(p.key); setSelectedStageId(null) }}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 period === p.key
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}
             >
@@ -328,7 +328,7 @@ export default function CustomerJourney() {
               onClick={() => { setCaseTypeFilter(f.key); setSelectedStageId(null) }}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 caseTypeFilter === f.key
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}
             >

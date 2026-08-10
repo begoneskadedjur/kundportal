@@ -559,7 +559,7 @@ export function FloorPlanViewer({
         <div className="absolute bottom-4 left-4 z-20 flex gap-2">
           <button
             onClick={handleConfirmPosition}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ab07f] text-white text-sm font-medium rounded-xl shadow-lg transition-colors min-h-[44px]"
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff] text-sm font-medium rounded-xl shadow-lg transition-colors min-h-[44px]"
           >
             <Check className="w-4 h-4" />
             Bekräfta position

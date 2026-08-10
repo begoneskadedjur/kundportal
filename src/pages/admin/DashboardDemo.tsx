@@ -337,7 +337,7 @@ const DashboardDemo: React.FC = () => {
         <div className="p-4 border-b border-slate-700/50">
           <Link to="/admin/dashboard" className="flex items-center gap-3 group">
             <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-teal-500/20 group-hover:scale-105 group-hover:shadow-teal-500/30 transition-all duration-300">
-              <span className="text-white font-bold text-sm">BG</span>
+              <span className="text-[#fff] font-bold text-sm">BG</span>
             </div>
             {!sidebarCollapsed && (
               <div className="overflow-hidden">
@@ -352,12 +352,12 @@ const DashboardDemo: React.FC = () => {
         <div className={`px-3 py-3 border-b border-slate-700/50 ${sidebarCollapsed ? 'flex justify-center' : ''}`}>
           {sidebarCollapsed ? (
             <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center" title={userName}>
-              <span className="text-white text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
+              <span className="text-[#fff] text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
             </div>
           ) : (
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                <span className="text-white text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
+                <span className="text-[#fff] text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
               </div>
               <div className="overflow-hidden">
                 <p className="text-white text-sm font-semibold truncate">{userName}</p>
@@ -380,7 +380,7 @@ const DashboardDemo: React.FC = () => {
           ) : (
             <Link
               to="/admin/skapa-avtal"
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-white font-semibold rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-[#fff] font-semibold rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
             >
               <Plus className="w-4 h-4" />
               <span className="text-sm">Skapa avtal</span>
@@ -546,14 +546,14 @@ const DashboardDemo: React.FC = () => {
       <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 z-40 px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-teal-500/20">
-            <span className="text-white font-bold text-xs">BG</span>
+            <span className="text-[#fff] font-bold text-xs">BG</span>
           </div>
           <p className="text-white font-semibold text-sm">BeGone</p>
         </div>
         <div className="flex items-center gap-2">
           <button className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 relative" aria-label="Notifieringar">
             <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white font-bold flex items-center justify-center">3</span>
+            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-[#fff] font-bold flex items-center justify-center">3</span>
           </button>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -669,10 +669,10 @@ const DashboardDemo: React.FC = () => {
           </button>
           <button className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors relative" aria-label="Notifieringar">
             <Bell className="w-5 h-5" />
-            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full text-[10px] text-white font-bold flex items-center justify-center">3</span>
+            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full text-[10px] text-[#fff] font-bold flex items-center justify-center">3</span>
           </button>
           <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
-            <span className="text-white text-xs font-bold">{userName.charAt(0).toUpperCase()}</span>
+            <span className="text-[#fff] text-xs font-bold">{userName.charAt(0).toUpperCase()}</span>
           </div>
         </div>
       </header>

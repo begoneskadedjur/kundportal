@@ -406,12 +406,12 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
           {/* Steg-indikatorer */}
           <div className="flex items-center gap-3">
             <div className={`flex items-center gap-2 text-sm font-medium ${step === 1 ? 'text-teal-400' : 'text-slate-500'}`}>
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step === 1 ? 'bg-teal-500 text-white' : 'bg-slate-700 text-slate-400'}`}>1</span>
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step === 1 ? 'bg-teal-500 text-[#fff]' : 'bg-slate-700 text-slate-400'}`}>1</span>
               Välj datum
             </div>
             <div className="flex-1 h-px bg-slate-700" />
             <div className={`flex items-center gap-2 text-sm font-medium ${step === 2 ? 'text-teal-400' : 'text-slate-500'}`}>
-              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step === 2 ? 'bg-teal-500 text-white' : 'bg-slate-700 text-slate-400'}`}>2</span>
+              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${step === 2 ? 'bg-teal-500 text-[#fff]' : 'bg-slate-700 text-slate-400'}`}>2</span>
               Välj tid
             </div>
           </div>
@@ -443,7 +443,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
                         onClick={() => setDurationMinutes(min)}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                           durationMinutes === min
-                            ? 'bg-teal-500 text-white'
+                            ? 'bg-teal-500 text-[#fff]'
                             : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                         }`}
                       >
@@ -500,7 +500,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
                   type="button"
                   onClick={() => { setManualMode(false); setManualStart(null); setSelectedSuggestion(null) }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    !manualMode ? 'bg-teal-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    !manualMode ? 'bg-teal-500 text-[#fff]' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                   }`}
                 >
                   <Calendar className="w-3.5 h-3.5" />
@@ -510,7 +510,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
                   type="button"
                   onClick={() => { setManualMode(true); setSelectedSuggestion(null) }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                    manualMode ? 'bg-teal-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    manualMode ? 'bg-teal-500 text-[#fff]' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                   }`}
                 >
                   <PenLine className="w-3.5 h-3.5" />

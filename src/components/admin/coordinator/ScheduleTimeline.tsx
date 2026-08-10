@@ -61,20 +61,20 @@ const getStatusColor = (status: string, caseType?: string): { bg: string; text: 
     
     // Premium lila färgschema för avtalsärenden
     if (ls.includes('avtalsärende') || caseType === 'contract') {
-        if (ls.includes('avslutat')) return { bg: 'bg-purple-700', text: 'text-white', border: 'border-purple-800' };
-        if (ls.includes('pågående')) return { bg: 'bg-purple-600', text: 'text-white', border: 'border-purple-700' };
-        if (ls.includes('bokad')) return { bg: 'bg-purple-500', text: 'text-white', border: 'border-purple-600' };
-        return { bg: 'bg-purple-500', text: 'text-white', border: 'border-purple-600' }; // Default för avtalsärenden
+        if (ls.includes('avslutat')) return { bg: 'bg-purple-700', text: 'text-[#fff]', border: 'border-purple-800' };
+        if (ls.includes('pågående')) return { bg: 'bg-purple-600', text: 'text-[#fff]', border: 'border-purple-700' };
+        if (ls.includes('bokad')) return { bg: 'bg-purple-500', text: 'text-[#fff]', border: 'border-purple-600' };
+        return { bg: 'bg-purple-500', text: 'text-[#fff]', border: 'border-purple-600' }; // Default för avtalsärenden
     }
     
     // Standard färgschema för ClickUp-ärenden
-    if (ls.includes('avslutat')) return { bg: 'bg-green-600', text: 'text-white', border: 'border-green-700' };
-    if (ls.startsWith('återbesök')) return { bg: 'bg-blue-600', text: 'text-white', border: 'border-blue-700' };
-    if (ls.includes('signerad')) return { bg: 'bg-[#20c58f]', text: 'text-white', border: 'border-emerald-600' };
-    if (ls.includes('offert')) return { bg: 'bg-orange-500', text: 'text-white', border: 'border-orange-600' };
+    if (ls.includes('avslutat')) return { bg: 'bg-green-600', text: 'text-[#fff]', border: 'border-green-700' };
+    if (ls.startsWith('återbesök')) return { bg: 'bg-blue-600', text: 'text-[#fff]', border: 'border-blue-700' };
+    if (ls.includes('signerad')) return { bg: 'bg-[#20c58f]', text: 'text-[#fff]', border: 'border-emerald-600' };
+    if (ls.includes('offert')) return { bg: 'bg-orange-500', text: 'text-[#fff]', border: 'border-orange-600' };
     if (ls.includes('bokad') || ls.includes('bokat')) return { bg: 'bg-yellow-500', text: 'text-black', border: 'border-yellow-600' };
-    if (ls.includes('review')) return { bg: 'bg-purple-600', text: 'text-white', border: 'border-purple-700' };
-    if (ls.includes('stängt')) return { bg: 'bg-red-600', text: 'text-white', border: 'border-red-700' };
+    if (ls.includes('review')) return { bg: 'bg-purple-600', text: 'text-[#fff]', border: 'border-purple-700' };
+    if (ls.includes('stängt')) return { bg: 'bg-red-600', text: 'text-[#fff]', border: 'border-red-700' };
     return { bg: 'bg-gray-500', text: 'text-white', border: 'border-gray-600' };
 };
 

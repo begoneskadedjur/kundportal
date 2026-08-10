@@ -287,7 +287,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
             setShowAddForm(prev => !prev)
           }}
           size="sm"
-          className="bg-green-600 hover:bg-green-700 text-white"
+          className="bg-green-600 hover:bg-green-700 text-[#fff]"
           disabled={unassignedTechnicians.length === 0}
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -367,7 +367,7 @@ const LeadTechnicianManager: React.FC<LeadTechnicianManagerProps> = ({
                     handleAddTechnician()
                   }}
                   disabled={loading || !selectedTechnicianId}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="bg-green-600 hover:bg-green-700 text-[#fff]"
                 >
                   {loading ? (
                     <>

@@ -410,7 +410,7 @@ export default function TechnicianCases() {
         <p className="text-slate-400 mb-4">{error}</p>
         <button
           onClick={() => fetchCases(profile?.technician_id || '')}
-          className="px-4 py-2 bg-[#20c58f] hover:bg-[#1ba876] text-white rounded-lg font-medium"
+          className="px-4 py-2 bg-[#20c58f] hover:bg-[#1ba876] text-[#fff] rounded-lg font-medium"
         >
           Försök igen
         </button>
@@ -431,7 +431,7 @@ export default function TechnicianCases() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500">
-              <Briefcase className="w-6 h-6 text-white" />
+              <Briefcase className="w-6 h-6 text-[#fff]" />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-white">Mina Ärenden</h1>
@@ -475,7 +475,7 @@ export default function TechnicianCases() {
             onClick={() => { setActiveTab(tab.key); setSearchTerm(''); setSelectedForBatch(new Set()) }}
             className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium min-h-[44px] transition-colors flex items-center justify-center gap-2 ${
               activeTab === tab.key
-                ? 'bg-[#20c58f] text-white'
+                ? 'bg-[#20c58f] text-[#fff]'
                 : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
             }`}
           >

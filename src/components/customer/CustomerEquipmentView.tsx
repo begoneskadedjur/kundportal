@@ -252,7 +252,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
           <MapPin className="w-8 h-8 text-red-400 mx-auto mb-3" />
           <h2 className="text-base font-semibold text-white mb-2">Kunde inte ladda data</h2>
           <p className="text-slate-400 mb-4 text-sm">{error}</p>
-          <button onClick={handleRefresh} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors">
+          <button onClick={handleRefresh} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-[#fff] rounded-lg text-sm font-medium transition-colors">
             <RefreshCw className="w-4 h-4 inline mr-2" />
             Försök igen
           </button>

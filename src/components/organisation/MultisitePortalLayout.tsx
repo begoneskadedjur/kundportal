@@ -154,7 +154,7 @@ export default function MultisitePortalLayout({
         <div className="p-4 border-b border-slate-700/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-emerald-500/20">
-              <span className="text-white font-bold text-sm">BG</span>
+              <span className="text-[#fff] font-bold text-sm">BG</span>
             </div>
             {!sidebarCollapsed && (
               <div className="overflow-hidden">
@@ -320,7 +320,7 @@ export default function MultisitePortalLayout({
       <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 z-40 px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
-            <span className="text-white font-bold text-xs">BG</span>
+            <span className="text-[#fff] font-bold text-xs">BG</span>
           </div>
           <div>
             <p className="text-white font-semibold text-sm leading-tight">BeGone</p>

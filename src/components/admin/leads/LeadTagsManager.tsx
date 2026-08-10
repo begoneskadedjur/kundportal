@@ -255,7 +255,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
         <Button
           onClick={() => setShowForm(!showForm)}
           size="sm"
-          className="bg-orange-600 hover:bg-orange-700 text-white"
+          className="bg-orange-600 hover:bg-orange-700 text-[#fff]"
         >
           <Plus className="w-4 h-4 mr-2" />
           Lägg till tagg
@@ -339,7 +339,7 @@ const LeadTagsManager: React.FC<LeadTagsManagerProps> = ({
               <Button
                 type="submit"
                 disabled={loading || !newTag.trim()}
-                className="bg-orange-600 hover:bg-orange-700 text-white"
+                className="bg-orange-600 hover:bg-orange-700 text-[#fff]"
               >
                 {loading ? (
                   <>

@@ -375,7 +375,7 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
                       <button
                         onClick={() => handleDownloadInspection(session.id, 'pdf')}
                         disabled={isDownloadingPDF}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#20c58f] hover:bg-[#1aad7d] text-white text-xs font-medium transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#20c58f] hover:bg-[#1aad7d] text-[#fff] text-xs font-medium transition-colors disabled:opacity-50"
                       >
                         {isDownloadingPDF ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
                         PDF
@@ -496,7 +496,7 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
                     <button
                       onClick={() => handleDownload(report)}
                       disabled={downloading === report.id}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#20c58f] hover:bg-[#1aad7d] text-white text-xs font-medium transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#20c58f] hover:bg-[#1aad7d] text-[#fff] text-xs font-medium transition-colors disabled:opacity-50"
                     >
                       {downloading === report.id
                         ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -554,7 +554,7 @@ const OrganisationSanitationReports: React.FC<OrganisationSanitationReportsProps
                       <button
                         onClick={() => handleDownload(historyReport)}
                         disabled={downloading === historyReport.id}
-                        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#20c58f] hover:bg-[#1aad7d] text-white text-xs font-medium transition-colors disabled:opacity-50"
+                        className="shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#20c58f] hover:bg-[#1aad7d] text-[#fff] text-xs font-medium transition-colors disabled:opacity-50"
                       >
                         {downloading === historyReport.id
                           ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

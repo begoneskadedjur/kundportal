@@ -718,7 +718,7 @@ export default function TeamChat() {
         <div className="p-2 border-b border-slate-700">
           <button
             onClick={handleNewConversation}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-[#fff] text-sm rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
             Ny chatt
@@ -865,7 +865,7 @@ export default function TeamChat() {
                 <div
                   className={`max-w-[85%] px-2.5 py-1.5 rounded-lg text-sm ${
                     msg.role === 'user'
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-emerald-600 text-[#fff]'
                       : 'bg-slate-800 border border-slate-700 text-slate-100'
                   }`}
                 >
@@ -991,7 +991,7 @@ export default function TeamChat() {
                 )}
                 <button
                   onClick={() => setSelectedImage(null)}
-                  className="absolute -top-1 -right-1 p-0.5 bg-red-500 rounded-full text-white"
+                  className="absolute -top-1 -right-1 p-0.5 bg-red-500 rounded-full text-[#fff]"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -1056,7 +1056,7 @@ export default function TeamChat() {
             <button
               onClick={handleSendMessage}
               disabled={isLoading || (!inputMessage.trim() && !selectedImage)}
-              className="p-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white rounded transition-colors"
+              className="p-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-[#fff] rounded transition-colors"
               title="Skicka meddelande"
             >
               <Send className="w-5 h-5" />

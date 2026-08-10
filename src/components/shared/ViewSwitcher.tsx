@@ -85,7 +85,7 @@ export function ViewSwitcher({ currentView, variant = 'sidebar', collapsed = fal
               transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[#20c58f] outline-none
               ${variant === 'mobile' ? 'py-2 text-sm' : 'py-1.5'}
               ${isActive
-                ? 'bg-[#20c58f] text-white shadow-sm shadow-[#20c58f]/30'
+                ? 'bg-[#20c58f] text-[#fff] shadow-sm shadow-[#20c58f]/30'
                 : 'text-slate-400 hover:text-white'
               }
             `}

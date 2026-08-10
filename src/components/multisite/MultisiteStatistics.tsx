@@ -162,7 +162,7 @@ const MultisiteStatistics: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-blue-500 rounded-xl flex items-center justify-center">
-                <BarChart3 className="w-6 h-6 text-white" />
+                <BarChart3 className="w-6 h-6 text-[#fff]" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-white">Statistik & Analys</h1>
@@ -179,7 +179,7 @@ const MultisiteStatistics: React.FC = () => {
                   className={`
                     px-3 py-1 rounded text-sm font-medium transition-colors
                     ${timeRange === range
-                      ? 'bg-emerald-500 text-white'
+                      ? 'bg-emerald-500 text-[#fff]'
                       : 'text-slate-400 hover:text-white'
                     }
                   `}

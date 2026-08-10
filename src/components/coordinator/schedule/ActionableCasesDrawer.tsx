@@ -524,7 +524,7 @@ function ContactPopover({ anchorRef, onConfirm, onClose }: {
         <button
           onClick={handleConfirm}
           disabled={!selectedMethod}
-          className="p-1.5 rounded bg-[#20c58f] text-white hover:bg-[#1ab07e] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="p-1.5 rounded bg-[#20c58f] text-[#fff] hover:bg-[#1ab07e] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
           title="Bekräfta"
         >
           <Check className="w-3.5 h-3.5" />

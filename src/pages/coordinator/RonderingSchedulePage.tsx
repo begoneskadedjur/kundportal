@@ -306,7 +306,7 @@ function NewScheduleSelector({ onClose, onConfirm, prefilledCustomerId }: NewSch
               )
             }}
             disabled={!canConfirm}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#20c58f] hover:bg-[#1aaa7a] text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#20c58f] hover:bg-[#1aaa7a] text-[#fff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Fortsätt till schemaläggning
           </button>
@@ -370,7 +370,7 @@ function CancelConfirmModal({ customerName, sessionCount, onClose, onConfirm, lo
           <button
             onClick={onConfirm}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-red-600 hover:bg-red-700 text-[#fff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             Avboka och ta bort ärenden
@@ -723,7 +723,7 @@ function OrgBatchSelector({ group, onClose, onConfirm }: OrgBatchSelectorProps) 
           <button
             onClick={() => onConfirm(selectedTechnicianId, selectedServiceType)}
             disabled={!selectedTechnicianId}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#20c58f] hover:bg-[#1aaa7a] text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-[#20c58f] hover:bg-[#1aaa7a] text-[#fff] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Fortsätt till schemaläggning
           </button>
@@ -780,7 +780,7 @@ function OrgGroupCard({
         {unitsWithout > 0 && (
           <button
             onClick={onScheduleAll}
-            className="ml-3 flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-white bg-[#20c58f] hover:bg-[#1aaa7a] rounded-lg transition-colors shrink-0"
+            className="ml-3 flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#fff] bg-[#20c58f] hover:bg-[#1aaa7a] rounded-lg transition-colors shrink-0"
           >
             <Plus className="w-3 h-3" />
             Schemalägg alla
@@ -1018,7 +1018,7 @@ export function RonderingSchedulePage() {
         </div>
         <button
           onClick={() => setShowSelector(true)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-[#20c58f] hover:bg-[#1aaa7a] text-white text-sm font-medium rounded-xl transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 bg-[#20c58f] hover:bg-[#1aaa7a] text-[#fff] text-sm font-medium rounded-xl transition-colors"
         >
           <Plus className="w-4 h-4" />
           Nytt schema
@@ -1049,7 +1049,7 @@ export function RonderingSchedulePage() {
               onClick={() => setServiceTypeFilter(opt.value)}
               className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
                 serviceTypeFilter === opt.value
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-400 hover:text-white'
               }`}
             >

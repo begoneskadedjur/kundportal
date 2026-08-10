@@ -71,7 +71,7 @@ export default function GalleryPagination({
               onClick={() => onPageChange(page)}
               className={`min-w-[36px] h-9 rounded-lg text-sm font-medium transition-colors ${
                 page === currentPage
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-300 hover:bg-slate-700'
               }`}
             >

@@ -168,7 +168,7 @@ export default function OneflowDiagnostics() {
             onClick={() => setActiveTab(tab.id as any)}
             className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === tab.id
-                ? 'bg-[#20c58f] text-white'
+                ? 'bg-[#20c58f] text-[#fff]'
                 : 'text-slate-400 hover:text-white hover:bg-slate-700'
             }`}
           >

@@ -97,7 +97,7 @@ export default function GalleryFilterBar({
           <Filter className="w-4 h-4" />
           Fler filter
           {activeFilterCount > 0 && (
-            <span className="w-5 h-5 rounded-full bg-[#20c58f] text-white text-xs
+            <span className="w-5 h-5 rounded-full bg-[#20c58f] text-[#fff] text-xs
                              flex items-center justify-center font-semibold">
               {activeFilterCount}
             </span>

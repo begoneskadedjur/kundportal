@@ -14,6 +14,17 @@
     
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>BeGone Kundportal</title>
+
+    <!-- Flash-skydd: sätt tema innan appen laddar så att fel tema aldrig blinkar -->
+    <script>
+      try {
+        var begoneTheme = localStorage.getItem('begone_theme') || 'dark';
+        if (begoneTheme === 'system') {
+          begoneTheme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        document.documentElement.setAttribute('data-theme', begoneTheme === 'light' ? 'light' : 'dark');
+      } catch (e) {}
+    </script>
     
     <!-- CSS Reset för zoom-problem -->
     <style>

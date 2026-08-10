@@ -36,7 +36,7 @@ const EconomicsHeader: React.FC = () => {
               onClick={() => setPeriodType(value)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
                 periodType === value
-                  ? 'bg-[#20c58f] text-white shadow-sm shadow-[#20c58f]/20'
+                  ? 'bg-[#20c58f] text-[#fff] shadow-sm shadow-[#20c58f]/20'
                   : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
               }`}
             >

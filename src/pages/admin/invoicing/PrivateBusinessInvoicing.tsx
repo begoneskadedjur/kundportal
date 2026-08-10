@@ -401,7 +401,7 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
 
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-[#fff] rounded-lg transition-colors"
         >
           <Download className="w-4 h-4" />
           Fortnox
@@ -449,7 +449,7 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
                       key={f}
                       onClick={() => setRotRutFilter(f)}
                       className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                        rotRutFilter === f ? 'bg-[#20c58f] text-white' : 'bg-slate-800 text-slate-400 hover:text-white'
+                        rotRutFilter === f ? 'bg-[#20c58f] text-[#fff]' : 'bg-slate-800 text-slate-400 hover:text-white'
                       }`}
                     >
                       {f === 'all' ? 'Alla' : f}

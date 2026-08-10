@@ -324,7 +324,7 @@ const MultisiteDashboard: React.FC = () => {
           <Card className="p-6 bg-slate-800/50 border-slate-700">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-5 h-5 bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 rounded-full"></div>
-              <h3 className="text-lg font-semibold text-white">Trafikljusstatus</h3>
+              <h3 className="text-lg font-semibold text-[#fff]">Trafikljusstatus</h3>
             </div>
             
             <div className="space-y-4">

@@ -6,6 +6,7 @@ import { topLevelItems, navGroups, mobileBottomItems } from './adminNavConfig'
 import { MobileNavGroup } from './MobileNavGroup'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
+import { ThemeToggle } from '../../shared/ThemeToggle'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getTicketStats } from '../../../services/communicationService'
 
@@ -32,15 +33,16 @@ export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) 
       <header className="lg:hidden fixed top-0 left-0 right-0 h-14 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 z-40 px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-teal-500/20">
-            <span className="text-white font-bold text-xs">BG</span>
+            <span className="text-[#fff] font-bold text-xs">BG</span>
           </div>
           <p className="text-white font-semibold text-sm">BeGone</p>
         </div>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <Link to="/admin/tickets" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 relative" aria-label="Notifieringar">
             <Bell className="w-5 h-5" />
             {ticketCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-white font-bold flex items-center justify-center">
+              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[9px] text-[#fff] font-bold flex items-center justify-center">
                 {ticketCount > 9 ? '9+' : ticketCount}
               </span>
             )}

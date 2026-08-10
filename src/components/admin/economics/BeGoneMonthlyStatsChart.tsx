@@ -402,7 +402,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
             <p className="mb-2">Fel vid laddning: {error}</p>
             <button
               onClick={fetchBeGoneData}
-              className="flex items-center gap-2 mx-auto px-4 py-2 bg-[#20c58f] hover:bg-[#1aa87a] text-white rounded-lg transition-colors"
+              className="flex items-center gap-2 mx-auto px-4 py-2 bg-[#20c58f] hover:bg-[#1aa87a] text-[#fff] rounded-lg transition-colors"
             >
               <RefreshCw className="w-4 h-4" />
               Försök igen
@@ -549,7 +549,7 @@ const BeGoneMonthlyStatsChart: React.FC = () => {
                       onClick={() => setActiveTab(tab.key as any)}
                       className={`flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-all duration-200 ${
                         isActive
-                          ? 'bg-[#20c58f] text-white shadow-sm'
+                          ? 'bg-[#20c58f] text-[#fff] shadow-sm'
                           : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                       }`}
                     >

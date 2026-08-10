@@ -1081,7 +1081,7 @@ export default function FollowUpCaseGuide() {
                       >
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${
                           isActive
-                            ? 'bg-amber-500 text-white'
+                            ? 'bg-amber-500 text-[#fff]'
                             : isCompleted
                               ? 'bg-amber-500/30 text-amber-400'
                               : 'bg-slate-700 text-slate-400'
@@ -1116,7 +1116,7 @@ export default function FollowUpCaseGuide() {
                       onClick={() => goToStep(index)}
                       className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
                         isActive
-                          ? 'bg-amber-500 text-white ring-4 ring-amber-500/30'
+                          ? 'bg-amber-500 text-[#fff] ring-4 ring-amber-500/30'
                           : isCompleted
                             ? 'bg-amber-500/30 text-amber-400'
                             : 'bg-slate-800 text-slate-400'

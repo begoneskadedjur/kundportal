@@ -88,7 +88,7 @@ export default function ColumnSelector({ visibleColumns, onToggle, onReset }: Co
         <Settings className="w-4 h-4" />
         Kolumner
         {hiddenCount > 0 && (
-          <span className="bg-[#20c58f] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="bg-[#20c58f] text-[#fff] text-xs rounded-full w-5 h-5 flex items-center justify-center">
             {hiddenCount}
           </span>
         )}

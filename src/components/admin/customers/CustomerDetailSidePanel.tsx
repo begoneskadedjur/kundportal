@@ -463,7 +463,7 @@ export default function CustomerDetailSidePanel({
                   onClick={() => setSelectedContractId(null)}
                   className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
                     !selectedContract
-                      ? 'bg-[#20c58f] text-white'
+                      ? 'bg-[#20c58f] text-[#fff]'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                   }`}
                 >
@@ -482,7 +482,7 @@ export default function CustomerDetailSidePanel({
                     onClick={() => setSelectedContractId(contract.id)}
                     className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-colors truncate max-w-[200px] ${
                       isActive
-                        ? 'bg-[#20c58f] text-white'
+                        ? 'bg-[#20c58f] text-[#fff]'
                         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                     }`}
                     title={contract.address_label || contract.contact_address || String(label)}

@@ -1389,7 +1389,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {selectedCluster.cases.map((caseData, index) => (
                 <div key={caseData.id} className="p-3 bg-slate-800 rounded-lg relative">
-                  <div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  <div className="absolute top-2 right-2 w-6 h-6 bg-blue-500 text-[#fff] text-xs font-bold rounded-full flex items-center justify-center">
                     {index + 1}
                   </div>
                   <div className="font-medium text-white text-sm truncate pr-8">

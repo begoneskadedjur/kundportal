@@ -191,7 +191,7 @@ export function ScheduleHeader({
               onClick={() => onChangeView(mode)}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                 viewMode === mode
-                  ? 'bg-[#20c58f] text-white shadow-sm'
+                  ? 'bg-[#20c58f] text-[#fff] shadow-sm'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -235,7 +235,7 @@ export function ScheduleHeader({
             <SlidersHorizontal className="w-3.5 h-3.5" />
             Filter
             {activeFilterCount > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#20c58f] text-white min-w-[18px] text-center leading-none">
+              <span className="ml-1 px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-[#20c58f] text-[#fff] min-w-[18px] text-center leading-none">
                 {activeFilterCount}
               </span>
             )}

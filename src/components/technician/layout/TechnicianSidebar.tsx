@@ -24,7 +24,7 @@ export function TechnicianSidebar({ currentPath, userName, onSignOut }: Technici
       <div className="px-3 py-3 border-b border-slate-700/50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
+            <span className="text-[#fff] text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
           </div>
           <div className="overflow-hidden flex-1 min-w-0">
             <p className="text-white text-sm font-semibold truncate">{userName}</p>

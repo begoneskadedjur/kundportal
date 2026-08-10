@@ -2180,7 +2180,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               onClick={() => applyTeamSuggestion(sugg)}
                             >
                               {isTopPick && (
-                                <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-emerald-500 text-white text-xs font-bold rounded-full shadow-lg">
+                                <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-emerald-500 text-[#fff] text-xs font-bold rounded-full shadow-lg">
                                   Bäst
                                 </div>
                               )}

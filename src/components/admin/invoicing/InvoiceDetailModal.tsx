@@ -760,7 +760,7 @@ export default function InvoiceDetailModal({
                           type="button"
                           onClick={handleSaveDueDate}
                           disabled={savingDueDate}
-                          className="px-2 py-0.5 bg-[#20c58f] hover:bg-[#1bb07e] text-white text-xs rounded disabled:opacity-50"
+                          className="px-2 py-0.5 bg-[#20c58f] hover:bg-[#1bb07e] text-[#fff] text-xs rounded disabled:opacity-50"
                         >
                           Spara
                         </button>
@@ -1494,7 +1494,7 @@ export default function InvoiceDetailModal({
                 <button
                   onClick={handleSendToFortnox}
                   disabled={sendingToFortnox}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07e] text-sm text-white rounded-lg transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07e] text-sm text-[#fff] rounded-lg transition-colors disabled:opacity-50"
                 >
                   {sendingToFortnox
                     ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
@@ -1517,7 +1517,7 @@ export default function InvoiceDetailModal({
                   <button
                     onClick={() => handleStatusChange('ready')}
                     disabled={updating}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-sm text-white rounded-lg transition-colors disabled:opacity-50"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-sm text-[#fff] rounded-lg transition-colors disabled:opacity-50"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     Återställ

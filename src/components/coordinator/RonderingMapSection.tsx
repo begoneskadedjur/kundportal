@@ -448,7 +448,7 @@ export default function RonderingMapSection({
               type="button"
               onClick={saveAnnotation}
               disabled={saving}
-              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1aad7d] text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1aad7d] text-[#fff] text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
             >
               <Check className="w-3.5 h-3.5" />
               {saving ? 'Sparar...' : 'Lägg till avvikelse'}

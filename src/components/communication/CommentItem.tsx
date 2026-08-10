@@ -415,7 +415,7 @@ export default function CommentItem({
               <div className="flex gap-1.5">
                 <button
                   onClick={handleSaveEdit}
-                  className="px-2.5 py-1 bg-[#20c58f] text-white rounded-md text-[12px] font-medium hover:bg-[#1ab07f] transition-colors"
+                  className="px-2.5 py-1 bg-[#20c58f] text-[#fff] rounded-md text-[12px] font-medium hover:bg-[#1ab07f] transition-colors"
                 >
                   Spara
                 </button>

@@ -293,7 +293,7 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                   <div className="flex items-center justify-between mb-1">
                     <span className={`
                       text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full
-                      ${isToday ? 'bg-[#20c58f] text-white' : isCurrentMonth ? 'text-white' : 'text-slate-600'}
+                      ${isToday ? 'bg-[#20c58f] text-[#fff]' : isCurrentMonth ? 'text-[#fff]' : 'text-slate-600'}
                     `}>
                       {day.getDate()}
                     </span>

@@ -630,7 +630,7 @@ export default function TechnicianEquipment() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-2">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500">
-                <Wrench className="w-6 h-6 text-white" />
+                <Wrench className="w-6 h-6 text-[#fff]" />
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-white">Utrustning</h1>
@@ -747,7 +747,7 @@ export default function TechnicianEquipment() {
                     <div className="w-full space-y-3">
                       <button
                         onClick={handlePlaceAnother}
-                        className="w-full py-3 px-4 bg-[#20c58f] hover:bg-[#1ab07f] text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                        className="w-full py-3 px-4 bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff] font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                       >
                         <Plus className="w-5 h-5" />
                         Placera fler utomhus
@@ -1059,7 +1059,7 @@ export default function TechnicianEquipment() {
                     setShowSchedulePrompt(false)
                     setShowScheduleWizard(true)
                   }}
-                  className="flex-1 py-2.5 px-4 bg-[#20c58f] hover:bg-[#1ab07f] text-white text-sm font-medium rounded-lg transition"
+                  className="flex-1 py-2.5 px-4 bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff] text-sm font-medium rounded-lg transition"
                 >
                   Ja, schemalägg
                 </button>

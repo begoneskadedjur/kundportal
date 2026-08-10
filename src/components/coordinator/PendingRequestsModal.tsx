@@ -313,7 +313,7 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
                     <div className="flex gap-2">
                       <Button
                         onClick={() => handleSchedule(caseItem)}
-                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-[#fff]"
                         size="sm"
                       >
                         <Calendar className="w-4 h-4 mr-2" />

@@ -117,7 +117,7 @@ export default function OfferRowDetail({ offer, senderEmail }: OfferRowDetailPro
             onClick={() => setActiveTab('internal')}
             className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
               activeTab === 'internal'
-                ? 'bg-[#20c58f] text-white'
+                ? 'bg-[#20c58f] text-[#fff]'
                 : 'bg-slate-800/50 text-slate-400 hover:text-slate-300 border border-slate-700/50'
             }`}
           >
@@ -129,7 +129,7 @@ export default function OfferRowDetail({ offer, senderEmail }: OfferRowDetailPro
               onClick={() => setActiveTab('external')}
               className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
                 activeTab === 'external'
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'bg-slate-800/50 text-slate-400 hover:text-slate-300 border border-slate-700/50'
               }`}
             >

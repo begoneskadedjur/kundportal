@@ -2474,7 +2474,7 @@ export default function EditContractCaseModal({
               <button
                 onClick={handleCreateFollowUpCase}
                 disabled={!followUpPestType || followUpLoading}
-                className="flex-1 sm:flex-none min-h-[44px] px-4 py-2.5 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-95"
+                className="flex-1 sm:flex-none min-h-[44px] px-4 py-2.5 text-sm bg-amber-500 hover:bg-amber-600 text-[#fff] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 active:scale-95"
               >
                 {followUpLoading ? (
                   <>

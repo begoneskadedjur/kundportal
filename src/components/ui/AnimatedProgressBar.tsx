@@ -65,9 +65,9 @@ export default function AnimatedProgressBar({
           <motion.div
             className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 relative overflow-hidden ${
               isCompleted
-                ? 'border-green-500 bg-green-500 text-white shadow-lg shadow-green-500/30'
+                ? 'border-green-500 bg-green-500 text-[#fff] shadow-lg shadow-green-500/30'
                 : isActive
-                  ? 'border-blue-500 bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                  ? 'border-blue-500 bg-blue-500 text-[#fff] shadow-lg shadow-blue-500/30'
                   : 'border-slate-600 bg-slate-800 text-slate-400 hover:border-slate-500'
             }`}
             animate={{
@@ -195,9 +195,9 @@ export default function AnimatedProgressBar({
                   <motion.div
                     className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 relative overflow-hidden ${
                       isCompleted
-                        ? 'border-green-500 bg-green-500 text-white'
+                        ? 'border-green-500 bg-green-500 text-[#fff]'
                         : isActive
-                          ? 'border-blue-500 bg-blue-500 text-white'
+                          ? 'border-blue-500 bg-blue-500 text-[#fff]'
                           : 'border-slate-600 bg-slate-800 text-slate-400'
                     } ${isClickable ? 'cursor-pointer' : 'cursor-default'}`}
                     animate={{

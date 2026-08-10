@@ -132,7 +132,7 @@ export function CommentThread({ contractId, senderEmail }: CommentThreadProps) {
         <button
           onClick={handleSend}
           disabled={sending || !newComment.trim()}
-          className="p-2 bg-[#20c58f] hover:bg-[#1bb07f] text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2 bg-[#20c58f] hover:bg-[#1bb07f] text-[#fff] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
         </button>

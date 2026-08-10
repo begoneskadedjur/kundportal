@@ -346,7 +346,7 @@ export function MonthlyBillingPipeline() {
         {/* Generera */}
         <button
           onClick={() => setShowGenerateModal(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 text-[#fff] rounded-lg transition-colors"
         >
           <Plus className="w-4 h-4" />
           Generera
@@ -360,19 +360,19 @@ export function MonthlyBillingPipeline() {
           <div className="flex gap-1">
             <button
               onClick={() => handleBulkStatusChange('approved')}
-              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs"
+              className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-[#fff] rounded text-xs"
             >
               Godkänn
             </button>
             <button
               onClick={() => handleBulkStatusChange('invoiced')}
-              className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs"
+              className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-[#fff] rounded text-xs"
             >
               Fakturerad
             </button>
             <button
               onClick={() => handleBulkStatusChange('paid')}
-              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs"
+              className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-[#fff] rounded text-xs"
             >
               Betald
             </button>

@@ -45,15 +45,15 @@ const AssessmentScaleBar: React.FC<AssessmentScaleBarProps> = ({
 
     const colorMap = {
       emerald: {
-        active: 'bg-emerald-500 text-white',
+        active: 'bg-emerald-500 text-[#fff]',
         inactive: 'bg-emerald-500/20 text-emerald-400/60'
       },
       amber: {
-        active: 'bg-amber-500 text-white',
+        active: 'bg-amber-500 text-[#fff]',
         inactive: 'bg-amber-500/20 text-amber-400/60'
       },
       red: {
-        active: 'bg-red-500 text-white',
+        active: 'bg-red-500 text-[#fff]',
         inactive: 'bg-red-500/20 text-red-400/60'
       }
     }

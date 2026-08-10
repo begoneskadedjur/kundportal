@@ -535,7 +535,7 @@ export function CustomerStationsModal({
                     onClick={() => setActiveView('outdoor')}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                       activeView === 'outdoor'
-                        ? 'bg-[#20c58f] text-white'
+                        ? 'bg-[#20c58f] text-[#fff]'
                         : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
@@ -551,7 +551,7 @@ export function CustomerStationsModal({
                     onClick={() => setActiveView('indoor')}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                       activeView === 'indoor'
-                        ? 'bg-[#20c58f] text-white'
+                        ? 'bg-[#20c58f] text-[#fff]'
                         : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
@@ -567,7 +567,7 @@ export function CustomerStationsModal({
                     onClick={() => setActiveView('schedule')}
                     className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
                       activeView === 'schedule'
-                        ? 'bg-[#20c58f] text-white'
+                        ? 'bg-[#20c58f] text-[#fff]'
                         : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
                     }`}
                   >
@@ -652,7 +652,7 @@ export function CustomerStationsModal({
                                     className={`
                                       flex-shrink-0 px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap
                                       ${plan.id === selectedFloorPlan?.id
-                                        ? 'bg-[#20c58f] text-white'
+                                        ? 'bg-[#20c58f] text-[#fff]'
                                         : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700'
                                       }
                                     `}
@@ -701,7 +701,7 @@ export function CustomerStationsModal({
                               {placementMode === 'view' && selectedFloorPlan && (
                                 <button
                                   onClick={() => setShowTypeSelector(true)}
-                                  className="absolute bottom-4 right-4 w-14 h-14 bg-[#20c58f] hover:bg-[#1ab07f] text-white rounded-full shadow-lg shadow-[#20c58f]/30 flex items-center justify-center transition-all hover:scale-105 z-20"
+                                  className="absolute bottom-4 right-4 w-14 h-14 bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff] rounded-full shadow-lg shadow-[#20c58f]/30 flex items-center justify-center transition-all hover:scale-105 z-20"
                                 >
                                   <Plus className="w-6 h-6" />
                                 </button>
@@ -730,7 +730,7 @@ export function CustomerStationsModal({
                                     onClick={cancelIndoorPlacement}
                                     className={`px-4 py-2 text-sm rounded-lg transition-colors ${
                                       floorPlanStations.length > 0
-                                        ? 'text-white bg-[#20c58f] hover:bg-[#1ab07f] font-medium'
+                                        ? 'text-[#fff] bg-[#20c58f] hover:bg-[#1ab07f] font-medium'
                                         : 'text-slate-300 hover:text-white bg-slate-700 hover:bg-slate-600'
                                     }`}
                                   >
@@ -905,7 +905,7 @@ export function CustomerStationsModal({
                                 <p className="text-slate-400 mb-4">Inga planritningar uppladdade</p>
                                 <button
                                   onClick={() => setShowUploadModal(true)}
-                                  className="px-4 py-2 bg-[#20c58f] hover:bg-[#1ab07f] text-white font-medium rounded-lg transition-colors inline-flex items-center gap-2"
+                                  className="px-4 py-2 bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff] font-medium rounded-lg transition-colors inline-flex items-center gap-2"
                                 >
                                   <Upload className="w-4 h-4" />
                                   Ladda upp planritning
@@ -962,8 +962,8 @@ export function CustomerStationsModal({
                     onClick={handleAddStationClick}
                     className={`w-full py-3 px-4 rounded-xl font-medium transition-colors flex items-center justify-center gap-2 ${
                       activeView === 'outdoor'
-                        ? 'bg-[#20c58f] hover:bg-[#1ab07f] text-white'
-                        : 'bg-[#20c58f] hover:bg-[#1ab07f] text-white'
+                        ? 'bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff]'
+                        : 'bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff]'
                     }`}
                   >
                     <Plus className="w-5 h-5" />

@@ -163,7 +163,7 @@ const OrganisationServiceActivityTimeline: React.FC<OrganisationServiceActivityT
               onClick={() => setStatusFilter(f.value)}
               className={`text-xs px-3 py-1 rounded-full border transition-colors ${
                 statusFilter === f.value
-                  ? 'bg-[#20c58f] border-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] border-[#20c58f] text-[#fff]'
                   : 'border-slate-700 text-slate-400 hover:text-white hover:border-slate-600'
               }`}
             >

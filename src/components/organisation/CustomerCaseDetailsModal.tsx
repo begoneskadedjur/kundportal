@@ -580,7 +580,7 @@ export default function CustomerCaseDetailsModal({
                           <Button
                             onClick={handleAcknowledgeRecommendations}
                             disabled={acknowledgingRecommendations}
-                            className="bg-green-600 hover:bg-green-700 text-white"
+                            className="bg-green-600 hover:bg-green-700 text-[#fff]"
                           >
                             {acknowledgingRecommendations ? 'Bekräftar...' : 'Bekräfta rekommendationer'}
                           </Button>

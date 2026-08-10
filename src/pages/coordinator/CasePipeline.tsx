@@ -516,7 +516,7 @@ export default function CasePipeline() {
               onClick={() => setActiveTab(tab.key)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                 activeTab === tab.key
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
@@ -533,7 +533,7 @@ export default function CasePipeline() {
               onClick={() => setDocTypeFilter(f.key)}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
                 docTypeFilter === f.key
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'text-slate-400 hover:text-white'
               }`}
             >

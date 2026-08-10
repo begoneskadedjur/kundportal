@@ -45,7 +45,7 @@ export default function ConfirmModal({
             <button
               onClick={onConfirm}
               disabled={loading}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-[#fff] text-sm font-medium rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {confirmLabel}

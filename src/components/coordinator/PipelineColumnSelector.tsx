@@ -93,7 +93,7 @@ export default function PipelineColumnSelector({ visibleColumns, onToggle, onRes
         <Settings className="w-3.5 h-3.5" />
         Kolumner
         {hiddenCount > 0 && (
-          <span className="bg-[#20c58f] text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
+          <span className="bg-[#20c58f] text-[#fff] text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
             {hiddenCount}
           </span>
         )}

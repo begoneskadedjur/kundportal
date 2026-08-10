@@ -479,7 +479,7 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
                         onClick={() => setCurrentPage(p as number)}
                         className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
                           currentPage === p
-                            ? 'bg-emerald-500 text-white'
+                            ? 'bg-emerald-500 text-[#fff]'
                             : 'text-slate-400 hover:text-white hover:bg-slate-700'
                         }`}
                       >

@@ -4,6 +4,7 @@ import { useLocation, Link } from 'react-router-dom'
 import { ChevronRight, Search, RefreshCw, Bell } from 'lucide-react'
 import { breadcrumbMap } from './adminNavConfig'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
+import { ThemeToggle } from '../../shared/ThemeToggle'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getTicketStats } from '../../../services/communicationService'
 
@@ -58,14 +59,15 @@ export function AdminTopHeader({ sidebarCollapsed, userName }: AdminTopHeaderPro
         <Link to="/admin/tickets" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors relative" aria-label="Notifieringar">
           <Bell className="w-5 h-5" />
           {ticketCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full text-[10px] text-white font-bold flex items-center justify-center">
+            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full text-[10px] text-[#fff] font-bold flex items-center justify-center">
               {ticketCount > 9 ? '9+' : ticketCount}
             </span>
           )}
         </Link>
+        <ThemeToggle />
         <ViewSwitcher currentView="admin" variant="header" />
         <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
-          <span className="text-white text-xs font-bold">{userName.charAt(0).toUpperCase()}</span>
+          <span className="text-[#fff] text-xs font-bold">{userName.charAt(0).toUpperCase()}</span>
         </div>
       </div>
     </header>

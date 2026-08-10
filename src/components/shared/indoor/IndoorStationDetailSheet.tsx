@@ -240,7 +240,7 @@ export function IndoorStationDetailSheet({
         {onRegisterInspection && station.status === 'active' && (
           <button
             onClick={onRegisterInspection}
-            className="w-full py-3 bg-[#20c58f] hover:bg-[#1ab07f] text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+            className="w-full py-3 bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff] font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
           >
             <CheckCircle2 className="w-5 h-5" />
             Registrera kontroll

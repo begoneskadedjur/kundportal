@@ -216,7 +216,7 @@ const ListItemComponent: React.FC<ListItemComponentProps> = ({
             className="w-10 h-10 rounded-full border-2 border-slate-600"
           />
         ) : (
-          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-[#fff] font-bold">
             {item.name.charAt(0).toUpperCase()}
           </div>
         )}
@@ -278,8 +278,8 @@ const ListItemComponent: React.FC<ListItemComponentProps> = ({
                 }}
                 className={`
                   px-3 py-1 text-xs rounded-lg transition-colors
-                  ${action.variant === 'primary' ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}
-                  ${action.variant === 'danger' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+                  ${action.variant === 'primary' ? 'bg-blue-600 hover:bg-blue-700 text-[#fff]' : ''}
+                  ${action.variant === 'danger' ? 'bg-red-600 hover:bg-red-700 text-[#fff]' : ''}
                   ${!action.variant || action.variant === 'secondary' ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' : ''}
                 `}
               >

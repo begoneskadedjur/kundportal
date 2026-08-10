@@ -472,7 +472,7 @@ export default function BoundariesMapPanel({
           title={!activeRegion?.polygon ? 'Välj ett område först' : addMode ? 'Klicka för att byta till ersätt-läge' : 'Klicka för att lägga till ett område till befintlig polygon'}
           className={`flex-shrink-0 text-xs px-2.5 py-1.5 rounded-lg border transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
             addMode
-              ? 'bg-[#20c58f] border-[#20c58f] text-white font-medium'
+              ? 'bg-[#20c58f] border-[#20c58f] text-[#fff] font-medium'
               : 'bg-slate-800 border-slate-600 text-slate-400 hover:border-slate-500 hover:text-slate-300'
           }`}
         >

@@ -43,7 +43,7 @@ export function SäljareTopHeader({ sidebarCollapsed, userName }: SäljareTopHea
           <RefreshCw className="w-4 h-4" />
         </button>
         <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
-          <span className="text-white text-xs font-bold">{userName.charAt(0).toUpperCase()}</span>
+          <span className="text-[#fff] text-xs font-bold">{userName.charAt(0).toUpperCase()}</span>
         </div>
       </div>
     </header>

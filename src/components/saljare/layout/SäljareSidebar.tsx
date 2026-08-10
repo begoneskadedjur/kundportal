@@ -53,7 +53,7 @@ export function SäljareSidebar({
         ) : (
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-xl flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
+              <span className="text-[#fff] text-sm font-bold">{userName.charAt(0).toUpperCase()}</span>
             </div>
             <div className="overflow-hidden flex-1 min-w-0">
               <p className="text-white text-sm font-semibold truncate">{userName}</p>
@@ -83,7 +83,7 @@ export function SäljareSidebar({
         ) : (
           <Link
             to="/saljare/leads"
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-white font-semibold rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-[#fff] font-semibold rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
           >
             <Target className="w-4 h-4" />
             <span className="text-sm">Ny Lead</span>

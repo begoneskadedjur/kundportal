@@ -455,7 +455,7 @@ const CustomerPortal: React.FC = () => {
       {/* Floating Action Button for Service Requests - positioned above mobile bottom nav */}
       <button
         onClick={() => setShowServiceRequest(true)}
-        className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full p-4 shadow-lg hover:shadow-emerald-500/25 transition-all duration-300 group z-30"
+        className="fixed bottom-24 lg:bottom-8 right-4 lg:right-8 bg-emerald-500 hover:bg-emerald-600 text-[#fff] rounded-full p-4 shadow-lg hover:shadow-emerald-500/25 transition-all duration-300 group z-30"
         title="Begär service"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

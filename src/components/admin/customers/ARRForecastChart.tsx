@@ -134,14 +134,14 @@ export default function ARRForecastChart({ customers }: ARRForecastChartProps) {
                     <div className="flex items-center gap-1 text-xs">
                       {year.newContracts > 0 && (
                         <TooltipWrapper content={`${year.newContracts} nya kontrakt`} position="top">
-                          <span className="bg-green-600 text-white px-1.5 py-0.5 rounded text-xs cursor-help">
+                          <span className="bg-green-600 text-[#fff] px-1.5 py-0.5 rounded text-xs cursor-help">
                             +{year.newContracts}
                           </span>
                         </TooltipWrapper>
                       )}
                       {year.expiredContracts > 0 && (
                         <TooltipWrapper content={`${year.expiredContracts} kontrakt löper ut`} position="top">
-                          <span className="bg-red-600 text-white px-1.5 py-0.5 rounded text-xs cursor-help">
+                          <span className="bg-red-600 text-[#fff] px-1.5 py-0.5 rounded text-xs cursor-help">
                             -{year.expiredContracts}
                           </span>
                         </TooltipWrapper>

@@ -258,7 +258,7 @@ export default function SNIBranchManager({
                 className={`
                   flex items-center gap-2 px-3 py-1.5 rounded-full text-sm
                   ${sniCode.is_primary 
-                    ? 'bg-[#20c58f] text-white border border-[#20c58f]/70'
+                    ? 'bg-[#20c58f] text-[#fff] border border-[#20c58f]/70'
                     : 'bg-slate-700 text-slate-300 border border-slate-600'
                   }
                 `}

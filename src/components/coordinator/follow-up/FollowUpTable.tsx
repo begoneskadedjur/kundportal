@@ -555,7 +555,7 @@ export function FollowUpTable({
               onClick={() => onStatusFilterChange(f.key)}
               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                 statusFilter === f.key
-                  ? 'bg-[#20c58f] text-white'
+                  ? 'bg-[#20c58f] text-[#fff]'
                   : 'bg-slate-800/50 text-slate-400 hover:text-slate-300 border border-slate-700/50'
               }`}
             >

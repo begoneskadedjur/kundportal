@@ -223,7 +223,7 @@ const LeadsTable: React.FC<LeadsTableProps> = ({
                                 {lead.lead_technicians.slice(0, 3).map((a) => (
                                   <div key={a.id} className="flex items-center gap-1">
                                     <div className={`w-1.5 h-1.5 rounded-full ${a.is_primary ? 'bg-yellow-400' : 'bg-green-400'}`} />
-                                    <span className="text-xs text-white">{a.technicians?.name || 'Okänd'}</span>
+                                    <span className="text-xs text-[#fff]">{a.technicians?.name || 'Okänd'}</span>
                                   </div>
                                 ))}
                               </div>

@@ -1157,7 +1157,7 @@ export function RecurringScheduleWizard({
               <button
                 onClick={() => setStep((step + 1) as WizardStep)}
                 disabled={!canProceed()}
-                className="flex items-center gap-1.5 px-4 py-2 bg-[#20c58f] hover:bg-[#1ab07f] disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition"
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#20c58f] hover:bg-[#1ab07f] disabled:bg-slate-700 disabled:text-slate-500 text-[#fff] text-sm font-medium rounded-lg transition"
               >
                 Nästa
                 <ChevronRight className="w-4 h-4" />
@@ -1166,7 +1166,7 @@ export function RecurringScheduleWizard({
               <button
                 onClick={handleSubmit}
                 disabled={!canProceed() || isSubmitting || loadingPreview}
-                className="flex items-center gap-2 px-4 py-2 bg-[#20c58f] hover:bg-[#1ab07f] disabled:bg-slate-700 disabled:text-slate-500 text-white text-sm font-medium rounded-lg transition"
+                className="flex items-center gap-2 px-4 py-2 bg-[#20c58f] hover:bg-[#1ab07f] disabled:bg-slate-700 disabled:text-slate-500 text-[#fff] text-sm font-medium rounded-lg transition"
               >
                 {isSubmitting ? (
                   <>

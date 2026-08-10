@@ -449,7 +449,7 @@ export function PreparationEditModal({
                     onClick={() => setMeasurementUnit(unit)}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       measurementUnit === unit
-                        ? 'bg-emerald-500 text-white'
+                        ? 'bg-emerald-500 text-[#fff]'
                         : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                     }`}
                   >

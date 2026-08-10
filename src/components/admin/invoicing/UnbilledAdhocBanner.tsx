@@ -136,7 +136,7 @@ export default function UnbilledAdhocBanner() {
             <button
               onClick={() => handleGenerate(group)}
               disabled={generating !== null}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#20c58f] hover:bg-[#1ba876] disabled:opacity-50 rounded-lg transition-colors shrink-0 ml-3"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#fff] bg-[#20c58f] hover:bg-[#1ba876] disabled:opacity-50 rounded-lg transition-colors shrink-0 ml-3"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${generating === group.key ? 'animate-spin' : ''}`} />
               Skapa faktura

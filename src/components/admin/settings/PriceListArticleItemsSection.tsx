@@ -423,7 +423,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
                                 <button
                                   onClick={() => saveRow(item)}
                                   disabled={state.saving}
-                                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded bg-[#20c58f] text-white hover:bg-[#20c58f]/90 disabled:opacity-50"
+                                  className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium rounded bg-[#20c58f] text-[#fff] hover:bg-[#20c58f]/90 disabled:opacity-50"
                                 >
                                   {state.saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                                   Spara ändringar

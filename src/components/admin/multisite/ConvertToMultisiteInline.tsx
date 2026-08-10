@@ -316,7 +316,7 @@ export default function ConvertToMultisiteInline({
               <div
                 className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
                   step === s.key
-                    ? 'bg-[#20c58f] text-white'
+                    ? 'bg-[#20c58f] text-[#fff]'
                     : stepIndex > i
                     ? 'bg-[#20c58f]/20 text-[#20c58f]'
                     : 'bg-slate-700 text-slate-400'
