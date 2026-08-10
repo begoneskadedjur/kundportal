@@ -756,7 +756,7 @@ export default function IncidentsPage() {
           <div className="text-center py-12 text-slate-400">
             <AlertTriangle className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p className="text-sm font-medium">Inga rapporter att visa</p>
-            <p className="text-xs text-slate-500 mt-1">Klicka &quot;Rapportera händelse&quot; för att rapportera oj, aj eller avvikelse</p>
+            <p className="text-xs text-slate-500 mt-1">Klicka &quot;Rapportera händelse&quot; för att rapportera tillbud, olycka eller avvikelse</p>
           </div>
         ) : (
           <div className="max-h-[calc(100vh-480px)] overflow-auto">

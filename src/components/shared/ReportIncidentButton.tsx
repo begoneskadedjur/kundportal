@@ -28,7 +28,7 @@ export function ReportIncidentButton({ role, collapsed = false, onNavigate }: Re
       <Link
         to={path}
         onClick={onNavigate}
-        title="Rapportera Oj eller Aj"
+        title="Rapportera tillbud, avvikelse eller olycka"
         className="w-full flex items-center justify-center p-2.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl transition-colors"
       >
         <AlertTriangle className="w-5 h-5 text-amber-400" />
@@ -40,10 +40,10 @@ export function ReportIncidentButton({ role, collapsed = false, onNavigate }: Re
     <Link
       to={path}
       onClick={onNavigate}
-      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-medium rounded-xl transition-colors text-sm"
+      className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 font-medium rounded-xl transition-colors text-sm text-center leading-snug"
     >
-      <AlertTriangle className="w-4 h-4" />
-      Rapportera Oj eller Aj
+      <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+      Rapportera tillbud, avvikelse eller olycka
     </Link>
   )
 }
