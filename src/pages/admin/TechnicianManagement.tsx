@@ -14,7 +14,7 @@ import AbaxVehicleModal from '../../components/admin/technicians/management/Abax
 import WorkScheduleModal from '../../components/admin/technicians/management/WorkScheduleModal'
 import TechnicianNotificationModal from '../../components/admin/technicians/management/TechnicianNotificationModal'
 
-import { technicianManagementService, type Technician, type TechnicianStats } from '../../services/technicianManagementService'
+import { technicianManagementService, type Technician, type TechnicianStats, type ExtraPortalRole } from '../../services/technicianManagementService'
 import { ALL_INCIDENT_TYPES, INCIDENT_TYPE_CONFIG, type IncidentType } from '../../types/caseIncidents'
 
 const STAFF_ROLES = [
@@ -146,6 +146,15 @@ export default function TechnicianManagement() {
   const handleRecipientTypesChange = (technicianId: string, types: IncidentType[]) => {
     setTechnicians(prev => prev.map(t =>
       t.id === technicianId ? { ...t, incident_recipient_types: types } : t
+    ))
+  }
+
+  // Uppdatera lokalt state när roller togglas direkt på ett kort
+  const handleExtraRolesChange = (technicianId: string, roles: ExtraPortalRole[]) => {
+    setTechnicians(prev => prev.map(t =>
+      t.id === technicianId
+        ? { ...t, extra_roles: roles, is_admin: t.role === 'Admin' || roles.includes('admin') }
+        : t
     ))
   }
 
@@ -386,6 +395,7 @@ export default function TechnicianManagement() {
               onManageWorkSchedule={handleManageWorkSchedule}
               onManageNotifications={handleManageNotifications}
               onRecipientTypesChange={handleRecipientTypesChange}
+              onExtraRolesChange={handleExtraRolesChange}
             />
           ))}
         </div>

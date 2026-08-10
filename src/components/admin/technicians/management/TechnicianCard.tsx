@@ -5,9 +5,23 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '../../../ui/Button'
-import { technicianManagementService, type Technician } from '../../../../services/technicianManagementService'
+import { technicianManagementService, type Technician, type ExtraPortalRole } from '../../../../services/technicianManagementService'
 import { ALL_INCIDENT_TYPES, INCIDENT_TYPE_CONFIG, type IncidentType } from '../../../../types/caseIncidents'
 import { IncidentRecipientService } from '../../../../services/incidentRecipientService'
+
+// Primärrollen (technicians.role) mappad till portalvyn den redan ger
+const PRIMARY_ROLE_TO_PORTAL: Record<string, ExtraPortalRole | null> = {
+  'Skadedjurstekniker': 'technician',
+  'Koordinator': 'koordinator',
+  'Admin': 'admin',
+  'Säljare': null,
+}
+
+const EXTRA_ROLE_CONFIG: Record<ExtraPortalRole, { label: string; activeClass: string }> = {
+  admin: { label: 'Admin', activeClass: 'bg-purple-500/10 text-purple-400 border-purple-500/30' },
+  koordinator: { label: 'Koordinator', activeClass: 'bg-green-500/10 text-green-400 border-green-500/30' },
+  technician: { label: 'Tekniker', activeClass: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' },
+}
 
 type TechnicianCardProps = {
   technician: Technician
@@ -18,6 +32,7 @@ type TechnicianCardProps = {
   onManageWorkSchedule: (technician: Technician) => void
   onManageNotifications: (technician: Technician) => void
   onRecipientTypesChange?: (technicianId: string, types: IncidentType[]) => void
+  onExtraRolesChange?: (technicianId: string, roles: ExtraPortalRole[]) => void
 }
 
 export default function TechnicianCard({
@@ -28,17 +43,56 @@ export default function TechnicianCard({
   onManageAuth,
   onManageWorkSchedule,
   onManageNotifications,
-  onRecipientTypesChange
+  onRecipientTypesChange,
+  onExtraRolesChange
 }: TechnicianCardProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [recipientTypes, setRecipientTypes] = useState<Set<IncidentType>>(
     new Set(technician.incident_recipient_types || [])
   )
   const [savingTypes, setSavingTypes] = useState(false)
+  const [extraRoles, setExtraRoles] = useState<Set<ExtraPortalRole>>(
+    new Set(technician.extra_roles || [])
+  )
+  const [savingRoles, setSavingRoles] = useState(false)
 
   useEffect(() => {
     setRecipientTypes(new Set(technician.incident_recipient_types || []))
   }, [technician.incident_recipient_types])
+
+  useEffect(() => {
+    setExtraRoles(new Set(technician.extra_roles || []))
+  }, [technician.extra_roles])
+
+  const primaryPortal = PRIMARY_ROLE_TO_PORTAL[technician.role] || null
+
+  const toggleExtraRole = async (role: ExtraPortalRole) => {
+    if (!technician.user_id || savingRoles) return
+    const previous = extraRoles
+    const next = new Set(previous)
+    const activating = !next.has(role)
+    if (activating) next.add(role)
+    else next.delete(role)
+
+    setExtraRoles(next)
+    setSavingRoles(true)
+    try {
+      await technicianManagementService.updateExtraRoles(
+        technician.id,
+        [...next],
+        technician.role === 'Admin'
+      )
+      onExtraRolesChange?.(technician.id, [...next])
+      const label = EXTRA_ROLE_CONFIG[role].label
+      toast.success(activating
+        ? `${technician.name} har nu ${label}-vyn`
+        : `${label}-vyn borttagen för ${technician.name}`)
+    } catch {
+      setExtraRoles(previous)
+    } finally {
+      setSavingRoles(false)
+    }
+  }
 
   const toggleRecipientType = async (type: IncidentType) => {
     if (!technician.user_id || savingTypes) return
@@ -111,18 +165,6 @@ export default function TechnicianCard({
                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-500/20 text-purple-400">
                   <Shield className="w-3 h-3 mr-1" />
                   Admin
-                </span>
-              )}
-              {(technician.extra_roles || []).includes('koordinator') && technician.role !== 'Koordinator' && (
-                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-500/20 text-green-400">
-                  <Shield className="w-3 h-3 mr-1" />
-                  Koordinator
-                </span>
-              )}
-              {(technician.extra_roles || []).includes('technician') && technician.role !== 'Skadedjurstekniker' && (
-                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-cyan-500/20 text-cyan-400">
-                  <Shield className="w-3 h-3 mr-1" />
-                  Tekniker
                 </span>
               )}
               {technician.has_login && (
@@ -296,6 +338,45 @@ export default function TechnicianCard({
               Visas som: {technician.display_name}
             </span>
           </div>
+        )}
+      </div>
+
+      {/* Roller & vyer - togglas direkt på kortet */}
+      <div className="mt-4 pt-3 border-t border-slate-700">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Shield className="w-3.5 h-3.5 text-purple-400" />
+          <span className="text-xs font-medium text-slate-400">Roller & vyer</span>
+          <span className="text-xs text-slate-600">· {technician.role} ingår</span>
+        </div>
+        {technician.has_login && technician.user_id ? (
+          <div className="flex flex-wrap gap-1.5">
+            {(Object.keys(EXTRA_ROLE_CONFIG) as ExtraPortalRole[])
+              .filter(role => role !== primaryPortal)
+              .map(role => {
+                const config = EXTRA_ROLE_CONFIG[role]
+                const active = extraRoles.has(role)
+                return (
+                  <button
+                    key={role}
+                    type="button"
+                    onClick={() => toggleExtraRole(role)}
+                    disabled={savingRoles}
+                    title={active
+                      ? `Klicka för att ta bort ${config.label}-vyn`
+                      : `Klicka för att ge ${config.label}-vyn`}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors disabled:opacity-50 ${
+                      active
+                        ? config.activeClass
+                        : 'bg-slate-800/50 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    {config.label}
+                  </button>
+                )
+              })}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">Kräver aktiverad inloggning</p>
         )}
       </div>
 
