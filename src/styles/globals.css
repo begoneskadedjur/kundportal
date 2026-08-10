@@ -30,16 +30,45 @@ html[data-theme="light"] {
   --color-slate-50:  #020617;
   --color-white:     #0f172a;   /* "vit" text blir mörk bläckfärg */
 
+  /* Accentfärger: -400 är byggd för mörk botten (text-amber-400 osv. på tint).
+     I ljust läge mörknas de till 600/700-värden med >=4.5:1 mot vitt.
+     -300 (hover-emfas) mappas till 800-serien, -200 till 900-serien,
+     så att "ljusare vid hover" blir "mörkare vid hover" i ljust läge.
+     Verifierat: inga bg-{färg}-200/300 finns i kodbasen; bg-{färg}-400
+     är statusprickar/progressbars som blir tydligare av mörkningen. */
+  --color-red-400:     #dc2626;  --color-red-300:     #991b1b;  --color-red-200:     #7f1d1d;
+  --color-orange-400:  #c2410c;  --color-orange-300:  #9a3412;  --color-orange-200:  #7c2d12;
+  --color-amber-400:   #b45309;  --color-amber-300:   #92400e;  --color-amber-200:   #78350f;
+  --color-yellow-400:  #a16207;  --color-yellow-300:  #854d0e;  --color-yellow-200:  #713f12;
+  --color-lime-400:    #4d7c0f;  --color-lime-300:    #3f6212;  --color-lime-200:    #365314;
+  --color-green-400:   #15803d;  --color-green-300:   #166534;  --color-green-200:   #14532d;
+  --color-emerald-400: #047857;  --color-emerald-300: #065f46;  --color-emerald-200: #064e3b;
+  --color-teal-400:    #0f766e;  --color-teal-300:    #115e59;  --color-teal-200:    #134e4a;
+  --color-cyan-400:    #0e7490;  --color-cyan-300:    #155e75;  --color-cyan-200:    #164e63;
+  --color-sky-400:     #0369a1;  --color-sky-300:     #075985;  --color-sky-200:     #0c4a6e;
+  --color-blue-400:    #2563eb;  --color-blue-300:    #1e40af;  --color-blue-200:    #1e3a8a;
+  --color-indigo-400:  #4f46e5;  --color-indigo-300:  #3730a3;  --color-indigo-200:  #312e81;
+  --color-violet-400:  #7c3aed;  --color-violet-300:  #5b21b6;  --color-violet-200:  #4c1d95;
+  --color-purple-400:  #9333ea;  --color-purple-300:  #6b21a8;  --color-purple-200:  #581c87;
+  --color-pink-400:    #db2777;  --color-pink-300:    #9d174d;  --color-pink-200:    #831843;
+  --color-rose-400:    #e11d48;  --color-rose-300:    #9f1239;  --color-rose-200:    #881337;
+
   color-scheme: light;
 }
 
+/* Dämpad text: text-slate-600 används som svagaste textnivån (tidsstämplar,
+   avskiljare). Variabeln kan inte remappas (631 kanter + 205 bakgrunder
+   använder slate-600), så bara text-utilityn skrivs över. */
+html[data-theme="light"] .text-slate-600 { color: #94a3b8; }
+html[data-theme="light"] .placeholder-slate-600::placeholder { color: #94a3b8; }
+
 html[data-theme="light"] .glass {
-  background-color: rgb(15 23 42 / 0.04);
-  border-color: rgb(15 23 42 / 0.10);
+  background-color: rgb(15 23 42 / 0.06);
+  border-color: rgb(15 23 42 / 0.14);
 }
 
 html[data-theme="light"] .glass-hover:hover {
-  background-color: rgb(15 23 42 / 0.08);
+  background-color: rgb(15 23 42 / 0.10);
 }
 
 /* Recharts-diagram: hårdkodade mörka attribut skrivs över i ljust läge.

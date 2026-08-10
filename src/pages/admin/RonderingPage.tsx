@@ -1176,7 +1176,7 @@ export default function RonderingPage() {
                         <div className="flex items-center justify-between gap-2 mb-1.5">
                           <div className="flex items-center gap-1.5 min-w-0">
                             {hasHotspot && <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Aktiv hotspot" />}
-                            <p className="text-xs font-semibold text-[#fff] leading-tight truncate">{c.regionName}</p>
+                            <p className="text-xs font-semibold text-white leading-tight truncate">{c.regionName}</p>
                           </div>
                           <span className={`text-[11px] font-bold flex-shrink-0 ${pct === 100 ? 'text-emerald-400' : 'text-slate-400'}`}>{pct}%</span>
                         </div>
