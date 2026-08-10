@@ -3,9 +3,11 @@ import {
   User, Mail, Phone, MapPin, MoreVertical, Edit,
   Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import Button from '../../../ui/Button'
 import { technicianManagementService, type Technician } from '../../../../services/technicianManagementService'
-import { INCIDENT_TYPE_CONFIG } from '../../../../types/caseIncidents'
+import { ALL_INCIDENT_TYPES, INCIDENT_TYPE_CONFIG, type IncidentType } from '../../../../types/caseIncidents'
+import { IncidentRecipientService } from '../../../../services/incidentRecipientService'
 
 type TechnicianCardProps = {
   technician: Technician
@@ -15,6 +17,7 @@ type TechnicianCardProps = {
   onManageAuth: (technician: Technician) => void
   onManageWorkSchedule: (technician: Technician) => void
   onManageNotifications: (technician: Technician) => void
+  onRecipientTypesChange?: (technicianId: string, types: IncidentType[]) => void
 }
 
 export default function TechnicianCard({
@@ -24,9 +27,44 @@ export default function TechnicianCard({
   onDelete,
   onManageAuth,
   onManageWorkSchedule,
-  onManageNotifications
+  onManageNotifications,
+  onRecipientTypesChange
 }: TechnicianCardProps) {
   const [showDropdown, setShowDropdown] = useState(false)
+  const [recipientTypes, setRecipientTypes] = useState<Set<IncidentType>>(
+    new Set(technician.incident_recipient_types || [])
+  )
+  const [savingTypes, setSavingTypes] = useState(false)
+
+  useEffect(() => {
+    setRecipientTypes(new Set(technician.incident_recipient_types || []))
+  }, [technician.incident_recipient_types])
+
+  const toggleRecipientType = async (type: IncidentType) => {
+    if (!technician.user_id || savingTypes) return
+    const previous = recipientTypes
+    const next = new Set(previous)
+    const activating = !next.has(type)
+    if (activating) next.add(type)
+    else next.delete(type)
+
+    setRecipientTypes(next)
+    setSavingTypes(true)
+    try {
+      await IncidentRecipientService.setRecipientTypes(technician.user_id, [...next])
+      onRecipientTypesChange?.(technician.id, [...next])
+      const label = INCIDENT_TYPE_CONFIG[type].label.toLowerCase()
+      toast.success(activating
+        ? `${technician.name} är nu mottagare av ${label}`
+        : `${technician.name} tar inte längre emot ${label}`)
+    } catch (err) {
+      console.error('Error toggling incident recipient type:', err)
+      setRecipientTypes(previous)
+      toast.error('Kunde inte spara mottagarinställningen')
+    } finally {
+      setSavingTypes(false)
+    }
+  }
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -81,20 +119,6 @@ export default function TechnicianCard({
                   Inloggning
                 </span>
               )}
-              {(technician.incident_recipient_types || []).map(type => {
-                const config = INCIDENT_TYPE_CONFIG[type]
-                if (!config) return null
-                return (
-                  <span
-                    key={type}
-                    className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${config.bgColor} ${config.color}`}
-                    title={`Mottagare av ${config.label.toLowerCase()}`}
-                  >
-                    <AlertTriangle className="w-3 h-3 mr-1" />
-                    {config.label}
-                  </span>
-                )
-              })}
             </div>
           </div>
         </div>
@@ -260,6 +284,42 @@ export default function TechnicianCard({
               Visas som: {technician.display_name}
             </span>
           </div>
+        )}
+      </div>
+
+      {/* Incidentmottagare - togglas direkt på kortet */}
+      <div className="mt-4 pt-3 border-t border-slate-700">
+        <div className="flex items-center gap-1.5 mb-2">
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-xs font-medium text-slate-400">Incidentmottagare</span>
+        </div>
+        {technician.has_login && technician.user_id ? (
+          <div className="flex flex-wrap gap-1.5">
+            {ALL_INCIDENT_TYPES.map(type => {
+              const config = INCIDENT_TYPE_CONFIG[type]
+              const active = recipientTypes.has(type)
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => toggleRecipientType(type)}
+                  disabled={savingTypes}
+                  title={active
+                    ? `Klicka för att sluta ta emot ${config.label.toLowerCase()}`
+                    : `Klicka för att bli mottagare av ${config.label.toLowerCase()}`}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors disabled:opacity-50 ${
+                    active
+                      ? `${config.bgColor} ${config.color} ${config.borderColor}`
+                      : 'bg-slate-800/50 text-slate-500 border-slate-700 hover:border-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {config.label}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">Kräver aktiverad inloggning</p>
         )}
       </div>
 

@@ -15,7 +15,7 @@ import WorkScheduleModal from '../../components/admin/technicians/management/Wor
 import TechnicianNotificationModal from '../../components/admin/technicians/management/TechnicianNotificationModal'
 
 import { technicianManagementService, type Technician, type TechnicianStats } from '../../services/technicianManagementService'
-import { ALL_INCIDENT_TYPES, INCIDENT_TYPE_CONFIG } from '../../types/caseIncidents'
+import { ALL_INCIDENT_TYPES, INCIDENT_TYPE_CONFIG, type IncidentType } from '../../types/caseIncidents'
 
 const STAFF_ROLES = [
   'Skadedjurstekniker',
@@ -139,6 +139,14 @@ export default function TechnicianManagement() {
     } catch (error) {
       // Fel hanteras av service
     }
+  }
+
+  // Uppdatera lokalt state när mottagartyper togglas direkt på ett kort
+  // (utan full refetch, så att sidan inte blinkar)
+  const handleRecipientTypesChange = (technicianId: string, types: IncidentType[]) => {
+    setTechnicians(prev => prev.map(t =>
+      t.id === technicianId ? { ...t, incident_recipient_types: types } : t
+    ))
   }
 
   const handleDeleteTechnician = async (id: string) => {
@@ -377,6 +385,7 @@ export default function TechnicianManagement() {
               onManageAuth={handleManageAuth}
               onManageWorkSchedule={handleManageWorkSchedule}
               onManageNotifications={handleManageNotifications}
+              onRecipientTypesChange={handleRecipientTypesChange}
             />
           ))}
         </div>
