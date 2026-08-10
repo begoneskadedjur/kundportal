@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react' // useEffect lades till för att hantera klick utanför
 import {
   User, Mail, Phone, MapPin, MoreVertical, Edit,
-  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell
+  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle
 } from 'lucide-react'
 import Button from '../../../ui/Button'
 import { technicianManagementService, type Technician } from '../../../../services/technicianManagementService'
+import { INCIDENT_TYPE_CONFIG } from '../../../../types/caseIncidents'
 
 type TechnicianCardProps = {
   technician: Technician
@@ -80,6 +81,20 @@ export default function TechnicianCard({
                   Inloggning
                 </span>
               )}
+              {(technician.incident_recipient_types || []).map(type => {
+                const config = INCIDENT_TYPE_CONFIG[type]
+                if (!config) return null
+                return (
+                  <span
+                    key={type}
+                    className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${config.bgColor} ${config.color}`}
+                    title={`Mottagare av ${config.label.toLowerCase()}`}
+                  >
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    {config.label}
+                  </span>
+                )
+              })}
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  Plus, Search, User, UserCheck, Users, Key, Car
+  Plus, Search, User, UserCheck, Users, Key, Car, AlertTriangle
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
@@ -15,6 +15,7 @@ import WorkScheduleModal from '../../components/admin/technicians/management/Wor
 import TechnicianNotificationModal from '../../components/admin/technicians/management/TechnicianNotificationModal'
 
 import { technicianManagementService, type Technician, type TechnicianStats } from '../../services/technicianManagementService'
+import { ALL_INCIDENT_TYPES, INCIDENT_TYPE_CONFIG } from '../../types/caseIncidents'
 
 const STAFF_ROLES = [
   'Skadedjurstekniker',
@@ -220,6 +221,29 @@ export default function TechnicianManagement() {
           )
         })}
       </div>
+
+      {/* Alert: Incidenttyper utan mottagare */}
+      {(() => {
+        const missingTypes = ALL_INCIDENT_TYPES.filter(
+          type => !technicians.some(tech => tech.incident_recipient_types?.includes(type))
+        )
+        if (missingTypes.length === 0) return null
+        return (
+          <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+              <div>
+                <h3 className="text-white font-medium text-sm">
+                  Incidenttyper utan mottagare: {missingTypes.map(t => INCIDENT_TYPE_CONFIG[t].label).join(', ')}
+                </h3>
+                <p className="text-slate-400 text-xs">
+                  Rapporter av dessa typer notifierar ingen. Öppna en person och kryssa i typerna under Incidentmottagare.
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Alert: Personal utan inloggning */}
       {stats.total > stats.withLogin && (

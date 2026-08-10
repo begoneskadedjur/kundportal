@@ -2,7 +2,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
-import type { NavGroup } from './adminNavConfig'
+import type { NavGroup, NavItem } from './adminNavConfig'
+import { useIncidentBadge } from '../../../hooks/useIncidentBadge'
 
 interface SidebarNavGroupProps {
   group: NavGroup
@@ -10,17 +11,30 @@ interface SidebarNavGroupProps {
   currentPath: string
 }
 
+function ItemBadge({ count }: { count: number }) {
+  if (count <= 0) return null
+  return (
+    <span className="ml-auto min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-slate-900 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+      {count > 99 ? '99+' : count}
+    </span>
+  )
+}
+
 export function SidebarNavGroup({ group, collapsed, currentPath }: SidebarNavGroupProps) {
   const isAnyActive = group.items.some(item => currentPath.startsWith(item.path))
   const [expanded, setExpanded] = useState(group.pinned || isAnyActive)
   const GroupIcon = group.icon
+  const incidentCount = useIncidentBadge()
+
+  const badgeCountFor = (item: NavItem) => (item.badgeKey === 'incidents' ? incidentCount : 0)
+  const groupBadgeCount = group.items.reduce((sum, item) => sum + badgeCountFor(item), 0)
 
   if (collapsed) {
     return (
       <div className="relative group/nav">
         <button
           className={`
-            w-full flex items-center justify-center px-3 py-2.5 rounded-xl transition-all duration-200
+            w-full flex items-center justify-center px-3 py-2.5 rounded-xl transition-all duration-200 relative
             ${isAnyActive
               ? 'bg-teal-500/10 text-teal-400'
               : 'text-slate-400 hover:text-white hover:bg-slate-800/30'
@@ -30,6 +44,9 @@ export function SidebarNavGroup({ group, collapsed, currentPath }: SidebarNavGro
           aria-label={group.label}
         >
           <GroupIcon className="w-5 h-5 flex-shrink-0" />
+          {groupBadgeCount > 0 && (
+            <span className="absolute top-1 right-2 w-2 h-2 rounded-full bg-amber-500" />
+          )}
         </button>
         <div className="absolute left-full top-0 ml-2 hidden group-hover/nav:block z-50">
           <div className="bg-slate-800 border border-slate-700 rounded-xl shadow-xl p-2 min-w-[200px]">
@@ -54,6 +71,7 @@ export function SidebarNavGroup({ group, collapsed, currentPath }: SidebarNavGro
                 >
                   <Icon className="w-4 h-4 flex-shrink-0" />
                   <span>{item.label}</span>
+                  <ItemBadge count={badgeCountFor(item)} />
                 </Link>
               )
             })}
@@ -76,7 +94,12 @@ export function SidebarNavGroup({ group, collapsed, currentPath }: SidebarNavGro
           <GroupIcon className="w-4 h-4 flex-shrink-0" />
           <span className="text-xs font-semibold uppercase tracking-wider">{group.label}</span>
         </div>
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+        <div className="flex items-center gap-1.5">
+          {!expanded && groupBadgeCount > 0 && (
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+          )}
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
+        </div>
       </button>
 
       <div className={`overflow-hidden transition-all duration-200 ${expanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
@@ -99,6 +122,7 @@ export function SidebarNavGroup({ group, collapsed, currentPath }: SidebarNavGro
               >
                 <Icon className="w-4 h-4 flex-shrink-0" />
                 <span>{item.label}</span>
+                <ItemBadge count={badgeCountFor(item)} />
               </Link>
             )
           })}

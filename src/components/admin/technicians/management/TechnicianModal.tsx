@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect } from 'react'
 import { User, Key, Car, Wrench, AlertCircle, Shield, AlertTriangle } from 'lucide-react'
-import { supabase } from '../../../../lib/supabase'
 import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
 import Select from '../../../ui/Select'
@@ -12,6 +11,8 @@ import { technicianManagementService, type Technician, type TechnicianFormData }
 import toast from 'react-hot-toast'
 import { ServiceCatalogService } from '../../../../services/servicesCatalogService'
 import type { ServiceWithGroup } from '../../../../types/services'
+import { IncidentRecipientService } from '../../../../services/incidentRecipientService'
+import { ALL_INCIDENT_TYPES, INCIDENT_TYPE_CONFIG, type IncidentType } from '../../../../types/caseIncidents'
 
 type TechnicianModalProps = {
   isOpen: boolean
@@ -36,7 +37,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
   const [bookingServices, setBookingServices] = useState<ServiceWithGroup[]>([])
   const [copyFromId, setCopyFromId] = useState<string>('')
   const [alsoAdmin, setAlsoAdmin] = useState(false)
-  const [incidentRecipient, setIncidentRecipient] = useState(false)
+  const [incidentTypes, setIncidentTypes] = useState<Set<IncidentType>>(new Set())
 
   useEffect(() => {
     const loadData = async () => {
@@ -52,7 +53,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
           display_name: technician.display_name || technician.name || ''
         });
         setAlsoAdmin(technician.is_admin || false);
-        setIncidentRecipient(technician.incident_recipient || false);
+        setIncidentTypes(new Set(technician.incident_recipient_types || []));
         // Hämta och sätt befintliga kompetenser
         const currentCompetencies = await technicianManagementService.getCompetencies(technician.id);
         setSelectedCompetencies(new Set(currentCompetencies));
@@ -61,7 +62,7 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
         setFormData({ name: '', role: 'Skadedjurstekniker', email: '', direct_phone: '', office_phone: '', address: '', abax_vehicle_id: '' });
         setSelectedCompetencies(new Set());
         setAlsoAdmin(false);
-        setIncidentRecipient(false);
+        setIncidentTypes(new Set());
       }
       setPassword('');
     };
@@ -116,12 +117,13 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
             await technicianManagementService.toggleAdminAccess(technician.id, shouldBeAdmin);
           }
         }
-        // Synka incident_recipient om ändrats
-        if (technician.has_login && incidentRecipient !== (technician.incident_recipient || false)) {
-          await supabase
-            .from('profiles')
-            .update({ incident_recipient: incidentRecipient })
-            .eq('technician_id', technician.id)
+        // Synka mottagartyper för tillbud/olycka/avvikelse om ändrats
+        if (technician.has_login && technician.user_id) {
+          const current = new Set(technician.incident_recipient_types || [])
+          const changed = current.size !== incidentTypes.size || [...incidentTypes].some(t => !current.has(t))
+          if (changed) {
+            await IncidentRecipientService.setRecipientTypes(technician.user_id, [...incidentTypes])
+          }
         }
         if (password.trim() && technician.user_id) {
           await technicianManagementService.updateUserPassword(technician.user_id, password);
@@ -196,21 +198,48 @@ export default function TechnicianModal({ isOpen, onClose, onSuccess, technician
           )}
           {/* Incidentmottagare - visas om personen har inloggning */}
           {technician?.has_login && (
-            <label className="flex items-center gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl cursor-pointer hover:border-slate-600 transition-colors">
-              <input
-                type="checkbox"
-                checked={incidentRecipient}
-                onChange={(e) => setIncidentRecipient(e.target.checked)}
-                className="h-4 w-4 rounded bg-slate-700 border-slate-500 text-[#20c58f] focus:ring-[#20c58f]"
-              />
-              <div className="flex items-center gap-2">
+            <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+              <div className="flex items-center gap-2 mb-1">
                 <AlertTriangle className="w-4 h-4 text-amber-400" />
-                <div>
-                  <span className="text-sm font-medium text-slate-300">Mottagare av tillbud & avvikelser</span>
-                  <p className="text-xs text-slate-500">Får notiser och kan se detaljer vid inkomna tillbud och avvikelser</p>
-                </div>
+                <span className="text-sm font-medium text-slate-300">Incidentmottagare</span>
               </div>
-            </label>
+              <p className="text-xs text-slate-500 mb-2">
+                Får notiser (in-app + e-post) och full insyn i valda incidenttyper
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {ALL_INCIDENT_TYPES.map(type => {
+                  const config = INCIDENT_TYPE_CONFIG[type]
+                  const checked = incidentTypes.has(type)
+                  return (
+                    <label
+                      key={type}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
+                        checked
+                          ? `${config.bgColor} ${config.borderColor}`
+                          : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => {
+                          setIncidentTypes(prev => {
+                            const next = new Set(prev)
+                            if (e.target.checked) next.add(type)
+                            else next.delete(type)
+                            return next
+                          })
+                        }}
+                        className="h-4 w-4 rounded bg-slate-700 border-slate-500 text-[#20c58f] focus:ring-[#20c58f]"
+                      />
+                      <span className={`text-sm ${checked ? config.color : 'text-slate-300'}`}>
+                        {config.label}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
           )}
           <Input label="E-post *" name="email" type="email" value={formData.email || ''} onChange={handleChange} required placeholder="namn@begone.se" className="bg-slate-800/50 border-slate-600"/>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

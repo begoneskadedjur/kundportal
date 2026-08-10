@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase'
 import toast from 'react-hot-toast'
+import type { IncidentType } from '../types/caseIncidents'
 
 // --- TYPDEFINITIONER ---
 
@@ -39,7 +40,7 @@ export type Technician = {
   user_id?: string | null
   display_name?: string | null
   is_admin?: boolean
-  incident_recipient?: boolean
+  incident_recipient_types?: IncidentType[]
 }
 
 export type TechnicianFormData = {
@@ -155,17 +156,27 @@ export const technicianManagementService = {
 
   async getAllTechnicians(): Promise<Technician[]> {
     try {
-      const [techniciansRes, profilesRes] = await Promise.all([
+      const [techniciansRes, profilesRes, recipientsRes] = await Promise.all([
         supabase.from('technicians').select('*').order('name', { ascending: true }),
-        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, incident_recipient')
+        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin'),
+        supabase.from('incident_recipients').select('user_id, incident_type')
       ]);
       if (techniciansRes.error) throw techniciansRes.error;
       if (profilesRes.error) throw profilesRes.error;
+      if (recipientsRes.error) throw recipientsRes.error;
 
       // Matcha profiler via FK (alla roller har nu technician_id)
       const profilesByTechId = new Map(
         profilesRes.data.filter(p => p.technician_id).map(p => [p.technician_id, p])
       );
+
+      // Mottagartyper per user_id
+      const recipientTypesByUserId = new Map<string, IncidentType[]>();
+      (recipientsRes.data || []).forEach(r => {
+        const list = recipientTypesByUserId.get(r.user_id) || [];
+        list.push(r.incident_type as IncidentType);
+        recipientTypesByUserId.set(r.user_id, list);
+      });
 
       const enrichedData = (techniciansRes.data || []).map(tech => {
         const profile = profilesByTechId.get(tech.id) || null;
@@ -175,7 +186,9 @@ export const technicianManagementService = {
           user_id: profile?.user_id || null,
           display_name: profile?.display_name || tech.name,
           is_admin: profile?.is_admin || false,
-          incident_recipient: profile?.incident_recipient || false
+          incident_recipient_types: profile?.user_id
+            ? (recipientTypesByUserId.get(profile.user_id) || [])
+            : []
         };
       });
       return enrichedData;
@@ -426,11 +439,20 @@ export const technicianManagementService = {
 
   async getTechnicianById(id: string): Promise<Technician> {
     try {
-      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, incident_recipient)`).eq('id', id).single();
+      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin)`).eq('id', id).single();
       if (error) throw error;
 
       // FK-join hittar profiler direkt (alla roller har nu technician_id)
       const profile = data.profiles;
+
+      let incidentRecipientTypes: IncidentType[] = [];
+      if (profile?.user_id) {
+        const { data: recipients } = await supabase
+          .from('incident_recipients')
+          .select('incident_type')
+          .eq('user_id', profile.user_id);
+        incidentRecipientTypes = (recipients || []).map(r => r.incident_type as IncidentType);
+      }
 
       return {
         ...data,
@@ -438,7 +460,7 @@ export const technicianManagementService = {
         user_id: profile?.user_id || null,
         display_name: profile?.display_name || data.name,
         is_admin: profile?.is_admin || false,
-        incident_recipient: profile?.incident_recipient || false
+        incident_recipient_types: incidentRecipientTypes
       };
     } catch (error: any) {
       console.error('Error fetching staff member:', error);

@@ -53,7 +53,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'AI Assistent', icon: Sparkles, path: '/technician/team-chat' },
       { label: 'Provisioner', icon: DollarSign, path: '/technician/commissions' },
-      { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/technician/tillbud-avvikelser' },
+      { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/technician/tillbud-avvikelser', badgeKey: 'incidents' },
     ],
   },
 ]

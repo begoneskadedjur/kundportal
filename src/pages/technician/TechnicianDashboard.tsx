@@ -228,7 +228,7 @@ export default function TechnicianDashboard() {
         {[
           { label: 'Skapa avtal', icon: FileSignature, path: '/technician/oneflow', color: 'text-[#20c58f]', bg: 'bg-[#20c58f]/15' },
           { label: 'AI Assistent', icon: Sparkles, path: '/technician/team-chat', color: 'text-cyan-400', bg: 'bg-cyan-500/15' },
-          { label: 'Rapportera tillbud', icon: AlertTriangle, path: '/technician/tillbud-avvikelser', color: 'text-amber-400', bg: 'bg-amber-500/15' },
+          { label: 'Rapportera Oj eller Aj', icon: AlertTriangle, path: '/technician/tillbud-avvikelser', color: 'text-amber-400', bg: 'bg-amber-500/15' },
         ].map(a => (
           <Link
             key={a.path}

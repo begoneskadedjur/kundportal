@@ -21,6 +21,7 @@ import {
   FileSearch,
   FilePen,
   ClipboardList,
+  AlertTriangle,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
@@ -39,6 +40,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Rondering & Schema', icon: CalendarRange, path: '/koordinator/rondering-schema' },
       { label: 'Schemaoptimerare', icon: Wand2, path: '/koordinator/booking-assistant' },
       { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets' },
+      { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/koordinator/tillbud-avvikelser', badgeKey: 'incidents' },
     ],
   },
   {
@@ -115,6 +117,7 @@ export const breadcrumbMap: Record<string, string> = {
 
   // Organisation
   '/koordinator/tickets': 'Tickets',
+  '/koordinator/tillbud-avvikelser': 'Tillbud & Avvikelser',
 
   // Verktyg
   '/koordinator/team-chat': 'AI Assistent',
