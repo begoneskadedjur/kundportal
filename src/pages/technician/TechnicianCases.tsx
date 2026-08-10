@@ -126,7 +126,8 @@ const INVOICE_PRIORITY: Record<string, number> = {
 type TabKey = 'active' | 'stale' | 'completed'
 
 export default function TechnicianCases() {
-  const { profile, isTechnician } = useAuth()
+  const { profile, availableViews } = useAuth()
+  const hasTechnicianView = availableViews.includes('technician')
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
@@ -157,15 +158,15 @@ export default function TechnicianCases() {
 
   // ─── Auth guard ───────────────────────────────────
   useEffect(() => {
-    if (profile && !isTechnician) navigate('/login', { replace: true })
-  }, [isTechnician, profile, navigate])
+    if (profile && !hasTechnicianView) navigate('/login', { replace: true })
+  }, [hasTechnicianView, profile, navigate])
 
   // ─── Data fetch ───────────────────────────────────
   useEffect(() => {
-    if (isTechnician && profile?.technician_id) {
+    if (hasTechnicianView && profile?.technician_id) {
       fetchCases(profile.technician_id)
     }
-  }, [isTechnician, profile?.technician_id])
+  }, [hasTechnicianView, profile?.technician_id])
 
   const fetchCases = async (technicianId: string) => {
     setLoading(true)

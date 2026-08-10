@@ -56,7 +56,9 @@ function getDateString(): string {
 // ─── Component ─────────────────────────────────
 
 export default function TechnicianDashboard() {
-  const { profile, isTechnician } = useAuth()
+  const { profile, availableViews } = useAuth()
+  // Tekniker-vyn är tillgänglig för alla med tekniker som primär- ELLER extraroll
+  const hasTechnicianView = availableViews.includes('technician')
   const navigate = useNavigate()
 
   const technicianId = profile?.technician_id
@@ -74,18 +76,18 @@ export default function TechnicianDashboard() {
   const [provisionData, setProvisionData] = useState<{ currentMonth: number; ytd: number }>({ currentMonth: 0, ytd: 0 })
 
   useEffect(() => {
-    if (profile && !isTechnician) {
+    if (profile && !hasTechnicianView) {
       navigate('/login', { replace: true })
     }
-  }, [isTechnician, profile, navigate])
+  }, [hasTechnicianView, profile, navigate])
 
   useEffect(() => {
-    if (isTechnician && technicianId) {
+    if (hasTechnicianView && technicianId) {
       fetchDashboardData()
       fetchLeadsSummary()
       fetchProvisionData()
     }
-  }, [isTechnician, technicianId])
+  }, [hasTechnicianView, technicianId])
 
   const fetchDashboardData = async () => {
     if (!technicianId) return

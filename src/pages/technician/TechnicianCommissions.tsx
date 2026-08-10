@@ -38,7 +38,8 @@ const caseTypeBadge: Record<string, { label: string; cls: string }> = {
 // ─── Komponent ────────────────────────────────────────────
 
 export default function TechnicianCommissions() {
-  const { profile, technician, isTechnician } = useAuth()
+  const { profile, technician, availableViews } = useAuth()
+  const hasTechnicianView = availableViews.includes('technician')
   const navigate = useNavigate()
 
   const technicianId = profile?.technician_id || technician?.id
@@ -50,10 +51,10 @@ export default function TechnicianCommissions() {
 
   // Auth guard
   useEffect(() => {
-    if (!isTechnician || !technicianId) {
+    if (!hasTechnicianView || !technicianId) {
       navigate('/login', { replace: true })
     }
-  }, [isTechnician, technicianId, navigate])
+  }, [hasTechnicianView, technicianId, navigate])
 
   // Data loading
   const loadData = useCallback(async () => {

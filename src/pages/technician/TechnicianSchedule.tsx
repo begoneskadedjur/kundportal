@@ -252,7 +252,8 @@ function getAbsenceStatus(dateStr: string, absences: TechnicianAbsence[], workSc
 const FilterPanel = ({ isOpen, onClose, activeStatuses, setActiveStatuses }: { isOpen: boolean, onClose: () => void, activeStatuses: Set<string>, setActiveStatuses: (s: Set<string>) => void }) => { const toggleStatus = (status: string) => { const newStatuses = new Set(activeStatuses); if (newStatuses.has(status)) newStatuses.delete(status); else newStatuses.add(status); setActiveStatuses(newStatuses); }; return (<AnimatePresence>{isOpen && (<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/60 z-40 flex justify-center items-center p-4"><motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl"><header className="p-4 border-b border-slate-800 flex items-center justify-between"><h2 className="text-lg font-bold">Filtrera Ärenden</h2><Button variant="ghost" size="icon" onClick={onClose}><X className="w-5 h-5" /></Button></header><div className="p-4 flex-grow overflow-y-auto"><div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{ALL_VALID_STATUSES.map(status => (<label key={status} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-slate-800/50"><input type="checkbox" checked={activeStatuses.has(status)} onChange={() => toggleStatus(status)} className="h-5 w-5 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500 shrink-0" /><span className={`text-sm ${activeStatuses.has(status) ? 'text-white' : 'text-slate-400'}`}>{status}</span></label>))}</div></div><footer className="p-4 border-t border-slate-800 flex flex-col sm:flex-row gap-2"><Button variant="secondary" onClick={() => setActiveStatuses(new Set(ALL_VALID_STATUSES))} className="w-full">Visa alla</Button><Button variant="secondary" onClick={() => setActiveStatuses(new Set(DEFAULT_ACTIVE_STATUSES))} className="w-full">Återställ</Button><Button variant="primary" onClick={onClose} className="w-full">Klar</Button></footer></motion.div></motion.div>)}</AnimatePresence>);};
 
 export default function TechnicianSchedule() {
-  const { profile, isTechnician } = useAuth();
+  const { profile, availableViews } = useAuth();
+  const hasTechnicianView = availableViews.includes('technician');
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const calendarRef = useRef<FullCalendar>(null);
@@ -360,7 +361,7 @@ export default function TechnicianSchedule() {
     }}, []);
   
   useEffect(() => {
-    if (!isTechnician || !profile?.technician_id) return;
+    if (!hasTechnicianView || !profile?.technician_id) return;
     fetchScheduledCases(profile.technician_id);
     const id = profile.technician_id;
     Promise.all([
@@ -370,7 +371,7 @@ export default function TechnicianSchedule() {
       if (schedRes.data?.work_schedule) setWorkSchedule(schedRes.data.work_schedule as WorkSchedule);
       if (absRes.data) setAbsences(absRes.data as TechnicianAbsence[]);
     });
-  }, [isTechnician, profile?.technician_id, fetchScheduledCases]);
+  }, [hasTechnicianView, profile?.technician_id, fetchScheduledCases]);
 
   // Hantera öppning av specifikt ärende från notifikation/länk
   useEffect(() => {
