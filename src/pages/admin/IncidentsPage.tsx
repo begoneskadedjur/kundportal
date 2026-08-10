@@ -4,13 +4,13 @@
 // övriga ser bara incidenter de rapporterat eller är berörda i.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { AlertTriangle, Search, RefreshCw, Calendar, Plus, X, Clock, User, Briefcase, ExternalLink, ChevronRight } from 'lucide-react'
+import { AlertTriangle, Search, RefreshCw, Calendar, Plus, X, Clock, User, Briefcase, ExternalLink, ChevronRight, Download } from 'lucide-react'
 import { supabase, getAuthHeaders } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 import Select from '../../components/ui/Select'
-import type { CaseIncident, IncidentType, IncidentStatus } from '../../types/caseIncidents'
-import { INCIDENT_TYPE_CONFIG, INCIDENT_STATUS_CONFIG, ALL_INCIDENT_TYPES } from '../../types/caseIncidents'
+import type { CaseIncident, IncidentType, IncidentStatus, IncidentCategory } from '../../types/caseIncidents'
+import { INCIDENT_TYPE_CONFIG, INCIDENT_STATUS_CONFIG, INCIDENT_CATEGORY_CONFIG, ALL_INCIDENT_TYPES } from '../../types/caseIncidents'
 import { IncidentRecipientService } from '../../services/incidentRecipientService'
 import DatePicker from 'react-datepicker'
 import { registerLocale } from 'react-datepicker'
@@ -46,6 +46,7 @@ export default function IncidentsPage() {
   const [saving, setSaving] = useState(false)
   const [formType, setFormType] = useState<IncidentType>('tillbud')
   const [formDescription, setFormDescription] = useState('')
+  const [formImmediateAction, setFormImmediateAction] = useState('')
   const [occurredAt, setOccurredAt] = useState<Date>(new Date())
   const [selectedEmployees, setSelectedEmployees] = useState<SimpleEmployee[]>([])
   const [addEmployeeId, setAddEmployeeId] = useState('')
@@ -163,7 +164,7 @@ export default function IncidentsPage() {
       if (error) throw error
 
       // RLS avgör vad som syns - nya (ohanterade) överst, därefter senaste först
-      const statusOrder: Record<string, number> = { ny: 0, under_utredning: 1, atgardad: 2 }
+      const statusOrder: Record<string, number> = { ny: 0, under_utredning: 1, atgardad: 2, avslutad: 3 }
       const sorted = (data || []).sort((a, b) => {
         const diff = (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
         if (diff !== 0) return diff
@@ -187,6 +188,7 @@ export default function IncidentsPage() {
     setShowForm(false)
     setFormType('tillbud')
     setFormDescription('')
+    setFormImmediateAction('')
     setOccurredAt(new Date())
     setSelectedEmployees([])
     setAddEmployeeId('')
@@ -214,6 +216,7 @@ export default function IncidentsPage() {
         .insert({
           type: formType,
           description: formDescription.trim(),
+          immediate_action: formImmediateAction.trim() || null,
           occurred_at: occurredAt.toISOString(),
           reported_by_id: user?.id || null,
           reported_by_name: reporterName,
@@ -295,6 +298,50 @@ export default function IncidentsPage() {
   // Tillgängliga anställda att lägga till (exkludera redan valda)
   const availableEmployees = employees.filter(e => !selectedEmployees.some(s => s.id === e.id))
 
+  // Excel-vänlig CSV-export av hela registret (för ISO-revision)
+  const exportCsv = () => {
+    const esc = (v: string | null | undefined) => `"${(v || '').replace(/"/g, '""')}"`
+    const rows = filteredIncidents.map(i => {
+      const employeeNames = (i.incident_employees || []).map(e => e.technician_name).join(', ') || i.technician_name || ''
+      const closed = i.status === 'avslutad' && i.closed_at
+        ? `${new Date(i.closed_at).toLocaleDateString('sv-SE')} ${i.closed_by_name || ''}`.trim()
+        : ''
+      return [
+        new Date(i.occurred_at).toLocaleDateString('sv-SE'),
+        INCIDENT_TYPE_CONFIG[i.type as IncidentType]?.label || i.type,
+        i.category ? INCIDENT_CATEGORY_CONFIG[i.category]?.label || '' : '',
+        i.description,
+        i.immediate_action,
+        i.authority_report === 'ja' ? 'Ja' : i.authority_report === 'nej' ? 'Nej' : '',
+        i.why_occurred,
+        i.root_cause,
+        i.action_taken,
+        i.responsible_name,
+        i.due_date ? new Date(i.due_date).toLocaleDateString('sv-SE') : '',
+        i.follow_up,
+        INCIDENT_STATUS_CONFIG[i.status as IncidentStatus]?.label || i.status,
+        closed,
+        i.reported_by_name,
+        employeeNames
+      ].map(v => esc(typeof v === 'string' ? v : v ?? '')).join(';')
+    })
+    const header = [
+      'Inträffade', 'Typ av ärende', 'Miljö/Kvalitet/Arbetsmiljö', 'Vad har hänt?',
+      'Vad har vi redan gjort?', 'Anmälan till anmalarbetsskada.se?',
+      'Varför inträffade händelsen? (direkt orsak)', 'Grundorsak', 'Beslutad åtgärd',
+      'Ansvarig', 'Klart till', 'Uppföljning - är åtgärd genomförd & tillräcklig?',
+      'Status', 'Ärendet avslutat (datum + signatur)', 'Rapporterad av', 'Berörda anställda'
+    ].map(esc).join(';')
+    // BOM + semikolon så att svensk Excel öppnar filen korrekt
+    const blob = new Blob(['﻿' + header + '\r\n' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `tillbud-avvikelser-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* Header */}
@@ -316,6 +363,17 @@ export default function IncidentsPage() {
             <Plus className="w-4 h-4" />
             Rapportera händelse
           </button>
+          {isRecipient && (
+            <button
+              onClick={exportCsv}
+              disabled={filteredIncidents.length === 0}
+              title="Exportera registret till Excel (CSV)"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-white transition-colors disabled:opacity-50"
+            >
+              <Download className="w-4 h-4" />
+              Exportera
+            </button>
+          )}
           <button
             onClick={fetchIncidents}
             disabled={loading}
@@ -389,13 +447,32 @@ export default function IncidentsPage() {
           )}
 
           {/* Beskrivning */}
-          <textarea
-            value={formDescription}
-            onChange={(e) => setFormDescription(e.target.value)}
-            rows={3}
-            placeholder="Beskriv händelsen: vad hände, var och hur?"
-            className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors resize-none placeholder-slate-500"
-          />
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1 block">
+              Vad har hänt? <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              value={formDescription}
+              onChange={(e) => setFormDescription(e.target.value)}
+              rows={3}
+              placeholder="Beskriv händelsen: vad hände, var och hur?"
+              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors resize-none placeholder-slate-500"
+            />
+          </div>
+
+          {/* Direktåtgärd */}
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1 block">
+              Vad har ni redan gjort? <span className="text-slate-600">(valfritt)</span>
+            </label>
+            <textarea
+              value={formImmediateAction}
+              onChange={(e) => setFormImmediateAction(e.target.value)}
+              rows={2}
+              placeholder="T.ex. sanerat platsen, uppsökt vårdcentral, kontaktat kund..."
+              className="w-full px-3 py-2 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors resize-none placeholder-slate-500"
+            />
+          </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* När hände det? */}
@@ -637,6 +714,7 @@ export default function IncidentsPage() {
               { value: 'ny', label: 'Ny' },
               { value: 'under_utredning', label: 'Under utredning' },
               { value: 'atgardad', label: 'Åtgärdad' },
+              { value: 'avslutad', label: 'Avslutad' },
             ]}
             className="w-44"
           />
@@ -689,7 +767,7 @@ export default function IncidentsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Status</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Beskrivning</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Berörda</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Rapporterad av</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Ansvarig</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">Datum</th>
                   <th className="px-2 py-3" />
                 </tr>
@@ -710,6 +788,11 @@ export default function IncidentsPage() {
                         <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${config.bgColor} ${config.color}`}>
                           {config.label}
                         </span>
+                        {incident.category && INCIDENT_CATEGORY_CONFIG[incident.category] && (
+                          <span className={`ml-1 px-2 py-0.5 text-xs rounded-full font-medium ${INCIDENT_CATEGORY_CONFIG[incident.category].bgColor} ${INCIDENT_CATEGORY_CONFIG[incident.category].color}`}>
+                            {INCIDENT_CATEGORY_CONFIG[incident.category].label}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${statusConfig.bgColor} ${statusConfig.color}`}>
@@ -725,8 +808,23 @@ export default function IncidentsPage() {
                       <td className="px-4 py-3 text-slate-300">
                         {employeeNames || incident.technician_name || '-'}
                       </td>
-                      <td className="px-4 py-3 text-slate-300">
-                        {incident.reported_by_name}
+                      <td className="px-4 py-3">
+                        {incident.responsible_name ? (
+                          <>
+                            <p className="text-slate-300">{incident.responsible_name}</p>
+                            {incident.due_date && (
+                              <p className={`text-xs mt-0.5 ${
+                                incident.status !== 'avslutad' && new Date(incident.due_date) < new Date()
+                                  ? 'text-red-400 font-medium'
+                                  : 'text-slate-500'
+                              }`}>
+                                Klart: {new Date(incident.due_date).toLocaleDateString('sv-SE')}
+                              </p>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-slate-400 text-xs whitespace-nowrap">
                         {new Date(incident.occurred_at).toLocaleDateString('sv-SE')}{' '}
@@ -755,6 +853,7 @@ export default function IncidentsPage() {
         <IncidentManageModal
           incident={managingIncident}
           handlerName={reporterName}
+          employees={employees}
           onClose={() => setManagingIncident(null)}
           onSaved={() => {
             setManagingIncident(null)
@@ -766,42 +865,74 @@ export default function IncidentsPage() {
   )
 }
 
-// Modal där mottagare sätter status och dokumenterar åtgärd
+// Utredningsmodal där mottagare arbetar enligt ISO-flödet:
+// klassificering → grundorsak → beslutad åtgärd med ansvarig/deadline → uppföljning → avslut
 function IncidentManageModal({
   incident,
   handlerName,
+  employees,
   onClose,
   onSaved
 }: {
   incident: CaseIncident
   handlerName: string
+  employees: SimpleEmployee[]
   onClose: () => void
   onSaved: () => void
 }) {
   const [status, setStatus] = useState<IncidentStatus>(incident.status || 'ny')
+  const [category, setCategory] = useState<IncidentCategory | ''>(incident.category || '')
+  const [authorityReport, setAuthorityReport] = useState<'' | 'ja' | 'nej'>(incident.authority_report || '')
+  const [immediateAction, setImmediateAction] = useState(incident.immediate_action || '')
+  const [whyOccurred, setWhyOccurred] = useState(incident.why_occurred || '')
+  const [rootCause, setRootCause] = useState(incident.root_cause || '')
   const [actionTaken, setActionTaken] = useState(incident.action_taken || '')
+  const [responsibleName, setResponsibleName] = useState(incident.responsible_name || '')
+  const [dueDate, setDueDate] = useState<Date | null>(incident.due_date ? new Date(incident.due_date) : null)
+  const [followUp, setFollowUp] = useState(incident.follow_up || '')
   const [saving, setSaving] = useState(false)
 
   const typeConfig = INCIDENT_TYPE_CONFIG[incident.type as IncidentType]
   const employeeNames = (incident.incident_employees || []).map(e => e.technician_name).join(', ')
 
+  const sectionClass = 'p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-2'
+  const labelClass = 'text-xs font-medium text-slate-400 mb-1 block'
+  const textareaClass = 'w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors resize-none placeholder-slate-500'
+
   const handleSave = async () => {
+    if (status === 'avslutad' && !followUp.trim()) {
+      toast.error('Fyll i uppföljningen innan ärendet avslutas')
+      return
+    }
     setSaving(true)
     try {
       const isHandled = status !== 'ny'
+      const isClosed = status === 'avslutad'
+      const localDate = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
       const { error } = await supabase
         .from('case_incidents')
         .update({
           status,
+          category: category || null,
+          authority_report: authorityReport || null,
+          immediate_action: immediateAction.trim() || null,
+          why_occurred: whyOccurred.trim() || null,
+          root_cause: rootCause.trim() || null,
           action_taken: actionTaken.trim() || null,
+          responsible_name: responsibleName || null,
+          due_date: dueDate ? localDate(dueDate) : null,
+          follow_up: followUp.trim() || null,
           handled_by_name: isHandled ? handlerName : null,
           handled_at: isHandled ? new Date().toISOString() : null,
+          closed_at: isClosed ? (incident.closed_at || new Date().toISOString()) : null,
+          closed_by_name: isClosed ? (incident.closed_by_name || handlerName) : null,
           updated_at: new Date().toISOString()
         })
         .eq('id', incident.id)
 
       if (error) throw error
-      toast.success('Rapporten uppdaterad')
+      toast.success(isClosed ? 'Ärendet avslutat' : 'Rapporten uppdaterad')
       onSaved()
     } catch (err) {
       console.error('Error updating incident:', err)
@@ -814,7 +945,7 @@ function IncidentManageModal({
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999] p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+        className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -823,7 +954,7 @@ function IncidentManageModal({
             <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${typeConfig.bgColor} ${typeConfig.color}`}>
               {typeConfig.label}
             </span>
-            <h2 className="text-sm font-semibold text-white">Hantera rapport</h2>
+            <h2 className="text-sm font-semibold text-white">Utredning & åtgärd</h2>
           </div>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-white transition-colors">
             <X className="w-4 h-4" />
@@ -831,10 +962,11 @@ function IncidentManageModal({
         </div>
 
         {/* Body */}
-        <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+        <div className="p-4 space-y-3 max-h-[75vh] overflow-y-auto">
           {/* Händelsen */}
-          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-2">
-            <p className="text-sm text-white whitespace-pre-wrap">{incident.description}</p>
+          <div className={sectionClass}>
+            <h3 className="text-sm font-semibold text-white">Vad har hänt?</h3>
+            <p className="text-sm text-slate-300 whitespace-pre-wrap">{incident.description}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
               <span className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />
@@ -852,12 +984,22 @@ function IncidentManageModal({
                 </span>
               )}
             </div>
+            <div>
+              <label className={labelClass}>Vad har vi redan gjort? (direktåtgärd)</label>
+              <textarea
+                value={immediateAction}
+                onChange={(e) => setImmediateAction(e.target.value)}
+                rows={2}
+                placeholder="Omedelbara åtgärder på plats..."
+                className={textareaClass}
+              />
+            </div>
           </div>
 
           {/* Status */}
           <div>
-            <label className="text-xs font-medium text-slate-400 mb-1 block">Status</label>
-            <div className="flex gap-2">
+            <label className={labelClass}>Status</label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(Object.keys(INCIDENT_STATUS_CONFIG) as IncidentStatus[]).map(s => {
                 const sc = INCIDENT_STATUS_CONFIG[s]
                 const isSelected = status === s
@@ -866,7 +1008,7 @@ function IncidentManageModal({
                     key={s}
                     type="button"
                     onClick={() => setStatus(s)}
-                    className={`flex-1 px-3 py-2 text-sm rounded-lg border transition-colors ${
+                    className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
                       isSelected
                         ? `${sc.bgColor} ${sc.color} border-current`
                         : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-600'
@@ -879,18 +1021,139 @@ function IncidentManageModal({
             </div>
           </div>
 
+          {/* Klassificering */}
+          <div className={sectionClass}>
+            <h3 className="text-sm font-semibold text-white">Klassificering</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Miljö, kvalitet eller arbetsmiljö?</label>
+                <Select
+                  value={category}
+                  onChange={(v) => setCategory(v as IncidentCategory | '')}
+                  options={[
+                    { value: '', label: 'Välj kategori...' },
+                    { value: 'miljo', label: 'Miljö' },
+                    { value: 'kvalitet', label: 'Kvalitet' },
+                    { value: 'arbetsmiljo', label: 'Arbetsmiljö' },
+                  ]}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Ska anmälan göras till anmalarbetsskada.se?</label>
+                <Select
+                  value={authorityReport}
+                  onChange={(v) => setAuthorityReport(v as '' | 'ja' | 'nej')}
+                  options={[
+                    { value: '', label: 'Ej bedömt' },
+                    { value: 'ja', label: 'Ja' },
+                    { value: 'nej', label: 'Nej' },
+                  ]}
+                />
+              </div>
+            </div>
+            {(incident.type === 'olycka' || incident.type === 'tillbud') && authorityReport === '' && (
+              <p className="text-xs text-amber-400 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 flex-shrink-0" />
+                Bedöm anmälningsplikten - allvarlig olycka eller allvarligt tillbud ska anmälas utan dröjsmål.
+              </p>
+            )}
+            {authorityReport === 'ja' && (
+              <a
+                href="https://anmalarbetsskada.se"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-red-400 underline inline-flex items-center gap-0.5 hover:text-red-300"
+              >
+                Gör anmälan på anmalarbetsskada.se <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+
+          {/* Orsaksanalys */}
+          <div className={sectionClass}>
+            <h3 className="text-sm font-semibold text-white">Orsaksanalys</h3>
+            <div>
+              <label className={labelClass}>Varför inträffade händelsen? (direkt orsak)</label>
+              <textarea
+                value={whyOccurred}
+                onChange={(e) => setWhyOccurred(e.target.value)}
+                rows={2}
+                placeholder="T.ex. skyddshandskar användes inte vid uppackning med kniv..."
+                className={textareaClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Vad är grundorsaken till problemet?</label>
+              <textarea
+                value={rootCause}
+                onChange={(e) => setRootCause(e.target.value)}
+                rows={2}
+                placeholder="Bakomliggande orsak - t.ex. rutin saknas, ovana, fel på utrustning..."
+                className={textareaClass}
+              />
+            </div>
+          </div>
+
           {/* Åtgärd */}
-          <div>
-            <label className="text-xs font-medium text-slate-400 mb-1 block">
-              Åtgärd / utredning
-            </label>
-            <textarea
-              value={actionTaken}
-              onChange={(e) => setActionTaken(e.target.value)}
-              rows={3}
-              placeholder="Vad har gjorts eller ska göras för att det inte ska hända igen?"
-              className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors resize-none placeholder-slate-500"
-            />
+          <div className={sectionClass}>
+            <h3 className="text-sm font-semibold text-white">Beslutad åtgärd</h3>
+            <div>
+              <label className={labelClass}>Vad ska göras för att det inte ska hända igen?</label>
+              <textarea
+                value={actionTaken}
+                onChange={(e) => setActionTaken(e.target.value)}
+                rows={3}
+                placeholder="Korrigerande och förebyggande åtgärder..."
+                className={textareaClass}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Ansvarig</label>
+                <Select
+                  value={responsibleName}
+                  onChange={setResponsibleName}
+                  options={[
+                    { value: '', label: 'Välj ansvarig...' },
+                    ...employees.map(e => ({ value: e.name, label: e.name }))
+                  ]}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Klart till</label>
+                <DatePicker
+                  selected={dueDate}
+                  onChange={(date) => setDueDate(date)}
+                  dateFormat="yyyy-MM-dd"
+                  locale="sv"
+                  isClearable
+                  placeholderText="Välj datum..."
+                  className="w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Uppföljning */}
+          <div className={sectionClass}>
+            <h3 className="text-sm font-semibold text-white">Uppföljning</h3>
+            <div>
+              <label className={labelClass}>
+                Är åtgärden genomförd och tillräcklig? <span className="text-slate-600">(krävs för att avsluta)</span>
+              </label>
+              <textarea
+                value={followUp}
+                onChange={(e) => setFollowUp(e.target.value)}
+                rows={2}
+                placeholder="Utvärdera effekten av åtgärden innan ärendet avslutas..."
+                className={textareaClass}
+              />
+            </div>
+            {incident.closed_at && (
+              <p className="text-xs text-slate-500">
+                Avslutat {new Date(incident.closed_at).toLocaleDateString('sv-SE')} av {incident.closed_by_name}
+              </p>
+            )}
           </div>
 
           {incident.handled_by_name && (
@@ -917,7 +1180,7 @@ function IncidentManageModal({
             className="flex items-center gap-2 px-4 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] rounded-lg text-sm text-white font-medium transition-colors disabled:opacity-50"
           >
             {saving && <RefreshCw className="w-3 h-3 animate-spin" />}
-            Spara
+            {status === 'avslutad' ? 'Spara & avsluta' : 'Spara'}
           </button>
         </div>
       </div>

@@ -2,7 +2,8 @@
 // Typer för tillbud, olyckor och avvikelser kopplade till ärenden
 
 export type IncidentType = 'tillbud' | 'olycka' | 'avvikelse'
-export type IncidentStatus = 'ny' | 'under_utredning' | 'atgardad'
+export type IncidentStatus = 'ny' | 'under_utredning' | 'atgardad' | 'avslutad'
+export type IncidentCategory = 'miljo' | 'kvalitet' | 'arbetsmiljo'
 
 export interface IncidentEmployee {
   id: string
@@ -29,6 +30,17 @@ export interface CaseIncident {
   action_taken: string | null
   handled_by_name: string | null
   handled_at: string | null
+  // ISO-utredningsfält (avvikelsehantering enligt 9001/14001/45001)
+  category: IncidentCategory | null
+  immediate_action: string | null
+  authority_report: 'ja' | 'nej' | null
+  why_occurred: string | null
+  root_cause: string | null
+  responsible_name: string | null
+  due_date: string | null
+  follow_up: string | null
+  closed_at: string | null
+  closed_by_name: string | null
   reported_by_id: string | null
   reported_by_name: string
   technician_id: string | null
@@ -103,6 +115,33 @@ export const INCIDENT_STATUS_CONFIG: Record<IncidentStatus, {
     label: 'Åtgärdad',
     color: 'text-[#20c58f]',
     bgColor: 'bg-[#20c58f]/10'
+  },
+  avslutad: {
+    label: 'Avslutad',
+    color: 'text-slate-400',
+    bgColor: 'bg-slate-500/10'
+  }
+}
+
+export const INCIDENT_CATEGORY_CONFIG: Record<IncidentCategory, {
+  label: string
+  color: string
+  bgColor: string
+}> = {
+  miljo: {
+    label: 'Miljö',
+    color: 'text-emerald-400',
+    bgColor: 'bg-emerald-500/10'
+  },
+  kvalitet: {
+    label: 'Kvalitet',
+    color: 'text-purple-400',
+    bgColor: 'bg-purple-500/10'
+  },
+  arbetsmiljo: {
+    label: 'Arbetsmiljö',
+    color: 'text-orange-400',
+    bgColor: 'bg-orange-500/10'
   }
 }
 
