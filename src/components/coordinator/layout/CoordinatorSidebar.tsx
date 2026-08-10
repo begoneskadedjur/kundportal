@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { BugReportModal } from '../../shared/BugReportModal'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
+import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
 import { topLevelItems, navGroups } from './coordinatorNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
 
@@ -92,6 +93,11 @@ export function CoordinatorSidebar({
             <span className="text-sm">Öppna schema</span>
           </Link>
         )}
+      </div>
+
+      {/* Rapportera tillbud/olycka/avvikelse */}
+      <div className="px-3 pt-2">
+        <ReportIncidentButton role="koordinator" collapsed={collapsed} />
       </div>
 
       {/* Navigation */}

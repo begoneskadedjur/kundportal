@@ -12,6 +12,7 @@ import {
 import { useState } from 'react'
 import { BugReportModal } from '../../shared/BugReportModal'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
+import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
 import { topLevelItems, navGroups, favoriteItems } from './adminNavConfig'
 import { SidebarNavGroup } from './SidebarNavGroup'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -96,6 +97,11 @@ export function AdminSidebar({
             <span className="text-sm">Skapa avtal</span>
           </Link>
         )}
+      </div>
+
+      {/* Rapportera tillbud/olycka/avvikelse */}
+      <div className="px-3 pt-2">
+        <ReportIncidentButton role="admin" collapsed={collapsed} />
       </div>
 
       {/* Navigation */}

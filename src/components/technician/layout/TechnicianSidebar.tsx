@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { LogOut, Bug } from 'lucide-react'
 import { BugReportModal } from '../../shared/BugReportModal'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
+import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
 import { topLevelItems, navGroups } from './technicianNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
 
@@ -34,6 +35,11 @@ export function TechnicianSidebar({ currentPath, userName, onSignOut }: Technici
 
       {/* Vy-växlare för användare med flera portalroller */}
       <ViewSwitcher currentView="technician" />
+
+      {/* Rapportera tillbud/olycka/avvikelse */}
+      <div className="px-3 pt-3">
+        <ReportIncidentButton role="technician" />
+      </div>
 
       {/* Navigation */}
       <nav className="flex-1 py-3 px-3 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700">
