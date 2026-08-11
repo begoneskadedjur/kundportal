@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   BookOpen, ShieldCheck, HeartPulse, Leaf, FileText,
   MessageSquareText, ClipboardList, MapPin, AlertTriangle, Users,
-  Calculator, Receipt, Wallet,
+  Calculator, Receipt, Wallet, CalendarPlus, CalendarDays,
 } from 'lucide-react'
 
 // ─── Innehållsblock (jsonb i intranet_documents.content) ───
@@ -125,6 +125,8 @@ export const INTRANET_SLUG_ICONS: Record<string, LucideIcon> = {
   'guide-prissattning': Calculator,
   'guide-fakturering': Receipt,
   'guide-fakturering-kontor': Wallet,
+  'guide-skapa-arenden': CalendarPlus,
+  'guide-schemavyn': CalendarDays,
 }
 
 // ─── Anslagstavla ───

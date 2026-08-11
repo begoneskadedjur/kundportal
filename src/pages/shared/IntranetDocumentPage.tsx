@@ -29,6 +29,8 @@ import {
 import { useRoleBasePath } from '../../hooks/useRoleBasePath'
 import PrissattningDemo from './intranet/interactive/PrissattningDemo'
 import FaktureringDemo from './intranet/interactive/FaktureringDemo'
+import ArendetyperDemo from './intranet/interactive/ArendetyperDemo'
+import SchemaDemo from './intranet/interactive/SchemaDemo'
 import AudienceModal from './intranet/AudienceModal'
 import { describeAudience } from '../../types/intranet'
 import { Eye } from 'lucide-react'
@@ -38,6 +40,8 @@ import { Eye } from 'lucide-react'
 const INTERACTIVE_COMPONENTS: Record<string, ComponentType> = {
   'prissattning-demo': PrissattningDemo,
   'fakturering-demo': FaktureringDemo,
+  'arendetyper-demo': ArendetyperDemo,
+  'schema-demo': SchemaDemo,
 }
 
 // ─── Blockrendering ────────────────────────────────

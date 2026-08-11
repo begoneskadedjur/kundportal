@@ -1370,12 +1370,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   <button type="button" onClick={() => selectCaseType('private')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
                     <User className="w-6 h-6 mx-auto mb-1.5 text-blue-400" />
                     <h3 className="text-sm font-semibold">Privatperson</h3>
-                    <p className="text-xs text-slate-400 mt-1">Engångsjobb via ClickUp</p>
+                    <p className="text-xs text-slate-400 mt-1">Engångsjobb - faktureras separat</p>
                   </button>
                   <button type="button" onClick={() => selectCaseType('business')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
                     <Building className="w-6 h-6 mx-auto mb-1.5 text-green-400" />
                     <h3 className="text-sm font-semibold">Företag</h3>
-                    <p className="text-xs text-slate-400 mt-1">Engångsjobb via ClickUp</p>
+                    <p className="text-xs text-slate-400 mt-1">Engångsjobb - faktureras separat</p>
                   </button>
                 </div>
 
