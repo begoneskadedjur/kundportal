@@ -117,6 +117,10 @@ import InternAdministration from './pages/shared/InternAdministration';
 // Lärosäte (shared learning center for all internal roles)
 import Larosate from './pages/shared/Larosate';
 
+// Intranät (obligatoriska arbetssätt & policys med läskvittens + handbok)
+import IntranetPage from './pages/shared/IntranetPage';
+import IntranetDocumentPage from './pages/shared/IntranetDocumentPage';
+
 // Global styles
 import './styles/globals.css';
 
@@ -200,12 +204,16 @@ function App() {
               {/* Organisation routes */}
               <Route path="trafikljusoversikt" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
 
+              {/* Intranät - Obligatoriska arbetssätt & policys med läskvittens */}
+              <Route path="intranat" element={<ProtectedRoute requiredRole="admin"><IntranetPage /></ProtectedRoute>} />
+              <Route path="intranat/:slug" element={<ProtectedRoute requiredRole="admin"><IntranetDocumentPage /></ProtectedRoute>} />
+
               {/* Lärosäte - Internt kunskapscenter för alla interna roller */}
               <Route path="larosate" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><Larosate /></ProtectedRoute>} />
-              <Route path="larosate/guides/ticket-system" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><TicketSystemGuide /></ProtectedRoute>} />
-              <Route path="larosate/guides/follow-up-case" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><FollowUpCaseGuide /></ProtectedRoute>} />
-              <Route path="larosate/guides/case-deletion" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><CaseDeletionGuide /></ProtectedRoute>} />
-              <Route path="larosate/guides/equipment-placement" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><EquipmentPlacementGuide /></ProtectedRoute>} />
+              <Route path="larosate/guides/ticket-system" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician", "säljare"] as any}><TicketSystemGuide /></ProtectedRoute>} />
+              <Route path="larosate/guides/follow-up-case" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician", "säljare"] as any}><FollowUpCaseGuide /></ProtectedRoute>} />
+              <Route path="larosate/guides/case-deletion" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician", "säljare"] as any}><CaseDeletionGuide /></ProtectedRoute>} />
+              <Route path="larosate/guides/equipment-placement" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician", "säljare"] as any}><EquipmentPlacementGuide /></ProtectedRoute>} />
 
               {/* Bakåtkompatibilitet: gamla URL:er redirectar till nya */}
               <Route path="customers" element={<Navigate to="/admin/befintliga-kunder" replace />} />
@@ -259,6 +267,8 @@ function App() {
               {/* Organisation */}
               <Route path="tickets" element={<ProtectedRoute requiredRole="koordinator"><InternAdministration /></ProtectedRoute>} />
               <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="koordinator"><IncidentsPage /></ProtectedRoute>} />
+              <Route path="intranat" element={<ProtectedRoute requiredRole="koordinator"><IntranetPage /></ProtectedRoute>} />
+              <Route path="intranat/:slug" element={<ProtectedRoute requiredRole="koordinator"><IntranetDocumentPage /></ProtectedRoute>} />
 
               {/* Verktyg */}
               <Route path="team-chat" element={<ProtectedRoute requiredRole="koordinator"><TeamChat /></ProtectedRoute>} />
@@ -280,6 +290,8 @@ function App() {
               {/* Guides & Lärosäte */}
               <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="koordinator"><CaseDeletionGuide /></ProtectedRoute>} />
               <Route path="guides/ticket-system" element={<ProtectedRoute requiredRole="koordinator"><TicketSystemGuide /></ProtectedRoute>} />
+              <Route path="guides/follow-up-case" element={<ProtectedRoute requiredRole="koordinator"><FollowUpCaseGuide /></ProtectedRoute>} />
+              <Route path="guides/equipment-placement" element={<ProtectedRoute requiredRole="koordinator"><EquipmentPlacementGuide /></ProtectedRoute>} />
               <Route path="larosate" element={<ProtectedRoute requiredRole="koordinator"><Larosate /></ProtectedRoute>} />
 
               {/* Bakåtkompatibilitet */}
@@ -320,6 +332,15 @@ function App() {
 
               {/* Verktyg */}
               <Route path="ai-assistent" element={<ProtectedRoute requiredRole="säljare"><TeamChat /></ProtectedRoute>} />
+
+              {/* Intranät + guider (Handbok) */}
+              <Route path="intranat" element={<ProtectedRoute requiredRole="säljare"><IntranetPage /></ProtectedRoute>} />
+              <Route path="intranat/:slug" element={<ProtectedRoute requiredRole="säljare"><IntranetDocumentPage /></ProtectedRoute>} />
+              <Route path="larosate" element={<ProtectedRoute requiredRole="säljare"><Larosate /></ProtectedRoute>} />
+              <Route path="guides/ticket-system" element={<ProtectedRoute requiredRole="säljare"><TicketSystemGuide /></ProtectedRoute>} />
+              <Route path="guides/follow-up-case" element={<ProtectedRoute requiredRole="säljare"><FollowUpCaseGuide /></ProtectedRoute>} />
+              <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="säljare"><CaseDeletionGuide /></ProtectedRoute>} />
+              <Route path="guides/equipment-placement" element={<ProtectedRoute requiredRole="säljare"><EquipmentPlacementGuide /></ProtectedRoute>} />
             </Route>
 
             {/* --- TEKNIKER ROUTES — nested under TechnicianLayout med persistent sidebar --- */}
@@ -340,6 +361,8 @@ function App() {
               <Route path="team-chat" element={<ProtectedRoute requiredRole="technician"><TeamChat /></ProtectedRoute>} />
               <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="technician"><IncidentsPage /></ProtectedRoute>} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="technician"><InternAdministration /></ProtectedRoute>} />
+              <Route path="intranat" element={<ProtectedRoute requiredRole="technician"><IntranetPage /></ProtectedRoute>} />
+              <Route path="intranat/:slug" element={<ProtectedRoute requiredRole="technician"><IntranetDocumentPage /></ProtectedRoute>} />
               <Route path="guides/equipment-placement" element={<ProtectedRoute requiredRole="technician"><EquipmentPlacementGuide /></ProtectedRoute>} />
               <Route path="guides/follow-up-case" element={<ProtectedRoute requiredRole="technician"><FollowUpCaseGuide /></ProtectedRoute>} />
               <Route path="guides/case-deletion" element={<ProtectedRoute requiredRole="technician"><CaseDeletionGuide /></ProtectedRoute>} />

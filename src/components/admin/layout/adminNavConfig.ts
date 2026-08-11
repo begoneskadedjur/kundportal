@@ -31,6 +31,7 @@ import {
   Calendar,
   Map,
   CalendarRange,
+  Landmark,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -38,7 +39,7 @@ export interface NavItem {
   icon: React.ElementType
   path: string
   /** Nyckel för dynamisk räknarbadge i sidomenyn (t.ex. ohanterade incidenter) */
-  badgeKey?: 'incidents'
+  badgeKey?: 'incidents' | 'intranet'
 }
 
 export interface NavGroup {
@@ -95,6 +96,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Användarkonton (Personal)', icon: UserCheck, path: '/admin/anvandarkonton-personal' },
       { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
       { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/admin/tillbud-avvikelser', badgeKey: 'incidents' },
+      { label: 'Intranät', icon: Landmark, path: '/admin/intranat', badgeKey: 'intranet' },
       { label: 'Buggrapporter', icon: Bug, path: '/admin/bug-reports' },
     ]
   },
@@ -184,6 +186,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/installningar/avtalsmallar': 'Avtalsmallar',
   '/admin/installningar/betalningsvillkor': 'Betalningsvillkor',
   '/admin/tillbud-avvikelser': 'Tillbud & Avvikelser',
+  '/admin/intranat': 'Intranät',
   '/admin/bug-reports': 'Buggrapporter',
   '/admin/inspektionsstatus': 'Inspektionsstatus',
 }

@@ -16,6 +16,7 @@ import {
   Sparkles,
   FilePen,
   FileSignature,
+  Landmark,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
@@ -55,6 +56,7 @@ export const navGroups: NavGroup[] = [
     icon: Sparkles,
     items: [
       { label: 'AI Assistent', icon: Sparkles, path: '/saljare/ai-assistent' },
+      { label: 'Intranät', icon: Landmark, path: '/saljare/intranat', badgeKey: 'intranet' },
     ],
   },
 ]
@@ -88,4 +90,6 @@ export const breadcrumbMap: Record<string, string> = {
 
   // Verktyg
   '/saljare/ai-assistent': 'AI Assistent',
+  '/saljare/intranat': 'Intranät',
+  '/saljare/larosate': 'Lärosäte',
 }

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import type { NavGroup, NavItem } from './adminNavConfig'
 import { useIncidentBadge } from '../../../hooks/useIncidentBadge'
+import { useIntranetBadge } from '../../../hooks/useIntranetBadge'
 
 interface MobileNavGroupProps {
   group: NavGroup
@@ -16,8 +17,10 @@ export function MobileNavGroup({ group, currentPath, onNavigate }: MobileNavGrou
   const [expanded, setExpanded] = useState(isAnyActive)
   const GroupIcon = group.icon
   const incidentCount = useIncidentBadge()
+  const intranetCount = useIntranetBadge()
 
-  const badgeCountFor = (item: NavItem) => (item.badgeKey === 'incidents' ? incidentCount : 0)
+  const badgeCountFor = (item: NavItem) =>
+    item.badgeKey === 'incidents' ? incidentCount : item.badgeKey === 'intranet' ? intranetCount : 0
   const groupBadgeCount = group.items.reduce((sum, item) => sum + badgeCountFor(item), 0)
 
   return (
