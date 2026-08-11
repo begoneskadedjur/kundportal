@@ -423,7 +423,11 @@ export default function CoordinatorSchedule() {
     ))
 
     try {
-      if (caseData.case_type === 'contract') {
+      // Avtalsbaserade ärenden ligger i cases-tabellen men får case_type efter
+      // sin tjänstetyp vid inläsning (adaptCaseToBeGoneRow) — alla dessa måste
+      // skrivas till cases, inte private/business_cases.
+      const CONTRACT_CASE_TYPES = ['contract', 'establishment', 'inspection', 'rondering', 'egenkontroll']
+      if (CONTRACT_CASE_TYPES.includes(caseData.case_type as string)) {
         const updateData: Record<string, string> = {
           scheduled_start: newStart.toISOString(),
           scheduled_end: newEnd.toISOString(),
@@ -432,8 +436,11 @@ export default function CoordinatorSchedule() {
           updateData.primary_technician_id = newTechnicianId!
           updateData.primary_technician_name = newTech.name || ''
         }
-        const { error } = await supabase.from('cases').update(updateData).eq('id', caseId)
+        const { data, error } = await supabase.from('cases').update(updateData).eq('id', caseId).select('id')
         if (error) throw error
+        // 0 träffade rader är "OK" i Supabase — behandla som fel så att en
+        // felriktad uppdatering aldrig ser ut som en lyckad sparning
+        if (!data || data.length === 0) throw new Error(`Inget avtalsärende med id ${caseId}`)
       } else {
         const table = caseData.case_type === 'business' ? 'business_cases' : 'private_cases'
         const updateData: Record<string, string> = {
@@ -444,10 +451,12 @@ export default function CoordinatorSchedule() {
           updateData.primary_assignee_id = newTechnicianId!
           updateData.primary_assignee_name = newTech.name || ''
         }
-        const { error } = await supabase.from(table).update(updateData).eq('id', caseId)
+        const { data, error } = await supabase.from(table).update(updateData).eq('id', caseId).select('id')
         if (error) throw error
+        if (!data || data.length === 0) throw new Error(`Inget ärende med id ${caseId} i ${table}`)
       }
-    } catch {
+    } catch (err) {
+      console.error('Error moving case:', err)
       toast.error('Kunde inte flytta ärendet')
       fetchData()
     }
