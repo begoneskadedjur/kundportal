@@ -5,6 +5,7 @@ import { BeGoneCaseRow } from '../../../types/database'
 import { getStatusStyle } from './scheduleConstants'
 import { formatTime, cityAddress } from './scheduleUtils'
 import { EventHoverCard } from './EventHoverCard'
+import { getCaseKindLabel } from '../../../constants/caseTypeLabels'
 
 interface GridEventCardProps {
   caseData: BeGoneCaseRow
@@ -51,12 +52,7 @@ export const GridEventCard = memo(function GridEventCard({
   const addr = cityAddress((caseData as any).adress)
   const serviceAndAddr = [service, addr].filter(Boolean).join(' · ')
 
-  const categoryLabel = (caseData as any).case_type === 'private' ? 'Privatperson'
-    : (caseData as any).case_type === 'business' ? 'Företag'
-    : (caseData as any).case_type === 'inspection' ? 'Avtalat Servicebesök'
-    : (caseData as any).case_type === 'establishment' ? 'Etablering'
-    : (caseData as any).case_type === 'rondering' ? 'Rondering TK'
-    : null
+  const categoryLabel = getCaseKindLabel((caseData as any).case_type)?.short || null
 
   const displayPrimary = (caseData as any).case_type === 'inspection'
     ? (customerName || caseNumber)

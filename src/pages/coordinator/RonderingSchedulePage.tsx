@@ -88,12 +88,13 @@ interface FutureSession {
 // HELPERS
 // ============================================================
 
+// Etiketter enligt src/constants/caseTypeLabels.ts
 function serviceTypeLabel(type: string | null | undefined): string {
   switch (type) {
     case 'rondering_trafikkontoret': return 'Rondering Trafikkontoret'
     case 'egenkontroll_trafikkontoret': return 'Egenkontroll'
-    case 'inspection': return 'Inspektion stationer'
-    default: return 'Inspektion stationer'
+    case 'inspection': return 'Stationskontroll'
+    default: return 'Stationskontroll'
   }
 }
 
@@ -133,7 +134,7 @@ interface NewScheduleSelectorProps {
 }
 
 const SERVICE_TYPE_OPTIONS = [
-  { value: 'inspection', label: 'Inspektion stationer' },
+  { value: 'inspection', label: 'Stationskontroll' },
   { value: 'rondering_trafikkontoret', label: 'Rondering Trafikkontoret' },
   { value: 'egenkontroll_trafikkontoret', label: 'Egenkontroll' },
 ]

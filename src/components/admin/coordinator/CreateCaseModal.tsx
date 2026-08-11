@@ -964,7 +964,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           // Fortsätt ändå - ärendet är skapat
         }
 
-        toast.success(`Inspektion stationer inbokat för ${customerName}!`);
+        toast.success(`Stationskontroll inbokad för ${customerName}!`);
 
       } else if (caseType === 'establishment') {
         let actualCustomerId = selectedContractCustomer;
@@ -1342,9 +1342,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     if (initialCaseData) return `Boka in: ${initialCaseData.title}`;
     if (step === 'selectType') return 'Välj ärendetyp';
     switch (caseType) {
-      case 'private': return 'Nytt ärende: Privatperson';
-      case 'business': return 'Nytt ärende: Företag';
-      case 'contract': return 'Nytt ärende: Avtalskund';
+      case 'private': return 'Nytt ärende: Engångsjobb Privatperson';
+      case 'business': return 'Nytt ärende: Engångsjobb Företag';
+      case 'contract': return 'Nytt ärende: Extrabesök Avtalskund';
       case 'inspection': return 'Ny stationskontroll';
       case 'establishment': return 'Ny etablering';
       case 'rondering': return 'Ny rondering: Trafikkontoret';
@@ -1369,13 +1369,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <div className="flex flex-col md:flex-row gap-3">
                   <button type="button" onClick={() => selectCaseType('private')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
                     <User className="w-6 h-6 mx-auto mb-1.5 text-blue-400" />
-                    <h3 className="text-sm font-semibold">Privatperson</h3>
-                    <p className="text-xs text-slate-400 mt-1">Engångsjobb - faktureras separat</p>
+                    <h3 className="text-sm font-semibold">Engångsjobb Privatperson</h3>
+                    <p className="text-xs text-slate-400 mt-1">Faktureras separat - ROT/RUT</p>
                   </button>
                   <button type="button" onClick={() => selectCaseType('business')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
                     <Building className="w-6 h-6 mx-auto mb-1.5 text-green-400" />
-                    <h3 className="text-sm font-semibold">Företag</h3>
-                    <p className="text-xs text-slate-400 mt-1">Engångsjobb - faktureras separat</p>
+                    <h3 className="text-sm font-semibold">Engångsjobb Företag</h3>
+                    <p className="text-xs text-slate-400 mt-1">Faktureras separat</p>
                   </button>
                 </div>
 
@@ -1385,24 +1385,24 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   <div className="flex flex-col md:flex-row gap-3">
                     <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
                       <FileCheck className="w-6 h-6 mx-auto mb-1.5 text-emerald-400" />
-                      <h3 className="text-sm font-semibold">Servicebesök</h3>
-                      <p className="text-xs text-slate-400 mt-1">Återkommande tjänster</p>
+                      <h3 className="text-sm font-semibold">Extrabesök Avtalskund</h3>
+                      <p className="text-xs text-slate-400 mt-1">Enstaka tjänst utöver avtalet - merförsäljning</p>
                       {contractCustomers.length > 0 && (
                         <p className="text-xs text-emerald-400 mt-1">{contractCustomers.length} kunder</p>
                       )}
                     </button>
                     <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
                       <ClipboardCheck className="w-6 h-6 mx-auto mb-1.5 text-cyan-400" />
-                      <h3 className="text-sm font-semibold">Inspektion stationer</h3>
-                      <p className="text-xs text-slate-400 mt-1">Kontroll av fällor & stationer</p>
+                      <h3 className="text-sm font-semibold">Stationskontroll Avtalskund</h3>
+                      <p className="text-xs text-slate-400 mt-1">Enstaka kontroll - återkommande läggs i Rondering & Schema</p>
                       {contractCustomers.length > 0 && (
                         <p className="text-xs text-cyan-400 mt-1">{contractCustomers.length} kunder</p>
                       )}
                     </button>
                     <button type="button" onClick={() => selectCaseType('establishment')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-lime-500/30 cursor-pointer">
                       <MapPin className="w-6 h-6 mx-auto mb-1.5 text-lime-400" />
-                      <h3 className="text-sm font-semibold">Etablering</h3>
-                      <p className="text-xs text-slate-400 mt-1">Utplacering av stationer</p>
+                      <h3 className="text-sm font-semibold">Etablering Avtalskund</h3>
+                      <p className="text-xs text-slate-400 mt-1">Utplacering av stationer vid avtalsstart</p>
                       {contractCustomers.length > 0 && (
                         <p className="text-xs text-lime-400 mt-1">{contractCustomers.length} kunder</p>
                       )}

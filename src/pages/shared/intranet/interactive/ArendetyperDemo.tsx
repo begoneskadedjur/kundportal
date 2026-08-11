@@ -6,11 +6,11 @@ import { useState } from 'react'
 import { MousePointerClick, CheckCircle2, XCircle, Sparkles, RotateCcw } from 'lucide-react'
 
 const CASE_TYPES = [
-  { id: 'private', label: 'Privatperson' },
-  { id: 'business', label: 'Företag' },
-  { id: 'contract', label: 'Servicebesök (avtalskund)' },
-  { id: 'inspection', label: 'Inspektion stationer' },
-  { id: 'establishment', label: 'Etablering' },
+  { id: 'private', label: 'Engångsjobb Privatperson' },
+  { id: 'business', label: 'Engångsjobb Företag' },
+  { id: 'contract', label: 'Extrabesök Avtalskund' },
+  { id: 'inspection', label: 'Stationskontroll Avtalskund' },
+  { id: 'establishment', label: 'Etablering Avtalskund' },
 ]
 
 interface Quiz {
@@ -23,12 +23,12 @@ const QUESTIONS: Quiz[] = [
   {
     scenario: 'En privatperson ringer om ett getingbo på villan. Ingen avtalskund.',
     correct: 'private',
-    explain: 'Engångsjobb åt privatperson = Privatperson. Ärendet faktureras separat när det avslutas, med ROT/RUT om det är aktuellt.',
+    explain: 'Engångsjobb åt privatperson = Engångsjobb Privatperson. Ärendet faktureras separat när det avslutas, med ROT/RUT om det är aktuellt.',
   },
   {
     scenario: 'En restaurang utan avtal vill ha en engångssanering av kackerlackor.',
     correct: 'business',
-    explain: 'Företag utan avtal = Företag (engångsjobb). Väljer du Etablering hamnar jobbet i avtalsflödet och faktureras aldrig som det ska.',
+    explain: 'Företag utan avtal = Engångsjobb Företag. Väljer du Etablering hamnar jobbet i avtalsflödet och faktureras aldrig som det ska.',
   },
   {
     scenario: 'En NY avtalskund har precis skrivit avtal - stationerna ska placeras ut för första gången.',
@@ -38,12 +38,12 @@ const QUESTIONS: Quiz[] = [
   {
     scenario: 'En avtalskunds stationer ska kontrolleras - ett enstaka kontrollbesök behöver in i schemat.',
     correct: 'inspection',
-    explain: 'Stationskontroller = Inspektion stationer. Obs: de ÅTERKOMMANDE kontrollerna schemaläggs normalt automatiskt via Rondering & Schema - manuellt skapar du bara enstaka extra kontroller.',
+    explain: 'Stationskontroller = Stationskontroll Avtalskund. Obs: de ÅTERKOMMANDE kontrollerna schemaläggs normalt automatiskt via Rondering & Schema - manuellt skapar du bara enstaka extra kontroller.',
   },
   {
     scenario: 'En avtalskund vill ha en EXTRA sanering utöver det som ingår i avtalet - ingen stationskontroll.',
     correct: 'contract',
-    explain: 'Enstaka tjänster hos avtalskund som inte är stationskontroll = Servicebesök. Lägg fakturarader i ärendet så hamnar det som merförsäljning med kundens prislista. INTE Företag (då tappas avtalskopplingen) och INTE Etablering.',
+    explain: 'Enstaka tjänster hos avtalskund som inte är stationskontroll = Extrabesök Avtalskund. Lägg fakturarader i ärendet så hamnar det som merförsäljning med kundens prislista. INTE Företag (då tappas avtalskopplingen) och INTE Etablering.',
   },
   {
     scenario: 'En tekniker ska utföra ett engångsjobb hos en kund utan avtal - vilken typ är FEL att välja?',
@@ -105,8 +105,8 @@ export default function ArendetyperDemo() {
               </p>
               <p className="text-xs text-slate-300 mt-1">
                 Huvudreglerna: Engångsjobb = Privatperson eller Företag. Stationskontroller =
-                Inspektion stationer (återkommande via Rondering & Schema). Enstaka tjänster hos
-                avtalskund = Servicebesök. Etablering = enbart utplacering av stationer vid avtalsstart.
+                Stationskontroll (återkommande via Rondering & Schema). Enstaka tjänster hos
+                avtalskund = Extrabesök. Etablering = enbart utplacering av stationer vid avtalsstart.
               </p>
               <button
                 onClick={restart}

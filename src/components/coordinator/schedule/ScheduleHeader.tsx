@@ -271,14 +271,14 @@ export function ScheduleHeader({
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
               >
                 <User className="w-4 h-4 text-blue-400" />
-                Privatperson
+                Engångsjobb Privatperson
               </button>
               <button
                 onClick={() => { onCreateCase('business'); setCreateMenuOpen(false) }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
               >
                 <Building className="w-4 h-4 text-green-400" />
-                Företag
+                Engångsjobb Företag
               </button>
               <div className="my-1.5 border-t border-slate-700" />
               <p className="px-3 py-1 text-[10px] text-slate-500 uppercase tracking-wider">Avtalskunder</p>
@@ -287,21 +287,21 @@ export function ScheduleHeader({
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
               >
                 <FileCheck className="w-4 h-4 text-emerald-400" />
-                Servicebesök
+                Extrabesök Avtalskund
               </button>
               <button
                 onClick={() => { onCreateCase('inspection'); setCreateMenuOpen(false) }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
               >
                 <ClipboardCheck className="w-4 h-4 text-cyan-400" />
-                Inspektion stationer
+                Stationskontroll Avtalskund
               </button>
               <button
                 onClick={() => { onCreateCase('establishment'); setCreateMenuOpen(false) }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors"
               >
                 <MapPin className="w-4 h-4 text-lime-400" />
-                Etablering
+                Etablering Avtalskund
               </button>
               <button
                 onClick={() => { onCreateCase('rondering'); setCreateMenuOpen(false) }}

@@ -25,7 +25,7 @@ interface DemoCase {
 
 const START_CASES: DemoCase[] = [
   { id: 'c1', title: 'Getingbo - Villa Ekbacken', tech: 'Kim', slot: 'Förmiddag', color: 'bg-blue-500/20 border-blue-500/40 text-blue-300' },
-  { id: 'c2', title: 'Servicebesök - Restaurang Prima', tech: 'Benny', slot: 'Förmiddag', color: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' },
+  { id: 'c2', title: 'Extrabesök - Restaurang Prima', tech: 'Benny', slot: 'Förmiddag', color: 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' },
   { id: 'c3', title: 'Etablering - Coop Lagret', tech: 'Hans', slot: 'Eftermiddag', color: 'bg-lime-500/20 border-lime-500/40 text-lime-300' },
   { id: 'c4', title: 'Råttor - BRF Utsikten', tech: 'Kim', slot: 'Eftermiddag', color: 'bg-purple-500/20 border-purple-500/40 text-purple-300' },
 ]
