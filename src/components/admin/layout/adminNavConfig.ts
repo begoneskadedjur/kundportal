@@ -31,7 +31,6 @@ import {
   Calendar,
   Map,
   CalendarRange,
-  Landmark,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -96,7 +95,6 @@ export const navGroups: NavGroup[] = [
       { label: 'Användarkonton (Personal)', icon: UserCheck, path: '/admin/anvandarkonton-personal' },
       { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
       { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/admin/tillbud-avvikelser', badgeKey: 'incidents' },
-      { label: 'Intranät', icon: Landmark, path: '/admin/intranat', badgeKey: 'intranet' },
       { label: 'Buggrapporter', icon: Bug, path: '/admin/bug-reports' },
     ]
   },

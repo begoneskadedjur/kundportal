@@ -12,7 +12,6 @@ import {
   CalendarDays,
   LogOut,
   ChevronDown,
-  User,
   Menu,
   X,
   GraduationCap,
@@ -44,14 +43,14 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Schema', path: '/koordinator/schema', icon: Calendar },
     { label: 'Sök ärenden', path: '/koordinator/sok-arenden', icon: Search },
     { label: 'Tickets', path: '/admin/tickets', icon: MessageSquareText },
-    { label: 'Lär dig systemet', path: '/admin/larosate', icon: GraduationCap },
+    { label: 'Intranät & Hjälpcenter', path: '/admin/intranat', icon: GraduationCap },
   ],
   koordinator: [
     { label: 'Dashboard', path: '/koordinator/dashboard', icon: LayoutDashboard },
     { label: 'Schema', path: '/koordinator/schema', icon: Calendar },
     { label: 'Sök ärenden', path: '/koordinator/sok-arenden', icon: Search },
     { label: 'Tickets', path: '/koordinator/tickets', icon: MessageSquareText },
-    { label: 'Lär dig systemet', path: '/admin/larosate', icon: GraduationCap },
+    { label: 'Intranät & Hjälpcenter', path: '/koordinator/intranat', icon: GraduationCap },
   ],
   technician: [
     { label: 'Dashboard', path: '/technician/dashboard', icon: LayoutDashboard },
@@ -59,7 +58,7 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Mina ärenden', path: '/technician/cases', icon: Search },
     { label: 'Mina offerter', path: '/technician/offer-follow-up', icon: FileSignature },
     { label: 'Tickets', path: '/technician/tickets', icon: MessageSquareText },
-    { label: 'Lär dig systemet', path: '/admin/larosate', icon: GraduationCap },
+    { label: 'Intranät & Hjälpcenter', path: '/technician/intranat', icon: GraduationCap },
   ],
 };
 

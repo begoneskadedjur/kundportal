@@ -6,6 +6,7 @@ import { topLevelItems, navGroups, mobileBottomItems } from './adminNavConfig'
 import { MobileNavGroup } from './MobileNavGroup'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
+import { IntranetLink } from '../../shared/IntranetLink'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getTicketStats } from '../../../services/communicationService'
@@ -76,6 +77,7 @@ export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) 
         <nav className="p-3 space-y-1">
           <ViewSwitcher currentView="admin" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <ReportIncidentButton role="admin" onNavigate={() => setMobileMenuOpen(false)} />
+          <IntranetLink basePath="/admin" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <div className="h-px bg-slate-700/50 my-3" />
           {topLevelItems.map(item => {
             const Icon = item.icon

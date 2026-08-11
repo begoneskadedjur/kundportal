@@ -15,7 +15,6 @@ import {
   FileSignature,
   Package,
   GitBranch,
-  Landmark,
 } from 'lucide-react'
 
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
@@ -55,7 +54,6 @@ export const navGroups: NavGroup[] = [
       { label: 'AI Assistent', icon: Sparkles, path: '/technician/team-chat' },
       { label: 'Provisioner', icon: DollarSign, path: '/technician/commissions' },
       { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/technician/tillbud-avvikelser', badgeKey: 'incidents' },
-      { label: 'Intranät', icon: Landmark, path: '/technician/intranat', badgeKey: 'intranet' },
     ],
   },
 ]

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { Menu, X, LogOut } from 'lucide-react'
 import { topLevelItems, navGroups, mobileBottomItems } from './saljareNavConfig'
 import { MobileNavGroup } from '../../admin/layout/MobileNavGroup'
+import { IntranetLink } from '../../shared/IntranetLink'
 
 interface SäljareMobileNavProps {
   currentPath: string
@@ -51,6 +52,8 @@ export function SäljareMobileNav({ currentPath, onSignOut }: SäljareMobileNavP
         `}
       >
         <nav className="p-3 space-y-1">
+          <IntranetLink basePath="/saljare" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
+          <div className="h-px bg-slate-700/50 my-3" />
           {topLevelItems.map(item => {
             const Icon = item.icon
             const isActive = currentPath === item.path

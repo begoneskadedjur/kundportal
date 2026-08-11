@@ -7,6 +7,7 @@ import { topLevelItems, navGroups, mobileBottomItems } from './technicianNavConf
 import { MobileNavGroup } from '../../admin/layout/MobileNavGroup'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
+import { IntranetLink } from '../../shared/IntranetLink'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getTicketStats } from '../../../services/communicationService'
@@ -78,6 +79,7 @@ export function TechnicianMobileNav({ currentPath, onSignOut }: TechnicianMobile
         <nav className="p-3 space-y-1">
           <ViewSwitcher currentView="technician" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <ReportIncidentButton role="technician" onNavigate={() => setMobileMenuOpen(false)} />
+          <IntranetLink basePath="/technician" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <div className="h-px bg-slate-700/50 my-3" />
           {topLevelItems.map(item => {
             const Icon = item.icon

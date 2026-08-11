@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { LogOut, Bug } from 'lucide-react'
 import { BugReportModal } from '../../shared/BugReportModal'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
+import { IntranetLink } from '../../shared/IntranetLink'
 import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
 import { topLevelItems, navGroups } from './technicianNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
@@ -79,8 +80,9 @@ export function TechnicianSidebar({ currentPath, userName, onSignOut }: Technici
         ))}
       </nav>
 
-      {/* Bottom: Bug report + Sign out */}
+      {/* Bottom: Intranät + Bug report + Sign out */}
       <div className="p-3 border-t border-slate-700/50 space-y-1">
+        <IntranetLink basePath="/technician" />
         <button
           onClick={() => setShowBugModal(true)}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
