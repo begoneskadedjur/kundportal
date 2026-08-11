@@ -5,6 +5,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   BookOpen, ShieldCheck, HeartPulse, Leaf, FileText,
   MessageSquareText, ClipboardList, MapPin, AlertTriangle, Users,
+  Calculator, Receipt, Wallet,
 } from 'lucide-react'
 
 // ─── Innehållsblock (jsonb i intranet_documents.content) ───
@@ -19,11 +20,13 @@ export type IntranetBlock =
   | { type: 'callout'; variant: 'info' | 'warning' | 'success'; title?: string; text: string }
   | { type: 'motto'; text: string }
   | { type: 'chain'; title?: string; steps: string[]; labels?: string[] }
+  /** Länk till ett annat intranätdokument (kort med titel + beskrivning) */
+  | { type: 'link'; slug: string; label: string; description?: string }
 
 export type IntranetSection = 'obligatoriskt' | 'handbok'
 export type IntranetCategory =
   | 'introduktion' | 'policy' | 'rutin' | 'guide'
-  | 'kommunikation' | 'arenden' | 'utrustning' | 'sakerhet'
+  | 'kommunikation' | 'arenden' | 'utrustning' | 'sakerhet' | 'ekonomi'
 
 export interface IntranetDocument {
   id: string
@@ -78,6 +81,7 @@ export const INTRANET_CATEGORY_CONFIG: Record<IntranetCategory, CategoryConfig> 
   arenden: { label: 'Ärendehantering', icon: ClipboardList, color: 'text-amber-400', bgColor: 'bg-amber-500/15' },
   utrustning: { label: 'Utrustning', icon: MapPin, color: 'text-emerald-400', bgColor: 'bg-emerald-500/15' },
   sakerhet: { label: 'Säkerhet & KMA', icon: AlertTriangle, color: 'text-red-400', bgColor: 'bg-red-500/15' },
+  ekonomi: { label: 'Ekonomi & Pris', icon: Wallet, color: 'text-teal-400', bgColor: 'bg-teal-500/15' },
 }
 
 /** Ikon per dokument-slug för mer igenkännbara kort (fallback = kategorins ikon) */
@@ -92,6 +96,8 @@ export const INTRANET_SLUG_ICONS: Record<string, LucideIcon> = {
   'guide-placera-stationer': MapPin,
   'guide-rapportera-tillbud': AlertTriangle,
   'guide-roller-och-vyer': Users,
+  'guide-prissattning': Calculator,
+  'guide-fakturering': Receipt,
 }
 
 // ─── Anslagstavla ───

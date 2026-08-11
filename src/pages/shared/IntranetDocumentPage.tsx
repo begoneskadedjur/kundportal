@@ -91,6 +91,8 @@ function BlockRenderer({ block, anchorId }: { block: IntranetBlock; anchorId?: s
         </div>
       )
     }
+    case 'link':
+      return <DocLinkBlock slug={block.slug} label={block.label} description={block.description} />
     case 'chain':
       return (
         <div className="my-5 p-4 bg-slate-800/30 border border-slate-700 rounded-xl overflow-x-auto">
@@ -117,6 +119,27 @@ function BlockRenderer({ block, anchorId }: { block: IntranetBlock; anchorId?: s
     default:
       return null
   }
+}
+
+/** Länk-kort till ett annat intranätdokument */
+function DocLinkBlock({ slug, label, description }: { slug: string; label: string; description?: string }) {
+  const basePath = useRoleBasePath()
+  return (
+    <Link
+      to={`${basePath}/intranat/dokument/${slug}`}
+      className="group flex items-center gap-3 my-5 p-4 rounded-xl bg-slate-800/40 border border-slate-700 hover:border-[#20c58f]/50 hover:bg-slate-800/60 transition-all"
+    >
+      <div className="w-10 h-10 rounded-xl bg-[#20c58f]/15 flex items-center justify-center flex-shrink-0">
+        <ArrowLeft className="w-5 h-5 text-[#20c58f] rotate-180" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-slate-500 uppercase tracking-wider">Läs också</p>
+        <p className="text-sm font-semibold text-white group-hover:text-[#20c58f] transition-colors">{label}</p>
+        {description && <p className="text-xs text-slate-400 mt-0.5">{description}</p>}
+      </div>
+      <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-[#20c58f] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+    </Link>
+  )
 }
 
 // ─── Sida ──────────────────────────────────────────
