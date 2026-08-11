@@ -22,6 +22,8 @@ export type IntranetBlock =
   | { type: 'chain'; title?: string; steps: string[]; labels?: string[] }
   /** Länk till ett annat intranätdokument (kort med titel + beskrivning) */
   | { type: 'link'; slug: string; label: string; description?: string }
+  /** Interaktiv demo - component slås upp i registret i dokumentläsaren */
+  | { type: 'interactive'; component: string }
 
 export type IntranetSection = 'obligatoriskt' | 'handbok'
 export type IntranetCategory =

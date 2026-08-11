@@ -2,7 +2,7 @@
 // Dokumentläsare för Intranät med läs- och förståelsekvittens.
 // Innehållet renderas från strukturerade block (jsonb i databasen).
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ComponentType } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
@@ -27,6 +27,13 @@ import {
   type IntranetDocumentWithStatus,
 } from '../../types/intranet'
 import { useRoleBasePath } from '../../hooks/useRoleBasePath'
+import PrissattningDemo from './intranet/interactive/PrissattningDemo'
+
+// Interaktiva demos - innehållsblock av typen interactive slår upp
+// sin komponent här via nyckeln i blockets component-fält
+const INTERACTIVE_COMPONENTS: Record<string, ComponentType> = {
+  'prissattning-demo': PrissattningDemo,
+}
 
 // ─── Blockrendering ────────────────────────────────
 
@@ -93,6 +100,10 @@ function BlockRenderer({ block, anchorId }: { block: IntranetBlock; anchorId?: s
     }
     case 'link':
       return <DocLinkBlock slug={block.slug} label={block.label} description={block.description} />
+    case 'interactive': {
+      const InteractiveComponent = INTERACTIVE_COMPONENTS[block.component]
+      return InteractiveComponent ? <InteractiveComponent /> : null
+    }
     case 'chain':
       return (
         <div className="my-5 p-4 bg-slate-800/30 border border-slate-700 rounded-xl overflow-x-auto">
