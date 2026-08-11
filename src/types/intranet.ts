@@ -2,7 +2,10 @@
 // Typer för Intranät: interna dokument med läs- och förståelsekvittens
 
 import type { LucideIcon } from 'lucide-react'
-import { BookOpen, ShieldCheck, HeartPulse, Leaf, FileText } from 'lucide-react'
+import {
+  BookOpen, ShieldCheck, HeartPulse, Leaf, FileText,
+  MessageSquareText, ClipboardList, MapPin, AlertTriangle, Users,
+} from 'lucide-react'
 
 // ─── Innehållsblock (jsonb i intranet_documents.content) ───
 
@@ -16,7 +19,9 @@ export type IntranetBlock =
   | { type: 'chain'; title?: string; steps: string[]; labels?: string[] }
 
 export type IntranetSection = 'obligatoriskt' | 'handbok'
-export type IntranetCategory = 'introduktion' | 'policy' | 'rutin' | 'guide'
+export type IntranetCategory =
+  | 'introduktion' | 'policy' | 'rutin' | 'guide'
+  | 'kommunikation' | 'arenden' | 'utrustning' | 'sakerhet'
 
 export interface IntranetDocument {
   id: string
@@ -67,6 +72,10 @@ export const INTRANET_CATEGORY_CONFIG: Record<IntranetCategory, CategoryConfig> 
   policy: { label: 'Policy', icon: ShieldCheck, color: 'text-[#20c58f]', bgColor: 'bg-[#20c58f]/15' },
   rutin: { label: 'Rutin', icon: FileText, color: 'text-amber-400', bgColor: 'bg-amber-500/15' },
   guide: { label: 'Guide', icon: BookOpen, color: 'text-purple-400', bgColor: 'bg-purple-500/15' },
+  kommunikation: { label: 'Kommunikation', icon: MessageSquareText, color: 'text-cyan-400', bgColor: 'bg-cyan-500/15' },
+  arenden: { label: 'Ärendehantering', icon: ClipboardList, color: 'text-amber-400', bgColor: 'bg-amber-500/15' },
+  utrustning: { label: 'Utrustning', icon: MapPin, color: 'text-emerald-400', bgColor: 'bg-emerald-500/15' },
+  sakerhet: { label: 'Säkerhet & KMA', icon: AlertTriangle, color: 'text-red-400', bgColor: 'bg-red-500/15' },
 }
 
 /** Ikon per dokument-slug för mer igenkännbara kort (fallback = kategorins ikon) */
@@ -75,7 +84,69 @@ export const INTRANET_SLUG_ICONS: Record<string, LucideIcon> = {
   'arbetsmiljopolicy': HeartPulse,
   'kvalitetspolicy': ShieldCheck,
   'miljopolicy': Leaf,
+  'guide-ticket-systemet': MessageSquareText,
+  'guide-foljearenden': ClipboardList,
+  'guide-avbryta-arenden': FileText,
+  'guide-placera-stationer': MapPin,
+  'guide-rapportera-tillbud': AlertTriangle,
+  'guide-roller-och-vyer': Users,
 }
+
+// ─── Anslagstavla ───
+
+export interface IntranetPost {
+  id: string
+  title: string
+  body: string
+  pinned: boolean
+  is_published: boolean
+  author_user_id: string
+  author_name: string | null
+  published_at: string
+  created_at: string
+  updated_at: string
+}
+
+// ─── Kontakter & ansvar ───
+
+export interface IntranetResponsibility {
+  id: string
+  area: string
+  description: string | null
+  person_name: string
+  email: string | null
+  phone: string | null
+  sort_order: number
+}
+
+export interface IntranetContact {
+  id: string
+  name: string
+  role: string
+  email: string | null
+  direct_phone: string | null
+  office_phone: string | null
+}
+
+// ─── KMA-statistik ───
+
+export interface KmaStats {
+  open_count: number
+  handled_this_year: number
+  reported_this_year: number
+}
+
+// ─── Onboarding ───
+
+/** Kurerad läsordning för nyanställda (dokument- och guide-slugs i ordning) */
+export const ONBOARDING_SLUGS: { slug: string; label: string }[] = [
+  { slug: 'introduktion-km-arbete', label: 'Introduktion till KM-arbetet' },
+  { slug: 'arbetsmiljopolicy', label: 'Arbetsmiljöpolicy' },
+  { slug: 'kvalitetspolicy', label: 'Kvalitetspolicy' },
+  { slug: 'miljopolicy', label: 'Miljöpolicy' },
+  { slug: 'guide-ticket-systemet', label: 'Guide: Ticket-systemet' },
+  { slug: 'guide-rapportera-tillbud', label: 'Guide: Rapportera tillbud' },
+]
 
 /** Ungefärlig lästid i minuter utifrån innehållsblocken */
 export function estimateReadingMinutes(content: IntranetBlock[]): number {

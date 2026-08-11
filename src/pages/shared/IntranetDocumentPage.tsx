@@ -2,7 +2,7 @@
 // Dokumentläsare för Intranät med läs- och förståelsekvittens.
 // Innehållet renderas från strukturerade block (jsonb i databasen).
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
@@ -30,10 +30,10 @@ import { useRoleBasePath } from '../../hooks/useRoleBasePath'
 
 // ─── Blockrendering ────────────────────────────────
 
-function BlockRenderer({ block }: { block: IntranetBlock }) {
+function BlockRenderer({ block, anchorId }: { block: IntranetBlock; anchorId?: string }) {
   switch (block.type) {
     case 'h2':
-      return <h2 className="text-lg font-semibold text-white mt-8 mb-3 first:mt-0">{block.text}</h2>
+      return <h2 id={anchorId} className="text-lg font-semibold text-white mt-8 mb-3 first:mt-0 scroll-mt-24">{block.text}</h2>
     case 'h3':
       return <h3 className="text-base font-semibold text-slate-200 mt-6 mb-2">{block.text}</h3>
     case 'p':
@@ -113,6 +113,29 @@ export default function IntranetDocumentPage() {
   const [error, setError] = useState<string | null>(null)
   const [doc, setDoc] = useState<IntranetDocumentWithStatus | null>(null)
   const [acknowledging, setAcknowledging] = useState(false)
+  const [readProgress, setReadProgress] = useState(0)
+
+  // Läsprogress: hur långt ner på sidan användaren scrollat
+  useEffect(() => {
+    const onScroll = () => {
+      const el = document.documentElement
+      const total = el.scrollHeight - el.clientHeight
+      setReadProgress(total > 0 ? Math.min(100, (el.scrollTop / total) * 100) : 100)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [doc?.id])
+
+  // Innehållsförteckning från h2-block
+  const toc = useMemo(
+    () =>
+      (doc?.content || [])
+        .map((block, i) => ({ block, i }))
+        .filter(({ block }) => block.type === 'h2')
+        .map(({ block, i }) => ({ id: `avsnitt-${i}`, text: (block as { text: string }).text })),
+    [doc?.content]
+  )
 
   useEffect(() => {
     if (slug && user?.id) fetchDocument(slug, user.id)
@@ -199,18 +222,27 @@ export default function IntranetDocumentPage() {
   const Icon = INTRANET_SLUG_ICONS[doc.slug] || config.icon
   const needsAck = doc.requires_acknowledgement && !doc.currentAck
   const isUpdatedSinceLastAck = needsAck && !!doc.latestAck
+  const isGuide = doc.section === 'handbok'
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-28">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 pb-28">
+
+      {/* Läsprogress */}
+      <div className="fixed top-0 left-0 right-0 h-0.5 z-50 pointer-events-none">
+        <div className="h-full bg-[#20c58f] transition-[width] duration-150" style={{ width: `${readProgress}%` }} />
+      </div>
 
       {/* Tillbaka-länk */}
       <Link
-        to={`${basePath}/intranat`}
+        to={`${basePath}/intranat${isGuide ? '/handbok' : '/policys'}`}
         className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-5"
       >
         <ArrowLeft className="w-4 h-4" />
-        Intranät
+        {isGuide ? 'Handbok' : 'Policys & rutiner'}
       </Link>
+
+      <div className="xl:grid xl:grid-cols-[1fr_220px] xl:gap-8">
+      <div className="max-w-3xl min-w-0">
 
       {/* Banner: uppdaterat dokument */}
       {isUpdatedSinceLastAck && (
@@ -256,9 +288,32 @@ export default function IntranetDocumentPage() {
       {/* Innehåll */}
       <article>
         {doc.content.map((block, i) => (
-          <BlockRenderer key={i} block={block} />
+          <BlockRenderer key={i} block={block} anchorId={block.type === 'h2' ? `avsnitt-${i}` : undefined} />
         ))}
       </article>
+
+      {/* Markera som läst (guider utan kvittenskrav) */}
+      {!doc.requires_acknowledgement && (
+        <div className="mt-10">
+          {doc.currentAck ? (
+            <div className="flex items-center gap-3 p-4 bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-xl">
+              <CheckCircle2 className="w-5 h-5 text-[#20c58f] flex-shrink-0" />
+              <p className="text-sm text-white">
+                Läst {new Date(doc.currentAck.acknowledged_at).toLocaleDateString('sv-SE')}
+              </p>
+            </div>
+          ) : (
+            <button
+              onClick={handleAcknowledge}
+              disabled={acknowledging}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-60 text-slate-300 hover:text-white rounded-xl text-sm font-medium transition-colors"
+            >
+              {acknowledging ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              Markera som läst
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Kvittens */}
       {doc.requires_acknowledgement && (
@@ -300,6 +355,29 @@ export default function IntranetDocumentPage() {
           )}
         </div>
       )}
+      </div>
+
+      {/* Innehållsförteckning (bred skärm) */}
+      {toc.length > 1 && (
+        <aside className="hidden xl:block">
+          <nav className="sticky top-24 p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Innehåll</p>
+            <ul className="space-y-1">
+              {toc.map(item => (
+                <li key={item.id}>
+                  <a
+                    href={`#${item.id}`}
+                    className="block px-2 py-1 text-sm text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors leading-snug"
+                  >
+                    {item.text}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </aside>
+      )}
+      </div>
     </div>
   )
 }

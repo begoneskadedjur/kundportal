@@ -4,8 +4,12 @@
 import { supabase } from '../lib/supabase'
 import type {
   IntranetAcknowledgement,
+  IntranetContact,
   IntranetDocument,
   IntranetDocumentWithStatus,
+  IntranetPost,
+  IntranetResponsibility,
+  KmaStats,
 } from '../types/intranet'
 
 export interface AckMatrixUser {
@@ -164,6 +168,7 @@ export class IntranetService {
       const key = `${ack.document_id}:${ack.user_id}`
       if (!acks.has(key)) acks.set(key, ack)
     }
+    // Endast dokument som kräver kvittens ingår i matrisen (guider räknas inte)
     const users: AckMatrixUser[] = (profilesRes.data || []).map(p => {
       const technician = p.technician as { name: string | null } | { name: string | null }[] | null
       const technicianName = Array.isArray(technician) ? technician[0]?.name : technician?.name
@@ -177,5 +182,90 @@ export class IntranetService {
     // Sortera på visningsnamn (profiler utan display_name hamnar annars fel)
     users.sort((a, b) => a.name.localeCompare(b.name, 'sv'))
     return { documents, users, acks }
+  }
+
+  // ─── Anslagstavla ───
+
+  static async getPosts(): Promise<IntranetPost[]> {
+    const { data, error } = await supabase
+      .from('intranet_posts')
+      .select('*')
+      .eq('is_published', true)
+      .order('pinned', { ascending: false })
+      .order('published_at', { ascending: false })
+    if (error) throw error
+    return (data || []) as IntranetPost[]
+  }
+
+  static async createPost(post: {
+    title: string
+    body: string
+    pinned: boolean
+    author_user_id: string
+    author_name: string | null
+  }): Promise<IntranetPost> {
+    const { data, error } = await supabase
+      .from('intranet_posts')
+      .insert(post)
+      .select('*')
+    if (error) throw error
+    if (!data || data.length === 0) throw new Error('Anslaget kunde inte sparas')
+    return data[0] as IntranetPost
+  }
+
+  static async updatePost(id: string, changes: { title: string; body: string; pinned: boolean }): Promise<void> {
+    const { data, error } = await supabase
+      .from('intranet_posts')
+      .update(changes)
+      .eq('id', id)
+      .select('id')
+    if (error) throw error
+    if (!data || data.length === 0) throw new Error('Anslaget kunde inte uppdateras')
+  }
+
+  static async deletePost(id: string): Promise<void> {
+    const { error } = await supabase.from('intranet_posts').delete().eq('id', id)
+    if (error) throw error
+  }
+
+  // ─── Kontakter & ansvar ───
+
+  static async getResponsibilities(): Promise<IntranetResponsibility[]> {
+    const { data, error } = await supabase
+      .from('intranet_responsibilities')
+      .select('*')
+      .order('sort_order', { ascending: true })
+    if (error) throw error
+    return (data || []) as IntranetResponsibility[]
+  }
+
+  static async getContacts(): Promise<IntranetContact[]> {
+    const { data, error } = await supabase
+      .from('technicians')
+      .select('id, name, role, email, direct_phone, office_phone, is_active')
+      .eq('is_active', true)
+      .order('name', { ascending: true })
+    if (error) throw error
+    return (data || []).map(t => ({
+      id: t.id,
+      name: t.name,
+      role: t.role,
+      email: t.email,
+      direct_phone: t.direct_phone,
+      office_phone: t.office_phone,
+    }))
+  }
+
+  // ─── KMA-statistik ───
+
+  static async getKmaStats(): Promise<KmaStats> {
+    const { data, error } = await supabase.rpc('intranet_kma_stats')
+    if (error) throw error
+    const row = Array.isArray(data) ? data[0] : data
+    return {
+      open_count: Number(row?.open_count || 0),
+      handled_this_year: Number(row?.handled_this_year || 0),
+      reported_this_year: Number(row?.reported_this_year || 0),
+    }
   }
 }

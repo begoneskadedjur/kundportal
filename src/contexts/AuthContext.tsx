@@ -7,7 +7,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 // Typer (uppdaterade med koordinator-roll)
-type Profile = {
+export type Profile = {
   id: string; email: string; is_admin: boolean; is_active: boolean;
   customer_id: string | null; user_id: string; technician_id?: string | null;
   role?: 'admin' | 'customer' | 'technician' | 'koordinator' | 'säljare'; display_name?: string | null;
