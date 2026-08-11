@@ -124,6 +124,7 @@ export const INTRANET_SLUG_ICONS: Record<string, LucideIcon> = {
   'guide-roller-och-vyer': Users,
   'guide-prissattning': Calculator,
   'guide-fakturering': Receipt,
+  'guide-fakturering-kontor': Wallet,
 }
 
 // ─── Anslagstavla ───

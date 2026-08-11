@@ -28,6 +28,7 @@ import {
 } from '../../types/intranet'
 import { useRoleBasePath } from '../../hooks/useRoleBasePath'
 import PrissattningDemo from './intranet/interactive/PrissattningDemo'
+import FaktureringDemo from './intranet/interactive/FaktureringDemo'
 import AudienceModal from './intranet/AudienceModal'
 import { describeAudience } from '../../types/intranet'
 import { Eye } from 'lucide-react'
@@ -36,6 +37,7 @@ import { Eye } from 'lucide-react'
 // sin komponent här via nyckeln i blockets component-fält
 const INTERACTIVE_COMPONENTS: Record<string, ComponentType> = {
   'prissattning-demo': PrissattningDemo,
+  'fakturering-demo': FaktureringDemo,
 }
 
 // ─── Blockrendering ────────────────────────────────
