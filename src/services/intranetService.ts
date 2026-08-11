@@ -256,6 +256,47 @@ export class IntranetService {
     }))
   }
 
+  // ─── Målgrupp per dokument (admin) ───
+
+  /** Sätt vilka som ser dokumentet. null + null = alla interna roller. */
+  static async setAudience(
+    documentId: string,
+    roles: string[] | null,
+    userIds: string[] | null
+  ): Promise<void> {
+    const { data, error } = await supabase
+      .from('intranet_documents')
+      .update({
+        audience_roles: roles && roles.length > 0 ? roles : null,
+        audience_user_ids: userIds && userIds.length > 0 ? userIds : null,
+      })
+      .eq('id', documentId)
+      .select('id')
+    if (error) throw error
+    if (!data || data.length === 0) throw new Error('Synligheten kunde inte sparas')
+  }
+
+  /** Interna användare för målgruppsvalet (admin) */
+  static async getInternalUsers(): Promise<{ user_id: string; name: string; role: string }[]> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('user_id, display_name, email, role, technician:technicians(name)')
+      .eq('is_active', true)
+      .in('role', ['admin', 'koordinator', 'technician', 'säljare'])
+    if (error) throw error
+    const users = (data || []).map(p => {
+      const technician = p.technician as { name: string | null } | { name: string | null }[] | null
+      const technicianName = Array.isArray(technician) ? technician[0]?.name : technician?.name
+      return {
+        user_id: p.user_id,
+        name: p.display_name || technicianName || p.email || 'Okänd',
+        role: p.role as string,
+      }
+    })
+    users.sort((a, b) => a.name.localeCompare(b.name, 'sv'))
+    return users
+  }
+
   // ─── KMA-statistik ───
 
   static async getKmaStats(): Promise<KmaStats> {

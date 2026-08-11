@@ -45,6 +45,30 @@ export interface IntranetDocument {
   source_updated_at: string | null
   created_at: string
   updated_at: string
+  /** null = alla interna roller; annars synligt för dessa roller */
+  audience_roles: string[] | null
+  /** Specifikt utvalda användare (utöver rollerna, ELLER-logik) */
+  audience_user_ids: string[] | null
+}
+
+export const AUDIENCE_ROLE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'admin', label: 'Admin' },
+  { value: 'koordinator', label: 'Koordinator' },
+  { value: 'technician', label: 'Tekniker' },
+  { value: 'säljare', label: 'Säljare' },
+]
+
+/** Kort beskrivning av ett dokuments målgrupp, t.ex. för admin-knappen */
+export function describeAudience(doc: Pick<IntranetDocument, 'audience_roles' | 'audience_user_ids'>): string {
+  const roles = doc.audience_roles || []
+  const users = doc.audience_user_ids || []
+  if (roles.length === 0 && users.length === 0) return 'Alla roller'
+  const parts: string[] = []
+  if (roles.length > 0) {
+    parts.push(roles.map(r => AUDIENCE_ROLE_OPTIONS.find(o => o.value === r)?.label || r).join(' + '))
+  }
+  if (users.length > 0) parts.push(`${users.length} utvalda`)
+  return parts.join(' + ')
 }
 
 export interface IntranetAcknowledgement {

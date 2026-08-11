@@ -28,6 +28,9 @@ import {
 } from '../../types/intranet'
 import { useRoleBasePath } from '../../hooks/useRoleBasePath'
 import PrissattningDemo from './intranet/interactive/PrissattningDemo'
+import AudienceModal from './intranet/AudienceModal'
+import { describeAudience } from '../../types/intranet'
+import { Eye } from 'lucide-react'
 
 // Interaktiva demos - innehållsblock av typen interactive slår upp
 // sin komponent här via nyckeln i blockets component-fält
@@ -157,8 +160,9 @@ function DocLinkBlock({ slug, label, description }: { slug: string; label: strin
 
 export default function IntranetDocumentPage() {
   const { slug } = useParams<{ slug: string }>()
-  const { user, profile } = useAuth()
+  const { user, profile, isAdmin } = useAuth()
   const basePath = useRoleBasePath()
+  const [showAudienceModal, setShowAudienceModal] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -283,14 +287,26 @@ export default function IntranetDocumentPage() {
         <div className="h-full bg-[#20c58f] transition-[width] duration-150" style={{ width: `${readProgress}%` }} />
       </div>
 
-      {/* Tillbaka-länk */}
-      <Link
-        to={`${basePath}/intranat${isGuide ? '/handbok' : '/policys'}`}
-        className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-5"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        {isGuide ? 'Handbok' : 'Policys & rutiner'}
-      </Link>
+      {/* Tillbaka-länk + synlighet (admin) */}
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <Link
+          to={`${basePath}/intranat${isGuide ? '/handbok' : '/policys'}`}
+          className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          {isGuide ? 'Handbok' : 'Policys & rutiner'}
+        </Link>
+        {isAdmin && (
+          <button
+            onClick={() => setShowAudienceModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800/60 hover:bg-slate-700 border border-slate-700 rounded-lg text-sm text-slate-300 hover:text-white transition-colors"
+            title="Styr vilka roller/användare som ser dokumentet"
+          >
+            <Eye className="w-4 h-4" />
+            Synlighet: {describeAudience(doc)}
+          </button>
+        )}
+      </div>
 
       <div className="xl:grid xl:grid-cols-[1fr_220px] xl:gap-8">
       <div className="max-w-3xl min-w-0">
@@ -407,6 +423,18 @@ export default function IntranetDocumentPage() {
         </div>
       )}
       </div>
+
+      {/* Synlighetsmodal (admin) */}
+      {showAudienceModal && (
+        <AudienceModal
+          doc={doc}
+          onClose={() => setShowAudienceModal(false)}
+          onSaved={(nextRoles, nextUserIds) => {
+            setDoc({ ...doc, audience_roles: nextRoles, audience_user_ids: nextUserIds })
+            setShowAudienceModal(false)
+          }}
+        />
+      )}
 
       {/* Innehållsförteckning (bred skärm) */}
       {toc.length > 1 && (
