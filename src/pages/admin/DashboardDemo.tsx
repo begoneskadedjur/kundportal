@@ -481,12 +481,12 @@ const DashboardDemo: React.FC = () => {
             <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors" aria-label="Sok">
               <Search className="w-4 h-4" />
               <span className="text-sm">Sok...</span>
-              <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded">⌘K</kbd>
+              <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded">Ctrl+K</kbd>
             </button>
           ) : (
             <button
               className="w-full flex items-center justify-center px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors"
-              title="Sok (Cmd+K)"
+              title="Sok (Ctrl+K)"
               aria-label="Sok"
             >
               <Search className="w-4 h-4" />
@@ -659,7 +659,7 @@ const DashboardDemo: React.FC = () => {
         >
           <Search className="w-4 h-4" />
           <span className="text-sm">Sok i systemet...</span>
-          <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-500 px-1.5 py-0.5 rounded">⌘K</kbd>
+          <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-500 px-1.5 py-0.5 rounded">Ctrl+K</kbd>
         </button>
 
         {/* Right side icons (2.3) */}

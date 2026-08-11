@@ -11,7 +11,6 @@ import {
   Users, 
   Settings,
   BarChart3,
-  Calendar,
   UserCheck,
   Wallet,
   Target
@@ -176,7 +175,7 @@ const QuickActionBar: React.FC<QuickActionBarProps> = ({ className = '' }) => {
           >
             <Search className="w-4 h-4" />
             <span>Sök...</span>
-            <div className="text-xs text-slate-500 ml-2">⌘K</div>
+            <div className="text-xs text-slate-500 ml-2">Ctrl+K</div>
           </motion.button>
         </div>
       </motion.div>

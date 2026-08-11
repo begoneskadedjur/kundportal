@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { LogOut, Bug } from 'lucide-react'
 import { BugReportModal } from '../../shared/BugReportModal'
-import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { IntranetLink } from '../../shared/IntranetLink'
 import { ProfileLink } from '../../shared/ProfileLink'
 import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
@@ -35,8 +34,6 @@ export function TechnicianSidebar({ currentPath, userName, onSignOut }: Technici
         </div>
       </div>
 
-      {/* Vy-växlare för användare med flera portalroller */}
-      <ViewSwitcher currentView="technician" />
 
       {/* Rapportera tillbud/olycka/avvikelse */}
       <div className="px-3 pt-3">

@@ -141,12 +141,12 @@ export function SäljareSidebar({
           <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors" aria-label="Sök">
             <Search className="w-4 h-4" />
             <span className="text-sm">Sök...</span>
-            <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded">⌘K</kbd>
+            <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded">Ctrl+K</kbd>
           </button>
         ) : (
           <button
             className="w-full flex items-center justify-center px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors"
-            title="Sök (Cmd+K)"
+            title="Sök (Ctrl+K)"
             aria-label="Sök"
           >
             <Search className="w-4 h-4" />

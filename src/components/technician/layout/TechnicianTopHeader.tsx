@@ -41,7 +41,7 @@ export function TechnicianTopHeader({ userName }: TechnicianTopHeaderProps) {
       >
         <Search className="w-4 h-4" />
         <span className="text-sm">Sök i systemet...</span>
-        <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-500 px-1.5 py-0.5 rounded">⌘K</kbd>
+        <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-500 px-1.5 py-0.5 rounded">Ctrl+K</kbd>
       </button>
 
       {/* Right side icons */}

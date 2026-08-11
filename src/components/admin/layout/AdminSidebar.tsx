@@ -10,7 +10,6 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { BugReportModal } from '../../shared/BugReportModal'
-import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
 import { IntranetLink } from '../../shared/IntranetLink'
 import { ProfileLink } from '../../shared/ProfileLink'
@@ -77,7 +76,6 @@ export function AdminSidebar({
       </div>
 
       {/* Vy-växlare för användare med flera portalroller */}
-      <ViewSwitcher currentView="admin" collapsed={collapsed} />
 
       {/* CTA Button */}
       <div className="px-3 pt-3">
@@ -198,12 +196,12 @@ export function AdminSidebar({
           <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors" aria-label="Sök">
             <Search className="w-4 h-4" />
             <span className="text-sm">Sök...</span>
-            <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded">⌘K</kbd>
+            <kbd className="ml-auto text-[10px] bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded">Ctrl+K</kbd>
           </button>
         ) : (
           <button
             className="w-full flex items-center justify-center px-3 py-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/50 transition-colors"
-            title="Sök (Cmd+K)"
+            title="Sök (Ctrl+K)"
             aria-label="Sök"
           >
             <Search className="w-4 h-4" />
