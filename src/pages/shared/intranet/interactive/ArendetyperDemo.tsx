@@ -9,6 +9,7 @@ const CASE_TYPES = [
   { id: 'private', label: 'Privatperson' },
   { id: 'business', label: 'Företag' },
   { id: 'contract', label: 'Servicebesök (avtalskund)' },
+  { id: 'inspection', label: 'Inspektion stationer' },
   { id: 'establishment', label: 'Etablering' },
 ]
 
@@ -35,14 +36,14 @@ const QUESTIONS: Quiz[] = [
     explain: 'Detta är det ENDA Etablering är till för: utplacering av stationer hos en avtalskund vid avtalsstart. Tjänsten Etableringskostnad förväljs automatiskt.',
   },
   {
-    scenario: 'En avtalskund ska ha sitt vanliga återkommande besök enligt avtalet.',
-    correct: 'contract',
-    explain: 'Återkommande besök som ingår i avtalet = Servicebesök. Besöket täcks av årspremien och ska inte ha extra fakturarader.',
+    scenario: 'En avtalskunds stationer ska kontrolleras - ett enstaka kontrollbesök behöver in i schemat.',
+    correct: 'inspection',
+    explain: 'Stationskontroller = Inspektion stationer. Obs: de ÅTERKOMMANDE kontrollerna schemaläggs normalt automatiskt via Rondering & Schema - manuellt skapar du bara enstaka extra kontroller.',
   },
   {
-    scenario: 'En avtalskund vill ha en EXTRA sanering utöver det som ingår i avtalet.',
+    scenario: 'En avtalskund vill ha en EXTRA sanering utöver det som ingår i avtalet - ingen stationskontroll.',
     correct: 'contract',
-    explain: 'Skapa ett Servicebesök på avtalskunden och lägg fakturarader i ärendet - då hamnar det som merförsäljning med kundens prislista. INTE Företag (då tappas avtalskopplingen) och INTE Etablering.',
+    explain: 'Enstaka tjänster hos avtalskund som inte är stationskontroll = Servicebesök. Lägg fakturarader i ärendet så hamnar det som merförsäljning med kundens prislista. INTE Företag (då tappas avtalskopplingen) och INTE Etablering.',
   },
   {
     scenario: 'En tekniker ska utföra ett engångsjobb hos en kund utan avtal - vilken typ är FEL att välja?',
@@ -103,8 +104,9 @@ export default function ArendetyperDemo() {
                 {correctCount} av {QUESTIONS.length} rätt{correctCount === QUESTIONS.length ? ' - perfekt!' : ''}
               </p>
               <p className="text-xs text-slate-300 mt-1">
-                Kom ihåg huvudregeln: Etablering är enbart utplacering av stationer hos avtalskunder.
-                Engångsjobb = Privatperson eller Företag. Allt hos en avtalskund = Servicebesök.
+                Huvudreglerna: Engångsjobb = Privatperson eller Företag. Stationskontroller =
+                Inspektion stationer (återkommande via Rondering & Schema). Enstaka tjänster hos
+                avtalskund = Servicebesök. Etablering = enbart utplacering av stationer vid avtalsstart.
               </p>
               <button
                 onClick={restart}
