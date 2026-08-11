@@ -76,8 +76,6 @@ export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) 
       >
         <nav className="p-3 space-y-1">
           <ViewSwitcher currentView="admin" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
-          <ReportIncidentButton role="admin" onNavigate={() => setMobileMenuOpen(false)} />
-          <IntranetLink basePath="/admin" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <div className="h-px bg-slate-700/50 my-3" />
           {topLevelItems.map(item => {
             const Icon = item.icon
@@ -102,6 +100,8 @@ export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) 
             <MobileNavGroup key={group.label} group={group} currentPath={currentPath} onNavigate={() => setMobileMenuOpen(false)} />
           ))}
           <div className="h-px bg-slate-700/50 my-3" />
+          <ReportIncidentButton role="admin" onNavigate={() => setMobileMenuOpen(false)} />
+          <IntranetLink basePath="/admin" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <button
             onClick={onSignOut}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all"
