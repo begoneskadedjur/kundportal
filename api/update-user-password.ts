@@ -1,8 +1,11 @@
 // api/update-user-password.ts
 // Serverless function för att uppdatera användarlösenord
 // Kräver service_role key som inte kan användas från frontend
+// Endast admin får anropa (säkrad 2026-08-11 - låg tidigare helt öppen)
 
+import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from './_lib/auth'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -15,7 +18,7 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
   }
 })
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -28,6 +31,10 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Endast admin får byta andra användares lösenord
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   try {
     const { user_id, new_password } = req.body
@@ -52,7 +59,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // Uppdatera lösenordet
-    const { data, error } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
       password: new_password
     })
 
@@ -70,8 +77,9 @@ export default async function handler(req: any, res: any) {
       message: 'Lösenordet har uppdaterats'
     })
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in update-user-password:', error)
-    return res.status(500).json({ error: error.message || 'Ett fel uppstod' })
+    const message = error instanceof Error ? error.message : 'Ett fel uppstod'
+    return res.status(500).json({ error: message })
   }
 }

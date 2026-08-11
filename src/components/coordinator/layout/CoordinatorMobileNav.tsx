@@ -7,6 +7,7 @@ import { MobileNavGroup } from '../../admin/layout/MobileNavGroup'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
 import { IntranetLink } from '../../shared/IntranetLink'
+import { ProfileLink } from '../../shared/ProfileLink'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getTicketStats } from '../../../services/communicationService'
@@ -102,6 +103,7 @@ export function CoordinatorMobileNav({ currentPath, onSignOut }: CoordinatorMobi
           <div className="h-px bg-slate-700/50 my-3" />
           <ReportIncidentButton role="koordinator" onNavigate={() => setMobileMenuOpen(false)} />
           <IntranetLink basePath="/koordinator" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
+          <ProfileLink variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <button
             onClick={onSignOut}
             className="w-full flex items-center gap-3 px-3 py-3 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all"

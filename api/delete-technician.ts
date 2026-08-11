@@ -1,5 +1,7 @@
 // api/delete-technician.ts - Ta bort tekniker/admin permanent
+// Endast admin får anropa (säkrad 2026-08-11 - låg tidigare helt öppen)
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from './_lib/auth'
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL!
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -15,6 +17,9 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   try {
     const { technician_id } = req.body

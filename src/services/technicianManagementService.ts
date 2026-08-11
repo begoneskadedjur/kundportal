@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase, getAuthHeaders } from '../lib/supabase'
 import toast from 'react-hot-toast'
 import type { IncidentType } from '../types/caseIncidents'
 
@@ -316,9 +316,7 @@ export const technicianManagementService = {
       // (admin API kräver service_role key som inte ska exponeras i frontend)
       const response = await fetch('/api/update-user-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           user_id: userId,
           new_password: newPassword
@@ -334,6 +332,33 @@ export const technicianManagementService = {
       toast.success("Lösenordet har uppdaterats!");
     } catch (error: any) {
       toast.error(`Kunde inte uppdatera lösenordet: ${error.message}`);
+      throw error;
+    }
+  },
+
+  /**
+   * Skickar ett nytt slumpat lösenord till en anställd via mail.
+   * Lösenordet genereras server-side (admin ser det aldrig) och kontot
+   * flaggas så att personen måste välja eget lösenord vid nästa inloggning.
+   */
+  async sendNewPassword(userId: string): Promise<void> {
+    if (!userId) {
+      toast.error('Användar-ID saknas.');
+      throw new Error('User ID is missing.');
+    }
+    try {
+      const response = await fetch('/api/send-new-password', {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({ user_id: userId })
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunde inte skicka nytt lösenord');
+      }
+      toast.success(result.message || 'Ett nytt lösenord har skickats via mail!');
+    } catch (error: any) {
+      toast.error(error.message || 'Kunde inte skicka nytt lösenord');
       throw error;
     }
   },
@@ -372,9 +397,7 @@ export const technicianManagementService = {
     try {
       const response = await fetch('/api/delete-technician', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           technician_id: id
         })
@@ -399,9 +422,7 @@ export const technicianManagementService = {
       // (admin API kräver service_role key som inte ska exponeras i frontend)
       const response = await fetch('/api/enable-technician-auth', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           technician_id: technicianId,
           email: email,
@@ -429,7 +450,7 @@ export const technicianManagementService = {
       // API:et hanterar allt server-side: slår upp user_id, raderar profil + auth-user
       const response = await fetch('/api/disable-technician-auth', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({ technician_id: technicianId })
       });
 

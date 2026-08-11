@@ -4,6 +4,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
 import { getStaffWelcomeEmailTemplate } from './email-templates/staff-welcome'
+import { requireAuth } from './_lib/auth'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -23,6 +24,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Endast admin får skicka personalinbjudningar (säkrad 2026-08-11)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -91,7 +96,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         email: email,
         invited_by: invitedBy || null,
         role: role,
-        temp_password: Buffer.from(tempPassword).toString('base64'), // Enkel base64 kryptering
+        // Lösenordet lagras aldrig - det skickas bara i välkomstmailet
+        temp_password: null,
         status: 'pending',
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 dagar
       })

@@ -55,6 +55,24 @@ export default function TechnicianCard({
     new Set(technician.extra_roles || [])
   )
   const [savingRoles, setSavingRoles] = useState(false)
+  const [sendingPassword, setSendingPassword] = useState(false)
+
+  const handleSendNewPassword = async () => {
+    if (!technician.user_id || sendingPassword) return
+    if (!window.confirm(
+      `Skicka ett nytt lösenord till ${technician.name} (${technician.email})?\n\n` +
+      'Ett säkert lösenord genereras automatiskt och mailas till personen, ' +
+      'som sedan måste välja ett eget lösenord vid nästa inloggning.'
+    )) return
+    setSendingPassword(true)
+    try {
+      await technicianManagementService.sendNewPassword(technician.user_id)
+    } catch {
+      // Fel hanteras med toast i servicen
+    } finally {
+      setSendingPassword(false)
+    }
+  }
 
   useEffect(() => {
     setRecipientTypes(new Set(technician.incident_recipient_types || []))
@@ -249,7 +267,22 @@ export default function TechnicianCard({
                   </>
                 )}
               </button>
-              
+
+              {technician.has_login && technician.user_id && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowDropdown(false)
+                    handleSendNewPassword()
+                  }}
+                  disabled={sendingPassword}
+                  className="w-full px-4 py-2 text-left text-sm text-white hover:bg-slate-700 flex items-center gap-2 disabled:opacity-50"
+                >
+                  <Key className="w-4 h-4" />
+                  {sendingPassword ? 'Skickar…' : 'Skicka nytt lösenord'}
+                </button>
+              )}
+
               <button
                 onClick={(e) => {
                   e.stopPropagation()

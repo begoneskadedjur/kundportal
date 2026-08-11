@@ -256,9 +256,10 @@ export default function UserProfile() {
       
       // Om det var första inloggningen, navigera till dashboard
       if (isFirstLogin) {
-        const dashboardPath = profile?.role === 'admin' ? '/admin/dashboard' : 
+        const dashboardPath = profile?.role === 'admin' ? '/admin/dashboard' :
                             profile?.role === 'koordinator' ? '/koordinator/dashboard' :
                             profile?.role === 'technician' ? '/technician/dashboard' :
+                            profile?.role === 'säljare' ? '/saljare/dashboard' :
                             '/customer/dashboard'
         navigate(dashboardPath)
       }
@@ -281,8 +282,16 @@ export default function UserProfile() {
   return (
     <div className="min-h-screen bg-slate-950">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <PageHeader 
-          title="Min profil" 
+        {!mustChangePassword && (
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-4"
+          >
+            ← Tillbaka
+          </button>
+        )}
+        <PageHeader
+          title="Min profil"
           description="Hantera dina kontouppgifter och inställningar"
         />
 

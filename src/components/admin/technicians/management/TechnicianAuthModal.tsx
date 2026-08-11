@@ -5,6 +5,7 @@ import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
 import LoadingSpinner from '../../../shared/LoadingSpinner'
 import { useAuth } from '../../../../contexts/AuthContext'
+import { getAuthHeaders } from '../../../../lib/supabase'
 import toast from 'react-hot-toast'
 
 type TechnicianAuthModalProps = {
@@ -60,9 +61,7 @@ export default function TechnicianAuthModal({
       // Använd API route för att skapa konto och skicka inbjudan
       const response = await fetch('/api/enable-technician-auth', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           technician_id: technician.id,
           email: technician.email,
@@ -102,9 +101,7 @@ export default function TechnicianAuthModal({
       // Använd API route för disable också
       const response = await fetch('/api/disable-technician-auth', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           technician_id: technician.id
         })
