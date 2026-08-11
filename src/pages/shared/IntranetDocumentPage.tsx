@@ -49,6 +49,23 @@ function BlockRenderer({ block, anchorId }: { block: IntranetBlock; anchorId?: s
           ))}
         </ul>
       )
+    case 'steps':
+      return (
+        <ol className="mb-5 mt-1">
+          {block.items.map((item, i) => (
+            <li key={i} className="relative flex gap-3.5 pb-4 last:pb-0">
+              {/* Stegmarkering med förbindelselinje */}
+              <div className="flex flex-col items-center flex-shrink-0">
+                <span className="w-7 h-7 rounded-full bg-[#20c58f]/15 border border-[#20c58f]/40 text-[#20c58f] text-sm font-bold flex items-center justify-center">
+                  {i + 1}
+                </span>
+                {i < block.items.length - 1 && <span className="w-px flex-1 bg-slate-700 mt-1" />}
+              </div>
+              <p className="text-[15px] leading-relaxed text-slate-300 pt-0.5">{item}</p>
+            </li>
+          ))}
+        </ol>
+      )
     case 'motto':
       return (
         <blockquote className="my-6 px-5 py-4 bg-[#20c58f]/10 border-l-4 border-[#20c58f] rounded-r-xl">

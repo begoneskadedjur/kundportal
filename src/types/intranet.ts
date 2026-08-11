@@ -14,6 +14,8 @@ export type IntranetBlock =
   | { type: 'h3'; text: string }
   | { type: 'p'; text: string }
   | { type: 'list'; items: string[] }
+  /** Numrerade steg med visuell stegmarkering - för gör så här-instruktioner */
+  | { type: 'steps'; items: string[] }
   | { type: 'callout'; variant: 'info' | 'warning' | 'success'; title?: string; text: string }
   | { type: 'motto'; text: string }
   | { type: 'chain'; title?: string; steps: string[]; labels?: string[] }
@@ -153,7 +155,7 @@ export function estimateReadingMinutes(content: IntranetBlock[]): number {
   let words = 0
   for (const block of content) {
     if ('text' in block && block.text) words += block.text.split(/\s+/).length
-    if (block.type === 'list') words += block.items.join(' ').split(/\s+/).length
+    if (block.type === 'list' || block.type === 'steps') words += block.items.join(' ').split(/\s+/).length
     if (block.type === 'chain') words += block.steps.length * 2
   }
   return Math.max(1, Math.round(words / 180))

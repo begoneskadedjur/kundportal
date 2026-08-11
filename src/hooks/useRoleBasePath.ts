@@ -8,9 +8,3 @@ export function useRoleBasePath(): string {
   const location = useLocation()
   return '/' + location.pathname.split('/')[1]
 }
-
-/** Skriv om en guide-sökväg till aktuellt rollprefix */
-export function guidePathForRole(guideId: string, basePath: string): string {
-  if (basePath === '/admin') return `/admin/larosate/guides/${guideId}`
-  return `${basePath}/guides/${guideId}`
-}

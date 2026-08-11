@@ -102,8 +102,16 @@ export function FloorPlanUploadForm({
   const [showBuildingInput, setShowBuildingInput] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [isPortrait, setIsPortrait] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Kolla bildens orientering - visningen och stationsplaceringen är byggd för liggande format
+  const checkOrientation = (url: string) => {
+    const img = new Image()
+    img.onload = () => setIsPortrait(img.height > img.width)
+    img.src = url
+  }
 
   const [isCompressing, setIsCompressing] = useState(false)
 
@@ -136,12 +144,14 @@ export function FloorPlanUploadForm({
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       const url = URL.createObjectURL(compressed)
       setPreviewUrl(url)
+      checkOrientation(url)
     } catch {
       // Fallback — använd original
       setSelectedFile(file)
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       const url = URL.createObjectURL(file)
       setPreviewUrl(url)
+      checkOrientation(url)
     } finally {
       setIsCompressing(false)
     }
@@ -154,6 +164,7 @@ export function FloorPlanUploadForm({
     }
     setSelectedFile(null)
     setPreviewUrl(null)
+    setIsPortrait(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -223,6 +234,9 @@ export function FloorPlanUploadForm({
             <p className="text-xs text-slate-500">
               JPG, PNG, WebP eller GIF (max 10MB)
             </p>
+            <p className="text-xs text-teal-400 mt-2">
+              Tips: använd liggande format (bredare än högt) - visning och stationsplacering är byggda för det
+            </p>
           </div>
         ) : (
           <div className="relative rounded-xl overflow-hidden bg-slate-800">
@@ -252,6 +266,16 @@ export function FloorPlanUploadForm({
           onChange={handleFileSelect}
           className="hidden"
         />
+
+        {/* Varning vid stående format */}
+        {selectedFile && isPortrait && (
+          <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+            <p className="text-xs text-amber-400">
+              Bilden är i stående format. Planritningar fungerar bäst i liggande format (landskap) -
+              då blir det enklare att placera och kontrollera stationer. Rotera gärna bilden och ladda upp igen.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Name */}
