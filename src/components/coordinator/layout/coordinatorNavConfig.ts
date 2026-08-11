@@ -119,6 +119,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/tickets': 'Tickets',
   '/koordinator/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/koordinator/intranat': 'Intranät',
+  '/koordinator/mitt-konto': 'Mitt konto',
 
   // Verktyg
   '/koordinator/team-chat': 'AI Assistent',

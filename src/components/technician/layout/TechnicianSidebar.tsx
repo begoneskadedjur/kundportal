@@ -84,7 +84,7 @@ export function TechnicianSidebar({ currentPath, userName, onSignOut }: Technici
       {/* Bottom: Intranät + Mitt konto + Bug report + Sign out */}
       <div className="p-3 border-t border-slate-700/50 space-y-1">
         <IntranetLink basePath="/technician" />
-        <ProfileLink />
+        <ProfileLink basePath="/technician" />
         <button
           onClick={() => setShowBugModal(true)}
           className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"

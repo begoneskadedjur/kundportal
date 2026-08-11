@@ -180,7 +180,7 @@ export function CoordinatorSidebar({
         <IntranetLink basePath="/koordinator" collapsed={collapsed} />
 
         {/* Mitt konto (profil + byt lösenord) */}
-        <ProfileLink collapsed={collapsed} />
+        <ProfileLink basePath="/koordinator" collapsed={collapsed} />
 
         {/* Sign out */}
         <button

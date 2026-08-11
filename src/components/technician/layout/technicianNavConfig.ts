@@ -80,4 +80,5 @@ export const breadcrumbMap: Record<string, string> = {
   '/technician/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/technician/tickets': 'Tickets',
   '/technician/intranat': 'Intranät',
+  '/technician/mitt-konto': 'Mitt konto',
 }

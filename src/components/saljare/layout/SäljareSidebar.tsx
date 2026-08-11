@@ -170,7 +170,7 @@ export function SäljareSidebar({
         <IntranetLink basePath="/saljare" collapsed={collapsed} />
 
         {/* Mitt konto (profil + byt lösenord) */}
-        <ProfileLink collapsed={collapsed} />
+        <ProfileLink basePath="/saljare" collapsed={collapsed} />
 
         {/* Sign out */}
         <button

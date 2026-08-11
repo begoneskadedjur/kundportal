@@ -90,4 +90,5 @@ export const breadcrumbMap: Record<string, string> = {
   '/saljare/ai-assistent': 'AI Assistent',
   '/saljare/intranat': 'Intranät',
   '/saljare/larosate': 'Lärosäte',
+  '/saljare/mitt-konto': 'Mitt konto',
 }

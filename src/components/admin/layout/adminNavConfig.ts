@@ -185,6 +185,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/installningar/betalningsvillkor': 'Betalningsvillkor',
   '/admin/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/admin/intranat': 'Intranät',
+  '/admin/mitt-konto': 'Mitt konto',
   '/admin/bug-reports': 'Buggrapporter',
   '/admin/inspektionsstatus': 'Inspektionsstatus',
 }

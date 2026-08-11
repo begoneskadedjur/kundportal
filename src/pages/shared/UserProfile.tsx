@@ -23,7 +23,16 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-export default function UserProfile() {
+interface UserProfileProps {
+  /**
+   * true när sidan är monterad inuti en rollayout (/admin/mitt-konto etc.)
+   * och redan har sidofält/header - då döljs egna tillbaka/logga ut-knappar.
+   * false för fristående /profile (tvingat lösenordsbyte vid första inloggning).
+   */
+  embedded?: boolean
+}
+
+export default function UserProfile({ embedded = false }: UserProfileProps) {
   const navigate = useNavigate()
   const { user, profile } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -273,26 +282,20 @@ export default function UserProfile() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className={embedded ? 'py-16 flex items-center justify-center' : 'min-h-screen bg-slate-950 flex items-center justify-center'}>
         <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className={embedded ? '' : 'min-h-screen bg-slate-950'}>
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {!mustChangePassword && (
-          <button
-            onClick={() => navigate(-1)}
-            className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-4"
-          >
-            ← Tillbaka
-          </button>
-        )}
         <PageHeader
           title="Min profil"
-          description="Hantera dina kontouppgifter och inställningar"
+          subtitle="Hantera dina kontouppgifter och inställningar"
+          showBackButton={!embedded && !mustChangePassword}
+          showLogoutButton={!embedded}
         />
 
         {/* Varning vid första inloggning */}

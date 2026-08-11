@@ -291,7 +291,6 @@
   "src/pages/organisation/Portal.tsx|TS2339": 1,
   "src/pages/organisation/RegionalPortal.tsx|TS2339": 1,
   "src/pages/saljare/SäljareDashboard.tsx|TS2345": 1,
-  "src/pages/shared/UserProfile.tsx|TS2322": 1,
   "src/pages/technician/StationInspectionModule.tsx|TS18047": 2,
   "src/pages/technician/StationInspectionModule.tsx|TS2322": 2,
   "src/pages/technician/StationInspectionModule.tsx|TS2339": 4,

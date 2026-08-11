@@ -229,7 +229,7 @@ export function AdminSidebar({
         <IntranetLink basePath="/admin" collapsed={collapsed} />
 
         {/* Mitt konto (profil + byt lösenord) */}
-        <ProfileLink collapsed={collapsed} />
+        <ProfileLink basePath="/admin" collapsed={collapsed} />
 
         {/* Sign out */}
         <button
