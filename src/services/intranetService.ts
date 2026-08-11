@@ -148,7 +148,7 @@ export class IntranetService {
         .order('acknowledged_at', { ascending: false }),
       supabase
         .from('profiles')
-        .select('user_id, display_name, email, role, is_active')
+        .select('user_id, display_name, email, role, is_active, technician:technicians(name)')
         .eq('is_active', true)
         .in('role', ['admin', 'koordinator', 'technician', 'säljare'])
         .order('display_name', { ascending: true }),
@@ -164,12 +164,18 @@ export class IntranetService {
       const key = `${ack.document_id}:${ack.user_id}`
       if (!acks.has(key)) acks.set(key, ack)
     }
-    const users: AckMatrixUser[] = (profilesRes.data || []).map(p => ({
-      user_id: p.user_id,
-      name: p.display_name || p.email || 'Okänd',
-      email: p.email || '',
-      role: p.role,
-    }))
+    const users: AckMatrixUser[] = (profilesRes.data || []).map(p => {
+      const technician = p.technician as { name: string | null } | { name: string | null }[] | null
+      const technicianName = Array.isArray(technician) ? technician[0]?.name : technician?.name
+      return {
+        user_id: p.user_id,
+        name: p.display_name || technicianName || p.email || 'Okänd',
+        email: p.email || '',
+        role: p.role,
+      }
+    })
+    // Sortera på visningsnamn (profiler utan display_name hamnar annars fel)
+    users.sort((a, b) => a.name.localeCompare(b.name, 'sv'))
     return { documents, users, acks }
   }
 }
