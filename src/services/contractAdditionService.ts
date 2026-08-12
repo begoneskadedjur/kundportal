@@ -94,11 +94,31 @@ export class ContractAdditionService {
     const plan = computePlannedInvoicesPure(billing as CustomerForPlanning)
     const today = new Date()
     const todayIso = toLocalIsoDate(today)
-    const futureStarts = plan
+    let futureStarts = plan
       .map(p => p.periodStart)
       .filter(start => start > todayIso)
+
+    // Inga kommande perioder inom avtalstiden (t.ex. ettårsavtal i sin
+    // sista period): avtal som inte sagts upp löper vidare, och
+    // fortsättningsperioderna genereras av cron-jobbet. Tillägget gäller
+    // då från nästa fortsättningsperiod - syntetisera den genom att
+    // stega frekvensen från sista planerade periodstarten.
+    if (futureStarts.length === 0 && plan.length > 0) {
+      const stepMonths = billing.billing_frequency === 'monthly' ? 1
+        : billing.billing_frequency === 'quarterly' ? 3
+        : billing.billing_frequency === 'semi_annual' ? 6
+        : 12
+      const lastStart = new Date(plan[plan.length - 1].periodStart)
+      const next = new Date(lastStart.getFullYear(), lastStart.getMonth(), 1)
+      for (let i = 0; i < 24 && toLocalIsoDate(next) <= todayIso; i++) {
+        next.setMonth(next.getMonth() + stepMonths)
+      }
+      if (toLocalIsoDate(next) > todayIso) {
+        futureStarts = [toLocalIsoDate(next)]
+      }
+    }
     if (futureStarts.length === 0) {
-      return { reason: 'Avtalet har ingen kommande fakturaperiod (nära avtalsslut) - kontakta kontoret.' }
+      return { reason: 'Avtalet har ingen kommande fakturaperiod - kontakta kontoret så läggs tillägget manuellt.' }
     }
 
     // Hoppa över perioder vars faktura redan är låst (bokförd/skickad/betald)
