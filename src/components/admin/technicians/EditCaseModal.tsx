@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, ChevronRight, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Footprints, Receipt, Copy, History } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Footprints, Receipt, Copy, History, Wrench, Wallet, Info } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -72,6 +72,10 @@ import RevisitModal from './RevisitModal'
 
 // Ärendehistorik
 import CaseHistoryPanel from '../../shared/CaseHistoryPanel'
+
+// Delade modal-byggstenar (visuell omgörning)
+import CaseModalSection from '../../shared/CaseModalSection'
+import CaseStatusStepper from '../../shared/CaseStatusStepper'
 
 // Provision
 import CommissionSection from '../../shared/CommissionSection'
@@ -156,6 +160,34 @@ function buildStatusOptions(currentStatus: string) {
     list.push(currentStatus)
   }
   return list.map(s => ({ value: s, label: s }))
+}
+
+// Statuschip i headern - samma färgspråk som CaseStatusStepper/schemat
+const getStatusChipStyle = (status: string): string => {
+  const ls = (status || '').toLowerCase()
+  if (ls.includes('avslutat')) return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+  if (ls.startsWith('återbesök')) return 'bg-blue-500/20 text-blue-300 border-blue-500/30'
+  if (ls.includes('signerad')) return 'bg-[#20c58f]/20 text-[#20c58f] border-[#20c58f]/30'
+  if (ls.includes('offert')) return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+  if (ls.includes('bokad') || ls.includes('bokat')) return 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+  if (ls.includes('öppen')) return 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+  return 'bg-slate-500/15 text-slate-300 border-slate-600/50'
+}
+
+// Ärendetyps-badge i headern
+const TYPE_BADGES: Record<TechnicianCase['case_type'], { label: string; cls: string }> = {
+  private: { label: 'Privatperson', cls: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
+  business: { label: 'Företag', cls: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' },
+  contract: { label: 'Avtalskund', cls: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
+}
+
+// Flikar (ren UI-state - avmonterar aldrig panelerna, göms med "hidden")
+type CaseModalTab = 'arende' | 'utforande' | 'ekonomi'
+const getDefaultTab = (status: string | undefined, view: string | null | undefined): CaseModalTab => {
+  const ls = (status || '').toLowerCase()
+  return view === 'technician' && (ls.includes('bokad') || ls.includes('bokat') || ls.includes('pågående'))
+    ? 'utforande'
+    : 'arende'
 }
 
 // Utility-funktion för att formatera adress (samma logik som TechnicianCases.tsx)
@@ -418,6 +450,14 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
   // Inline title edit state
   const [editingTitle, setEditingTitle] = useState(false)
+
+  // Aktiv flik (ren UI-state). Tekniker med bokat/pågående ärende landar på
+  // "Utförande", övriga på "Ärende". Panelerna avmonteras aldrig - de göms
+  // med className "hidden" så att barnkomponenternas state/effekter behålls.
+  const [activeTab, setActiveTab] = useState<CaseModalTab>(() => getDefaultTab(caseData?.status, activeView))
+  useEffect(() => {
+    if (isOpen && caseData) setActiveTab(getDefaultTab(caseData.status, activeView))
+  }, [isOpen, caseData?.id])
 
   // Kommunikations-panel state
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
@@ -1346,7 +1386,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     return (
       <Modal isOpen={isOpen} onClose={() => {}} title="Sparat!" size="md" preventClose={true} usePortal={true}>
         <div className="p-8 text-center">
-          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <CheckCircle className="w-16 h-16 text-[#20c58f] mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">Ärendet har uppdaterats</h3>
           <p className="text-slate-400">Ändringarna har sparats framgångsrikt</p>
         </div>
@@ -1369,7 +1409,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     : undefined
 
   const footer = (
-    <div className="flex items-center px-4 py-2 bg-slate-800/50">
+    <div className="flex items-center justify-between px-4 py-2.5">
       <button
         type="button"
         onClick={() => setShowDeleteDialog(true)}
@@ -1378,7 +1418,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         <Trash2 className="w-3 h-3" />
         Radera
       </button>
-      <div className="ml-auto flex items-center gap-2">
+      <div className="flex items-center gap-2">
         <Button type="button" variant="secondary" size="sm" onClick={onClose} disabled={loading || timeTrackingLoading}>
           Avbryt
         </Button>
@@ -1396,27 +1436,106 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // Kontrollera om kommunikation kan visas
   const showCommunication = currentCase && (currentCase.case_type === 'private' || currentCase.case_type === 'business');
 
+  const typeBadge = TYPE_BADGES[currentCase.case_type] || TYPE_BADGES.private
+
+  const headerStatus = formData.status || currentCase.status || ''
+
   const modalTitle = (
-    <div className="flex items-center gap-2">
-      <span>Ärende: {currentCase.case_number || currentCase.title}</span>
+    <div className="flex items-center gap-2 min-w-0">
+      {editingTitle ? (
+        <input
+          name="title"
+          value={formData.title || ''}
+          onChange={handleChange}
+          className="flex-1 min-w-0 px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+          placeholder="Ärendenamn..."
+          autoFocus
+          onBlur={() => setEditingTitle(false)}
+          onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+        />
+      ) : (
+        <>
+          <span className="font-mono font-semibold text-white truncate">
+            {currentCase.case_number || currentCase.title}
+          </span>
+          <button
+            type="button"
+            onClick={() => setEditingTitle(true)}
+            className="p-1 text-slate-400 hover:text-white rounded transition-colors flex-shrink-0"
+            title="Redigera ärendenamn"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        </>
+      )}
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border flex-shrink-0 ${getStatusChipStyle(headerStatus)}`}>
+        <span className="w-1.5 h-1.5 rounded-full bg-current" />
+        {headerStatus}
+      </span>
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border flex-shrink-0 ${typeBadge.cls}`}>
+        {typeBadge.label}
+      </span>
       {visitNumber > 1 && (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">
+        <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 flex-shrink-0">
           Besök {visitNumber}
         </span>
-      )}
-      {!editingTitle && (
-        <button onClick={() => setEditingTitle(true)} className="p-1 text-slate-400 hover:text-white rounded transition-colors" title="Redigera ärendenamn">
-          <Pencil className="w-3.5 h-3.5" />
-        </button>
       )}
     </div>
   )
 
+  const customerLabel = currentCase.case_type === 'business'
+    ? ((currentCase as any).company_name || currentCase.kontaktperson || currentCase.title)
+    : (currentCase.kontaktperson || currentCase.title)
+  const modalSubtitle = [customerLabel, formatAddress(currentCase.adress)].filter(Boolean).join(' · ')
+
   return (
     <>
-    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} size="xl" footer={footer} preventClose={true} allowBackdropClose={!loading && !timeTrackingLoading} usePortal={true} className="scroll-smooth"
+    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} subtitle={modalSubtitle || undefined} size="full" footer={footer} preventClose={true} allowBackdropClose={!loading && !timeTrackingLoading} usePortal={true} className="scroll-smooth"
       headerActions={
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          {/* Avtal */}
+          <button
+            type="button"
+            onClick={handleCreateContract}
+            className="flex items-center gap-1.5 h-8 px-2.5 bg-slate-800/50 border border-slate-700 hover:border-[#20c58f]/50 rounded-lg text-slate-300 hover:text-white text-xs font-medium transition-colors"
+            title="Skapa serviceavtal för denna kund"
+          >
+            <FileSignature className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">Avtal</span>
+          </button>
+
+          {/* Offert */}
+          <button
+            type="button"
+            onClick={handleCreateOffer}
+            className="flex items-center gap-1.5 h-8 px-2.5 bg-slate-800/50 border border-slate-700 hover:border-[#20c58f]/50 rounded-lg text-slate-300 hover:text-white text-xs font-medium transition-colors"
+            title="Skapa offertförslag för denna kund"
+          >
+            <Receipt className="w-3.5 h-3.5 shrink-0" />
+            <span className="hidden sm:inline">Offert</span>
+          </button>
+
+          {/* Rapport */}
+          {reportGeneration.canGenerateReport ? (
+            <WorkReportDropdown
+              onDownload={reportGeneration.downloadReport}
+              onSendToTechnician={reportGeneration.sendToTechnician}
+              onSendToContact={reportGeneration.sendToContact}
+              disabled={!reportGeneration.canGenerateReport || reportGeneration.isGenerating}
+              technicianName={reportGeneration.technicianName}
+              contactName={reportGeneration.contactName}
+              totalReports={reportGeneration.totalReports}
+              hasRecentReport={reportGeneration.hasRecentReport}
+              currentReport={reportGeneration.currentReport}
+              getTimeSinceReport={reportGeneration.getTimeSinceReport}
+            />
+          ) : (
+            <div className="flex items-center gap-1.5 h-8 px-2.5 bg-slate-800/30 border border-slate-700/50 rounded-lg text-slate-500 text-xs font-medium cursor-not-allowed">
+              <FileCheck className="w-3.5 h-3.5 shrink-0" />
+              <span className="hidden sm:inline">Rapport</span>
+            </div>
+          )}
+
           {/* Fas 13b: visa signerad offert (Oneflow) — öppna i ny flik eller ladda ned */}
           {currentCase.oneflow_contract_id && (
             <CustomerContractButton
@@ -1428,7 +1547,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             <button
               type="button"
               onClick={() => setShowActionDialog(true)}
-              className="p-2 text-slate-400 hover:text-teal-400 hover:bg-teal-500/20 rounded-lg transition-all duration-200"
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
               title="Boka återbesök eller skapa nytt ärende"
             >
               <Footprints className="w-5 h-5" />
@@ -1437,7 +1556,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           <button
             type="button"
             onClick={() => setShowHistoryPanel(true)}
-            className="p-2 text-slate-400 hover:text-amber-400 hover:bg-amber-500/20 rounded-lg transition-all duration-200 relative"
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors relative"
             title="Ärendehistorik"
           >
             <History className="w-5 h-5" />
@@ -1449,7 +1568,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             <button
               type="button"
               onClick={() => setShowCommunicationPanel(true)}
-              className="p-2 text-slate-400 hover:text-purple-400 hover:bg-purple-500/20 rounded-lg transition-all duration-200"
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
               title="Öppna kommunikation"
             >
               <MessageSquare className="w-5 h-5" />
@@ -1458,80 +1577,42 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         </div>
       }
     >
-      <div className="flex flex-col h-full">
+      {/* Statusstepper - kopplad till samma statesetter som gamla status-selecten */}
+      <CaseStatusStepper
+        status={formData.status || ''}
+        statuses={buildStatusOptions(formData.status || '').map(o => o.value)}
+        onChange={(s) => setFormData(prev => ({ ...prev, status: s }))}
+        stepDates={[
+          (currentCase as any).created_at || (currentCase as any).created_date || null,
+          formData.start_date || currentCase.start_date || null,
+          (currentCase as any).completed_date || null,
+        ]}
+      />
 
-        {/* Action header — flex-shrink-0 så dropdown aldrig klipps av scroll */}
-        {currentCase && (
-          <div className="flex-shrink-0 px-4 sm:px-5 py-3 bg-slate-800/30 border-b border-slate-700">
-            <div className="grid grid-cols-2 sm:flex sm:items-center sm:justify-end gap-2 sm:gap-3">
-              {/* Avtal */}
-              <button
-                type="button"
-                onClick={handleCreateContract}
-                className="flex items-center justify-center gap-1.5 h-9 px-3 bg-violet-500/15 hover:bg-violet-500/25 border border-violet-500/30 hover:border-violet-500/50 rounded-lg text-violet-300 hover:text-violet-200 text-sm font-medium transition-all duration-200 active:scale-95"
-                title="Skapa serviceavtal för denna kund"
-              >
-                <FileSignature className="w-4 h-4 shrink-0" />
-                <span>Avtal</span>
-                <ChevronRight className="w-3 h-3 shrink-0 opacity-50" />
-              </button>
+      {/* Sticky flikrad */}
+      <div className="sticky top-0 z-10 flex gap-1 px-4 py-2 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50">
+        {([
+          { id: 'arende', label: 'Ärende', icon: FileText },
+          { id: 'utforande', label: 'Utförande', icon: Wrench },
+          { id: 'ekonomi', label: 'Ekonomi', icon: Wallet },
+        ] as const).map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === tab.id
+                ? 'bg-[#20c58f]/15 text-[#20c58f] border border-[#20c58f]/30'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-transparent'
+            }`}
+          >
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-              {/* Offert */}
-              <button
-                type="button"
-                onClick={handleCreateOffer}
-                className="flex items-center justify-center gap-1.5 h-9 px-3 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 hover:border-emerald-500/50 rounded-lg text-emerald-300 hover:text-emerald-200 text-sm font-medium transition-all duration-200 active:scale-95"
-                title="Skapa offertförslag för denna kund"
-              >
-                <Receipt className="w-4 h-4 shrink-0" />
-                <span>Offert</span>
-                <ChevronRight className="w-3 h-3 shrink-0 opacity-50" />
-              </button>
-
-              {/* Rapport */}
-              {reportGeneration.canGenerateReport ? (
-                <WorkReportDropdown
-                  onDownload={reportGeneration.downloadReport}
-                  onSendToTechnician={reportGeneration.sendToTechnician}
-                  onSendToContact={reportGeneration.sendToContact}
-                  disabled={!reportGeneration.canGenerateReport || reportGeneration.isGenerating}
-                  technicianName={reportGeneration.technicianName}
-                  contactName={reportGeneration.contactName}
-                  totalReports={reportGeneration.totalReports}
-                  hasRecentReport={reportGeneration.hasRecentReport}
-                  currentReport={reportGeneration.currentReport}
-                  getTimeSinceReport={reportGeneration.getTimeSinceReport}
-                />
-              ) : (
-                <div className="flex items-center gap-1.5 h-9 px-3 bg-slate-700/30 border border-slate-700/50 rounded-lg text-slate-500 text-sm font-medium cursor-not-allowed">
-                  <FileCheck className="w-4 h-4 shrink-0" />
-                  <span>Rapport</span>
-                </div>
-              )}
-            </div>
-
-            {/* Varningar */}
-            {(reportGeneration.canGenerateReport && (!reportGeneration.hasTechnicianEmail || !reportGeneration.hasContactEmail)) && (
-              <div className="mt-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded px-3 py-2">
-                {!reportGeneration.hasTechnicianEmail && '⚠️ Ingen tekniker-email tillgänglig. '}
-                {!reportGeneration.hasContactEmail && '⚠️ Ingen kontaktperson-email tillgänglig.'}
-              </div>
-            )}
-            {(!currentCase.kontaktperson || !currentCase.e_post_kontaktperson) && (
-              <div className="mt-2 text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded px-3 py-2">
-                ⚠️ Komplettera kontaktuppgifter för bästa avtal/offert-skapning
-              </div>
-            )}
-            {currentCase.parent_case_id && (
-              <div className="mt-2 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded px-3 py-2">
-                ℹ️ Detta är ett följeärende
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Scrollbart innehåll */}
-        <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+      <div className="p-4">
 
         {/* Val-dialog: Återbesök eller Nytt ärende — fixed overlay */}
         {showActionDialog && (
@@ -1651,40 +1732,45 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               <p className="text-red-400">{error}</p>
             </div>
           )}
-          
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><FileText className="w-4 h-4 text-teal-400" />Ärendeinformation</h3>
-            {editingTitle && (
-              <div className="flex items-center gap-2">
-                <input name="title" value={formData.title || ''} onChange={handleChange}
-                  className="flex-1 px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm"
-                  placeholder="Ärendenamn..."
-                  autoFocus
-                  onBlur={() => setEditingTitle(false)}
-                  onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                />
-              </div>
-            )}
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning</label>
-              <textarea
-                name="description"
-                value={formData.description || ''}
-                onChange={handleChange}
-                ref={(el) => { if (el) autoResize(el) }}
-                rows={2}
-                style={{ maxHeight: '16rem' }}
-                className="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition-all duration-200 leading-relaxed overflow-y-auto resize-none"
-                placeholder="Beskriv ärendet i detalj..."
-              />
+
+          {/* Varningar (flyttade från gamla actionbandet) */}
+          {(reportGeneration.canGenerateReport && (!reportGeneration.hasTechnicianEmail || !reportGeneration.hasContactEmail)) && (
+            <div className="flex items-start gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>
+                {!reportGeneration.hasTechnicianEmail && 'Ingen tekniker-email tillgänglig. '}
+                {!reportGeneration.hasContactEmail && 'Ingen kontaktperson-email tillgänglig.'}
+              </span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          )}
+          {(!currentCase.kontaktperson || !currentCase.e_post_kontaktperson) && (
+            <div className="flex items-start gap-2 text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>Komplettera kontaktuppgifter för bästa avtal/offert-skapning</span>
+            </div>
+          )}
+          {currentCase.parent_case_id && (
+            <div className="flex items-start gap-2 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
+              <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>Detta är ett följeärende</span>
+            </div>
+          )}
+
+          {/* ════════ Flik: Ärende ════════ */}
+          <div className={activeTab === 'arende' ? 'space-y-3' : 'hidden'}>
+            <CaseModalSection icon={FileText} iconClassName="text-teal-400" title="Ärendeinformation">
+              <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Status</label>
-                <Select
-                  value={formData.status || ''}
-                  onChange={(v) => setFormData(prev => ({ ...prev, status: v }))}
-                  options={buildStatusOptions(formData.status || '')}
+                <label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning</label>
+                <textarea
+                  name="description"
+                  value={formData.description || ''}
+                  onChange={handleChange}
+                  ref={(el) => { if (el) autoResize(el) }}
+                  rows={2}
+                  style={{ maxHeight: '16rem' }}
+                  className="w-full px-3 py-1.5 bg-slate-900/60 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-[#20c58f] focus:ring-2 focus:ring-[#20c58f]/20 transition-all duration-200 leading-relaxed overflow-y-auto resize-none"
+                  placeholder="Beskriv ärendet i detalj..."
                 />
               </div>
               {showTimeTracking && (
@@ -1719,14 +1805,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   )}
                 </div>
               )}
-            </div>
+              </div>
+            </CaseModalSection>
 
             {/* Tekniker-tilldelningar */}
-            <div className="space-y-2 pt-3 border-t border-slate-700/50">
-              <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                <User className="w-4 h-4 text-orange-400" />
-                Tekniker
-              </h3>
+            <CaseModalSection icon={User} iconClassName="text-orange-400" title="Tekniker">
               <div className="flex items-center gap-2">
                 {([
                   { key: 'primary_assignee_id', label: 'Primär' },
@@ -1774,14 +1857,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   )
                 })}
               </div>
-            </div>
-          </div>
+            </CaseModalSection>
 
-          <div className="space-y-2 pt-3 border-t border-slate-700/50">
-            {/* ✅ UPPDATERAD SEKTION FÖR SCHEMALÄGGNING */}
+            {/* Schemaläggning */}
             {showTimeTracking && (
-              <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><CalendarIcon className="w-4 h-4 text-purple-400" />Schemaläggning</h3>
+              <CaseModalSection icon={CalendarIcon} iconClassName="text-purple-400" title="Schemaläggning">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
                           <label className="block text-xs font-medium text-slate-400 mb-1">Starttid</label>
@@ -1814,12 +1894,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                           />
                       </div>
                   </div>
-              </div>
+              </CaseModalSection>
             )}
 
+            {/* Kontaktinformation */}
             {showTimeTracking && (
-              <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><User className="w-4 h-4 text-green-400" />Kontaktinformation</h3>
+              <CaseModalSection icon={User} iconClassName="text-emerald-400" title="Kontaktinformation">
+                <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <Input name="kontaktperson" placeholder="Kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} />
                   {currentCase.case_type === 'business' ? (
@@ -1846,60 +1927,43 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                     <button
                       type="button"
                       onClick={() => openInMaps(formData.adress)}
-                      className="flex items-center gap-1 text-xs text-teal-400 hover:text-teal-300 transition-colors"
+                      className="flex items-center gap-1 text-xs text-[#20c58f] hover:text-[#20c58f]/80 transition-colors"
                     >
                       <MapPin className="w-3 h-3" />
                       Öppna i Maps
                     </button>
                   )}
                 </div>
-              </div>
+                </div>
+              </CaseModalSection>
             )}
 
             {/* Företagsinfo & Fakturering (bara business cases) */}
             {currentCase.case_type === 'business' && (
-              <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><FileText className="w-4 h-4 text-blue-400" />Företag & Fakturering</h3>
+              <CaseModalSection icon={Receipt} iconClassName="text-indigo-400" title="Företag & Fakturering">
                 <div className="grid grid-cols-2 gap-2">
                   <Input name="company_name" placeholder="Företagsnamn" value={formData.company_name || ''} onChange={handleChange} />
                   <Input name="bestallare" placeholder="Beställare" value={formData.bestallare || ''} onChange={handleChange} />
                   <Input name="markning_faktura" placeholder="Märkning faktura" value={formData.markning_faktura || ''} onChange={handleChange} />
                   <Input name="e_post_faktura" placeholder="E-post faktura" type="email" value={formData.e_post_faktura || ''} onChange={handleChange} />
                 </div>
-              </div>
+              </CaseModalSection>
             )}
+          </div>
 
-            {/* Saneringsrapport sektion */}
+          {/* ════════ Flik: Utförande ════════ */}
+          <div className={activeTab === 'utforande' ? 'space-y-3' : 'hidden'}>
+            {/* Tidtagning - kompakt "Arbetstid"-sektion */}
             {showTimeTracking && (
-              <div className="space-y-1.5 pt-3 border-t border-slate-700/50">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4 text-purple-400" />Saneringsrapport
-                </h3>
-                <textarea
-                  name="rapport"
-                  value={formData.rapport || ''}
-                  onChange={handleChange}
-                  ref={(el) => { if (el) autoResize(el) }}
-                  rows={2}
-                  style={{ maxHeight: '16rem' }}
-                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors overflow-y-auto resize-none"
-                  placeholder="Metoder, resultat, rekommendationer..."
-                />
-              </div>
-            )}
-
-            {/* Tidtagning */}
-            {showTimeTracking && (
-              <div className="pt-3 border-t border-slate-700/50">
+              <CaseModalSection icon={Clock} iconClassName={isRunning ? 'text-[#20c58f]' : 'text-slate-400'} title="Arbetstid">
                 <div className="flex items-center gap-3">
-                  <Clock className={`w-4 h-4 flex-shrink-0 ${isRunning ? 'text-green-400' : 'text-slate-400'}`} />
-                  <span className={`text-lg font-bold font-mono ${isRunning ? 'text-green-400' : 'text-white'}`}>
+                  <span className={`text-lg font-bold font-mono ${isRunning ? 'text-[#20c58f]' : 'text-white'}`}>
                     {formatMinutesDetailed(displayTime)}
                   </span>
                   <span className="text-xs text-slate-500">
                     {isRunning ? (
-                      <span className="text-green-400 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
+                      <span className="text-[#20c58f] flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-[#20c58f] rounded-full animate-pulse" />
                         Aktiv
                       </span>
                     ) : displayTime > 0 ? 'Pausad' : 'Ej påbörjad'}
@@ -1928,12 +1992,28 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                     )}
                   </div>
                 </div>
-              </div>
+              </CaseModalSection>
+            )}
+
+            {/* Saneringsrapport sektion */}
+            {showTimeTracking && (
+              <CaseModalSection icon={BookOpen} iconClassName="text-purple-400" title="Saneringsrapport">
+                <textarea
+                  name="rapport"
+                  value={formData.rapport || ''}
+                  onChange={handleChange}
+                  ref={(el) => { if (el) autoResize(el) }}
+                  rows={2}
+                  style={{ maxHeight: '16rem' }}
+                  className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] transition-colors overflow-y-auto resize-none"
+                  placeholder="Metoder, resultat, rekommendationer..."
+                />
+              </CaseModalSection>
             )}
 
             {/* Använda preparat - Visas INTE för Inspektion */}
             {currentCase && serviceArticle?.name !== 'Inspektion' && formData.skadedjur !== 'Inspektion' && (
-              <div className="pt-3 border-t border-slate-700/50">
+              <CaseModalSection>
                 <CasePreparationsSection
                   caseId={currentCase.id}
                   caseType={currentCase.case_type === 'private' ? 'private' : 'business'}
@@ -1942,12 +2022,34 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   technicianName={currentCase.primary_assignee_name || null}
                   isReadOnly={false}
                 />
-              </div>
+              </CaseModalSection>
             )}
 
+            {/* Bilder sektion - visas för alla ärendetyper */}
+            {currentCase && (
+              <CaseModalSection icon={ImageIcon} iconClassName="text-cyan-400" title="Bilder">
+                {/* Bildgalleri med draft-läge - ändringar sparas först när man klickar "Spara ändringar" */}
+                <CaseImageGallery
+                  ref={imageGalleryRef}
+                  caseId={currentCase.id}
+                  caseType={currentCase.case_type}
+                  canDelete={true}
+                  canEdit={true}
+                  refreshTrigger={imageRefreshTrigger}
+                  showCategories={true}
+                  draftMode={true}
+                  userId={profile?.id}
+                  onPendingChangesUpdate={setHasPendingImageChanges}
+                />
+              </CaseModalSection>
+            )}
+          </div>
+
+          {/* ════════ Flik: Ekonomi ════════ */}
+          <div className={activeTab === 'ekonomi' ? 'space-y-3' : 'hidden'}>
             {/* Utförda tjänster/artiklar för fakturering */}
             {currentCase && (
-              <div className="pt-3 border-t border-slate-700/50">
+              <CaseModalSection>
                 <CaseServiceSelector
                   key={servicesSelectorKey}
                   caseId={currentCase.id}
@@ -1960,19 +2062,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   onChange={handleBillingSummaryChange}
                   highlightMissingFastighet={rotRutFastighetError}
                 />
-              </div>
+              </CaseModalSection>
             )}
 
             {/* Kundnummer (befintlig kund hittad via person-/org-nr) */}
             {currentCase && existingCustomerNumber !== null && (
-              <div className="pt-3 border-t border-slate-700/50">
+              <CaseModalSection subtle>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <CheckCircle className="w-4 h-4 text-[#20c58f]" />
                   <span>Kundnummer: </span>
                   <span className="font-semibold text-white">{existingCustomerNumber}</span>
                   <span className="text-slate-500">(återanvänds från befintlig kund)</span>
                 </div>
-              </div>
+              </CaseModalSection>
             )}
 
             {/* Kundgruppsval för nya företagskunder (engångskunder) */}
@@ -1981,12 +2083,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               formData.status === 'Avslutat' &&
               hasBillableAmount &&
               existingCustomerNumber === null && (
-              <div className="pt-3 border-t border-slate-700/50">
-                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-2">
-                  <div className="flex items-center gap-1.5">
-                    <Receipt className="w-4 h-4 text-[#20c58f]" />
-                    <h3 className="text-sm font-semibold text-white">Kundgrupp (för fakturering)</h3>
-                  </div>
+              <CaseModalSection icon={Receipt} iconClassName="text-[#20c58f]" title="Kundgrupp (för fakturering)">
+                <div className="space-y-2">
                   <p className="text-xs text-slate-400">
                     Välj kundgrupp så tilldelas ett kundnummer när ärendet sparas. Krävs för Fortnox-export.
                   </p>
@@ -2022,12 +2120,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                       })}
                   </div>
                 </div>
-              </div>
+              </CaseModalSection>
             )}
 
             {/* Provision sektion */}
             {currentCase && (
-              <div className="pt-3 border-t border-slate-700/50">
+              <CaseModalSection>
                 <CommissionSection
                   isEligible={commissionEligible}
                   onEligibleChange={setCommissionEligible}
@@ -2057,36 +2155,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   postsLocked={commissionPostsLocked}
                   subcontractorDeduction={billingSummary?.subcontractor_total || 0}
                 />
-              </div>
+              </CaseModalSection>
             )}
-
-            {/* Bilder sektion - visas för alla ärendetyper */}
-            {currentCase && (
-              <div className="space-y-2 pt-3 border-t border-slate-700/50">
-                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                  <ImageIcon className="w-4 h-4 text-cyan-400" />Bilder
-                </h3>
-
-                {/* Bildgalleri med draft-läge - ändringar sparas först när man klickar "Spara ändringar" */}
-                <CaseImageGallery
-                  ref={imageGalleryRef}
-                  caseId={currentCase.id}
-                  caseType={currentCase.case_type}
-                  canDelete={true}
-                  canEdit={true}
-                  refreshTrigger={imageRefreshTrigger}
-                  showCategories={true}
-                  draftMode={true}
-                  userId={profile?.id}
-                  onPendingChangesUpdate={setHasPendingImageChanges}
-                />
-              </div>
-            )}
-
-
           </div>
         </form>
-      </div>
       </div>
 
       {/* Historikpanel (slide-in från höger) */}
