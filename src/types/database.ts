@@ -252,6 +252,8 @@ export type Database = {
           // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
           work_order_number: string | null
           work_object: string | null
+          // Fakturamärkning - blir "Er referens" (invoice_marking) på merförsäljningsfakturan
+          invoice_marking: string | null
         }
         Insert: Omit<Database['public']['Tables']['cases']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['cases']['Insert']>

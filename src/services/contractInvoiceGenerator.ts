@@ -736,6 +736,18 @@ export class ContractInvoiceGenerator {
       if (existing) existingInvoiceId = existing.id
     }
 
+    // Fakturamärkning från ärendet ("Er referens" i Fortnox) - bara vid
+    // per_case-gruppering; en månadsbatch spänner över flera ärenden
+    let invoiceMarking: string | null = null
+    if (grouping === 'per_case') {
+      const { data: caseRow } = await supabase
+        .from('cases')
+        .select('invoice_marking')
+        .eq('id', caseId)
+        .maybeSingle()
+      invoiceMarking = caseRow?.invoice_marking?.trim() || null
+    }
+
     let invoiceId: string
     if (existingInvoiceId) {
       invoiceId = existingInvoiceId
@@ -768,6 +780,7 @@ export class ContractInvoiceGenerator {
           billing_period_start: monthStart,
           billing_period_end: monthEnd,
           due_date: toLocalIsoDate(due),
+          invoice_marking: invoiceMarking,
         })
         .select('id')
         .single()
