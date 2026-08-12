@@ -175,6 +175,48 @@ const transformBusinessCase = (data: BusinessCasesRow): CaseContext => {
   };
 };
 
+// Transform contract case (cases-tabellen, avtalskunder) to CaseContext.
+// Svenska statusar (Bokad/Avslutat...) finns inte i ClickUp-STATUS_CONFIG,
+// så färgen mappas lokalt med neutral fallback.
+const CONTRACT_STATUS_COLORS: Record<string, string> = {
+  'öppen': '#0ea5e9',
+  'bokad': '#f59e0b',
+  'bokat': '#f59e0b',
+  'pågående': '#8b5cf6',
+  'avslutat': '#10b981',
+}
+
+const transformContractCase = (data: any): CaseContext => {
+  const coords = extractCoordinates(data.address);
+  return {
+    id: data.id,
+    caseType: 'contract' as CaseType,
+    title: data.title,
+    status: data.status as ClickUpStatus,
+    statusColor: CONTRACT_STATUS_COLORS[(data.status || '').toLowerCase()] || '#87909e',
+    contactPerson: data.contact_person ?? null,
+    contactPhone: data.contact_phone ?? null,
+    contactEmail: data.contact_email ?? null,
+    address: formatAddress(data.address) ?? data.address_formatted ?? null,
+    addressLat: coords.lat ?? data.address_lat ?? null,
+    addressLng: coords.lng ?? data.address_lng ?? null,
+    pestType: data.pest_type ?? null,
+    otherPestType: null,
+    startDate: data.scheduled_start ?? data.scheduled_date ?? null,
+    dueDate: data.scheduled_end ?? null,
+    description: data.description ?? null,
+    rapport: data.work_report ?? data.technician_report ?? null,
+    price: data.price ?? null,
+    timeSpentMinutes: data.time_spent_minutes ?? null,
+    rotRut: null,
+    fastighetsbeteckning: null,
+    primaryAssigneeName: data.primary_technician_name ?? data.assigned_technician_name ?? null,
+    secondaryAssigneeName: data.secondary_technician_name ?? null,
+    tertiaryAssigneeName: data.tertiary_technician_name ?? null,
+    clickupTaskId: null
+  };
+};
+
 export function useCaseContext(
   caseId: string | null,
   caseType: CaseType | null
@@ -189,17 +231,15 @@ export function useCaseContext(
       return;
     }
 
-    // Contract cases are not yet supported
-    if (caseType === 'contract') {
-      setError('Avtalsärenden stöds inte ännu');
-      return;
-    }
-
     setIsLoading(true);
     setError(null);
 
     try {
-      const tableName = caseType === 'private' ? 'private_cases' : 'business_cases';
+      const tableName = caseType === 'private'
+        ? 'private_cases'
+        : caseType === 'business'
+          ? 'business_cases'
+          : 'cases';
 
       const { data, error: fetchError } = await supabase
         .from(tableName)
@@ -222,7 +262,9 @@ export function useCaseContext(
 
       const context = caseType === 'private'
         ? transformPrivateCase(data as PrivateCasesRow)
-        : transformBusinessCase(data as BusinessCasesRow);
+        : caseType === 'business'
+          ? transformBusinessCase(data as BusinessCasesRow)
+          : transformContractCase(data);
 
       setCaseContext(context);
     } catch (err) {

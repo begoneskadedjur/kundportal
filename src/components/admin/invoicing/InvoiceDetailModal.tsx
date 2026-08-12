@@ -46,8 +46,11 @@ import { ROT_RUT_PERCENT } from '../../../types/caseBilling'
 import { calculateRotRutSummary } from '../../../utils/rotRutConstants'
 import type { CaseBillingItem } from '../../../types/caseBilling'
 import { useCaseContext } from '../../../hooks/useCaseContext'
+import type { CaseContext } from '../../../hooks/useCaseContext'
 import { formatSwedishDateTime } from '../../../types/database'
 import ServiceCostBreakdown from '../../shared/ServiceCostBreakdown'
+import CaseModalSection from '../../shared/CaseModalSection'
+import InvoiceStatusStepper from '../../shared/InvoiceStatusStepper'
 import CommentSection from '../../communication/CommentSection'
 import CaseContextImagePreview from '../../communication/CaseContextImagePreview'
 import EmbeddedMapPreview from '../../communication/EmbeddedMapPreview'
@@ -64,6 +67,109 @@ const formatTimeSpent = (minutes: number | null): string | null => {
   if (h > 0 && m > 0) return `${h}h ${m}m`
   if (h > 0) return `${h}h`
   return `${m}m`
+}
+
+// Delat "Utfört arbete"-innehåll — samma JSX för desktop-sektionen och
+// den utfällbara mobilvyn: metadatarad + arbetsrapport med visa mer-toggle
+// + använda preparat + bilder. Ren presentation, ingen datahämtning.
+function WorkPerformedContent({
+  caseContext,
+  preparations
+}: {
+  caseContext: CaseContext | null
+  preparations: CasePreparationWithDetails[]
+}) {
+  const [reportExpanded, setReportExpanded] = useState(false)
+
+  if (!caseContext) {
+    return <p className="text-sm text-slate-500 py-1">Ingen arbetsrapport ännu</p>
+  }
+
+  const timeSpent = formatTimeSpent(caseContext.timeSpentMinutes)
+
+  return (
+    <div className="space-y-2.5">
+      {/* Metadata: tekniker · utförandedatum · arbetstid · skadedjur */}
+      {(caseContext.primaryAssigneeName || caseContext.startDate || timeSpent || caseContext.pestType) && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          {caseContext.primaryAssigneeName && (
+            <span className="inline-flex items-center gap-1.5 text-slate-300">
+              <User className="w-3.5 h-3.5 text-green-400" />
+              {caseContext.primaryAssigneeName}
+            </span>
+          )}
+          {caseContext.startDate && (
+            <span className="inline-flex items-center gap-1.5 text-slate-300">
+              <Calendar className="w-3.5 h-3.5 text-purple-400" />
+              {formatSwedishDateTime(caseContext.startDate)}
+            </span>
+          )}
+          {timeSpent && (
+            <span className="inline-flex items-center gap-1.5 text-slate-300">
+              <Timer className="w-3.5 h-3.5 text-green-400" />
+              {timeSpent}
+            </span>
+          )}
+          {caseContext.pestType && (
+            <span className="inline-flex items-center gap-1.5 text-slate-300">
+              <Bug className="w-3.5 h-3.5 text-orange-400" />
+              {caseContext.pestType}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Arbetsrapport */}
+      {caseContext.rapport ? (
+        <div className="bg-slate-900/50 rounded-lg p-2.5">
+          <p className={`text-sm text-slate-300 whitespace-pre-wrap ${reportExpanded ? '' : 'line-clamp-6'}`}>
+            {caseContext.rapport}
+          </p>
+          <button
+            type="button"
+            onClick={() => setReportExpanded(!reportExpanded)}
+            className="mt-1.5 text-xs text-[#20c58f] hover:text-[#1bb07e]"
+          >
+            {reportExpanded ? 'Visa mindre' : 'Visa mer'}
+          </button>
+        </div>
+      ) : (
+        <p className="text-sm text-slate-500">Ingen arbetsrapport ännu</p>
+      )}
+
+      {/* Använda preparat */}
+      {preparations.length > 0 && (
+        <div>
+          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 mb-1">
+            <FlaskConical className="w-3.5 h-3.5 text-teal-400" />
+            Använda preparat
+          </h4>
+          <div className="bg-slate-900/50 rounded-lg border border-slate-700/50 divide-y divide-slate-700/50">
+            {preparations.map(p => (
+              <div key={p.id} className="px-2.5 py-2 flex items-center justify-between">
+                <div>
+                  <span className="text-sm text-slate-200">{p.preparation?.name || 'Okänt preparat'}</span>
+                  {p.preparation?.type && (
+                    <span className="ml-1.5 px-1.5 py-0.5 text-[10px] rounded bg-teal-500/20 text-teal-400 font-medium">
+                      {p.preparation.type}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs text-slate-400">{p.quantity} {p.unit}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bilder */}
+      <CaseContextImagePreview
+        caseId={caseContext.id}
+        caseType={caseContext.caseType}
+        maxThumbnails={4}
+      />
+    </div>
+  )
 }
 
 interface InvoiceDetailModalProps {
@@ -125,27 +231,37 @@ export default function InvoiceDetailModal({
     fetch()
   }, [invoice?.customer_id, invoice?.invoice_type])
 
-  // Hämta ärendekontext via case_id/case_type
+  // Ad-hoc/avtalsfakturor har case_type = null (constraint tillåter bara null/private/business),
+  // men deras ärende är ett contract-ärende. Härled 'contract' så ärendekontext,
+  // preparat och kommunikationspanelen kan matcha case_comments (som triggern
+  // handle_invoice_paid skriver med case_type='contract').
+  const effectiveCaseType: CaseType | null = invoice
+    ? (invoice.case_type as CaseType | null) ??
+      ((invoice.invoice_type === 'adhoc' || invoice.invoice_type === 'contract') ? 'contract' : null)
+    : null
+
+  // Hämta ärendekontext via case_id + härledd ärendetyp — för contract/adhoc
+  // pekar invoice.case_id på cases-tabellen, som hooken stöder via caseType 'contract'
   const { caseContext, isLoading: contextLoading } = useCaseContext(
     isOpen && invoice ? invoice.case_id : null,
-    isOpen && invoice ? (invoice.case_type as CaseType) : null
+    isOpen && invoice ? effectiveCaseType : null
   )
 
-  // Hämta preparat för ärendet (endast för Privat/Företag med case-koppling)
+  // Hämta preparat för ärendet (Privat/Företag + contract/adhoc via härledd ärendetyp)
   useEffect(() => {
     if (!invoice) { setPreparations([]); return }
-    if (!invoice.case_id || !invoice.case_type) { setPreparations([]); return }
+    if (!invoice.case_id || !effectiveCaseType) { setPreparations([]); return }
     const fetchPreparations = async () => {
       const { data } = await supabase
         .from('case_preparations')
         .select('*, preparation:preparations(*)')
         .eq('case_id', invoice.case_id)
-        .eq('case_type', invoice.case_type)
+        .eq('case_type', effectiveCaseType)
         .order('created_at', { ascending: true })
       setPreparations((data as CasePreparationWithDetails[] | null) || [])
     }
     fetchPreparations()
-  }, [invoice?.case_id, invoice?.case_type])
+  }, [invoice?.case_id, invoice?.case_type, invoice?.invoice_type])
 
   // Hämta case_billing_items (interna kostnader + tjänster) för att bygga kostnadsuppdelning
   useEffect(() => {
@@ -697,13 +813,6 @@ export default function InvoiceDetailModal({
   const statusConfig = invoice ? INVOICE_STATUS_CONFIG[invoice.status] : null
   // Privat = visa pris inkl. moms i UI. Företag/avtal = exkl. moms. (Lagring/Fortnox påverkas inte.)
   const isPrivate = invoice?.case_type === 'private'
-  // Ad-hoc/avtalsfakturor har case_type = null (constraint tillåter bara null/private/business),
-  // men deras ärende är ett contract-ärende. Härled 'contract' så kommunikationspanelen kan
-  // matcha case_comments (som triggern handle_invoice_paid skriver med case_type='contract').
-  const effectiveCaseType: CaseType | null = invoice
-    ? (invoice.case_type as CaseType | null) ??
-      ((invoice.invoice_type === 'adhoc' || invoice.invoice_type === 'contract') ? 'contract' : null)
-    : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -714,21 +823,35 @@ export default function InvoiceDetailModal({
       <div className="relative w-full max-w-6xl max-h-[92vh] bg-slate-900 rounded-xl shadow-2xl border border-slate-700 overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800/50">
-          <div className="flex items-center gap-3">
-            <FileText className="w-5 h-5 text-blue-400" />
-            <div>
-              <h2 className="text-base font-semibold text-white">
-                Faktura {invoice?.invoice_number || '...'}
-                {linkedCaseNumber && (
-                  <span className="ml-2 font-mono text-xs font-normal text-slate-400">
-                    Ärende: {linkedCaseNumber}
+          <div className="flex items-center gap-3 min-w-0">
+            <FileText className="w-5 h-5 text-blue-400 flex-shrink-0" />
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-semibold font-mono text-white">
+                  {invoice?.invoice_number || '...'}
+                </h2>
+                {invoice && statusConfig && (
+                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusConfig.bgColor} ${statusConfig.color} ${statusConfig.borderColor}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                    {statusConfig.label}
                   </span>
                 )}
-              </h2>
-              {invoice && statusConfig && (
-                <span className={`px-2 py-0.5 text-xs rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>
-                  {statusConfig.label}
-                </span>
+                {linkedCaseNumber && (
+                  <span
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium font-mono border bg-blue-500/20 text-blue-300 border-blue-500/30"
+                    title="Fakturans kopplade ärende"
+                  >
+                    <ClipboardCheck className="w-3 h-3" />
+                    {linkedCaseNumber}
+                  </span>
+                )}
+              </div>
+              {invoice && (
+                <p className="text-xs text-slate-400 mt-1 truncate">
+                  {invoice.customer_name}
+                  {invoice.organization_number && <> · {invoice.organization_number}</>}
+                  <> · {formatInvoiceAmount(invoice.total_amount)}</>
+                </p>
               )}
             </div>
           </div>
@@ -739,6 +862,25 @@ export default function InvoiceDetailModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Statusstepper — läsvy av fakturans flöde */}
+        {invoice && (
+          <div className="flex-shrink-0">
+            <InvoiceStatusStepper
+              status={invoice.status}
+              stepDates={[
+                invoice.created_at,
+                invoice.approved_at,
+                null,
+                invoice.booked_at,
+                invoice.sent_at,
+                invoice.paid_at
+              ]}
+              isOverdue={isInvoiceOverdue(invoice.due_date, invoice.status)}
+              nextStepText={INVOICE_STATUS_CONFIG[invoice.status]?.description}
+            />
+          </div>
+        )}
 
         {/* Content — split-view desktop, stacked mobile */}
         <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
@@ -751,48 +893,94 @@ export default function InvoiceDetailModal({
               </div>
             ) : invoice ? (
               <div className="p-4 space-y-4">
-                {/* Kundinformation */}
-                <div className="bg-slate-800/50 rounded-lg p-3">
-                  <h3 className="text-xs font-medium text-slate-400 mb-2">Kundinformation</h3>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex items-start gap-2">
-                      <User className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
+                {/* Varning om inaktuella fakturarader */}
+                {staleInfo?.stale && (
+                  <div className="flex items-center justify-between gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
                       <div>
-                        <div className="text-sm text-white font-medium">{invoice.customer_name}</div>
-                        {invoice.organization_number && (
-                          <div className="text-xs text-slate-400">{invoice.case_type === 'private' ? 'Personnr' : 'Org.nr'}: {invoice.organization_number}</div>
-                        )}
+                        <div className="text-sm font-medium text-amber-400">Fakturan är inaktuell</div>
+                        <p className="text-xs text-amber-300/80 mt-0.5">
+                          {staleInfo.reason} sedan fakturan skapades
+                        </p>
                       </div>
                     </div>
-                    {invoice.customer_email && (
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="text-sm text-slate-300 truncate">{invoice.customer_email}</span>
-                      </div>
-                    )}
-                    {invoice.customer_phone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-3.5 h-3.5 text-slate-400" />
-                        <span className="text-sm text-slate-300">{invoice.customer_phone}</span>
-                      </div>
-                    )}
-                    {invoice.customer_address && (
-                      <div className="flex items-start gap-2">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
-                        <span className="text-sm text-slate-300">{invoice.customer_address}</span>
-                      </div>
-                    )}
-                    {invoice.fastighetsbeteckning && (
-                      <div className="flex items-start gap-2">
-                        <Building2 className="w-3.5 h-3.5 text-slate-400 mt-0.5" />
-                        <div>
-                          <div className="text-xs text-slate-400">Fastighetsbeteckning</div>
-                          <div className="text-sm text-white">{invoice.fastighetsbeteckning}</div>
-                        </div>
-                      </div>
-                    )}
+                    <button
+                      onClick={handleRegenerate}
+                      disabled={regenerating}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-400 border border-amber-500/50 rounded-lg hover:bg-amber-500/10 transition-colors disabled:opacity-50 flex-shrink-0"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? 'animate-spin' : ''}`} />
+                      Uppdatera
+                    </button>
                   </div>
-                </div>
+                )}
+
+                {/* Avtalstillägg: raden betalas pro rata - inte en rabatt */}
+                {contractAdditions.length > 0 && (
+                  <div className="flex items-start gap-3 p-3 bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg">
+                    <RotateCcw className="w-4 h-4 text-[#20c58f] flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1.5">
+                      <div className="text-sm font-medium text-[#20c58f]">Avtalstillägg - betalas pro rata</div>
+                      {contractAdditions.map((add, i) => (
+                        <p key={i} className="text-xs text-slate-300">
+                          <span className="font-medium">{add.description.replace(/^Avtalstillägg:\s*/i, '')}</span>
+                          {' '}har lagts till i kundens avtal{add.created_by_name ? ` av ${add.created_by_name}` : ''}.
+                          Radpriset {formatInvoiceAmount(Number(add.prorated_amount))} avser återstående tid fram till nästa premieperiod
+                          - det är inte ett rabatterat fullpris. Årspremien höjs{' '}
+                          {formatInvoiceAmount(Number(add.previous_annual_value))} → {formatInvoiceAmount(Number(add.new_annual_value))}/år
+                          {' '}från {formatInvoiceDate(add.effective_from)}.
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Kräver godkännande - rabatt-text bara när det finns faktisk rabatt */}
+                {invoice.requires_approval && invoice.status === 'pending_approval' && (
+                  realDiscountRows.length > 0 ? (
+                    <div className="flex items-start gap-3 p-3 bg-orange-500/20 border border-orange-500/30 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="text-sm font-medium text-orange-400">Rabatt kräver godkännande</div>
+                        {realDiscountRows.map(row => (
+                          <div key={row.id} className="text-xs text-orange-300">
+                            <span className="font-medium">{row.service_name || row.article_name}</span>
+                            {' '}-{Number(row.discount_percent)}%
+                            {row.discount_motivation?.trim() ? (
+                              <span className="block text-slate-300 mt-0.5">Motivering: {row.discount_motivation}</span>
+                            ) : (
+                              <span className="block text-amber-400 mt-0.5">Motivering saknas</span>
+                            )}
+                          </div>
+                        ))}
+                        <p className="text-xs text-orange-300/80">Godkänns av rabattansvarig under Godkännanden.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <div className="text-sm font-medium text-slate-300">Kräver godkännande</div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Fakturan måste godkännas innan den kan skickas.
+                          {contractAdditions.length > 0 && ' Det låga radpriset är pro rata för ett avtalstillägg - ingen rabatt har lämnats.'}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                )}
+
+                {/* Utfört arbete — ärendekontext från teknikern */}
+                <CaseModalSection icon={ClipboardCheck} iconClassName="text-amber-400" title="Utfört arbete">
+                  {contextLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <RefreshCw className="w-4 h-4 text-slate-400 animate-spin" />
+                    </div>
+                  ) : (
+                    <WorkPerformedContent caseContext={caseContext} preparations={preparations} />
+                  )}
+                </CaseModalSection>
 
                 {/* Datum — kompakt */}
                 <div className="grid grid-cols-3 gap-3">
@@ -802,6 +990,15 @@ export default function InvoiceDetailModal({
                       Skapad
                     </div>
                     <div className="text-sm text-white font-medium">{formatInvoiceDate(invoice.created_at)}</div>
+                  </div>
+                  <div className="bg-slate-800/50 rounded-lg p-3">
+                    <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-1">
+                      <ClipboardCheck className="w-3.5 h-3.5" />
+                      Utfört
+                    </div>
+                    <div className="text-sm text-white font-medium">
+                      {caseContext?.startDate ? formatInvoiceDate(caseContext.startDate) : '–'}
+                    </div>
                   </div>
                   <div className={`rounded-lg p-3 ${isOverdue ? 'bg-red-500/20' : 'bg-slate-800/50'}`}>
                     <div className={`flex items-center justify-between gap-1.5 text-xs mb-1 ${isOverdue ? 'text-red-400' : 'text-slate-400'}`}>
@@ -849,15 +1046,6 @@ export default function InvoiceDetailModal({
                         {isOverdue && <span className="text-xs ml-1">(Förfallen)</span>}
                       </div>
                     )}
-                  </div>
-                  <div className="bg-slate-800/50 rounded-lg p-3">
-                    <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-1">
-                      <Building2 className="w-3.5 h-3.5" />
-                      Ärendetyp
-                    </div>
-                    <div className="text-sm text-white font-medium">
-                      {invoice.case_type === 'private' ? 'Privatperson' : 'Företag'}
-                    </div>
                   </div>
                 </div>
 
@@ -966,41 +1154,6 @@ export default function InvoiceDetailModal({
                   })()}
                 </div>
 
-                {/* Kostnadsuppdelning per tjänst (från Prisguiden) */}
-                {(() => {
-                  // Tjänsteraderna som artiklarna mappas mot.
-                  // Privat/företag: fakturaraderna länkar direkt till case_billing_items via case_billing_item_id.
-                  // Ad-hoc/avtal: fakturaraderna länkar via contract_billing_item_id, så vi bygger istället
-                  // tjänsteraderna direkt från case_billing_items (vars id är det mapped_service_id pekar på).
-                  const isContractOrAdhoc = invoice.invoice_type === 'adhoc' || invoice.invoice_type === 'contract'
-                  const serviceRows = isContractOrAdhoc
-                    ? caseBillingItems
-                        .filter(i => i.item_type === 'service')
-                        .map(i => ({
-                          id: i.id,
-                          serviceItemId: i.id,
-                          name: i.service_name || i.article_name,
-                          revenue: i.total_price,
-                        }))
-                    : invoice.items
-                        .filter(i => i.case_billing_item_id)
-                        .map(i => ({
-                          id: i.id,
-                          serviceItemId: i.case_billing_item_id!,
-                          name: i.article_name,
-                          // total_price är exkl. moms för alla ärendetyper — samma bas som artikelkostnaderna.
-                          revenue: i.total_price,
-                        }))
-                  return (
-                    <ServiceCostBreakdown
-                      serviceRows={serviceRows}
-                      articleItems={caseBillingItems.filter(i => i.item_type === 'article')}
-                      totalRevenue={invoice.subtotal}
-                      formatAmount={formatInvoiceAmount}
-                    />
-                  )
-                })()}
-
                 {/* ROT/RUT att ansöka om — framträdande ruta */}
                 {(() => {
                   const rotRutDeduction = calculateRotRutSummary(invoice.items).totalDeduction
@@ -1034,83 +1187,47 @@ export default function InvoiceDetailModal({
                   )
                 })()}
 
-                {/* Varning om inaktuella fakturarader */}
-                {staleInfo?.stale && (
-                  <div className="flex items-center justify-between gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                    <div className="flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                      <div>
-                        <div className="text-sm font-medium text-amber-400">Fakturan är inaktuell</div>
-                        <p className="text-xs text-amber-300/80 mt-0.5">
-                          {staleInfo.reason} sedan fakturan skapades
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleRegenerate}
-                      disabled={regenerating}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-400 border border-amber-500/50 rounded-lg hover:bg-amber-500/10 transition-colors disabled:opacity-50 flex-shrink-0"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${regenerating ? 'animate-spin' : ''}`} />
-                      Uppdatera
-                    </button>
-                  </div>
-                )}
-
-                {/* Avtalstillägg: raden betalas pro rata - inte en rabatt */}
-                {contractAdditions.length > 0 && (
-                  <div className="flex items-start gap-3 p-3 bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg">
-                    <RotateCcw className="w-4 h-4 text-[#20c58f] flex-shrink-0 mt-0.5" />
-                    <div className="space-y-1.5">
-                      <div className="text-sm font-medium text-[#20c58f]">Avtalstillägg - betalas pro rata</div>
-                      {contractAdditions.map((add, i) => (
-                        <p key={i} className="text-xs text-slate-300">
-                          <span className="font-medium">{add.description.replace(/^Avtalstillägg:\s*/i, '')}</span>
-                          {' '}har lagts till i kundens avtal{add.created_by_name ? ` av ${add.created_by_name}` : ''}.
-                          Radpriset {formatInvoiceAmount(Number(add.prorated_amount))} avser återstående tid fram till nästa premieperiod
-                          - det är inte ett rabatterat fullpris. Årspremien höjs{' '}
-                          {formatInvoiceAmount(Number(add.previous_annual_value))} → {formatInvoiceAmount(Number(add.new_annual_value))}/år
-                          {' '}från {formatInvoiceDate(add.effective_from)}.
-                        </p>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Kräver godkännande - rabatt-text bara när det finns faktisk rabatt */}
-                {invoice.requires_approval && invoice.status === 'pending_approval' && (
-                  realDiscountRows.length > 0 ? (
-                    <div className="flex items-start gap-3 p-3 bg-orange-500/20 border border-orange-500/30 rounded-lg">
-                      <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
-                      <div className="space-y-1.5 min-w-0">
-                        <div className="text-sm font-medium text-orange-400">Rabatt kräver godkännande</div>
-                        {realDiscountRows.map(row => (
-                          <div key={row.id} className="text-xs text-orange-300">
-                            <span className="font-medium">{row.service_name || row.article_name}</span>
-                            {' '}-{Number(row.discount_percent)}%
-                            {row.discount_motivation?.trim() ? (
-                              <span className="block text-slate-300 mt-0.5">Motivering: {row.discount_motivation}</span>
-                            ) : (
-                              <span className="block text-amber-400 mt-0.5">Motivering saknas</span>
-                            )}
-                          </div>
-                        ))}
-                        <p className="text-xs text-orange-300/80">Godkänns av rabattansvarig under Godkännanden.</p>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-start gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-lg">
-                      <AlertCircle className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <div className="text-sm font-medium text-slate-300">Kräver godkännande</div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Fakturan måste godkännas innan den kan skickas.
-                          {contractAdditions.length > 0 && ' Det låga radpriset är pro rata för ett avtalstillägg - ingen rabatt har lämnats.'}
-                        </p>
-                      </div>
-                    </div>
+                {/* Intern kalkyl — kostnadsuppdelning per tjänst (från Prisguiden), hopfälld */}
+                {(() => {
+                  // Tjänsteraderna som artiklarna mappas mot.
+                  // Privat/företag: fakturaraderna länkar direkt till case_billing_items via case_billing_item_id.
+                  // Ad-hoc/avtal: fakturaraderna länkar via contract_billing_item_id, så vi bygger istället
+                  // tjänsteraderna direkt från case_billing_items (vars id är det mapped_service_id pekar på).
+                  const isContractOrAdhoc = invoice.invoice_type === 'adhoc' || invoice.invoice_type === 'contract'
+                  const serviceRows = isContractOrAdhoc
+                    ? caseBillingItems
+                        .filter(i => i.item_type === 'service')
+                        .map(i => ({
+                          id: i.id,
+                          serviceItemId: i.id,
+                          name: i.service_name || i.article_name,
+                          revenue: i.total_price,
+                        }))
+                    : invoice.items
+                        .filter(i => i.case_billing_item_id)
+                        .map(i => ({
+                          id: i.id,
+                          serviceItemId: i.case_billing_item_id!,
+                          name: i.article_name,
+                          // total_price är exkl. moms för alla ärendetyper — samma bas som artikelkostnaderna.
+                          revenue: i.total_price,
+                        }))
+                  // Pro rata-läge: ALLA tjänsterader är avtalstilläggsrader — marginal
+                  // mot pro rata-priset är missvisande, visa neutral text istället.
+                  const allAdditionRows =
+                    serviceRows.length > 0 &&
+                    serviceRows.every(r => additionRowIds.includes(r.serviceItemId))
+                  return (
+                    <ServiceCostBreakdown
+                      serviceRows={serviceRows}
+                      articleItems={caseBillingItems.filter(i => i.item_type === 'article')}
+                      totalRevenue={invoice.subtotal}
+                      formatAmount={formatInvoiceAmount}
+                      defaultCollapsed
+                      neutralMargin={allAdditionRows}
+                    />
                   )
-                )}
+                })()}
 
                 {/* Märkning faktura */}
                 {invoice.invoice_marking && (
@@ -1140,320 +1257,162 @@ export default function InvoiceDetailModal({
             <div className="lg:w-[400px] flex-shrink-0 flex flex-col min-h-0 border-t lg:border-t-0 border-slate-700">
               {/* Desktop: always visible context + comm */}
               <div className="hidden lg:flex lg:flex-col lg:h-full lg:min-h-0">
-                {/* Ärendekontext — scrollbar topp-del */}
-                <div className="flex-shrink-0 max-h-[45%] overflow-y-auto border-b border-slate-700">
-                  {contextLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                      <RefreshCw className="w-5 h-5 text-slate-400 animate-spin" />
-                    </div>
-                  ) : caseContext ? (
-                    <div className="p-3 space-y-3">
-                      {/* Ärendetitel + status */}
-                      <div>
-                        <h3 className="text-sm font-semibold text-slate-100 truncate">{caseContext.title}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span
-                            className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                            style={{
-                              backgroundColor: `${caseContext.statusColor}20`,
-                              color: caseContext.statusColor
-                            }}
-                          >
-                            {caseContext.status}
-                          </span>
-                          {caseContext.pestType && (
-                            <span className="inline-flex items-center gap-1 text-xs text-orange-400">
-                              <Bug className="w-3 h-3" />
-                              {caseContext.pestType}
-                            </span>
+                {/* Faktureringsuppgifter + avtal + säljare + karta */}
+                <div className="flex-shrink-0 overflow-y-auto border-b border-slate-700 p-3 space-y-3">
+                  {/* Faktureringsuppgifter — fakturans snapshot, det som skickas till Fortnox */}
+                  <CaseModalSection icon={Building2} iconClassName="text-blue-400" title="Faktureringsuppgifter">
+                    <div className="space-y-1.5">
+                      <p className="text-sm text-white font-medium">{invoice.customer_name}</p>
+                      {invoice.organization_number && (
+                        <p className="text-xs text-slate-400">
+                          {invoice.case_type === 'private' ? 'Personnr' : 'Org.nr'}: {invoice.organization_number}
+                        </p>
+                      )}
+                      {invoice.customer_email && (
+                        <div className="flex items-center gap-1.5 text-xs min-w-0">
+                          <Mail className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                          <a href={`mailto:${invoice.customer_email}`} className="text-blue-400 hover:text-blue-300 truncate">
+                            {invoice.customer_email}
+                          </a>
+                        </div>
+                      )}
+                      {invoice.customer_phone && (
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <Phone className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                          <a href={`tel:${invoice.customer_phone}`} className="text-blue-400 hover:text-blue-300">
+                            {invoice.customer_phone}
+                          </a>
+                        </div>
+                      )}
+                      {invoice.customer_address && (
+                        <div className="flex items-start gap-1.5 text-xs text-slate-300">
+                          <MapPin className="w-3 h-3 text-slate-500 mt-0.5 flex-shrink-0" />
+                          <span>{invoice.customer_address}</span>
+                        </div>
+                      )}
+                      {invoice.fastighetsbeteckning && (
+                        <div className="flex items-start gap-1.5 text-xs text-slate-300">
+                          <Home className="w-3 h-3 text-slate-500 mt-0.5 flex-shrink-0" />
+                          <span>Fastighet: {invoice.fastighetsbeteckning}</span>
+                        </div>
+                      )}
+                      <p className="text-[10px] text-slate-500 pt-0.5">Uppgifterna skickas till Fortnox</p>
+
+                      {(contractCustomer?.contact_person || contractCustomer?.contact_email || contractCustomer?.contact_phone) && (
+                        <div className="pt-1.5 border-t border-slate-700/50 space-y-1">
+                          <p className="text-xs font-medium text-slate-400">Kontaktperson</p>
+                          {contractCustomer.contact_person && (
+                            <div className="flex items-center gap-1.5 text-xs text-slate-300">
+                              <User className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                              <span>{contractCustomer.contact_person}</span>
+                            </div>
+                          )}
+                          {contractCustomer.contact_email && (
+                            <div className="flex items-center gap-1.5 text-xs min-w-0">
+                              <Mail className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                              <a href={`mailto:${contractCustomer.contact_email}`} className="text-blue-400 hover:text-blue-300 truncate">
+                                {contractCustomer.contact_email}
+                              </a>
+                            </div>
+                          )}
+                          {contractCustomer.contact_phone && (
+                            <div className="flex items-center gap-1.5 text-xs">
+                              <Phone className="w-3 h-3 text-slate-500 flex-shrink-0" />
+                              <a href={`tel:${contractCustomer.contact_phone}`} className="text-blue-400 hover:text-blue-300">
+                                {contractCustomer.contact_phone}
+                              </a>
+                            </div>
                           )}
                         </div>
-                      </div>
-
-                      {/* Tekniker */}
-                      {(caseContext.primaryAssigneeName || caseContext.secondaryAssigneeName) && (
-                        <div className="space-y-1">
-                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
-                            <Users className="w-3 h-3 text-blue-400" />
-                            Tekniker
-                          </h4>
-                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 space-y-0.5">
-                            {caseContext.primaryAssigneeName && (
-                              <p className="text-sm text-slate-200">{caseContext.primaryAssigneeName}</p>
-                            )}
-                            {caseContext.secondaryAssigneeName && (
-                              <p className="text-sm text-slate-400">{caseContext.secondaryAssigneeName}</p>
-                            )}
-                            {caseContext.tertiaryAssigneeName && (
-                              <p className="text-sm text-slate-400">{caseContext.tertiaryAssigneeName}</p>
-                            )}
-                          </div>
-                        </div>
                       )}
 
-                      {/* Schema */}
-                      {(caseContext.startDate || caseContext.dueDate) && (
-                        <div className="space-y-1">
-                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
-                            <Calendar className="w-3 h-3 text-purple-400" />
-                            Schemalagt
-                          </h4>
-                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 space-y-1">
-                            {caseContext.startDate && (
-                              <div className="flex items-center gap-1.5 text-sm">
-                                <Clock className="w-3 h-3 text-slate-500" />
-                                <span className="text-slate-400">Start:</span>
-                                <span className="text-slate-200">{formatSwedishDateTime(caseContext.startDate)}</span>
-                              </div>
-                            )}
-                            {caseContext.dueDate && (
-                              <div className="flex items-center gap-1.5 text-sm">
-                                <Clock className="w-3 h-3 text-slate-500" />
-                                <span className="text-slate-400">Slut:</span>
-                                <span className="text-slate-200">{formatSwedishDateTime(caseContext.dueDate)}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                      {invoice.customer_id && (
+                        <a
+                          href={`/admin/befintliga-kunder?customer=${invoice.customer_id}`}
+                          className="inline-flex items-center gap-1 pt-1 text-xs text-blue-400 hover:text-blue-300"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          Öppna kundkort
+                        </a>
                       )}
-
-                      {/* Beskrivning */}
-                      {caseContext.description && (
-                        <div className="space-y-1">
-                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
-                            <FileText className="w-3 h-3 text-blue-400" />
-                            Beskrivning
-                          </h4>
-                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
-                            <p className="text-sm text-slate-300 whitespace-pre-wrap line-clamp-4">{caseContext.description}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Saneringsrapport */}
-                      {caseContext.rapport && (
-                        <div className="space-y-1">
-                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-amber-400 uppercase tracking-wide">
-                            <ClipboardCheck className="w-3 h-3" />
-                            Dokumentation Tekniker
-                          </h4>
-                          <div className="bg-amber-500/5 rounded-lg p-2.5 border border-amber-500/20">
-                            <p className="text-sm text-slate-300 whitespace-pre-wrap line-clamp-4">{caseContext.rapport}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Arbetstid */}
-                      {formatTimeSpent(caseContext.timeSpentMinutes) && (
-                        <div className="space-y-1">
-                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
-                            <Timer className="w-3 h-3 text-green-400" />
-                            Arbetstid
-                          </h4>
-                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
-                            <p className="text-sm text-slate-200 font-medium">{formatTimeSpent(caseContext.timeSpentMinutes)}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* ROT/RUT */}
-                      {caseContext.rotRut && (
-                        <div className="space-y-1">
-                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
-                            <Home className="w-3 h-3 text-[#20c58f]" />
-                            {caseContext.rotRut}-avdrag
-                          </h4>
-                          <div className="bg-[#20c58f]/5 rounded-lg p-2.5 border border-[#20c58f]/20">
-                            <span className="px-1.5 py-0.5 text-xs rounded bg-[#20c58f]/20 text-[#20c58f] font-medium">
-                              {caseContext.rotRut}
-                            </span>
-                            {caseContext.fastighetsbeteckning && (
-                              <p className="text-xs text-slate-400 mt-1">Fastighet: {caseContext.fastighetsbeteckning}</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Preparat */}
-                      {preparations.length > 0 && (
-                        <div className="space-y-1">
-                          <h4 className="flex items-center gap-1.5 text-xs font-medium text-slate-400 uppercase tracking-wide">
-                            <FlaskConical className="w-3 h-3 text-teal-400" />
-                            Använda preparat
-                          </h4>
-                          <div className="bg-slate-900/50 rounded-lg border border-slate-700/50 divide-y divide-slate-700/50">
-                            {preparations.map(p => (
-                              <div key={p.id} className="px-2.5 py-2 flex items-center justify-between">
-                                <div>
-                                  <span className="text-sm text-slate-200">{p.preparation?.name || 'Okänt preparat'}</span>
-                                  {p.preparation?.type && (
-                                    <span className="ml-1.5 px-1.5 py-0.5 text-[10px] rounded bg-teal-500/20 text-teal-400 font-medium">
-                                      {p.preparation.type}
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="text-xs text-slate-400">{p.quantity} {p.unit}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Plats */}
-                      {caseContext.address && (
-                        <EmbeddedMapPreview
-                          lat={caseContext.addressLat}
-                          lng={caseContext.addressLng}
-                          address={caseContext.address}
-                          height={120}
-                        />
-                      )}
-
-                      {/* Bilder */}
-                      <CaseContextImagePreview
-                        caseId={caseContext.id}
-                        caseType={caseContext.caseType}
-                        maxThumbnails={4}
-                      />
                     </div>
-                  ) : invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc' ? (
-                    <div className="p-3 space-y-3">
-                      <div>
-                        <h3 className="text-sm font-semibold text-slate-100">
-                          {invoice.invoice_type === 'contract' ? 'Avtalsfakturering' : 'Merförsäljning'}
-                        </h3>
+                  </CaseModalSection>
+
+                  {/* Avtal — period/frekvens/årspremie */}
+                  {(invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc') && contractCustomer && (
+                    <CaseModalSection
+                      icon={FileText}
+                      iconClassName="text-[#20c58f]"
+                      title={invoice.invoice_type === 'contract' ? 'Avtal' : 'Avtal (merförsäljning)'}
+                    >
+                      <div className="space-y-1 text-xs">
                         {invoice.billing_period_start && invoice.billing_period_end && (
-                          <p className="text-xs text-slate-400 mt-1">
-                            Period: {formatInvoiceDate(invoice.billing_period_start)} – {formatInvoiceDate(invoice.billing_period_end)}
-                          </p>
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Faktureringsperiod</span>
+                            <span className="text-slate-200">
+                              {formatInvoiceDate(invoice.billing_period_start)} – {formatInvoiceDate(invoice.billing_period_end)}
+                            </span>
+                          </div>
+                        )}
+                        {contractCustomer.contract_start_date && contractCustomer.contract_end_date && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Period</span>
+                            <span className="text-slate-200">
+                              {formatInvoiceDate(contractCustomer.contract_start_date)} → {formatInvoiceDate(contractCustomer.contract_end_date)}
+                            </span>
+                          </div>
+                        )}
+                        {contractCustomer.billing_frequency && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Frekvens</span>
+                            <span className="text-slate-200">
+                              {contractCustomer.billing_frequency === 'annual' ? 'Årsvis' :
+                               contractCustomer.billing_frequency === 'monthly' ? 'Månadsvis' :
+                               contractCustomer.billing_frequency === 'quarterly' ? 'Kvartalsvis' :
+                               contractCustomer.billing_frequency}
+                            </span>
+                          </div>
+                        )}
+                        {contractCustomer.annual_value != null && contractCustomer.annual_value > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Årspremie</span>
+                            <span className="text-slate-200 font-medium">
+                              {formatInvoiceAmount(contractCustomer.annual_value)}
+                            </span>
+                          </div>
+                        )}
+                        {contractCustomer.terminated_at && (
+                          <div className="flex justify-between">
+                            <span className="text-slate-400">Uppsagt</span>
+                            <span className="text-amber-400">
+                              {formatInvoiceDate(contractCustomer.terminated_at)}
+                            </span>
+                          </div>
                         )}
                       </div>
+                    </CaseModalSection>
+                  )}
 
-                      {/* Avtalsöversikt */}
-                      {contractCustomer && (
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Avtal</h4>
-                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 space-y-1 text-xs">
-                            {contractCustomer.contract_start_date && contractCustomer.contract_end_date && (
-                              <div className="flex justify-between">
-                                <span className="text-slate-400">Period</span>
-                                <span className="text-slate-200">
-                                  {formatInvoiceDate(contractCustomer.contract_start_date)} → {formatInvoiceDate(contractCustomer.contract_end_date)}
-                                </span>
-                              </div>
-                            )}
-                            {contractCustomer.billing_frequency && (
-                              <div className="flex justify-between">
-                                <span className="text-slate-400">Frekvens</span>
-                                <span className="text-slate-200">
-                                  {contractCustomer.billing_frequency === 'annual' ? 'Årsvis' :
-                                   contractCustomer.billing_frequency === 'monthly' ? 'Månadsvis' :
-                                   contractCustomer.billing_frequency === 'quarterly' ? 'Kvartalsvis' :
-                                   contractCustomer.billing_frequency}
-                                </span>
-                              </div>
-                            )}
-                            {contractCustomer.annual_value != null && contractCustomer.annual_value > 0 && (
-                              <div className="flex justify-between">
-                                <span className="text-slate-400">Årspremie</span>
-                                <span className="text-slate-200 font-medium">
-                                  {formatInvoiceAmount(contractCustomer.annual_value)}
-                                </span>
-                              </div>
-                            )}
-                            {contractCustomer.terminated_at && (
-                              <div className="flex justify-between">
-                                <span className="text-slate-400">Uppsagt</span>
-                                <span className="text-amber-400">
-                                  {formatInvoiceDate(contractCustomer.terminated_at)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
+                  {/* Säljare */}
+                  {contractCustomer?.assigned_account_manager && (
+                    <CaseModalSection icon={User} iconClassName="text-blue-400" title="Säljare">
+                      <p className="text-sm text-slate-200">{contractCustomer.assigned_account_manager}</p>
+                      {contractCustomer.account_manager_email && (
+                        <a href={`mailto:${contractCustomer.account_manager_email}`} className="text-xs text-blue-400 hover:text-blue-300">
+                          {contractCustomer.account_manager_email}
+                        </a>
                       )}
+                    </CaseModalSection>
+                  )}
 
-                      {/* Anteckning (skickas till Fortnox) */}
-                      {invoice.notes && (
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Beskrivning</h4>
-                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
-                            <p className="text-sm text-slate-300 whitespace-pre-wrap">{invoice.notes}</p>
-                            <p className="text-[10px] text-slate-500 mt-1">Skickas till Fortnox</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Kund + kontaktperson */}
-                      {invoice.customer_id && (
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Kund</h4>
-                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50 space-y-1">
-                            <p className="text-sm text-slate-200 font-medium">{invoice.customer_name}</p>
-                            {invoice.organization_number && (
-                              <p className="text-xs text-slate-400">Org.nr {invoice.organization_number}</p>
-                            )}
-                            {contractCustomer?.contact_person && (
-                              <div className="flex items-center gap-1.5 text-xs text-slate-300 mt-1">
-                                <User className="w-3 h-3 text-slate-500" />
-                                <span>{contractCustomer.contact_person}</span>
-                              </div>
-                            )}
-                            {contractCustomer?.contact_email && (
-                              <div className="flex items-center gap-1.5 text-xs">
-                                <Mail className="w-3 h-3 text-slate-500" />
-                                <a href={`mailto:${contractCustomer.contact_email}`} className="text-blue-400 hover:text-blue-300 truncate">
-                                  {contractCustomer.contact_email}
-                                </a>
-                              </div>
-                            )}
-                            {contractCustomer?.contact_phone && (
-                              <div className="flex items-center gap-1.5 text-xs">
-                                <Phone className="w-3 h-3 text-slate-500" />
-                                <a href={`tel:${contractCustomer.contact_phone}`} className="text-blue-400 hover:text-blue-300">
-                                  {contractCustomer.contact_phone}
-                                </a>
-                              </div>
-                            )}
-                            <a
-                              href={`/admin/befintliga-kunder?customer=${invoice.customer_id}`}
-                              className="inline-flex items-center gap-1 mt-2 text-xs text-blue-400 hover:text-blue-300"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                              Öppna kundkort
-                            </a>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Säljare */}
-                      {contractCustomer?.assigned_account_manager && (
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wide">Säljare</h4>
-                          <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
-                            <p className="text-sm text-slate-200">{contractCustomer.assigned_account_manager}</p>
-                            {contractCustomer.account_manager_email && (
-                              <a href={`mailto:${contractCustomer.account_manager_email}`} className="text-xs text-blue-400 hover:text-blue-300">
-                                {contractCustomer.account_manager_email}
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Karta */}
-                      {(contractCustomer?.contact_address || invoice.customer_address) && (
-                        <EmbeddedMapPreview
-                          lat={null}
-                          lng={null}
-                          address={contractCustomer?.contact_address || invoice.customer_address || null}
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-4 text-center text-sm text-slate-500">
-                      Kunde inte ladda ärendedata
-                    </div>
+                  {/* Karta */}
+                  {(caseContext?.address || contractCustomer?.contact_address || invoice.customer_address) && (
+                    <EmbeddedMapPreview
+                      lat={caseContext?.addressLat ?? null}
+                      lng={caseContext?.addressLng ?? null}
+                      address={caseContext?.address || contractCustomer?.contact_address || invoice.customer_address || null}
+                      height={120}
+                    />
                   )}
                 </div>
 
@@ -1491,45 +1450,10 @@ export default function InvoiceDetailModal({
 
                 {contextExpanded && (
                   <div className="px-4 pb-4 space-y-3">
-                    {/* Ärendekontext — kompakt mobil */}
-                    {caseContext && (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium"
-                            style={{
-                              backgroundColor: `${caseContext.statusColor}20`,
-                              color: caseContext.statusColor
-                            }}
-                          >
-                            {caseContext.status}
-                          </span>
-                          {caseContext.pestType && (
-                            <span className="text-xs text-orange-400">{caseContext.pestType}</span>
-                          )}
-                          {caseContext.primaryAssigneeName && (
-                            <span className="text-xs text-slate-400">• {caseContext.primaryAssigneeName}</span>
-                          )}
-                          {formatTimeSpent(caseContext.timeSpentMinutes) && (
-                            <span className="text-xs text-green-400">• {formatTimeSpent(caseContext.timeSpentMinutes)}</span>
-                          )}
-                        </div>
-                        {caseContext.rapport && (
-                          <div className="bg-amber-500/5 rounded-lg p-2 border border-amber-500/20">
-                            <p className="text-xs text-slate-300 line-clamp-3">{caseContext.rapport}</p>
-                          </div>
-                        )}
-                        {preparations.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {preparations.map(p => (
-                              <span key={p.id} className="px-1.5 py-0.5 text-[10px] rounded bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                                {p.preparation?.name} ({p.quantity} {p.unit})
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {/* Utfört arbete — samma innehåll som desktop-sektionen */}
+                    <CaseModalSection icon={ClipboardCheck} iconClassName="text-amber-400" title="Utfört arbete">
+                      <WorkPerformedContent caseContext={caseContext} preparations={preparations} />
+                    </CaseModalSection>
 
                     {/* Avtalskontext — mobil */}
                     {(invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc') && (
