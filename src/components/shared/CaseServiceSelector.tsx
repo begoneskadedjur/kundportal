@@ -19,7 +19,8 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle,
-  Calculator
+  Calculator,
+  Repeat
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
@@ -43,6 +44,7 @@ import {
   itemRequiresApproval
 } from '../../types/caseBilling'
 import { getEffectiveRotPercent, getEffectiveRutPercent, calculateRotRutSummary } from '../../utils/rotRutConstants'
+import ContractAdditionModal from './ContractAdditionModal'
 import type { ServiceWithGroup } from '../../types/services'
 import { ARTICLE_CATEGORIES, calculatePricePerDosageUnit, getDosageDisplayUnit, resolveTieredPrice, formatTierSummary } from '../../types/articles'
 import type { ArticleCategory, QuantityTier } from '../../types/articles'
@@ -150,6 +152,8 @@ export default function CaseServiceSelector({
   const [expandedCategories, setExpandedCategories] = useState<Set<ArticleCategory>>(new Set(ARTICLE_CATEGORIES))
   const [showCalculatorPanel, setShowCalculatorPanel] = useState(false)
   const [saving, setSaving] = useState(false)
+  // Avtalstillägg-modal (tjänsterad som höjer kundens årspremie)
+  const [additionModalItemId, setAdditionModalItemId] = useState<string | null>(null)
 
   // Prisguide-state som överlever öppna/stäng-cykler
   const [priceAssignments, setPriceAssignments] = useState<Record<string, string>>(
@@ -752,6 +756,33 @@ export default function CaseServiceSelector({
   }
 
   // ──────────────────────────────────────────────────────────────
+  // Avtalstillägg: markera/avmarkera tjänsterad som avtalshöjning
+  // ──────────────────────────────────────────────────────────────
+  const handleConfirmAddition = async (annualAmount: number, proratedAmount: number) => {
+    if (!additionModalItemId) return
+    try {
+      await CaseBillingService.setContractAddition(additionModalItemId, annualAmount, proratedAmount)
+      await reloadItems()
+      setAdditionModalItemId(null)
+      toast.success('Avtalstillägg markerat - premien höjs när ärendet avslutas')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara avtalstillägget')
+    }
+  }
+
+  const handleRemoveAddition = async () => {
+    if (!additionModalItemId) return
+    try {
+      await CaseBillingService.setContractAddition(additionModalItemId, null)
+      await reloadItems()
+      setAdditionModalItemId(null)
+      toast.success('Avtalstillägget borttaget - kontrollera radens pris')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ta bort avtalstillägget')
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
   // Prisguide: applicera priser per fakturarad
   // ──────────────────────────────────────────────────────────────
   const handleApplyPrices = async (prices: Record<string, number>) => {
@@ -977,6 +1008,30 @@ export default function CaseServiceSelector({
                         <CheckCircle className="w-3 h-3" />
                         Fast pris
                       </span>
+                    )}
+                    {/* Avtalstillägg: endast avtalskundärenden med sparade rader */}
+                    {caseType === 'contract' && customerId && caseId && !draftMode && (
+                      item.contract_addition_annual != null ? (
+                        <button
+                          type="button"
+                          onClick={() => setAdditionModalItemId(item.id)}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded text-[10px] font-medium hover:bg-emerald-500/30 transition-colors"
+                          title="Raden är markerad som avtalstillägg - klicka för detaljer"
+                        >
+                          <Repeat className="w-3 h-3" />
+                          Avtalstillägg +{Number(item.contract_addition_annual).toLocaleString('sv-SE')} kr/år
+                        </button>
+                      ) : !readOnly ? (
+                        <button
+                          type="button"
+                          onClick={() => setAdditionModalItemId(item.id)}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-700/60 text-slate-400 border border-slate-600 rounded text-[10px] font-medium hover:text-white hover:border-slate-500 transition-colors"
+                          title="Lägg till som fast del av kundens avtal (höjer årspremien)"
+                        >
+                          <Repeat className="w-3 h-3" />
+                          Lägg till i avtalet
+                        </button>
+                      ) : null
                     )}
                   </div>
                   {/* Kontroller på rad 2 */}
@@ -1519,6 +1574,24 @@ export default function CaseServiceSelector({
         rotRutSelections={priceRotRutSelections}
         onRotRutSelectionsChange={setPriceRotRutSelections}
       />
+
+      {/* Avtalstillägg-modal */}
+      {additionModalItemId && customerId && (() => {
+        const item = serviceItems.find(i => i.id === additionModalItemId)
+        if (!item) return null
+        return (
+          <ContractAdditionModal
+            itemId={item.id}
+            serviceName={item.service_name || item.article_name || 'Tjänst'}
+            customerId={customerId}
+            existingAnnual={item.contract_addition_annual != null ? Number(item.contract_addition_annual) : null}
+            defaultAnnual={Math.round(item.total_price || item.unit_price || 0)}
+            onConfirm={async (annual, quote) => handleConfirmAddition(annual, quote.proratedAmount)}
+            onRemove={handleRemoveAddition}
+            onClose={() => setAdditionModalItemId(null)}
+          />
+        )
+      })()}
     </div>
   )
 }

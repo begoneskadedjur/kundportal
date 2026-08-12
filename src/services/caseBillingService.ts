@@ -221,6 +221,34 @@ export class CaseBillingService {
   /**
    * Uppdatera case billing item
    */
+  /**
+   * Avtalstillägg: markera/avmarkera en tjänsterad som tillägg till avtalet.
+   * Vid markering sätts radens pris till pro rata-beloppet (antal 1, ingen
+   * rabatt) - det är vad som faktureras nu. Årsbeloppet appliceras på
+   * premien först när ärendet avslutas (apply_contract_addition-RPC:n).
+   */
+  static async setContractAddition(
+    id: string,
+    annualAmount: number | null,
+    proratedUnitPrice?: number
+  ): Promise<void> {
+    const update: Record<string, unknown> = { contract_addition_annual: annualAmount }
+    if (annualAmount !== null && proratedUnitPrice !== undefined) {
+      update.quantity = 1
+      update.discount_percent = 0
+      update.unit_price = proratedUnitPrice
+      update.discounted_price = proratedUnitPrice
+      update.total_price = proratedUnitPrice
+    }
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .update(update)
+      .eq('id', id)
+      .select('id')
+    if (error) throw error
+    if (!data || data.length === 0) throw new Error('Raden kunde inte uppdateras')
+  }
+
   static async updateCaseArticle(
     id: string,
     input: UpdateCaseArticleInput

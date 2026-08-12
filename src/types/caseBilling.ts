@@ -64,6 +64,12 @@ export interface CaseBillingItem {
   min_quantity: number | null
   /** För artikel-rader: case_billing_items.id för tjänsteraden som artikeln är mappad mot via Prisguiden. */
   mapped_service_id: string | null
+  /**
+   * Avtalstillägg: årsbelopp (exkl moms) som läggs på kundens årspremie när
+   * ärendet avslutas. Radens eget pris är pro rata-beloppet fram till nästa
+   * fakturaperiod. null = vanlig rad.
+   */
+  contract_addition_annual?: number | null
   created_at: string
   updated_at: string
 }

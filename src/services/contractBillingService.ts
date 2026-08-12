@@ -453,6 +453,19 @@ export class ContractBillingService {
       console.error('Kunde inte skapa adhoc-invoice:', err)
     }
 
+    // 6. Avtalstillägg: rader markerade som tillägg höjer kundens årspremie
+    //    (idempotent per rad via apply_contract_addition-RPC:n, toasts sköts
+    //    i ContractAdditionService så alla avslutsvägar får samma feedback)
+    const hasAdditions = allCaseBillingItems.some(i => i.contract_addition_annual != null)
+    if (hasAdditions) {
+      try {
+        const { ContractAdditionService } = await import('./contractAdditionService')
+        await ContractAdditionService.applyAdditionsForCase(caseId, null)
+      } catch (additionError) {
+        console.error('Avtalstillägg kunde inte appliceras:', additionError)
+      }
+    }
+
     return {
       created: caseBillingItems.length,
       totalAmount,
