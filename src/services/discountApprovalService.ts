@@ -37,7 +37,76 @@ export interface ApprovalItem {
   additions: AdditionLine[]
 }
 
+export interface PremiumApprovalItem {
+  invoice: Invoice
+  /** Kundens aktuella årspremie (exkl moms) */
+  currentAnnualValue: number
+}
+
 export class DiscountApprovalService {
+  /**
+   * Årspremiefakturor som väntar på godkännande (utskickskontrollen),
+   * sorterade med närmaste period först. Egen flik på Godkännanden.
+   */
+  static async getPendingContractInvoices(): Promise<PremiumApprovalItem[]> {
+    const { data: invoices, error } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('status', 'pending_approval')
+      .eq('invoice_type', 'contract')
+      .eq('is_historical', false)
+      .order('billing_period_start', { ascending: true })
+    if (error) throw error
+    if (!invoices || invoices.length === 0) return []
+
+    const customerIds = [...new Set(invoices.map(i => i.customer_id).filter(Boolean))]
+    const { data: customers } = await supabase
+      .from('customers')
+      .select('id, annual_value')
+      .in('id', customerIds)
+    const annualByCustomer = new Map(
+      (customers || []).map(c => [c.id, Number(c.annual_value ?? 0)])
+    )
+
+    return invoices.map(inv => ({
+      invoice: inv as Invoice,
+      currentAnnualValue: annualByCustomer.get(inv.customer_id) ?? 0,
+    }))
+  }
+
+  /**
+   * Indexjustera kundens årspremie vid godkännandet. Går via SECURITY
+   * DEFINER-RPC (loggar i contract_additions med kind='index_adjustment'
+   * → syns i avtalstidslinjen) och räknar sedan om alla olåsta
+   * premiefakturor till nya premien. OBS: justeringen slår igenom på
+   * ALLA ännu ej bokförda/skickade premiefakturor, inte bara den valda.
+   */
+  static async applyIndexAdjustment(params: {
+    customerId: string
+    newAnnualValue: number
+    effectiveFrom: string
+    description: string
+    createdByName: string | null
+  }): Promise<{ previousAnnualValue: number; newAnnualValue: number }> {
+    const { data, error } = await supabase.rpc('apply_index_adjustment', {
+      p_customer_id: params.customerId,
+      p_new_annual_value: params.newAnnualValue,
+      p_effective_from: params.effectiveFrom,
+      p_description: params.description,
+      p_created_by_name: params.createdByName,
+    })
+    if (error) throw new Error(error.message)
+
+    const { ContractInvoiceGenerator } = await import('./contractInvoiceGenerator')
+    await ContractInvoiceGenerator.regenerateForCustomer(params.customerId)
+
+    const result = data as { previous_annual_value: number; new_annual_value: number }
+    return {
+      previousAnnualValue: Number(result.previous_annual_value),
+      newAnnualValue: Number(result.new_annual_value),
+    }
+  }
+
   /** Alla fakturor som väntar på godkännande, med rabatt-/tilläggsdetaljer */
   static async getPendingApprovals(): Promise<ApprovalItem[]> {
     const { data: invoices, error } = await supabase

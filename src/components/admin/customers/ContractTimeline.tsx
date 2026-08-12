@@ -11,6 +11,7 @@ import {
   Rocket,
   Repeat,
   Receipt,
+  TrendingUp,
   XCircle,
   CalendarClock,
   RefreshCw,
@@ -22,7 +23,7 @@ import { formatCurrency } from '../../../utils/customerMetrics'
 interface TimelineEvent {
   date: string            // YYYY-MM-DD för sortering
   isFuture: boolean
-  type: 'start' | 'addition' | 'invoice' | 'terminated' | 'end'
+  type: 'start' | 'addition' | 'index' | 'invoice' | 'terminated' | 'end'
   title: string
   subtitle?: string
   chips?: { label: string; cls: string }[]
@@ -49,6 +50,7 @@ const INVOICE_STATUS_CLS: Record<string, string> = {
 const TYPE_STYLE: Record<TimelineEvent['type'], { icon: React.ElementType; dot: string; iconColor: string }> = {
   start: { icon: Rocket, dot: 'bg-[#20c58f]/15 border-[#20c58f]/50', iconColor: 'text-[#20c58f]' },
   addition: { icon: Repeat, dot: 'bg-amber-500/15 border-amber-500/50', iconColor: 'text-amber-400' },
+  index: { icon: TrendingUp, dot: 'bg-cyan-500/15 border-cyan-500/50', iconColor: 'text-cyan-400' },
   invoice: { icon: Receipt, dot: 'bg-slate-700/60 border-slate-600', iconColor: 'text-slate-400' },
   terminated: { icon: XCircle, dot: 'bg-red-500/15 border-red-500/50', iconColor: 'text-red-400' },
   end: { icon: CalendarClock, dot: 'bg-cyan-500/15 border-cyan-500/50', iconColor: 'text-cyan-400' },
@@ -84,7 +86,7 @@ export default function ContractTimeline({ customerId }: { customerId: string })
             .single(),
           supabase
             .from('contract_additions')
-            .select('description, annual_amount, prorated_amount, effective_from, previous_annual_value, new_annual_value, created_by_name, applied_at')
+            .select('description, annual_amount, prorated_amount, effective_from, previous_annual_value, new_annual_value, created_by_name, applied_at, kind')
             .eq('customer_id', customerId)
             .order('applied_at', { ascending: true }),
           supabase
@@ -141,22 +143,28 @@ export default function ContractTimeline({ customerId }: { customerId: string })
           })
         }
 
-        // Avtalstillägg
+        // Avtalstillägg + indexjusteringar (samma logg, olika kind)
         for (const add of additions) {
           const appliedDate = String(add.applied_at).slice(0, 10)
+          const isIndex = add.kind === 'index_adjustment'
+          const premiumChip = {
+            label: `Årspremie ${formatCurrency(Number(add.previous_annual_value))} → ${formatCurrency(Number(add.new_annual_value))}/år från ${fmtDate(add.effective_from)}`,
+            cls: 'bg-[#20c58f]/15 text-[#20c58f]',
+          }
           list.push({
             date: appliedDate,
             isFuture: false,
-            type: 'addition',
-            title: add.description.replace(/^Avtalstillägg:\s*/i, 'Tillägg: '),
+            type: isIndex ? 'index' : 'addition',
+            title: isIndex
+              ? add.description
+              : add.description.replace(/^Avtalstillägg:\s*/i, 'Tillägg: '),
             subtitle: add.created_by_name ? `Av ${add.created_by_name}` : undefined,
-            chips: [
-              { label: `Direktdebitering ${formatCurrency(Number(add.prorated_amount))}`, cls: 'bg-amber-500/15 text-amber-400' },
-              {
-                label: `Årspremie ${formatCurrency(Number(add.previous_annual_value))} → ${formatCurrency(Number(add.new_annual_value))}/år från ${fmtDate(add.effective_from)}`,
-                cls: 'bg-[#20c58f]/15 text-[#20c58f]',
-              },
-            ],
+            chips: isIndex
+              ? [premiumChip]
+              : [
+                  { label: `Direktdebitering ${formatCurrency(Number(add.prorated_amount))}`, cls: 'bg-amber-500/15 text-amber-400' },
+                  premiumChip,
+                ],
           })
         }
 
