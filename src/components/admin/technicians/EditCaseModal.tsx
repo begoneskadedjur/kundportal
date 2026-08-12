@@ -473,11 +473,17 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // Artikelgrupp-ID för filtrering av interna kostnader
   const [articleGroupId, setArticleGroupId] = useState<string | null>(null)
 
-  // Hämta service_group_id + artikelgrupp-ID vid laddning (utan att rensa service_id)
+  // Härled service_group_id + artikelgrupp-ID från vald tjänst (utan att
+  // rensa service_id). Triggas på formData i stället för caseData: init-
+  // effekten nollställer service_group_id varje gång caseData får ny
+  // referens, och då måste gruppen härledas om även när service_id-värdet
+  // är oförändrat - annars ser tjänstevalet tomt ut fast tjänsten är sparad.
   useEffect(() => {
-    if (!caseData?.service_id) { setArticleGroupId(null); return }
+    const sid = formData.service_id
+    if (!sid) { setArticleGroupId(null); return }
+    if (formData.service_group_id) return
     ;(async () => {
-      const { data: svc } = await supabase.from('services').select('group_id').eq('id', caseData.service_id).single()
+      const { data: svc } = await supabase.from('services').select('group_id').eq('id', sid).single()
       if (!svc?.group_id) { setArticleGroupId(null); return }
       // Sätt service_group_id i formData utan att rensa service_id
       setFormData(prev => ({ ...prev, service_group_id: svc.group_id }))
@@ -486,7 +492,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       const { data: ag } = await supabase.from('article_groups').select('id').eq('name', sg.name).maybeSingle()
       setArticleGroupId(ag?.id ?? null)
     })()
-  }, [caseData?.service_id])
+  }, [formData.service_id, formData.service_group_id])
 
   // Auto-sätt avdrag från underleverantörsartiklar
   useEffect(() => {
