@@ -17,7 +17,8 @@ import {
   Activity,
   Shield,
   TrendingDown,
-  FileSignature
+  FileSignature,
+  History
 } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import HealthScoreBadge from './HealthScoreBadge'
@@ -26,6 +27,7 @@ import PortalAccessBadge from './PortalAccessBadge'
 import AdminCasesList from './AdminCasesList'
 import CustomerEquipmentDualView from './CustomerEquipmentDualView'
 import ContractDetailRow from './ContractDetailRow'
+import ContractTimeline from './ContractTimeline'
 import BillingSettingsModal from './BillingSettingsModal'
 import { formatCurrency, getContractProgress } from '../../../utils/customerMetrics'
 import { supabase } from '../../../lib/supabase'
@@ -596,6 +598,20 @@ export default function SingleCustomerDetailModal({
                 </p>
               </section>
             )}
+
+            {/* Avtalshistorik - tidslinje över avtalets förändringar */}
+            <section className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-cyan-500/20 rounded-lg border border-cyan-500/30">
+                  <History className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Avtalshistorik</h3>
+                  <p className="text-xs text-slate-400">Start, tillägg, debiteringar och avtalsslut i kronologisk ordning</p>
+                </div>
+              </div>
+              <ContractTimeline customerId={site.id} />
+            </section>
 
             {/* Cases Management Section */}
             <section className="space-y-4">

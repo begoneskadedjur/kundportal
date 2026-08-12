@@ -1,11 +1,12 @@
 // src/pages/admin/CustomerDetails.tsx - DIN BEFINTLIGA AVANCERADE VERSION + contract_end_date
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { 
-  ArrowLeft, Building2, User, Mail, Phone, MapPin, 
+import {
+  ArrowLeft, Building2, User, Mail, Phone, MapPin,
   Calendar, DollarSign, FileText, Users, Eye, Edit,
   AlertTriangle, CheckCircle, Clock, Briefcase,
-  BarChart3, TrendingUp, CreditCard, Activity, Package
+  BarChart3, TrendingUp, CreditCard, Activity, Package,
+  History as HistoryIcon
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
@@ -15,6 +16,7 @@ import { getBusinessTypeLabel, getBusinessTypeIcon } from '../../constants/busin
 import { getContractStatus } from '../../types/database' // 🆕 Import hjälpfunktion
 import toast from 'react-hot-toast'
 import { PageHeader } from '../../components/shared'
+import ContractTimeline from '../../components/admin/customers/ContractTimeline'
 import EditableCustomerField from '../../components/admin/EditableCustomerField'
 import ProductsViewer from '../../components/admin/ProductsViewer'
 import { useTechnicians } from '../../hooks/useTechnicians'
@@ -438,6 +440,20 @@ export default function CustomerDetails() {
                   <h2 className="text-lg font-semibold text-white">Avtalsbeskrivning</h2>
                 </div>
                 <p className="text-slate-300 leading-relaxed">{customer.agreement_text}</p>
+              </Card>
+            )}
+
+            {/* Avtalshistorik - tidslinje över avtalets förändringar */}
+            {customer.id && (
+              <Card>
+                <div className="flex items-center mb-4">
+                  <HistoryIcon className="w-5 h-5 text-cyan-400 mr-2" />
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">Avtalshistorik</h2>
+                    <p className="text-xs text-slate-400">Start, tillägg, debiteringar och avtalsslut</p>
+                  </div>
+                </div>
+                <ContractTimeline customerId={customer.id} />
               </Card>
             )}
 
