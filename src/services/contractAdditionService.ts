@@ -173,6 +173,23 @@ export class ContractAdditionService {
     if (error) return { applied: 0, newAnnualValue: null, errors: [error.message] }
     if (!rows || rows.length === 0) return { applied: 0, newAnnualValue: null, errors: [] }
 
+    // Tillägget beskrivs med PRODUKTEN som adderats till avtalet (artikelrader
+    // mappade mot tjänsteraden i prisguiden), inte tjänsten teknikern utförde.
+    // mapped_service_id pekar på tjänsteRADENS case_billing_items.id.
+    const { data: articleRows } = await supabase
+      .from('case_billing_items')
+      .select('article_name, quantity, mapped_service_id')
+      .eq('case_id', caseId)
+      .not('mapped_service_id', 'is', null)
+    const productsByServiceRow = new Map<string, string[]>()
+    for (const a of articleRows || []) {
+      if (!a.article_name || !a.mapped_service_id) continue
+      const label = (a.quantity ?? 1) > 1 ? `${a.quantity}× ${a.article_name}` : a.article_name
+      const list = productsByServiceRow.get(a.mapped_service_id) || []
+      list.push(label)
+      productsByServiceRow.set(a.mapped_service_id, list)
+    }
+
     // Hämta ärendets kund
     const { data: caseRow, error: caseError } = await supabase
       .from('cases')
@@ -192,11 +209,18 @@ export class ContractAdditionService {
       }
       billingCustomerId = quote.billingCustomerId
 
+      // Produktnamn i första hand, tjänstenamn som fallback (t.ex. när
+      // ingen artikel mappats mot tjänsteraden)
+      const products = productsByServiceRow.get(row.id)
+      const additionLabel = products && products.length > 0
+        ? products.join(', ')
+        : row.service_name
+
       const { data, error: rpcError } = await supabase.rpc('apply_contract_addition', {
         p_case_billing_item_id: row.id,
         p_customer_id: quote.billingCustomerId,
         p_case_id: caseId,
-        p_description: `Avtalstillägg: ${row.service_name}`,
+        p_description: `Avtalstillägg: ${additionLabel}`,
         p_annual_amount: annual,
         p_prorated_amount: Number(row.total_price ?? row.unit_price ?? 0),
         p_effective_from: quote.effectiveFrom,
