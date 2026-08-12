@@ -142,7 +142,8 @@ export default function DiscountApprovals() {
         <div>
           <h1 className="text-2xl font-bold text-white">Godkännanden</h1>
           <p className="text-sm text-slate-400">
-            Granska rabatter och godkänn fakturor innan de går vidare till Fortnox
+            Granska rabatter och avtalstillägg innan fakturorna går vidare till Fortnox.
+            Vanliga årspremiefakturor utan rabatt godkänns som vanligt under Fakturering.
           </p>
         </div>
       </div>
@@ -258,7 +259,7 @@ export default function DiscountApprovals() {
                   </div>
                 ) : (
                   <p className="text-sm text-slate-400">
-                    Ingen rabatt - kräver godkännande enligt rutin
+                    Ingen rabatt - fakturan innehåller ett avtalstillägg (se nedan)
                   </p>
                 )}
 

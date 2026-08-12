@@ -99,11 +99,17 @@ export class DiscountApprovalService {
       additionsByCase.set(row.case_id, list)
     }
 
-    return invoices.map(inv => ({
-      invoice: inv as Invoice,
-      discountLines: inv.case_id ? (discountsByCase.get(inv.case_id) || []) : [],
-      additions: inv.case_id ? (additionsByCase.get(inv.case_id) || []) : [],
-    }))
+    // Sidan visar BARA fakturor med faktisk rabatt eller avtalstillägg.
+    // Vanliga årspremiefakturor skapas alltid i pending_approval som sitt
+    // normala startläge (godkänns i Fakturering-flödet) och hör inte hemma
+    // i rabattgranskningen.
+    return invoices
+      .map(inv => ({
+        invoice: inv as Invoice,
+        discountLines: inv.case_id ? (discountsByCase.get(inv.case_id) || []) : [],
+        additions: inv.case_id ? (additionsByCase.get(inv.case_id) || []) : [],
+      }))
+      .filter(item => item.discountLines.length > 0 || item.additions.length > 0)
   }
 
   /** Godkänn: faktura → ready, tekniker med rabattrader notifieras */
