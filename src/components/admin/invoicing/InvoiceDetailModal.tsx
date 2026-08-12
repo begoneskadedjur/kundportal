@@ -452,12 +452,13 @@ export default function InvoiceDetailModal({
         completed_date?: string | null
         start_date?: string | null
         primary_assignee_name?: string | null
+        invoice_marking?: string | null
       } | null = null
       if (invoice.case_id) {
         if (effectiveCaseType === 'contract') {
           const { data } = await supabase
             .from('cases')
-            .select('case_number, completed_date, scheduled_start, primary_technician_name')
+            .select('case_number, completed_date, scheduled_start, primary_technician_name, invoice_marking')
             .eq('id', invoice.case_id)
             .maybeSingle()
           if (data) {
@@ -467,12 +468,22 @@ export default function InvoiceDetailModal({
               completed_date: d.completed_date,
               start_date: d.scheduled_start,
               primary_assignee_name: d.primary_technician_name,
+              invoice_marking: d.invoice_marking,
             }
           }
-        } else {
-          const caseTable = invoice.case_type === 'private' ? 'private_cases' : 'business_cases'
+        } else if (invoice.case_type === 'business') {
           const { data } = await supabase
-            .from(caseTable)
+            .from('business_cases')
+            .select('case_number, completed_date, start_date, primary_assignee_name, markning_faktura')
+            .eq('id', invoice.case_id)
+            .maybeSingle()
+          if (data) {
+            const d = data as any
+            caseMetaEarly = { ...d, invoice_marking: d.markning_faktura }
+          }
+        } else {
+          const { data } = await supabase
+            .from('private_cases')
             .select('case_number, completed_date, start_date, primary_assignee_name')
             .eq('id', invoice.case_id)
             .maybeSingle()
@@ -480,6 +491,14 @@ export default function InvoiceDetailModal({
         }
       }
       const technicianName = caseMetaEarly?.primary_assignee_name ?? null
+
+      // Fakturamärkningen kan ha lagts till i ärendet EFTER att fakturan
+      // skapades - ärendets aktuella värde vinner över fakturans snapshot,
+      // så att "Er referens" i Fortnox alltid speglar senaste märkningen.
+      const effectiveMarking = caseMetaEarly?.invoice_marking?.trim() || invoice.invoice_marking || null
+      if (effectiveMarking && effectiveMarking !== invoice.invoice_marking) {
+        await supabase.from('invoices').update({ invoice_marking: effectiveMarking }).eq('id', invoice.id)
+      }
 
       // 2. Hämta eller skapa kund i Fortnox.
       // Privatpersoner: Type=PRIVATE, 10 dagars betalningsvillkor, priser inkl.
@@ -562,7 +581,7 @@ export default function InvoiceDetailModal({
       if (invoice.invoice_number) {
         fortnoxPayload.ExternalInvoiceReference2 = invoice.invoice_number
       }
-      if (invoice.invoice_marking) fortnoxPayload.YourReference = invoice.invoice_marking
+      if (effectiveMarking) fortnoxPayload.YourReference = effectiveMarking
       if (invoice.notes) fortnoxPayload.Remarks = invoice.notes
 
       // ROT/RUT: fakturanivån bär bara typen ('rot'/'rut'); raderna är
