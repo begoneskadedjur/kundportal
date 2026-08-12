@@ -220,6 +220,25 @@ export default function InvoiceDetailModal({
     fetchCaseBilling()
   }, [invoice?.case_id, invoice?.case_type, invoice?.invoice_type, invoice?.customer_id, invoice?.items])
 
+  // Ärendenumret för fakturans kopplade ärende - visas i headern så att
+  // kopplingen faktura ↔ ärende alltid är synlig (fakturanumret i sig är
+  // en obruten löpande serie och kan inte bygga på ärendenumret)
+  const [linkedCaseNumber, setLinkedCaseNumber] = useState<string | null>(null)
+  useEffect(() => {
+    if (!invoice?.case_id) { setLinkedCaseNumber(null); return }
+    const table = invoice.case_type === 'private'
+      ? 'private_cases'
+      : invoice.case_type === 'business'
+        ? 'business_cases'
+        : 'cases'
+    supabase
+      .from(table)
+      .select('case_number')
+      .eq('id', invoice.case_id)
+      .maybeSingle()
+      .then(({ data }) => setLinkedCaseNumber(data?.case_number || null))
+  }, [invoice?.case_id, invoice?.case_type])
+
   // Avtalstillägg på fakturans rader: pro rata-pris, inte rabatt.
   // Detaljerna (premieändring, från-datum) hämtas från tilläggslogen.
   const additionRowIds = caseBillingItems
@@ -681,6 +700,11 @@ export default function InvoiceDetailModal({
             <div>
               <h2 className="text-base font-semibold text-white">
                 Faktura {invoice?.invoice_number || '...'}
+                {linkedCaseNumber && (
+                  <span className="ml-2 font-mono text-xs font-normal text-slate-400">
+                    Ärende: {linkedCaseNumber}
+                  </span>
+                )}
               </h2>
               {invoice && statusConfig && (
                 <span className={`px-2 py-0.5 text-xs rounded-full ${statusConfig.bgColor} ${statusConfig.color}`}>

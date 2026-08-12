@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Select from '../../../components/ui/Select'
+import { supabase } from '../../../lib/supabase'
 import { InvoiceService } from '../../../services/invoiceService'
 import type { Invoice, InvoiceStatus, InvoiceStats } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
@@ -40,6 +41,10 @@ interface Props {
 export default function PrivateBusinessInvoicing({ invoiceType = 'private-business' }: Props) {
   // State
   const [invoices, setInvoices] = useState<Invoice[]>([])
+  // Ärendenummer per case_id - fakturanumret är en obruten löpande serie
+  // (bokföringskrav) och kan inte bygga på ärendenumret, så kopplingen
+  // visas i stället under fakturanumret i listan
+  const [caseNumbers, setCaseNumbers] = useState<Record<string, string>>({})
   const [stats, setStats] = useState<InvoiceStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -138,6 +143,32 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
       setInvoices(invoicesData)
       setStats(statsData)
       setSelectedIds([])
+
+      // Slå upp ärendenummer för fakturor kopplade till ärenden
+      const byTable: Record<'private_cases' | 'business_cases' | 'cases', string[]> = {
+        private_cases: [], business_cases: [], cases: []
+      }
+      for (const inv of invoicesData) {
+        if (!inv.case_id) continue
+        if (inv.case_type === 'private') byTable.private_cases.push(inv.case_id)
+        else if (inv.case_type === 'business') byTable.business_cases.push(inv.case_id)
+        else byTable.cases.push(inv.case_id)
+      }
+      const map: Record<string, string> = {}
+      await Promise.all(
+        (Object.keys(byTable) as (keyof typeof byTable)[])
+          .filter(t => byTable[t].length > 0)
+          .map(async table => {
+            const { data } = await supabase
+              .from(table)
+              .select('id, case_number')
+              .in('id', [...new Set(byTable[table])])
+            for (const row of data || []) {
+              if (row.case_number) map[row.id] = row.case_number
+            }
+          })
+      )
+      setCaseNumbers(map)
     } catch (error) {
       console.error('Fel vid laddning:', error)
       toast.error('Kunde inte ladda fakturor')
@@ -244,6 +275,9 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
         </td>
         <td className="px-3 py-2 font-mono text-white text-xs">
           {invoice.invoice_number || '-'}
+          {invoice.case_id && caseNumbers[invoice.case_id] && (
+            <div className="text-[10px] text-slate-500">{caseNumbers[invoice.case_id]}</div>
+          )}
         </td>
         <td className="px-3 py-2">
           <div className="text-white">{invoice.customer_name}</div>

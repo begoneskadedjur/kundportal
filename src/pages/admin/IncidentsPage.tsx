@@ -4,7 +4,7 @@
 // övriga ser bara incidenter de rapporterat eller är berörda i.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { AlertTriangle, Search, RefreshCw, Calendar, Plus, X, Clock, User, Briefcase, ExternalLink, ChevronRight, Download } from 'lucide-react'
+import { AlertTriangle, Search, RefreshCw, Calendar, Plus, X, Clock, User, Briefcase, ExternalLink, ChevronRight, Download, Trash2 } from 'lucide-react'
 import { supabase, getAuthHeaders } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
@@ -891,6 +891,30 @@ function IncidentManageModal({
   const [dueDate, setDueDate] = useState<Date | null>(incident.due_date ? new Date(incident.due_date) : null)
   const [followUp, setFollowUp] = useState(incident.follow_up || '')
   const [saving, setSaving] = useState(false)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  // Radering: handläggare (mottagare av typen) och admin/koordinator -
+  // samma krets som kan öppna modalen; RLS-policyn skyddar i botten
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      await supabase.from('incident_employees').delete().eq('incident_id', incident.id)
+      const { error, count } = await supabase
+        .from('case_incidents')
+        .delete({ count: 'exact' })
+        .eq('id', incident.id)
+      if (error) throw error
+      if (!count) throw new Error('Du saknar behörighet att radera rapporten')
+      toast.success('Rapporten raderad')
+      onSaved()
+    } catch (err) {
+      console.error('Error deleting incident:', err)
+      toast.error(err instanceof Error ? err.message : 'Kunde inte radera rapporten')
+      setDeleting(false)
+      setConfirmingDelete(false)
+    }
+  }
 
   const typeConfig = INCIDENT_TYPE_CONFIG[incident.type as IncidentType]
   const employeeNames = (incident.incident_employees || []).map(e => e.technician_name).join(', ')
@@ -1165,23 +1189,57 @@ function IncidentManageModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-4 py-2.5 border-t border-slate-700">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
-          >
-            Avbryt
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] rounded-lg text-sm text-[#fff] font-medium transition-colors disabled:opacity-50"
-          >
-            {saving && <RefreshCw className="w-3 h-3 animate-spin" />}
-            {status === 'avslutad' ? 'Spara & avsluta' : 'Spara'}
-          </button>
+        <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-slate-700">
+          {confirmingDelete ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs text-red-400">Radera rapporten permanent? Kan inte ångras.</span>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 border border-red-500/50 text-red-400 hover:bg-red-500/30 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {deleting ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                Ja, radera
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingDelete(false)}
+                disabled={deleting}
+                className="px-2 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Nej
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(true)}
+              className="flex items-center gap-1.5 px-2 py-1.5 text-sm text-red-400/80 hover:text-red-400 transition-colors"
+              title="Radera rapporten permanent"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Radera
+            </button>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              Avbryt
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-2 px-4 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] rounded-lg text-sm text-[#fff] font-medium transition-colors disabled:opacity-50"
+            >
+              {saving && <RefreshCw className="w-3 h-3 animate-spin" />}
+              {status === 'avslutad' ? 'Spara & avsluta' : 'Spara'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
