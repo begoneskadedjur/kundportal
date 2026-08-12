@@ -220,6 +220,34 @@ export default function InvoiceDetailModal({
     fetchCaseBilling()
   }, [invoice?.case_id, invoice?.case_type, invoice?.invoice_type, invoice?.customer_id, invoice?.items])
 
+  // Avtalstillägg på fakturans rader: pro rata-pris, inte rabatt.
+  // Detaljerna (premieändring, från-datum) hämtas från tilläggslogen.
+  const additionRowIds = caseBillingItems
+    .filter(i => i.contract_addition_annual != null)
+    .map(i => i.id)
+  const realDiscountRows = caseBillingItems
+    .filter(i => Number(i.discount_percent) > 0 && i.contract_addition_annual == null)
+  const [contractAdditions, setContractAdditions] = useState<{
+    description: string
+    prorated_amount: number
+    previous_annual_value: number
+    new_annual_value: number
+    effective_from: string
+    created_by_name: string | null
+  }[]>([])
+  useEffect(() => {
+    if (additionRowIds.length === 0) { setContractAdditions([]); return }
+    const fetchAdditions = async () => {
+      const { data } = await supabase
+        .from('contract_additions')
+        .select('description, prorated_amount, previous_annual_value, new_annual_value, effective_from, created_by_name')
+        .in('case_billing_item_id', additionRowIds)
+      setContractAdditions(data || [])
+    }
+    fetchAdditions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [additionRowIds.join(',')])
+
   // Ladda fakturadata
   useEffect(() => {
     if (isOpen && invoiceId) {
@@ -986,17 +1014,59 @@ export default function InvoiceDetailModal({
                   </div>
                 )}
 
-                {/* Varning om rabatt kräver godkännande */}
-                {invoice.requires_approval && invoice.status === 'pending_approval' && (
-                  <div className="flex items-start gap-3 p-3 bg-orange-500/20 border border-orange-500/30 rounded-lg">
-                    <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <div className="text-sm font-medium text-orange-400">Rabatt kräver godkännande</div>
-                      <p className="text-xs text-orange-300 mt-0.5">
-                        Fakturan innehåller rabatterade artiklar och måste godkännas innan den kan skickas.
-                      </p>
+                {/* Avtalstillägg: raden betalas pro rata - inte en rabatt */}
+                {contractAdditions.length > 0 && (
+                  <div className="flex items-start gap-3 p-3 bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg">
+                    <RotateCcw className="w-4 h-4 text-[#20c58f] flex-shrink-0 mt-0.5" />
+                    <div className="space-y-1.5">
+                      <div className="text-sm font-medium text-[#20c58f]">Avtalstillägg - betalas pro rata</div>
+                      {contractAdditions.map((add, i) => (
+                        <p key={i} className="text-xs text-slate-300">
+                          <span className="font-medium">{add.description.replace(/^Avtalstillägg:\s*/i, '')}</span>
+                          {' '}har lagts till i kundens avtal{add.created_by_name ? ` av ${add.created_by_name}` : ''}.
+                          Radpriset {formatInvoiceAmount(Number(add.prorated_amount))} avser återstående tid fram till nästa premieperiod
+                          - det är inte ett rabatterat fullpris. Årspremien höjs{' '}
+                          {formatInvoiceAmount(Number(add.previous_annual_value))} → {formatInvoiceAmount(Number(add.new_annual_value))}/år
+                          {' '}från {formatInvoiceDate(add.effective_from)}.
+                        </p>
+                      ))}
                     </div>
                   </div>
+                )}
+
+                {/* Kräver godkännande - rabatt-text bara när det finns faktisk rabatt */}
+                {invoice.requires_approval && invoice.status === 'pending_approval' && (
+                  realDiscountRows.length > 0 ? (
+                    <div className="flex items-start gap-3 p-3 bg-orange-500/20 border border-orange-500/30 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-1.5 min-w-0">
+                        <div className="text-sm font-medium text-orange-400">Rabatt kräver godkännande</div>
+                        {realDiscountRows.map(row => (
+                          <div key={row.id} className="text-xs text-orange-300">
+                            <span className="font-medium">{row.service_name || row.article_name}</span>
+                            {' '}-{Number(row.discount_percent)}%
+                            {row.discount_motivation?.trim() ? (
+                              <span className="block text-slate-300 mt-0.5">Motivering: {row.discount_motivation}</span>
+                            ) : (
+                              <span className="block text-amber-400 mt-0.5">Motivering saknas</span>
+                            )}
+                          </div>
+                        ))}
+                        <p className="text-xs text-orange-300/80">Godkänns av rabattansvarig under Godkännanden.</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <div className="text-sm font-medium text-slate-300">Kräver godkännande</div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Fakturan måste godkännas innan den kan skickas.
+                          {contractAdditions.length > 0 && ' Det låga radpriset är pro rata för ett avtalstillägg - ingen rabatt har lämnats.'}
+                        </p>
+                      </div>
+                    </div>
+                  )
                 )}
 
                 {/* Märkning faktura */}

@@ -70,6 +70,12 @@ export interface CaseBillingItem {
    * fakturaperiod. null = vanlig rad.
    */
   contract_addition_annual?: number | null
+  /**
+   * Teknikerns motivering till rabatten - krävs vid ärendeavslut när
+   * discount_percent > 0 (avtalstilläggsrader undantagna). Visas för
+   * rabattansvarig vid godkännande.
+   */
+  discount_motivation?: string | null
   created_at: string
   updated_at: string
 }

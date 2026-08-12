@@ -563,6 +563,26 @@ export default function RonderingCaseModal({
 
   // Spara ändringar
   const handleSubmit = async () => {
+    // SPÄRR: rabattrader utan motivering blockerar avslut. Körs FÖRE alla
+    // skrivningar (statusändring, ad-hoc-fakturering, provision).
+    // Avtalstilläggsrader räknas inte som rabatt (exkluderas i servicen).
+    if (formData.status === 'Avslutat' && originalStatusRef.current !== 'Avslutat') {
+      try {
+        const unmotivated = await CaseBillingService.getUnmotivatedDiscountItems(caseData.id)
+        if (unmotivated.length > 0) {
+          const names = unmotivated.map(i => `${i.name} (-${i.discount_percent}%)`).join(', ')
+          toast.error(
+            `Motivera rabatten på ${names} under Tjänster & fakturarader innan ärendet avslutas`,
+            { duration: 8000 }
+          )
+          return
+        }
+      } catch (guardError: any) {
+        toast.error(`Kunde inte kontrollera rabattmotiveringar: ${guardError.message}`)
+        return
+      }
+    }
+
     setLoading(true)
     try {
       const { error } = await supabase

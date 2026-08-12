@@ -12,6 +12,7 @@ export type Profile = {
   customer_id: string | null; user_id: string; technician_id?: string | null;
   role?: 'admin' | 'customer' | 'technician' | 'koordinator' | 'säljare'; display_name?: string | null;
   extra_roles?: string[] | null;
+  can_approve_discounts?: boolean;
   theme_preference?: 'dark' | 'light' | 'system' | null;
   technicians?: { name: string; role: string; email: string; } | null;
 };

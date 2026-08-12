@@ -1216,8 +1216,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       if (draftBillingItems.length > 0 && finalCaseId && !initialCaseData?.id) {
         try {
           for (const item of draftBillingItems) {
+            let createdItem: { id: string } | null = null
             if (item.item_type === 'service' && item.service_id) {
-              await CaseBillingService.addServiceToCase({
+              createdItem = await CaseBillingService.addServiceToCase({
                 case_id: finalCaseId,
                 case_type: finalCaseType,
                 customer_id: actualCustomerId || undefined,
@@ -1230,7 +1231,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 vat_rate: item.vat_rate || 25,
               })
             } else if (item.article_id) {
-              await CaseBillingService.addArticleToCase({
+              createdItem = await CaseBillingService.addArticleToCase({
                 case_id: finalCaseId,
                 case_type: finalCaseType,
                 customer_id: actualCustomerId || undefined,
@@ -1243,6 +1244,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 vat_rate: item.vat_rate || 25,
                 price_source: item.price_source,
               })
+            }
+            // Rabattmotivering från draft-läget följer med raden in i DB
+            if (createdItem && (item.discount_percent || 0) > 0 && item.discount_motivation?.trim()) {
+              await CaseBillingService.setDiscountMotivation(createdItem.id, item.discount_motivation)
             }
           }
           toast.success(`${draftBillingItems.length} rad${draftBillingItems.length > 1 ? 'er' : ''} tillagda`)

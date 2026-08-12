@@ -435,6 +435,8 @@ export type Database = {
           multisite_role: 'quality_manager' | 'regional_manager' | 'site_manager' | null
           site_access: string[] | null  // Array av site IDs
           region_access: string | null  // För regional managers
+          // Rabattansvarig: får godkänna/avslå fakturor med rabatterade rader
+          can_approve_discounts: boolean
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>

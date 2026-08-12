@@ -110,6 +110,8 @@ export default function CaseArticleSelector({
   const [customPriceEnabled, setCustomPriceEnabled] = useState(false)
   const [customPriceInput, setCustomPriceInput] = useState('')
   const [hasUnsentInvoice, setHasUnsentInvoice] = useState(false)
+  // Rabattmotivering (item id → input string, sparas på blur)
+  const [motivationDrafts, setMotivationDrafts] = useState<Record<string, string>>({})
   const discountTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const dosageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const fastighetsTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
@@ -364,6 +366,34 @@ export default function CaseArticleSelector({
     discountTimers.current[item.id] = setTimeout(() => {
       handleUpdateDiscount(item, value)
     }, 600)
+  }
+
+  // Rabattmotivering - krävs vid ärendeavslut för rabatterade rader. Sparas på blur.
+  const handleMotivationBlur = async (item: CaseBillingItem) => {
+    const draft = motivationDrafts[item.id]
+    if (draft === undefined) return
+    setMotivationDrafts(prev => { const n = { ...prev }; delete n[item.id]; return n })
+    const newValue = draft.trim() || null
+    if ((item.discount_motivation ?? null) === newValue) return
+
+    if (draftMode) {
+      // Draft-läge: håll motiveringen i state - den persisteras när raden skapas
+      const newItems = selectedItems.map(i =>
+        i.id === item.id ? { ...i, discount_motivation: newValue } : i
+      )
+      updateDraftState(newItems)
+      return
+    }
+
+    try {
+      await CaseBillingService.setDiscountMotivation(item.id, newValue)
+      setSelectedItems(prev => prev.map(i =>
+        i.id === item.id ? { ...i, discount_motivation: newValue } : i
+      ))
+    } catch (error) {
+      console.error('Kunde inte spara rabattmotivering:', error)
+      toast.error('Kunde inte spara rabattmotivering')
+    }
   }
 
   // Debounced dosage amount update
@@ -965,6 +995,34 @@ export default function CaseArticleSelector({
                         <span className="text-xs text-orange-400">-{item.discount_percent}%</span>
                       )}
                     </div>
+
+                    {/* Rabattmotivering - krävs vid avslut (avtalstilläggsrader undantagna) */}
+                    {item.discount_percent > 0 && item.contract_addition_annual == null && (() => {
+                      const motivationValue = motivationDrafts[item.id] ?? item.discount_motivation ?? ''
+                      const isEmpty = String(motivationValue).trim() === ''
+                      return (
+                        <div className="mt-2">
+                          <label className="block text-xs font-medium text-slate-400 mb-1">
+                            Motivering till rabatt (krävs vid avslut)
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={motivationValue}
+                            onChange={(e) => setMotivationDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                            onBlur={() => handleMotivationBlur(item)}
+                            disabled={readOnly}
+                            placeholder="Varför lämnas rabatten? Visas för rabattansvarig."
+                            className="w-full px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] resize-none disabled:opacity-60"
+                          />
+                          {isEmpty && !readOnly && (
+                            <p className="flex items-center gap-1 text-[10px] text-amber-400 mt-0.5">
+                              <AlertCircle className="w-3 h-3 shrink-0" />
+                              Motivering krävs innan ärendet kan avslutas
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })()}
 
                     {/* Kortare ärende — alla kundtyper, bara arbetstid */}
                     {article && article.category === 'Arbetstid' && (

@@ -31,6 +31,7 @@ import {
   Calendar,
   Map,
   CalendarRange,
+  BadgeCheck,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -84,6 +85,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Ekonomisk översikt', icon: DollarSign, path: '/admin/ekonomi' },
       { label: 'Fakturering', icon: Receipt, path: '/admin/fakturering' },
+      { label: 'Godkännanden', icon: BadgeCheck, path: '/admin/godkannanden' },
       { label: 'Provisioner', icon: Wallet, path: '/admin/provisioner' },
     ]
   },
@@ -155,6 +157,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/leads': 'Leads',
   '/admin/ekonomi': 'Ekonomisk översikt',
   '/admin/fakturering': 'Fakturering',
+  '/admin/godkannanden': 'Godkännanden',
   '/admin/provisioner': 'Provisioner',
   '/admin/teknikerstatistik': 'Teknikerstatistik',
   '/admin/anvandarkonton-personal': 'Användarkonton (Personal)',

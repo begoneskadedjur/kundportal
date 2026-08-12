@@ -1007,6 +1007,26 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       }
     }
 
+    // SPÄRR: rabattrader utan motivering blockerar avslut. Körs FÖRE alla
+    // skrivningar (statusändring, fakturering via upsertInvoiceFromCase, provision).
+    // Avtalstilläggsrader räknas inte som rabatt (exkluderas i servicen).
+    if (formData.status === 'Avslutat' && currentCase.status !== 'Avslutat') {
+      try {
+        const unmotivated = await CaseBillingService.getUnmotivatedDiscountItems(currentCase.id);
+        if (unmotivated.length > 0) {
+          const names = unmotivated.map(i => `${i.name} (-${i.discount_percent}%)`).join(', ');
+          toast.error(
+            `Motivera rabatten på ${names} under Tjänster & fakturarader innan ärendet avslutas`,
+            { duration: 8000 }
+          );
+          return;
+        }
+      } catch (guardError: any) {
+        toast.error(`Kunde inte kontrollera rabattmotiveringar: ${guardError.message}`);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
     

@@ -44,6 +44,7 @@ import SmsTemplatesPage from './pages/admin/settings/SmsTemplatesPage';
 import PaymentTermsPage from './pages/admin/settings/PaymentTermsPage';
 import InspectionStatusLabelsPage from './pages/admin/settings/InspectionStatusLabelsPage';
 import InvoicingPage from './pages/admin/invoicing';
+import DiscountApprovals from './pages/admin/DiscountApprovals';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import CustomerAnalytics from './pages/admin/CustomerAnalytics';
@@ -167,6 +168,7 @@ function App() {
               <Route path="tjansteutbud" element={<ProtectedRoute requiredRole="admin"><ServiceCatalogPage /></ProtectedRoute>} />
               <Route path="fakturering" element={<ProtectedRoute requiredRole="admin"><InvoicingPage /></ProtectedRoute>} />
               <Route path="fakturering/*" element={<ProtectedRoute requiredRole="admin"><InvoicingPage /></ProtectedRoute>} />
+              <Route path="godkannanden" element={<ProtectedRoute requiredRole="admin"><DiscountApprovals /></ProtectedRoute>} />
               <Route path="skapa-avtal" element={<ProtectedRoute requiredRole="admin"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="avtalsdiagnostik" element={<ProtectedRoute requiredRole="admin"><OneflowDiagnostics /></ProtectedRoute>} />
               <Route path="forsaljningspipeline" element={<ProtectedRoute requiredRole="admin"><ContractsOverview /></ProtectedRoute>} />

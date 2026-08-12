@@ -177,6 +177,24 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
       return
     }
 
+    // Delfakturering skickar rabattrader till fakturering - samma motiverings-
+    // krav som vid ärendeavslut (avtalstilläggsrader är undantagna i servicen)
+    if (invoiceNow && pendingBillingItems.length > 0) {
+      try {
+        const unmotivated = await CaseBillingService.getUnmotivatedDiscountItems(caseData.id)
+        if (unmotivated.length > 0) {
+          toast.error(
+            `Motivera rabatten på ${unmotivated.map(u => `${u.name} (-${u.discount_percent}%)`).join(', ')} under Tjänster & fakturarader innan delfakturering.`,
+            { duration: 8000 }
+          )
+          return
+        }
+      } catch {
+        toast.error('Kunde inte kontrollera rabattmotiveringar - försök igen.')
+        return
+      }
+    }
+
     setLoading(true)
 
     try {

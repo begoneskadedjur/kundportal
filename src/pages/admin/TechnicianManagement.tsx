@@ -158,6 +158,13 @@ export default function TechnicianManagement() {
     ))
   }
 
+  // Uppdatera lokalt state när rabattansvar togglas direkt på ett kort
+  const handleDiscountApproverChange = (technicianId: string, canApprove: boolean) => {
+    setTechnicians(prev => prev.map(t =>
+      t.id === technicianId ? { ...t, can_approve_discounts: canApprove } : t
+    ))
+  }
+
   const handleDeleteTechnician = async (id: string) => {
     try {
       await technicianManagementService.deleteTechnician(id)
@@ -396,6 +403,7 @@ export default function TechnicianManagement() {
               onManageNotifications={handleManageNotifications}
               onRecipientTypesChange={handleRecipientTypesChange}
               onExtraRolesChange={handleExtraRolesChange}
+              onDiscountApproverChange={handleDiscountApproverChange}
             />
           ))}
         </div>

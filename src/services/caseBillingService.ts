@@ -239,6 +239,10 @@ export class CaseBillingService {
       update.unit_price = proratedUnitPrice
       update.discounted_price = proratedUnitPrice
       update.total_price = proratedUnitPrice
+      // Pro rata är inte en rabatt - raden betalar för återstående tid,
+      // inte ett sänkt pris, och ska inte fastna i rabattgodkännandet
+      update.requires_approval = false
+      update.discount_motivation = null
     }
     const { data, error } = await supabase
       .from('case_billing_items')
@@ -247,6 +251,41 @@ export class CaseBillingService {
       .select('id')
     if (error) throw error
     if (!data || data.length === 0) throw new Error('Raden kunde inte uppdateras')
+  }
+
+  /**
+   * Spara teknikerns motivering till en rabatt. Krävs vid ärendeavslut för
+   * alla rader med discount_percent > 0 (avtalstilläggsrader undantagna).
+   */
+  static async setDiscountMotivation(id: string, motivation: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('case_billing_items')
+      .update({ discount_motivation: motivation?.trim() || null })
+      .eq('id', id)
+    if (error) throw error
+  }
+
+  /**
+   * Rabattrader som saknar motivering för ett ärende - används som spärr
+   * vid ärendeavslut. Avtalstilläggsrader räknas inte som rabatt.
+   */
+  static async getUnmotivatedDiscountItems(caseId: string): Promise<
+    { id: string; name: string; discount_percent: number }[]
+  > {
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .select('id, article_name, service_name, discount_percent, discount_motivation, contract_addition_annual')
+      .eq('case_id', caseId)
+      .eq('status', 'pending')
+      .gt('discount_percent', 0)
+    if (error) throw error
+    return (data || [])
+      .filter(r => r.contract_addition_annual == null && !r.discount_motivation?.trim())
+      .map(r => ({
+        id: r.id,
+        name: r.service_name || r.article_name,
+        discount_percent: Number(r.discount_percent),
+      }))
   }
 
   static async updateCaseArticle(

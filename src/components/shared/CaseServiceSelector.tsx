@@ -169,6 +169,8 @@ export default function CaseServiceSelector({
   const [editingPrice, setEditingPrice] = useState<Record<string, string>>({})
   // Inline fastighetsbeteckning editing (service item id → input string)
   const [editingFastighet, setEditingFastighet] = useState<Record<string, string>>({})
+  // Inline rabattmotivering (service item id → input string)
+  const [editingMotivation, setEditingMotivation] = useState<Record<string, string>>({})
 
   const onChangeRef = useRef(onChange)
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
@@ -724,6 +726,35 @@ export default function CaseServiceSelector({
   }
 
   // ──────────────────────────────────────────────────────────────
+  // Rabattmotivering (krävs vid ärendeavslut för rabatterade rader)
+  // ──────────────────────────────────────────────────────────────
+  const handleMotivationBlur = async (id: string) => {
+    const draft = editingMotivation[id]
+    if (draft === undefined) return
+    setEditingMotivation(prev => { const n = { ...prev }; delete n[id]; return n })
+    const item = allItems.find(i => i.id === id)
+    if (!item) return
+    const newValue = draft.trim() || null
+    if ((item.discount_motivation ?? null) === newValue) return
+    if (draftMode && !caseId) {
+      // Draft-läge: håll motiveringen i state - den persisteras när raden skapas
+      const updated = allItems.map(i => i.id === id ? { ...i, discount_motivation: newValue } : i)
+      setAllItems(updated)
+      notifyChange(updated)
+      return
+    }
+    if (!caseId) return
+    try {
+      await CaseBillingService.setDiscountMotivation(id, newValue)
+      const updated = allItems.map(i => i.id === id ? { ...i, discount_motivation: newValue } : i)
+      setAllItems(updated)
+      notifyChange(updated)
+    } catch (err: any) {
+      toast.error(err.message)
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────
   // Ta bort item
   // ──────────────────────────────────────────────────────────────
   const handleRemove = async (id: string) => {
@@ -1153,6 +1184,34 @@ export default function CaseServiceSelector({
                       })()}
                     </div>
                   )}
+
+                  {/* Rabattmotivering - krävs vid avslut (avtalstilläggsrader undantagna) */}
+                  {item.discount_percent > 0 && item.contract_addition_annual == null && (() => {
+                    const motivationValue = editingMotivation[item.id] ?? item.discount_motivation ?? ''
+                    const isEmpty = String(motivationValue).trim() === ''
+                    return (
+                      <div className="mt-2">
+                        <label className="block text-xs font-medium text-slate-400 mb-1">
+                          Motivering till rabatt (krävs vid avslut)
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={motivationValue}
+                          onChange={e => setEditingMotivation(prev => ({ ...prev, [item.id]: e.target.value }))}
+                          onBlur={() => handleMotivationBlur(item.id)}
+                          disabled={readOnly}
+                          placeholder="Varför lämnas rabatten? Visas för rabattansvarig."
+                          className="w-full px-3 py-1.5 text-xs bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] resize-none disabled:opacity-60"
+                        />
+                        {isEmpty && !readOnly && (
+                          <p className="flex items-center gap-1 text-[10px] text-amber-400 mt-0.5">
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            Motivering krävs innan ärendet kan avslutas
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )
             })}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react' // useEffect lades till för att hantera klick utanför
 import {
   User, Mail, Phone, MapPin, MoreVertical, Edit,
-  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle
+  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle, BadgeCheck
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '../../../ui/Button'
@@ -33,6 +33,7 @@ type TechnicianCardProps = {
   onManageNotifications: (technician: Technician) => void
   onRecipientTypesChange?: (technicianId: string, types: IncidentType[]) => void
   onExtraRolesChange?: (technicianId: string, roles: ExtraPortalRole[]) => void
+  onDiscountApproverChange?: (technicianId: string, canApprove: boolean) => void
 }
 
 export default function TechnicianCard({
@@ -44,7 +45,8 @@ export default function TechnicianCard({
   onManageWorkSchedule,
   onManageNotifications,
   onRecipientTypesChange,
-  onExtraRolesChange
+  onExtraRolesChange,
+  onDiscountApproverChange
 }: TechnicianCardProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [recipientTypes, setRecipientTypes] = useState<Set<IncidentType>>(
@@ -56,6 +58,8 @@ export default function TechnicianCard({
   )
   const [savingRoles, setSavingRoles] = useState(false)
   const [sendingPassword, setSendingPassword] = useState(false)
+  const [isDiscountApprover, setIsDiscountApprover] = useState(!!technician.can_approve_discounts)
+  const [savingDiscountApprover, setSavingDiscountApprover] = useState(false)
 
   const handleSendNewPassword = async () => {
     if (!technician.user_id || sendingPassword) return
@@ -81,6 +85,30 @@ export default function TechnicianCard({
   useEffect(() => {
     setExtraRoles(new Set(technician.extra_roles || []))
   }, [technician.extra_roles])
+
+  useEffect(() => {
+    setIsDiscountApprover(!!technician.can_approve_discounts)
+  }, [technician.can_approve_discounts])
+
+  const toggleDiscountApprover = async () => {
+    if (!technician.user_id || savingDiscountApprover) return
+    const previous = isDiscountApprover
+    const next = !previous
+
+    setIsDiscountApprover(next)
+    setSavingDiscountApprover(true)
+    try {
+      await technicianManagementService.updateCanApproveDiscounts(technician.id, next)
+      onDiscountApproverChange?.(technician.id, next)
+      toast.success(next
+        ? `${technician.name} är nu rabattansvarig`
+        : `${technician.name} är inte längre rabattansvarig`)
+    } catch {
+      setIsDiscountApprover(previous)
+    } finally {
+      setSavingDiscountApprover(false)
+    }
+  }
 
   const primaryPortal = PRIMARY_ROLE_TO_PORTAL[technician.role] || null
 
@@ -189,6 +217,12 @@ export default function TechnicianCard({
                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-500/20 text-green-400">
                   <Key className="w-3 h-3 mr-1" />
                   Inloggning
+                </span>
+              )}
+              {isDiscountApprover && (
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-[#20c58f]/10 text-[#20c58f]">
+                  <BadgeCheck className="w-3 h-3 mr-1" />
+                  Rabattansvarig
                 </span>
               )}
             </div>
@@ -410,6 +444,48 @@ export default function TechnicianCard({
           </div>
         ) : (
           <p className="text-xs text-slate-500">Kräver aktiverad inloggning</p>
+        )}
+      </div>
+
+      {/* Rabattansvarig - togglas direkt på kortet */}
+      <div className="mt-4 pt-3 border-t border-slate-700">
+        <div className="flex items-center gap-1.5 mb-2">
+          <BadgeCheck className="w-3.5 h-3.5 text-[#20c58f]" />
+          <span className="text-xs font-medium text-slate-400">Rabattansvarig</span>
+        </div>
+        {technician.has_login && technician.user_id ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-slate-500">
+              {isDiscountApprover
+                ? 'Granskar och godkänner rabatter på fakturor'
+                : 'Kan tilldelas rätt att godkänna rabatter'}
+            </p>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isDiscountApprover}
+              onClick={toggleDiscountApprover}
+              disabled={savingDiscountApprover}
+              title={isDiscountApprover
+                ? 'Klicka för att ta bort rabattansvaret'
+                : 'Klicka för att göra personen rabattansvarig'}
+              className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${
+                isDiscountApprover
+                  ? 'bg-[#20c58f] border-[#20c58f]'
+                  : 'bg-slate-700 border-slate-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-[#fff] transition-transform ${
+                  isDiscountApprover ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">
+            Kräver aktiverad inloggning - bara personer med konto kan vara rabattansvariga
+          </p>
         )}
       </div>
 
