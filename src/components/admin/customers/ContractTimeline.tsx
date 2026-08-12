@@ -89,7 +89,8 @@ export default function ContractTimeline({ customerId }: { customerId: string })
             .order('applied_at', { ascending: true }),
           supabase
             .from('invoices')
-            .select('billing_period_start, billing_period_end, amount, status')
+            // subtotal = exkl. moms, samma enhet som årspremien (annual_value)
+            .select('billing_period_start, billing_period_end, subtotal, status')
             .eq('customer_id', customerId)
             .eq('invoice_type', 'contract')
             .order('billing_period_start', { ascending: true }),
@@ -131,7 +132,7 @@ export default function ContractTimeline({ customerId }: { customerId: string })
             type: 'invoice',
             title: `Årspremie ${fmtPeriod(inv.billing_period_start, inv.billing_period_end)}`,
             chips: [
-              { label: formatCurrency(Number(inv.amount ?? 0)), cls: 'bg-slate-700/60 text-slate-300' },
+              { label: formatCurrency(Number(inv.subtotal ?? 0)), cls: 'bg-slate-700/60 text-slate-300' },
               {
                 label: INVOICE_STATUS_LABEL[inv.status] || inv.status,
                 cls: INVOICE_STATUS_CLS[inv.status] || 'bg-slate-700/60 text-slate-300',
