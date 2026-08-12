@@ -226,8 +226,8 @@ export default function AdminKpiModal({ isOpen, onClose, title, kpiType, data }:
             setEditCaseOpen(false);
             setSelectedCase(null);
           }}
-          case={selectedCase}
-          onSave={() => {
+          caseData={selectedCase}
+          onSuccess={() => {
             setEditCaseOpen(false);
             setSelectedCase(null);
             // Optionally refresh data here
