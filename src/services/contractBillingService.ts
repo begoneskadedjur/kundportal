@@ -397,8 +397,11 @@ export class ContractBillingService {
       return {
         customer_id: customerId,
         article_id: item.article_id,
-        article_code: item.article_code,
-        article_name: item.article_name,
+        // Tjänsterader bär koden i service_code (article_code är null) -
+        // samma fallback som invoiceService, annars tappas artikelnumret
+        // på Fortnox-fakturan för merförsäljning mot avtal
+        article_code: item.service_code || item.article_code,
+        article_name: item.service_name || item.article_name,
         quantity: item.quantity,
         unit_price: item.unit_price,
         total_price: item.total_price,
