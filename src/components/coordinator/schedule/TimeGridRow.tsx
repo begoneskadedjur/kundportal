@@ -1,4 +1,4 @@
-// TimeGridRow.tsx — En teknikers tidsrad med events och frånvaro
+﻿// TimeGridRow.tsx â€” En teknikers tidsrad med events och frÃ¥nvaro
 import { useMemo, memo, useState, useRef } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
 import { HOUR_WIDTH, DAY_START_HOUR, TOTAL_HOURS, WEEK_DAY_COL_WIDTH, WEEK_HOUR_WIDTH, ROW_HEIGHT, getGridWidth, SNAP_MINUTES } from './scheduleConstants'
@@ -27,7 +27,7 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
   const [dropPreviewX, setDropPreviewX] = useState<number | null>(null)
   const [dropPreviewTime, setDropPreviewTime] = useState<Date | null>(null)
 
-  // Beräkna lanes för överlappande events
+  // BerÃ¤kna lanes fÃ¶r Ã¶verlappande events
   const laneMap = useMemo(() => assignLanes(cases), [cases])
 
   function xToTime(clientX: number): Date {
@@ -80,7 +80,7 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
           </div>
         ))}
 
-        {/* Frånvaro-block */}
+        {/* FrÃ¥nvaro-block */}
         {absences.map(a => (
           <AbsenceBlock key={a.id} absence={a} onClick={onAbsenceClick} viewMode={viewMode} weekStart={weekStart} />
         ))}
@@ -89,7 +89,7 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
         {cases.map(c => {
           const la = laneMap.get(c.id)
           return (
-            <EventBlock key={c.id} caseData={c} onClick={onCaseClick} viewMode={viewMode} weekStart={weekStart} lane={la?.lane} totalLanes={la?.totalLanes} />
+            <EventBlock key={c.id} caseData={c} onClick={onCaseClick} viewMode={viewMode} weekStart={weekStart} lane={la?.lane} totalLanes={la?.totalLanes} rowTechnicianId={technician.id} />
           )
         })}
       </div>
@@ -134,7 +134,7 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
         />
       )}
 
-      {/* Drop-preview: vertikal blå linje + tidsetikett */}
+      {/* Drop-preview: vertikal blÃ¥ linje + tidsetikett */}
       {dragOver && dropPreviewX !== null && dropPreviewTime !== null && (
         <div
           className="absolute top-0 h-full w-[2px] bg-blue-400 pointer-events-none z-20"
@@ -147,7 +147,7 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
         </div>
       )}
 
-      {/* Timrutnät */}
+      {/* TimrutnÃ¤t */}
       {hours.map(i => (
         <div
           key={i}
@@ -161,7 +161,7 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
         </div>
       ))}
 
-      {/* Frånvaro-block */}
+      {/* FrÃ¥nvaro-block */}
       {absences.map(a => (
         <AbsenceBlock key={a.id} absence={a} onClick={onAbsenceClick} viewMode={viewMode} weekStart={weekStart} />
       ))}
@@ -170,7 +170,7 @@ export const TimeGridRow = memo(function TimeGridRow({ technician, cases, absenc
       {cases.map(c => {
         const la = laneMap.get(c.id)
         return (
-          <EventBlock key={c.id} caseData={c} onClick={onCaseClick} viewMode={viewMode} weekStart={weekStart} lane={la?.lane} totalLanes={la?.totalLanes} />
+          <EventBlock key={c.id} caseData={c} onClick={onCaseClick} viewMode={viewMode} weekStart={weekStart} lane={la?.lane} totalLanes={la?.totalLanes} rowTechnicianId={technician.id} />
         )
       })}
     </div>

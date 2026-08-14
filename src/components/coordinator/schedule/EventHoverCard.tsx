@@ -16,10 +16,13 @@ export function EventHoverCard({ caseData }: EventHoverCardProps) {
   const isContract = caseData.case_type === 'contract'
   const isEstablishment = caseData.case_type === 'establishment'
 
+  // Fler än en tekniker: peka ut vem som är huvudansvarig
+  const coTechs = [caseData.secondary_assignee_name, caseData.tertiary_assignee_name].filter(Boolean)
   const technicians = [
-    caseData.primary_assignee_name,
-    caseData.secondary_assignee_name,
-    caseData.tertiary_assignee_name,
+    caseData.primary_assignee_name
+      ? (coTechs.length > 0 ? `${caseData.primary_assignee_name} (ansvarig)` : caseData.primary_assignee_name)
+      : null,
+    ...coTechs,
   ].filter(Boolean)
 
   return (

@@ -15,9 +15,11 @@ interface EventBlockProps {
   lane?: number
   totalLanes?: number
   onDragStart?: (e: React.DragEvent, caseData: BeGoneCaseRow) => void
+  /** Teknikerraden kortet ritas på - används för att märka medtekniker-kort */
+  rowTechnicianId?: string
 }
 
-export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode, weekStart, lane = 0, totalLanes = 1, onDragStart }: EventBlockProps) {
+export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode, weekStart, lane = 0, totalLanes = 1, onDragStart, rowTechnicianId }: EventBlockProps) {
   const [hovered, setHovered] = useState(false)
   const [dragging, setDragging] = useState(false)
   const blockRef = useRef<HTMLDivElement>(null)
@@ -46,6 +48,12 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
   const isEstablishment = caseData.case_type === 'establishment'
   const displayName = caseData.company_name || caseData.bestallare || caseData.kontaktperson || caseData.title || ''
   const caseNum = caseData.case_number
+  // Rollen på just den här teknikerraden: samma ärende kan ligga på flera
+  // rader, och medteknikerns kort märks så man ser vem som är huvudansvarig
+  const isCoTechRow = !!rowTechnicianId
+    && rowTechnicianId !== caseData.primary_assignee_id
+    && (rowTechnicianId === (caseData as any).secondary_assignee_id
+      || rowTechnicianId === (caseData as any).tertiary_assignee_id)
   const addr = shortAddress(caseData.adress)
   const isWeek = viewMode === 'week'
   const showSecondLine = !isWeek && !isCompact && width > 150
@@ -93,6 +101,11 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
             {isEstablishment && <span className="text-lime-400 mr-0.5">⬡</span>}
             {displayName}
           </span>
+          {isCoTechRow && (
+            <span className={`shrink-0 ${isCompact ? 'text-[7px]' : 'text-[8px]'} px-1 py-px rounded border leading-none bg-slate-700/80 border-slate-500/40 text-slate-300`}>
+              Medtekniker
+            </span>
+          )}
           {!isWeek && (
             <span className={`${isCompact ? 'text-[8px]' : 'text-[10px]'} font-mono shrink-0 ${style.text} opacity-80`}>
               {startStr}–{endStr}
