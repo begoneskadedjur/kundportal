@@ -421,6 +421,22 @@ export default function CoordinatorSchedule() {
           }
         : c
     ))
+    // VIKTIGT: även contractCases måste uppdateras - handleOpenCaseModal
+    // hämtar avtalsärenden därifrån, och en stale rad gör att modalen
+    // öppnas med gamla tider som sedan skrivs tillbaka vid Spara
+    setContractCases(prev => prev.map(c =>
+      c.id === caseId
+        ? {
+            ...c,
+            scheduled_start: newStart.toISOString(),
+            scheduled_end: newEnd.toISOString(),
+            ...(shouldChangeTech && newTech ? {
+              primary_technician_id: newTechnicianId,
+              primary_technician_name: newTech.name,
+            } : {}),
+          }
+        : c
+    ))
 
     try {
       // Avtalsbaserade ärenden ligger i cases-tabellen men får case_type efter

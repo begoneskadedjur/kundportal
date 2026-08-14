@@ -516,15 +516,26 @@ export default function EditContractCaseModal({
     }
   }, [caseData, isOpen])
 
+  // Hämta alltid färsk data från DB när modalen öppnas. Prop:en kan vara
+  // stale (t.ex. schemats listor efter drag & drop) - utan detta skriver
+  // Spara tillbaka gamla schematider och ärendet "hoppar tillbaka".
+  useEffect(() => {
+    if (isOpen && caseData?.id) {
+      refreshCaseData(caseData.id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, caseData?.id])
+
   // Funktion för att hämta uppdaterad data från databasen
-  const refreshCaseData = async (): Promise<any | null> => {
-    if (!localCaseData?.id) return null
+  const refreshCaseData = async (caseId?: string): Promise<any | null> => {
+    const id = caseId ?? localCaseData?.id
+    if (!id) return null
 
     try {
       const { data, error } = await supabase
         .from('cases')
         .select('*')
-        .eq('id', localCaseData.id)
+        .eq('id', id)
         .single()
 
       if (error) throw error
@@ -553,6 +564,9 @@ export default function EditContractCaseModal({
           price: data.price ?? prev.price,
           pest_level: data.pest_level !== null ? data.pest_level : prev.pest_level,
           problem_rating: data.problem_rating !== null ? data.problem_rating : prev.problem_rating,
+          invoice_marking: data.invoice_marking ?? prev.invoice_marking,
+          work_order_number: data.work_order_number ?? prev.work_order_number,
+          work_object: data.work_object ?? prev.work_object,
         }))
         return data
       }

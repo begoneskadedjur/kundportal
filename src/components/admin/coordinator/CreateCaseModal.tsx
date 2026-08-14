@@ -908,7 +908,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           send_booking_confirmation: formData.skicka_bokningsbekraftelse === 'Ja',
           // Ärendemärkning (kunder med aktiverad ärendemärkning)
           work_order_number: (formData as any).work_order_number?.trim() || null,
-          work_object: (formData as any).work_object?.trim() || null
+          work_object: (formData as any).work_object?.trim() || null,
+          // Fakturamärkning - fältet visas i skapa-flödet men sparades
+          // tidigare bara för business_cases; på cases heter kolumnen
+          // invoice_marking (blir Er referens på merförsäljningsfakturan)
+          invoice_marking: formData.markning_faktura?.trim() || null
         };
 
         // Skapa case
@@ -1127,7 +1131,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           case_number: caseNumber,
           // Ärendemärkning (kunder med aktiverad ärendemärkning)
           work_order_number: (formData as any).work_order_number?.trim() || null,
-          work_object: (formData as any).work_object?.trim() || null
+          work_object: (formData as any).work_object?.trim() || null,
+          // Fakturamärkning (Er referens på merförsäljningsfakturan)
+          invoice_marking: formData.markning_faktura?.trim() || null
         };
 
         let createdCaseId: string | null = null;
