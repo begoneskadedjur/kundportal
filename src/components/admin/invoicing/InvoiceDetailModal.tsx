@@ -291,6 +291,9 @@ export default function InvoiceDetailModal({
           .select('*')
           .in('case_id', caseIds)
           .eq('case_type', 'contract')
+          // Makulerade rader (t.ex. från ett tidigare avslutsförsök) hör
+          // inte till fakturan och ska inte dubblera kostnadsuppdelningen
+          .neq('status', 'cancelled')
         setCaseBillingItems((data as CaseBillingItem[] | null) || [])
         return
       }
@@ -308,6 +311,7 @@ export default function InvoiceDetailModal({
             .select('*')
             .eq('case_id', contract.id)
             .eq('case_type', 'contract')
+            .neq('status', 'cancelled')
           setCaseBillingItems((data as CaseBillingItem[] | null) || [])
           return
         }
