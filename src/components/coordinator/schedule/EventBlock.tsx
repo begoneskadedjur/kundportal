@@ -49,11 +49,16 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
   const displayName = caseData.company_name || caseData.bestallare || caseData.kontaktperson || caseData.title || ''
   const caseNum = caseData.case_number
   // Rollen på just den här teknikerraden: samma ärende kan ligga på flera
-  // rader, och medteknikerns kort märks så man ser vem som är huvudansvarig
+  // rader. Medteknikerns kort märks och dämpas lätt, och ansvarigs kort
+  // får en Ansvarig-badge - men bara när ärendet faktiskt har medtekniker
+  // (vanliga enteknikersärenden ska se ut som förut).
+  const hasCoTechs = !!((caseData as any).secondary_assignee_id || (caseData as any).tertiary_assignee_id)
   const isCoTechRow = !!rowTechnicianId
     && rowTechnicianId !== caseData.primary_assignee_id
     && (rowTechnicianId === (caseData as any).secondary_assignee_id
       || rowTechnicianId === (caseData as any).tertiary_assignee_id)
+  const isPrimaryRowWithTeam = hasCoTechs && !!rowTechnicianId
+    && rowTechnicianId === caseData.primary_assignee_id
   const addr = shortAddress(caseData.adress)
   const isWeek = viewMode === 'week'
   const showSecondLine = !isWeek && !isCompact && width > 150
@@ -80,6 +85,7 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
         ${dragging ? 'opacity-40 ring-2 ring-white/30 cursor-grabbing' : ''}
         ${style.bg} ${style.border}
         ${isContract ? 'ring-1 ring-purple-400/20' : ''}
+        ${isCoTechRow && !dragging ? 'opacity-80 saturate-[.85]' : ''}
       `}
       style={{
         left: x,
@@ -104,6 +110,11 @@ export const EventBlock = memo(function EventBlock({ caseData, onClick, viewMode
           {isCoTechRow && (
             <span className={`shrink-0 ${isCompact ? 'text-[7px]' : 'text-[8px]'} px-1 py-px rounded border leading-none bg-slate-700/80 border-slate-500/40 text-slate-300`}>
               Medtekniker
+            </span>
+          )}
+          {isPrimaryRowWithTeam && (
+            <span className={`shrink-0 ${isCompact ? 'text-[7px]' : 'text-[8px]'} px-1 py-px rounded border leading-none bg-[#20c58f]/20 border-[#20c58f]/40 text-[#20c58f]`}>
+              Ansvarig
             </span>
           )}
           {!isWeek && (
