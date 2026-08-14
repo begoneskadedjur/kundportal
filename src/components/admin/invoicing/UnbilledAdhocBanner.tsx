@@ -38,17 +38,19 @@ export default function UnbilledAdhocBanner() {
   const [generating, setGenerating] = useState<string | null>(null)
 
   const fetchOrphans = useCallback(async () => {
-    // Äkta läckage = rader skapade från ett ärende (case_id) som fastnat i
-    // pending utan faktura. Historiska Fortnox-importrader ("Historisk
-    // engångsfaktura", case_id null, redan betalda i Fortnox) får ALDRIG
-    // listas här - en återkörning skulle dubbelfakturera dem.
+    // Äkta läckage = rader skapade från ett ärende (case_id) som saknar
+    // faktura, oavsett om de väntar på godkännande (pending) eller är
+    // godkända (approved - normalfallet när ingen rabatt finns).
+    // Historiska Fortnox-importrader ("Historisk engångsfaktura", case_id
+    // null, redan betalda i Fortnox) får ALDRIG listas här - en återkörning
+    // skulle dubbelfakturera dem.
     const { data, error } = await supabase
       .from('contract_billing_items')
       .select('id, case_id, customer_id, total_price, status, invoice_date, customer:customers(company_name, adhoc_invoice_grouping)')
       .eq('item_type', 'ad_hoc')
       .is('invoice_id', null)
       .not('case_id', 'is', null)
-      .eq('status', 'pending')
+      .in('status', ['pending', 'approved'])
 
     if (error) {
       console.error('[UnbilledAdhocBanner] Kunde inte hämta ofakturerade rader:', error)

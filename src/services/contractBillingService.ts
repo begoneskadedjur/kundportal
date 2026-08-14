@@ -451,6 +451,12 @@ export class ContractBillingService {
         completedAt: completedDate,
         grouping,
       })
+      // Vi skapade precis rader ovan - null betyder att generatorn inte kunde
+      // läsa tillbaka dem (t.ex. RLS som döljer raderna för användaren) och
+      // det får ALDRIG passera som "inget att fakturera"
+      if (!invoiceId) {
+        throw new Error('Faktureringsraderna kunde inte läsas tillbaka - fakturan skapades inte. Raderna finns kvar och kan faktureras från Merförsäljning-fliken.')
+      }
     } catch (err) {
       invoiceError = err instanceof Error ? err.message : String(err)
       console.error('Kunde inte skapa adhoc-invoice:', err)
