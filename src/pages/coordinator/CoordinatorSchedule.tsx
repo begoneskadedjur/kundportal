@@ -128,12 +128,14 @@ export default function CoordinatorSchedule() {
       primary_assignee_id: contractCase.primary_technician_id,
       primary_assignee_name: contractCase.primary_technician_name || null,
       primary_assignee_email: contractCase.primary_technician_email || null,
-      secondary_assignee_id: null,
-      secondary_assignee_name: null,
-      secondary_assignee_email: null,
-      tertiary_assignee_id: null,
-      tertiary_assignee_name: null,
-      tertiary_assignee_email: null,
+      // Sekundär/tertiär tekniker måste mappas - annars visas ärendet
+      // bara på primärteknikerns schemarad (ScheduleGrid fördelar på alla tre)
+      secondary_assignee_id: (contractCase as any).secondary_technician_id || null,
+      secondary_assignee_name: (contractCase as any).secondary_technician_name || null,
+      secondary_assignee_email: (contractCase as any).secondary_technician_email || null,
+      tertiary_assignee_id: (contractCase as any).tertiary_technician_id || null,
+      tertiary_assignee_name: (contractCase as any).tertiary_technician_name || null,
+      tertiary_assignee_email: (contractCase as any).tertiary_technician_email || null,
       case_type: (
         contractCase.service_type === 'establishment' ? 'establishment' :
         contractCase.service_type === 'inspection' ? 'inspection' :

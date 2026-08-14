@@ -290,7 +290,7 @@ export default function TechnicianSchedule() {
       const [privateResult, businessResult, contractResult] = await Promise.all([ 
         supabase.from('private_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`), 
         supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
-        supabase.from('cases').select('*, customer:customers(*)').eq('primary_technician_id', technicianId).in('status', ALL_VALID_STATUSES)
+        supabase.from('cases').select('*, customer:customers(*)').or(`primary_technician_id.eq.${technicianId},secondary_technician_id.eq.${technicianId},tertiary_technician_id.eq.${technicianId}`).in('status', ALL_VALID_STATUSES)
       ]); 
 
       if (privateResult.error) throw privateResult.error;
@@ -327,10 +327,12 @@ export default function TechnicianSchedule() {
           primary_assignee_id: c.primary_technician_id,
           primary_assignee_name: c.primary_technician_name,
           primary_assignee_email: c.primary_technician_email,
-          secondary_assignee_id: null,
-          secondary_assignee_name: null,
-          tertiary_assignee_id: null,
-          tertiary_assignee_name: null,
+          secondary_assignee_id: c.secondary_technician_id || null,
+          secondary_assignee_name: c.secondary_technician_name || null,
+          tertiary_assignee_id: c.tertiary_technician_id || null,
+          tertiary_assignee_name: c.tertiary_technician_name || null,
+          technician_role: c.secondary_technician_id === technicianId ? 'secondary'
+            : c.tertiary_technician_id === technicianId ? 'tertiary' : 'primary',
           // Kontaktuppgifter
           adress: customer.contact_address || c.address?.formatted_address || c.address,
           kontaktperson: customer.contact_person || c.contact_person,
@@ -345,7 +347,6 @@ export default function TechnicianSchedule() {
           case_price: c.price,
           case_type: caseType,
           service_type: c.service_type,
-          technician_role: 'primary' as const,
           // Företagsinformation
           bestallare: customer.company_name,
           organization_number: customer.organization_number
