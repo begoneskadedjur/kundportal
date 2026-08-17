@@ -227,17 +227,15 @@ export default function PriceCalculatorPanel({
 
   /**
    * ROT/RUT-tillgänglighet per tjänsterad.
-   * Berättigande styrs i första hand av mappade artiklar (interna kostnader),
-   * i andra hand av tjänstens egen flagga.
+   * Styrs ENBART av tjänstens egna flaggor i katalogen (arbetstidstjänster).
+   * Mappade artiklar får inte längre göra en paketprisad tjänst avdragsberättigad —
+   * avdraget ska ligga på en separat arbetstidsrad ("Dela upp för ROT/RUT").
    */
   const rotRutAvailability = (serviceId: string): { canRot: boolean; canRut: boolean } => {
-    const assigned = articleItems.filter(a => assignments[a.id] === serviceId)
-    const articleRot = assigned.some(a => a.rot_eligible)
-    const articleRut = assigned.some(a => a.rut_eligible)
     const svc = serviceItems.find(s => s.id === serviceId)
     return {
-      canRot: articleRot || !!svc?.rot_eligible,
-      canRut: articleRut || !!svc?.rut_eligible,
+      canRot: !!svc?.rot_eligible,
+      canRut: !!svc?.rut_eligible,
     }
   }
 

@@ -122,6 +122,13 @@ function buildDataFieldsForDocument(
       { custom_id: 'epost-faktura', value: contractData['e-post-kontaktperson'] || '' }
       // Faktura-referens och märkning lämnas tomma så kunden kan fylla i
     )
+
+    // Kund-fältet: mappningen foretag→kund ger tomt värde för privatpersoner
+    // (foretag är tomt då). Fallback: använd kontaktpersonens namn så att det
+    // obligatoriska fältet alltid är ifyllt — företagsnamn för företag, personnamn för privat.
+    if (!fields.some(f => f.custom_id === 'kund') && contractData['Kontaktperson']) {
+      fields.push({ custom_id: 'kund', value: contractData['Kontaktperson'] })
+    }
   }
   
   // case_id fungerar inte i Oneflow-mallen för offerter
@@ -329,6 +336,36 @@ export default async function handler(
   const documentTypeText = documentType === 'offer' ? 'offert' : 'kontrakt'
   console.log(`Skapar ${documentTypeText} för ${recipient.name} (${recipient.email})`)
 
+  // Supabase-klient (används för ärendenummer-uppslag + metadata-persistens nedan)
+  const supabase = createClient(
+    process.env.VITE_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_KEY!
+  )
+
+  // Slå upp ärendenumret (BE-XXXXXXX) för dokumentnamnet
+  let caseNumber: string | null = null
+  if (caseId) {
+    try {
+      const caseTable = partyType === 'company' ? 'business_cases' : 'private_cases'
+      const { data: caseRow } = await supabase
+        .from(caseTable)
+        .select('case_number')
+        .eq('id', caseId)
+        .maybeSingle()
+      caseNumber = caseRow?.case_number ?? null
+    } catch (err) {
+      console.warn('Kunde inte slå upp ärendenummer för dokumentnamn:', err)
+    }
+  }
+
+  // Dokumentnamn i Oneflow (annars "Namnlös"). Max 130 tecken enligt API:et.
+  const counterpartyName = recipient.company_name || recipient.name || ''
+  const documentName = [
+    documentType === 'offer' ? 'Offert' : 'Avtal',
+    counterpartyName,
+    caseNumber
+  ].filter(Boolean).join(' – ').slice(0, 130)
+
   const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
 
   // Bygg participant-objekt
@@ -370,6 +407,7 @@ export default async function handler(
   const createPayload: any = {
     workspace_id: Number(workspaceId),
     template_id: Number(templateId),
+    name: documentName,
     data_fields,
     parties
   }
@@ -449,11 +487,6 @@ export default async function handler(
     }
 
     // Spara creator info i databasen
-    const supabase = createClient(
-      process.env.VITE_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_KEY!
-    )
-    
     // Upsert kontrakt-metadata direkt (skapar raden om webhook inte hunnit)
     const upsertData: any = {
       oneflow_contract_id: createdContract.id.toString(),

@@ -69,7 +69,12 @@ interface WizardData {
     total_price: number
     vat_rate?: number
     rot_rut_type?: 'ROT' | 'RUT' | null
-    service?: { rot_rate_percent?: number | null; rut_rate_percent?: number | null } | null
+    service?: {
+      rot_rate_percent?: number | null
+      rut_rate_percent?: number | null
+      rot_eligible?: boolean
+      rut_eligible?: boolean
+    } | null
   }>
   
   // Steg 7 - Avtalsobjekt
@@ -500,10 +505,34 @@ export default function OneflowContractCreator() {
     if (currentStep === productsStep) {
       if (wizardData.case_id) {
         if (!wizardData.prefillServices || wizardData.prefillServices.length === 0) return 'Lägg till minst en tjänst på ärendet'
-        return ''
+        return validateRotRutRows(wizardData.prefillServices)
       }
       if (!wizardData.draftItems.some(i => i.item_type === 'service')) return 'Lägg till minst en tjänst'
-      return ''
+      return validateRotRutRows(wizardData.draftItems.filter(i => i.item_type === 'service'))
+    }
+    return ''
+  }
+
+  // Guardrail: ROT/RUT-avdrag måste ligga på arbetstidstjänster (avdraget
+  // beräknas på arbetskostnaden) och ett dokument kan bara ha en avdragstyp.
+  const validateRotRutRows = (
+    rows: Array<{
+      rot_rut_type?: 'ROT' | 'RUT' | null
+      service_name?: string | null
+      service?: { rot_eligible?: boolean; rut_eligible?: boolean } | null
+    }>
+  ): string => {
+    const deductionRows = rows.filter(r => r.rot_rut_type)
+    if (deductionRows.length === 0) return ''
+    const hasRot = deductionRows.some(r => r.rot_rut_type === 'ROT')
+    const hasRut = deductionRows.some(r => r.rot_rut_type === 'RUT')
+    if (hasRot && hasRut) return 'Dokumentet kan inte ha både ROT och RUT – dela upp i separata ärenden'
+    const misplaced = deductionRows.filter(
+      r => r.service && !r.service.rot_eligible && !r.service.rut_eligible
+    )
+    if (misplaced.length > 0) {
+      const names = misplaced.map(r => r.service_name || 'Tjänst').join(', ')
+      return `ROT/RUT ligger på "${names}" som inte är en arbetstidstjänst – använd "Dela upp för ROT/RUT"`
     }
     return ''
   }

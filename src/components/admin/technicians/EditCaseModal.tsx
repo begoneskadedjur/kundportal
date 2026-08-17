@@ -683,6 +683,28 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     if (hasRot) deductionType = 'rot'
     else if (hasRut) deductionType = 'rut'
 
+    // Guardrails: ROT/RUT måste vara korrekt uppsatt innan offerten skapas
+    if (hasRot && hasRut) {
+      toast.error('Ärendet har både ROT och RUT – dela upp i separata ärenden innan offert skapas.');
+      return;
+    }
+    // Avdrag får bara ligga på arbetstidstjänster (avdraget beräknas på arbetskostnaden)
+    const misplacedDeduction = billingItems.filter(item =>
+      item.item_type === 'service' &&
+      item.rot_rut_type &&
+      item.service &&
+      !item.service.rot_eligible &&
+      !item.service.rut_eligible
+    );
+    if (misplacedDeduction.length > 0) {
+      const names = misplacedDeduction.map(i => i.service_name || i.article_name).join(', ');
+      toast.error(
+        `ROT/RUT ligger på "${names}" som inte är en arbetstidstjänst. Använd "Dela upp för ROT/RUT" i Ekonomi-fliken så att avdraget beräknas på arbetskostnaden.`,
+        { duration: 8000 }
+      );
+      return;
+    }
+
     // Bestäm rätt offertmall baserat på ärendetyp och artiklarnas avdragsval
     let selectedTemplate = '8919037' // Default: Privatperson inkl moms
     if (currentCase.case_type === 'business') {

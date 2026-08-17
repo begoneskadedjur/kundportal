@@ -16,6 +16,8 @@ export interface PrefillService {
   service?: {
     rot_rate_percent?: number | null
     rut_rate_percent?: number | null
+    rot_eligible?: boolean
+    rut_eligible?: boolean
   } | null
 }
 
@@ -35,8 +37,10 @@ export function mapBillingItemsToPrefillServices(
       rot_rut_type: item.rot_rut_type,
       service: item.service
         ? {
-            rot_rate_percent: (item.service as any).rot_rate_percent ?? null,
-            rut_rate_percent: (item.service as any).rut_rate_percent ?? null,
+            rot_rate_percent: item.service.rot_rate_percent ?? null,
+            rut_rate_percent: item.service.rut_rate_percent ?? null,
+            rot_eligible: item.service.rot_eligible ?? false,
+            rut_eligible: item.service.rut_eligible ?? false,
           }
         : null,
     }))
