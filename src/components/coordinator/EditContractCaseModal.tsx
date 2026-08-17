@@ -39,6 +39,7 @@ import CaseStatusStepper from '../shared/CaseStatusStepper'
 
 // Fakturering - ad-hoc billing för avtalskunder vid ärendeavslut
 import { CaseBillingService } from '../../services/caseBillingService'
+import { mapBillingItemsToPrefillServices, mapBillingItemsToSelectedArticles } from '../../utils/billingPrefill'
 import { ContractBillingService } from '../../services/contractBillingService'
 
 // Radering av ärenden
@@ -1027,7 +1028,21 @@ export default function EditContractCaseModal({
       toast.error('Välj vem som ska motta offerten')
       return
     }
-    
+
+    // Hämta ärendets tjänster/artiklar så wizarden vet om produktsteget kan hoppas över.
+    // Avtalsärendens rader ligger i case_billing_items med case_type='contract'.
+    let prefillServices: ReturnType<typeof mapBillingItemsToPrefillServices> = []
+    let prefillArticles: ReturnType<typeof mapBillingItemsToSelectedArticles> = []
+    if (caseData?.id) {
+      try {
+        const billingItems = await CaseBillingService.getCaseBillingItems(caseData.id, 'contract')
+        prefillServices = mapBillingItemsToPrefillServices(billingItems)
+        prefillArticles = mapBillingItemsToSelectedArticles(billingItems)
+      } catch (err) {
+        console.warn('Kunde inte hämta ärendets tjänster för offert-prefill:', err)
+      }
+    }
+
     const prefillData = {
       ...oneflowData,
       documentType: 'offer',
@@ -1045,6 +1060,11 @@ export default function EditContractCaseModal({
       pestType: formData.pest_type,
       // Add case_id for webhook linking
       case_id: caseData?.id,
+      // Avtalsärenden lagrar billing-rader med case_type='contract'
+      caseType: 'contract',
+      // Ärendets tjänster/artiklar — styr om wizarden får hoppa förbi produktsteget
+      prefillServices,
+      prefillArticles,
       // Add customer price list for article pricing
       selectedPriceListId: customerData?.price_list_id || null,
       // Add multisite recipient information

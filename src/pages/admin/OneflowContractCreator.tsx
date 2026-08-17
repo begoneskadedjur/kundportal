@@ -86,6 +86,8 @@ interface WizardData {
   
   // Case linking
   case_id?: string
+  /** Ärendetyp för case_billing_items-uppslag (avtalsärenden lagrar rader med case_type='contract') */
+  case_type?: 'private' | 'business' | 'contract'
 
   // Kundgrupp (bara vid avtal)
   customer_group_id: string | null
@@ -265,6 +267,7 @@ export default function OneflowContractCreator() {
             begynnelsedag: customerData.begynnelsedag || prev.begynnelsedag,
             // Lägg till case_id för webhook-koppling
             case_id: customerData.case_id || undefined,
+            case_type: customerData.caseType || undefined,
             // Lägg till prislista från kunden
             selectedPriceListId: customerData.selectedPriceListId || prev.selectedPriceListId,
             // Förifylla artiklar från ärendet
@@ -295,10 +298,19 @@ export default function OneflowContractCreator() {
                 customerData.selectedTemplate &&
                 customerData.Kontaktperson &&
                 customerData['e-post-kontaktperson']) {
-              // Vi har all data - hoppa förbi produktval till avtalsobjekt (steg 7 för offert, 8 för avtal)
               const docType = customerData.documentType || prefillType
-              const targetStep = docType === 'contract' ? 8 : 7
-              console.log('Auto-selecting template and jumping to step:', targetStep)
+              // Produktsteget får bara hoppas över om ärendet har minst en
+              // prissatt tjänst — annars landar wizarden på Produkter så att
+              // tjänster och priser sätts upp innan dokumentet skapas.
+              const hasUsableProducts = Array.isArray(customerData.prefillServices) &&
+                customerData.prefillServices.some((s: { total_price?: number }) => (s?.total_price ?? 0) > 0)
+              const productsStepNum = docType === 'contract' ? 7 : 6
+              const objectStepNum = docType === 'contract' ? 8 : 7
+              const targetStep = hasUsableProducts ? objectStepNum : productsStepNum
+              console.log('Auto-selecting template and jumping to step:', targetStep, { hasUsableProducts })
+              if (!hasUsableProducts) {
+                toast('Ärendet saknar prissatta tjänster – lägg till dem innan du går vidare', { icon: '🛒', duration: 5000 })
+              }
               setCurrentStep(targetStep)
               setMaxReachedStep(targetStep)
             } else if (customerData.autoSelectTemplate && customerData.selectedTemplate) {
@@ -1320,7 +1332,7 @@ export default function OneflowContractCreator() {
             {hasCaseLink ? (
               <CaseServiceSelector
                 caseId={wizardData.case_id}
-                caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
+                caseType={wizardData.case_type ?? (wizardData.partyType === 'company' ? 'business' : 'private')}
                 customerId={null}
                 primaryServiceId={null}
                 onChange={(items) => {
