@@ -30,6 +30,55 @@ export function isTechWorkingAt(
   return cur >= sh * 60 + sm && cur < eh * 60 + em
 }
 
+// ─── Beläggningssplit: engångskunder vs avtalskunder ───
+
+/** Ärenden från private_cases/business_cases = engångskunder; övriga (cases-tabellen) = avtalskunder */
+export function isOneTimeCase(caseType?: string | null): boolean {
+  return caseType === 'private' || caseType === 'business'
+}
+
+export interface ScheduledHoursSplit {
+  engang: number
+  avtal: number
+  total: number
+}
+
+/** Summera schemalagda timmar uppdelat på engångskunder vs avtalskunder */
+export function splitScheduledHours(
+  cases: Array<{ start_date?: string | null; due_date?: string | null; case_type?: string | null }>
+): ScheduledHoursSplit {
+  let engang = 0
+  let avtal = 0
+  for (const c of cases) {
+    if (!c.start_date || !c.due_date) continue
+    const h = (new Date(c.due_date).getTime() - new Date(c.start_date).getTime()) / 3_600_000
+    if (isOneTimeCase(c.case_type)) engang += h
+    else avtal += h
+  }
+  return { engang, avtal, total: engang + avtal }
+}
+
+/**
+ * Alla ärenden där teknikern har någon av de tre rollerna (primär/sekundär/tertiär).
+ * Varje ärende returneras max en gång per tekniker — medtekniker räknas alltid,
+ * men dubbelräknas aldrig.
+ */
+export function casesForTechnician<
+  T extends {
+    primary_assignee_id?: string | null
+    secondary_assignee_id?: string | null
+    tertiary_assignee_id?: string | null
+  }
+>(cases: T[], techId: string): T[] {
+  return cases.filter(c =>
+    c.primary_assignee_id === techId ||
+    c.secondary_assignee_id === techId ||
+    c.tertiary_assignee_id === techId
+  )
+}
+
+export const roundHours = (h: number): number => Math.round(h * 10) / 10
+
 // ─── Dagvy-positionering ───
 
 /** Tid → horisontell pixel-offset (dagvy) */

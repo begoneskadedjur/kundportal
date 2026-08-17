@@ -1,7 +1,7 @@
 // WeekGridView.tsx — Vertikal tidsgrid, Google Calendar-stil
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
-import { isSameDay, getWeekStart, getWeekDays, formatTime, isTechWorkingAt, getTechWeekCapacity } from './scheduleUtils'
+import { isSameDay, getWeekStart, getWeekDays, formatTime, isTechWorkingAt, getTechWeekCapacity, splitScheduledHours, casesForTechnician, roundHours } from './scheduleUtils'
 import type { WorkSchedule } from '../../../types/database'
 import { TECH_COLORS, WEEK_HOUR_HEIGHT, WEEK_TIME_COL_WIDTH, WEEK_DAY_START, WEEK_DAY_END, WEEK_TOTAL_HOURS, WEEK_GRID_HEIGHT, SNAP_MINUTES } from './scheduleConstants'
 import { GridEventCard } from './GridEventCard'
@@ -90,7 +90,7 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
     return m
   }, [technicians])
 
-  // Tekniker med ärenden denna vecka (för legende)
+  // Tekniker med ärenden denna vecka (för legende) — alla tre roller räknas
   const activeTechs = useMemo(() => {
     const techIdsThisWeek = new Set(
       cases
@@ -98,7 +98,7 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
           const d = c.start_date || c.due_date
           return d && weekDays.some(w => isSameDay(new Date(d), w))
         })
-        .map(c => c.primary_assignee_id)
+        .flatMap(c => [c.primary_assignee_id, c.secondary_assignee_id, c.tertiary_assignee_id])
         .filter(Boolean)
     )
     return technicians
@@ -106,28 +106,24 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
       .filter(t => techIdsThisWeek.has(t.id))
   }, [technicians, cases, weekDays])
 
-  // Beläggning per tekniker denna vecka
+  // Beläggning per tekniker denna vecka — alla roller, uppdelat engång/avtal
   const techCapacityMap = useMemo(() => {
-    const map = new Map<string, { scheduled: number; capacity: number; pct: number; colorClass: string }>()
+    const map = new Map<string, { scheduled: number; engang: number; avtal: number; capacity: number; pct: number; colorClass: string }>()
+    const weekCases = cases.filter(c => {
+      const d = c.start_date || c.due_date
+      return d && weekDays.some(w => isSameDay(new Date(d), w))
+    })
     for (const t of activeTechs) {
       const cap = getTechWeekCapacity(t.work_schedule as any, weekStart)
-      let scheduled = 0
-      for (const c of cases) {
-        if (c.primary_assignee_id !== t.id) continue
-        const d = c.start_date || c.due_date
-        if (!d || !weekDays.some(w => isSameDay(new Date(d), w))) continue
-        if (c.start_date && c.due_date) {
-          scheduled += (new Date(c.due_date).getTime() - new Date(c.start_date).getTime()) / 3_600_000
-        }
-      }
-      const s = Math.round(scheduled * 10) / 10
-      const pct = cap > 0 ? Math.round((scheduled / cap) * 10000) / 100 : 0
+      const split = splitScheduledHours(casesForTechnician(weekCases, t.id))
+      const s = roundHours(split.total)
+      const pct = cap > 0 ? Math.round((split.total / cap) * 10000) / 100 : 0
       const colorClass = cap === 0 || pct === 0
         ? 'text-slate-500'
         : pct < 70 ? 'text-emerald-400'
         : pct < 90 ? 'text-amber-400'
         : 'text-red-400'
-      map.set(t.id, { scheduled: s, capacity: cap, pct, colorClass })
+      map.set(t.id, { scheduled: s, engang: roundHours(split.engang), avtal: roundHours(split.avtal), capacity: cap, pct, colorClass })
     }
     return map
   }, [activeTechs, cases, weekStart, weekDays])
@@ -238,9 +234,18 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                   <span className="font-medium">{shortName}</span>
                 </div>
                 {cap && (
-                  <div className={`text-[10px] font-normal pl-3.5 mt-0.5 ${cap.colorClass}`}>
-                    {cap.scheduled}h / {cap.capacity}h · {cap.pct}%
-                  </div>
+                  <>
+                    <div className={`text-[10px] font-normal pl-3.5 mt-0.5 ${cap.colorClass}`}>
+                      {cap.scheduled}h / {cap.capacity}h · {cap.pct}%
+                    </div>
+                    {cap.scheduled > 0 && (
+                      <div className="text-[10px] font-normal pl-3.5">
+                        <span className="text-[#20c58f]">{cap.engang}h engång</span>
+                        <span className="text-slate-600"> · </span>
+                        <span className="text-violet-400">{cap.avtal}h avtal</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </button>
             )

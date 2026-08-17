@@ -1,7 +1,7 @@
 // MonthGridView.tsx — Månadsvy med 4-6 veckors grid
 import { useMemo, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
-import { isSameDay, formatTime, isTechWorkingDay, isTechWorkingAt, getTechMonthCapacity } from './scheduleUtils'
+import { isSameDay, formatTime, isTechWorkingDay, isTechWorkingAt, getTechMonthCapacity, splitScheduledHours, casesForTechnician, roundHours } from './scheduleUtils'
 import { TECH_COLORS, WEEK_DAY_START, WEEK_DAY_END, SNAP_MINUTES } from './scheduleConstants'
 import type { WorkSchedule } from '../../../types/database'
 import { GridEventCard } from './GridEventCard'
@@ -108,36 +108,37 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
   }, [technicians])
 
   const activeTechs = useMemo(() => {
-    const ids = new Set(cases.map(c => c.primary_assignee_id).filter(Boolean))
+    // Alla tre roller räknas — även tekniker som bara är medtekniker syns
+    const ids = new Set(
+      cases
+        .flatMap(c => [c.primary_assignee_id, c.secondary_assignee_id, c.tertiary_assignee_id])
+        .filter(Boolean)
+    )
     return technicians.map((t, i) => ({ ...t, idx: i })).filter(t => ids.has(t.id))
   }, [technicians, cases])
 
-  // Beläggning per tekniker denna månad
+  // Beläggning per tekniker denna månad — alla roller, uppdelat engång/avtal
   const techCapacityMap = useMemo(() => {
     const year = currentDate.getFullYear()
     const month = currentDate.getMonth()
-    const map = new Map<string, { scheduled: number; capacity: number; pct: number; colorClass: string }>()
+    const map = new Map<string, { scheduled: number; engang: number; avtal: number; capacity: number; pct: number; colorClass: string }>()
+    const monthCases = cases.filter(c => {
+      const d = c.start_date || c.due_date
+      if (!d) return false
+      const cDate = new Date(d)
+      return cDate.getFullYear() === year && cDate.getMonth() === month
+    })
     for (const t of activeTechs) {
       const cap = getTechMonthCapacity(t.work_schedule as any, year, month)
-      let scheduled = 0
-      for (const c of cases) {
-        if (c.primary_assignee_id !== t.id) continue
-        const d = c.start_date || c.due_date
-        if (!d) continue
-        const cDate = new Date(d)
-        if (cDate.getFullYear() !== year || cDate.getMonth() !== month) continue
-        if (c.start_date && c.due_date) {
-          scheduled += (new Date(c.due_date).getTime() - new Date(c.start_date).getTime()) / 3_600_000
-        }
-      }
-      const s = Math.round(scheduled * 10) / 10
-      const pct = cap > 0 ? Math.round((scheduled / cap) * 10000) / 100 : 0
+      const split = splitScheduledHours(casesForTechnician(monthCases, t.id))
+      const s = roundHours(split.total)
+      const pct = cap > 0 ? Math.round((split.total / cap) * 10000) / 100 : 0
       const colorClass = cap === 0 || pct === 0
         ? 'text-slate-500'
         : pct < 70 ? 'text-emerald-400'
         : pct < 90 ? 'text-amber-400'
         : 'text-red-400'
-      map.set(t.id, { scheduled: s, capacity: cap, pct, colorClass })
+      map.set(t.id, { scheduled: s, engang: roundHours(split.engang), avtal: roundHours(split.avtal), capacity: cap, pct, colorClass })
     }
     return map
   }, [activeTechs, cases, currentDate])
@@ -199,9 +200,18 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                   <span className="font-medium">{shortName}</span>
                 </div>
                 {cap && (
-                  <div className={`text-[10px] font-normal pl-3.5 mt-0.5 ${cap.colorClass}`}>
-                    {cap.scheduled}h / {cap.capacity}h · {cap.pct}%
-                  </div>
+                  <>
+                    <div className={`text-[10px] font-normal pl-3.5 mt-0.5 ${cap.colorClass}`}>
+                      {cap.scheduled}h / {cap.capacity}h · {cap.pct}%
+                    </div>
+                    {cap.scheduled > 0 && (
+                      <div className="text-[10px] font-normal pl-3.5">
+                        <span className="text-[#20c58f]">{cap.engang}h engång</span>
+                        <span className="text-slate-600"> · </span>
+                        <span className="text-violet-400">{cap.avtal}h avtal</span>
+                      </div>
+                    )}
+                  </>
                 )}
               </button>
             )

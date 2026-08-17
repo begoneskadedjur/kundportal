@@ -74,7 +74,8 @@ export function ScheduleGrid({
     for (const t of technicians) map.set(t.id, [])
 
     for (const c of dateCases) {
-      const ids = [c.primary_assignee_id, c.secondary_assignee_id, c.tertiary_assignee_id].filter(Boolean) as string[]
+      // Set: en tekniker med flera roller på samma ärende får det bara en gång
+      const ids = [...new Set([c.primary_assignee_id, c.secondary_assignee_id, c.tertiary_assignee_id].filter(Boolean))] as string[]
       for (const id of ids) {
         const arr = map.get(id)
         if (arr) arr.push(c)
