@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
+import { formatAddress } from '../../utils/addressFormatter'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -402,7 +403,7 @@ export default function EditContractCaseModal({
         alternative_contact_person: caseData.alternative_contact_person || '',
         alternative_contact_phone: caseData.alternative_contact_phone || '',
         alternative_contact_email: caseData.alternative_contact_email || '',
-        address: caseData.address?.formatted_address || caseData.address || caseData.adress || '',
+        address: formatAddress(caseData.address || caseData.adress),
         pest_type: caseData.pest_type || caseData.skadedjur || '',
         other_pest_type: caseData.other_pest_type || caseData.annat_skadedjur || '',
         service_id: caseData.service_id || null,
@@ -551,7 +552,8 @@ export default function EditContractCaseModal({
           contact_person: data.contact_person ?? prev.contact_person,
           contact_phone: data.contact_phone ?? prev.contact_phone,
           contact_email: data.contact_email ?? prev.contact_email,
-          address: data.address ?? prev.address,
+          // data.address kan vara ett JSON-objekt ({formatted_address}) — rendera aldrig rått
+          address: data.address != null ? formatAddress(data.address) : prev.address,
           pest_type: data.pest_type ?? prev.pest_type,
           scheduled_start: data.scheduled_start ? new Date(data.scheduled_start) : prev.scheduled_start,
           scheduled_end: data.scheduled_end ? new Date(data.scheduled_end) : prev.scheduled_end,
@@ -632,7 +634,7 @@ export default function EditContractCaseModal({
           contact_person: prev.contact_person || finalCustomerData.contact_person || '',
           contact_email: prev.contact_email || finalCustomerData.contact_email || '',
           contact_phone: prev.contact_phone || finalCustomerData.contact_phone || '',
-          address: prev.address || finalCustomerData.contact_address || ''
+          address: prev.address || formatAddress(finalCustomerData.contact_address)
         }))
       }
     } catch (error) {
@@ -962,7 +964,7 @@ export default function EditContractCaseModal({
     const contactPerson = selectedRecipient?.contactPerson || formData.contact_person || customerData?.contact_person || ''
     const email = selectedRecipient?.contactEmail || formData.contact_email || customerData?.contact_email || ''
     const phone = selectedRecipient?.contactPhone || formData.contact_phone || customerData?.contact_phone || ''
-    const address = formData.address || customerData?.contact_address || ''
+    const address = formData.address || formatAddress(customerData?.contact_address)
     
     console.log('prepareCustomerDataForOneflow - Contact data source:', {
       selectedRecipient: selectedRecipient ? {

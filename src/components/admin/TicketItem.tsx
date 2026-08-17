@@ -23,6 +23,7 @@ import type { CaseType } from '../../types/communication';
 import { formatDistanceToNow } from 'date-fns';
 import { sv } from 'date-fns/locale';
 import type { TicketDirection } from './TicketViewTabs';
+import { formatAddress } from '../../utils/addressFormatter';
 
 interface TicketItemProps {
   ticket: Ticket;
@@ -313,10 +314,10 @@ export function TicketItem({
         )}
 
         {/* Adress - Dölj på mobil om det blir för trångt */}
-        {adress && (
+        {formatAddress(adress) && (
           <div className="hidden sm:flex items-center gap-1.5">
             <MapPin className="w-3.5 h-3.5" />
-            <span className="truncate max-w-[200px]">{adress}</span>
+            <span className="truncate max-w-[200px]">{formatAddress(adress)}</span>
           </div>
         )}
 

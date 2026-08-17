@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { CaseWithEvents, CaseEvent, CaseEventType } from '../../services/communicationService';
 import { formatDistanceToNow } from '../../utils/dateUtils';
+import { formatAddress } from '../../utils/addressFormatter';
 
 interface CaseEventCardProps {
   caseData: CaseWithEvents;
@@ -207,10 +208,10 @@ export default function CaseEventCard({ caseData, onOpenCase, onMarkResolved, is
                     {caseData.skadedjur}
                   </span>
                 )}
-                {caseData.adress && (
+                {formatAddress(caseData.adress) && (
                   <span className="flex items-center gap-1 truncate">
                     <MapPin className="w-3 h-3" />
-                    {caseData.adress}
+                    {formatAddress(caseData.adress)}
                   </span>
                 )}
               </div>

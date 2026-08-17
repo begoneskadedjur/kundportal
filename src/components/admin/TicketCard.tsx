@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import type { Ticket, CaseComment } from '../../types/communication';
 import { formatDistanceToNow } from '../../utils/dateUtils';
+import { formatAddress } from '../../utils/addressFormatter';
 
 interface TicketCardProps {
   ticket: Ticket;
@@ -210,10 +211,10 @@ export default function TicketCard({
                     {(ticket as any).service?.name || ticket.skadedjur}
                   </span>
                 )}
-                {ticket.adress && (
+                {formatAddress(ticket.adress) && (
                   <span className="flex items-center gap-1 truncate">
                     <MapPin className="w-3 h-3" />
-                    {ticket.adress}
+                    {formatAddress(ticket.adress)}
                   </span>
                 )}
               </div>
