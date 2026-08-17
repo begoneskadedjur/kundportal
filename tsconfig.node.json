@@ -19,6 +19,7 @@
     "src/lib/clickup.ts",
     "src/lib/supabase-admin.ts",
     "src/lib/pdf-generator.ts",
+    "src/lib/begoneLogo.ts",
     "src/types/database.ts"
 
     // OBS: vite.config.ts kan inte typkollas här — Vite är ESM-only och detta
