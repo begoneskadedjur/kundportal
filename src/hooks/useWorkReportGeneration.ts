@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { supabase, getAuthHeaders } from '../lib/supabase'
 import { sanitationReportService, type SanitationReport } from '../services/sanitationReportService'
+import { CaseImageService } from '../services/caseImageService'
 import { useAuth } from '../contexts/AuthContext'
 
 interface TechnicianCase {
@@ -126,6 +127,17 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       .eq('case_type', caseTypeForPrep)
       .eq('item_type', 'service')
       .neq('status', 'cancelled')
+
+    // Hämta ärendets bilder (signerade URL:er, 1 h giltighet - räcker för genereringen)
+    let images: Array<{ url: string; tags?: string[]; description?: string | null }> = []
+    try {
+      const caseImages = await CaseImageService.getCaseImages(caseData.id, caseTypeForPrep)
+      images = caseImages
+        .filter(img => img.url)
+        .map(img => ({ url: img.url, tags: img.tags, description: img.description ?? null }))
+    } catch (err) {
+      console.warn('Kunde inte hämta ärendebilder för rapporten:', err)
+    }
 
     // Hämta tjänstenamn från service_id (undervalet i tjänsteutbud)
     let serviceName = caseData.skadedjur || ''
@@ -298,7 +310,8 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       taskDetails,
       customerInfo,
       preparations: (preparations || []) as any[],
-      billingItems: (billingItems || []) as any[]
+      billingItems: (billingItems || []) as any[],
+      images
     }
   }
 
@@ -435,7 +448,7 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
       
       setIsGenerating(true)
 
-      const { taskDetails, customerInfo, preparations, billingItems } = await createReportData()
+      const { taskDetails, customerInfo, preparations, billingItems, images } = await createReportData()
 
       // Anropa Puppeteer-baserad PDF-generator
       const response = await fetch('/api/generate-work-report', {
@@ -445,7 +458,8 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
           taskDetails,
           customerInfo,
           preparations,
-          billingItems
+          billingItems,
+          images
         })
       })
 
@@ -562,14 +576,17 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     try {
       setIsGenerating(true)
       
-      const { taskDetails, customerInfo } = await createReportData()
-      
+      const { taskDetails, customerInfo, preparations, billingItems, images } = await createReportData()
+
       const response = await fetch('/api/send-work-report', {
         method: 'POST',
         headers: await getAuthHeaders(),
         body: JSON.stringify({
           taskDetails,
           customerInfo,
+          preparations,
+          billingItems,
+          images,
           recipientType: 'technician',
           recipientEmail: technicianEmail,
           recipientName: technicianName
@@ -631,14 +648,17 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
     try {
       setIsGenerating(true)
       
-      const { taskDetails, customerInfo } = await createReportData()
-      
+      const { taskDetails, customerInfo, preparations, billingItems, images } = await createReportData()
+
       const response = await fetch('/api/send-work-report', {
         method: 'POST',
         headers: await getAuthHeaders(),
         body: JSON.stringify({
           taskDetails,
           customerInfo,
+          preparations,
+          billingItems,
+          images,
           recipientType: 'contact',
           recipientEmail: caseData.e_post_kontaktperson,
           recipientName: caseData.kontaktperson

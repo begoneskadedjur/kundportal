@@ -64,6 +64,22 @@ export interface BillingItem {
   article_code: string | null;
 }
 
+export interface ReportImage {
+  /** Signerad eller publik URL som Chromium kan hämta vid rendering */
+  url: string;
+  tags?: string[];
+  description?: string | null;
+}
+
+// Bildtaggar → svensk etikett (samma taggar som CaseImageGallery)
+const IMAGE_TAG_LABELS: Record<string, string> = {
+  before: 'Före',
+  after: 'Efter',
+  general: 'Övrigt',
+  pr: 'PR',
+  education: 'Utbildning',
+}
+
 // Helper function to find custom field
 const getFieldValue = (taskDetails: TaskDetails, fieldName: string) => {
   return taskDetails.custom_fields.find(field =>
@@ -153,7 +169,8 @@ export const generateWorkReportHTML = (
   customerInfo: CustomerInfo,
   preparations: PreparationItem[] = [],
   billingItems: BillingItem[] = [],
-  mapUrl: string | null = null
+  mapUrl: string | null = null,
+  images: ReportImage[] = []
 ) => {
   // Get all relevant custom fields
   const addressField = getFieldValue(taskDetails, 'adress')
@@ -234,7 +251,28 @@ export const generateWorkReportHTML = (
       <div class="report-text prewrap">${esc(reportField.value)}</div>
     </section>` : ''
 
-  // 3. Använda preparat
+  // 3. Bilder från ärendet (signerade URL:er hämtas av Chromium vid rendering)
+  const imagesSection = images.length > 0 ? `
+    <section class="section">
+      ${sectionTitle('Bilder från ärendet')}
+      <div class="image-grid">
+        ${images.map(img => {
+          const tagLabel = img.tags?.length ? IMAGE_TAG_LABELS[img.tags[0]] || '' : ''
+          return `
+          <figure class="image-item">
+            <img src="${img.url}" alt="Ärendebild" />
+            ${tagLabel || img.description ? `
+              <figcaption>
+                ${tagLabel ? `<span class="image-tag">${esc(tagLabel)}</span>` : ''}
+                ${img.description ? esc(img.description) : ''}
+              </figcaption>
+            ` : ''}
+          </figure>`
+        }).join('')}
+      </div>
+    </section>` : ''
+
+  // 4. Använda preparat
   const preparationsSection = preparations.length > 0 ? `
     <section class="section">
       ${sectionTitle('Använda preparat')}
@@ -254,7 +292,7 @@ export const generateWorkReportHTML = (
       </table>
     </section>` : ''
 
-  // 4. Utförda tjänster & material (aldrig priser i ärenderapporter)
+  // 5. Utförda tjänster & material (aldrig priser i ärenderapporter)
   const billingSection = billingItems.length > 0 ? `
     <section class="section">
       ${sectionTitle('Utförda tjänster & material')}
@@ -273,7 +311,7 @@ export const generateWorkReportHTML = (
       </table>
     </section>` : ''
 
-  // 5. Uppgifter — kund och leverantör sida vid sida, kompakt
+  // 6. Uppgifter — kund och leverantör sida vid sida, kompakt
   const partiesSection = `
     <section class="section">
       ${sectionTitle('Uppgifter')}
@@ -385,6 +423,43 @@ export const generateWorkReportHTML = (
     /* ── Utfört arbete ── */
     .report-text { font-size: 10.5pt; line-height: 1.6; }
 
+    /* ── Bilder ── */
+    .image-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .image-item {
+      border: 1px solid ${colors.border};
+      border-radius: 4px;
+      overflow: hidden;
+      page-break-inside: avoid;
+    }
+    .image-item img {
+      width: 100%;
+      height: 190px;
+      object-fit: cover;
+      display: block;
+    }
+    .image-item figcaption {
+      font-size: 8.5pt;
+      color: ${colors.label};
+      padding: 4px 8px;
+      border-top: 1px solid ${colors.border};
+    }
+    .image-tag {
+      display: inline-block;
+      background: ${colors.accent};
+      color: #fff;
+      font-size: 7pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 999px;
+      padding: 1px 7px;
+      margin-right: 6px;
+    }
+
     /* ── Tabeller ── */
     .data-table {
       width: 100%;
@@ -459,6 +534,7 @@ export const generateWorkReportHTML = (
 
   ${caseInfoSection}
   ${workReportSection}
+  ${imagesSection}
   ${preparationsSection}
   ${billingSection}
   ${partiesSection}
@@ -474,7 +550,8 @@ export async function generateWorkReportPDF(
   taskDetails: TaskDetails,
   customerInfo: CustomerInfo,
   preparations: PreparationItem[] = [],
-  billingItems: BillingItem[] = []
+  billingItems: BillingItem[] = [],
+  images: ReportImage[] = []
 ): Promise<Buffer> {
   let browser = null
 
@@ -494,7 +571,7 @@ export async function generateWorkReportPDF(
     }
 
     // Generate HTML
-    const html = generateWorkReportHTML(taskDetails, customerInfo, preparations, billingItems, mapUrl)
+    const html = generateWorkReportHTML(taskDetails, customerInfo, preparations, billingItems, mapUrl, images)
 
     // Launch Puppeteer
     browser = await puppeteer.launch({
@@ -555,9 +632,10 @@ export async function generateWorkReportBase64(
   taskDetails: TaskDetails,
   customerInfo: CustomerInfo,
   preparations: PreparationItem[] = [],
-  billingItems: BillingItem[] = []
+  billingItems: BillingItem[] = [],
+  images: ReportImage[] = []
 ): Promise<{ pdf: string; filename: string }> {
-  const pdfBuffer = await generateWorkReportPDF(taskDetails, customerInfo, preparations, billingItems)
+  const pdfBuffer = await generateWorkReportPDF(taskDetails, customerInfo, preparations, billingItems, images)
   const pdfBase64 = pdfBuffer.toString('base64')
   const filename = `Saneringsrapport_${taskDetails.task_id}_${new Date().toISOString().split('T')[0]}.pdf`
 

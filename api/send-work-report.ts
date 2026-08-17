@@ -75,6 +75,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       customerInfo,
       caseData,
       customerData,
+      preparations = [],
+      billingItems = [],
+      images = [],
       pdf: pdfBase64,
       filename: pdfFilename,
       recipientType,
@@ -112,8 +115,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       status = caseData.status || 'Okänd'
       techName = caseData.primary_technician_name || caseData.assignee_name
     } else if (taskDetails && customerInfo) {
-      // Gammalt flöde — generera PDF internt
-      pdfBuffer = await generateWorkReportPDF(taskDetails, customerInfo)
+      // Gammalt flöde — generera PDF internt (med preparat, tjänster och bilder)
+      pdfBuffer = await generateWorkReportPDF(taskDetails, customerInfo, preparations, billingItems, images)
       caseNumber = taskDetails.task_info?.name || taskDetails.task_id || 'Okänt'
       contactPersonName = customerInfo.contact_person || recipientName || ''
       const addrField = taskDetails.custom_fields?.find((f: any) => f.name?.toLowerCase() === 'adress' && f.has_value)
