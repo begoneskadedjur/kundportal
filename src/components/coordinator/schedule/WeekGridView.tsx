@@ -2,6 +2,7 @@
 import { useMemo, useRef, useEffect, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
 import { isSameDay, getWeekStart, getWeekDays, formatTime, isTechWorkingAt, getTechWeekCapacity, splitScheduledHours, casesForTechnician, roundHours } from './scheduleUtils'
+import { CapacitySplitBars } from './CapacitySplitBars'
 import type { WorkSchedule } from '../../../types/database'
 import { TECH_COLORS, WEEK_HOUR_HEIGHT, WEEK_TIME_COL_WIDTH, WEEK_DAY_START, WEEK_DAY_END, WEEK_TOTAL_HOURS, WEEK_GRID_HEIGHT, SNAP_MINUTES } from './scheduleConstants'
 import { GridEventCard } from './GridEventCard'
@@ -238,13 +239,10 @@ export function WeekGridView({ technicians, cases, currentDate, onCaseClick, onD
                     <div className={`text-[10px] font-normal pl-3.5 mt-0.5 ${cap.colorClass}`}>
                       {cap.scheduled}h / {cap.capacity}h · {cap.pct}%
                     </div>
-                    {cap.scheduled > 0 && (
-                      <div className="text-[10px] font-normal pl-3.5">
-                        <span className="text-[#20c58f]">{cap.engang}h engång</span>
-                        <span className="text-slate-600"> · </span>
-                        <span className="text-violet-400">{cap.avtal}h avtal</span>
-                      </div>
-                    )}
+                    {/* Dubbla mini-barer: Engångskunder vs Avtalskunder */}
+                    <div className="pl-3.5 mt-1 w-32">
+                      <CapacitySplitBars engang={cap.engang} avtal={cap.avtal} capacity={cap.capacity} />
+                    </div>
                   </>
                 )}
               </button>

@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react'
 import { BeGoneCaseRow, Technician } from '../../../types/database'
 import { isSameDay, formatTime, isTechWorkingDay, isTechWorkingAt, getTechMonthCapacity, splitScheduledHours, casesForTechnician, roundHours } from './scheduleUtils'
+import { CapacitySplitBars } from './CapacitySplitBars'
 import { TECH_COLORS, WEEK_DAY_START, WEEK_DAY_END, SNAP_MINUTES } from './scheduleConstants'
 import type { WorkSchedule } from '../../../types/database'
 import { GridEventCard } from './GridEventCard'
@@ -204,13 +205,10 @@ export function MonthGridView({ technicians, cases, currentDate, onCaseClick, on
                     <div className={`text-[10px] font-normal pl-3.5 mt-0.5 ${cap.colorClass}`}>
                       {cap.scheduled}h / {cap.capacity}h · {cap.pct}%
                     </div>
-                    {cap.scheduled > 0 && (
-                      <div className="text-[10px] font-normal pl-3.5">
-                        <span className="text-[#20c58f]">{cap.engang}h engång</span>
-                        <span className="text-slate-600"> · </span>
-                        <span className="text-violet-400">{cap.avtal}h avtal</span>
-                      </div>
-                    )}
+                    {/* Dubbla mini-barer: Engångskunder vs Avtalskunder */}
+                    <div className="pl-3.5 mt-1 w-32">
+                      <CapacitySplitBars engang={cap.engang} avtal={cap.avtal} capacity={cap.capacity} />
+                    </div>
                   </>
                 )}
               </button>
