@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   CalendarRange, Plus, Pause, Play, Trash2, Edit3,
   Loader2, Search, ChevronDown, ChevronUp, X,
-  Calendar, Clock, User, ExternalLink, Building2
+  Calendar, Clock, User, ExternalLink, Building2, Users
 } from 'lucide-react'
 import { format, differenceInMonths } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -21,6 +21,7 @@ import {
 } from '../../services/recurringScheduleService'
 import { RecurringScheduleWizard } from '../../components/technician/RecurringScheduleWizard'
 import { EditScheduleModal } from '../../components/technician/EditScheduleModal'
+import DistributeTechniciansModal from '../../components/coordinator/DistributeTechniciansModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'
 import RonderingCaseModal from '../../components/coordinator/RonderingCaseModal'
 import { FREQUENCY_CONFIG, DAY_PATTERN_CONFIG } from '../../types/recurringSchedule'
@@ -108,6 +109,20 @@ function serviceTypeBadge(type: string | null | undefined): string {
 
 function visitsPerPeriodLabel(frequency: RecurringFrequency): string {
   return FREQUENCY_CONFIG[frequency]?.description || frequency
+}
+
+// Tekniker-avatar med initialer — samma stil som ärendemodalens teknikersektion
+function TechAvatarBadge({ name, size = 'sm' }: { name: string; size?: 'sm' | 'md' }) {
+  const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+  const cls = size === 'sm' ? 'w-6 h-6 text-[9px]' : 'w-8 h-8 text-[10px]'
+  return (
+    <span
+      className={`${cls} rounded-full bg-[#20c58f]/20 border-2 border-[#20c58f] flex items-center justify-center font-bold text-[#20c58f] shrink-0`}
+      title={name}
+    >
+      {initials}
+    </span>
+  )
 }
 
 function periodRemainingLabel(contractEndDate: string | null): string {
@@ -392,10 +407,11 @@ interface ScheduleCardProps {
   onResume: () => void
   onCancel: (sessionCount: number) => void
   onEdit: () => void
+  onSwapTechnician: () => void
   actionLoading: string | null
 }
 
-function ScheduleCard({ schedule, onPause, onResume, onCancel, onEdit, actionLoading }: ScheduleCardProps) {
+function ScheduleCard({ schedule, onPause, onResume, onCancel, onEdit, onSwapTechnician, actionLoading }: ScheduleCardProps) {
   const [expanded, setExpanded] = useState(false)
   const [sessions, setSessions] = useState<FutureSession[]>([])
   const [loadingSessions, setLoadingSessions] = useState(false)
@@ -493,9 +509,18 @@ function ScheduleCard({ schedule, onPause, onResume, onCancel, onEdit, actionLoa
                 {schedule.preferred_time} ({schedule.estimated_duration_minutes} min)
               </span>
               <span className="text-xs text-slate-500">·</span>
-              <span className="flex items-center gap-1 text-xs text-slate-400">
-                <User className="w-3 h-3" />
-                {schedule.technician?.name || '—'}
+              <span className="flex items-center gap-1.5 text-xs text-slate-300">
+                {schedule.technician?.name ? (
+                  <>
+                    <TechAvatarBadge name={schedule.technician.name} />
+                    {schedule.technician.name}
+                  </>
+                ) : (
+                  <>
+                    <User className="w-3 h-3" />
+                    —
+                  </>
+                )}
               </span>
             </div>
 
@@ -526,6 +551,14 @@ function ScheduleCard({ schedule, onPause, onResume, onCancel, onEdit, actionLoa
 
           {/* Action buttons */}
           <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={onSwapTechnician}
+              disabled={loading}
+              title="Byt tekniker"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-[#20c58f] hover:bg-slate-700 transition-colors disabled:opacity-40"
+            >
+              <Users className="w-3.5 h-3.5" />
+            </button>
             <button
               onClick={onEdit}
               disabled={loading}
@@ -747,16 +780,24 @@ interface OrgGroupCardProps {
   onEdit: (id: string) => void
   onAddUnit: (unit: UnitRow) => void
   onScheduleAll: () => void
+  onSwapTechnician: (schedules: RecurringScheduleWithRelations[], title: string) => void
 }
 
 function OrgGroupCard({
-  group, actionLoading, onPause, onResume, onCancel, onEdit, onAddUnit, onScheduleAll
+  group, actionLoading, onPause, onResume, onCancel, onEdit, onAddUnit, onScheduleAll, onSwapTechnician
 }: OrgGroupCardProps) {
   const [expanded, setExpanded] = useState(true)
 
   const totalSchedules = group.units.reduce((sum, u) => sum + u.schedules.length, 0)
   const unitsWithout = group.units.filter(u => u.schedules.length === 0).length
   const unitLabel = group.isRegional ? 'regioner' : 'enheter'
+  const allSchedules = group.units.flatMap(u => u.schedules)
+  // Unika tekniker som driftar organisationens scheman (för avatarer i headern)
+  const orgTechnicians = [...new Map(
+    allSchedules
+      .filter(s => s.technician?.name)
+      .map(s => [s.technician!.id, s.technician!.name])
+  ).entries()]
 
   return (
     <div className="bg-slate-800/20 border border-slate-700/60 rounded-xl overflow-hidden">
@@ -776,17 +817,43 @@ function OrgGroupCard({
               {unitsWithout} utan schema
             </span>
           )}
+          {/* Tekniker som driftar organisationens scheman */}
+          {orgTechnicians.length > 0 && (
+            <span className="flex -space-x-1.5 shrink-0 ml-1">
+              {orgTechnicians.slice(0, 4).map(([id, name]) => (
+                <span key={id} className="ring-2 ring-slate-900 rounded-full">
+                  <TechAvatarBadge name={name} />
+                </span>
+              ))}
+              {orgTechnicians.length > 4 && (
+                <span className="w-6 h-6 rounded-full bg-slate-700 border-2 border-slate-600 flex items-center justify-center text-[9px] font-bold text-slate-300 ring-2 ring-slate-900">
+                  +{orgTechnicians.length - 4}
+                </span>
+              )}
+            </span>
+          )}
           {expanded ? <ChevronUp className="w-4 h-4 text-slate-400 shrink-0 ml-auto" /> : <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 ml-auto" />}
         </button>
-        {unitsWithout > 0 && (
-          <button
-            onClick={onScheduleAll}
-            className="ml-3 flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#fff] bg-[#20c58f] hover:bg-[#1aaa7a] rounded-lg transition-colors shrink-0"
-          >
-            <Plus className="w-3 h-3" />
-            Schemalägg alla
-          </button>
-        )}
+        <div className="flex items-center gap-2 ml-3 shrink-0">
+          {totalSchedules > 0 && (
+            <button
+              onClick={() => onSwapTechnician(allSchedules, group.parentName)}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#20c58f] border border-[#20c58f]/40 hover:bg-[#20c58f]/10 rounded-lg transition-colors"
+            >
+              <Users className="w-3 h-3" />
+              Fördela tekniker
+            </button>
+          )}
+          {unitsWithout > 0 && (
+            <button
+              onClick={onScheduleAll}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-[#fff] bg-[#20c58f] hover:bg-[#1aaa7a] rounded-lg transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              Schemalägg alla
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Units list */}
@@ -820,6 +887,7 @@ function OrgGroupCard({
                       onResume={() => onResume(s.id)}
                       onCancel={(sessionCount) => onCancel(s.id, unit.siteName, sessionCount)}
                       onEdit={() => onEdit(s.id)}
+                      onSwapTechnician={() => onSwapTechnician([s], unit.siteName)}
                       actionLoading={actionLoading}
                     />
                   ))}
@@ -859,6 +927,8 @@ export function RonderingSchedulePage() {
   } | null>(null)
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
   const [cancelTarget, setCancelTarget] = useState<{ id: string; customerName: string; sessionCount: number } | null>(null)
+  // Byt/fördela tekniker — ett schema (enskilt byte) eller flera (hel organisation)
+  const [swapTarget, setSwapTarget] = useState<{ schedules: RecurringScheduleWithRelations[]; title: string } | null>(null)
 
   const loadSchedules = useCallback(async () => {
     setLoading(true)
@@ -1082,6 +1152,7 @@ export function RonderingSchedulePage() {
                   onEdit={id => setEditScheduleId(id)}
                   onAddUnit={handleOpenSelectorForUnit}
                   onScheduleAll={() => setOrgBatchTarget(group)}
+                  onSwapTechnician={(scheds, title) => setSwapTarget({ schedules: scheds, title })}
                 />
               ))}
             </div>
@@ -1101,6 +1172,7 @@ export function RonderingSchedulePage() {
                   onResume={() => handleResume(s.id)}
                   onCancel={(sessionCount) => handleCancel(s.id, s.customer?.company_name || 'kunden', sessionCount)}
                   onEdit={() => setEditScheduleId(s.id)}
+                  onSwapTechnician={() => setSwapTarget({ schedules: [s], title: s.customer?.company_name || 'Schema' })}
                   actionLoading={actionLoading}
                 />
               ))}
@@ -1174,6 +1246,15 @@ export function RonderingSchedulePage() {
           onClose={() => setEditScheduleId(null)}
           onUpdated={() => { setEditScheduleId(null); loadSchedules() }}
           scheduleId={editScheduleId}
+        />
+      )}
+
+      {swapTarget && (
+        <DistributeTechniciansModal
+          schedules={swapTarget.schedules}
+          title={swapTarget.title}
+          onClose={() => setSwapTarget(null)}
+          onDone={() => { setSwapTarget(null); loadSchedules() }}
         />
       )}
     </div>

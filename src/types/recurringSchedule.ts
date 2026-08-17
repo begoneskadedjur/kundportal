@@ -210,6 +210,8 @@ export interface UpdateRecurringScheduleInput {
   status?: RecurringScheduleStatus
   notes?: string | null
   custom_frequency_config?: CustomFrequencyConfig | null
+  /** Teknikerbyte — framtida generering (klient + cron) följer nya teknikern */
+  technician_id?: string
 }
 
 // ============================================

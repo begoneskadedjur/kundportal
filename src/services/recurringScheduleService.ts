@@ -933,3 +933,184 @@ export async function getCustomerScheduleInfo(
     }))
   }
 }
+
+// ============================================
+// TEKNIKERBYTE / FÖRDELNING
+// ============================================
+
+export interface SwapVisitPreview {
+  sessionId: string
+  caseId: string | null
+  scheduledAt: string
+  scheduledEnd: string | null
+  /** Beskrivning av krocken — null betyder att besöket kan flyttas fritt */
+  conflict: string | null
+}
+
+/**
+ * Dry-run inför teknikerbyte: kollar varje framtida besök i schemat mot
+ * målteknikerns befintliga bokningar (alla fyra källor, alla tre roller),
+ * frånvaro och arbetsschema. Skriver ingenting.
+ */
+export async function previewTechnicianSwap(
+  scheduleId: string,
+  newTechnicianId: string
+): Promise<SwapVisitPreview[]> {
+  const sessions = (await getFutureSessionsForSchedule(scheduleId))
+    .filter(s => s.status === 'scheduled')
+  if (sessions.length === 0) return []
+
+  const from = new Date()
+  const lastStart = new Date(sessions[sessions.length - 1].scheduled_at)
+  const to = new Date(lastStart.getTime() + 24 * 3_600_000)
+
+  const [bookings, absences, techResult] = await Promise.all([
+    fetchTechnicianBookings(newTechnicianId, from, to),
+    fetchTechnicianAbsences(newTechnicianId, from, to),
+    supabase.from('technicians').select('work_schedule').eq('id', newTechnicianId).single(),
+  ])
+  const workSchedule = (techResult.data?.work_schedule ?? null) as {
+    [day: string]: { active: boolean; start: string; end: string } | undefined
+  } | null
+
+  const WEEK_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+
+  const withinWorkHours = (start: Date, end: Date): boolean => {
+    if (!workSchedule) return true
+    const day = workSchedule[WEEK_DAYS[start.getDay()]]
+    if (!day?.active) return false
+    const [sh, sm] = day.start.split(':').map(Number)
+    const [eh, em] = day.end.split(':').map(Number)
+    const startMin = start.getHours() * 60 + start.getMinutes()
+    const endMin = end.getHours() * 60 + end.getMinutes()
+    return startMin >= sh * 60 + sm && endMin <= eh * 60 + em
+  }
+
+  const fmtClash = (d: Date) =>
+    d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }) + ' ' +
+    d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+
+  return sessions.map(s => {
+    const start = new Date(s.scheduled_at)
+    const end = s.scheduled_end ? new Date(s.scheduled_end) : new Date(start.getTime() + 3_600_000)
+    const base = {
+      sessionId: s.id,
+      caseId: s.case_id,
+      scheduledAt: s.scheduled_at,
+      scheduledEnd: s.scheduled_end,
+    }
+
+    const clash = bookings.find(b => b.start < end && b.end > start)
+    if (clash) {
+      return { ...base, conflict: `Krockar med ${clash.title || 'annan bokning'} (${fmtClash(clash.start)})` }
+    }
+
+    const absent = absences.find(a => {
+      const aStart = new Date(a.start_date)
+      const aEnd = new Date(a.end_date)
+      return aStart < end && aEnd > start
+    })
+    if (absent) return { ...base, conflict: 'Teknikern är frånvarande' }
+
+    if (!withinWorkHours(start, end)) return { ...base, conflict: 'Utanför teknikerns arbetstid' }
+
+    return { ...base, conflict: null }
+  })
+}
+
+/**
+ * Genomför teknikerbyte för ett schema:
+ *  1. recurring_schedules.technician_id — så att all framtida generering
+ *     (klientflödet OCH cron-förlängningen) hamnar hos nya teknikern
+ *  2. Framtida sessions (status='scheduled') — täcker även cron-genererade
+ *     sessions som saknar cases-rad
+ *  3. Länkade framtida cases — byter BARA den roll där gamla teknikern står
+ *     (medtekniker på ärendet röras aldrig)
+ *
+ * Besök i skipSessionIds lämnas kvar hos nuvarande tekniker ("lämna kvar"
+ * vid krock). Historiska/utförda besök röras aldrig.
+ */
+export async function executeTechnicianSwap(
+  scheduleId: string,
+  newTechnicianId: string,
+  options: { skipSessionIds?: string[] } = {}
+): Promise<boolean> {
+  const { data: schedule } = await supabase
+    .from('recurring_schedules')
+    .select('technician_id')
+    .eq('id', scheduleId)
+    .single()
+  if (!schedule) return false
+  const oldTechnicianId = schedule.technician_id
+
+  const { data: newTech } = await supabase
+    .from('technicians')
+    .select('id, name, email')
+    .eq('id', newTechnicianId)
+    .single()
+  if (!newTech) return false
+
+  // 1. Schemat självt
+  const updated = await updateRecurringSchedule(scheduleId, { technician_id: newTechnicianId })
+  if (!updated) return false
+
+  const nowISO = new Date().toISOString()
+  const skip = new Set(options.skipSessionIds ?? [])
+
+  // 2. Framtida sessions
+  const { data: sessions } = await supabase
+    .from('station_inspection_sessions')
+    .select('id, case_id')
+    .eq('recurring_schedule_id', scheduleId)
+    .eq('status', 'scheduled')
+    .gt('scheduled_at', nowISO)
+
+  const targets = (sessions ?? []).filter(s => !skip.has(s.id))
+  const sessionIds = targets.map(s => s.id)
+  const caseIds = targets.map(s => s.case_id).filter(Boolean) as string[]
+
+  if (sessionIds.length > 0) {
+    const { error } = await supabase
+      .from('station_inspection_sessions')
+      .update({ technician_id: newTechnicianId, updated_at: nowISO })
+      .in('id', sessionIds)
+    if (error) {
+      console.error('executeTechnicianSwap: kunde inte uppdatera sessions:', error)
+      return false
+    }
+  }
+
+  // 3. Länkade cases — byt rollen där gamla teknikern står
+  if (caseIds.length > 0) {
+    const { data: caseRows } = await supabase
+      .from('cases')
+      .select('id, primary_technician_id, secondary_technician_id, tertiary_technician_id')
+      .in('id', caseIds)
+
+    for (const c of caseRows ?? []) {
+      const patch: Record<string, unknown> = { updated_at: nowISO }
+      if (c.primary_technician_id === oldTechnicianId || !c.primary_technician_id) {
+        patch.primary_technician_id = newTech.id
+        patch.primary_technician_name = newTech.name
+        patch.primary_technician_email = newTech.email ?? null
+      } else if (c.secondary_technician_id === oldTechnicianId) {
+        patch.secondary_technician_id = newTech.id
+        patch.secondary_technician_name = newTech.name
+        patch.secondary_technician_email = newTech.email ?? null
+      } else if (c.tertiary_technician_id === oldTechnicianId) {
+        patch.tertiary_technician_id = newTech.id
+        patch.tertiary_technician_name = newTech.name
+        patch.tertiary_technician_email = newTech.email ?? null
+      } else {
+        // Ärendet har flyttats manuellt till annan tekniker — rör det inte
+        continue
+      }
+      const { error } = await supabase.from('cases').update(patch).eq('id', c.id)
+      if (error) {
+        console.error('executeTechnicianSwap: kunde inte uppdatera case', c.id, error)
+      }
+    }
+  }
+
+  return true
+}
