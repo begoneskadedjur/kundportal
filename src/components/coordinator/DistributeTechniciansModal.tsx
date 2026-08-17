@@ -64,10 +64,12 @@ export default function DistributeTechniciansModal({
   const [executing, setExecuting] = useState(false)
 
   useEffect(() => {
+    // Bara fälttekniker — technicians-tabellen innehåller all personal
     supabase
       .from('technicians')
       .select('id, name')
       .eq('is_active', true)
+      .eq('role', 'Skadedjurstekniker')
       .order('name')
       .then(({ data }) => setTechnicians((data as TechnicianOption[]) || []))
   }, [])
