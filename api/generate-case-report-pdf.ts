@@ -978,12 +978,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('case_id', caseData.id)
         .eq('case_type', 'contract')
 
-      // Hämta fakturarader
+      // Hämta fakturarader — ENDAST tjänsterader (item_type='service').
+      // Artikelrader är interna kostnader och ska aldrig visas i kundrapporter.
       const { data: billingItems } = await supabase
         .from('case_billing_items')
         .select('article_name, quantity')
         .eq('case_id', caseData.id)
         .eq('case_type', 'contract')
+        .eq('item_type', 'service')
+        .neq('status', 'cancelled')
 
       // Bygg Google Maps URL
       const googleMapsKey = process.env.GOOGLE_MAPS_API_KEY || ''
