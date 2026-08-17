@@ -6,6 +6,19 @@ import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuthenticated } from './_lib/auth'
+import { BEGONE_LOGO_DATA_URI } from '../src/lib/begoneLogo'
+
+// Färgpalett enligt Begones dokumentstandard (används av single-case-mallen)
+const docColors = {
+  ink: '#0f172a',            // Rubriker
+  text: '#1f2937',           // Brödtext
+  label: '#6b7280',          // Etiketter / dämpad text
+  accent: '#20c58f',         // Brandgrön
+  tableHeaderBg: '#f0fdf9',  // Ljusgrön tabellheader
+  zebra: '#fafafa',          // Zebra-rader
+  border: '#e5e7eb',         // Tunn grå border
+  rule: '#d1d5db',           // Sektionslinjer
+}
 
 // BeGone Professional Color Palette
 const beGoneColors = {
@@ -115,16 +128,16 @@ const getTrafficLightStatus = (pest_level: number | null, problem_rating: number
   }
 }
 
-// Generate HTML for single case report
-const TAG_LABELS: Record<string, string> = {
-  before: 'Före',
-  after: 'Efter',
-  general: 'Generell',
-  pr: 'PR',
-  education: 'Utbildning'
-}
+// Enkel HTML-escape för användarinmatad text (enradsvärden; nl2br hanterar flerradiga)
+const esc = (value: unknown): string =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
 
-const generateSingleCaseHTML = (
+// Generate HTML for single case report — följer Begones dokumentstandard
+// (samma formspråk som saneringsrapporten i src/lib/pdf-generator.ts)
+export const generateSingleCaseHTML = (
   caseData: any,
   customerData: any,
   _reportType: string,
@@ -139,448 +152,376 @@ const generateSingleCaseHTML = (
     : (caseData.address?.address || customerData?.contact_address || null)
   const hasTrafficLight = caseData.pest_level !== null || caseData.problem_rating !== null
 
+  const caseNumber = caseData.case_number || caseData.title || ''
+  const todayLong = new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })
+
+  // Sektioner numreras löpande — sektioner utan innehåll renderas inte alls
+  let sectionNo = 0
+  const sectionTitle = (title: string) =>
+    `<h2 class="section-title"><span class="section-no">${++sectionNo}.</span> ${title}</h2>`
+
+  // 1. Ärendeinformation
+  const infoRows: Array<[string, string]> = [
+    ['Datum för utförande', esc(formatDate(caseData.scheduled_start))],
+    ['Arbetsplats', esc(addressStr || 'Ej angivet')],
+    ['Tjänst', esc(caseData.pest_type || 'Ej specificerat')],
+    ['Ansvarig tekniker', esc(caseData.primary_technician_name || 'Ej tilldelad')],
+  ]
+  if (caseData.visit_number && caseData.visit_number > 1) infoRows.push(['Besök nr', esc(caseData.visit_number)])
+  if (caseData.work_order_number) infoRows.push(['Arbetsorder nr', esc(caseData.work_order_number)])
+  if (caseData.work_object) infoRows.push(['Objekt', esc(caseData.work_object)])
+
+  const caseInfoSection = `
+    <section class="section">
+      ${sectionTitle('Ärendeinformation')}
+      <div class="info-grid">
+        ${infoRows.map(([label, value]) => `
+          <div class="info-item">
+            <div class="info-label">${label}</div>
+            <div class="info-value">${value}</div>
+          </div>
+        `).join('')}
+        ${caseData.description ? `
+          <div class="info-item span-2">
+            <div class="info-label">Ärendebeskrivning</div>
+            <div class="info-value">${nl2br(caseData.description)}</div>
+          </div>
+        ` : ''}
+      </div>
+      ${mapUrl ? `
+        <div class="map-frame">
+          <img src="${mapUrl}" class="map-image" alt="Karta över arbetsplatsen" />
+        </div>
+      ` : ''}
+    </section>`
+
+  // 2. Utfört arbete — rapportens kärna. Renderas bara när det finns innehåll.
+  const workReportSection = caseData.work_report ? `
+    <section class="section">
+      ${sectionTitle('Utfört arbete')}
+      <div class="report-text">${nl2br(caseData.work_report)}</div>
+    </section>` : ''
+
+  // 3. Teknisk bedömning (trafikljus) — färgkodad callout
+  const assessmentSection = hasTrafficLight ? `
+    <section class="section">
+      ${sectionTitle('Teknisk bedömning')}
+      <div class="assessment" style="border-left-color: ${trafficLight.color};">
+        <div class="assessment-label" style="color: ${trafficLight.color};">${trafficLight.label}</div>
+        <div class="assessment-sub">Bedömning av vår tekniker efter inspektion på plats</div>
+        <div class="assessment-grid">
+          <div>
+            <div class="info-label">Aktivitetsnivå</div>
+            <div class="assessment-value" style="color: ${trafficLight.color};">Nivå ${caseData.pest_level || 0} av 3</div>
+            <div class="assessment-note">${(caseData.pest_level >= 3) ? 'Hög nivå - kräver omedelbar åtgärd' : (caseData.pest_level === 2) ? 'Medium nivå - bör åtgärdas' : 'Låg nivå - under kontroll'}</div>
+          </div>
+          <div>
+            <div class="info-label">Situationsbedömning</div>
+            <div class="assessment-value" style="color: ${trafficLight.color};">${caseData.problem_rating || 0} av 5</div>
+            <div class="assessment-note">${(caseData.problem_rating >= 4) ? 'Allvarligt - åtgärd krävs' : (caseData.problem_rating === 3) ? 'Medium - övervakning rekommenderas' : 'Låg - situationen är stabil'}</div>
+          </div>
+        </div>
+      </div>
+    </section>` : ''
+
+  // 4. Rekommendationer (+ ev. kundbekräftelse)
+  const recommendationsSection = caseData.recommendations ? `
+    <section class="section">
+      ${sectionTitle('Rekommendationer')}
+      <div class="report-text">${nl2br(caseData.recommendations)}</div>
+      ${caseData.recommendations_acknowledged ? `
+        <div class="ack-row">Bekräftat av kund ${esc(formatDate(caseData.recommendations_acknowledged_at))}</div>
+      ` : ''}
+    </section>` : ''
+
+  // 5. Bilder från ärendet
+  const imagesSection = images.length > 0 ? `
+    <section class="section">
+      ${sectionTitle('Bilder från ärendet')}
+      <div class="image-grid">
+        ${images.map(img => `
+          <figure class="image-item">
+            <img src="${img.url}" alt="Ärendebild" />
+            ${img.description ? `<figcaption>${esc(img.description)}</figcaption>` : ''}
+          </figure>`
+        ).join('')}
+      </div>
+    </section>` : ''
+
+  // 6. Använda preparat
+  const preparationsSection = preparations.length > 0 ? `
+    <section class="section">
+      ${sectionTitle('Använda preparat')}
+      <table class="data-table">
+        <thead>
+          <tr><th>Preparat</th><th>Mängd</th><th>Reg.nr</th></tr>
+        </thead>
+        <tbody>
+          ${preparations.map((p: any) => `
+            <tr>
+              <td>${esc(p.preparation?.name || p.name || 'Okänt')}</td>
+              <td>${esc(p.quantity)} ${esc(p.unit || '')}</td>
+              <td>${esc(p.preparation?.registration_number || p.registration_number || '–')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </section>` : ''
+
+  // 7. Utförda tjänster & material (aldrig priser i ärenderapporter)
+  const billingSection = billingItems.length > 0 ? `
+    <section class="section">
+      ${sectionTitle('Utförda tjänster & material')}
+      <table class="data-table">
+        <thead>
+          <tr><th>Tjänst / material</th><th class="num">Antal</th></tr>
+        </thead>
+        <tbody>
+          ${billingItems.map((item: any) => `
+            <tr>
+              <td>${esc(item.article_name)}</td>
+              <td class="num">${esc(item.quantity)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </section>` : ''
+
+  // 8. Uppgifter — kund och leverantör sida vid sida, kompakt
+  const partiesSection = `
+    <section class="section">
+      ${sectionTitle('Uppgifter')}
+      <div class="parties">
+        <div class="party">
+          <div class="party-heading">Kund</div>
+          <div class="party-row"><span>Företag</span>${esc(customerData?.company_name || 'Ej angivet')}</div>
+          <div class="party-row"><span>Kontaktperson</span>${esc(caseData.contact_person || customerData?.contact_person || 'Ej angivet')}</div>
+          ${customerData?.org_number ? `<div class="party-row"><span>Org.nr</span>${esc(customerData.org_number)}</div>` : ''}
+          <div class="party-row"><span>Telefon</span>${esc(caseData.contact_phone || customerData?.contact_phone || 'Ej angivet')}</div>
+          <div class="party-row"><span>E-post</span>${esc(caseData.contact_email || customerData?.contact_email || 'Ej angivet')}</div>
+        </div>
+        <div class="party">
+          <div class="party-heading">Leverantör</div>
+          <div class="party-row"><span>Företag</span>BeGone Skadedjur &amp; Sanering AB</div>
+          <div class="party-row"><span>Org.nr</span>559378-9208</div>
+          <div class="party-row"><span>Adress</span>Bläcksvampsvägen 17, 141 60 Huddinge</div>
+          <div class="party-row"><span>Telefon</span>010 280 44 10</div>
+          <div class="party-row"><span>E-post</span>info@begone.se</div>
+        </div>
+      </div>
+    </section>`
+
   return `
 <!DOCTYPE html>
 <html lang="sv">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BeGone Ärenderapport - ${caseData.case_number || caseData.title}</title>
+  <title>Ärenderapport ${esc(caseNumber)}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      color: ${beGoneColors.darkGray};
-      background: white;
-      line-height: 1.6;
-      font-optical-sizing: auto;
-      font-variant-ligatures: common-ligatures;
-      text-rendering: optimizeLegibility;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+      font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.5;
+      color: ${docColors.text};
+      background: #fff;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
 
-    .container { max-width: 210mm; margin: 0 auto; padding: 15mm; background: white; }
+    /* ── Sidhuvud ── */
+    .doc-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 12px;
+      border-bottom: 3px solid ${docColors.accent};
+      margin-bottom: 22px;
+    }
+    .doc-logo { width: 150px; height: auto; display: block; }
+    .doc-meta { text-align: right; }
+    .doc-type {
+      font-size: 10pt;
+      font-weight: 700;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: ${docColors.label};
+    }
+    .doc-case {
+      font-size: 15pt;
+      font-weight: 700;
+      color: ${docColors.ink};
+      margin-top: 2px;
+    }
+    .doc-date { font-size: 9pt; color: ${docColors.label}; margin-top: 2px; }
 
-    .header {
-      background: white;
-      border-bottom: 3px solid ${beGoneColors.accent};
-      padding: 20px 0;
-      margin-bottom: 24px;
+    /* ── Sektioner ── */
+    .section { margin-bottom: 20px; }
+    .section-title {
+      font-size: 12.5pt;
+      font-weight: 700;
+      color: ${docColors.ink};
+      padding-bottom: 5px;
+      border-bottom: 1px solid ${docColors.rule};
+      margin-bottom: 10px;
+      page-break-after: avoid;
+    }
+    .section-no { color: ${docColors.accent}; }
+
+    /* ── Ärendeinformation ── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 24px;
+    }
+    .info-item.span-2 { grid-column: 1 / -1; }
+    .info-label {
+      font-size: 7.5pt;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: ${docColors.label};
+    }
+    .info-value { font-size: 10.5pt; color: ${docColors.text}; overflow-wrap: break-word; }
+
+    .map-frame {
+      margin-top: 12px;
+      border: 1px solid ${docColors.border};
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .map-image { width: 100%; height: 140px; object-fit: cover; display: block; }
+
+    /* ── Löptext ── */
+    .report-text { font-size: 10.5pt; line-height: 1.6; overflow-wrap: break-word; }
+
+    /* ── Teknisk bedömning ── */
+    .assessment {
+      border: 1px solid ${docColors.border};
+      border-left: 4px solid ${docColors.accent};
+      border-radius: 4px;
+      padding: 10px 14px;
+      background: #fafafa;
+    }
+    .assessment-label { font-size: 11.5pt; font-weight: 700; }
+    .assessment-sub { font-size: 9pt; color: ${docColors.label}; margin-bottom: 8px; }
+    .assessment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .assessment-value { font-size: 11pt; font-weight: 700; }
+    .assessment-note { font-size: 9pt; color: ${docColors.label}; }
+
+    .ack-row {
+      margin-top: 8px;
+      font-size: 9.5pt;
+      font-weight: 600;
+      color: ${docColors.accent};
+    }
+
+    /* ── Bilder ── */
+    .image-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .image-item {
+      border: 1px solid ${docColors.border};
+      border-radius: 4px;
+      overflow: hidden;
       page-break-inside: avoid;
     }
-    .header-content { display: flex; justify-content: space-between; align-items: center; }
-    .logo { display: flex; align-items: center; gap: 16px; }
-    .logo-icon {
-      width: 48px; height: 48px;
-      background: ${beGoneColors.accent};
-      border-radius: 12px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 24px; font-weight: 800; color: white;
+    .image-item img {
+      width: 100%;
+      height: 190px;
+      object-fit: cover;
+      display: block;
     }
-    .logo-text { font-size: 28px; font-weight: 800; color: ${beGoneColors.primary}; letter-spacing: -0.5px; }
-    .header-meta { text-align: right; }
-    .header-title {
-      font-size: 14px; font-weight: 700; color: ${beGoneColors.primary};
-      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;
-    }
-    .header-date { font-size: 13px; color: ${beGoneColors.mediumGray}; }
-
-    .kpi-grid {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 12px; margin-bottom: 24px; page-break-inside: avoid;
-    }
-    .kpi-card {
-      background: white; border: 1px solid ${beGoneColors.border};
-      border-radius: 8px; padding: 12px 16px;
-      page-break-inside: avoid; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-    .kpi-label {
-      font-size: 10px; font-weight: 600; color: ${beGoneColors.mediumGray};
-      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;
-    }
-    .kpi-value { font-size: 20px; font-weight: 800; color: ${beGoneColors.primary}; margin-bottom: 2px; }
-    .kpi-value.accent { color: ${beGoneColors.accent}; }
-    .kpi-subtitle { font-size: 12px; color: ${beGoneColors.mediumGray}; }
-
-    .section { margin-bottom: 20px; page-break-inside: avoid; }
-    .section-header {
-      font-size: 15px; font-weight: 700; color: ${beGoneColors.primary};
-      margin-bottom: 12px; padding-bottom: 6px;
-      border-bottom: 2px solid ${beGoneColors.divider};
-    }
-    .section-header.accent { color: ${beGoneColors.accent}; }
-
-    .card {
-      background: white; border: 1px solid ${beGoneColors.border};
-      border-radius: 8px; padding: 16px; margin-bottom: 12px;
-      page-break-inside: avoid; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    .image-item figcaption {
+      font-size: 8.5pt;
+      color: ${docColors.label};
+      padding: 4px 8px;
+      border-top: 1px solid ${docColors.border};
     }
 
-    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .info-group { margin-bottom: 8px; }
-    .info-label {
-      font-size: 10px; font-weight: 600; color: ${beGoneColors.mediumGray};
-      text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
+    /* ── Tabeller ── */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10pt;
+      border: 1px solid ${docColors.border};
     }
-    .info-value { font-size: 14px; color: ${beGoneColors.darkGray}; font-weight: 500; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
-
-    .map-container { margin-top: 16px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border}; }
-    .map-image { width: 100%; display: block; }
-
-    .report-container {
-      background: ${beGoneColors.lightestGray};
-      border-radius: 8px; padding: 24px; margin-bottom: 24px; page-break-inside: avoid;
-    }
-    .report-content {
-      background: white; border: 1px solid ${beGoneColors.border};
-      border-radius: 8px; padding: 20px; min-height: 80px; overflow: hidden; max-width: 100%;
-    }
-    .report-text { font-size: 14px; line-height: 1.7; color: ${beGoneColors.darkGray}; overflow-wrap: break-word; word-break: break-word; max-width: 100%; }
-
-    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .data-table th {
-      text-align: left; font-size: 10px; font-weight: 600; color: ${beGoneColors.mediumGray};
-      text-transform: uppercase; letter-spacing: 0.5px;
-      padding: 8px 12px; border-bottom: 2px solid ${beGoneColors.divider};
+      background: ${docColors.tableHeaderBg};
+      text-align: left;
+      font-size: 8pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: ${docColors.ink};
+      padding: 6px 10px;
+      border-bottom: 1px solid ${docColors.border};
     }
-    .data-table td { padding: 8px 12px; border-bottom: 1px solid ${beGoneColors.divider}; color: ${beGoneColors.darkGray}; }
+    .data-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid ${docColors.border};
+    }
+    .data-table tbody tr:nth-child(even) td { background: ${docColors.zebra}; }
     .data-table tr:last-child td { border-bottom: none; }
+    .data-table .num { text-align: right; width: 70px; }
 
-    .footer {
-      margin-top: 32px; padding-top: 24px;
-      border-top: 3px solid ${beGoneColors.accent};
-      text-align: center; page-break-inside: avoid; background: white;
+    /* ── Uppgifter (kund/leverantör) ── */
+    .parties {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
     }
-    .footer-logo {
-      font-size: 20px; font-weight: 800; color: ${beGoneColors.primary};
-      margin-bottom: 12px; display: flex; align-items: center; justify-content: center; gap: 8px;
+    .party {
+      border: 1px solid ${docColors.border};
+      border-radius: 4px;
+      padding: 10px 12px;
     }
-    .footer-logo-icon {
-      width: 32px; height: 32px; background: ${beGoneColors.accent};
-      border-radius: 8px; display: flex; align-items: center; justify-content: center;
-      font-size: 16px; color: white; font-weight: 800;
+    .party-heading {
+      font-size: 8.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: ${docColors.accent};
+      margin-bottom: 6px;
     }
-    .footer-text { font-size: 12px; color: ${beGoneColors.mediumGray}; margin-bottom: 12px; line-height: 1.6; }
-    .footer-contact { font-size: 11px; color: ${beGoneColors.darkGray}; }
-    .footer-contact a { color: ${beGoneColors.accent}; text-decoration: none; font-weight: 600; }
+    .party-row {
+      display: flex;
+      font-size: 9.5pt;
+      padding: 2px 0;
+    }
+    .party-row span {
+      flex: 0 0 105px;
+      font-size: 8pt;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: ${docColors.label};
+      padding-top: 1.5px;
+    }
 
-    @media print {
-      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-      .container { padding: 12mm; }
-      .section { page-break-inside: avoid; }
-      .card { page-break-inside: avoid; }
-      h1, h2, h3 { page-break-after: avoid; }
-    }
+    section, .party, .data-table, .map-frame, .assessment { page-break-inside: avoid; }
   </style>
 </head>
 <body>
-  <div class="container">
-
-    <!-- Header -->
-    <div class="header">
-      <div class="header-content">
-        <div class="logo">
-          <div class="logo-icon">B</div>
-          <div class="logo-text">BeGone</div>
-        </div>
-        <div class="header-meta">
-          <div class="header-title">ÄRENDERAPPORT</div>
-          <div class="header-date">${new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-        </div>
-      </div>
+  <header class="doc-header">
+    <img src="${BEGONE_LOGO_DATA_URI}" class="doc-logo" alt="BeGone Skadedjur & Sanering" />
+    <div class="doc-meta">
+      <div class="doc-type">Ärenderapport</div>
+      <div class="doc-case">${esc(caseNumber)}</div>
+      <div class="doc-date">${todayLong}</div>
     </div>
+  </header>
 
-    <!-- KPI Grid -->
-    <div class="kpi-grid">
-      <div class="kpi-card">
-        <div class="kpi-label">Ärende ID</div>
-        <div class="kpi-value" style="font-size: 18px">${caseData.case_number || 'N/A'}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Status</div>
-        <div class="kpi-value accent">${caseData.status || 'Okänd'}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-label">Tjänst</div>
-        <div class="kpi-value">${caseData.pest_type || 'Ej specificerat'}</div>
-      </div>
-      ${(caseData.visit_number && caseData.visit_number > 1) ? `
-      <div class="kpi-card">
-        <div class="kpi-label">Antal besök</div>
-        <div class="kpi-value">${caseData.visit_number}</div>
-      </div>` : ''}
-    </div>
-
-    <!-- Kunduppgifter -->
-    <div class="section">
-      <div class="section-header">Kunduppgifter</div>
-      <div class="card">
-        <div class="info-grid">
-          <div class="info-group">
-            <div class="info-label">Företag</div>
-            <div class="info-value">${customerData?.company_name || 'Okänt företag'}</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Kontaktperson</div>
-            <div class="info-value">${caseData.contact_person || customerData?.contact_person || 'Ej specificerat'}</div>
-          </div>
-          ${customerData?.org_number ? `
-          <div class="info-group">
-            <div class="info-label">Org.nr</div>
-            <div class="info-value">${customerData.org_number}</div>
-          </div>
-          ` : ''}
-          <div class="info-group">
-            <div class="info-label">Telefon</div>
-            <div class="info-value">${caseData.contact_phone || customerData?.contact_phone || 'Ej angivet'}</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">E-post</div>
-            <div class="info-value">${caseData.contact_email || customerData?.contact_email || 'Ej angivet'}</div>
-          </div>
-          ${addressStr ? `
-          <div class="info-group">
-            <div class="info-label">Adress</div>
-            <div class="info-value">${addressStr}</div>
-          </div>
-          ` : ''}
-        </div>
-      </div>
-    </div>
-
-    <!-- Leverantörsuppgifter -->
-    <div class="section">
-      <div class="section-header">Leverantörsuppgifter</div>
-      <div class="card">
-        <div class="info-grid">
-          <div class="info-group">
-            <div class="info-label">Företag</div>
-            <div class="info-value">BeGone Skadedjur &amp; Sanering AB</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Organisationsnummer</div>
-            <div class="info-value">559378-9208</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Besöksadress</div>
-            <div class="info-value">Bläcksvampsvägen 17, 141 60 Huddinge</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Telefon</div>
-            <div class="info-value">010 280 44 10</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Email</div>
-            <div class="info-value">info@begone.se</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Ansvarig tekniker</div>
-            <div class="info-value">${caseData.primary_technician_name || 'Ej tilldelad'}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Ärendeinformation -->
-    <div class="section">
-      <div class="section-header accent">Ärendeinformation</div>
-      <div class="card">
-        <div class="info-grid">
-          <div class="info-group">
-            <div class="info-label">Datum för utförande</div>
-            <div class="info-value">${formatDate(caseData.scheduled_start)}</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Arbetsplats</div>
-            <div class="info-value">${addressStr || 'Ej angivet'}</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Tjänst</div>
-            <div class="info-value">${caseData.pest_type || 'Ej specificerat'}</div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Ärendestatus</div>
-            <div class="info-value">${caseData.status || 'Okänd status'}</div>
-          </div>
-          ${caseData.work_order_number ? `
-          <div class="info-group">
-            <div class="info-label">Arbetsorder nr</div>
-            <div class="info-value">${caseData.work_order_number}</div>
-          </div>
-          ` : ''}
-          ${caseData.work_object ? `
-          <div class="info-group">
-            <div class="info-label">Objekt</div>
-            <div class="info-value">${caseData.work_object}</div>
-          </div>
-          ` : ''}
-        </div>
-        ${mapUrl ? `
-        <div class="map-container">
-          <img src="${mapUrl}" class="map-image" alt="Karta över arbetsplatsen" />
-        </div>
-        ` : ''}
-      </div>
-    </div>
-
-    <!-- Ärendebeskrivning -->
-    ${caseData.description ? `
-    <div class="section">
-      <div class="section-header accent">Ärendebeskrivning</div>
-      <div class="report-container">
-        <div class="report-content">
-          <div class="report-text">${nl2br(caseData.description)}</div>
-        </div>
-      </div>
-    </div>
-    ` : ''}
-
-    <!-- Arbetsrapport -->
-    ${caseData.work_report ? `
-    <div class="section">
-      <div class="section-header accent">Arbetsrapport</div>
-      <div class="report-container">
-        <div class="report-content">
-          <div class="report-text">${nl2br(caseData.work_report)}</div>
-        </div>
-      </div>
-    </div>
-    ` : ''}
-
-    <!-- Teknisk bedömning (trafikljus) -->
-    ${hasTrafficLight ? `
-    <div class="section">
-      <div class="section-header accent">Teknisk bedömning</div>
-      <div class="card" style="border-left: 4px solid ${trafficLight.color};">
-        <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid ${beGoneColors.divider};">
-          <div style="font-size: 15px; font-weight: 700; color: #1F2937; margin-bottom: 2px;">${trafficLight.label}</div>
-          <div style="font-size: 12px; color: #6B7280;">Baserat på inspektion och expertis har vår tekniker bedömt situationen</div>
-        </div>
-        <div class="info-grid">
-          <div class="info-group">
-            <div class="info-label">Aktivitetsnivå</div>
-            <div class="info-value" style="color: ${trafficLight.color}; font-weight: 700;">Nivå ${caseData.pest_level || 0} av 3</div>
-            <div style="font-size: 12px; color: #6B7280; margin-top: 2px;">
-              ${(caseData.pest_level >= 3) ? 'Hög nivå - Kräver omedelbar åtgärd' : (caseData.pest_level === 2) ? 'Medium nivå - Bör åtgärdas' : 'Låg nivå - Under kontroll'}
-            </div>
-          </div>
-          <div class="info-group">
-            <div class="info-label">Situationsbedömning</div>
-            <div class="info-value" style="color: ${trafficLight.color}; font-weight: 700;">${caseData.problem_rating || 0} av 5</div>
-            <div style="font-size: 12px; color: #6B7280; margin-top: 2px;">
-              ${(caseData.problem_rating >= 4) ? 'Allvarligt - Åtgärd krävs' : (caseData.problem_rating === 3) ? 'Medium - Övervakning rekommenderas' : 'Låg - Situationen är stabil'}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    ` : ''}
-
-    <!-- Rekommendationer -->
-    ${caseData.recommendations ? `
-    <div class="section">
-      <div class="section-header accent">Rekommendationer</div>
-      <div class="report-container">
-        <div class="report-content">
-          <div class="report-text">${nl2br(caseData.recommendations)}</div>
-          ${caseData.recommendations_acknowledged ? `
-          <div style="margin-top: 16px; padding: 12px; background: #22C55E20; border-radius: 6px; border: 1px solid #22C55E;">
-            <strong style="color: #22C55E;">Bekräftat av kund:</strong> ${formatDate(caseData.recommendations_acknowledged_at)}
-          </div>
-          ` : ''}
-        </div>
-      </div>
-    </div>
-    ` : ''}
-
-    <!-- Använda preparat -->
-    ${preparations.length > 0 ? `
-    <div class="section">
-      <div class="section-header accent">Använda preparat</div>
-      <div class="card" style="padding: 0; overflow: hidden;">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Preparat</th>
-              <th>Mängd</th>
-              <th>Reg.nr</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${preparations.map((p: any) => `
-              <tr>
-                <td>${p.preparation?.name || p.name || 'Okänt'}</td>
-                <td>${p.quantity} ${p.unit || ''}</td>
-                <td>${p.preparation?.registration_number || p.registration_number || '–'}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    ` : ''}
-
-    <!-- Produkter & tjänster -->
-    ${billingItems.length > 0 ? `
-    <div class="section">
-      <div class="section-header accent">Produkter &amp; tjänster</div>
-      <div class="card" style="padding: 0; overflow: hidden;">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Artikel</th>
-              <th>Antal</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${billingItems.map((item: any) => `
-              <tr>
-                <td>${item.article_name}</td>
-                <td>${item.quantity}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    ` : ''}
-
-    <!-- Bilder -->
-    ${images.length > 0 ? `
-    <div class="section">
-      <div class="section-header">Bilder (${images.length})</div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-        ${images.map(img => `
-          <div style="break-inside: avoid; background: #F8FAFC; border: 1px solid ${beGoneColors.border}; border-radius: 8px; overflow: hidden;">
-            <img src="${img.url}" style="width: 100%; display: block; max-height: 220px; object-fit: cover;" />
-            ${img.description ? `<div style="padding: 8px 12px;"><p style="font-size: 11px; color: #475569; margin: 0; font-style: italic; line-height: 1.4;">${img.description}</p></div>` : ''}
-          </div>
-        `).join('')}
-      </div>
-    </div>
-    ` : ''}
-
-    <!-- Footer -->
-    <div class="footer">
-      <div class="footer-logo">
-        <div class="footer-logo-icon">B</div>
-        <span>BeGone</span>
-      </div>
-      <div class="footer-text">
-        Professionell skadedjursbekämpning sedan 2022<br>
-        Vi säkerställer trygga och skadedjursfria miljöer för hem och verksamheter
-      </div>
-      <div class="footer-contact">
-        <strong>Kontakt:</strong> info@begone.se | 010 280 44 10 |
-        <a href="https://begone.se">www.begone.se</a>
-      </div>
-    </div>
-
-  </div>
+  ${caseInfoSection}
+  ${workReportSection}
+  ${assessmentSection}
+  ${recommendationsSection}
+  ${imagesSection}
+  ${preparationsSection}
+  ${billingSection}
+  ${partiesSection}
 </body>
 </html>
   `
@@ -1079,15 +1020,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       waitUntil: 'networkidle0'
     })
 
-    // Generate PDF
+    // Generate PDF — single-case följer dokumentstandarden med sidfot på varje
+    // sida; multiple-cases behåller sin egen inbyggda footer
+    const isSingle = reportType === 'single'
+    const footerTemplate = `
+      <div style="width: 100%; font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; font-size: 7pt; color: #6b7280; padding: 0 15mm; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #e5e7eb; padding-top: 6px; margin: 0 15mm;">
+        <span>BeGone Skadedjur &amp; Sanering AB · info@begone.se · 010 280 44 10 · www.begone.se</span>
+        <span>Sida <span class="pageNumber"></span> av <span class="totalPages"></span></span>
+      </div>`
     const pdf = await page.pdf({
       format: 'A4',
       printBackground: true,
       preferCSSPageSize: false,
+      ...(isSingle ? {
+        displayHeaderFooter: true,
+        headerTemplate: '<span></span>',
+        footerTemplate,
+      } : {}),
       margin: {
         top: '15mm',
         right: '15mm',
-        bottom: '15mm',
+        bottom: isSingle ? '20mm' : '15mm',
         left: '15mm'
       }
     })

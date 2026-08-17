@@ -71,15 +71,6 @@ export interface ReportImage {
   description?: string | null;
 }
 
-// Bildtaggar → svensk etikett (samma taggar som CaseImageGallery)
-const IMAGE_TAG_LABELS: Record<string, string> = {
-  before: 'Före',
-  after: 'Efter',
-  general: 'Övrigt',
-  pr: 'PR',
-  education: 'Utbildning',
-}
-
 // Helper function to find custom field
 const getFieldValue = (taskDetails: TaskDetails, fieldName: string) => {
   return taskDetails.custom_fields.find(field =>
@@ -256,19 +247,12 @@ export const generateWorkReportHTML = (
     <section class="section">
       ${sectionTitle('Bilder från ärendet')}
       <div class="image-grid">
-        ${images.map(img => {
-          const tagLabel = img.tags?.length ? IMAGE_TAG_LABELS[img.tags[0]] || '' : ''
-          return `
+        ${images.map(img => `
           <figure class="image-item">
             <img src="${img.url}" alt="Ärendebild" />
-            ${tagLabel || img.description ? `
-              <figcaption>
-                ${tagLabel ? `<span class="image-tag">${esc(tagLabel)}</span>` : ''}
-                ${img.description ? esc(img.description) : ''}
-              </figcaption>
-            ` : ''}
+            ${img.description ? `<figcaption>${esc(img.description)}</figcaption>` : ''}
           </figure>`
-        }).join('')}
+        ).join('')}
       </div>
     </section>` : ''
 
@@ -446,18 +430,6 @@ export const generateWorkReportHTML = (
       color: ${colors.label};
       padding: 4px 8px;
       border-top: 1px solid ${colors.border};
-    }
-    .image-tag {
-      display: inline-block;
-      background: ${colors.accent};
-      color: #fff;
-      font-size: 7pt;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-radius: 999px;
-      padding: 1px 7px;
-      margin-right: 6px;
     }
 
     /* ── Tabeller ── */
