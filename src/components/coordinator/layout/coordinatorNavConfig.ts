@@ -39,7 +39,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Ärenden', icon: ClipboardList, path: '/koordinator/arenden' },
       { label: 'Rondering & Schema', icon: CalendarRange, path: '/koordinator/rondering-schema' },
       { label: 'Schemaoptimerare', icon: Wand2, path: '/koordinator/booking-assistant' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets' },
+      { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets', badgeKey: 'tickets' },
       { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/koordinator/tillbud-avvikelser', badgeKey: 'incidents' },
     ],
   },

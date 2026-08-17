@@ -5,6 +5,7 @@ import { ChevronDown } from 'lucide-react'
 import type { NavGroup, NavItem } from './adminNavConfig'
 import { useIncidentBadge } from '../../../hooks/useIncidentBadge'
 import { useIntranetBadge } from '../../../hooks/useIntranetBadge'
+import { useTicketsBadge } from '../../../hooks/useTicketsBadge'
 
 interface SidebarNavGroupProps {
   group: NavGroup
@@ -27,9 +28,13 @@ export function SidebarNavGroup({ group, collapsed, currentPath }: SidebarNavGro
   const GroupIcon = group.icon
   const incidentCount = useIncidentBadge()
   const intranetCount = useIntranetBadge()
+  const ticketsCount = useTicketsBadge()
 
   const badgeCountFor = (item: NavItem) =>
-    item.badgeKey === 'incidents' ? incidentCount : item.badgeKey === 'intranet' ? intranetCount : 0
+    item.badgeKey === 'incidents' ? incidentCount
+      : item.badgeKey === 'intranet' ? intranetCount
+      : item.badgeKey === 'tickets' ? ticketsCount
+      : 0
   const groupBadgeCount = group.items.reduce((sum, item) => sum + badgeCountFor(item), 0)
 
   if (collapsed) {

@@ -34,7 +34,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Mina ärenden', icon: ClipboardList, path: '/technician/cases' },
       { label: 'Schema', icon: Calendar, path: '/technician/schedule' },
       { label: 'Utrustning', icon: Package, path: '/technician/equipment' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/technician/tickets' },
+      { label: 'Tickets', icon: MessageSquareText, path: '/technician/tickets', badgeKey: 'tickets' },
     ],
   },
   {

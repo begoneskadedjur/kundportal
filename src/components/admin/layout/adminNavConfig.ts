@@ -39,7 +39,7 @@ export interface NavItem {
   icon: React.ElementType
   path: string
   /** Nyckel för dynamisk räknarbadge i sidomenyn (t.ex. ohanterade incidenter) */
-  badgeKey?: 'incidents' | 'intranet'
+  badgeKey?: 'incidents' | 'intranet' | 'tickets'
 }
 
 export interface NavGroup {
@@ -95,7 +95,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Teknikerstatistik', icon: BarChart3, path: '/admin/teknikerstatistik' },
       { label: 'Användarkonton (Personal)', icon: UserCheck, path: '/admin/anvandarkonton-personal' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
+      { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets', badgeKey: 'tickets' },
       { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/admin/tillbud-avvikelser', badgeKey: 'incidents' },
       { label: 'Buggrapporter', icon: Bug, path: '/admin/bug-reports' },
     ]
