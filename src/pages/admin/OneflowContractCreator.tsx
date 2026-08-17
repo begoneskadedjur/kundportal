@@ -69,6 +69,7 @@ interface WizardData {
     total_price: number
     vat_rate?: number
     rot_rut_type?: 'ROT' | 'RUT' | null
+    fastighetsbeteckning?: string | null
     service?: {
       rot_rate_percent?: number | null
       rut_rate_percent?: number | null
@@ -570,6 +571,14 @@ export default function OneflowContractCreator() {
     const part1 = wizardData.agreementText.substring(0, LIMIT)
     const part2 = wizardData.agreementText.substring(LIMIT, LIMIT * 2)
 
+    // Fastighetsbeteckning från raden med ROT/RUT-avdrag (arbetstidsraden) —
+    // förifyller mallens Fastighetsbeteckning-fält i offerter
+    const rotRutRow = (wizardData.case_id && wizardData.prefillServices?.length
+      ? wizardData.prefillServices
+      : wizardData.draftItems.filter(i => i.item_type === 'service')
+    ).find(r => r.rot_rut_type)
+    const fastighetsbeteckning = rotRutRow?.fastighetsbeteckning || ''
+
     const contractData = {
       anstalld: wizardData.anstalld,
       'e-post-anstlld': wizardData['e-post-anstlld'],
@@ -622,6 +631,7 @@ export default function OneflowContractCreator() {
           sendForSigning: wizardData.sendForSigning, 
           partyType: wizardData.partyType,
           documentType: wizardData.documentType,
+          fastighetsbeteckning, // Endast offerter använder fältet (hanteras i API:t)
           caseId: wizardData.case_id, // Skicka case_id för webhook-koppling
           senderEmail: user?.email,
           senderName: wizardData.anstalld,
@@ -646,6 +656,7 @@ export default function OneflowContractCreator() {
                 price_source: null,
                 notes: null,
                 rot_rut_type: s.rot_rut_type ?? null,
+                fastighetsbeteckning: s.fastighetsbeteckning ?? null,
                 mapped_service_id: null,
               }))
             : wizardData.draftItems.map(i => ({
@@ -666,6 +677,7 @@ export default function OneflowContractCreator() {
                 price_source: i.price_source,
                 notes: i.notes,
                 rot_rut_type: i.rot_rut_type,
+                fastighetsbeteckning: i.fastighetsbeteckning ?? null,
                 mapped_service_id: i.mapped_service_id,
               }))
           )

@@ -13,6 +13,7 @@ export interface PrefillService {
   total_price: number
   vat_rate?: number
   rot_rut_type?: 'ROT' | 'RUT' | null
+  fastighetsbeteckning?: string | null
   service?: {
     rot_rate_percent?: number | null
     rut_rate_percent?: number | null
@@ -35,6 +36,7 @@ export function mapBillingItemsToPrefillServices(
       total_price: item.total_price,
       vat_rate: item.vat_rate,
       rot_rut_type: item.rot_rut_type,
+      fastighetsbeteckning: item.fastighetsbeteckning ?? null,
       service: item.service
         ? {
             rot_rate_percent: item.service.rot_rate_percent ?? null,

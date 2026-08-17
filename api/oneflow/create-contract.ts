@@ -16,6 +16,8 @@ interface ContractRequestBody {
   sendForSigning: boolean
   partyType: 'company' | 'individual'
   documentType: 'offer' | 'contract'
+  // Fastighetsbeteckning från ROT/RUT-raden — förifylls i offertmallarna
+  fastighetsbeteckning?: string | null
   // NYTT: Dynamisk användare från frontend
   senderEmail?: string
   senderName?: string
@@ -69,6 +71,7 @@ interface ContractRequestBody {
     price_source?: string
     notes?: string | null
     rot_rut_type?: 'ROT' | 'RUT' | null
+    fastighetsbeteckning?: string | null
     mapped_service_id?: string | null
   }>
 }
@@ -94,9 +97,10 @@ const FIELD_MAPPING = {
 
 // BYGG DATAFÄLT BASERAT PÅ DOKUMENTTYP
 function buildDataFieldsForDocument(
-  contractData: Record<string, string>, 
+  contractData: Record<string, string>,
   documentType: 'offer' | 'contract',
-  caseId?: string
+  caseId?: string,
+  fastighetsbeteckning?: string | null
 ): Array<{ custom_id: string; value: string }> {
   const fields: Array<{ custom_id: string; value: string }> = []
   
@@ -128,6 +132,12 @@ function buildDataFieldsForDocument(
     // obligatoriska fältet alltid är ifyllt — företagsnamn för företag, personnamn för privat.
     if (!fields.some(f => f.custom_id === 'kund') && contractData['Kontaktperson']) {
       fields.push({ custom_id: 'kund', value: contractData['Kontaktperson'] })
+    }
+
+    // Fastighetsbeteckning (ROT/RUT-raden) — förifylls så kunden slipper.
+    // Fältet finns bara i offertmallarna, därför skickas det aldrig för avtal.
+    if (fastighetsbeteckning) {
+      fields.push({ custom_id: 'fastighetsbeteckning', value: fastighetsbeteckning })
     }
   }
   
@@ -296,6 +306,7 @@ export default async function handler(
     sendForSigning,
     partyType,
     documentType,
+    fastighetsbeteckning,
     senderEmail,
     senderName,
     selectedProducts,
@@ -366,7 +377,7 @@ export default async function handler(
     caseNumber
   ].filter(Boolean).join(' – ').slice(0, 130)
 
-  const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId)
+  const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId, fastighetsbeteckning)
 
   // Bygg participant-objekt
   const participantData = {
@@ -417,7 +428,7 @@ export default async function handler(
   }
 
   try {
-    const createResponse = await fetch(
+    const doCreate = (payload: any) => fetch(
       'https://api.oneflow.com/v1/contracts/create',
       {
         method: 'POST',
@@ -427,11 +438,32 @@ export default async function handler(
           'x-oneflow-user-email': userEmail, // ANVÄND DYNAMISK EMAIL
           Accept: 'application/json',
         },
-        body: JSON.stringify(createPayload),
+        body: JSON.stringify(payload),
       }
     )
 
-    const createdContract = await createResponse.json()
+    let createResponse = await doCreate(createPayload)
+    let createdContract = await createResponse.json()
+
+    // Fallback: om Oneflow avvisar just fastighetsbeteckning-fältet (t.ex. mall
+    // utan fältet), försök en gång till utan det istället för att blockera offerten.
+    if (
+      !createResponse.ok &&
+      fastighetsbeteckning &&
+      JSON.stringify(createdContract.parameter_problems || createdContract.detail || '')
+        .toLowerCase()
+        .includes('fastighetsbeteckning')
+    ) {
+      console.warn('Oneflow avvisade fastighetsbeteckning-fältet — försöker igen utan det')
+      const retryPayload = {
+        ...createPayload,
+        data_fields: createPayload.data_fields.filter(
+          (f: { custom_id: string }) => f.custom_id !== 'fastighetsbeteckning'
+        ),
+      }
+      createResponse = await doCreate(retryPayload)
+      createdContract = await createResponse.json()
+    }
 
     if (!createResponse.ok) {
       console.error('Fel vid skapande av kontrakt:', JSON.stringify(createdContract, null, 2))
@@ -617,6 +649,7 @@ export default async function handler(
           requires_approval: false,
           notes: item.notes || null,
           rot_rut_type: item.rot_rut_type || null,
+          fastighetsbeteckning: item.fastighetsbeteckning || null,
           mapped_service_id: mappedServiceIdOverride,
         })
 
