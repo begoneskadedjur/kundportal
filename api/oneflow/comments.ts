@@ -16,11 +16,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const baseUrl = `https://api.oneflow.com/v1/contracts/${contractId}/comments`
-  // Avsändaren härleds från sessionen - den gamla x-sender-email-headern
-  // var fritt spoofbar och togs bort 2026-07-05.
+  // All Oneflow-kommunikation sker som info@begone.se — systemet kör på EN
+  // Oneflow-licens (medvetet beslut). Personlig attribution finns i portalens
+  // egen kommentarspegel (oneflow_comments.author_name), inte i Oneflow.
   const headers: Record<string, string> = {
     'x-oneflow-api-token': ONEFLOW_API_TOKEN,
-    'x-oneflow-user-email': auth.email || ONEFLOW_USER_EMAIL,
+    'x-oneflow-user-email': ONEFLOW_USER_EMAIL,
     'Content-Type': 'application/json',
   }
 
