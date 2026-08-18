@@ -5,6 +5,7 @@
 // direkta etiketter, ärliga täckningsnoter där historiken är tunn.
 import { useState, useEffect, useMemo } from 'react'
 import { Loader2, TrendingUp, TrendingDown, Minus, Users, Info } from 'lucide-react'
+import { supabase } from '../../../lib/supabase'
 import { OfferFollowUpService } from '../../../services/offerFollowUpService'
 import type { StatsContractRow, StatsAggregates } from '../../../services/offerFollowUpService'
 
@@ -59,10 +60,8 @@ function avg(values: number[]): number | null {
   return values.reduce((a, b) => a + b, 0) / values.length
 }
 
-const techName = (row: StatsContractRow) =>
-  row.begone_employee_name || row.created_by_name || 'Okänd'
-const techEmail = (row: StatsContractRow) =>
-  (row.begone_employee_email || row.created_by_email || '').toLowerCase()
+interface KnownTech { id: string; name: string; email: string | null }
+const UNKNOWN_TECH_ID = '__unknown__'
 
 // ─── Små byggstenar ───────────────────────────────────────────
 
@@ -190,13 +189,47 @@ export default function DocumentStatsView({ isCoordinator, ownDocsEmail }: Docum
   const [techFilter, setTechFilter] = useState<string>('all')
   const [compare, setCompare] = useState<string[]>([])
 
+  const [technicians, setTechnicians] = useState<KnownTech[]>([])
+
   useEffect(() => {
     setLoading(true)
-    OfferFollowUpService.getStatsContracts(ownDocsEmail)
-      .then(setRows)
+    Promise.all([
+      OfferFollowUpService.getStatsContracts(ownDocsEmail),
+      supabase.from('technicians').select('id, name, email').eq('is_active', true),
+    ])
+      .then(([contractRows, techResult]) => {
+        setRows(contractRows)
+        setTechnicians((techResult.data as KnownTech[]) || [])
+      })
       .catch(err => console.error('Stats fetch:', err))
       .finally(() => setLoading(false))
   }, [ownDocsEmail])
+
+  // Mappa dokumentens avsändare (fritextfält med historiska stavningsvarianter)
+  // till KANONISKA tekniker: e-postmatchning först, namn-fallback sedan.
+  const resolveTech = useMemo(() => {
+    const byEmail = new Map<string, KnownTech>()
+    const byName = new Map<string, KnownTech>()
+    for (const t of technicians) {
+      if (t.email) byEmail.set(t.email.toLowerCase(), t)
+      byName.set(t.name.trim().toLowerCase(), t)
+    }
+    return (row: StatsContractRow): KnownTech | null => {
+      for (const e of [row.begone_employee_email, row.created_by_email]) {
+        if (e) {
+          const t = byEmail.get(e.trim().toLowerCase())
+          if (t) return t
+        }
+      }
+      for (const n of [row.begone_employee_name, row.created_by_name]) {
+        if (n) {
+          const t = byName.get(n.trim().toLowerCase())
+          if (t) return t
+        }
+      }
+      return null
+    }
+  }, [technicians])
 
   // Periodgränser
   const { fromISO, toISO, prevFromISO } = useMemo(() => {
@@ -211,32 +244,57 @@ export default function DocumentStatsView({ isCoordinator, ownDocsEmail }: Docum
     return { fromISO: from.toISOString(), toISO: to, prevFromISO: prevFrom.toISOString() }
   }, [period])
 
+  // Matchar en rad mot valt teknikerfilter (kanoniskt tekniker-id)
+  const matchesTechFilter = useMemo(() => {
+    return (row: StatsContractRow): boolean => {
+      if (techFilter === 'all') return true
+      const tech = resolveTech(row)
+      if (techFilter === UNKNOWN_TECH_ID) return tech === null
+      return tech?.id === techFilter
+    }
+  }, [techFilter, resolveTech])
+
+  // Alla e-postvarianter som förekommer på vald teknikers dokument (till RPC:n)
+  const filterEmails = useMemo(() => {
+    if (ownDocsEmail) return [ownDocsEmail]
+    if (techFilter === 'all') return null
+    const emails = new Set<string>()
+    for (const r of rows) {
+      if (!matchesTechFilter(r)) continue
+      for (const e of [r.begone_employee_email, r.created_by_email]) {
+        if (e) emails.add(e.trim().toLowerCase())
+      }
+    }
+    const tech = technicians.find(t => t.id === techFilter)
+    if (tech?.email) emails.add(tech.email.toLowerCase())
+    return [...emails]
+  }, [ownDocsEmail, techFilter, rows, matchesTechFilter, technicians])
+
   // Aggregat via RPC (produkter/tjänster/marginaler)
   useEffect(() => {
     setAggLoading(true)
-    const tech = ownDocsEmail || (techFilter !== 'all' ? techFilter : null)
-    OfferFollowUpService.getStatsAggregates(fromISO, toISO, tech)
+    OfferFollowUpService.getStatsAggregates(fromISO, toISO, filterEmails)
       .then(setAggregates)
       .catch(err => console.error('Aggregates fetch:', err))
       .finally(() => setAggLoading(false))
-  }, [fromISO, toISO, techFilter, ownDocsEmail])
+  }, [fromISO, toISO, filterEmails])
 
   // Filtrerade dokument i period + föregående period (för trend)
   const docs = useMemo(() =>
     rows.filter(r =>
       r.created_at >= fromISO && r.created_at < toISO &&
       (typeFilter === 'all' || r.type === typeFilter) &&
-      (techFilter === 'all' || techEmail(r) === techFilter)
-    ), [rows, fromISO, toISO, typeFilter, techFilter])
+      matchesTechFilter(r)
+    ), [rows, fromISO, toISO, typeFilter, matchesTechFilter])
 
   const prevDocs = useMemo(() =>
     prevFromISO
       ? rows.filter(r =>
           r.created_at >= prevFromISO && r.created_at < fromISO &&
           (typeFilter === 'all' || r.type === typeFilter) &&
-          (techFilter === 'all' || techEmail(r) === techFilter)
+          matchesTechFilter(r)
         )
-      : [], [rows, prevFromISO, fromISO, typeFilter, techFilter])
+      : [], [rows, prevFromISO, fromISO, typeFilter, matchesTechFilter])
 
   // Nyckeltal
   const stats = useMemo(() => {
@@ -344,22 +402,34 @@ export default function DocumentStatsView({ isCoordinator, ownDocsEmail }: Docum
     }
   }, [docs])
 
-  // Per tekniker
+  // Per tekniker — grupperat på KANONISK tekniker (mappad mot teknikertabellen)
   const techRows = useMemo(() => {
     const map = new Map<string, { name: string; docs: StatsContractRow[] }>()
     for (const r of docs) {
-      const email = techEmail(r)
-      if (!email) continue
-      const entry = map.get(email) || { name: techName(r), docs: [] }
+      const tech = resolveTech(r)
+      const key = tech?.id || UNKNOWN_TECH_ID
+      const entry = map.get(key) || { name: tech?.name || 'Okänd avsändare', docs: [] }
       entry.docs.push(r)
-      map.set(email, entry)
+      map.set(key, entry)
+    }
+    // Marginaler mappas till kanonisk tekniker via samma e-postupplösning
+    const emailToTechId = new Map<string, string>()
+    for (const t of technicians) {
+      if (t.email) emailToTechId.set(t.email.toLowerCase(), t.id)
+    }
+    for (const r of rows) {
+      const tech = resolveTech(r)
+      if (!tech) continue
+      for (const e of [r.begone_employee_email, r.created_by_email]) {
+        if (e) emailToTechId.set(e.trim().toLowerCase(), tech.id)
+      }
     }
     const marginByTech = new Map<string, number[]>()
     for (const m of aggregates?.marginaler || []) {
-      if (!m.tech_email) continue
-      const arr = marginByTech.get(m.tech_email) || []
+      const key = (m.tech_email && emailToTechId.get(m.tech_email)) || UNKNOWN_TECH_ID
+      const arr = marginByTech.get(key) || []
       arr.push(m.marginal_pct)
-      marginByTech.set(m.tech_email, arr)
+      marginByTech.set(key, arr)
     }
     return [...map.entries()].map(([email, { name, docs: d }]) => {
       const signed = d.filter(r => r.status === 'signed')
@@ -383,17 +453,25 @@ export default function DocumentStatsView({ isCoordinator, ownDocsEmail }: Docum
         marginN: techMargins.length,
       }
     }).sort((a, b) => b.sent - a.sent)
-  }, [docs, aggregates])
+  }, [docs, rows, aggregates, resolveTech, technicians])
 
   const compareRows = techRows.filter(t => compare.includes(t.email))
   const allTechs = useMemo(() => {
-    const set = new Map<string, string>()
+    // Dropdown: kanoniska tekniker som har minst ett dokument + ev. okänd-hink
+    const withDocs = new Set<string>()
+    let hasUnknown = false
     for (const r of rows) {
-      const e = techEmail(r)
-      if (e) set.set(e, techName(r))
+      const tech = resolveTech(r)
+      if (tech) withDocs.add(tech.id)
+      else hasUnknown = true
     }
-    return [...set.entries()].sort((a, b) => a[1].localeCompare(b[1], 'sv'))
-  }, [rows])
+    const list: Array<[string, string]> = technicians
+      .filter(t => withDocs.has(t.id))
+      .map(t => [t.id, t.name] as [string, string])
+      .sort((a, b) => a[1].localeCompare(b[1], 'sv'))
+    if (hasUnknown) list.push([UNKNOWN_TECH_ID, 'Okänd avsändare'])
+    return list
+  }, [rows, technicians, resolveTech])
 
   const toggleCompare = (email: string) => {
     setCompare(prev => prev.includes(email)

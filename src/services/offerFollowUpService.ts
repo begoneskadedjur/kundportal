@@ -569,16 +569,22 @@ export class OfferFollowUpService {
       .filter(r => r.created_by_email !== null || systemIds.has(r.id))
   }
 
-  /** Aggregat (produkter/tjänster/marginaler) via RPC — jsonb:n stannar i databasen */
+  /**
+   * Aggregat (produkter/tjänster/marginaler) via RPC — jsonb:n stannar i
+   * databasen. technicianEmails = ALLA e-postvarianter som mappats till den
+   * valda teknikern (fritextfältet i wizarden har historiska stavningsvarianter).
+   */
   static async getStatsAggregates(
     fromISO: string,
     toISO: string,
-    technicianEmail?: string | null
+    technicianEmails?: string[] | null
   ): Promise<StatsAggregates> {
     const { data, error } = await supabase.rpc('dokumentsignering_statistik', {
       p_from: fromISO,
       p_to: toISO,
-      p_tech_email: technicianEmail || null,
+      p_tech_emails: technicianEmails && technicianEmails.length > 0
+        ? technicianEmails.map(e => e.toLowerCase())
+        : null,
     })
     if (error) throw error
     return (data || { produkter: [], tjanster: [], marginaler: [] }) as StatsAggregates
