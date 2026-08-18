@@ -154,7 +154,15 @@ export class CasePreparationService {
         throw new Error(`Databasfel: ${error.message}`)
       }
 
-      return data || []
+      // Fallback (samma mönster som tjänstegrupp/stationstyp): ärendets
+      // skadedjur/tjänstenamn matchar ofta inte preparatens pest_types-taggar
+      // exakt (t.ex. "Sanering Fågel", "Gnagare") — visa då hela listan
+      // istället för en tom rullista.
+      const result = data || []
+      if (result.length === 0) {
+        return await CasePreparationService.getAllActivePreparations()
+      }
+      return result
     } catch (error) {
       console.error('CasePreparationService.getPreparationsForPestType fel:', error)
       throw error
