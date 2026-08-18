@@ -456,9 +456,10 @@ export default function DocumentStatsView({ isCoordinator, ownDocsEmail }: Docum
             ))}
           </select>
         )}
-        {prevFromISO && (
-          <span className="ml-auto text-[10px] text-slate-600">Trender jämförs mot föregående {period === '365' ? 'år' : `${period} dagar`}</span>
-        )}
+        <span className="ml-auto text-[10px] text-slate-600">
+          Omfattar endast dokument skapade i portalen
+          {prevFromISO && ` · trender mot föregående ${period === '365' ? 'år' : `${period} dagar`}`}
+        </span>
       </div>
 
       <div className="p-4 space-y-6">

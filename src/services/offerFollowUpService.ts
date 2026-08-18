@@ -533,7 +533,12 @@ export class OfferFollowUpService {
     }
   }
 
-  /** Lätta kolumner för statistikvyn — alla dokument, all tid (klienten periodfiltrerar) */
+  /**
+   * Lätta kolumner för statistikvyn — ENDAST dokument skapade i portalen
+   * (wizarden). Importerade/Oneflow-skapade dokument utan strukturerad data
+   * räknas inte med. Systemdokument = created_by_email satt ELLER tjänsterader
+   * i case_billing_items (wizard-dokument från innan created_by-spårningen).
+   */
   static async getStatsContracts(technicianEmail?: string): Promise<StatsContractRow[]> {
     let query = supabase
       .from('contracts')
@@ -550,9 +555,18 @@ export class OfferFollowUpService {
         `begone_employee_email.eq.${technicianEmail},created_by_email.eq.${technicianEmail}`
       )
     }
-    const { data, error } = await query
+    const [{ data, error }, { data: billingRows }] = await Promise.all([
+      query,
+      supabase
+        .from('case_billing_items')
+        .select('case_id')
+        .eq('case_type', 'contract')
+        .eq('item_type', 'service'),
+    ])
     if (error) throw error
-    return (data || []) as StatsContractRow[]
+    const systemIds = new Set((billingRows || []).map(r => r.case_id))
+    return ((data || []) as StatsContractRow[])
+      .filter(r => r.created_by_email !== null || systemIds.has(r.id))
   }
 
   /** Aggregat (produkter/tjänster/marginaler) via RPC — jsonb:n stannar i databasen */
