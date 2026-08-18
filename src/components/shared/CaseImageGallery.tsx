@@ -365,7 +365,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
       let uploadCount = 0
       for (const file of Array.from(files)) {
         if (!isValidImageType(file.type)) {
-          toast.error(`${file.name}: Ogiltigt filformat`)
+          toast.error(`${file.name}: Filtypen stöds inte – endast bilder (JPEG, PNG, WebP, HEIC) kan laddas upp`)
           continue
         }
         if (!isValidImageSize(file.size)) {
@@ -390,7 +390,7 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
 
     Array.from(files).forEach(file => {
       if (!isValidImageType(file.type)) {
-        toast.error(`${file.name}: Ogiltigt filformat`)
+        toast.error(`${file.name}: Filtypen stöds inte – endast bilder (JPEG, PNG, WebP, HEIC) kan laddas upp`)
         return
       }
 
@@ -945,7 +945,20 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
   )
 
   return (
-    <div className="space-y-2">
+    <div
+      className="space-y-2"
+      // Drag & drop: utan dessa handlers öppnar webbläsaren en släppt fil
+      // (t.ex. PDF) i fliken helt utan feedback — nu valideras den som filval
+      onDragOver={(e) => {
+        if ((draftMode || immediateUpload) && canEdit) e.preventDefault()
+      }}
+      onDrop={(e) => {
+        if ((draftMode || immediateUpload) && canEdit) {
+          e.preventDefault()
+          handleFileSelect(e.dataTransfer.files)
+        }
+      }}
+    >
       {/* Pending changes indicator */}
       {draftMode && pendingChangesCount > 0 && (
         <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/20 border border-amber-500/40 rounded-lg text-amber-300 text-sm">

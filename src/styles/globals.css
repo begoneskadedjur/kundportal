@@ -9,6 +9,39 @@
 }
 
 /* ============================================================
+   SCROLLBARS - smala och i temats färger, globalt.
+   Följer ljust/mörkt tema via --color-slate-* som remappas nedan.
+   ============================================================ */
+* {
+  scrollbar-width: thin;                                        /* Firefox */
+  scrollbar-color: var(--color-slate-600) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-slate-600);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-slate-500);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ============================================================
    LJUST TEMA - central mappningstabell
    Tailwind 4 kompilerar färgklasser till var(--color-*), så hela
    appen byter tema genom att skriva över variablerna här. Mörkt

@@ -47,7 +47,7 @@ export default function CaseImageUpload({
     Array.from(files).forEach(file => {
       // Validera filtyp
       if (!isValidImageType(file.type)) {
-        toast.error(`${file.name}: Ogiltigt filformat`)
+        toast.error(`${file.name}: Filtypen stöds inte – endast bilder (JPEG, PNG, WebP, HEIC) kan laddas upp`)
         return
       }
 
