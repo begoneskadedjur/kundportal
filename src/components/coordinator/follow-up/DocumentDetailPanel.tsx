@@ -96,6 +96,15 @@ export default function DocumentDetailPanel({
     OfferFollowUpService.getOneflowConversation(offer.oneflow_contract_id)
       .then(data => { if (!cancelled) setOneflowComments(data) })
       .catch(() => { if (!cancelled) setOneflowComments([]) })
+    // Synka ikapp från Oneflow i bakgrunden (retroaktiv historik + inlägg
+    // som saknar webhook) och uppdatera vyn om något nytt kom in
+    OfferFollowUpService.syncConversationFromOneflow(offer.oneflow_contract_id)
+      .then(gotAny => {
+        if (cancelled || !gotAny) return
+        return OfferFollowUpService.getOneflowConversation(offer.oneflow_contract_id)
+          .then(data => { if (!cancelled) setOneflowComments(data) })
+      })
+      .catch(() => {})
     OfferFollowUpService.getCallLogs(offer.id)
       .then(data => { if (!cancelled) setCallLogs(data) })
       .catch(() => { if (!cancelled) setCallLogs([]) })
@@ -191,9 +200,11 @@ export default function DocumentDetailPanel({
         const result = await OfferFollowUpService.postComment(offer.oneflow_contract_id, composer.trim())
         await OfferFollowUpService.mirrorPostedComment(
           offer.oneflow_contract_id,
-          { id: result?.id, body: composer.trim() },
+          { id: result?.id ?? result?.data?.id, body: composer.trim() },
           { name: userName || null }
         )
+        // Säkerhetsnät om POST-svaret saknade id: hämta tråden från Oneflow
+        await OfferFollowUpService.syncConversationFromOneflow(offer.oneflow_contract_id)
         const refreshed = await OfferFollowUpService.getOneflowConversation(offer.oneflow_contract_id)
         setOneflowComments(refreshed)
         toast.success('Svar skickat i Oneflow')

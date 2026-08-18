@@ -3,8 +3,13 @@
 // Koordinatorn ska aldrig lämna kön — därför popover, inte modal.
 import { useState } from 'react'
 import { Phone, Loader2 } from 'lucide-react'
+import DatePicker, { registerLocale } from 'react-datepicker'
+import sv from 'date-fns/locale/sv'
+import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { OfferFollowUpService } from '../../../services/offerFollowUpService'
+
+registerLocale('sv', sv)
 
 interface CallLogPopoverProps {
   contractId: string
@@ -121,11 +126,21 @@ export default function CallLogPopover({
               {c.label}
             </button>
           ))}
-          <input
-            type="date"
-            value={followUpAt || ''}
-            onChange={e => setFollowUpAt(e.target.value || null)}
-            className="px-2 py-1 text-[11px] bg-slate-800 border border-slate-700 rounded-md text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+          <DatePicker
+            selected={followUpAt ? new Date(followUpAt + 'T12:00:00') : null}
+            onChange={(d: Date | null) => {
+              if (!d) { setFollowUpAt(null); return }
+              const yyyy = d.getFullYear()
+              const mm = String(d.getMonth() + 1).padStart(2, '0')
+              const dd = String(d.getDate()).padStart(2, '0')
+              setFollowUpAt(`${yyyy}-${mm}-${dd}`)
+            }}
+            locale="sv"
+            dateFormat="yyyy-MM-dd"
+            minDate={new Date()}
+            placeholderText="Datum…"
+            portalId="datepicker-portal"
+            className="w-28 px-2 py-1 text-[11px] bg-slate-800 border border-slate-700 rounded-md text-slate-300 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
           />
         </div>
       </div>

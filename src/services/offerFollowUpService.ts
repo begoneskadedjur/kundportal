@@ -536,22 +536,69 @@ export class OfferFollowUpService {
     if (error) console.error('markCommentsRead:', error)
   }
 
-  /** Spegla en nyss skickad Oneflow-kommentar lokalt (webhooken synkar ikapp senare) */
+  /** Spegla en nyss skickad Oneflow-kommentar lokalt så den syns direkt */
   static async mirrorPostedComment(
     oneflowContractId: string,
     posted: { id?: number; body: string },
     author: { name: string | null }
   ): Promise<void> {
-    if (!posted.id) return
-    await supabase.from('oneflow_comments').upsert({
+    const commentId = posted.id ?? (posted as any)?.data?.id
+    if (!commentId) return
+    const { error } = await supabase.from('oneflow_comments').upsert({
       oneflow_contract_id: oneflowContractId,
-      oneflow_comment_id: posted.id,
+      oneflow_comment_id: commentId,
       author_name: author.name,
       author_type: 'internal',
       is_private: false,
       body: posted.body,
       commented_at: new Date().toISOString(),
-    }, { onConflict: 'oneflow_comment_id', ignoreDuplicates: false })
+    }, { onConflict: 'oneflow_comment_id', ignoreDuplicates: true })
+    if (error) console.error('mirrorPostedComment:', error)
+  }
+
+  /**
+   * Synka hela dokumentchatten från Oneflow till DB (insert-only, rör inte
+   * befintliga rader). Körs när panelen öppnas — ger retroaktiv historik för
+   * äldre dokument och täcker att Oneflow inte skickar webhook för alla inlägg.
+   */
+  static async syncConversationFromOneflow(oneflowContractId: string): Promise<boolean> {
+    try {
+      const data = await this.getComments(oneflowContractId)
+      const comments: Array<{
+        id: number
+        body?: string
+        created_time?: string
+        private?: boolean
+        parent_id?: number | null
+        participants?: { sender?: { participant_name?: string; party_name?: string } }
+      }> = data?.data || []
+      if (comments.length === 0) return false
+
+      const rows = comments.map(c => {
+        const partyName = c.participants?.sender?.party_name || ''
+        return {
+          oneflow_contract_id: oneflowContractId,
+          oneflow_comment_id: c.id,
+          parent_comment_id: c.parent_id ?? null,
+          author_name: c.participants?.sender?.participant_name || null,
+          author_type: partyName.toLowerCase().includes('begone') ? 'internal' : 'customer',
+          is_private: c.private ?? false,
+          body: c.body || '',
+          commented_at: c.created_time || new Date().toISOString(),
+        }
+      })
+      const { error } = await supabase
+        .from('oneflow_comments')
+        .upsert(rows, { onConflict: 'oneflow_comment_id', ignoreDuplicates: true })
+      if (error) {
+        console.error('syncConversationFromOneflow:', error)
+        return false
+      }
+      return true
+    } catch (err) {
+      console.error('syncConversationFromOneflow:', err)
+      return false
+    }
   }
 
   /** Logga ett samtal + ev. planera uppföljning ("ring åter") */

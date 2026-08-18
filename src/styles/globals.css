@@ -41,6 +41,12 @@
   background: transparent;
 }
 
+/* react-datepicker via portalId="datepicker-portal": kalendern renderas på
+   body-nivå för att inte klippas av modaler/popovers — måste ligga över dem */
+#datepicker-portal .react-datepicker-popper {
+  z-index: 70;
+}
+
 /* ============================================================
    LJUST TEMA - central mappningstabell
    Tailwind 4 kompilerar färgklasser till var(--color-*), så hela

@@ -186,6 +186,7 @@ export default function ExtendSigningPeriodDialog({
                 minDate={defaults.min}
                 placeholderText="Välj utgångsdatum..."
                 disabled={saving}
+                portalId="datepicker-portal"
                 wrapperClassName="w-full"
                 className="w-full pl-9 pr-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg text-white text-sm focus:outline-none focus:border-[#20c58f] focus:ring-2 focus:ring-[#20c58f]/20 transition-all"
               />
