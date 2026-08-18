@@ -4,7 +4,7 @@
 import { useState } from 'react'
 import { Phone, Loader2 } from 'lucide-react'
 import DatePicker, { registerLocale } from 'react-datepicker'
-import sv from 'date-fns/locale/sv'
+import { sv } from 'date-fns/locale'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
 import { OfferFollowUpService } from '../../../services/offerFollowUpService'
