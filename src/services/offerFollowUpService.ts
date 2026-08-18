@@ -26,6 +26,91 @@ function classifyPriority(
   return 'normal'
 }
 
+// === Arbetskön: kategorier sorterade efter väntekostnad ===
+// Varje dokument ligger i exakt EN kategori (högsta prioritet vinner).
+export type QueueCategory =
+  | 'ringlista'    // uppföljningsdatum är idag eller passerat
+  | 'boka'         // signerat, ej bokat — kunden väntar på oss
+  | 'svar'         // oläst kundkommentar — dialogen är levande
+  | 'loper_ut'     // signeringsfristen ≤ 3 dagar (eller ålders-fallback)
+  | 'aldrig_fram'  // studsad e-post eller aldrig öppnad
+  | 'forfallna'    // förfallet, ej hanterat
+  | 'bevakas'      // skickat, inväntar kund — ingen åtgärd
+  | 'klart'        // bokat/avfärdat/avskrivet
+
+export const QUEUE_SECTIONS: Array<{
+  key: QueueCategory
+  label: string
+  /** Tailwind-textfärg för räknarbadgen när sektionen har innehåll */
+  accent: string
+  collapsedByDefault: boolean
+}> = [
+  { key: 'ringlista', label: 'Ringlista idag', accent: 'text-[#20c58f]', collapsedByDefault: false },
+  { key: 'boka', label: 'Signerade — boka in', accent: 'text-[#20c58f]', collapsedByDefault: false },
+  { key: 'svar', label: 'Kunden har svarat', accent: 'text-blue-400', collapsedByDefault: false },
+  { key: 'loper_ut', label: 'Löper ut snart', accent: 'text-amber-400', collapsedByDefault: false },
+  { key: 'aldrig_fram', label: 'Nådde aldrig fram', accent: 'text-red-400', collapsedByDefault: false },
+  { key: 'forfallna', label: 'Förfallna', accent: 'text-slate-400', collapsedByDefault: false },
+  { key: 'bevakas', label: 'Bevakas', accent: 'text-slate-500', collapsedByDefault: true },
+  { key: 'klart', label: 'Klara & avfärdade', accent: 'text-slate-500', collapsedByDefault: true },
+]
+
+// Öppnad/ej öppnad-spårningen började när first_visit-webhooken driftsattes —
+// äldre dokument utan first_viewed betyder "okänt", inte "aldrig öppnad".
+const VIEW_TRACKING_START = '2026-08-18'
+const DEADLINE_SOON_DAYS = 3
+const NEVER_OPENED_DAYS = 5
+
+function classifyQueueCategory(o: {
+  status: string
+  age_days: number
+  days_until_deadline: number | null
+  unread_customer_comments: number
+  customer_first_viewed_at: string | null
+  email_delivery_failed_at: string | null
+  booked_case_id: string | null
+  created_at: string
+  action: CoordinatorCaseAction | null
+}): QueueCategory {
+  const coordStatus = o.action?.coordinator_status
+  const followUpAt = o.action?.follow_up_at || null
+  const today = new Date().toISOString().substring(0, 10)
+
+  // 1. Planerad uppföljning styr över allt utom klart
+  if (followUpAt && o.status !== 'signed' && o.status !== 'declined') {
+    if (followUpAt <= today) return 'ringlista'
+    return 'bevakas' // snoozad till framtida datum
+  }
+
+  // 2. Signerade: kunden väntar på bokning
+  if (o.status === 'signed') {
+    const handled = o.booked_case_id || coordStatus === 'booked' || coordStatus === 'completed'
+    return handled ? 'klart' : 'boka'
+  }
+
+  if (o.status === 'declined') return 'klart'
+
+  // 3. Oläst kundkommentar — dialogen är öppen NU
+  if (o.unread_customer_comments > 0) return 'svar'
+
+  if (o.status === 'overdue') {
+    return o.action?.dismissed_at || coordStatus === 'completed' ? 'klart' : 'forfallna'
+  }
+
+  // 4. Pågående: frist och leverans
+  if (o.days_until_deadline !== null && o.days_until_deadline <= DEADLINE_SOON_DAYS) return 'loper_ut'
+  if (o.email_delivery_failed_at) return 'aldrig_fram'
+  if (
+    !o.customer_first_viewed_at &&
+    o.created_at >= VIEW_TRACKING_START &&
+    o.age_days >= NEVER_OPENED_DAYS
+  ) return 'aldrig_fram'
+  // Fallback-heuristik tills dokumentet har en synkad deadline
+  if (o.days_until_deadline === null && o.age_days >= THRESHOLDS.APPROACHING_DEADLINE_DAYS) return 'loper_ut'
+
+  return 'bevakas'
+}
+
 export interface FollowUpOffer {
   id: string
   oneflow_contract_id: string
@@ -50,6 +135,24 @@ export interface FollowUpOffer {
   priority: OfferPriority
   is_recently_overdue: boolean
   days_since_overdue: number | null
+  // Livscykel & signeringsfrist
+  status_updated_at: string | null
+  signing_deadline: string | null
+  /** Dagar kvar till fristen (negativt = passerad). null = ingen synkad deadline */
+  days_until_deadline: number | null
+  customer_first_viewed_at: string | null
+  email_delivery_failed_at: string | null
+  // Identitet & spårning
+  quote_reference_number: string | null
+  template_id: string | null
+  created_by_name: string | null
+  created_by_email: string | null
+  booked_case_id: string | null
+  // Dokumentchatt
+  unread_customer_comments: number
+  latest_customer_comment: { body: string; at: string } | null
+  // Arbetskön
+  queue_category: QueueCategory
   // Dölj-funktion
   hidden_by: string[]
   // Koppling till ursprungligt ärende
@@ -98,7 +201,9 @@ const OFFER_COLUMNS = `
   id, oneflow_contract_id, type, status, company_name, contact_person,
   contact_email, contact_phone, total_value, begone_employee_name,
   begone_employee_email, created_at, updated_at, hidden_by, source_id, source_type,
-  customer_id
+  customer_id, status_updated_at, signing_deadline, customer_first_viewed_at,
+  email_delivery_failed_at, quote_reference_number, template_id,
+  created_by_name, created_by_email, booked_case_id
 `
 
 const EMPTY_KPIS: FollowUpKPIs = {
@@ -113,13 +218,23 @@ export class OfferFollowUpService {
    * Hämta all dashboard-data i EN runda (1 contracts-query, 1 tekniker-query, 1 kommentar-query).
    * Beräknar offers, KPIs och techStats lokalt.
    */
-  static async getDashboardData(technicianEmail?: string): Promise<DashboardData> {
-    // 1) Hämta alla relevanta kontrakt
-    const { data: allContracts, error: contractsError } = await supabase
+  static async getDashboardData(technicianEmail?: string, userId?: string): Promise<DashboardData> {
+    // 1) Hämta relevanta kontrakt. I teknikerläge filtreras SERVER-SIDE så att
+    //    bara egna dokument (avsändare ELLER skapare) lämnar databasen —
+    //    KPI:erna räknas sedan på samma filtrerade set.
+    let contractsQuery = supabase
       .from('contracts')
       .select(OFFER_COLUMNS)
       .in('status', ['pending', 'overdue', 'signed', 'declined'])
       .order('created_at', { ascending: true })
+
+    if (technicianEmail) {
+      contractsQuery = contractsQuery.or(
+        `begone_employee_email.eq.${technicianEmail},created_by_email.eq.${technicianEmail}`
+      )
+    }
+
+    const { data: allContracts, error: contractsError } = await contractsQuery
 
     if (contractsError) throw contractsError
     if (!allContracts || allContracts.length === 0) {
@@ -137,17 +252,31 @@ export class OfferFollowUpService {
       if (t.email) techByEmail.set(t.email.toLowerCase(), { id: t.id, name: t.name, role: t.role || '' })
     }
 
-    // 3) Kolla vilka kontrakt som har kommentarer
-    const contractIds = allContracts.map(o => o.oneflow_contract_id).filter(Boolean)
-    const { data: commentEvents } = contractIds.length > 0
-      ? await supabase
-          .from('oneflow_sync_log')
-          .select('oneflow_contract_id')
-          .in('oneflow_contract_id', contractIds)
-          .like('event_type', '%comment%')
-      : { data: [] }
+    // 3) Dokumentchatten: kundkommentarer + användarens läskvittenser.
+    //    Tabellen innehåller bara våra dokument — hämta kundinläggen rakt av.
+    const [{ data: customerComments }, { data: myReads }] = await Promise.all([
+      supabase
+        .from('oneflow_comments')
+        .select('id, oneflow_contract_id, body, commented_at')
+        .eq('author_type', 'customer')
+        .eq('is_private', false)
+        .order('commented_at', { ascending: true }),
+      userId
+        ? supabase.from('oneflow_comment_reads').select('comment_id').eq('user_id', userId)
+        : Promise.resolve({ data: [] as { comment_id: string }[] }),
+    ])
 
-    const hasCommentsSet = new Set((commentEvents || []).map(e => e.oneflow_contract_id))
+    const readSet = new Set((myReads || []).map(r => r.comment_id))
+    const unreadByContract = new Map<string, number>()
+    const latestByContract = new Map<string, { body: string; at: string }>()
+    const hasCommentsSet = new Set<string>()
+    for (const c of customerComments || []) {
+      hasCommentsSet.add(c.oneflow_contract_id)
+      latestByContract.set(c.oneflow_contract_id, { body: c.body, at: c.commented_at })
+      if (!readSet.has(c.id)) {
+        unreadByContract.set(c.oneflow_contract_id, (unreadByContract.get(c.oneflow_contract_id) || 0) + 1)
+      }
+    }
 
     // 4) Hämta coordinator_case_actions för alla kontrakt
     const allContractIds = allContracts.map(c => c.id)
@@ -169,33 +298,47 @@ export class OfferFollowUpService {
       const email = o.begone_employee_email?.toLowerCase() || ''
       const tech = techByEmail.get(email) || null
       const age_days = Math.floor((now - new Date(o.created_at).getTime()) / (1000 * 60 * 60 * 24))
+      // "Dagar sedan förfallet" räknas på status_updated_at (exakt statusbyte) —
+      // updated_at skrivs om av varje content-webhook och är opålitlig
+      const overdueSince = o.status_updated_at || o.updated_at
       const days_since_overdue = o.status === 'overdue'
-        ? Math.floor((now - new Date(o.updated_at).getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.floor((now - new Date(overdueSince).getTime()) / (1000 * 60 * 60 * 24))
         : null
+      const days_until_deadline = o.signing_deadline
+        ? Math.ceil((new Date(o.signing_deadline + 'T23:59:59').getTime() - now) / (1000 * 60 * 60 * 24))
+        : null
+      const unread = unreadByContract.get(o.oneflow_contract_id) || 0
+      const action = actionByContractId.get(o.id) || null
 
-      return {
+      const base = {
         ...o,
         technician_id: tech?.id || null,
         technician_name: tech?.name || o.begone_employee_name,
         age_days,
         has_comments: hasCommentsSet.has(o.oneflow_contract_id),
         days_since_overdue,
+        days_until_deadline,
         priority: classifyPriority(o.status, age_days, days_since_overdue),
         is_recently_overdue: o.status === 'overdue' && days_since_overdue !== null && days_since_overdue <= THRESHOLDS.RECENTLY_OVERDUE_DAYS,
         hidden_by: o.hidden_by || [],
         source_id: o.source_id || null,
         source_type: o.source_type || null,
         customer_id: o.customer_id || null,
-        action: actionByContractId.get(o.id) || null,
+        booked_case_id: o.booked_case_id || null,
+        unread_customer_comments: unread,
+        latest_customer_comment: latestByContract.get(o.oneflow_contract_id) || null,
+        action,
+      }
+
+      return {
+        ...base,
+        queue_category: classifyQueueCategory(base),
       }
     })
 
-    // Filtrera per tekniker om det behövs
-    const offers = technicianEmail
-      ? allOffers.filter(o => o.begone_employee_email?.toLowerCase() === technicianEmail.toLowerCase())
-      : allOffers
+    const offers = allOffers
 
-    // === Beräkna KPIs (alltid på alla kontrakt, inte filtrerade) ===
+    // === Beräkna KPIs (på samma dataset som listan — i teknikerläge de egna dokumenten) ===
     const pendingContracts = allContracts.filter(c => c.status === 'pending')
     const overdueContracts = allContracts.filter(c => c.status === 'overdue')
     const signedContracts = allContracts.filter(c => c.status === 'signed')
@@ -362,6 +505,118 @@ export class OfferFollowUpService {
       services: items.filter(i => i.item_type === 'service'),
       articles: items.filter(i => i.item_type === 'article'),
     }
+  }
+
+  /** Hämta persisterad Oneflow-dokumentchatt för ett kontrakt (från DB, inte API) */
+  static async getOneflowConversation(oneflowContractId: string): Promise<Array<{
+    id: string
+    oneflow_comment_id: number
+    author_name: string | null
+    author_type: 'customer' | 'internal'
+    is_private: boolean
+    body: string
+    commented_at: string
+  }>> {
+    const { data, error } = await supabase
+      .from('oneflow_comments')
+      .select('id, oneflow_comment_id, author_name, author_type, is_private, body, commented_at')
+      .eq('oneflow_contract_id', oneflowContractId)
+      .order('commented_at', { ascending: true })
+    if (error) throw error
+    return (data || []) as any
+  }
+
+  /** Markera kundkommentarer som lästa för en användare */
+  static async markCommentsRead(commentIds: string[], userId: string): Promise<void> {
+    if (commentIds.length === 0) return
+    const rows = commentIds.map(id => ({ comment_id: id, user_id: userId }))
+    const { error } = await supabase
+      .from('oneflow_comment_reads')
+      .upsert(rows, { onConflict: 'comment_id,user_id', ignoreDuplicates: true })
+    if (error) console.error('markCommentsRead:', error)
+  }
+
+  /** Spegla en nyss skickad Oneflow-kommentar lokalt (webhooken synkar ikapp senare) */
+  static async mirrorPostedComment(
+    oneflowContractId: string,
+    posted: { id?: number; body: string },
+    author: { name: string | null }
+  ): Promise<void> {
+    if (!posted.id) return
+    await supabase.from('oneflow_comments').upsert({
+      oneflow_contract_id: oneflowContractId,
+      oneflow_comment_id: posted.id,
+      author_name: author.name,
+      author_type: 'internal',
+      is_private: false,
+      body: posted.body,
+      commented_at: new Date().toISOString(),
+    }, { onConflict: 'oneflow_comment_id', ignoreDuplicates: false })
+  }
+
+  /** Logga ett samtal + ev. planera uppföljning ("ring åter") */
+  static async logCall(
+    contractId: string,
+    input: {
+      outcome: 'reached' | 'voicemail' | 'no_answer'
+      note?: string | null
+      followUpAt?: string | null
+      byEmail?: string | null
+      byName?: string | null
+    }
+  ): Promise<void> {
+    const { error: logError } = await supabase.from('document_call_logs').insert({
+      contract_id: contractId,
+      outcome: input.outcome,
+      note: input.note || null,
+      called_by_email: input.byEmail || null,
+      called_by_name: input.byName || null,
+    })
+    if (logError) throw logError
+
+    // Uppdatera koordinatorns åtgärdsrad: kontakträknare + ev. uppföljning
+    const { data: existing } = await supabase
+      .from('coordinator_case_actions')
+      .select('contact_attempts')
+      .eq('contract_id', contractId)
+      .maybeSingle()
+
+    const { error: actionError } = await supabase
+      .from('coordinator_case_actions')
+      .upsert({
+        contract_id: contractId,
+        contact_attempts: (existing?.contact_attempts || 0) + 1,
+        last_contact_attempt_at: new Date().toISOString(),
+        last_contact_method: 'phone',
+        follow_up_at: input.followUpAt || null,
+        follow_up_note: input.followUpAt ? (input.note || null) : null,
+      }, { onConflict: 'contract_id' })
+    if (actionError) throw actionError
+  }
+
+  /** Sätt eller rensa planerad uppföljning utan samtalslogg */
+  static async setFollowUp(contractId: string, followUpAt: string | null, note?: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('coordinator_case_actions')
+      .upsert({
+        contract_id: contractId,
+        follow_up_at: followUpAt,
+        follow_up_note: followUpAt ? (note || null) : null,
+      }, { onConflict: 'contract_id' })
+    if (error) throw error
+  }
+
+  /** Hämta samtalsloggen för ett kontrakt */
+  static async getCallLogs(contractId: string): Promise<Array<{
+    id: string; outcome: string; note: string | null; called_by_name: string | null; created_at: string
+  }>> {
+    const { data, error } = await supabase
+      .from('document_call_logs')
+      .select('id, outcome, note, called_by_name, created_at')
+      .eq('contract_id', contractId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
   }
 
   /** Skicka kommentar (via API-proxy) */

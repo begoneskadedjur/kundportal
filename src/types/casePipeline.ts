@@ -26,6 +26,9 @@ export interface CoordinatorCaseAction {
   dismissed_by: string | null
   status_updated_at: string | null
   status_updated_by: string | null
+  /** Planerad uppföljning ("ring åter") — styr Ringlista/snooze i arbetskön */
+  follow_up_at?: string | null
+  follow_up_note?: string | null
   created_at: string
   updated_at: string
 }
