@@ -99,7 +99,8 @@ const CaseImageGallery = forwardRef<CaseImageGalleryRef, CaseImageGalleryProps>(
   const [pendingDeletes, setPendingDeletes] = useState<string[]>([])
   const [pendingTagChanges, setPendingTagChanges] = useState<Map<string, CaseImageTag[]>>(new Map())
   const [pendingDescriptionChanges, setPendingDescriptionChanges] = useState<Map<string, string>>(new Map())
-  const [isCommitting, setIsCommitting] = useState(false)
+  // Värdet läses inte i UI:t ännu — behåll settern så commitChanges kan flagga pågående sparning
+  const [, setIsCommitting] = useState(false)
 
   // Notifiera parent om pending changes
   useEffect(() => {
