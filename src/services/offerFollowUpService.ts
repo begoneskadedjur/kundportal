@@ -194,6 +194,32 @@ export interface DashboardData {
   techStats: TechnicianOfferStats[]
 }
 
+// === Statistikvyn ===
+export interface StatsContractRow {
+  id: string
+  type: 'offer' | 'contract'
+  status: string
+  total_value: number | null
+  begone_employee_email: string | null
+  begone_employee_name: string | null
+  created_by_email: string | null
+  created_by_name: string | null
+  created_at: string
+  status_updated_at: string | null
+  organization_number: string | null
+  template_id: string | null
+  customer_first_viewed_at: string | null
+  booked_case_id: string | null
+  source_id: string | null
+  source_type: string | null
+}
+
+export interface StatsAggregates {
+  produkter: Array<{ name: string; antal: number; varde: number }>
+  tjanster: Array<{ name: string; dokument: number; varde: number; signerade: number }>
+  marginaler: Array<{ tech_email: string | null; marginal_pct: number; intakt: number }>
+}
+
 export type FollowUpStatusFilter = 'all' | 'pending' | 'overdue' | 'signed' | 'declined'
 export type FollowUpSortBy = 'priority' | 'oldest' | 'newest' | 'value_desc' | 'technician'
 
@@ -505,6 +531,43 @@ export class OfferFollowUpService {
       services: items.filter(i => i.item_type === 'service'),
       articles: items.filter(i => i.item_type === 'article'),
     }
+  }
+
+  /** Lätta kolumner för statistikvyn — alla dokument, all tid (klienten periodfiltrerar) */
+  static async getStatsContracts(technicianEmail?: string): Promise<StatsContractRow[]> {
+    let query = supabase
+      .from('contracts')
+      .select(`
+        id, type, status, total_value, begone_employee_email, begone_employee_name,
+        created_by_email, created_by_name, created_at, status_updated_at,
+        organization_number, template_id, customer_first_viewed_at, booked_case_id,
+        source_id, source_type
+      `)
+      .in('status', ['pending', 'overdue', 'signed', 'declined'])
+      .order('created_at', { ascending: true })
+    if (technicianEmail) {
+      query = query.or(
+        `begone_employee_email.eq.${technicianEmail},created_by_email.eq.${technicianEmail}`
+      )
+    }
+    const { data, error } = await query
+    if (error) throw error
+    return (data || []) as StatsContractRow[]
+  }
+
+  /** Aggregat (produkter/tjänster/marginaler) via RPC — jsonb:n stannar i databasen */
+  static async getStatsAggregates(
+    fromISO: string,
+    toISO: string,
+    technicianEmail?: string | null
+  ): Promise<StatsAggregates> {
+    const { data, error } = await supabase.rpc('dokumentsignering_statistik', {
+      p_from: fromISO,
+      p_to: toISO,
+      p_tech_email: technicianEmail || null,
+    })
+    if (error) throw error
+    return (data || { produkter: [], tjanster: [], marginaler: [] }) as StatsAggregates
   }
 
   /** Hämta persisterad Oneflow-dokumentchatt för ett kontrakt (från DB, inte API) */

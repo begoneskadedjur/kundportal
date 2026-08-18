@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { OfferFollowUpService, QUEUE_SECTIONS } from '../../services/offerFollowUpService'
 import DocumentQueueList from '../../components/coordinator/follow-up/DocumentQueueList'
 import DocumentDetailPanel from '../../components/coordinator/follow-up/DocumentDetailPanel'
+import DocumentStatsView from '../../components/coordinator/follow-up/DocumentStatsView'
 import BookInModal from '../../components/coordinator/follow-up/BookInModal'
 import DeleteOfferConfirmDialog from '../../components/coordinator/follow-up/DeleteOfferConfirmDialog'
 import ExtendSigningPeriodDialog from '../../components/coordinator/follow-up/ExtendSigningPeriodDialog'
@@ -34,6 +35,7 @@ export default function OfferFollowUp() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showHidden, setShowHidden] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [view, setView] = useState<'queue' | 'stats'>('queue')
 
   const [deleteTarget, setDeleteTarget] = useState<FollowUpOffer | null>(null)
   const [extendTarget, setExtendTarget] = useState<FollowUpOffer | null>(null)
@@ -176,6 +178,20 @@ export default function OfferFollowUp() {
                 : `Dina dokument · ${actionCount > 0 ? `${actionCount} att agera på` : 'inget kräver åtgärd'}`}
             </p>
           </div>
+          {/* Vyväxlare: arbetskön eller statistiken */}
+          <div className="flex bg-slate-800/50 rounded-lg p-0.5 ml-2">
+            {([['queue', 'Arbetskö'], ['stats', 'Statistik']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setView(key)}
+                className={`px-3 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                  view === key ? 'bg-[#20c58f] text-[#fff]' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 ml-auto flex-wrap">
@@ -190,48 +206,59 @@ export default function OfferFollowUp() {
             </span>
           )}
 
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
-            <input
-              id="doc-search-input"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Sök kund, offertnr…"
-              className="w-52 pl-8 pr-3 py-1.5 bg-slate-800/60 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-            />
-          </div>
+          {view === 'queue' && (
+            <>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+                <input
+                  id="doc-search-input"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Sök kund, offertnr…"
+                  className="w-52 pl-8 pr-3 py-1.5 bg-slate-800/60 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                />
+              </div>
 
-          <div className="flex bg-slate-800/50 rounded-lg p-0.5">
-            {([
-              { key: 'all', label: 'Båda' },
-              { key: 'offer', label: 'Offerter' },
-              { key: 'contract', label: 'Avtal' },
-            ] as const).map(f => (
+              <div className="flex bg-slate-800/50 rounded-lg p-0.5">
+                {([
+                  { key: 'all', label: 'Båda' },
+                  { key: 'offer', label: 'Offerter' },
+                  { key: 'contract', label: 'Avtal' },
+                ] as const).map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => setDocTypeFilter(f.key)}
+                    className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                      docTypeFilter === f.key ? 'bg-[#20c58f] text-[#fff]' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
               <button
-                key={f.key}
-                onClick={() => setDocTypeFilter(f.key)}
-                className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
-                  docTypeFilter === f.key ? 'bg-[#20c58f] text-[#fff]' : 'text-slate-400 hover:text-white'
-                }`}
+                onClick={() => fetchData(true)}
+                disabled={refreshing}
+                title="Uppdatera"
+                className="p-1.5 text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600 rounded-lg transition-colors disabled:opacity-50"
               >
-                {f.label}
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => fetchData(true)}
-            disabled={refreshing}
-            title="Uppdatera"
-            className="p-1.5 text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600 rounded-lg transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* ── Master-detail ── */}
-      <div className="flex-1 flex min-h-0 bg-slate-900/40 border border-slate-800 rounded-xl overflow-hidden">
+      {/* ── Statistikvyn ── */}
+      {view === 'stats' && (
+        <div className="flex-1 flex flex-col min-h-0 bg-slate-900/40 border border-slate-800 rounded-xl">
+          <DocumentStatsView isCoordinator={isCoordinator} ownDocsEmail={ownDocsEmail} />
+        </div>
+      )}
+
+      {/* ── Master-detail (arbetskön) ── */}
+      <div className={`flex-1 min-h-0 bg-slate-900/40 border border-slate-800 rounded-xl ${view === 'queue' ? 'flex' : 'hidden'}`}>
         {/* Kön */}
         <div className={`w-full lg:w-[400px] lg:shrink-0 lg:border-r border-slate-800 flex-col min-h-0 ${selectedId ? 'hidden lg:flex' : 'flex'}`}>
           <DocumentQueueList
