@@ -150,7 +150,9 @@ export const generateSingleCaseHTML = (
   const addressStr = typeof caseData.address === 'string'
     ? caseData.address
     : (caseData.address?.address || customerData?.contact_address || null)
-  const hasTrafficLight = caseData.pest_level !== null || caseData.problem_rating !== null
+  // != null täcker både null OCH undefined — obedömda ärenden vars fält aldrig
+  // skickades med i payloaden ska inte visa en falsk "OK 0 av 3"-bedömning
+  const hasTrafficLight = caseData.pest_level != null || caseData.problem_rating != null
 
   const caseNumber = caseData.case_number || caseData.title || ''
   const todayLong = new Date().toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -169,6 +171,7 @@ export const generateSingleCaseHTML = (
   ]
   if (caseData.visit_number && caseData.visit_number > 1) infoRows.push(['Besök nr', esc(caseData.visit_number)])
   if (caseData.work_order_number) infoRows.push(['Arbetsorder nr', esc(caseData.work_order_number)])
+  if (caseData.invoice_marking) infoRows.push(['Märkning faktura', esc(caseData.invoice_marking)])
   if (caseData.work_object) infoRows.push(['Objekt', esc(caseData.work_object)])
 
   const caseInfoSection = `

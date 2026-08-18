@@ -44,6 +44,7 @@ interface TechnicianCase {
   // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
   work_order_number?: string | null;
   work_object?: string | null;
+  invoice_marking?: string | null;
 }
 
 export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
@@ -222,8 +223,10 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       })(),
       price: caseData.case_price,
       // Trafikljussystem - VIKTIGT för den nya rapporten!
-      pest_level: caseData.pest_level,
-      problem_rating: caseData.problem_rating,
+      // ?? null: undefined skulle försvinna ur JSON-payloaden och tolkas som
+      // "bedömd" av API:t — explicit null betyder "ej bedömd"
+      pest_level: caseData.pest_level ?? null,
+      problem_rating: caseData.problem_rating ?? null,
       // Arbetsrapport - KORREKT fältnamn för PDF-generatorn
       work_report: caseData.rapport,
       // Rekommendationer från databasen 
@@ -236,6 +239,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
       work_order_number: caseData.work_order_number || null,
       work_object: caseData.work_object || null,
+      invoice_marking: caseData.invoice_marking || null,
       visit_number: await (async () => {
         const { count } = await supabase
           .from('case_updates_log')
