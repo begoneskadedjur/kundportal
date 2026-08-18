@@ -534,10 +534,10 @@ export class OfferFollowUpService {
   }
 
   /**
-   * Lätta kolumner för statistikvyn — ENDAST dokument skapade i portalen
-   * (wizarden). Importerade/Oneflow-skapade dokument utan strukturerad data
-   * räknas inte med. Systemdokument = created_by_email satt ELLER tjänsterader
-   * i case_billing_items (wizard-dokument från innan created_by-spårningen).
+   * Lätta kolumner för statistikvyn — ENBART dokument från nya systemet:
+   * created_by sätts automatiskt från sessionen, så datan är enhetlig
+   * (avsändare, fakturarader, interna kostnader). Äldre wizard-dokument
+   * med fritextavsändare och importer räknas inte.
    */
   static async getStatsContracts(technicianEmail?: string): Promise<StatsContractRow[]> {
     let query = supabase
@@ -549,24 +549,16 @@ export class OfferFollowUpService {
         source_id, source_type
       `)
       .in('status', ['pending', 'overdue', 'signed', 'declined'])
+      .not('created_by_email', 'is', null)
       .order('created_at', { ascending: true })
     if (technicianEmail) {
       query = query.or(
         `begone_employee_email.eq.${technicianEmail},created_by_email.eq.${technicianEmail}`
       )
     }
-    const [{ data, error }, { data: billingRows }] = await Promise.all([
-      query,
-      supabase
-        .from('case_billing_items')
-        .select('case_id')
-        .eq('case_type', 'contract')
-        .eq('item_type', 'service'),
-    ])
+    const { data, error } = await query
     if (error) throw error
-    const systemIds = new Set((billingRows || []).map(r => r.case_id))
-    return ((data || []) as StatsContractRow[])
-      .filter(r => r.created_by_email !== null || systemIds.has(r.id))
+    return (data || []) as StatsContractRow[]
   }
 
   /**
