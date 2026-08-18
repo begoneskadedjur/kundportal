@@ -11,12 +11,15 @@ interface CoordinatorStatusDropdownProps {
   value: CoordinatorCaseStatus
   onChange: (status: CoordinatorCaseStatus) => void
   size?: 'sm' | 'md'
+  /** 'up' när trigger sitter nära en nederkant (t.ex. detaljpanelens åtgärdsfot) */
+  direction?: 'down' | 'up'
 }
 
 export default function CoordinatorStatusDropdown({
   value,
   onChange,
   size = 'sm',
+  direction = 'down',
 }: CoordinatorStatusDropdownProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -48,7 +51,9 @@ export default function CoordinatorStatusDropdown({
         <ChevronDown className="w-2.5 h-2.5" />
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1 min-w-[120px]">
+        <div className={`absolute left-0 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 py-1 min-w-[120px] ${
+          direction === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
+        }`}>
           {(Object.entries(COORDINATOR_STATUS_CONFIG) as [CoordinatorCaseStatus, typeof cfg][]).map(([key, val]) => (
             <button
               key={key}

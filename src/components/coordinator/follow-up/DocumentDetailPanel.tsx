@@ -525,6 +525,7 @@ export default function DocumentDetailPanel({
               value={offer.action?.coordinator_status || 'new'}
               onChange={(status) => onStatusChange(offer.id, status)}
               size="sm"
+              direction="up"
             />
           )}
           <div className="relative">

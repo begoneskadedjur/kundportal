@@ -28,6 +28,7 @@ import {
 } from '../../types/intranet'
 import { useRoleBasePath } from '../../hooks/useRoleBasePath'
 import PrissattningDemo from './intranet/interactive/PrissattningDemo'
+import DokumentsigneringDemo from './intranet/interactive/DokumentsigneringDemo'
 import FaktureringDemo from './intranet/interactive/FaktureringDemo'
 import ArendetyperDemo from './intranet/interactive/ArendetyperDemo'
 import SchemaDemo from './intranet/interactive/SchemaDemo'
@@ -39,6 +40,7 @@ import { Eye } from 'lucide-react'
 // sin komponent här via nyckeln i blockets component-fält
 const INTERACTIVE_COMPONENTS: Record<string, ComponentType> = {
   'prissattning-demo': PrissattningDemo,
+  'dokumentsignering-demo': DokumentsigneringDemo,
   'fakturering-demo': FaktureringDemo,
   'arendetyper-demo': ArendetyperDemo,
   'schema-demo': SchemaDemo,
