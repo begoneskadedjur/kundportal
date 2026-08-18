@@ -105,6 +105,7 @@ interface ContractInsertData {
   begone_employee_email?: string | null
   contract_length?: string | null
   start_date?: string | null
+  signing_deadline?: string | null
   contact_person?: string | null
   contact_email?: string | null
   contact_phone?: string | null
@@ -518,6 +519,7 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     begone_employee_email: findField('e-post-anstlld', 'e-post-anstalld', 'e-post-anställd', 'vr-kontakt-mail', 'vår-kontakt-mail') || null,
     contract_length: findField('avtalslngd', 'avtalslängd', 'avtals-längd', 'contract-length') || null,
     start_date: findField('begynnelsedag', 'startdatum', 'start-date', 'utfrande-datum', 'utförande-datum') || null,
+    signing_deadline: extractSigningDeadline(details),
     
     // Kontakt-information (använd party/participant som fallback)
     contact_person: findField('Kontaktperson', 'kontaktperson', 'kontakt-person', 'contact-person') || counterParticipant?.name || firstParticipant?.name || null,
@@ -538,6 +540,82 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     
     // Kundkoppling sätts senare vid signering
     customer_id: null
+  }
+}
+
+// Extrahera signeringsdeadline ur Oneflow-kontraktsobjektet.
+// Fältnamnet varierar mellan API-versioner — prova kända kandidater och logga
+// om inget hittas så vi kan komplettera listan.
+const extractSigningDeadline = (details: any): string | null => {
+  const raw =
+    details?.signing_period_expiry_date ||
+    details?._private?.signing_period_expiration?.expire_date ||
+    details?._private_ownerside?.signing_period_expiration?.expire_date ||
+    details?.signing_period_expiration?.expire_date ||
+    null
+  if (!raw) return null
+  const dateStr = String(raw).substring(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : null
+}
+
+// Synka Oneflow-kommentarer till oneflow_comments (dokumentchatten).
+// Körs vid comment:create-webhook — hämtar hela tråden och upsertar, så även
+// historik/svar som skapats innan persistensen fångas ikapp.
+const syncOneflowComments = async (contractId: string): Promise<void> => {
+  try {
+    const response = await fetch(
+      `https://api.oneflow.com/v1/contracts/${contractId}/comments`,
+      {
+        headers: {
+          'x-oneflow-api-token': process.env.ONEFLOW_API_TOKEN!,
+          'x-oneflow-user-email': process.env.ONEFLOW_USER_EMAIL || 'info@begone.se',
+          Accept: 'application/json',
+        },
+      }
+    )
+    if (!response.ok) {
+      console.error(`💬 Kunde inte hämta kommentarer för ${contractId}: HTTP ${response.status}`)
+      return
+    }
+    const data = await response.json() as {
+      data?: Array<{
+        id: number
+        body?: string
+        created_time?: string
+        private?: boolean
+        parent_id?: number | null
+        participants?: { sender?: { participant_name?: string; party_name?: string } }
+      }>
+    }
+    const comments = data.data || []
+    if (comments.length === 0) return
+
+    const rows = comments.map(c => {
+      const partyName = c.participants?.sender?.party_name || ''
+      return {
+        oneflow_contract_id: contractId,
+        oneflow_comment_id: c.id,
+        parent_comment_id: c.parent_id ?? null,
+        author_name: c.participants?.sender?.participant_name || null,
+        author_email: null,
+        // BeGone-part = internt inlägg, allt annat = kund
+        author_type: partyName.toLowerCase().includes('begone') ? 'internal' : 'customer',
+        is_private: c.private ?? false,
+        body: c.body || '',
+        commented_at: c.created_time || new Date().toISOString(),
+      }
+    })
+
+    const { error } = await supabase
+      .from('oneflow_comments')
+      .upsert(rows, { onConflict: 'oneflow_comment_id', ignoreDuplicates: false })
+    if (error) {
+      console.error('💬 Kunde inte spara kommentarer:', error)
+    } else {
+      console.log(`💬 ${rows.length} kommentarer synkade för kontrakt ${contractId}`)
+    }
+  } catch (err) {
+    console.error('💬 syncOneflowComments fel:', err)
   }
 }
 
@@ -1790,9 +1868,24 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           console.log('❌ Deltagare avvisat')
           break
 
-        case 'participant:first_visit':
-          console.log('👁️ Första besök av deltagare')
+        case 'participant:first_visit': {
+          console.log('👁️ Första besök av deltagare — markerar kunden som "har öppnat"')
+          const nowISO = new Date().toISOString()
+          // customer_first_viewed_at sätts bara första gången; last_accessed alltid
+          const { data: viewRow } = await supabase
+            .from('contracts')
+            .select('customer_first_viewed_at')
+            .eq('oneflow_contract_id', contractId)
+            .single()
+          await supabase
+            .from('contracts')
+            .update({
+              customer_first_viewed_at: viewRow?.customer_first_viewed_at || nowISO,
+              customer_last_accessed_at: nowISO,
+            })
+            .eq('oneflow_contract_id', contractId)
           break
+        }
 
         // Data field & content events  
         case 'data_field:update':
@@ -1816,7 +1909,8 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
         // Comment events
         case 'comment:create':
-          console.log('💬 Kommentar tillagd')
+          console.log('💬 Kommentar tillagd — synkar dokumentchatten')
+          await syncOneflowComments(contractId)
           break
 
         // Party events
@@ -1832,7 +1926,11 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
         // Participant delivery/delegation events
         case 'participant:delivery_failure':
-          console.log('📧 Leveransfel för deltagare')
+          console.log('📧 Leveransfel för deltagare — flaggar studsad e-post')
+          await supabase
+            .from('contracts')
+            .update({ email_delivery_failed_at: new Date().toISOString() })
+            .eq('oneflow_contract_id', contractId)
           break
 
         case 'participant:delegate':

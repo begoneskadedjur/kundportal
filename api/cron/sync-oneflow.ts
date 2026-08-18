@@ -86,6 +86,20 @@ interface OneFlowContract {
   state_updated_time?: string
 }
 
+// Extrahera signeringsdeadline ur ett Oneflow-kontraktsobjekt (list- eller detaljform).
+// Samma kandidatlista som i api/oneflow/webhook.ts — håll dem i synk.
+function extractSigningDeadline(obj: any): string | null {
+  const raw =
+    obj?.signing_period_expiry_date ||
+    obj?._private?.signing_period_expiration?.expire_date ||
+    obj?._private_ownerside?.signing_period_expiration?.expire_date ||
+    obj?.signing_period_expiration?.expire_date ||
+    null
+  if (!raw) return null
+  const dateStr = String(raw).substring(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? dateStr : null
+}
+
 interface OneFlowContractDetail {
   id: number
   name?: string
@@ -264,6 +278,7 @@ function mapToInsertData(detail: OneFlowContractDetail, listItem: OneFlowContrac
     total_value: totalValue > 0 ? totalValue : null,
     selected_products: detail.product_groups || null,
     start_date: parseDate(mapped.start_date),
+    signing_deadline: extractSigningDeadline(detail) ?? extractSigningDeadline(listItem),
     customer_id: null,
     created_at: listItem.published_time || detail.created_time || listItem.created_time || null,
     updated_at: listItem.state_updated_time || detail.updated_time || listItem.updated_time || null,
@@ -308,9 +323,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 2. Hämta alla kontrakt från DB
     const { data: dbContracts } = await supabase
       .from('contracts')
-      .select('oneflow_contract_id, status')
+      .select('oneflow_contract_id, status, signing_deadline')
 
-    const dbMap = new Map<string, { oneflow_contract_id: string; status: string }>()
+    const dbMap = new Map<string, { oneflow_contract_id: string; status: string; signing_deadline: string | null }>()
     for (const c of dbContracts || []) {
       if (c.oneflow_contract_id) {
         dbMap.set(c.oneflow_contract_id, c)
@@ -412,6 +427,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log(`[sync-oneflow] Statusdrift fixad ${c.id}: ${dbRecord.status} → ${newStatus}`)
       }
       await delay(30)
+    }
+
+    // === Uppdatera signeringsdeadline för pågående dokument ===
+    // Deadline kan förlängas i Oneflow utanför portalen — håll den i synk.
+    // Bara pending/overdue behöver färsk deadline; detaljhämtning per kontrakt
+    // (listan innehåller sällan expiration-fältet).
+    const deadlineCandidates = oneflowContracts.filter(c => {
+      const dbRecord = dbMap.get(c.id.toString())
+      return dbRecord && (dbRecord.status === 'pending' || dbRecord.status === 'overdue')
+    })
+    for (const c of deadlineCandidates) {
+      try {
+        const dbRecord = dbMap.get(c.id.toString())!
+        let deadline = extractSigningDeadline(c)
+        if (!deadline) {
+          const detail = await fetchContractDetails(c.id)
+          deadline = extractSigningDeadline(detail)
+          await delay(50)
+        }
+        if (deadline && deadline !== dbRecord.signing_deadline) {
+          const { error } = await supabase
+            .from('contracts')
+            .update({ signing_deadline: deadline })
+            .eq('oneflow_contract_id', c.id.toString())
+          if (error) {
+            console.error(`[sync-oneflow] Fel vid deadline-uppdatering av ${c.id}:`, error.message)
+            stats.errors++
+          } else {
+            console.log(`[sync-oneflow] Deadline uppdaterad för ${c.id}: ${dbRecord.signing_deadline || 'null'} → ${deadline}`)
+          }
+        }
+      } catch (err: any) {
+        console.error(`[sync-oneflow] Undantag vid deadline-synk av ${c.id}:`, err.message)
+        stats.errors++
+      }
     }
 
     const summary = {

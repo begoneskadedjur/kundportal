@@ -136,11 +136,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.warn('Kunde inte hämta uppdaterad status från Oneflow:', detailErr)
     }
 
-    // 5. Uppdatera DB
+    // 5. Uppdatera DB — skriv även tillbaka den nya deadlinen så
+    // "Löper ut snart"-logiken räknar på rätt datum direkt
     const { error: updateError } = await supabase
       .from('contracts')
       .update({
         status: newStatus,
+        signing_deadline: expireDate,
         updated_at: new Date().toISOString(),
       })
       .eq('id', contractId)
