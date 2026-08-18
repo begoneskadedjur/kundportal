@@ -2,9 +2,11 @@
 // Fast detaljpanel i master-detail-vyn: dokumenthuvud, livscykel-tidslinje,
 // "Väntar på"-rad, sammanflätad konversation (Oneflow + internt) och åtgärdsfot.
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Phone, Mail, ExternalLink, Loader2, Send, MoreHorizontal,
   EyeOff as EyeOffIcon, Trash2, CalendarClock, MessageSquare, Activity, Package, Lock,
+  FileText,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
@@ -63,6 +65,7 @@ export default function DocumentDetailPanel({
   offer, isCoordinator, userId, userName, userEmail,
   onChanged, onExtend, onDelete, onHide, onStatusChange, onBookIn,
 }: DocumentDetailPanelProps) {
+  const navigate = useNavigate()
   const [tab, setTab] = useState<PanelTab>('conversation')
   const [oneflowComments, setOneflowComments] = useState<Awaited<ReturnType<typeof OfferFollowUpService.getOneflowConversation>>>([])
   const [callLogs, setCallLogs] = useState<Awaited<ReturnType<typeof OfferFollowUpService.getCallLogs>>>([])
@@ -269,13 +272,33 @@ export default function DocumentDetailPanel({
               </span>
               <DeadlinePill offer={offer} />
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5 font-mono">
-              {offer.quote_reference_number}
-              <span className="font-sans"> · {offer.type === 'offer' ? 'Offert' : 'Avtal'}</span>
-              {offer.total_value != null && Number(offer.total_value) > 0 && (
-                <span className="font-sans"> · {Math.round(Number(offer.total_value)).toLocaleString('sv-SE')} kr</span>
+            <div className="flex items-center gap-1 flex-wrap text-[11px] text-slate-500 mt-0.5">
+              {offer.source_case_number && offer.source_id && (
+                <>
+                  {isCoordinator ? (
+                    <button
+                      onClick={() => navigate(`/koordinator/schema?openCase=${offer.source_id}`)}
+                      title="Öppna ursprungsärendet i schemat"
+                      className="inline-flex items-center gap-1 font-mono text-[#20c58f] hover:underline"
+                    >
+                      <FileText className="w-3 h-3" />
+                      {offer.source_case_number}
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 font-mono text-slate-300">
+                      <FileText className="w-3 h-3" />
+                      {offer.source_case_number}
+                    </span>
+                  )}
+                  <span>·</span>
+                </>
               )}
-            </p>
+              <span>{offer.type === 'offer' ? 'Offert' : 'Avtal'}</span>
+              {offer.total_value != null && Number(offer.total_value) > 0 && (
+                <span>· {Math.round(Number(offer.total_value)).toLocaleString('sv-SE')} kr</span>
+              )}
+              <span className="font-mono text-slate-600">· {offer.quote_reference_number}</span>
+            </div>
             <p className="text-[11px] text-slate-500">
               Skickad {sentAt}{sentBy ? ` av ${sentBy}` : ''}
             </p>

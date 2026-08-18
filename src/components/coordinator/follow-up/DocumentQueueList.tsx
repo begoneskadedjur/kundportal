@@ -94,7 +94,9 @@ function QueueRow({ offer, selected, onSelect }: {
 }) {
   const unread = offer.unread_customer_comments
   const sender = (offer.created_by_name || offer.begone_employee_name || '').split(' ')[0]
-  const refShort = offer.quote_reference_number?.replace(/^BG-/, '').split('-').slice(0, 2).join('-')
+  // Ärendenumret (BE-xxx) är den identifierare som säger något — BG-referensen är bara fallback
+  const refShort = offer.source_case_number
+    || offer.quote_reference_number?.replace(/^BG-/, '').split('-').slice(0, 2).join('-')
 
   return (
     <button

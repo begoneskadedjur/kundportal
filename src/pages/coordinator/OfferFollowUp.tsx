@@ -68,7 +68,7 @@ export default function OfferFollowUp() {
       if (q) {
         const haystack = [
           o.company_name, o.contact_person, o.contact_email,
-          o.quote_reference_number, o.technician_name, o.begone_employee_name, o.created_by_name,
+          o.quote_reference_number, o.source_case_number, o.technician_name, o.begone_employee_name, o.created_by_name,
         ].filter(Boolean).join(' ').toLowerCase()
         if (!haystack.includes(q)) return false
       }
@@ -214,7 +214,7 @@ export default function OfferFollowUp() {
                   id="doc-search-input"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  placeholder="Sök kund, offertnr…"
+                  placeholder="Sök kund, ärendenr…"
                   className="w-52 pl-8 pr-3 py-1.5 bg-slate-800/60 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                 />
               </div>

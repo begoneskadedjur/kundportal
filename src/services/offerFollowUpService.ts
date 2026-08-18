@@ -158,6 +158,8 @@ export interface FollowUpOffer {
   // Koppling till ursprungligt ärende
   source_id: string | null
   source_type: string | null
+  /** Ärendenumret på ursprungsärendet (t.ex. BE-0008452) — sätts bara för wizard-skapade dokument */
+  source_case_number: string | null
   // Koppling till registrerad kund (satt när signerat avtal länkats via webhook)
   customer_id: string | null
   // Koordinator-åtgärder (status, kvittering, kontaktförsök, etc.)
@@ -318,6 +320,24 @@ export class OfferFollowUpService {
       if (a.contract_id) actionByContractId.set(a.contract_id, a)
     }
 
+    // 5) Ärendenummer för ursprungsärenden — wizard-skapade dokument bär source_id
+    //    mot private_cases/business_cases. Raderade ärenden ger bara null (ingen länk).
+    const privateSourceIds = [...new Set(allContracts.filter(c => c.source_type === 'private_case' && c.source_id).map(c => c.source_id as string))]
+    const businessSourceIds = [...new Set(allContracts.filter(c => c.source_type === 'business_case' && c.source_id).map(c => c.source_id as string))]
+    type SourceCaseRow = { id: string; case_number: string | null }
+    const [privateSourceRes, businessSourceRes] = await Promise.all([
+      privateSourceIds.length > 0
+        ? supabase.from('private_cases').select('id, case_number').in('id', privateSourceIds)
+        : Promise.resolve({ data: [] as SourceCaseRow[] }),
+      businessSourceIds.length > 0
+        ? supabase.from('business_cases').select('id, case_number').in('id', businessSourceIds)
+        : Promise.resolve({ data: [] as SourceCaseRow[] }),
+    ])
+    const caseNumberBySourceId = new Map<string, string>()
+    for (const row of [...(privateSourceRes.data || []), ...(businessSourceRes.data || [])]) {
+      if (row.case_number) caseNumberBySourceId.set(row.id, row.case_number)
+    }
+
     // === Beräkna offers ===
     const now = Date.now()
     const allOffers: FollowUpOffer[] = allContracts.map(o => {
@@ -349,6 +369,7 @@ export class OfferFollowUpService {
         hidden_by: o.hidden_by || [],
         source_id: o.source_id || null,
         source_type: o.source_type || null,
+        source_case_number: (o.source_id && caseNumberBySourceId.get(o.source_id)) || null,
         customer_id: o.customer_id || null,
         booked_case_id: o.booked_case_id || null,
         unread_customer_comments: unread,
