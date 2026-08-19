@@ -11,15 +11,17 @@ import {
   formatMonthSv,
   isImportedContract,
   lastNoticeDate,
+  PREMIUM_EVENT_LABEL,
   type RecordAddition,
   type RecordBillingItem,
   type RecordContract,
+  type RecordPremiumEvent,
 } from '../../../../hooks/useCustomerRecord'
 
 export interface RecordTimelineEvent {
   /** YYYY-MM-DD (eller full ISO) — används för sortering och datumkolumn */
   date: string
-  kind: 'start' | 'signed' | 'addition' | 'index' | 'terminated' | 'notice' | 'end' | 'invoice'
+  kind: 'start' | 'signed' | 'addition' | 'index' | 'terminated' | 'notice' | 'end' | 'invoice' | 'premium'
   title: string
   detail?: string
   /** Taggning i den fulla strömmen: avtalets label eller kundradens namn */
@@ -109,6 +111,24 @@ export function buildAdditionEvents(additions: RecordAddition[], tag?: string): 
     })
 }
 
+/** Premietrappa (etapp 4): step_up = Upptrappning, indexation = Indexering osv.
+ *  'start'-event hoppas över — Avtalsstart finns redan som egen händelse. */
+export function buildPremiumTimelineEvents(events: RecordPremiumEvent[], tag?: string): RecordTimelineEvent[] {
+  return events
+    .filter((e) => e.event_type !== 'start')
+    .map((e) => {
+      const parts: string[] = [`${formatKr(Number(e.annual_value ?? 0))}/år`]
+      if (e.note) parts.push(e.note)
+      return {
+        date: toDateKey(e.effective_from),
+        kind: 'premium' as const,
+        title: PREMIUM_EVENT_LABEL[e.event_type] ?? 'Premiejustering',
+        detail: parts.join(' · '),
+        tag,
+      }
+    })
+}
+
 /** Fakturahändelser: aggregerar contract_billing_items per faktureringsperiod */
 export function buildInvoiceEvents(items: RecordBillingItem[], tag?: string): RecordTimelineEvent[] {
   const byPeriod = new Map<string, RecordBillingItem[]>()
@@ -143,11 +163,13 @@ export function buildInvoiceEvents(items: RecordBillingItem[], tag?: string): Re
 export function buildSingleContractTimeline(
   contract: RecordContract,
   additions: RecordAddition[],
-  billingItems: RecordBillingItem[]
+  billingItems: RecordBillingItem[],
+  premiumEvents: RecordPremiumEvent[] = []
 ): RecordTimelineEvent[] {
   return [
     ...buildContractEvents(contract),
     ...buildAdditionEvents(additions),
+    ...buildPremiumTimelineEvents(premiumEvents),
     ...buildInvoiceEvents(billingItems),
   ]
 }
@@ -157,11 +179,14 @@ export function buildFamilyTimeline(
   contracts: RecordContract[],
   additionsByCustomer: Map<string, RecordAddition[]>,
   billingByCustomer: Map<string, RecordBillingItem[]>,
-  customerNameById: Map<string, string>
+  customerNameById: Map<string, string>,
+  premiumEventsByContract?: Map<string, RecordPremiumEvent[]>
 ): RecordTimelineEvent[] {
   const events: RecordTimelineEvent[] = []
   for (const contract of contracts) {
     events.push(...buildContractEvents(contract, contractDisplayName(contract)))
+    const premium = premiumEventsByContract?.get(contract.id) ?? []
+    events.push(...buildPremiumTimelineEvents(premium, contractDisplayName(contract)))
   }
   for (const [customerId, additions] of additionsByCustomer) {
     events.push(...buildAdditionEvents(additions, customerNameById.get(customerId)))

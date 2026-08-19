@@ -9,6 +9,7 @@ import {
   BILLING_FREQUENCY_LABEL,
   contractAnnualValue,
   contractDisplayName,
+  currentPremiumEvent,
   customerRowName,
   formatDateSv,
   formatKr,
@@ -16,10 +17,14 @@ import {
   isEndedContract,
   isImportedContract,
   isTerminatedButRunning,
+  nextPremiumEvent,
+  PREMIUM_EVENT_LABEL,
   type RecordAddition,
   type RecordBillingItem,
   type RecordContract,
+  type RecordContractSite,
   type RecordCustomer,
+  type RecordPremiumEvent,
 } from '../../../../hooks/useCustomerRecord'
 import ContractTimelineList, { buildSingleContractTimeline } from './ContractTimelineList'
 
@@ -64,11 +69,27 @@ interface Props {
   /** Tillägg + fakturarader filtrerade på ägarens customer_id */
   additions: RecordAddition[]
   billingItems: RecordBillingItem[]
+  /** Premietrappa: contract_premium_events för DETTA avtal (etapp 4) */
+  premiumEvents?: RecordPremiumEvent[]
+  /** Omfattning: contract_sites-rader för DETTA avtal (etapp 4) */
+  contractSites?: RecordContractSite[]
+  /** Kundrader i familjen (för enhetsnamn i OMFATTAR-listan) */
+  customerById?: Map<string, RecordCustomer>
   /** Kompakt läge för Översikt-fliken: ingen expander, färre rader */
   compact?: boolean
 }
 
-export default function ContractCard({ contract, owner, root, additions, billingItems, compact = false }: Props) {
+export default function ContractCard({
+  contract,
+  owner,
+  root,
+  additions,
+  billingItems,
+  premiumEvents = [],
+  contractSites = [],
+  customerById,
+  compact = false,
+}: Props) {
   const [expanded, setExpanded] = useState(false)
 
   const imported = isImportedContract(contract)
@@ -78,8 +99,8 @@ export default function ContractCard({ contract, owner, root, additions, billing
   const annual = contractAnnualValue(contract)
 
   const timelineEvents = useMemo(
-    () => buildSingleContractTimeline(contract, additions, billingItems),
-    [contract, additions, billingItems]
+    () => buildSingleContractTimeline(contract, additions, billingItems, premiumEvents),
+    [contract, additions, billingItems, premiumEvents]
   )
 
   const latestInvoiceRows = useMemo(
@@ -93,14 +114,43 @@ export default function ContractCard({ contract, owner, root, additions, billing
 
   const products = useMemo(() => parseSelectedProducts(contract.selected_products), [contract.selected_products])
 
+  // Premietrappa (etapp 4): aktuellt + nästa trappsteg när events finns
+  const currentStep = useMemo(() => currentPremiumEvent(premiumEvents), [premiumEvents])
+  const nextStep = useMemo(() => nextPremiumEvent(premiumEvents), [premiumEvents])
+
   // Belopp i avtalets egen rytm
+  const inRhythm = (value: number) =>
+    contract.billing_frequency === 'monthly'
+      ? `${Math.round(value / 12).toLocaleString('sv-SE')} kr/mån`
+      : `${formatKr(value)}/år`
+
   const moneyLine = (() => {
+    if (premiumEvents.length > 0) {
+      const currentValue = Number(currentStep?.annual_value ?? annual)
+      const base = `Just nu: ${inRhythm(currentValue)}`
+      if (nextStep) {
+        return `${base} (→ ${inRhythm(Number(nextStep.annual_value ?? 0))} från ${formatDateSv(nextStep.effective_from)})`
+      }
+      return base
+    }
     if (!annual) return 'Avropsavtal — fasta priser per ärende'
     if (contract.billing_frequency === 'monthly') {
       return `${Math.round(annual / 12).toLocaleString('sv-SE')} kr/mån (${formatKr(annual)}/år)`
     }
     return `${formatKr(annual)}/år`
   })()
+
+  // Omfattning: enheter som avtalet täcker, med namn från familjens kundrader
+  const todayKey = new Date().toISOString().slice(0, 10)
+  const coveredSites = contractSites.map((cs) => {
+    const site = customerById?.get(cs.customer_id)
+    return {
+      row: cs,
+      name: site ? customerRowName(site) : 'Okänd enhet',
+      isFuture: !!cs.active_from && cs.active_from > todayKey,
+      isEnded: !!cs.active_to && cs.active_to < todayKey,
+    }
+  })
 
   const frequencyLabel = contract.billing_frequency ? BILLING_FREQUENCY_LABEL[contract.billing_frequency] : null
   const startDate = contract.contract_start_date ?? contract.start_date
@@ -235,6 +285,71 @@ export default function ContractCard({ contract, owner, root, additions, billing
                     </li>
                   )
                 })}
+              </ul>
+            </div>
+          )}
+
+          {/* Premietrappa (etapp 4) */}
+          {premiumEvents.length > 0 && (
+            <div>
+              <h4 className="text-xs uppercase tracking-wide text-slate-500 mb-1.5">Premietrappa</h4>
+              <ul className="space-y-1">
+                {premiumEvents.map((event) => {
+                  const isFuture = event.effective_from > todayKey
+                  const isCurrent = currentStep?.id === event.id
+                  return (
+                    <li key={event.id} className="flex items-baseline gap-2 text-sm min-w-0">
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 self-center ${
+                          isFuture ? 'border border-slate-500 bg-transparent' : 'bg-[#20c58f]'
+                        }`}
+                        aria-hidden
+                      />
+                      <span className={`text-xs tabular-nums shrink-0 w-24 ${isFuture ? 'text-slate-600' : 'text-slate-500'}`}>
+                        {formatDateSv(event.effective_from)}
+                      </span>
+                      <span className={`shrink-0 ${isFuture ? 'text-slate-500' : 'text-slate-300'}`}>
+                        {PREMIUM_EVENT_LABEL[event.event_type] ?? event.event_type}
+                      </span>
+                      <span className={`tabular-nums shrink-0 ${isFuture ? 'text-slate-500' : 'text-slate-200'}`}>
+                        {formatKr(Number(event.annual_value ?? 0))}/år
+                      </span>
+                      {isCurrent && (
+                        <span className="text-[10px] uppercase tracking-wide text-[#20c58f] shrink-0">Just nu</span>
+                      )}
+                      {event.note && <span className="text-xs text-slate-500 truncate">· {event.note}</span>}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+
+          {/* Omfattning (etapp 4): enheter som avtalet täcker */}
+          {coveredSites.length > 0 && (
+            <div>
+              <h4 className="text-xs uppercase tracking-wide text-slate-500 mb-1.5">
+                Omfattar ({coveredSites.length})
+              </h4>
+              <ul className="space-y-1">
+                {coveredSites.map(({ row, name, isFuture, isEnded }) => (
+                  <li key={row.id} className="flex items-baseline gap-2 text-sm min-w-0">
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 self-center ${
+                        isFuture || isEnded ? 'border border-slate-500 bg-transparent' : 'bg-[#20c58f]'
+                      }`}
+                      aria-hidden
+                    />
+                    <span className={`truncate ${isEnded ? 'text-slate-500 line-through' : 'text-slate-300'}`}>{name}</span>
+                    {isFuture && row.active_from && (
+                      <span className="text-xs text-slate-500 shrink-0">startar {formatDateSv(row.active_from)}</span>
+                    )}
+                    {isEnded && row.active_to && (
+                      <span className="text-xs text-slate-600 shrink-0">t.o.m. {formatDateSv(row.active_to)}</span>
+                    )}
+                    {row.note && <span className="text-xs text-slate-500 truncate">· {row.note}</span>}
+                  </li>
+                ))}
               </ul>
             </div>
           )}

@@ -49,6 +49,29 @@ export interface RecordAddition {
   kind: string | null
 }
 
+// Etapp 4: avtalets premie över tid. Aktuellt värde = senaste raden
+// med effective_from <= idag; framtida rader är kommande trappsteg.
+export type PremiumEventType = 'start' | 'step_up' | 'indexation' | 'addition' | 'adjustment' | 'termination'
+
+export interface RecordPremiumEvent {
+  id: string
+  contract_id: string
+  effective_from: string
+  annual_value: number
+  event_type: PremiumEventType
+  note: string | null
+}
+
+// Etapp 4: enheter som ett avtal OMFATTAR (avtalet bor på contracts.customer_id).
+export interface RecordContractSite {
+  id: string
+  contract_id: string
+  customer_id: string
+  active_from: string | null
+  active_to: string | null
+  note: string | null
+}
+
 export interface CustomerRecordData {
   /** Raden för :id (kan vara org eller enhet) */
   customer: RecordCustomer
@@ -60,6 +83,10 @@ export interface CustomerRecordData {
   contracts: RecordContract[]
   billingItems: RecordBillingItem[]
   additions: RecordAddition[]
+  /** Premietrappa: alla contract_premium_events för familjens avtal */
+  premiumEvents: RecordPremiumEvent[]
+  /** Omfattning: contract_sites-rader för familjens avtal */
+  contractSites: RecordContractSite[]
   /** Antal ärenden (cases) per customer_id i familjen */
   caseCounts: Record<string, number>
 }
@@ -111,8 +138,9 @@ export function useCustomerRecord(customerId: string | undefined) {
 
     const familyIds = [root.id, ...units.map((u) => u.id)]
 
-    // 3-6. Avtal, fakturarader, tillägg och ärendeantal parallellt
-    const [contractsRes, billingRes, additionsRes, casesRes] = await Promise.all([
+    // 3-8. Avtal, fakturarader, tillägg, premietrappa, omfattning och ärendeantal parallellt.
+    // Premie/omfattning filtreras på avtalets ägare via inner join mot contracts.
+    const [contractsRes, billingRes, additionsRes, premiumRes, sitesRes, casesRes] = await Promise.all([
       supabase
         .from('contracts')
         .select('*')
@@ -130,6 +158,16 @@ export function useCustomerRecord(customerId: string | undefined) {
         .in('customer_id', familyIds)
         .order('applied_at', { ascending: true }),
       supabase
+        .from('contract_premium_events')
+        .select('id, contract_id, effective_from, annual_value, event_type, note, contract:contracts!inner(customer_id)')
+        .in('contract.customer_id', familyIds)
+        .order('effective_from', { ascending: true }),
+      supabase
+        .from('contract_sites')
+        .select('id, contract_id, customer_id, active_from, active_to, note, contract:contracts!inner(customer_id)')
+        .in('contract.customer_id', familyIds)
+        .order('active_from', { ascending: true }),
+      supabase
         .from('cases')
         .select('id, status, customer_id')
         .in('customer_id', familyIds),
@@ -137,8 +175,10 @@ export function useCustomerRecord(customerId: string | undefined) {
 
     if (contractsRes.error) throw new Error(`Kunde inte hämta avtal: ${contractsRes.error.message}`)
     if (billingRes.error) throw new Error(`Kunde inte hämta fakturarader: ${billingRes.error.message}`)
-    // contract_additions/cases är sekundärdata — sväljs inte men får inte fälla sidan
+    // contract_additions/premie/omfattning/cases är sekundärdata — får inte fälla sidan
     const additions = (additionsRes.error ? [] : (additionsRes.data ?? [])) as RecordAddition[]
+    const premiumEvents = (premiumRes.error ? [] : (premiumRes.data ?? [])) as unknown as RecordPremiumEvent[]
+    const contractSites = (sitesRes.error ? [] : (sitesRes.data ?? [])) as unknown as RecordContractSite[]
 
     // Trashed-rader är bara relevanta för importmönstret (template_id='imported'
     // eller oneflow_contract_id 'imported-…') — övriga trashed filtreras bort.
@@ -159,6 +199,8 @@ export function useCustomerRecord(customerId: string | undefined) {
       contracts,
       billingItems: (billingRes.data ?? []) as unknown as RecordBillingItem[],
       additions,
+      premiumEvents,
+      contractSites,
       caseCounts,
     }
   }, [])
@@ -225,6 +267,48 @@ export function isTerminatedButRunning(c: RecordContract, today = new Date()): b
 /** annual_value är redan normaliserat årsvärde oavsett billing_frequency */
 export function contractAnnualValue(c: RecordContract): number {
   return Number(c.annual_value ?? 0)
+}
+
+// ---------------------------------------------------------------------------
+// Premietrappa (etapp 4)
+// ---------------------------------------------------------------------------
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+/** Aktuellt trappsteg: senaste eventet med effective_from <= idag */
+export function currentPremiumEvent(events: RecordPremiumEvent[]): RecordPremiumEvent | null {
+  const key = todayKey()
+  const past = events
+    .filter((e) => e.effective_from <= key)
+    .sort((a, b) => a.effective_from.localeCompare(b.effective_from))
+  return past[past.length - 1] ?? null
+}
+
+/** Nästa framtida trappsteg (step_up/indexation/…) */
+export function nextPremiumEvent(events: RecordPremiumEvent[]): RecordPremiumEvent | null {
+  const key = todayKey()
+  const future = events
+    .filter((e) => e.effective_from > key)
+    .sort((a, b) => a.effective_from.localeCompare(b.effective_from))
+  return future[0] ?? null
+}
+
+/** Avtalets AKTUELLA årsvärde: premietrappan om den finns, annars annual_value */
+export function contractEffectiveAnnualValue(c: RecordContract, events: RecordPremiumEvent[]): number {
+  const current = currentPremiumEvent(events)
+  if (current) return Number(current.annual_value ?? 0)
+  return contractAnnualValue(c)
+}
+
+export const PREMIUM_EVENT_LABEL: Record<PremiumEventType, string> = {
+  start: 'Start',
+  step_up: 'Upptrappning',
+  indexation: 'Indexering',
+  addition: 'Avtalstillägg',
+  adjustment: 'Justering',
+  termination: 'Avslut',
 }
 
 export function formatKr(n: number): string {

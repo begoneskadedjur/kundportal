@@ -76,7 +76,9 @@ interface Customer {
   service_details?: string | null
   customer_number?: number | null
   customer_group_id?: string | null
-  
+  // Additivt (etapp 3): när kundnumret verifierats mot Fortnox
+  fortnox_verified_at?: string | null
+
   // Multisite fields
   organization_id?: string | null
   is_multisite: boolean
@@ -153,6 +155,9 @@ export interface ConsolidatedCustomer {
   business_type?: string | null
   customer_number?: number | null
   customer_group_id?: string | null
+  // Additivt (etapp 3): Fortnox-verifiering + säljare från primärraden
+  fortnox_verified_at?: string | null
+  sales_person?: string | null
 
   // Aggregated data
   sites: CustomerSite[]
@@ -630,6 +635,8 @@ export function useConsolidatedCustomers() {
             business_type: huvudkontor.business_type,
             customer_number: huvudkontor.customer_number,
             customer_group_id: huvudkontor.customer_group_id,
+            fortnox_verified_at: huvudkontor.fortnox_verified_at ?? null,
+            sales_person: huvudkontor.sales_person ?? null,
 
             sites: [],
             totalSites: 0,
@@ -714,6 +721,8 @@ export function useConsolidatedCustomers() {
           business_type: customer.business_type,
           customer_number: customer.customer_number,
           customer_group_id: customer.customer_group_id,
+          fortnox_verified_at: customer.fortnox_verified_at ?? null,
+          sales_person: customer.sales_person ?? null,
 
           sites: [customer],
           totalSites: 1,
