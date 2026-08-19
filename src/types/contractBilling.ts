@@ -68,6 +68,12 @@ export interface ContractBillingItemWithRelations extends ContractBillingItem {
     billing_email: string | null
     billing_address: string | null
     contact_address: string | null
+    billing_reference: string | null
+    cost_center: string | null
+    billing_recipient: string | null
+    customer_number: number | null
+    site_name: string | null
+    parent_customer_id: string | null
   }
   article?: {
     id: string
@@ -304,6 +310,9 @@ export interface ContractInvoiceCustomer {
   cost_center: string | null
   billing_recipient: string | null
   customer_number: number | null
+  /** Multisite: enhetens namn — märks ut på fakturan så kunden ser vilket objekt som avses */
+  site_name: string | null
+  parent_customer_id: string | null
 }
 
 /**

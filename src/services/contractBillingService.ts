@@ -212,7 +212,7 @@ export class ContractBillingService {
       .from('contract_billing_items')
       .select(`
         *,
-        customer:customers(id, company_name, organization_number, billing_email, billing_address, contact_address, billing_reference, cost_center, billing_recipient, customer_number),
+        customer:customers(id, company_name, organization_number, billing_email, billing_address, contact_address, billing_reference, cost_center, billing_recipient, customer_number, site_name, parent_customer_id),
         article:articles(id, code, name)
       `)
       .order('created_at', { ascending: false })
@@ -824,6 +824,8 @@ export class ContractBillingService {
           billing_reference: first.customer?.billing_reference ?? null,
           cost_center: first.customer?.cost_center ?? null,
           billing_recipient: first.customer?.billing_recipient ?? null,
+          site_name: first.customer?.site_name ?? null,
+          parent_customer_id: first.customer?.parent_customer_id ?? null,
         },
         items: groupItems,
         subtotal,

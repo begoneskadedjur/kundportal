@@ -45,23 +45,37 @@ const addDays = (s: string, days: number) => {
   return d.toLocaleDateString('sv-SE')
 }
 
-// Bygger förklarande avtalstext för fakturan (visas ej för årsavtal)
+// Bygger förklarande avtalstext för fakturan (frekvensraden visas ej för årsavtal).
+// Multisite-enheter delar Fortnox-kundkort med huvudkontoret — då måste fakturan
+// själv tala om vilket avtalsobjekt den avser, annars ser kundens fakturor identiska ut.
 function buildRemarksText(
   subtotal: number,
   billingFrequency: string | null | undefined,
-  contractType: string | null | undefined
+  contractType: string | null | undefined,
+  siteLabel?: string | null
 ): string | null {
-  if (!billingFrequency || billingFrequency === 'annual' || billingFrequency === 'on_demand') {
-    return null
+  const lines: string[] = []
+  if (siteLabel) {
+    lines.push(`Avser: ${siteLabel}`)
   }
-  const config = BILLING_FREQUENCY_CONFIG[billingFrequency as BillingFrequency]
-  if (!config) return null
-  const periodsPerYear = Math.round(12 / config.months)  // 12 för monthly, 4 för quarterly etc.
-  const annualValue = Math.round(subtotal * periodsPerYear)
-  const fraction = `1/${periodsPerYear}`
-  const freqLabel = config.label.toLowerCase()
-  const avtalNamn = contractType || 'Avtalstjänster'
-  return `${avtalNamn} - betalning av årsavtal. Årsavgäld: ${formatBillingAmount(annualValue)} exkl. moms. Faktureras ${freqLabel} (${fraction} per faktura)`
+  const config = billingFrequency && billingFrequency !== 'annual' && billingFrequency !== 'on_demand'
+    ? BILLING_FREQUENCY_CONFIG[billingFrequency as BillingFrequency]
+    : null
+  if (config) {
+    const periodsPerYear = Math.round(12 / config.months)  // 12 för monthly, 4 för quarterly etc.
+    const annualValue = Math.round(subtotal * periodsPerYear)
+    const fraction = `1/${periodsPerYear}`
+    const freqLabel = config.label.toLowerCase()
+    const avtalNamn = contractType || 'Avtalstjänster'
+    lines.push(`${avtalNamn} - betalning av årsavtal. Årsavgäld: ${formatBillingAmount(annualValue)} exkl. moms. Faktureras ${freqLabel} (${fraction} per faktura)`)
+  }
+  return lines.length > 0 ? lines.join('\n') : null
+}
+
+// Enhetsetikett för multisite: enhetens namn (company_name bär redan "Kund - Enhet")
+function resolveSiteLabel(customer: { site_name: string | null; parent_customer_id: string | null; company_name: string }): string | null {
+  if (!customer.parent_customer_id && !customer.site_name) return null
+  return customer.company_name || customer.site_name
 }
 
 // Momsspecifikation per skattesats
@@ -344,7 +358,7 @@ export function ContractInvoiceModal({
       const subtotal = invoice.items
         .filter(i => i.status !== 'cancelled')
         .reduce((sum, i) => sum + i.total_price, 0)
-      const remarks = buildRemarksText(subtotal, billingFrequency, contractType)
+      const remarks = buildRemarksText(subtotal, billingFrequency, contractType, resolveSiteLabel(invoice.customer))
 
       // 4. Skapa fakturaobjekt
       const periodLabel = formatBillingPeriod(invoice.period_start, invoice.period_end)
@@ -625,7 +639,7 @@ export function ContractInvoiceModal({
 
               {/* Avtalsinfo-not */}
               {(() => {
-                const remarksText = buildRemarksText(invoice.subtotal, billingFrequency, contractType)
+                const remarksText = buildRemarksText(invoice.subtotal, billingFrequency, contractType, resolveSiteLabel(invoice.customer))
                 return remarksText ? (
                   <div className="px-3 py-2.5 bg-slate-800/20 border border-slate-700/30 rounded-xl">
                     <p className="text-[10px] text-slate-500 uppercase tracking-wide font-medium mb-1">Avtalsinfo</p>
