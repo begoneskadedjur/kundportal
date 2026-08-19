@@ -130,7 +130,9 @@ export function EquipmentMap({
   // Hjälpfunktion: hämta rätt färg
   const getEquipmentColor = useCallback((item: EquipmentPlacementWithRelations): string => {
     if (item.station_type_data?.color) return item.station_type_data.color
+    // Legacy-rader kan ha visningsnamn med versal i equipment_type — testa gemener också
     const typeData = typeColorMap.get(item.equipment_type)
+      || typeColorMap.get((item.equipment_type || '').toLowerCase())
     if (typeData?.color) return typeData.color
     return '#6b7280'
   }, [typeColorMap])
@@ -672,17 +674,22 @@ export function EquipmentMap({
     }
   }, [previewPosition, gpsAccuracy, isLoaded])
 
-  // Legend-data
+  // Legend-data — nycklas på normaliserad etikett (gemener) så att
+  // legacy-varianter av samma typ ('betongstation'/'Betongstation') inte
+  // ger dubbla rader i legenden
   const legendItems = useMemo(() => {
     const legendMap = new Map<string, { color: string; label: string }>()
     equipment.forEach(item => {
-      if (!legendMap.has(item.equipment_type)) {
-        const dynamicData = item.station_type_data
-        const mappedData = typeColorMap.get(item.equipment_type)
-        const legacyConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]
-        legendMap.set(item.equipment_type, {
+      const dynamicData = item.station_type_data
+      const mappedData = typeColorMap.get(item.equipment_type)
+        || typeColorMap.get((item.equipment_type || '').toLowerCase())
+      const legacyConfig = EQUIPMENT_TYPE_CONFIG[item.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]
+      const label = dynamicData?.name || mappedData?.name || legacyConfig?.label || item.equipment_type
+      const key = (label || '').toLowerCase()
+      if (!legendMap.has(key)) {
+        legendMap.set(key, {
           color: dynamicData?.color || mappedData?.color || legacyConfig?.color || '#6b7280',
-          label: dynamicData?.name || mappedData?.name || legacyConfig?.label || item.equipment_type
+          label
         })
       }
     })

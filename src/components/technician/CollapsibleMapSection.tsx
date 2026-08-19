@@ -1,24 +1,39 @@
 // src/components/technician/CollapsibleMapSection.tsx
 // Kollapsbar kartsektion med statistik
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Map as MapIcon, ChevronDown, MapPin, Home, Building2, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react'
+import { Map as MapIcon, ChevronDown, MapPin, Home, Building2, CheckCircle2, AlertTriangle, AlertCircle, SlidersHorizontal } from 'lucide-react'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG } from '../../types/database'
+import { StationTypeService } from '../../services/stationTypeService'
+import type { StationType } from '../../types/stationTypes'
 
-// Läsbar typetikett för en placering — dynamisk stationstyp först, legacy-fallback sedan
-function equipmentTypeLabel(e: EquipmentPlacementWithRelations): string {
-  return e.station_type_data?.name
-    || EQUIPMENT_TYPE_CONFIG[e.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]?.label
-    || e.equipment_type
-    || 'Okänd typ'
-}
-
-function equipmentTypeColor(e: EquipmentPlacementWithRelations): string {
-  return e.station_type_data?.color
-    || EQUIPMENT_TYPE_CONFIG[e.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]?.color
-    || '#6b7280'
+// Normaliserad typinfo för en placering. equipment_type innehåller historiskt
+// en blandning av koder ('betesstation', 'mekanisk_falla') och visningsnamn
+// ('Betongstation') — matcha mot station_types via både code och name (gemener)
+// så samma typ inte dyker upp flera gånger i filtret.
+function resolveTypeInfo(
+  e: EquipmentPlacementWithRelations,
+  lookup: Map<string, { label: string; color: string }>
+): { key: string; label: string; color: string } {
+  if (e.station_type_data) {
+    return {
+      key: e.station_type_data.name.toLowerCase(),
+      label: e.station_type_data.name,
+      color: e.station_type_data.color
+    }
+  }
+  const raw = (e.equipment_type || '').toLowerCase()
+  const matched = lookup.get(raw)
+  if (matched) {
+    return { key: matched.label.toLowerCase(), label: matched.label, color: matched.color }
+  }
+  const legacy = EQUIPMENT_TYPE_CONFIG[e.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]
+  if (legacy) {
+    return { key: legacy.label.toLowerCase(), label: legacy.label, color: legacy.color }
+  }
+  return { key: raw || 'okänd', label: e.equipment_type || 'Okänd typ', color: '#6b7280' }
 }
 
 interface CollapsibleMapSectionProps {
@@ -43,53 +58,139 @@ export function CollapsibleMapSection({
   className = ''
 }: CollapsibleMapSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
-  const [typeFilter, setTypeFilter] = useState<string | null>(null)
+  const [showMobileFilter, setShowMobileFilter] = useState(false)
+  const [stationTypes, setStationTypes] = useState<StationType[]>([])
+  const [hiddenTypeKeys, setHiddenTypeKeys] = useState<Set<string>>(new Set())
+  const [hiddenCustomerIds, setHiddenCustomerIds] = useState<Set<string>>(new Set())
 
   const activeCount = stats.byStatus?.active || 0
   const problematicCount = (stats.byStatus?.damaged || 0) + (stats.byStatus?.missing || 0) + (stats.byStatus?.needs_service || 0)
   const removedCount = stats.byStatus?.removed || 0
 
-  // Stationstyper som förekommer bland placeringarna — för filterchips
-  const typeOptions = useMemo(() => {
+  // Stationstyper för normalisering av legacy-värden i equipment_type
+  useEffect(() => {
+    StationTypeService.getActiveStationTypes()
+      .then(setStationTypes)
+      .catch(err => console.error('Kunde inte hämta stationstyper:', err))
+  }, [])
+
+  const typeLookup = useMemo(() => {
     const map = new Map<string, { label: string; color: string }>()
+    stationTypes.forEach(t => {
+      map.set(t.code.toLowerCase(), { label: t.name, color: t.color })
+      map.set(t.name.toLowerCase(), { label: t.name, color: t.color })
+    })
+    return map
+  }, [stationTypes])
+
+  // Typer som förekommer bland placeringarna, normaliserade och med antal
+  const typeOptions = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; color: string; count: number }>()
     equipment.forEach(e => {
-      const label = equipmentTypeLabel(e)
-      if (!map.has(label)) map.set(label, { label, color: equipmentTypeColor(e) })
+      const info = resolveTypeInfo(e, typeLookup)
+      const existing = map.get(info.key)
+      if (existing) existing.count++
+      else map.set(info.key, { ...info, count: 1 })
     })
     return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'sv'))
+  }, [equipment, typeLookup])
+
+  // Kunder som förekommer bland placeringarna, med antal
+  const customerOptions = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number }>()
+    equipment.forEach(e => {
+      if (!e.customer_id) return
+      const existing = map.get(e.customer_id)
+      if (existing) existing.count++
+      else map.set(e.customer_id, { id: e.customer_id, name: e.customer?.company_name || 'Okänd kund', count: 1 })
+    })
+    return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'sv'))
   }, [equipment])
 
   const filteredEquipment = useMemo(
-    () => typeFilter ? equipment.filter(e => equipmentTypeLabel(e) === typeFilter) : equipment,
-    [equipment, typeFilter]
+    () => equipment.filter(e =>
+      !hiddenTypeKeys.has(resolveTypeInfo(e, typeLookup).key) &&
+      (!e.customer_id || !hiddenCustomerIds.has(e.customer_id))
+    ),
+    [equipment, typeLookup, hiddenTypeKeys, hiddenCustomerIds]
   )
 
-  const filterChips = typeOptions.length > 1 && (
-    <div className="flex items-center gap-1.5 flex-wrap px-3 py-2 bg-slate-900/40 border-b border-slate-700/50">
-      <button
-        onClick={() => setTypeFilter(null)}
-        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-          typeFilter === null
-            ? 'bg-[#20c58f]/15 text-[#20c58f] border border-[#20c58f]/50'
-            : 'bg-slate-800/70 text-slate-400 border border-slate-700/50 hover:text-white'
-        }`}
-      >
-        Alla ({equipment.length})
-      </button>
-      {typeOptions.map(t => (
-        <button
-          key={t.label}
-          onClick={() => setTypeFilter(typeFilter === t.label ? null : t.label)}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-            typeFilter === t.label
-              ? 'bg-[#20c58f]/15 text-[#20c58f] border border-[#20c58f]/50'
-              : 'bg-slate-800/70 text-slate-400 border border-slate-700/50 hover:text-white'
-          }`}
-        >
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
-          {t.label}
-        </button>
-      ))}
+  const toggleInSet = (set: Set<string>, value: string): Set<string> => {
+    const next = new Set(set)
+    if (next.has(value)) next.delete(value)
+    else next.add(value)
+    return next
+  }
+
+  const hasActiveFilter = hiddenTypeKeys.size > 0 || hiddenCustomerIds.size > 0
+  const showFilterPanel = typeOptions.length > 1 || customerOptions.length > 1
+
+  // Filterpanel med kryssrader — används i statistikkolumnen (desktop)
+  // och i den kollapsbara sektionen (mobil)
+  const filterPanel = showFilterPanel && (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+          <SlidersHorizontal className="w-3.5 h-3.5" />
+          Visa på kartan
+        </p>
+        {hasActiveFilter && (
+          <button
+            onClick={() => { setHiddenTypeKeys(new Set()); setHiddenCustomerIds(new Set()) }}
+            className="text-xs text-[#20c58f] hover:text-[#1ab07f] transition-colors"
+          >
+            Visa allt
+          </button>
+        )}
+      </div>
+
+      {typeOptions.length > 1 && (
+        <div className="space-y-0.5">
+          {typeOptions.map(t => (
+            <label
+              key={t.key}
+              className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-slate-700/30 cursor-pointer transition-colors"
+            >
+              <input
+                type="checkbox"
+                checked={!hiddenTypeKeys.has(t.key)}
+                onChange={() => setHiddenTypeKeys(prev => toggleInSet(prev, t.key))}
+                className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-900 text-[#20c58f] focus:ring-[#20c58f] focus:ring-offset-0"
+              />
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />
+              <span className={`text-sm flex-1 min-w-0 truncate ${hiddenTypeKeys.has(t.key) ? 'text-slate-500' : 'text-slate-300'}`}>
+                {t.label}
+              </span>
+              <span className="text-xs text-slate-500 tabular-nums">{t.count}</span>
+            </label>
+          ))}
+        </div>
+      )}
+
+      {customerOptions.length > 1 && (
+        <div>
+          <p className="text-xs font-medium text-slate-500 mb-1 px-1.5">Kunder</p>
+          <div className="space-y-0.5 max-h-44 overflow-y-auto">
+            {customerOptions.map(c => (
+              <label
+                key={c.id}
+                className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-slate-700/30 cursor-pointer transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={!hiddenCustomerIds.has(c.id)}
+                  onChange={() => setHiddenCustomerIds(prev => toggleInSet(prev, c.id))}
+                  className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-900 text-[#20c58f] focus:ring-[#20c58f] focus:ring-offset-0"
+                />
+                <span className={`text-sm flex-1 min-w-0 truncate ${hiddenCustomerIds.has(c.id) ? 'text-slate-500' : 'text-slate-300'}`}>
+                  {c.name}
+                </span>
+                <span className="text-xs text-slate-500 tabular-nums">{c.count}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -158,11 +259,17 @@ export function CollapsibleMapSection({
               </span>
             </div>
           </div>
+
+          {/* Kartfilter */}
+          {filterPanel && (
+            <div className="mt-4 pt-4 border-t border-slate-700/50">
+              {filterPanel}
+            </div>
+          )}
         </div>
 
         {/* Höger: Karta */}
-        <div className="relative flex flex-col">
-          {filterChips}
+        <div className="relative">
           {equipment.length > 0 ? (
             <EquipmentMap
               equipment={filteredEquipment}
@@ -233,9 +340,32 @@ export function CollapsibleMapSection({
                 )}
               </div>
 
+              {/* Kartfilter (mobil) — bakom en toggle för att spara yta */}
+              {filterPanel && (
+                <div className="border-t border-slate-700/50">
+                  <button
+                    onClick={() => setShowMobileFilter(!showMobileFilter)}
+                    className="w-full px-4 py-2.5 flex items-center justify-between text-sm text-slate-300"
+                  >
+                    <span className="flex items-center gap-2">
+                      <SlidersHorizontal className="w-4 h-4 text-slate-400" />
+                      Filter
+                      {hasActiveFilter && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#20c58f]" />
+                      )}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showMobileFilter ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showMobileFilter && (
+                    <div className="px-4 pb-3">
+                      {filterPanel}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Karta */}
               <div className="border-t border-slate-700/50">
-                {filterChips}
                 {equipment.length > 0 ? (
                   <EquipmentMap
                     equipment={filteredEquipment}
