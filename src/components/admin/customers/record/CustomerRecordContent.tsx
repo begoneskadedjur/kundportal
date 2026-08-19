@@ -24,8 +24,9 @@ import ContractTimelineList, {
 } from './ContractTimelineList'
 import BillingChainSection from './BillingChainSection'
 import UnitsSection from './UnitsSection'
+import AccessAccountsSection, { countAccessPersons } from './AccessAccountsSection'
 
-type TabId = 'oversikt' | 'avtal' | 'fakturering' | 'enheter' | 'arenden'
+type TabId = 'oversikt' | 'avtal' | 'fakturering' | 'enheter' | 'arenden' | 'atkomst'
 
 function WhisperHeader({ children }: { children: React.ReactNode }) {
   return <h2 className="text-xs uppercase tracking-wide text-slate-500 mb-3">{children}</h2>
@@ -118,7 +119,7 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
     }
   }, [data])
 
-  const { customer, root, units, billingItems, caseCounts } = data
+  const { customer, root, units, billingItems, caseCounts, access } = data
   const {
     customerById,
     additionsByCustomer,
@@ -186,6 +187,7 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
   }
 
   const showUnitsTab = units.length > 0
+  const accessCount = countAccessPersons(access)
 
   const tabs: { id: TabId; label: string; visible: boolean }[] = [
     { id: 'oversikt', label: 'Översikt', visible: true },
@@ -193,6 +195,7 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
     { id: 'fakturering', label: 'Fakturering', visible: true },
     { id: 'enheter', label: `Enheter (${units.length})`, visible: showUnitsTab },
     { id: 'arenden', label: `Ärenden (${totalCases})`, visible: true },
+    { id: 'atkomst', label: `Åtkomst & konton (${accessCount})`, visible: true },
   ]
 
   return (
@@ -244,7 +247,7 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
       </div>
 
       <div hidden={activeTab !== 'fakturering'} className="pt-6">
-        <BillingChainSection root={root} units={units} billingItems={billingItems} />
+        <BillingChainSection root={root} units={units} contracts={sortedContracts} billingItems={billingItems} />
       </div>
 
       {showUnitsTab && (
@@ -270,6 +273,10 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
           ))}
         </ul>
         <p className="text-xs text-slate-600 mt-3">Fullständig ärendelista kommer i en senare etapp.</p>
+      </div>
+
+      <div hidden={activeTab !== 'atkomst'} className="pt-6">
+        <AccessAccountsSection access={access} customerById={customerById} />
       </div>
     </div>
   )

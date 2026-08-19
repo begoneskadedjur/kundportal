@@ -69,6 +69,17 @@ function formatKr(n: number): string {
   return `${Math.round(n).toLocaleString('sv-SE')} kr`
 }
 
+/** Portalstatus för raden (etapp 6) — härledd från hookens befintliga fält */
+export function portalStatusInfo(org: ConsolidatedCustomer): { label: string; dotClass: string } {
+  if (org.activeUsersCount > 0) {
+    return { label: 'Aktiv', dotClass: 'bg-[#20c58f]' }
+  }
+  if (org.pendingInvitationsCount > 0 || org.portalAccessStatus !== 'none') {
+    return { label: 'Inbjuden', dotClass: 'bg-amber-400' }
+  }
+  return { label: 'Ej inbjuden', dotClass: 'bg-slate-600' }
+}
+
 // ---------------------------------------------------------------------------
 // Statuspunkt för Fortnox-kundnummer
 // ---------------------------------------------------------------------------
@@ -141,6 +152,7 @@ export default function CustomerListRow({
   const isMultisite = org.organizationType === 'multisite'
   const { number, verified } = resolveFortnoxInfo(org)
   const next = nextEventInfo(org)
+  const portal = portalStatusInfo(org)
   const annual = org.totalAnnualValue || 0
   const contractCount = org.contractCount || 0
   const seller = org.assigned_account_manager ?? org.sales_person ?? null
@@ -207,6 +219,11 @@ export default function CustomerListRow({
           </span>
           <span className={`${next.className} truncate md:w-44`}>{next.text}</span>
           <span className="hidden lg:block text-slate-500 truncate w-28">{seller ?? '–'}</span>
+          {/* Portalstatus — sista kolumnen (etapp 6) */}
+          <span className="hidden lg:flex items-center gap-1.5 w-24 shrink-0">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${portal.dotClass}`} aria-hidden />
+            <span className="text-xs text-slate-500 truncate">{portal.label}</span>
+          </span>
         </span>
 
         {/* Åtgärdsmeny — hover-reveal */}

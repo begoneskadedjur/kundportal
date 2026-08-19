@@ -21,6 +21,8 @@ export type RecordContract = Contract & { label?: string | null }
 export interface RecordBillingItem {
   id: string
   customer_id: string
+  /** Etapp 5: koppling till avtalet (null för äldre/ej entydiga rader) */
+  contract_id: string | null
   billing_period_start: string
   billing_period_end: string
   article_name: string
@@ -72,6 +74,47 @@ export interface RecordContractSite {
   note: string | null
 }
 
+// Etapp 6: Åtkomst & konton — portalanvändare, multisite-roller och inbjudningar.
+export interface RecordAccessProfile {
+  user_id: string
+  customer_id: string | null
+  display_name: string | null
+  email: string | null
+  last_login: string | null
+  last_sign_in_at?: string | null
+  has_ever_signed_in?: boolean | null
+}
+
+export interface RecordAccessInvitation {
+  id: string
+  email: string
+  customer_id: string
+  accepted_at: string | null
+  expires_at: string | null
+  created_at: string | null
+}
+
+export interface RecordMultisiteUser {
+  id: string
+  user_id: string
+  role_type: string
+  site_ids: string[] | null
+  display_name: string | null
+  email: string | null
+  last_login: string | null
+  last_sign_in_at?: string | null
+  has_ever_signed_in?: boolean | null
+}
+
+export interface RecordAccessData {
+  /** Kundportal-konton (profiles med role='customer') för familjen */
+  profiles: RecordAccessProfile[]
+  /** Inbjudningar (user_invitations) för familjen */
+  invitations: RecordAccessInvitation[]
+  /** Multisite-roller (verksamhetschef/regionchef/platsansvarig) för organisationen */
+  multisiteUsers: RecordMultisiteUser[]
+}
+
 export interface CustomerRecordData {
   /** Raden för :id (kan vara org eller enhet) */
   customer: RecordCustomer
@@ -89,10 +132,12 @@ export interface CustomerRecordData {
   contractSites: RecordContractSite[]
   /** Antal ärenden (cases) per customer_id i familjen */
   caseCounts: Record<string, number>
+  /** Åtkomst & konton (etapp 6) — sekundärdata, tomma listor vid fel */
+  access: RecordAccessData
 }
 
 const BILLING_ITEM_COLUMNS =
-  'id, customer_id, billing_period_start, billing_period_end, article_name, total_price, status, invoice_number, invoiced_at, paid_at, due_date, sent_at, fortnox_document_number, notes'
+  'id, customer_id, contract_id, billing_period_start, billing_period_end, article_name, total_price, status, invoice_number, invoiced_at, paid_at, due_date, sent_at, fortnox_document_number, notes'
 
 const ADDITION_COLUMNS =
   'id, customer_id, description, annual_amount, prorated_amount, effective_from, previous_annual_value, new_annual_value, created_by_name, applied_at, kind'
@@ -138,9 +183,10 @@ export function useCustomerRecord(customerId: string | undefined) {
 
     const familyIds = [root.id, ...units.map((u) => u.id)]
 
-    // 3-8. Avtal, fakturarader, tillägg, premietrappa, omfattning och ärendeantal parallellt.
+    // 3-8. Avtal, fakturarader, tillägg, premietrappa, omfattning, ärendeantal
+    // samt åtkomstdata (etapp 6) parallellt.
     // Premie/omfattning filtreras på avtalets ägare via inner join mot contracts.
-    const [contractsRes, billingRes, additionsRes, premiumRes, sitesRes, casesRes] = await Promise.all([
+    const [contractsRes, billingRes, additionsRes, premiumRes, sitesRes, casesRes, profilesRes, invitationsRes] = await Promise.all([
       supabase
         .from('contracts')
         .select('*')
@@ -171,7 +217,49 @@ export function useCustomerRecord(customerId: string | undefined) {
         .from('cases')
         .select('id, status, customer_id')
         .in('customer_id', familyIds),
+      supabase
+        .from('profiles')
+        .select('user_id, customer_id, display_name, email, last_login, last_sign_in_at, has_ever_signed_in')
+        .in('customer_id', familyIds)
+        .eq('role', 'customer'),
+      supabase
+        .from('user_invitations')
+        .select('id, email, customer_id, accepted_at, expires_at, created_at')
+        .in('customer_id', familyIds),
     ])
+
+    // Multisite-roller kräver organisationens id — hämtas bara när root är multisite.
+    // Sekundärdata: fel får inte fälla sidan.
+    let multisiteUsers: RecordMultisiteUser[] = []
+    if (root.organization_id) {
+      const { data: roleRows } = await supabase
+        .from('multisite_user_roles')
+        .select('id, user_id, role_type, site_ids')
+        .eq('organization_id', root.organization_id)
+        .eq('is_active', true)
+      const userIds = (roleRows ?? []).map((r) => r.user_id)
+      if (userIds.length > 0) {
+        const { data: roleProfiles } = await supabase
+          .from('profiles')
+          .select('user_id, display_name, email, last_login, last_sign_in_at, has_ever_signed_in')
+          .in('user_id', userIds)
+        const profileByUserId = new Map((roleProfiles ?? []).map((p) => [p.user_id, p]))
+        multisiteUsers = (roleRows ?? []).map((r) => {
+          const p = profileByUserId.get(r.user_id)
+          return {
+            id: r.id,
+            user_id: r.user_id,
+            role_type: r.role_type,
+            site_ids: r.site_ids ?? null,
+            display_name: p?.display_name ?? null,
+            email: p?.email ?? null,
+            last_login: p?.last_login ?? null,
+            last_sign_in_at: p?.last_sign_in_at ?? null,
+            has_ever_signed_in: p?.has_ever_signed_in ?? null,
+          }
+        })
+      }
+    }
 
     if (contractsRes.error) throw new Error(`Kunde inte hämta avtal: ${contractsRes.error.message}`)
     if (billingRes.error) throw new Error(`Kunde inte hämta fakturarader: ${billingRes.error.message}`)
@@ -202,6 +290,11 @@ export function useCustomerRecord(customerId: string | undefined) {
       premiumEvents,
       contractSites,
       caseCounts,
+      access: {
+        profiles: (profilesRes.error ? [] : (profilesRes.data ?? [])) as RecordAccessProfile[],
+        invitations: (invitationsRes.error ? [] : (invitationsRes.data ?? [])) as RecordAccessInvitation[],
+        multisiteUsers,
+      },
     }
   }, [])
 

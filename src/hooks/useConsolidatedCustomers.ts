@@ -4,10 +4,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import type { ContractWithBilling } from '../types/database'
 import {
-  calculatePortfolioValue,
-  countActiveCustomers,
-  calculateRenewalValue,
-  countHighRiskCustomers,
   calculateHealthScore,
   calculateChurnRisk,
   calculateRenewalProbability,

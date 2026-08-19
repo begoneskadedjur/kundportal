@@ -1,17 +1,20 @@
 // src/components/admin/customers/record/BillingChainSection.tsx
-// Fakturering-fliken: faktureringskedjan per kundrad i familjen (org + enheter).
-// Aggregerar contract_billing_items per faktureringsperiod och faktura, med
-// status, fakturanummer och förfallodatum. Rader kan i dag inte knytas till
-// ett specifikt avtal (contract_id saknas i tabellen) — därav grupperingen.
+// Fakturering-fliken: faktureringskedjan grupperad PER AVTAL (etapp 5).
+// Rader med contract_id hamnar under sitt avtal; äldre/ej entydiga rader utan
+// koppling samlas i en restgrupp "Ej avtalskopplade rader" per kundrad.
+// Perioder aggregeras per faktureringsperiod och faktura, med status,
+// fakturanummer och förfallodatum.
 
 import { useMemo, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Circle, Clock, XCircle } from 'lucide-react'
 import {
+  contractDisplayName,
   customerRowName,
   formatDateSv,
   formatKr,
   formatMonthSv,
   type RecordBillingItem,
+  type RecordContract,
   type RecordCustomer,
 } from '../../../../hooks/useCustomerRecord'
 
@@ -47,7 +50,7 @@ function buildPeriodRows(items: RecordBillingItem[]): PeriodRow[] {
   const groups = new Map<string, RecordBillingItem[]>()
   for (const item of items) {
     const invoice = item.fortnox_document_number ?? item.invoice_number ?? ''
-    const key = `${item.billing_period_start.slice(0, 10)}|${invoice}`
+    const key = item.billing_period_start.slice(0, 10) + '|' + invoice
     const list = groups.get(key) ?? []
     list.push(item)
     groups.set(key, list)
@@ -66,12 +69,32 @@ function buildPeriodRows(items: RecordBillingItem[]): PeriodRow[] {
 
 const INITIAL_VISIBLE = 8
 
-function CustomerGroup({
+/** Kundnummer/via HK-noten för raden som fakturorna hör till */
+function CustomerNote({ customer, root }: { customer: RecordCustomer; root: RecordCustomer }) {
+  const isUnit = !!customer.parent_customer_id
+  if (isUnit) {
+    return customer.customer_number != null ? (
+      <span className="text-xs font-mono text-slate-500">#{customer.customer_number}</span>
+    ) : (
+      <span className="text-xs text-slate-500">
+        faktureras via HK{root.customer_number != null && <span className="font-mono"> #{root.customer_number}</span>}
+      </span>
+    )
+  }
+  return customer.customer_number != null ? (
+    <span className="text-xs font-mono text-slate-500">#{customer.customer_number} · org</span>
+  ) : null
+}
+
+function BillingGroup({
+  title,
   customer,
   root,
   items,
 }: {
-  customer: RecordCustomer
+  title: string
+  /** Kundraden som raderna faktureras på (avtalets ägare eller restgruppens rad) */
+  customer: RecordCustomer | null
   root: RecordCustomer
   items: RecordBillingItem[]
 }) {
@@ -89,28 +112,20 @@ function CustomerGroup({
       .reduce((sum, i) => sum + Number(i.total_price ?? 0), 0)
   }, [items])
 
-  const isUnit = !!customer.parent_customer_id
   const visibleRows = showAll ? rows : rows.slice(0, INITIAL_VISIBLE)
 
   return (
     <div>
-      {/* Gruppheader: kundrad + kundnummer/via HK */}
-      <div className="flex items-baseline gap-2 pb-1.5 border-b border-slate-800">
-        <h3 className="text-sm font-semibold text-slate-100">{customerRowName(customer)}</h3>
-        {isUnit ? (
-          customer.customer_number != null ? (
-            <span className="text-xs font-mono text-slate-500">#{customer.customer_number}</span>
-          ) : (
-            <span className="text-xs text-slate-500">
-              faktureras via HK{root.customer_number != null && <span className="font-mono"> #{root.customer_number}</span>}
-            </span>
-          )
-        ) : (
-          customer.customer_number != null && (
-            <span className="text-xs font-mono text-slate-500">#{customer.customer_number} · org</span>
-          )
+      {/* Gruppheader: avtal/restgrupp + kundrad med kundnummer/via HK */}
+      <div className="flex items-baseline gap-2 pb-1.5 border-b border-slate-800 min-w-0">
+        <h3 className="text-sm font-semibold text-slate-100 truncate">{title}</h3>
+        {customer && (
+          <span className="flex items-baseline gap-1.5 min-w-0 shrink-0">
+            <span className="text-xs text-slate-400 truncate">{customerRowName(customer)}</span>
+            <CustomerNote customer={customer} root={root} />
+          </span>
         )}
-        <span className="ml-auto text-xs text-slate-500 tabular-nums">
+        <span className="ml-auto text-xs text-slate-500 tabular-nums shrink-0">
           Fakturerat i år: {formatKr(invoicedThisYear)}
         </span>
       </div>
@@ -161,29 +176,75 @@ function CustomerGroup({
 interface Props {
   root: RecordCustomer
   units: RecordCustomer[]
+  /** Familjens avtal i visningsordning (från CustomerRecordContent) */
+  contracts: RecordContract[]
   billingItems: RecordBillingItem[]
 }
 
-export default function BillingChainSection({ root, units, billingItems }: Props) {
-  const byCustomer = useMemo(() => {
-    const map = new Map<string, RecordBillingItem[]>()
-    for (const item of billingItems) {
-      const list = map.get(item.customer_id) ?? []
-      list.push(item)
-      map.set(item.customer_id, list)
-    }
-    return map
-  }, [billingItems])
+export default function BillingChainSection({ root, units, contracts, billingItems }: Props) {
+  const { contractGroups, orphanGroups } = useMemo(() => {
+    const contractIds = new Set(contracts.map((c) => c.id))
+    const byContract = new Map<string, RecordBillingItem[]>()
+    const orphansByCustomer = new Map<string, RecordBillingItem[]>()
 
-  // Org-raden visas alltid; enheter bara om de har egna rader
-  const groups: RecordCustomer[] = [root, ...units.filter((u) => (byCustomer.get(u.id) ?? []).length > 0)]
+    for (const item of billingItems) {
+      // Rader mot avtal som inte längre visas (t.ex. bortfiltrerade trashed)
+      // behandlas som ej avtalskopplade så att de inte försvinner ur kedjan.
+      if (item.contract_id && contractIds.has(item.contract_id)) {
+        const list = byContract.get(item.contract_id) ?? []
+        list.push(item)
+        byContract.set(item.contract_id, list)
+      } else {
+        const list = orphansByCustomer.get(item.customer_id) ?? []
+        list.push(item)
+        orphansByCustomer.set(item.customer_id, list)
+      }
+    }
+
+    const family = [root, ...units]
+    const customerById = new Map(family.map((c) => [c.id, c]))
+
+    return {
+      contractGroups: contracts.map((contract) => ({
+        contract,
+        owner: customerById.get(contract.customer_id ?? '') ?? root,
+        items: byContract.get(contract.id) ?? [],
+      })),
+      // Restgrupper i familjeordning: org först, sedan enheterna
+      orphanGroups: family
+        .filter((c) => (orphansByCustomer.get(c.id) ?? []).length > 0)
+        .map((c) => ({ customer: c, items: orphansByCustomer.get(c.id)! })),
+    }
+  }, [root, units, contracts, billingItems])
+
+  if (contractGroups.length === 0 && orphanGroups.length === 0) {
+    return (
+      <section>
+        <p className="text-sm text-slate-500">Inga fakturarader ännu.</p>
+      </section>
+    )
+  }
 
   return (
     <section className="space-y-6">
-      {groups.map((customer) => (
-        <CustomerGroup key={customer.id} customer={customer} root={root} items={byCustomer.get(customer.id) ?? []} />
+      {contractGroups.map(({ contract, owner, items }) => (
+        <BillingGroup
+          key={contract.id}
+          title={contractDisplayName(contract)}
+          customer={owner}
+          root={root}
+          items={items}
+        />
       ))}
-      <p className="text-xs text-slate-600">Per kundrad — koppling per avtal kommer i etapp 5.</p>
+      {orphanGroups.map(({ customer, items }) => (
+        <BillingGroup
+          key={`orphan-${customer.id}`}
+          title="Ej avtalskopplade rader"
+          customer={customer}
+          root={root}
+          items={items}
+        />
+      ))}
     </section>
   )
 }

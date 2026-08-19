@@ -103,13 +103,20 @@ export default function ContractCard({
     [contract, additions, billingItems, premiumEvents]
   )
 
+  // Etapp 5: fakturarader kopplade till DETTA avtal via contract_id.
+  // Fallback: kundradens alla rader när ingen rad är avtalskopplad (äldre data).
+  const scopedBillingItems = useMemo(() => {
+    const hasLinks = billingItems.some((i) => i.contract_id != null)
+    return hasLinks ? billingItems.filter((i) => i.contract_id === contract.id) : billingItems
+  }, [billingItems, contract.id])
+
   const latestInvoiceRows = useMemo(
     () =>
-      [...billingItems]
+      [...scopedBillingItems]
         .filter((i) => i.status !== 'cancelled')
         .sort((a, b) => b.billing_period_start.localeCompare(a.billing_period_start))
         .slice(0, 3),
-    [billingItems]
+    [scopedBillingItems]
   )
 
   const products = useMemo(() => parseSelectedProducts(contract.selected_products), [contract.selected_products])
