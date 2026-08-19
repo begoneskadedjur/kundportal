@@ -14,7 +14,6 @@ import {
   Edit3,
   MoreVertical,
   Receipt,
-  RefreshCw,
   TrendingUp,
   Users,
   XCircle,
@@ -60,9 +59,8 @@ export function nextEventInfo(org: ConsolidatedCustomer): { text: string; classN
   if (!end) return { text: '–', className: 'text-slate-600' }
   const days = org.daysToNextRenewal ?? Math.ceil((new Date(end).getTime() - Date.now()) / DAY_MS)
   if (days <= 0) return { text: 'Fortlöpande', className: 'text-slate-500' }
-  if (days <= 30) return { text: `Utgår ${formatDayMonth(end)}`, className: 'text-red-400' }
-  if (days <= 90) return { text: `Utgår ${formatDayMonth(end)}`, className: 'text-amber-400' }
-  return { text: `Förnyelse ${formatMonthYear(end)}`, className: 'text-slate-400' }
+  if (days <= 90) return { text: `Ny period ${formatDayMonth(end)}`, className: 'text-amber-400' }
+  return { text: `Ny period ${formatMonthYear(end)}`, className: 'text-slate-400' }
 }
 
 function formatKr(n: number): string {
@@ -109,7 +107,6 @@ export interface RowActions {
   onRevenue: () => void
   onBillingSettings: () => void
   onContacts: () => void
-  onRenewal: () => void
   onTerminate: () => void
 }
 
@@ -163,12 +160,6 @@ export default function CustomerListRow({
   const annual = org.totalAnnualValue || 0
   const contractCount = org.contractCount || 0
   const seller = org.assigned_account_manager ?? org.sales_person ?? null
-
-  const showRenewalAction =
-    !org.isTerminated &&
-    org.daysToNextRenewal != null &&
-    org.daysToNextRenewal > 0 &&
-    org.daysToNextRenewal <= 90
 
   const menuItem =
     'w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2.5 transition-colors'
@@ -271,12 +262,6 @@ export default function CustomerListRow({
                   <span className="ml-auto text-xs text-slate-500 tabular-nums">{contactCount}</span>
                 )}
               </button>
-              {showRenewalAction && (
-                <button onClick={() => { setMenuOpen(false); actions.onRenewal() }} className={menuItem}>
-                  <RefreshCw className="w-4 h-4 text-slate-400" />
-                  Starta förnyelse
-                </button>
-              )}
               {!org.isTerminated && (
                 <>
                   <div className="border-t border-slate-800 my-1" />

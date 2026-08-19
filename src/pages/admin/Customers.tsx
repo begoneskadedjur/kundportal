@@ -15,7 +15,6 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import CustomerRevenueModal from '../../components/admin/customers/CustomerRevenueModal'
 import EmailCampaignModal from '../../components/admin/customers/EmailCampaignModal'
 import EditCustomerModal from '../../components/admin/customers/EditCustomerModal'
-import RenewalWorkflowModal from '../../components/admin/customers/RenewalWorkflowModal'
 import TerminateContractModal from '../../components/admin/customers/TerminateContractModal'
 import AddContractCustomerModal from '../../components/admin/customers/AddContractCustomerModal'
 import CreateCustomerManuallyModal from '../../components/admin/customers/CreateCustomerManuallyModal'
@@ -31,14 +30,16 @@ import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers, type ConsolidatedCustomer } from '../../hooks/useConsolidatedCustomers'
 import toast from 'react-hot-toast'
 
-// "Kräver åtgärd": utgående inom 30 dgr eller uppsagd med slutdatum inom 90 dgr
+// "Kräver åtgärd": uppsagd med slutdatum inom 90 dgr. Avtal förlängs automatiskt
+// vid periodskifte (generate-continuing-contracts-cronen), så ett kommande
+// periodskifte är INTE en åtgärd — det får en egen grupp.
 function requiresAction(c: ConsolidatedCustomer): boolean {
   if (c.isTerminated) {
     if (!c.effectiveEndDate) return false
     const days = Math.ceil((new Date(c.effectiveEndDate).getTime() - Date.now()) / 86_400_000)
     return days >= 0 && days <= 90
   }
-  return c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 30
+  return false
 }
 
 // Sorteringsdatum för "Kräver åtgärd" (närmast deadline först)
@@ -86,8 +87,6 @@ export default function Customers() {
   const [revenueCustomer, setRevenueCustomer] = useState<any>(null)
   // Multi-kontrakt-refaktor (Fas 12 bug D): scopa Intäkter-modal till valt avtal.
   const [revenueContractId, setRevenueContractId] = useState<string | null>(null)
-  const [renewalModalOpen, setRenewalModalOpen] = useState(false)
-  const [renewalOrganization, setRenewalOrganization] = useState<any>(null)
   const [terminateModalOpen, setTerminateModalOpen] = useState(false)
   const [terminateOrganization, setTerminateOrganization] = useState<any>(null)
   const [addManualCustomerOpen, setAddManualCustomerOpen] = useState(false)
@@ -149,7 +148,6 @@ export default function Customers() {
     flashCustomerId ||
     (revenueModalOpen && revenueCustomer?.id) ||
     (editModalOpen && editingOrgId) ||
-    (renewalModalOpen && renewalOrganization?.id) ||
     (terminateModalOpen && terminateOrganization?.id) ||
     (billingSettingsOpen && billingSettingsOrg?.id) ||
     (contactsModalOpen && contactsOrg?.id) ||
@@ -226,7 +224,7 @@ export default function Customers() {
 
     return [
       { key: 'atgard', label: 'Kräver åtgärd', rows: atgard, sum: null as number | null },
-      { key: 'fornyelse', label: 'Förnyelse inom 90 dgr', rows: fornyelse, sum: sumAnnual(fornyelse) },
+      { key: 'fornyelse', label: 'Periodskifte inom 90 dgr', rows: fornyelse, sum: sumAnnual(fornyelse) },
       { key: 'aktiva', label: 'Aktiva', rows: aktiva, sum: sumAnnual(aktiva) },
       { key: 'pausade', label: 'Pausade', rows: pausade, sum: null as number | null },
       { key: 'uppsagda', label: 'Uppsagda', rows: uppsagda, sum: null as number | null },
@@ -382,11 +380,6 @@ export default function Customers() {
     setRevenueModalOpen(true)
   }
 
-  const handleStartRenewal = (organization: ConsolidatedCustomer) => {
-    setRenewalOrganization(organization)
-    setRenewalModalOpen(true)
-  }
-
   const handleTerminate = (organization: ConsolidatedCustomer) => {
     setTerminateOrganization(organization)
     setTerminateModalOpen(true)
@@ -455,7 +448,7 @@ export default function Customers() {
               onClick={() => applyPreset('expiring')}
               className="hover:text-[#20c58f] transition-colors"
             >
-              <span className="text-slate-200 tabular-nums">{portfolio.renewals}</span> förnyelser inom 90 dgr
+              <span className="text-slate-200 tabular-nums">{portfolio.renewals}</span> periodskiften inom 90 dgr
             </button>
             <span className="text-slate-700">·</span>
             <button
@@ -783,7 +776,6 @@ export default function Customers() {
                           onRevenue: () => handleViewRevenue(org),
                           onBillingSettings: () => handleBillingSettings(org),
                           onContacts: () => handleContacts(org),
-                          onRenewal: () => handleStartRenewal(org),
                           onTerminate: () => handleTerminate(org),
                         }}
                       />
@@ -889,15 +881,6 @@ export default function Customers() {
         }}
       />
 
-      {/* Renewal Workflow Modal */}
-      <RenewalWorkflowModal
-        organization={renewalOrganization}
-        isOpen={renewalModalOpen}
-        onClose={() => {
-          setRenewalModalOpen(false)
-          setRenewalOrganization(null)
-        }}
-      />
 
       {/* Terminate Contract Modal */}
       <TerminateContractModal

@@ -80,7 +80,7 @@ export function buildContractEvents(contract: RecordContract, tag?: string): Rec
     events.push({
       date: toDateKey(contract.contract_end_date),
       kind: 'end',
-      title: contract.terminated_at ? 'Avtalet löper ut' : 'Avtalet löper ut / förnyas',
+      title: contract.terminated_at ? 'Avtalet upphör' : 'Periodskifte — förlängs automatiskt om ej uppsagt',
       tag,
     })
   }
