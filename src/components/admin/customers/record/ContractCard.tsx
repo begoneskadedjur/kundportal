@@ -183,7 +183,11 @@ export default function ContractCard({
                 Aktivt
               </span>
             )}
-            {imported ? (
+            {contract.fromCustomerRow ? (
+              <span className="text-[10px] uppercase tracking-wide text-slate-500 border border-slate-700 rounded px-1.5 py-0.5" title="Avtalsdatan kommer från kundkortet — ingen separat avtalsrad finns ännu">
+                Från kundkortet
+              </span>
+            ) : imported ? (
               <span className="text-[10px] uppercase tracking-wide text-slate-500 border border-slate-700 rounded px-1.5 py-0.5">
                 Importerat
               </span>

@@ -214,6 +214,9 @@ export default function CustomerListRow({
           </span>
           <span className="text-slate-200 tabular-nums shrink-0 md:w-24 md:text-right">
             {annual > 0 ? formatKr(annual) : '–'}
+            {org.manualBilling && (
+              <span className="block text-[10px] leading-tight text-slate-500 font-normal">manuell fakt.</span>
+            )}
           </span>
           <span className={`${next.className} truncate md:w-44`}>{next.text}</span>
           <span className="hidden lg:block text-slate-500 truncate w-28">{seller ?? '–'}</span>

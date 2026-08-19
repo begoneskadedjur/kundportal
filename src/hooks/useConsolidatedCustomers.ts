@@ -210,6 +210,8 @@ export interface ConsolidatedCustomer {
   is_active: boolean
   isTerminated: boolean
   isPaused: boolean
+  /** Löpande avtal som faktureras manuellt i Fortnox (billing_active=false utan pausdatum) */
+  manualBilling: boolean
   pausedUntil: string | null
   effectiveEndDate?: string | null
   hasExpiringSites: boolean
@@ -677,6 +679,7 @@ export function useConsolidatedCustomers() {
             is_active: huvudkontor.is_active || false,
             isTerminated: false,
             isPaused: false,
+            manualBilling: false,
             pausedUntil: null,
             effectiveEndDate: null,
             hasExpiringSites: false,
@@ -780,7 +783,8 @@ export function useConsolidatedCustomers() {
 
           is_active: customer.is_active || false,
           isTerminated: !!customer.terminated_at,
-          isPaused: !customer.terminated_at && customer.billing_active === false,
+          isPaused: !customer.terminated_at && !!customer.billing_paused_until && new Date(customer.billing_paused_until) > new Date(),
+          manualBilling: !customer.terminated_at && customer.billing_active === false && !customer.billing_paused_until,
           pausedUntil: customer.billing_paused_until ?? null,
           effectiveEndDate: customer.effective_end_date || null,
           hasExpiringSites: customer.contractProgress.daysRemaining <= 90,
@@ -924,8 +928,11 @@ export function useConsolidatedCustomers() {
 
         // Termination — org is terminated if ALL sites are terminated
         org.isTerminated = sites.every(site => !!site.terminated_at)
-        // Paus — pausad om ALLA sites har billing_active=false, men INTE om uppsagd
-        org.isPaused = !org.isTerminated && sites.every(site => site.billing_active === false)
+        // Paus = uttrycklig fakturapaus (billing_paused_until). Avstängd fakturering
+        // utan pausdatum betyder "faktureras manuellt i Fortnox", inte pausad.
+        org.isPaused = !org.isTerminated && sites.some(site =>
+          !!site.billing_paused_until && new Date(site.billing_paused_until) > new Date())
+        org.manualBilling = !org.isTerminated && !org.isPaused && sites.every(site => site.billing_active === false)
         const pausedSites = sites.filter(s => s.billing_paused_until)
         org.pausedUntil = pausedSites.length > 0
           ? pausedSites.sort((a, b) => (a.billing_paused_until ?? '').localeCompare(b.billing_paused_until ?? ''))[0].billing_paused_until ?? null

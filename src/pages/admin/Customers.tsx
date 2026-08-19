@@ -169,8 +169,6 @@ export default function Customers() {
   const [quickView, setQuickView] = useState<QuickView>('all')
 
   // Paginering
-  const [currentPage, setCurrentPage] = useState(1)
-  const pageSize = 50
 
   // Kollapserbara filter
   const [filtersExpanded, setFiltersExpanded] = useState(false)
@@ -231,13 +229,9 @@ export default function Customers() {
     ].filter(g => g.rows.length > 0)
   }, [filteredCustomers])
 
-  // Paginering över den grupp-ordnade listan
+  // Ingen paginering: grupperna renderas i sin helhet så att alla statusar
+  // alltid går att öppna direkt. Pausade/Uppsagda är kollapsade by default.
   const orderedRows = useMemo(() => groups.flatMap(g => g.rows), [groups])
-  const totalPages = Math.ceil(orderedRows.length / pageSize)
-  const pageIdSet = useMemo(
-    () => new Set(orderedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize).map(c => c.id)),
-    [orderedRows, currentPage]
-  )
 
   // Portföljrad — beräknas på hela datasetet (exkl. uppsagda)
   const portfolio = useMemo(() => {
@@ -280,11 +274,6 @@ export default function Customers() {
     setOrganizationTypeFilter('all')
     setQuickView('all')
 
-    const index = orderedRows.findIndex(org => org.id === match.id)
-    if (index >= 0) {
-      setCurrentPage(Math.floor(index / pageSize) + 1)
-    }
-
     setFlashCustomerId(match.id)
 
     const scrollTimer = setTimeout(() => {
@@ -321,14 +310,12 @@ export default function Customers() {
     setSearchInput(''); setStatusFilter('all'); setHealthFilter('all')
     setPortalFilter('all'); setOrganizationTypeFilter('all'); setManagerFilter('all')
     setQuickView('all')
-    setCurrentPage(1)
   }
 
   // Applicera preset
   const applyPreset = (preset: string) => {
     setSearchInput(''); setHealthFilter('all'); setPortalFilter('all'); setManagerFilter('all')
     setQuickView('all')
-    setCurrentPage(1)
 
     switch (preset) {
       case 'expiring':
@@ -350,7 +337,6 @@ export default function Customers() {
   }
 
   // Reset paginering vid filterändring
-  useEffect(() => { setCurrentPage(1) }, [searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, quickView])
 
   // Toggle expanded row (multisite-enheter)
   const toggleExpandedRow = (customerId: string) => {
@@ -735,7 +721,7 @@ export default function Customers() {
             <ul>
               {groups.map((group, groupIndex) => {
                 const collapsed = collapsedGroups[group.key] === true
-                const rowsOnPage = group.rows.filter(r => pageIdSet.has(r.id))
+                const rowsOnPage = group.rows
                 return (
                   <React.Fragment key={group.key}>
                     {/* Whisper header med räknare */}
@@ -805,49 +791,6 @@ export default function Customers() {
             </div>
           )}
 
-          {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 sm:px-6 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl mt-2">
-              <span className="text-sm text-slate-400">
-                Visar {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, orderedRows.length)} av {orderedRows.length}
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 rounded text-xs font-medium transition-colors bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 disabled:opacity-40 disabled:cursor-not-allowed min-h-[36px]"
-                >
-                  Föregående
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
-                  .map((page, idx, arr) => (
-                    <React.Fragment key={page}>
-                      {idx > 0 && arr[idx - 1] !== page - 1 && (
-                        <span className="text-slate-500 text-xs">...</span>
-                      )}
-                      <button
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-8 h-8 rounded text-xs font-medium transition-colors ${
-                          page === currentPage
-                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                            : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    </React.Fragment>
-                  ))
-                }
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 rounded text-xs font-medium transition-colors bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 disabled:opacity-40 disabled:cursor-not-allowed min-h-[36px]"
-                >
-                  Nästa
-                </button>
-              </div>
-            </div>
-          )}
       </div>
 
       {/* Email Campaign Modal */}

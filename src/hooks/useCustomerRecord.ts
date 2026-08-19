@@ -16,7 +16,7 @@ export type RecordCustomer = Customer & {
 }
 
 // contracts.label är ny, backfylld kolumn — används som avtalsnamn
-export type RecordContract = Contract & { label?: string | null }
+export type RecordContract = Contract & { label?: string | null; fromCustomerRow?: boolean }
 
 export interface RecordBillingItem {
   id: string
@@ -273,6 +273,46 @@ export function useCustomerRecord(customerId: string | undefined) {
     const contracts = ((contractsRes.data ?? []) as RecordContract[]).filter(
       (c) => c.status !== 'trashed' || isImportedContract(c)
     )
+
+    // Fallback: många importerade kunder (bl.a. juli-batchen 2026) har avtalsdata
+    // på KUNDRADEN men ingen contracts-rad alls. Syntetisera ett kundrads-avtal
+    // för varje familjerad med premie/avtalsdatum som saknar riktigt avtal, så
+    // sidan visar enheter, avtal och årspremier tills riktiga rader backfyllts.
+    const familyRows = [root, ...units]
+    const coveredCustomerIds = new Set(contracts.map((c) => c.customer_id))
+    for (const row of familyRows) {
+      if (coveredCustomerIds.has(row.id)) continue
+      const annual = Number(row.annual_value ?? 0)
+      if (!(annual > 0) && !row.contract_start_date) continue
+      // HK i multisite utan egen premie bär inget eget avtal (premierna bor på enheterna)
+      if (row.site_type === 'huvudkontor' && units.length > 0 && !(annual > 0)) continue
+      contracts.push({
+        id: `kundrad-${row.id}`,
+        customer_id: row.id,
+        label: row.contract_type || 'Avtal',
+        fromCustomerRow: true,
+        contract_type: row.contract_type ?? null,
+        status: row.terminated_at ? 'terminated' : 'signed',
+        type: 'contract',
+        oneflow_contract_id: null,
+        template_id: null,
+        annual_value: annual > 0 ? annual : null,
+        total_value: annual > 0 ? annual : null,
+        total_contract_value: annual > 0 ? annual : null,
+        billing_frequency: row.billing_frequency ?? null,
+        contract_start_date: row.contract_start_date ?? null,
+        contract_end_date: row.contract_end_date ?? null,
+        start_date: row.contract_start_date ?? null,
+        contract_length: row.contract_length ?? null,
+        notice_period_months: row.notice_period_months ?? null,
+        terminated_at: row.terminated_at ?? null,
+        agreement_text: row.agreement_text ?? null,
+        selected_products: null,
+        address_label: row.site_name ?? null,
+        contact_address: row.contact_address ?? null,
+        created_at: row.created_at,
+      } as unknown as RecordContract)
+    }
 
     const caseCounts: Record<string, number> = {}
     for (const row of (casesRes.error ? [] : (casesRes.data ?? [])) as { customer_id: string | null }[]) {
