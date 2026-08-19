@@ -195,21 +195,17 @@ export default function TechnicianEquipment() {
     fetchCustomers()
   }, [])
 
-  // Öppna kundmodal automatiskt om ?customer=<id> finns i URL
+  // ?customer=<id> i URL kommer från "Gå till utplacering" i etableringsärendet.
+  // Beslut 2026-08-19: öppna ALLTID etableringswizarden med kunden förfylld —
+  // teknikern kommer hit för att placera ut något, oavsett om kunden redan har stationer.
   useEffect(() => {
     const customerId = searchParams.get('customer')
-    if (!customerId || customers.length === 0) return
+    if (!customerId) return
     if (customerParamHandled.current) return
     customerParamHandled.current = true
-    const found = allCustomers.find(c => c.id === customerId)
-    if (found) {
-      setSelectedCustomerForModal(found)
-    } else {
-      // Kunden har inga stationer ännu — öppna wizard direkt
-      setWizardCustomerId(customerId)
-      setIsWizardOpen(true)
-    }
-  }, [searchParams, allCustomers, customers])
+    setWizardCustomerId(customerId)
+    setIsWizardOpen(true)
+  }, [searchParams])
 
   // Uppdatera utrustning
   const refreshData = useCallback(async () => {

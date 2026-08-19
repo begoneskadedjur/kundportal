@@ -19,7 +19,7 @@ import {
   CalendarClock,
   ClipboardList
 } from 'lucide-react'
-import { StationHealthBadge, HealthStatus } from '../shared/StationHealthBadge'
+import { StationHealthBadge } from '../shared/StationHealthBadge'
 import { EquipmentService, CustomerStationSummary } from '../../services/equipmentService'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG, EQUIPMENT_STATUS_CONFIG } from '../../types/database'
 import toast from 'react-hot-toast'
@@ -140,12 +140,12 @@ export function ExpandableCustomerRow({
         `}
         onClick={onToggleExpand}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           {/* Expand/collapse-ikon */}
           <motion.div
             animate={{ rotate: isExpanded ? 90 : 0 }}
             transition={{ duration: 0.15 }}
-            className="flex-shrink-0"
+            className="flex-shrink-0 mt-3"
           >
             <ChevronRight className="w-4 h-4 text-slate-500" />
           </motion.div>
@@ -158,72 +158,67 @@ export function ExpandableCustomerRow({
             <Building2 className={`w-5 h-5 ${hasStations ? 'text-emerald-400' : 'text-slate-500'}`} />
           </div>
 
-          {/* Kundinfo */}
+          {/* Kundinfo — namnet får hela bredden, metadata på egen rad
+              (tidigare låg allt på en rad och namnet trunkerades till oläslighet på mobil) */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className={`font-medium truncate ${hasStations ? 'text-white' : 'text-slate-400'}`}>
-                {customer.customer_name}
-              </h3>
-            </div>
+            <h3 className={`font-medium leading-snug break-words line-clamp-2 ${hasStations ? 'text-white' : 'text-slate-400'}`}>
+              {customer.customer_name}
+            </h3>
             {customer.customer_address && (
               <p className="text-sm text-slate-500 truncate">{customer.customer_address}</p>
             )}
-          </div>
 
-          {/* Statistik */}
-          <div className="flex items-center gap-4 flex-shrink-0">
-            {/* Stationsantal */}
-            {hasStations ? (
-              <div className="flex items-center gap-3 text-sm">
-                {customer.outdoor_count > 0 && (
-                  <span className="flex items-center gap-1 text-blue-400">
-                    <MapPin className="w-3.5 h-3.5" />
-                    {customer.outdoor_count}
-                  </span>
-                )}
-                {customer.indoor_count > 0 && (
-                  <span className="flex items-center gap-1 text-cyan-400">
-                    <Home className="w-3.5 h-3.5" />
-                    {customer.indoor_count}
-                  </span>
-                )}
-              </div>
-            ) : (
-              <span className="text-xs text-slate-500">Inga stationer</span>
-            )}
+            {/* Metadata-rad: stationsantal, hälsa och åtgärder */}
+            <div className="flex items-center gap-3 flex-wrap mt-1.5">
+              {hasStations ? (
+                <div className="flex items-center gap-3 text-sm">
+                  {customer.outdoor_count > 0 && (
+                    <span className="flex items-center gap-1 text-blue-400">
+                      <MapPin className="w-3.5 h-3.5" />
+                      {customer.outdoor_count}
+                    </span>
+                  )}
+                  {customer.indoor_count > 0 && (
+                    <span className="flex items-center gap-1 text-cyan-400">
+                      <Home className="w-3.5 h-3.5" />
+                      {customer.indoor_count}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-xs text-slate-500">Inga stationer</span>
+              )}
 
-            {/* Hälsostatus */}
-            {hasStations && (
-              <StationHealthBadge status={customer.health_status} size="sm" />
-            )}
+              {hasStations && (
+                <StationHealthBadge status={customer.health_status} size="sm" />
+              )}
 
-            {/* Schema-info panel */}
-            {onOpenSchedulePanel && hasStations && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenSchedulePanel(customer.customer_id, customer.customer_name)
-                }}
-                className="p-1.5 text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 rounded-lg transition-colors"
-                title="Visa schema och kontroller"
-              >
-                <ClipboardList className="w-4 h-4" />
-              </button>
-            )}
+              {onOpenSchedulePanel && hasStations && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenSchedulePanel(customer.customer_id, customer.customer_name)
+                  }}
+                  className="p-2 -my-1 text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 rounded-lg transition-colors"
+                  title="Visa schema och kontroller"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                </button>
+              )}
 
-            {/* Kalender-ikon för schemaläggning */}
-            {onSchedule && hasStations && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onSchedule()
-                }}
-                className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
-                title="Schemalägg kontroller"
-              >
-                <CalendarClock className="w-4 h-4" />
-              </button>
-            )}
+              {onSchedule && hasStations && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onSchedule()
+                  }}
+                  className="p-2 -my-1 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-colors"
+                  title="Schemalägg kontroller"
+                >
+                  <CalendarClock className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

@@ -510,11 +510,11 @@ export class EquipmentService {
   /**
    * Hämta alla kunder (för dropdown-val)
    */
-  static async getCustomersForDropdown(): Promise<{ id: string; company_name: string; contact_address: string | null }[]> {
+  static async getCustomersForDropdown(): Promise<{ id: string; company_name: string; contact_address: string | null; organization_number: string | null }[]> {
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('id, company_name, contact_address')
+        .select('id, company_name, contact_address, organization_number')
         .eq('is_active', true)
         .order('company_name', { ascending: true })
 
@@ -548,7 +548,7 @@ export class EquipmentService {
           customer_id,
           status,
           placed_at,
-          customer:customers!customer_id(id, company_name, contact_address, organization_id, parent_customer_id, is_multisite, site_type, site_name, contract_start_date, contract_end_date)
+          customer:customers!customer_id(id, company_name, contact_address, organization_number, organization_id, parent_customer_id, is_multisite, site_type, site_name, contract_start_date, contract_end_date)
         `)
         .eq('placed_by_technician_id', technicianId)
 
@@ -566,7 +566,7 @@ export class EquipmentService {
           placed_at,
           floor_plan:floor_plans!floor_plan_id(
             customer_id,
-            customer:customers!customer_id(id, company_name, contact_address, organization_id, parent_customer_id, is_multisite, site_type, site_name, contract_start_date, contract_end_date)
+            customer:customers!customer_id(id, company_name, contact_address, organization_number, organization_id, parent_customer_id, is_multisite, site_type, site_name, contract_start_date, contract_end_date)
           )
         `)
         .eq('placed_by_technician_id', technicianId)
@@ -581,6 +581,7 @@ export class EquipmentService {
         customer_id: string
         customer_name: string
         customer_address: string | null
+        organization_number: string | null
         organization_id: string | null
         parent_customer_id: string | null
         is_multisite: boolean
@@ -602,6 +603,7 @@ export class EquipmentService {
             customer_id: customerId,
             customer_name: item.customer.company_name,
             customer_address: item.customer.contact_address,
+            organization_number: item.customer.organization_number || null,
             organization_id: item.customer.organization_id || null,
             parent_customer_id: item.customer.parent_customer_id || null,
             is_multisite: item.customer.is_multisite || false,
@@ -631,6 +633,7 @@ export class EquipmentService {
             customer_id: customerId,
             customer_name: cust.company_name,
             customer_address: cust.contact_address,
+            organization_number: cust.organization_number || null,
             organization_id: cust.organization_id || null,
             parent_customer_id: cust.parent_customer_id || null,
             is_multisite: cust.is_multisite || false,
@@ -677,6 +680,7 @@ export class EquipmentService {
           customer_id: customer.customer_id,
           customer_name: customer.customer_name,
           customer_address: customer.customer_address,
+          organization_number: customer.organization_number,
           outdoor_count: customer.outdoor_stations.length,
           indoor_count: customer.indoor_stations.length,
           health_status,
@@ -985,6 +989,7 @@ export interface CustomerStationSummary {
   customer_id: string
   customer_name: string
   customer_address: string | null
+  organization_number?: string | null
   outdoor_count: number
   indoor_count: number
   health_status: 'excellent' | 'good' | 'fair' | 'poor'

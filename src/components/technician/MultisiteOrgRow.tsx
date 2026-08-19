@@ -1,10 +1,8 @@
 // src/components/technician/MultisiteOrgRow.tsx
 // Expanderbar org-rad för multisite-kunder med enheter och checkboxar
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { format } from 'date-fns'
-import { sv } from 'date-fns/locale'
 import {
   Building2,
   MapPin,
@@ -13,7 +11,6 @@ import {
   CalendarClock,
   CheckSquare,
   Square,
-  Loader2,
   ClipboardList
 } from 'lucide-react'
 import { StationHealthBadge, HealthStatus } from '../shared/StationHealthBadge'
@@ -99,12 +96,12 @@ export function MultisiteOrgRow({
         `}
         onClick={onToggleExpand}
       >
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           {/* Expand/collapse */}
           <motion.div
             animate={{ rotate: isExpanded ? 90 : 0 }}
             transition={{ duration: 0.15 }}
-            className="flex-shrink-0"
+            className="flex-shrink-0 mt-3"
           >
             <ChevronRight className="w-4 h-4 text-slate-500" />
           </motion.div>
@@ -114,65 +111,65 @@ export function MultisiteOrgRow({
             <Building2 className="w-5 h-5 text-purple-400" />
           </div>
 
-          {/* Org-info */}
+          {/* Org-info — namnet får hela bredden, metadata på egen rad */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-medium text-white truncate">{orgName}</h3>
-              <span className="text-xs px-1.5 py-0.5 bg-purple-500/15 text-purple-400 rounded border border-purple-500/20">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-medium text-white leading-snug break-words line-clamp-2">{orgName}</h3>
+              <span className="text-xs px-1.5 py-0.5 bg-purple-500/15 text-purple-400 rounded border border-purple-500/20 whitespace-nowrap">
                 {sites.length} enheter
               </span>
             </div>
-          </div>
 
-          {/* Statistik + schema-ikon */}
-          <div className="flex items-center gap-3 flex-shrink-0">
-            {totalStations > 0 && (
-              <div className="flex items-center gap-3 text-sm">
-                {totalOutdoor > 0 && (
-                  <span className="flex items-center gap-1 text-blue-400">
-                    <MapPin className="w-3.5 h-3.5" />
-                    {totalOutdoor}
-                  </span>
-                )}
-                {totalIndoor > 0 && (
-                  <span className="flex items-center gap-1 text-cyan-400">
-                    <Home className="w-3.5 h-3.5" />
-                    {totalIndoor}
-                  </span>
-                )}
-              </div>
-            )}
+            {/* Metadata-rad: stationsantal, hälsa och åtgärder */}
+            <div className="flex items-center gap-3 flex-wrap mt-1.5">
+              {totalStations > 0 && (
+                <div className="flex items-center gap-3 text-sm">
+                  {totalOutdoor > 0 && (
+                    <span className="flex items-center gap-1 text-blue-400">
+                      <MapPin className="w-3.5 h-3.5" />
+                      {totalOutdoor}
+                    </span>
+                  )}
+                  {totalIndoor > 0 && (
+                    <span className="flex items-center gap-1 text-cyan-400">
+                      <Home className="w-3.5 h-3.5" />
+                      {totalIndoor}
+                    </span>
+                  )}
+                </div>
+              )}
 
-            {totalStations > 0 && (
-              <StationHealthBadge status={worstHealth} size="sm" />
-            )}
+              {totalStations > 0 && (
+                <StationHealthBadge status={worstHealth} size="sm" />
+              )}
 
-            {/* Schema-info panel */}
-            {onOpenSchedulePanel && (
+              {/* Schema-info panel */}
+              {onOpenSchedulePanel && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    const siteTargets = sites.map(s => ({
+                      customerId: s.customer_id,
+                      siteName: s.site_name || s.customer_name.split(' - ').pop() || s.customer_name
+                    }))
+                    onOpenSchedulePanel(sites[0].customer_id, orgName, siteTargets)
+                  }}
+                  className="p-2 -my-1 text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 rounded-lg transition-colors"
+                  title="Visa schema och kontroller"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Kalender-ikon för att schemalägga alla */}
               <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  const siteTargets = sites.map(s => ({
-                    customerId: s.customer_id,
-                    siteName: s.site_name || s.customer_name.split(' - ').pop() || s.customer_name
-                  }))
-                  onOpenSchedulePanel(sites[0].customer_id, orgName, siteTargets)
-                }}
-                className="p-1.5 text-slate-400 hover:text-[#20c58f] hover:bg-[#20c58f]/10 rounded-lg transition-colors"
-                title="Visa schema och kontroller"
+                onClick={handleScheduleAll}
+                className="p-2 -my-1 text-slate-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors"
+                title="Schemalägg alla enheter"
               >
-                <ClipboardList className="w-4 h-4" />
+                <CalendarClock className="w-4 h-4" />
               </button>
-            )}
-
-            {/* Kalender-ikon för att schemalägga alla */}
-            <button
-              onClick={handleScheduleAll}
-              className="p-1.5 text-slate-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors"
-              title="Schemalägg alla enheter"
-            >
-              <CalendarClock className="w-4 h-4" />
-            </button>
+            </div>
           </div>
         </div>
       </div>
@@ -248,13 +245,13 @@ export function MultisiteOrgRow({
                         <MapPin className="w-4 h-4 text-slate-400" />
                       </div>
 
-                      {/* Enhet-info */}
+                      {/* Enhet-info — enhetsnamnet får radbrytas, stationsinfo på egen rad */}
                       <div
                         className="flex-1 min-w-0"
                         onClick={() => onOpenSiteDetails(site)}
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-white truncate">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-medium text-white leading-snug break-words line-clamp-2">
                             {siteName}
                           </span>
                           {site.site_type === 'huvudkontor' && (
@@ -266,12 +263,8 @@ export function MultisiteOrgRow({
                         {site.customer_address && (
                           <p className="text-xs text-slate-500 truncate">{site.customer_address}</p>
                         )}
-                      </div>
-
-                      {/* Stationsantal + hälsa */}
-                      <div className="flex items-center gap-2 flex-shrink-0">
                         {siteStations > 0 && (
-                          <div className="flex items-center gap-2 text-xs">
+                          <div className="flex items-center gap-2 text-xs mt-1">
                             {site.outdoor_count > 0 && (
                               <span className="flex items-center gap-0.5 text-blue-400">
                                 <MapPin className="w-3 h-3" />
@@ -284,10 +277,8 @@ export function MultisiteOrgRow({
                                 {site.indoor_count}
                               </span>
                             )}
+                            <StationHealthBadge status={site.health_status} size="sm" />
                           </div>
-                        )}
-                        {siteStations > 0 && (
-                          <StationHealthBadge status={site.health_status} size="sm" />
                         )}
                       </div>
                     </div>

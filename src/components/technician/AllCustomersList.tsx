@@ -3,7 +3,7 @@
 // Multisite-kunder grupperas under en org-rad med enheter
 
 import { useState, useMemo } from 'react'
-import { Search, SortAsc, Building2 } from 'lucide-react'
+import { Search, Building2 } from 'lucide-react'
 import Select from '../ui/Select'
 import { ExpandableCustomerRow } from './ExpandableCustomerRow'
 import { MultisiteOrgRow } from './MultisiteOrgRow'
@@ -141,22 +141,25 @@ export function AllCustomersList({
       })
     }
 
-    // Steg 3: Filtrera på sökfråga
+    // Steg 3: Filtrera på sökfråga — substring-matchning på namn/adress/org.nr
+    // (tidigare krävdes att man visste hur namnet BÖRJADE, vilket stoppade tekniker i fält)
     let filtered = items
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
+      const orgNrQuery = query.replace(/-/g, '')
+      const matchesCustomer = (c: CustomerStationSummary) =>
+        c.customer_name.toLowerCase().includes(query) ||
+        c.site_name?.toLowerCase().includes(query) ||
+        c.customer_address?.toLowerCase().includes(query) ||
+        (orgNrQuery.length > 0 && c.organization_number?.replace(/-/g, '').includes(orgNrQuery))
+
       filtered = items.filter(item => {
         if (item.type === 'customer') {
-          return item.customer.customer_name.toLowerCase().startsWith(query) ||
-            item.customer.customer_address?.toLowerCase().includes(query)
+          return matchesCustomer(item.customer)
         } else {
-          // Sök i org-namn eller någon enhets namn/adress
-          return item.orgName.toLowerCase().startsWith(query) ||
-            item.sites.some(s =>
-              s.customer_name.toLowerCase().includes(query) ||
-              s.site_name?.toLowerCase().includes(query) ||
-              s.customer_address?.toLowerCase().includes(query)
-            )
+          // Sök i org-namn eller någon enhets namn/adress/org.nr
+          return item.orgName.toLowerCase().includes(query) ||
+            item.sites.some(matchesCustomer)
         }
       })
     }
@@ -233,7 +236,7 @@ export function AllCustomersList({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Sök kund (börjar på...)"
+              placeholder="Sök kund, adress eller org.nr"
               className="w-full pl-10 pr-4 py-2.5 bg-slate-900/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
             />
             {searchQuery && (

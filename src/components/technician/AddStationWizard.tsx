@@ -61,6 +61,8 @@ interface AddStationWizardProps {
 interface CustomerOption {
   id: string
   company_name: string
+  contact_address?: string | null
+  organization_number?: string | null
   hasStations?: boolean
 }
 
@@ -164,11 +166,14 @@ export function AddStationWizard({
   const filteredCustomers = useMemo(() => {
     let result = [...customers]
 
-    // Filtrera på sökfråga
+    // Filtrera på sökfråga — namn, adress eller org.nr
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
+      const orgNrQuery = query.replace(/-/g, '')
       result = result.filter(c =>
-        c.company_name.toLowerCase().includes(query)
+        c.company_name.toLowerCase().includes(query) ||
+        c.contact_address?.toLowerCase().includes(query) ||
+        (orgNrQuery.length > 0 && c.organization_number?.replace(/-/g, '').includes(orgNrQuery))
       )
     }
 
@@ -548,7 +553,7 @@ export function AddStationWizard({
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Sök kund..."
+                      placeholder="Sök kund, adress eller org.nr"
                       className="w-full pl-10 pr-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                       autoFocus
                     />
@@ -586,18 +591,13 @@ export function AddStationWizard({
                             {yourCustomers.length > 0 ? 'Alla kunder' : 'Kunder'}
                           </h3>
                           <div className="space-y-2">
-                            {otherCustomers.slice(0, 20).map(customer => (
+                            {otherCustomers.map(customer => (
                               <CustomerButton
                                 key={customer.id}
                                 customer={customer}
                                 onClick={() => handleCustomerSelect(customer)}
                               />
                             ))}
-                            {otherCustomers.length > 20 && (
-                              <p className="text-sm text-slate-500 text-center py-2">
-                                + {otherCustomers.length - 20} fler kunder (sök för att hitta)
-                              </p>
-                            )}
                           </div>
                         </div>
                       )}
