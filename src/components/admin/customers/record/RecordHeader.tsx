@@ -23,6 +23,8 @@ interface Props {
   /** Summa av familjens aktiva avtals annual_value */
   familyAnnualValue: number
   activeContractsCount: number
+  /** T.ex. "1 på organisationen, 4 på enheterna" — null för icke-multisite */
+  contractDistribution?: string | null
   nextEvent: RecordTimelineEvent | null
   /** T.ex. "/admin/befintliga-kunder" */
   basePath: string
@@ -69,6 +71,7 @@ export default function RecordHeader({
   unitsCount,
   familyAnnualValue,
   activeContractsCount,
+  contractDistribution,
   nextEvent,
   basePath,
 }: Props) {
@@ -133,10 +136,13 @@ export default function RecordHeader({
         {familyAnnualValue > 0 ? (
           <span>
             {formatKr(familyAnnualValue)}/år över {activeContractsCount} avtal
+            {contractDistribution ? ` (${contractDistribution})` : ''}
           </span>
         ) : (
           <span className="text-slate-500">
-            {activeContractsCount > 0 ? `${activeContractsCount} avtal utan fast årsvärde` : 'Inga aktiva avtal'}
+            {activeContractsCount > 0
+              ? `${activeContractsCount} avtal utan fast årsvärde${contractDistribution ? ` (${contractDistribution})` : ''}`
+              : 'Inga aktiva avtal'}
           </span>
         )}
         {nextEvent && (

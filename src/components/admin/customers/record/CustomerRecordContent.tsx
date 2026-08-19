@@ -87,6 +87,16 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
     })
 
     const activeContracts = sortedContracts.filter((c) => !isEndedContract(c))
+    // Fördelning: var avtalen bor (organisationen vs enheterna)
+    const unitIds = new Set(units.map((u) => u.id))
+    const contractsOnUnits = activeContracts.filter((c) => unitIds.has(c.customer_id ?? '')).length
+    const contractsOnOrg = activeContracts.length - contractsOnUnits
+    const contractDistribution = units.length > 0 && activeContracts.length > 0
+      ? [
+          contractsOnOrg > 0 ? `${contractsOnOrg} på organisationen` : null,
+          contractsOnUnits > 0 ? `${contractsOnUnits} på enheterna` : null,
+        ].filter(Boolean).join(', ')
+      : null
     // AKTUELLT årsvärde: premietrappan styr när events finns, annars annual_value
     const familyAnnualValue = activeContracts.reduce(
       (sum, c) => sum + contractEffectiveAnnualValue(c, premiumByContract.get(c.id) ?? []),
@@ -113,6 +123,7 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
       sortedContracts,
       activeContracts,
       familyAnnualValue,
+      contractDistribution,
       timelineEvents,
       nextEvent,
       totalCases,
@@ -129,6 +140,7 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
     sortedContracts,
     activeContracts,
     familyAnnualValue,
+    contractDistribution,
     timelineEvents,
     nextEvent,
     totalCases,
@@ -160,6 +172,7 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
       unitsCount={units.length}
       familyAnnualValue={familyAnnualValue}
       activeContractsCount={activeContracts.length}
+      contractDistribution={contractDistribution}
       nextEvent={nextEvent}
       basePath={basePath}
     />

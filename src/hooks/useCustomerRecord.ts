@@ -384,11 +384,17 @@ export function contractDisplayName(c: RecordContract): string {
   return `Avtal #${c.oneflow_contract_id}`
 }
 
-/** Avtalet har passerat sitt slut (effective_end_date/contract_end_date) eller status 'ended' */
+/**
+ * Avtalet är avslutat. Rullande modell: ett passerat contract_end_date utan
+ * uppsägning betyder INTE att avtalet är slut — det förlängs automatiskt vid
+ * periodskifte (generate-continuing-contracts-cronen). Bara uppsagda avtal
+ * (terminated_at) eller status 'ended' räknas som avslutade.
+ */
 export function isEndedContract(c: RecordContract, today = new Date()): boolean {
   if ((c.status as string) === 'ended') return true
+  if (!c.terminated_at) return false
   const end = c.effective_end_date ?? c.contract_end_date
-  if (!end) return false
+  if (!end) return true
   return new Date(end).getTime() < today.getTime()
 }
 
