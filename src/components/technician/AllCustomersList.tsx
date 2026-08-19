@@ -249,12 +249,15 @@ export function AllCustomersList({
             )}
           </div>
 
-          <Select
-            value={sortBy}
-            onChange={(v) => setSortBy(v as SortOption)}
-            options={SORT_OPTIONS}
-            className="w-48"
-          />
+          {/* Wrapper styr bredden — Select-roten är alltid w-full och
+              trycker annars ihop sökfältet till bara ikonen */}
+          <div className="w-full sm:w-48 shrink-0">
+            <Select
+              value={sortBy}
+              onChange={(v) => setSortBy(v as SortOption)}
+              options={SORT_OPTIONS}
+            />
+          </div>
         </div>
 
         <div className="flex items-center justify-between mt-3 text-sm text-slate-400">

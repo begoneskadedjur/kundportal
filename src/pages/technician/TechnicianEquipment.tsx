@@ -30,6 +30,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Button from '../../components/ui/Button'
 import { AllCustomersList } from '../../components/technician/AllCustomersList'
+import { InspectionOverviewTab } from '../../components/technician/InspectionOverviewTab'
 import { CustomerStationsModal } from '../../components/technician/CustomerStationsModal'
 import { CollapsibleMapSection } from '../../components/technician/CollapsibleMapSection'
 import { AddStationWizard } from '../../components/technician/AddStationWizard'
@@ -48,10 +49,32 @@ interface Customer {
   contact_address: string | null
 }
 
+type EquipmentTab = 'kunder' | 'karta' | 'kontroller'
+
+const EQUIPMENT_TABS: { value: EquipmentTab; label: string }[] = [
+  { value: 'kunder', label: 'Kunder' },
+  { value: 'karta', label: 'Karta' },
+  { value: 'kontroller', label: 'Kontroller' }
+]
+
 export default function TechnicianEquipment() {
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Aktiv tabb i URL:en så att bakåtknapp och delade länkar fungerar
+  const tabParam = searchParams.get('tab')
+  const activeTab: EquipmentTab =
+    tabParam === 'karta' || tabParam === 'kontroller' ? tabParam : 'kunder'
+
+  const setActiveTab = (tab: EquipmentTab) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('tab', tab)
+      next.delete('customer')
+      return next
+    }, { replace: true })
+  }
 
   // State
   const [allEquipment, setAllEquipment] = useState<EquipmentPlacementWithRelations[]>([])
@@ -630,7 +653,7 @@ export default function TechnicianEquipment() {
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-white">Utrustning</h1>
-                <p className="text-slate-400 text-sm">Fordon och utrustningshantering</p>
+                <p className="text-slate-400 text-sm">Stationer, kunder och kontroller</p>
               </div>
             </div>
             <button
@@ -640,6 +663,23 @@ export default function TechnicianEquipment() {
               <RefreshCw className="w-4 h-4" />
               Uppdatera
             </button>
+          </div>
+
+          {/* Tabbar: Kunder / Karta / Kontroller */}
+          <div className="flex gap-1 p-1 bg-slate-800/50 border border-slate-700/50 rounded-xl mt-4 w-full sm:w-auto sm:inline-flex">
+            {EQUIPMENT_TABS.map(tab => (
+              <button
+                key={tab.value}
+                onClick={() => setActiveTab(tab.value)}
+                className={`flex-1 sm:flex-none sm:px-6 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === tab.value
+                    ? 'bg-[#20c58f] text-[#fff]'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
         {loading ? (
@@ -651,29 +691,59 @@ export default function TechnicianEquipment() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Statistik + Karta sektion - ALLTID synlig */}
-            <CollapsibleMapSection
-              equipment={allEquipment}
-              stats={stats}
-              onEquipmentClick={handleEquipmentClick}
-              defaultExpanded={true}
-            />
+            {/* Tab: Kunder — kompakt statistik + kundlista */}
+            {activeTab === 'kunder' && (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Stationer totalt', value: stats.total },
+                    { label: 'Utomhus', value: stats.outdoor },
+                    { label: 'Inomhus', value: stats.indoor },
+                    { label: 'Kunder', value: stats.customerCount }
+                  ].map(s => (
+                    <div key={s.label} className="p-3 bg-slate-800/50 border border-slate-700/50 rounded-xl">
+                      <p className="text-2xl font-bold text-white tabular-nums">{s.value}</p>
+                      <p className="text-xs text-slate-400">{s.label}</p>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white mb-4">
+                    Kunder med stationer
+                  </h2>
+                  <AllCustomersList
+                    customers={allCustomers}
+                    loading={loading}
+                    onOpenCustomerDetails={handleOpenCustomerDetails}
+                    onSchedule={(targets) => handleScheduleFromList(targets)}
+                    onOpenSchedulePanel={(customerId, customerName, sites) => {
+                      setSchedulePanelTarget({ customerId, customerName, sites })
+                    }}
+                  />
+                </div>
+              </>
+            )}
 
-            {/* Kundlista - visar kunder med stationer */}
-            <div>
-              <h2 className="text-lg font-semibold text-white mb-4">
-                Kunder med stationer
-              </h2>
-              <AllCustomersList
+            {/* Tab: Karta — statistik + karta över alla teknikerns stationer */}
+            {activeTab === 'karta' && (
+              <CollapsibleMapSection
+                equipment={allEquipment}
+                stats={stats}
+                onEquipmentClick={handleEquipmentClick}
+                defaultExpanded={true}
+              />
+            )}
+
+            {/* Tab: Kontroller — överblick över inbokade stationskontroller */}
+            {activeTab === 'kontroller' && (
+              <InspectionOverviewTab
+                technicianId={technicianId}
                 customers={allCustomers}
-                loading={loading}
-                onOpenCustomerDetails={handleOpenCustomerDetails}
-                onSchedule={(targets) => handleScheduleFromList(targets)}
-                onOpenSchedulePanel={(customerId, customerName, sites) => {
-                  setSchedulePanelTarget({ customerId, customerName, sites })
+                onOpenSchedulePanel={(customerId, customerName) => {
+                  setSchedulePanelTarget({ customerId, customerName })
                 }}
               />
-            </div>
+            )}
           </div>
         )}
 
