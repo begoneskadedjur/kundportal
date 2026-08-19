@@ -68,6 +68,11 @@ interface CustomerStationsModalProps {
   onClose: () => void
   onAddStation?: (customerId: string, type: 'outdoor' | 'indoor') => void
   onStationClick?: (station: any, type: 'outdoor' | 'indoor') => void
+  /** 'page' renderar innehållet som ett vanligt sidkort (utan backdrop/fixed
+      positionering) — används av kunddetaljsidan /technician/equipment/customer/:id */
+  variant?: 'modal' | 'page'
+  /** Startflik, t.ex. från ?tab= i kunddetaljsidans URL */
+  initialView?: 'outdoor' | 'indoor' | 'schedule'
 }
 
 type ViewType = 'outdoor' | 'indoor' | 'schedule'
@@ -122,10 +127,13 @@ export function CustomerStationsModal({
   isOpen,
   onClose,
   onAddStation,
-  onStationClick
+  onStationClick,
+  variant = 'modal',
+  initialView
 }: CustomerStationsModalProps) {
   const { profile } = useAuth()
-  const [activeView, setActiveView] = useState<ViewType>('outdoor')
+  const isPage = variant === 'page'
+  const [activeView, setActiveView] = useState<ViewType>(initialView || 'outdoor')
   const [loading, setLoading] = useState(false)
   const [outdoorStations, setOutdoorStations] = useState<EquipmentPlacementWithRelations[]>([])
   const [indoorStations, setIndoorStations] = useState<IndoorStationWithRelations[]>([])
@@ -170,8 +178,9 @@ export function CustomerStationsModal({
     }
   }, [isOpen, customer?.customer_id])
 
-  // Blockera scroll på body när modal är öppen
+  // Blockera scroll på body när modal är öppen (ej i page-läge — sidan ska scrolla)
   useEffect(() => {
+    if (isPage) return
     if (isOpen) {
       document.body.style.overflow = 'hidden'
     } else {
@@ -432,28 +441,9 @@ export function CustomerStationsModal({
 
   if (!customer) return null
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
-          />
-
-          {/* Modal - större för att rymma mer innehåll */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-2 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl md:h-auto md:max-h-[90vh] z-50 flex flex-col"
-          >
-            <div className="flex-1 min-h-0 bg-slate-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col relative">
+  // Själva innehållet — delas mellan modal-läget och page-läget
+  const innerContent = (
+            <div className={`flex-1 min-h-0 bg-slate-900 rounded-2xl overflow-hidden flex flex-col relative ${isPage ? 'border border-slate-700/50' : 'shadow-2xl'}`}>
               {/* Header */}
               <div className="px-5 py-4 border-b border-slate-700 flex-shrink-0 bg-slate-800">
                 <div className="flex items-start justify-between gap-3">
@@ -1148,8 +1138,12 @@ export function CustomerStationsModal({
                 )}
               </AnimatePresence>
             </div>
-          </motion.div>
+  )
 
+  // Sub-modaler (uppladdning, typväljare, stationsformulär, schemawizard) —
+  // fixed-positionerade och fungerar likadant i båda lägena
+  const overlays = (
+        <>
           {/* Modal: Ladda upp planritning */}
           {showUploadModal && customer && (
             <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
@@ -1228,6 +1222,43 @@ export function CustomerStationsModal({
               technicianId={profile?.technician_id || ''}
             />
           )}
+        </>
+  )
+
+  // Page-läge: rendera som vanligt sidkort utan backdrop/fixed positionering
+  if (isPage) {
+    return (
+      <>
+        {innerContent}
+        {overlays}
+      </>
+    )
+  }
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+          />
+
+          {/* Modal - större för att rymma mer innehåll */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="fixed inset-2 md:inset-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-4xl md:h-auto md:max-h-[90vh] z-50 flex flex-col"
+          >
+            {innerContent}
+          </motion.div>
+          {overlays}
         </>
       )}
     </AnimatePresence>

@@ -21,17 +21,13 @@ import {
   RefreshCw,
   X,
   AlertCircle,
-  ArrowLeft,
-  MapPin,
   Check,
   Wrench,
   Home
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import Button from '../../components/ui/Button'
 import { AllCustomersList } from '../../components/technician/AllCustomersList'
 import { InspectionOverviewTab } from '../../components/technician/InspectionOverviewTab'
-import { CustomerStationsModal } from '../../components/technician/CustomerStationsModal'
 import { CollapsibleMapSection } from '../../components/technician/CollapsibleMapSection'
 import { AddStationWizard } from '../../components/technician/AddStationWizard'
 import { RecurringScheduleWizard } from '../../components/technician/RecurringScheduleWizard'
@@ -39,7 +35,6 @@ import { ScheduleInfoPanel } from '../../components/technician/ScheduleInfoPanel
 import { EditScheduleModal } from '../../components/technician/EditScheduleModal'
 import { getRecurringSchedulesByCustomer } from '../../services/recurringScheduleService'
 import type { BatchScheduleUnit } from '../../types/recurringSchedule'
-import { getOutdoorInspectionsByStation } from '../../services/inspectionSessionService'
 import type { OutdoorInspectionWithRelations } from '../../types/inspectionSession'
 import { CasePreparationService } from '../../services/casePreparationService'
 
@@ -80,6 +75,7 @@ export default function TechnicianEquipment() {
   const [allEquipment, setAllEquipment] = useState<EquipmentPlacementWithRelations[]>([])
   const [allCustomers, setAllCustomers] = useState<CustomerStationSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingEquipment, setEditingEquipment] = useState<EquipmentPlacementWithRelations | null>(null)
   const [outdoorInspections, setOutdoorInspections] = useState<OutdoorInspectionWithRelations[]>([])
@@ -87,9 +83,6 @@ export default function TechnicianEquipment() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lightboxImage, setLightboxImage] = useState<string | null>(null)
   const [customers, setCustomers] = useState<Customer[]>([])
-
-  // Modal for kundstationer - nu visar full kundinfo
-  const [selectedCustomerForModal, setSelectedCustomerForModal] = useState<CustomerStationSummary | null>(null)
 
   // Wizard state
   const [isWizardOpen, setIsWizardOpen] = useState(false)
@@ -134,6 +127,9 @@ export default function TechnicianEquipment() {
   const technicianId = profile?.technician_id || ''
 
   const customerParamHandled = useRef(false)
+
+  // Cache för avtalsuppslag per kund (batch-placering, se handleFormSubmit)
+  const resolvedContractCache = useRef<Map<string, string | null>>(new Map())
 
   // Beräkna statistik baserat på teknikerns placeringar
   const stats = useMemo(() => {
@@ -230,11 +226,12 @@ export default function TechnicianEquipment() {
     setIsWizardOpen(true)
   }, [searchParams])
 
-  // Uppdatera utrustning
+  // Uppdatera utrustning i bakgrunden — blankar INTE sidan med spinner,
+  // viktigt mitt i batch-placeringsflödet där refreshData anropas per station
   const refreshData = useCallback(async () => {
     if (!technicianId) return
 
-    setLoading(true)
+    setRefreshing(true)
     try {
       const [equipmentData, customerData] = await Promise.all([
         EquipmentService.getEquipmentByTechnician(technicianId),
@@ -245,7 +242,7 @@ export default function TechnicianEquipment() {
     } catch (error) {
       console.error('Fel vid uppdatering av utrustning:', error)
     } finally {
-      setLoading(false)
+      setRefreshing(false)
     }
   }, [technicianId])
 
@@ -269,25 +266,9 @@ export default function TechnicianEquipment() {
     // För inomhus hanteras det i modalen via IndoorEquipmentView
   }
 
-  // Hantera kundklick i listan - öppna full kundmodal
+  // Hantera kundklick i listan — navigera till kunddetaljsidan
   const handleOpenCustomerDetails = (customer: CustomerStationSummary) => {
-    setSelectedCustomerForModal(customer)
-  }
-
-  // Hantera stationsklick i modal (utomhus öppnar redigeringsformulär, inomhus hanteras i modalen)
-  // Hantera "Lägg till station" från modal
-  const handleAddStationFromModal = (customerId: string, type: 'outdoor' | 'indoor') => {
-    setSelectedCustomerForModal(null)
-    setWizardCustomerId(customerId)
-    setEditingEquipment(null)
-    setPreviewPosition(null)
-    setBatchCount(0)
-    setBatchCustomerName(allCustomers.find(c => c.customer_id === customerId)?.customer_name || '')
-    setShowSuccessState(false)
-    setFormResetKey(0)
-    setLastEquipmentType(null)
-    setLastUsedMap(false)
-    setIsFormOpen(true)
+    navigate(`/technician/equipment/customer/${customer.customer_id}`)
   }
 
   // Hantera ny placering
@@ -331,14 +312,20 @@ export default function TechnicianEquipment() {
         // Multi-kontrakt-refaktor (Fas 8d): auto-resolva contract_id från
         // kundens aktiva kontrakt. Vid >1 avtal väljs det första — admin kan
         // sedan flytta utrustning till rätt avtal via CustomerEquipmentDualView.
-        // Synth-rader (id 'synth-...') sparas inte.
+        // Synth-rader (id 'synth-...') sparas inte. Cachas per kund så
+        // batch-placering inte gör samma avtalsuppslag för varje station.
         let resolvedContractId: string | null = null
-        try {
-          const contracts = await ContractService.getActiveContracts(customerId)
-          const real = contracts.filter(c => !c.id.startsWith('synth-'))
-          resolvedContractId = real[0]?.id ?? null
-        } catch {
-          resolvedContractId = null
+        if (resolvedContractCache.current.has(customerId)) {
+          resolvedContractId = resolvedContractCache.current.get(customerId) ?? null
+        } else {
+          try {
+            const contracts = await ContractService.getActiveContracts(customerId)
+            const real = contracts.filter(c => !c.id.startsWith('synth-'))
+            resolvedContractId = real[0]?.id ?? null
+          } catch {
+            resolvedContractId = null
+          }
+          resolvedContractCache.current.set(customerId, resolvedContractId)
         }
 
         // Skapa ny
@@ -631,12 +618,10 @@ export default function TechnicianEquipment() {
     setSchedulePromptCustomerId(null)
   }
 
-  // Hantera klick på karta för att öppna utrustning
+  // Hantera klick på karta — navigera till kundens detaljsida
   const handleEquipmentClick = (equipment: EquipmentPlacementWithRelations) => {
-    // Öppna kundmodalen med denna kunds stationer
-    const customerSummary = allCustomers.find(c => c.customer_id === equipment.customer_id)
-    if (customerSummary) {
-      setSelectedCustomerForModal(customerSummary)
+    if (equipment.customer_id) {
+      navigate(`/technician/equipment/customer/${equipment.customer_id}`)
     }
   }
 
@@ -658,9 +643,10 @@ export default function TechnicianEquipment() {
             </div>
             <button
               onClick={refreshData}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors w-full sm:w-auto"
+              disabled={refreshing}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-slate-300 hover:text-white transition-colors w-full sm:w-auto disabled:opacity-60"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               Uppdatera
             </button>
           </div>
@@ -746,14 +732,6 @@ export default function TechnicianEquipment() {
             )}
           </div>
         )}
-
-        {/* Kundstationsmodal - visar full kundinformation */}
-        <CustomerStationsModal
-          customer={selectedCustomerForModal}
-          isOpen={!!selectedCustomerForModal}
-          onClose={() => setSelectedCustomerForModal(null)}
-          onAddStation={handleAddStationFromModal}
-        />
 
         {/* Wizard för att lägga till station */}
         <AddStationWizard

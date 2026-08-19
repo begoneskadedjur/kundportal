@@ -91,6 +91,7 @@ import TechnicianCases from './pages/technician/TechnicianCases';
 import TechnicianSchedule from './pages/technician/TechnicianSchedule';
 import StationInspectionModule from './pages/technician/StationInspectionModule';
 import TechnicianEquipment from './pages/technician/TechnicianEquipment';
+import TechnicianCustomerStationsPage from './pages/technician/TechnicianCustomerStationsPage';
 import TechnicianCustomerJourney from './pages/technician/TechnicianCustomerJourney';
 
 // Customer pages
@@ -353,6 +354,7 @@ function App() {
               <Route path="offer-follow-up" element={<Navigate to="/technician/dokumentsignering" replace />} />
               <Route path="min-kundresa" element={<ProtectedRoute requiredRole="technician"><TechnicianCustomerJourney /></ProtectedRoute>} />
               <Route path="equipment" element={<ProtectedRoute requiredRole="technician"><TechnicianEquipment /></ProtectedRoute>} />
+              <Route path="equipment/customer/:customerId" element={<ProtectedRoute requiredRole="technician"><TechnicianCustomerStationsPage /></ProtectedRoute>} />
               <Route path="team-chat" element={<ProtectedRoute requiredRole="technician"><TeamChat /></ProtectedRoute>} />
               <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="technician"><IncidentsPage /></ProtectedRoute>} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="technician"><InternAdministration /></ProtectedRoute>} />

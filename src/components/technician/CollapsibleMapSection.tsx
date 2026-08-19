@@ -1,11 +1,25 @@
 // src/components/technician/CollapsibleMapSection.tsx
 // Kollapsbar kartsektion med statistik
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Map, ChevronDown, ChevronUp, MapPin, Home, Building2, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react'
+import { Map as MapIcon, ChevronDown, MapPin, Home, Building2, CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
-import { EquipmentPlacementWithRelations } from '../../types/database'
+import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG } from '../../types/database'
+
+// Läsbar typetikett för en placering — dynamisk stationstyp först, legacy-fallback sedan
+function equipmentTypeLabel(e: EquipmentPlacementWithRelations): string {
+  return e.station_type_data?.name
+    || EQUIPMENT_TYPE_CONFIG[e.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]?.label
+    || e.equipment_type
+    || 'Okänd typ'
+}
+
+function equipmentTypeColor(e: EquipmentPlacementWithRelations): string {
+  return e.station_type_data?.color
+    || EQUIPMENT_TYPE_CONFIG[e.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]?.color
+    || '#6b7280'
+}
 
 interface CollapsibleMapSectionProps {
   equipment: EquipmentPlacementWithRelations[]
@@ -29,10 +43,55 @@ export function CollapsibleMapSection({
   className = ''
 }: CollapsibleMapSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  const [typeFilter, setTypeFilter] = useState<string | null>(null)
 
   const activeCount = stats.byStatus?.active || 0
   const problematicCount = (stats.byStatus?.damaged || 0) + (stats.byStatus?.missing || 0) + (stats.byStatus?.needs_service || 0)
   const removedCount = stats.byStatus?.removed || 0
+
+  // Stationstyper som förekommer bland placeringarna — för filterchips
+  const typeOptions = useMemo(() => {
+    const map = new Map<string, { label: string; color: string }>()
+    equipment.forEach(e => {
+      const label = equipmentTypeLabel(e)
+      if (!map.has(label)) map.set(label, { label, color: equipmentTypeColor(e) })
+    })
+    return [...map.values()].sort((a, b) => a.label.localeCompare(b.label, 'sv'))
+  }, [equipment])
+
+  const filteredEquipment = useMemo(
+    () => typeFilter ? equipment.filter(e => equipmentTypeLabel(e) === typeFilter) : equipment,
+    [equipment, typeFilter]
+  )
+
+  const filterChips = typeOptions.length > 1 && (
+    <div className="flex items-center gap-1.5 flex-wrap px-3 py-2 bg-slate-900/40 border-b border-slate-700/50">
+      <button
+        onClick={() => setTypeFilter(null)}
+        className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+          typeFilter === null
+            ? 'bg-[#20c58f]/15 text-[#20c58f] border border-[#20c58f]/50'
+            : 'bg-slate-800/70 text-slate-400 border border-slate-700/50 hover:text-white'
+        }`}
+      >
+        Alla ({equipment.length})
+      </button>
+      {typeOptions.map(t => (
+        <button
+          key={t.label}
+          onClick={() => setTypeFilter(typeFilter === t.label ? null : t.label)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+            typeFilter === t.label
+              ? 'bg-[#20c58f]/15 text-[#20c58f] border border-[#20c58f]/50'
+              : 'bg-slate-800/70 text-slate-400 border border-slate-700/50 hover:text-white'
+          }`}
+        >
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: t.color }} />
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
 
   return (
     <div className={`bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 overflow-hidden ${className}`}>
@@ -102,10 +161,11 @@ export function CollapsibleMapSection({
         </div>
 
         {/* Höger: Karta */}
-        <div className="relative">
+        <div className="relative flex flex-col">
+          {filterChips}
           {equipment.length > 0 ? (
             <EquipmentMap
-              equipment={equipment}
+              equipment={filteredEquipment}
               onEquipmentClick={onEquipmentClick}
               height="300px"
               showControls={true}
@@ -115,7 +175,7 @@ export function CollapsibleMapSection({
           ) : (
             <div className="h-[300px] flex items-center justify-center bg-slate-900/30">
               <div className="text-center">
-                <Map className="w-12 h-12 text-slate-600 mx-auto mb-2" />
+                <MapIcon className="w-12 h-12 text-slate-600 mx-auto mb-2" />
                 <p className="text-slate-500 text-sm">Inga utomhusstationer att visa</p>
               </div>
             </div>
@@ -132,7 +192,7 @@ export function CollapsibleMapSection({
         >
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center">
-              <Map className="w-4 h-4 text-blue-400" />
+              <MapIcon className="w-4 h-4 text-blue-400" />
             </div>
             <div className="text-left">
               <span className="font-medium text-white">Kartvy</span>
@@ -175,9 +235,10 @@ export function CollapsibleMapSection({
 
               {/* Karta */}
               <div className="border-t border-slate-700/50">
+                {filterChips}
                 {equipment.length > 0 ? (
                   <EquipmentMap
-                    equipment={equipment}
+                    equipment={filteredEquipment}
                     onEquipmentClick={onEquipmentClick}
                     height="200px"
                     showControls={false}
@@ -187,7 +248,7 @@ export function CollapsibleMapSection({
                 ) : (
                   <div className="h-[200px] flex items-center justify-center bg-slate-900/30">
                     <div className="text-center">
-                      <Map className="w-10 h-10 text-slate-600 mx-auto mb-2" />
+                      <MapIcon className="w-10 h-10 text-slate-600 mx-auto mb-2" />
                       <p className="text-slate-500 text-sm">Inga stationer att visa</p>
                     </div>
                   </div>

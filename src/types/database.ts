@@ -1838,6 +1838,9 @@ export interface EquipmentPlacement {
   status_updated_by: string | null
   comment: string | null
   photo_path: string | null
+  // Koppling till station_types — sätts vid skapande via kod-/namnmatchning
+  // på equipment_type; null på äldre rader (läsvägarna har legacy-fallback)
+  station_type_id?: string | null
   created_at: string
   updated_at: string
 }

@@ -66,52 +66,83 @@ export class IndoorStationService {
       // Skapa map för snabb lookup på code
       const typesByCode = new Map(allStationTypes?.map(t => [t.code, t]) || [])
 
-      // Lägg till signerade URLs, senaste inspektion och mätning
-      const stationsWithExtras = await Promise.all(
-        (data || []).map(async (station) => {
-          // Hämta senaste inspektion
-          const { data: inspections } = await supabase
-            .from('indoor_station_inspections')
-            .select('*')
-            .eq('station_id', station.id)
-            .order('inspected_at', { ascending: false })
-            .limit(1)
+      // Batcha inspektioner, mätningar och foto-URL:er i ett fåtal frågor
+      // i stället för 3-4 frågor PER station (N+1)
+      const stationIds = (data || []).map(s => s.id)
 
-          // Räkna antal inspektioner
-          const { count } = await supabase
-            .from('indoor_station_inspections')
-            .select('*', { count: 'exact', head: true })
-            .eq('station_id', station.id)
+      const [inspectionsRes, measurementsRes] = stationIds.length > 0
+        ? await Promise.all([
+            supabase
+              .from('indoor_station_inspections')
+              .select('*')
+              .in('station_id', stationIds)
+              .order('inspected_at', { ascending: false }),
+            supabase
+              .from('station_measurements')
+              .select('id, value, measured_at, indoor_station_id')
+              .in('indoor_station_id', stationIds)
+              .order('measured_at', { ascending: false })
+          ])
+        : [{ data: [] }, { data: [] }]
 
-          // Hämta senaste mätning
-          const { data: measurements } = await supabase
-            .from('station_measurements')
-            .select('id, value, measured_at')
-            .eq('indoor_station_id', station.id)
-            .order('measured_at', { ascending: false })
-            .limit(1)
+      // Gruppera per station — listorna är sorterade fallande,
+      // så första förekomsten per station är den senaste
+      const latestInspectionByStation = new Map<string, IndoorStationInspection>()
+      const inspectionCountByStation = new Map<string, number>()
+      for (const insp of (inspectionsRes.data || []) as IndoorStationInspection[]) {
+        if (!latestInspectionByStation.has(insp.station_id)) {
+          latestInspectionByStation.set(insp.station_id, insp)
+        }
+        inspectionCountByStation.set(insp.station_id, (inspectionCountByStation.get(insp.station_id) || 0) + 1)
+      }
 
-          // Fallback: Om station_type_data saknas, matcha station_type mot station_types.code
-          let stationTypeData = station.station_type_data
-          if (!stationTypeData && station.station_type) {
-            const matchedType = typesByCode.get(station.station_type)
-            if (matchedType) {
-              stationTypeData = matchedType
-            }
+      type MeasurementRow = { id: string; value: number | null; measured_at: string; indoor_station_id: string }
+      const latestMeasurementByStation = new Map<string, MeasurementRow>()
+      for (const m of (measurementsRes.data || []) as MeasurementRow[]) {
+        if (!latestMeasurementByStation.has(m.indoor_station_id)) {
+          latestMeasurementByStation.set(m.indoor_station_id, m)
+        }
+      }
+
+      // Signerade foto-URL:er i batch, grupperat per bucket (samma
+      // bucket-logik som getStationPhotoUrl)
+      const photoUrlByPath = new Map<string, string>()
+      const photoPaths = (data || []).map(s => s.photo_path).filter(Boolean) as string[]
+      if (photoPaths.length > 0) {
+        const byBucket = new Map<string, string[]>()
+        for (const p of photoPaths) {
+          const bucket = (p.startsWith('indoor/') || p.startsWith('outdoor/'))
+            ? 'inspection-photos'
+            : INDOOR_STATION_PHOTOS_BUCKET
+          byBucket.set(bucket, [...(byBucket.get(bucket) || []), p])
+        }
+        await Promise.all([...byBucket.entries()].map(async ([bucket, paths]) => {
+          const { data: signed } = await supabase.storage.from(bucket).createSignedUrls(paths, 3600)
+          signed?.forEach(s => {
+            if (s.signedUrl && s.path) photoUrlByPath.set(s.path, s.signedUrl)
+          })
+        }))
+      }
+
+      const stationsWithExtras = (data || []).map(station => {
+        // Fallback: Om station_type_data saknas, matcha station_type mot station_types.code
+        let stationTypeData = station.station_type_data
+        if (!stationTypeData && station.station_type) {
+          const matchedType = typesByCode.get(station.station_type)
+          if (matchedType) {
+            stationTypeData = matchedType
           }
+        }
 
-          return {
-            ...station,
-            station_type_data: stationTypeData,
-            latest_inspection: inspections?.[0] || null,
-            inspection_count: count || 0,
-            latest_measurement: measurements?.[0] || null,
-            photo_url: station.photo_path
-              ? await this.getStationPhotoUrl(station.photo_path)
-              : undefined
-          }
-        })
-      )
+        return {
+          ...station,
+          station_type_data: stationTypeData,
+          latest_inspection: latestInspectionByStation.get(station.id) || null,
+          inspection_count: inspectionCountByStation.get(station.id) || 0,
+          latest_measurement: latestMeasurementByStation.get(station.id) || null,
+          photo_url: station.photo_path ? photoUrlByPath.get(station.photo_path) : undefined
+        }
+      })
 
       console.log('Stationer hämtade:', stationsWithExtras.length)
       return stationsWithExtras
