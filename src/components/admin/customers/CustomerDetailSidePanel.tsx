@@ -3,6 +3,7 @@
 // Ersätter expand-i-rad-mönstret. Query-logik lyft ur ExpandedCustomerRow i Customers.tsx.
 
 import React, { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   X, Building2, Mail, Phone, User, MapPin, Users as UsersIcon,
   Edit3, TrendingUp, RefreshCw, XCircle, Receipt, ExternalLink,
@@ -153,8 +154,18 @@ export default function CustomerDetailSidePanel({
   const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
   const [loadingContract, setLoadingContract] = useState(false)
 
+  const navigate = useNavigate()
+  const location = useLocation()
+  // Panelen renderas från /admin, /koordinator och /saljare — behåll rollprefixet
+  const recordBasePath = location.pathname.includes('/befintliga-kunder')
+    ? `${location.pathname.split('/befintliga-kunder')[0]}/befintliga-kunder`
+    : '/admin/befintliga-kunder'
   const primarySite = organization?.sites?.[0]
   const isMultisite = organization?.organizationType === 'multisite'
+  // Kanoniska kundsidan: multisite → huvudkontorets kundrad, annars primärraden
+  const recordCustomerId = isMultisite
+    ? (organization?.sites?.find((s) => s.site_type === 'huvudkontor')?.id ?? primarySite?.id)
+    : primarySite?.id
 
   // Multi-kontrakt-refaktor (Fas 9): valt avtal i sidopanelen. Synth-rader
   // (id 'synth-*') filtreras bort — de finns inte i DB och ger inget värde
@@ -364,6 +375,19 @@ export default function CustomerDetailSidePanel({
               )}
             </div>
           </div>
+          {recordCustomerId && (
+            <button
+              onClick={() => {
+                onClose()
+                navigate(`${recordBasePath}/${recordCustomerId}`)
+              }}
+              className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs text-slate-400 hover:text-[#20c58f] hover:bg-slate-800 transition-colors shrink-0"
+              title="Öppna kundens fullständiga sida"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              Öppna som sida
+            </button>
+          )}
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"

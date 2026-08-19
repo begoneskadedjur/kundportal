@@ -27,6 +27,7 @@ import SäljareLayout from './components/saljare/layout/SäljareLayout';
 import SäljareDashboard from './pages/saljare/SäljareDashboard';
 import Customers from './pages/admin/Customers';
 import CustomerDetails from './pages/admin/CustomerDetails';
+import CustomerRecordPage from './pages/admin/CustomerRecordPage';
 import Economics from './pages/admin/Economics';
 import Technicians from './pages/admin/Technicians';
 import TechnicianManagement from './pages/admin/TechnicianManagement';
@@ -148,7 +149,7 @@ function App() {
               <Route path="dashboard" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
               <Route path="dashboard-demo" element={<ProtectedRoute requiredRole="admin"><DashboardDemo /></ProtectedRoute>} />
               <Route path="befintliga-kunder" element={<ProtectedRoute requiredRole="admin"><Customers /></ProtectedRoute>} />
-              <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="admin"><CustomerDetails /></ProtectedRoute>} />
+              <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="admin"><CustomerRecordPage /></ProtectedRoute>} />
               <Route path="egenkontroll" element={<ProtectedRoute requiredRole="admin"><EgenkontrollPage /></ProtectedRoute>} />
               <Route path="rondering-schema" element={<ProtectedRoute requiredRole="admin"><RonderingSchedulePage /></ProtectedRoute>} />
               <Route path="kundprognos" element={<ProtectedRoute requiredRole="admin"><CustomerAnalytics /></ProtectedRoute>} />
@@ -243,7 +244,7 @@ function App() {
 
               {/* Kunder & Avtal */}
               <Route path="befintliga-kunder" element={<ProtectedRoute requiredRole="koordinator"><Customers /></ProtectedRoute>} />
-              <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="koordinator"><CustomerDetails /></ProtectedRoute>} />
+              <Route path="befintliga-kunder/:id" element={<ProtectedRoute requiredRole="koordinator"><CustomerRecordPage /></ProtectedRoute>} />
               <Route path="trafikljusoversikt" element={<AdminOrKoordinatorRoute><TrafficLightOverview /></AdminOrKoordinatorRoute>} />
               <Route path="kundprognos" element={<ProtectedRoute requiredRole="koordinator"><CustomerAnalytics /></ProtectedRoute>} />
               <Route path="manadsrapport" element={<ProtectedRoute requiredRole="koordinator"><MonthlyReport /></ProtectedRoute>} />
