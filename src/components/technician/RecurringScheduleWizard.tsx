@@ -138,9 +138,15 @@ export function RecurringScheduleWizard({
   const isBatch = !!batchUnits && batchUnits.length > 1
 
   // Step 1: Start date
-  const [startDate, setStartDate] = useState<Date>(
-    contractStartDate ? new Date(contractStartDate) : new Date()
-  )
+  // Starta aldrig i det förflutna: avtalsstart används bara om den ligger
+  // framåt i tiden (nytecknat avtal), annars idag — man lägger scheman i
+  // efterhand för löpande avtal och ska inte behöva bläddra fram flera år.
+  const [startDate, setStartDate] = useState<Date>(() => {
+    const today = new Date()
+    if (!contractStartDate) return today
+    const start = new Date(contractStartDate)
+    return start > today ? start : today
+  })
 
   // Step 2: Duration (single-unit mode)
   const [durationMinutes, setDurationMinutes] = useState(60)
