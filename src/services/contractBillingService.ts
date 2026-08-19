@@ -113,6 +113,19 @@ export class ContractBillingService {
     const adjustmentPercent = customer?.price_adjustment_percent ?? 0
     const hasAdjustment = adjustmentPercent !== 0
 
+    // Etapp 5: koppla raderna till kundradens avtal när det är entydigt.
+    // Exakt ett avtal (signed/active eller importerat trashed) => contract_id,
+    // vid 0 eller >1 => null. Fel här får inte stoppa genereringen.
+    let resolvedContractId: string | null = null
+    const { data: contractRows } = await supabase
+      .from('contracts')
+      .select('id')
+      .eq('customer_id', customerId)
+      .or("status.in.(signed,active),and(status.eq.trashed,template_id.eq.imported)")
+    if (contractRows?.length === 1) {
+      resolvedContractId = contractRows[0].id
+    }
+
     // Artiklar lagras med årsbelopp — skala till rätt period
     const FREQ_DIVISOR: Record<BillingFrequency, number> = {
       monthly: 12, quarterly: 4, semi_annual: 2, annual: 1, on_demand: 1
@@ -135,6 +148,7 @@ export class ContractBillingService {
 
         return {
           customer_id: customerId,
+          contract_id: resolvedContractId,
           billing_period_start: periodStart,
           billing_period_end: periodEnd,
           article_id: ca.article_id,
@@ -178,6 +192,7 @@ export class ContractBillingService {
 
         return {
           customer_id: customerId,
+          contract_id: resolvedContractId,
           billing_period_start: periodStart,
           billing_period_end: periodEnd,
           article_id: item.article?.id || null,

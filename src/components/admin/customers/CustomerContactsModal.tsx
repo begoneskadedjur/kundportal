@@ -186,16 +186,18 @@ export default function CustomerContactsModal({
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999] p-4">
       <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-4 py-3 border-b border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#20c58f]/10 rounded-full flex items-center justify-center">
-              <Users className="w-4 h-4 text-[#20c58f]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold text-white truncate">Kontaktpersoner</h2>
-              <p className="text-slate-400 text-xs truncate">{customerName} — {contacts.length} kontakter</p>
-            </div>
+        <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-slate-700">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-white truncate">Kontaktpersoner</h2>
+            <p className="text-slate-400 text-xs truncate mt-0.5">{customerName} — {contacts.length} kontakter</p>
           </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors shrink-0"
+            aria-label="Stäng"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Body */}
@@ -280,7 +282,7 @@ export default function CustomerContactsModal({
               </div>
 
               <div className="flex justify-end gap-2 pt-2 border-t border-slate-700/50">
-                <Button variant="secondary" onClick={resetForm} disabled={saving}>
+                <Button variant="outline" onClick={resetForm} disabled={saving}>
                   Avbryt
                 </Button>
                 <Button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5">
@@ -349,7 +351,7 @@ export default function CustomerContactsModal({
 
         {/* Footer */}
         <div className="px-4 py-2.5 border-t border-slate-700/50 flex items-center justify-end">
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Stäng
           </Button>
         </div>
@@ -379,7 +381,7 @@ function ContactRow({
         </div>
         <div className="flex items-center gap-3 mt-0.5">
           {contact.responsibility_area && (
-            <span className="text-xs px-1.5 py-0.5 bg-[#20c58f]/10 text-[#20c58f] rounded">
+            <span className="text-xs px-1.5 py-0.5 text-slate-400 border border-slate-700 rounded">
               {contact.responsibility_area}
             </span>
           )}

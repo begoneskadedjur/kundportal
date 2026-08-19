@@ -106,6 +106,8 @@ export interface ContractBillingBatch {
 
 export interface CreateBillingItemInput {
   customer_id: string
+  /** Etapp 5: koppling till kundradens avtal (null när kopplingen inte är entydig) */
+  contract_id?: string | null
   billing_period_start: string
   billing_period_end: string
   article_id?: string | null

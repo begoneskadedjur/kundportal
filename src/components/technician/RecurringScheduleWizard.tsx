@@ -18,7 +18,7 @@ import { supabase } from '../../lib/supabase'
 import {
   previewScheduleDates,
   createScheduleWithSessions,
-  resolveContractEndDate
+  resolveScheduleHorizon
 } from '../../services/recurringScheduleService'
 import type {
   RecurringFrequency,
@@ -112,24 +112,25 @@ export function RecurringScheduleWizard({
   const { profile } = useAuth()
   const [step, setStep] = useState<WizardStep>(1)
 
-  // Avtalsslutdatum med arv från huvudkontoret. Om proppen saknas (t.ex. enhet
-  // utan eget datum, eller anropare som inte skickar med det) slår vi upp
-  // kundens/huvudkontorets datum innan felvyn visas. null = fortfarande laddar.
-  const [resolvedEndDate, setResolvedEndDate] = useState<string | null | undefined>(contractEndDate)
-  // Starta i "löser upp"-läge om proppen saknas, så felvyn inte blinkar till
-  // innan uppslaget hunnit köra.
-  const [resolvingEndDate, setResolvingEndDate] = useState(!contractEndDate)
+  // Schemahorisont med arv från huvudkontoret OCH rullande periodskifte:
+  // ett passerat avtalsslutdatum rullas fram i hela år till nästa brytpunkt
+  // (avtal löper tills de sägs upp). horizonRolled = true betyder att datumet
+  // är en framrullad brytpunkt, inte ett faktiskt avtalsslut.
+  const [resolvedEndDate, setResolvedEndDate] = useState<string | null | undefined>(undefined)
+  const [resolvingEndDate, setResolvingEndDate] = useState(true)
+  const [horizonRolled, setHorizonRolled] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    if (contractEndDate) {
-      setResolvedEndDate(contractEndDate)
-      return
-    }
     if (!isOpen || !customerId) return
     setResolvingEndDate(true)
-    resolveContractEndDate(customerId, contractEndDate)
-      .then(resolved => { if (!cancelled) setResolvedEndDate(resolved) })
+    resolveScheduleHorizon(customerId, contractEndDate)
+      .then(({ endDate, rolled }) => {
+        if (!cancelled) {
+          setResolvedEndDate(endDate)
+          setHorizonRolled(rolled)
+        }
+      })
       .finally(() => { if (!cancelled) setResolvingEndDate(false) })
     return () => { cancelled = true }
   }, [customerId, contractEndDate, isOpen])
@@ -137,9 +138,15 @@ export function RecurringScheduleWizard({
   const isBatch = !!batchUnits && batchUnits.length > 1
 
   // Step 1: Start date
-  const [startDate, setStartDate] = useState<Date>(
-    contractStartDate ? new Date(contractStartDate) : new Date()
-  )
+  // Starta aldrig i det förflutna: avtalsstart används bara om den ligger
+  // framåt i tiden (nytecknat avtal), annars idag — man lägger scheman i
+  // efterhand för löpande avtal och ska inte behöva bläddra fram flera år.
+  const [startDate, setStartDate] = useState<Date>(() => {
+    const today = new Date()
+    if (!contractStartDate) return today
+    const start = new Date(contractStartDate)
+    return start > today ? start : today
+  })
 
   // Step 2: Duration (single-unit mode)
   const [durationMinutes, setDurationMinutes] = useState(60)
@@ -520,8 +527,8 @@ export function RecurringScheduleWizard({
             <div>
               <h3 className="text-base font-semibold text-white mb-1">Avtalsslutdatum saknas</h3>
               <p className="text-sm text-slate-400">
-                Kunden <span className="text-white font-medium">{customerName}</span> saknar ett registrerat avtalsslutdatum.
-                Ange detta i kundkortet innan återkommande kontroller kan schemaläggas.
+                Kunden <span className="text-white font-medium">{customerName}</span> saknar både avtalsslut- och startdatum,
+                så ingen schemahorisont kan beräknas. Ange avtalsdatum i kundkortet först.
               </p>
             </div>
           </div>
@@ -611,6 +618,13 @@ export function RecurringScheduleWizard({
                     <p className="text-xs text-slate-500 text-center">
                       Första kontroll: {format(startDate, 'EEEE d MMMM yyyy', { locale: sv })}
                     </p>
+                    {horizonRolled && resolvedEndDate && (
+                      <p className="text-xs text-slate-500 text-center">
+                        Fortlöpande avtal — kontroller planeras till nästa periodskifte{' '}
+                        <span className="text-slate-300">{format(new Date(resolvedEndDate), 'd MMM yyyy', { locale: sv })}</span>,
+                        därefter förlängs schemat automatiskt.
+                      </p>
+                    )}
                   </div>
                 )}
 

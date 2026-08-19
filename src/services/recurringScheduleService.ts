@@ -64,6 +64,60 @@ export async function resolveContractEndDate(
   return parent.contract_end_date ?? null
 }
 
+/**
+ * Rullande schemahorisont. Avtal löper tills de sägs upp och förlängs
+ * automatiskt vid periodskifte (generate-continuing-contracts-cronen) — ett
+ * passerat contract_end_date betyder alltså inte att schemat ska ta slut,
+ * utan att nästa brytpunkt ligger ett helt antal år framåt. Uppsagda avtal
+ * rullas aldrig. Saknas slutdatum helt (tillsvidare) används avtalsstartens
+ * nästa årsdag som brytpunkt.
+ */
+export async function resolveScheduleHorizon(
+  customerId: string,
+  ownEndDate?: string | null
+): Promise<{ endDate: string | null; rolled: boolean }> {
+  const { data: customer } = await supabase
+    .from('customers')
+    .select('contract_end_date, contract_start_date, terminated_at, parent_customer_id')
+    .eq('id', customerId)
+    .single()
+
+  let endDate = ownEndDate ?? customer?.contract_end_date ?? null
+  let startDate = customer?.contract_start_date ?? null
+  let terminated = !!customer?.terminated_at
+
+  if (customer?.parent_customer_id) {
+    const { data: parent } = await supabase
+      .from('customers')
+      .select('contract_end_date, contract_start_date, terminated_at')
+      .eq('id', customer.parent_customer_id)
+      .single()
+    if (parent) {
+      endDate = endDate ?? parent.contract_end_date ?? null
+      startDate = startDate ?? parent.contract_start_date ?? null
+      terminated = terminated || !!parent.terminated_at
+    }
+  }
+
+  if (terminated) return { endDate, rolled: false }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const roll = (iso: string) => {
+    const d = new Date(iso + 'T12:00:00')
+    let rolled = false
+    while (d <= today) {
+      d.setFullYear(d.getFullYear() + 1)
+      rolled = true
+    }
+    return { endDate: format(d, 'yyyy-MM-dd'), rolled }
+  }
+
+  if (endDate) return roll(endDate)
+  if (startDate) return { ...roll(startDate), rolled: true }
+  return { endDate: null, rolled: false }
+}
+
 // ============================================
 // CRUD OPERATIONS
 // ============================================

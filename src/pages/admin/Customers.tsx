@@ -1,344 +1,72 @@
-// src/pages/admin/Customers.tsx - Success Management Dashboard för kundhantering
+// src/pages/admin/Customers.tsx — Befintliga kunder (etapp 3 av redesignen)
+// CRM-lista à la Attio/Linear: portföljrad i text (inga KPI-kort), grupperade
+// sektioner med räknare i whisper headers, ny radanatomi med Fortnox-statuspunkt
+// och peek-panel (?peek=<id>) som återanvänder record-innehållet från kundsidan.
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import {
-  Search, Filter, RefreshCw, ChevronDown, ChevronUp, ChevronRight,
-  Mail, Phone, Building2, User, Calendar, Coins,
-  AlertTriangle, Activity, Send, Edit3, Users, FilePlus,
-  ExternalLink, MoreVertical, TrendingUp, Receipt, XCircle, FileText
+  Search, Filter, RefreshCw, ChevronDown, ChevronRight,
+  Building2, AlertTriangle, Activity, Send, Edit3, FilePlus, FileText
 } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import CustomerKpiCards from '../../components/admin/customers/CustomerKpiCards'
 import CustomerRevenueModal from '../../components/admin/customers/CustomerRevenueModal'
 import EmailCampaignModal from '../../components/admin/customers/EmailCampaignModal'
 import EditCustomerModal from '../../components/admin/customers/EditCustomerModal'
-import RenewalWorkflowModal from '../../components/admin/customers/RenewalWorkflowModal'
 import TerminateContractModal from '../../components/admin/customers/TerminateContractModal'
 import AddContractCustomerModal from '../../components/admin/customers/AddContractCustomerModal'
 import CreateCustomerManuallyModal from '../../components/admin/customers/CreateCustomerManuallyModal'
 import AddXpertContractCustomerModal from '../../components/admin/customers/AddXpertContractCustomerModal'
 import ImportCustomerByPdfModal from '../../components/admin/customers/ImportCustomerByPdfModal'
 import ImportCustomerByOrgnrModal from '../../components/admin/customers/ImportCustomerByOrgnrModal'
-import TooltipWrapper from '../../components/ui/TooltipWrapper'
-import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
-import { useConsolidatedCustomers, type ContactSummary } from '../../hooks/useConsolidatedCustomers'
-import ExpandableOrganizationRow from '../../components/admin/customers/ExpandableOrganizationRow'
-import ColumnSelector, { useColumnVisibility } from '../../components/admin/customers/ColumnSelector'
-import SiteDetailRow from '../../components/admin/customers/SiteDetailRow'
-import MultisiteExpandedTabs from '../../components/admin/customers/MultisiteExpandedTabs'
-import Select from '../../components/ui/Select'
-import MultiSiteCustomerDetailModal from '../../components/admin/customers/MultiSiteCustomerDetailModal'
-import SingleCustomerDetailModal from '../../components/admin/customers/SingleCustomerDetailModal'
 import BillingSettingsModal from '../../components/admin/customers/BillingSettingsModal'
 import CustomerContactsModal from '../../components/admin/customers/CustomerContactsModal'
-import CustomerDetailSidePanel from '../../components/admin/customers/CustomerDetailSidePanel'
-import { 
-  formatCurrency, 
-  formatContractPeriod,
-  getContractProgress 
-} from '../../utils/customerMetrics'
-import { supabase, getAuthHeaders } from '../../lib/supabase'
+import CustomerPeekPanel from '../../components/admin/customers/CustomerPeekPanel'
+import CustomerListRow, { resolveFortnoxInfo } from '../../components/admin/customers/CustomerListRow'
+import Select from '../../components/ui/Select'
+import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
+import { useConsolidatedCustomers, type ConsolidatedCustomer } from '../../hooks/useConsolidatedCustomers'
 import toast from 'react-hot-toast'
-import { PriceListService } from '../../services/priceListService'
-import type { PriceList, PriceListItemWithArticle } from '../../types/articles'
-import { ImportedCustomerContractService } from '../../services/importedCustomerContractService'
-import { CaseBillingService } from '../../services/caseBillingService'
-import { PricingSettingsService } from '../../services/pricingSettingsService'
-import type { CaseBillingItemWithRelations, CaseServiceSummary } from '../../types/caseBilling'
-import type { PricingSettings } from '../../types/pricingSettings'
 
-const getMarginColor = (marginPercent: number, settings: PricingSettings): string => {
-  if (marginPercent >= settings.target_margin_percent) return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-  if (marginPercent >= settings.min_margin_percent) return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-  return 'bg-red-500/20 text-red-400 border border-red-500/30'
+// "Kräver åtgärd": uppsagd med slutdatum inom 90 dgr. Avtal förlängs automatiskt
+// vid periodskifte (generate-continuing-contracts-cronen), så ett kommande
+// periodskifte är INTE en åtgärd — det får en egen grupp.
+function requiresAction(c: ConsolidatedCustomer): boolean {
+  if (c.isTerminated) {
+    if (!c.effectiveEndDate) return false
+    const days = Math.ceil((new Date(c.effectiveEndDate).getTime() - Date.now()) / 86_400_000)
+    return days >= 0 && days <= 90
+  }
+  return false
 }
 
-// Expanded row component för att visa mer detaljer
-const ExpandedCustomerRow = ({ customer, colSpan = 10, contacts = [] }: { customer: any; colSpan?: number; contacts?: ContactSummary[] }) => {
-  const [priceListData, setPriceListData] = useState<{
-    priceList: PriceList | null
-    items: PriceListItemWithArticle[]
-  }>({ priceList: null, items: [] })
-  const [loadingPriceList, setLoadingPriceList] = useState(false)
-  const [contractData, setContractData] = useState<{
-    services: CaseBillingItemWithRelations[]
-    articles: CaseBillingItemWithRelations[]
-    summary: CaseServiceSummary | null
-  }>({ services: [], articles: [], summary: null })
-  const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
-  const [loadingContract, setLoadingContract] = useState(false)
-
-  useEffect(() => {
-    const fetchPriceList = async () => {
-      if (!customer.price_list_id) return
-      setLoadingPriceList(true)
-      try {
-        const [pl, items] = await Promise.all([
-          PriceListService.getPriceListById(customer.price_list_id),
-          PriceListService.getPriceListItems(customer.price_list_id)
-        ])
-        setPriceListData({ priceList: pl, items })
-      } catch (err) {
-        console.error('Error fetching price list:', err)
-      } finally {
-        setLoadingPriceList(false)
-      }
-    }
-    fetchPriceList()
-  }, [customer.price_list_id])
-
-  useEffect(() => {
-    const fetchContract = async () => {
-      if (!customer.id) return
-      setLoadingContract(true)
-      try {
-        const [contractId, settings] = await Promise.all([
-          ImportedCustomerContractService.findContract(customer.id),
-          PricingSettingsService.get()
-        ])
-        setPricingSettings(settings)
-        if (!contractId) {
-          setContractData({ services: [], articles: [], summary: null })
-          return
-        }
-        const [{ services, articles }, summary] = await Promise.all([
-          ImportedCustomerContractService.getItems(contractId),
-          CaseBillingService.getCaseServiceSummary(contractId, 'contract', settings.min_margin_percent)
-        ])
-        setContractData({ services, articles, summary })
-      } catch (err) {
-        console.error('Error fetching contract:', err)
-        setContractData({ services: [], articles: [], summary: null })
-      } finally {
-        setLoadingContract(false)
-      }
-    }
-    fetchContract()
-  }, [customer.id])
-
-  return (
-    <tr>
-      <td colSpan={colSpan} className="px-4 py-4 bg-slate-800/30">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Kontaktinformation */}
-          <div>
-            <h4 className="text-sm font-medium text-slate-300 mb-3">Kontaktinformation</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-slate-500" />
-                <span className="text-slate-400">Kontaktperson:</span>
-                <span className="text-white">{customer.contact_person || 'Ej angiven'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-slate-500" />
-                <span className="text-slate-400">E-post:</span>
-                <a href={`mailto:${customer.contact_email}`} className="text-blue-400 hover:text-blue-300">
-                  {customer.contact_email}
-                </a>
-              </div>
-              {customer.billing_email && customer.billing_email !== customer.contact_email && (
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-yellow-400" />
-                  <span className="text-slate-400">Faktura:</span>
-                  <a href={`mailto:${customer.billing_email}`} className="text-yellow-400 hover:text-yellow-300">
-                    {customer.billing_email}
-                  </a>
-                </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-slate-500" />
-                <span className="text-slate-400">Telefon:</span>
-                <a href={`tel:${customer.contact_phone}`} className="text-blue-400 hover:text-blue-300">
-                  {customer.contact_phone || 'Ej angivet'}
-                </a>
-              </div>
-              <div className="flex items-center gap-2">
-                <Building2 className="w-4 h-4 text-slate-500" />
-                <span className="text-slate-400">Adress:</span>
-                <span className="text-white">{customer.contact_address || 'Ej angiven'}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Avtalsinnehåll (tjänster från fakturainställningar) + Prislista för extra-tjänster */}
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-sm font-medium text-slate-300">Avtalsinnehåll</h4>
-                {contractData.summary?.margin_percent != null && pricingSettings && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${getMarginColor(
-                    contractData.summary.margin_percent,
-                    pricingSettings
-                  )}`}>
-                    {contractData.summary.margin_percent.toFixed(1)}% marginal
-                  </span>
-                )}
-              </div>
-              {loadingContract ? (
-                <p className="text-xs text-slate-500">Laddar...</p>
-              ) : (
-                <>
-                  {contractData.services.length > 0 ? (
-                    <div className="space-y-1 mb-3 max-h-32 overflow-y-auto">
-                      {contractData.services.map(item => (
-                        <div key={item.id} className="flex items-center justify-between text-xs py-1">
-                          <span className="text-slate-200">
-                            {item.quantity > 1 && (
-                              <span className="text-slate-500 mr-1">{item.quantity}×</span>
-                            )}
-                            {item.service_name || item.article_name}
-                          </span>
-                          <span className="text-slate-400 font-mono">
-                            {new Intl.NumberFormat('sv-SE').format(item.total_price)} kr
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-500 mb-3">Inget avtalsinnehåll registrerat</p>
-                  )}
-
-                  {contractData.articles.length > 0 && (
-                    <div className="pt-2 border-t border-slate-700/50">
-                      <div className="flex items-center justify-between text-xs font-medium text-slate-400 mb-1">
-                        <span>Interna kostnader ({contractData.articles.length})</span>
-                        <span className="font-mono">
-                          {new Intl.NumberFormat('sv-SE').format(contractData.summary?.articles.total_purchase_cost ?? 0)} kr
-                        </span>
-                      </div>
-                      <div className="space-y-0.5 max-h-24 overflow-y-auto">
-                        {contractData.articles.map(item => (
-                          <div key={item.id} className="flex items-center justify-between text-xs text-slate-500 py-0.5">
-                            <span className="truncate">
-                              {item.quantity > 1 && <span className="mr-1">{item.quantity}×</span>}
-                              {item.article_name}
-                            </span>
-                            <span className="font-mono shrink-0 ml-2">
-                              {new Intl.NumberFormat('sv-SE').format(item.total_price)} kr
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div>
-              <h4 className="text-xs font-medium text-slate-400 mb-2">Prislista för extra-tjänster</h4>
-              {loadingPriceList ? (
-                <p className="text-xs text-slate-500">Laddar...</p>
-              ) : priceListData.priceList ? (
-                <div>
-                  <div className="text-xs text-purple-400 mb-1 font-medium">
-                    {priceListData.priceList.name}
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    {priceListData.items.length > 0
-                      ? `${priceListData.items.length} specialpris för merförsäljning`
-                      : 'Ingen merförsäljning i prislistan'}
-                  </p>
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500">Ingen prislista tilldelad (standardpriser gäller)</p>
-              )}
-            </div>
-          </div>
-
-          {/* Health Score Breakdown */}
-          <div>
-            <h4 className="text-sm font-medium text-slate-300 mb-3">Health Score Breakdown</h4>
-            <div className="space-y-2">
-              {Object.entries(customer.healthScore.breakdown).map(([key, data]: [string, any]) => (
-                <div key={key} className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}:
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-white font-medium">{data.score}/100</span>
-                    <div className="w-20 h-2 bg-slate-700 rounded-full overflow-hidden">
-                      <div 
-                        className={`h-full transition-all ${
-                          data.score >= 80 ? 'bg-green-500' :
-                          data.score >= 60 ? 'bg-yellow-500' :
-                          'bg-red-500'
-                        }`}
-                        style={{ width: `${data.score}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Registrerade kontaktpersoner */}
-        {contacts.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-slate-700/50">
-            <h4 className="text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
-              <Users className="w-4 h-4 text-slate-400" />
-              Registrerade kontaktpersoner ({contacts.length})
-            </h4>
-            <div className="max-h-[200px] overflow-y-auto space-y-1">
-              {contacts.map((contact, i) => (
-                <div key={i} className="flex items-center gap-3 px-3 py-1.5 rounded-lg hover:bg-slate-800/40 transition-colors text-sm">
-                  <div className="min-w-0 flex items-center gap-2 flex-1">
-                    <span className="font-medium text-slate-200 truncate">{contact.name}</span>
-                    {contact.title && (
-                      <span className="text-xs text-slate-500 truncate hidden sm:inline">{contact.title}</span>
-                    )}
-                    {contact.responsibility_area && (
-                      <span className="text-xs text-[#20c58f] bg-[#20c58f]/10 px-1.5 py-0.5 rounded shrink-0">{contact.responsibility_area}</span>
-                    )}
-                  </div>
-                  <div className="hidden md:flex items-center gap-3 text-xs text-slate-400 shrink-0">
-                    {contact.phone && <span>{contact.phone}</span>}
-                    {contact.email && <span className="truncate max-w-[180px]">{contact.email}</span>}
-                  </div>
-                  <div className="flex items-center gap-0.5 shrink-0">
-                    {contact.phone && (
-                      <a href={`tel:${contact.phone}`} className="p-1 text-slate-500 hover:text-[#20c58f] transition-colors" title={`Ring ${contact.name}: ${contact.phone}`}>
-                        <Phone className="w-3.5 h-3.5" />
-                      </a>
-                    )}
-                    {contact.email && (
-                      <a href={`mailto:${contact.email}`} className="p-1 text-slate-500 hover:text-[#20c58f] transition-colors" title={`Maila ${contact.name}: ${contact.email}`}>
-                        <Mail className="w-3.5 h-3.5" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Avtalsinformation */}
-        {customer.agreement_text && (
-          <div className="mt-4 pt-4 border-t border-slate-700">
-            <h4 className="text-sm font-medium text-slate-300 mb-2">Avtalstext</h4>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              {customer.agreement_text}
-            </p>
-          </div>
-        )}
-      </td>
-    </tr>
-  )
+// Sorteringsdatum för "Kräver åtgärd" (närmast deadline först)
+function actionDateMs(c: ConsolidatedCustomer): number {
+  const iso = c.isTerminated ? c.effectiveEndDate : c.nextRenewalDate
+  return iso ? new Date(iso).getTime() : Number.MAX_SAFE_INTEGER
 }
+
+function formatAnnualSum(v: number): string {
+  if (v >= 1_000_000) {
+    return `${(v / 1_000_000).toLocaleString('sv-SE', { maximumFractionDigits: 1 })} Mkr/år`
+  }
+  return `${Math.round(v / 1000).toLocaleString('sv-SE')} tkr/år`
+}
+
+type QuickView = 'all' | 'atgard' | 'fortnox'
 
 export default function Customers() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  // Use consolidated customers hook instead of regular customer analytics
-  const { 
-    consolidatedCustomers, 
-    analytics: consolidatedAnalytics,
+
+  // Samma sida används under /admin, /koordinator och /saljare
+  const basePath = `${location.pathname.split('/befintliga-kunder')[0]}/befintliga-kunder`
+
+  const {
+    consolidatedCustomers,
     loading,
     error,
     filterCustomers: filterConsolidatedCustomers,
@@ -346,27 +74,19 @@ export default function Customers() {
     getContactsForOrganization
   } = useConsolidatedCustomers()
 
-  // Keep old hook for backwards compatibility with components that need individual customers
+  // Behålls för EmailCampaignModal som behöver individuella kundrader
   const { customers: legacyCustomers } = useCustomerAnalytics()
-  
+
   // State management
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
-  const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set())
-  const [sendingInvitation, setSendingInvitation] = useState<string | null>(null)
   const [emailCampaignOpen, setEmailCampaignOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<any>(null)
   const [editingOrgId, setEditingOrgId] = useState<string | null>(null)
-  const [multiSiteDetailOpen, setMultiSiteDetailOpen] = useState(false)
-  const [selectedMultiSiteOrg, setSelectedMultiSiteOrg] = useState<any>(null)
-  const [singleCustomerDetailOpen, setSingleCustomerDetailOpen] = useState(false)
-  const [selectedSingleCustomer, setSelectedSingleCustomer] = useState<any>(null)
   const [revenueModalOpen, setRevenueModalOpen] = useState(false)
   const [revenueCustomer, setRevenueCustomer] = useState<any>(null)
   // Multi-kontrakt-refaktor (Fas 12 bug D): scopa Intäkter-modal till valt avtal.
   const [revenueContractId, setRevenueContractId] = useState<string | null>(null)
-  const [renewalModalOpen, setRenewalModalOpen] = useState(false)
-  const [renewalOrganization, setRenewalOrganization] = useState<any>(null)
   const [terminateModalOpen, setTerminateModalOpen] = useState(false)
   const [terminateOrganization, setTerminateOrganization] = useState<any>(null)
   const [addManualCustomerOpen, setAddManualCustomerOpen] = useState(false)
@@ -378,46 +98,38 @@ export default function Customers() {
   const importDropdownRef = useRef<HTMLDivElement>(null)
   const [billingSettingsOpen, setBillingSettingsOpen] = useState(false)
   const [billingSettingsOrg, setBillingSettingsOrg] = useState<any>(null)
-  // Multi-kontrakt-refaktor (Fas 9): scopa BillingSettingsModal till valt avtal
-  // när användaren öppnar via sidopanel/per-avtal-rad. null = single-kontrakt.
+  // Multi-kontrakt-refaktor (Fas 9): scopa BillingSettingsModal till valt avtal.
   const [billingSettingsContractId, setBillingSettingsContractId] = useState<string | null>(null)
   const [contactsModalOpen, setContactsModalOpen] = useState(false)
   const [contactsOrg, setContactsOrg] = useState<any>(null)
-  const [mobileOverflowId, setMobileOverflowId] = useState<string | null>(null)
 
-  // Sidopanel för kunddetaljer (ersätter inline-expand för single-kunder)
-  const [sidePanelOrg, setSidePanelOrg] = useState<any>(null)
-  // Multi-kontrakt-refaktor (Fas 9): vilken kontraktsrad som klickades — sidopanelen
-  // använder det som default-val. null = primärt avtal (1-kontrakt-fallet).
-  const [sidePanelContractId, setSidePanelContractId] = useState<string | null>(null)
-  const sidePanelOpen = sidePanelOrg !== null
-
-  // Multi-kontrakt-refaktor (Fas 11 bug 2): synka sidePanelOrg när
-  // consolidatedCustomers uppdateras (efter refresh). Annars renderar sidopanelen
-  // stale snapshot tagen vid radklick — admin tvingas stänga + ctrl+shift+r för
-  // att se ändringar gjorda i en modal som anropar refresh().
-  useEffect(() => {
-    if (!sidePanelOrg) return
-    const updated = consolidatedCustomers.find(c => c.id === sidePanelOrg.id)
-    if (updated && updated !== sidePanelOrg) {
-      setSidePanelOrg(updated)
-    }
-  }, [consolidatedCustomers])
-
-  // Collapsade statusgrupper i tabellen
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({})
+  // Kollapsade gruppsektioner — Pausade + Uppsagda kollapsade by default
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({
+    pausade: true,
+    uppsagda: true,
+  })
   const toggleGroup = (key: string) => setCollapsedGroups(prev => ({ ...prev, [key]: !prev[key] }))
 
-  // Flash-highlight från URL-param (?customerId=...) när man navigerat hit från offertuppföljningen
+  // Flash-highlight från URL-param (?customerId=...) vid navigation från offertuppföljningen
   const [flashCustomerId, setFlashCustomerId] = useState<string | null>(null)
 
-  // Close mobile overflow on outside click
-  useEffect(() => {
-    if (!mobileOverflowId) return
-    const handler = () => setMobileOverflowId(null)
-    document.addEventListener('click', handler)
-    return () => document.removeEventListener('click', handler)
-  }, [mobileOverflowId])
+  // Peek-panel via URL-param (?peek=<customers.id>) — history-safe
+  const peekCustomerId = searchParams.get('peek')
+
+  // customers.id att peek:a för en rad (multisite-rader har organization_id som id)
+  const peekIdFor = (org: ConsolidatedCustomer): string | null =>
+    org.organizationType === 'multisite'
+      ? (org.headquarterCustomer?.id ?? org.sites[0]?.id ?? null)
+      : org.id
+
+  const openPeek = (org: ConsolidatedCustomer) => {
+    const id = peekIdFor(org)
+    if (!id) return
+    setSearchParams(prev => { prev.set('peek', id); return prev })
+  }
+  const closePeek = useCallback(() => {
+    setSearchParams(prev => { prev.delete('peek'); return prev })
+  }, [setSearchParams])
 
   // Close import dropdown on outside click
   useEffect(() => {
@@ -431,21 +143,17 @@ export default function Customers() {
     return () => document.removeEventListener('mousedown', handler)
   }, [importDropdownOpen])
 
-  // Active customer highlight — tracks which org has an open modal/panel
+  // Active customer highlight — vilken org som har öppen modal
   const activeCustomerId =
     flashCustomerId ||
-    (sidePanelOpen && sidePanelOrg?.id) ||
     (revenueModalOpen && revenueCustomer?.id) ||
     (editModalOpen && editingOrgId) ||
-    (multiSiteDetailOpen && selectedMultiSiteOrg?.id) ||
-    (singleCustomerDetailOpen && selectedSingleCustomer?.id) ||
-    (renewalModalOpen && renewalOrganization?.id) ||
     (terminateModalOpen && terminateOrganization?.id) ||
     (billingSettingsOpen && billingSettingsOrg?.id) ||
     (contactsModalOpen && contactsOrg?.id) ||
     null
 
-  // Filter states — searchInput är UI-state, searchTerm debouncas för prestanda vid 3000+ kunder
+  // Filter states — searchInput är UI-state, searchTerm debouncas för prestanda
   const [searchInput, setSearchInput] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -458,24 +166,18 @@ export default function Customers() {
   const [portalFilter, setPortalFilter] = useState<'all' | 'full' | 'partial' | 'none'>('all')
   const [managerFilter, setManagerFilter] = useState<string>('all')
   const [organizationTypeFilter, setOrganizationTypeFilter] = useState<'all' | 'multisite' | 'single'>('all')
-
-  // Sortering
-  const [sortField, setSortField] = useState<string>('company_name')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [quickView, setQuickView] = useState<QuickView>('all')
 
   // Paginering
   const [currentPage, setCurrentPage] = useState(1)
   const pageSize = 50
-
-  // Kolumnväljare
-  const { visibleColumns, toggleColumn, resetToDefaults } = useColumnVisibility()
 
   // Kollapserbara filter
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   const activeFilterCount = [statusFilter, healthFilter, portalFilter, organizationTypeFilter, managerFilter]
     .filter(f => f !== 'all').length
 
-  // Filtered customers
+  // Filtered customers (hookens filter + snabbvy-filter)
   const filteredCustomers = useMemo(() => {
     const result = filterConsolidatedCustomers({
       search: searchTerm,
@@ -486,123 +188,81 @@ export default function Customers() {
       organizationType: organizationTypeFilter === 'all' ? undefined : organizationTypeFilter
     })
 
+    if (quickView === 'atgard') return result.filter(requiresAction)
+    if (quickView === 'fortnox') {
+      return result.filter(c => !c.isTerminated && resolveFortnoxInfo(c).number == null)
+    }
     return result
-  }, [consolidatedCustomers, searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, filterConsolidatedCustomers])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consolidatedCustomers, searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, quickView, filterConsolidatedCustomers])
 
-  // Sorterade kunder
-  const sortedCustomers = useMemo(() => {
-    return [...filteredCustomers].sort((a, b) => {
-      let aVal: any, bVal: any
-      switch (sortField) {
-        case 'company_name':
-          aVal = a.company_name; bVal = b.company_name; break
-        case 'totalAnnualValue':
-          aVal = a.totalAnnualValue || 0; bVal = b.totalAnnualValue || 0; break
-        case 'totalCasesValue':
-          aVal = a.totalCasesValue || 0; bVal = b.totalCasesValue || 0; break
-        case 'totalContractValue':
-          aVal = a.totalContractValue; bVal = b.totalContractValue; break
-        case 'daysToNextRenewal':
-          aVal = a.daysToNextRenewal ?? 9999; bVal = b.daysToNextRenewal ?? 9999; break
-        case 'healthScore':
-          aVal = a.overallHealthScore.score; bVal = b.overallHealthScore.score; break
-        case 'churnRisk':
-          aVal = a.highestChurnRisk.score; bVal = b.highestChurnRisk.score; break
-        default: return 0
-      }
-      if (typeof aVal === 'string') return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
-      return sortDirection === 'asc' ? (aVal - bVal) : (bVal - aVal)
-    })
-  }, [filteredCustomers, sortField, sortDirection])
+  // Grupperade sektioner (ersätter gamla statusgrupperna)
+  const groups = useMemo(() => {
+    const byName = [...filteredCustomers].sort((a, b) =>
+      (a.company_name ?? '').localeCompare(b.company_name ?? '', 'sv')
+    )
 
-  // Multi-kontrakt-refaktor (Fas 9): splittra single-customer-orgs med flera
-  // riktiga avtal till en virtuell rad per avtal. Varje rad får override:ade
-  // avtalsfält (annual, slutdatum, contract-värde) och __contractId/__addressLabel
-  // så listan/UI visar avtalets data direkt — inte aggregat. Synth-kontrakt
-  // räknas inte. Multisite lämnas orört (har egen detaljvy).
-  const expandedCustomers = useMemo(() => {
-    const out: any[] = []
-    for (const org of sortedCustomers) {
-      const site = org.sites?.[0]
-      const realContracts: any[] = (site?.contracts ?? []).filter(
-        (c: any) => !c.id?.startsWith?.('synth-')
-      )
-      if (org.organizationType !== 'single' || realContracts.length <= 1) {
-        out.push(org)
-        continue
-      }
-      // Splittra: en rad per avtal, behåll original-org som referens via __originalOrg
-      for (const contract of realContracts) {
-        const annual = Number(contract.annual_value ?? 0)
-        const totalValue = Number(contract.total_contract_value ?? contract.total_value ?? annual)
-        const endDate = contract.contract_end_date ?? contract.effective_end_date ?? null
-        const startDate = contract.contract_start_date ?? null
-        const daysRemaining = endDate
-          ? Math.ceil((new Date(endDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-          : null
-        out.push({
-          ...org,
-          // Unikt id för React-key + deep-linking
-          id: `${org.id}::${contract.id}`,
-          __originalOrgId: org.id,
-          __contractId: contract.id,
-          __addressLabel: contract.address_label || contract.contact_address || null,
-          totalAnnualValue: annual,
-          totalMonthlyValue: annual ? Math.round(annual / 12) : 0,
-          totalContractValue: totalValue,
-          earliestContractStartDate: startDate,
-          nextRenewalDate: endDate,
-          daysToNextRenewal: daysRemaining,
-          // Visa adress + företagsnamn i ExpandableOrganizationRow:
-          // raden känner inte till split-läget — vi smugglar in adressen via
-          // ett extra fält och låter raden visa det vid render (se nedan).
-        })
-      }
+    const atgard: ConsolidatedCustomer[] = []
+    const fornyelse: ConsolidatedCustomer[] = []
+    const aktiva: ConsolidatedCustomer[] = []
+    const pausade: ConsolidatedCustomer[] = []
+    const uppsagda: ConsolidatedCustomer[] = []
+
+    for (const c of byName) {
+      if (requiresAction(c)) atgard.push(c)
+      else if (c.isTerminated) uppsagda.push(c)
+      else if (c.isPaused) pausade.push(c)
+      else if (c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90) fornyelse.push(c)
+      else aktiva.push(c)
     }
-    return out
-  }, [sortedCustomers])
 
-  // Paginerade kunder
-  const paginatedCustomers = expandedCustomers.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  )
-  const totalPages = Math.ceil(expandedCustomers.length / pageSize)
+    atgard.sort((a, b) => actionDateMs(a) - actionDateMs(b))
+    fornyelse.sort((a, b) => (a.daysToNextRenewal ?? 9999) - (b.daysToNextRenewal ?? 9999))
 
-  // Gruppera paginerade kunder efter status för desktop-tabellen
-  const groupedCustomers = useMemo(() => {
-    const now = Date.now()
-    const active: any[] = []
-    const paused: any[] = []
-    const terminated: any[] = []
-    const expired: any[] = []
-
-    for (const c of paginatedCustomers) {
-      if (c.isPaused) paused.push(c)
-      else if (c.isTerminated) terminated.push(c)
-      else if (c.nextRenewalDate && new Date(c.nextRenewalDate).getTime() < now) expired.push(c)
-      else active.push(c)
-    }
+    const sumAnnual = (rows: ConsolidatedCustomer[]) =>
+      rows.reduce((sum, c) => sum + (c.totalAnnualValue || 0), 0)
 
     return [
-      { key: 'active',     label: 'Aktiva',               dot: 'bg-emerald-500', rows: active },
-      { key: 'paused',     label: 'Pausade',              dot: 'bg-amber-500',   rows: paused },
-      { key: 'expired',    label: 'Fortlöpande (avtalstid passerad)', dot: 'bg-slate-400', rows: expired },
-      { key: 'terminated', label: 'Uppsagda',             dot: 'bg-red-500',     rows: terminated },
+      { key: 'atgard', label: 'Kräver åtgärd', rows: atgard, sum: null as number | null },
+      { key: 'fornyelse', label: 'Periodskifte inom 90 dgr', rows: fornyelse, sum: sumAnnual(fornyelse) },
+      { key: 'aktiva', label: 'Aktiva', rows: aktiva, sum: sumAnnual(aktiva) },
+      { key: 'pausade', label: 'Pausade', rows: pausade, sum: null as number | null },
+      { key: 'uppsagda', label: 'Uppsagda', rows: uppsagda, sum: null as number | null },
     ].filter(g => g.rows.length > 0)
-  }, [paginatedCustomers])
+  }, [filteredCustomers])
 
-  // Deep-link via ?customerId=... — hitta kunden, navigera till rätt sida, scrolla + flash-highlighta
+  // Paginering över den grupp-ordnade listan
+  const orderedRows = useMemo(() => groups.flatMap(g => g.rows), [groups])
+  const totalPages = Math.ceil(orderedRows.length / pageSize)
+  const pageIdSet = useMemo(
+    () => new Set(orderedRows.slice((currentPage - 1) * pageSize, currentPage * pageSize).map(c => c.id)),
+    [orderedRows, currentPage]
+  )
+
+  // Portföljrad — beräknas på hela datasetet (exkl. uppsagda)
+  const portfolio = useMemo(() => {
+    const active = consolidatedCustomers.filter(c => !c.isTerminated)
+    const annualSum = active.reduce((sum, c) => sum + (c.totalAnnualValue || 0), 0)
+    const contractCount = active.reduce(
+      (sum, c) => sum + (c.contractCount || (c.totalAnnualValue ? 1 : 0)),
+      0
+    )
+    const renewals = active.filter(c =>
+      c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90
+    ).length
+    const missingFortnox = active.filter(c => resolveFortnoxInfo(c).number == null).length
+    return { annualSum, contractCount, customerCount: active.length, renewals, missingFortnox }
+  }, [consolidatedCustomers])
+
+  // Deep-link via ?customerId=... — hitta kunden, navigera till rätt sida, scrolla + flash
   useEffect(() => {
     const targetId = searchParams.get('customerId')
     if (!targetId || loading || consolidatedCustomers.length === 0) return
 
-    // Matcha på organization-id, site-id och huvudkontorets id (HK ligger
-    // inte längre i sites-arrayen)
     const match = consolidatedCustomers.find(org =>
       org.id === targetId
       || org.sites.some(s => s.id === targetId)
-      || (org.headquarterCustomer as any)?.id === targetId
+      || org.headquarterCustomer?.id === targetId
     )
     if (!match) {
       toast.error('Kunden kunde inte hittas i listan')
@@ -618,23 +278,20 @@ export default function Customers() {
     setPortalFilter('all')
     setManagerFilter('all')
     setOrganizationTypeFilter('all')
+    setQuickView('all')
 
-    // Bestäm rätt sida baserat på aktuell sortering
-    const index = sortedCustomers.findIndex(org => org.id === match.id)
+    const index = orderedRows.findIndex(org => org.id === match.id)
     if (index >= 0) {
-      const targetPage = Math.floor(index / pageSize) + 1
-      setCurrentPage(targetPage)
+      setCurrentPage(Math.floor(index / pageSize) + 1)
     }
 
     setFlashCustomerId(match.id)
 
-    // Scroll efter att DOM hunnit uppdateras
     const scrollTimer = setTimeout(() => {
       const el = document.querySelector(`[data-customer-row-id="${match.id}"]`)
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }, 250)
 
-    // Flash-highlight försvinner efter 4s, ta bort URL-param direkt
     const flashTimer = setTimeout(() => setFlashCustomerId(null), 4000)
     setSearchParams(prev => { prev.delete('customerId'); return prev }, { replace: true })
 
@@ -645,27 +302,17 @@ export default function Customers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, loading, consolidatedCustomers])
 
-  // Sorteringshantering
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(d => d === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortField(field)
-      setSortDirection('asc')
-    }
-    setCurrentPage(1)
-  }
-
-  // Snabbvy-counts (beräknas på hela datasetet, inte filtrerat)
+  // Snabbvy-counts (på hela datasetet)
   const expiringCount = consolidatedCustomers.filter(c => c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90).length
-  const highRiskCount = consolidatedAnalytics.organizationsAtRisk
-  const multisiteCount = consolidatedAnalytics.multisiteOrganizations
+  const atgardCount = consolidatedCustomers.filter(requiresAction).length
+  const multisiteCount = consolidatedCustomers.filter(c => !c.isTerminated && c.organizationType === 'multisite').length
   const terminatedCount = consolidatedCustomers.filter(c => c.isTerminated).length
 
   // Aktiv preset-detektering
-  const activePreset = statusFilter === 'expiring' ? 'expiring'
+  const activePreset: string = quickView === 'atgard' ? 'atgard'
+    : quickView === 'fortnox' ? 'fortnox'
+    : statusFilter === 'expiring' ? 'expiring'
     : statusFilter === 'terminated' ? 'terminated'
-    : healthFilter === 'poor' ? 'highrisk'
     : organizationTypeFilter === 'multisite' ? 'multisite'
     : 'all'
 
@@ -673,38 +320,39 @@ export default function Customers() {
   const resetFilters = () => {
     setSearchInput(''); setStatusFilter('all'); setHealthFilter('all')
     setPortalFilter('all'); setOrganizationTypeFilter('all'); setManagerFilter('all')
-    setSortField('company_name'); setSortDirection('asc')
+    setQuickView('all')
     setCurrentPage(1)
   }
 
   // Applicera preset
   const applyPreset = (preset: string) => {
     setSearchInput(''); setHealthFilter('all'); setPortalFilter('all'); setManagerFilter('all')
+    setQuickView('all')
     setCurrentPage(1)
 
     switch (preset) {
       case 'expiring':
         setStatusFilter('expiring'); setOrganizationTypeFilter('all')
-        setSortField('daysToNextRenewal'); setSortDirection('asc')
         break
-      case 'highrisk':
-        setStatusFilter('all'); setOrganizationTypeFilter('all'); setHealthFilter('poor')
-        setSortField('churnRisk'); setSortDirection('desc')
+      case 'atgard':
+        setStatusFilter('all'); setOrganizationTypeFilter('all'); setQuickView('atgard')
+        break
+      case 'fortnox':
+        setStatusFilter('all'); setOrganizationTypeFilter('all'); setQuickView('fortnox')
         break
       case 'multisite':
         setStatusFilter('all'); setOrganizationTypeFilter('multisite')
         break
       case 'terminated':
         setStatusFilter('terminated'); setOrganizationTypeFilter('all')
-        setSortField('company_name'); setSortDirection('asc')
         break
     }
   }
 
   // Reset paginering vid filterändring
-  useEffect(() => { setCurrentPage(1) }, [searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter])
+  useEffect(() => { setCurrentPage(1) }, [searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, quickView])
 
-  // Toggle expanded row
+  // Toggle expanded row (multisite-enheter)
   const toggleExpandedRow = (customerId: string) => {
     const newExpanded = new Set(expandedRows)
     if (newExpanded.has(customerId)) {
@@ -715,118 +363,35 @@ export default function Customers() {
     setExpandedRows(newExpanded)
   }
 
-  // Portal invitation for consolidated customers
-  const inviteToPortal = async (organization: any) => {
-    setSendingInvitation(organization.id)
-    try {
-      if (organization.organizationType === 'multisite') {
-        // For multisite - invite organization
-        toast.info('Multisite portal-inbjudan kommer snart...')
-        // TODO: Implement multisite portal invitation
-      } else {
-        // For single customer - use existing logic
-        const singleCustomer = organization.sites[0]
-        const response = await fetch('/api/create-customer', {
-          method: 'POST',
-          headers: await getAuthHeaders(),
-          body: JSON.stringify({
-            company_name: singleCustomer.company_name,
-            contact_person: singleCustomer.contact_person,
-            contact_email: singleCustomer.contact_email,
-            contact_phone: singleCustomer.contact_phone,
-            customer_id: singleCustomer.id,
-            skip_customer_creation: true
-          })
-        })
-
-        const data = await response.json()
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Kunde inte skicka inbjudan')
-        }
-        
-        toast.success('Portal-inbjudan skickad!')
-      }
-      refresh()
-    } catch (error: any) {
-      console.error('Error inviting to portal:', error)
-      toast.error(error.message || 'Ett fel uppstod')
-    } finally {
-      setSendingInvitation(null)
-    }
-  }
-
   // Handle customer edit — skickar huvudkontoret för multisite, annars sites[0]
-  const handleEditCustomer = (org: any) => {
+  const handleEditCustomer = (org: ConsolidatedCustomer) => {
     setEditingCustomer(org.headquarterCustomer || org.sites?.[0] || org)
     setEditingOrgId(org.id)
     setEditModalOpen(true)
   }
 
-  // Multisite: redigera en specifik ENHETS kundrad (kundnummer, kontakt m.m.)
-  const handleEditSite = (org: any, site: any) => {
-    setEditingCustomer(site)
-    setEditingOrgId(org.id)
-    setEditModalOpen(true)
-  }
-
-  // Multisite: scopa en org till EN enhet — modalerna (fakturering/intäkter)
-  // behandlar då enheten som en fristående kund: egen kundrad, ingen HK-
-  // konsolidering och ingen datum-propagering till syskon-enheter.
-  const scopeOrgToSite = (org: any, site: any) => ({
-    ...org,
-    organizationType: 'single',
-    company_name: site.company_name,
-    organization_number: site.organization_number ?? org.organization_number,
-    contact_email: site.contact_email,
-    customer_number: site.customer_number ?? null,
-    sites: [site],
-    headquarterCustomer: null,
-  })
-
-  const handleCustomerSaved = (updatedCustomer: any) => {
-    // Refresh the data to show updated information
+  const handleCustomerSaved = () => {
     refresh()
   }
 
-  // Handle multisite detail view - Opens detailed modal for multisite organizations
-  const handleViewMultiSiteDetails = (organization: any) => {
-    setSelectedMultiSiteOrg(organization)
-    setMultiSiteDetailOpen(true)
-  }
-
-  // Handle single customer detail view - Opens detailed modal for single customers
-  const handleViewSingleCustomerDetails = (organization: any) => {
-    setSelectedSingleCustomer(organization)
-    setSingleCustomerDetailOpen(true)
-  }
-
-  // Handle revenue modal — scopeSite = visa bara den enhetens fakturor (multisite)
-  const handleViewRevenue = (organization: any, contractId: string | null = null, scopeSite: any = null) => {
-    setRevenueCustomer(scopeSite ? scopeOrgToSite(organization, scopeSite) : organization)
+  const handleViewRevenue = (organization: ConsolidatedCustomer, contractId: string | null = null) => {
+    setRevenueCustomer(organization)
     setRevenueContractId(contractId)
     setRevenueModalOpen(true)
   }
 
-  const handleStartRenewal = (organization: any) => {
-    setRenewalOrganization(organization)
-    setRenewalModalOpen(true)
-  }
-
-  const handleTerminate = (organization: any) => {
+  const handleTerminate = (organization: ConsolidatedCustomer) => {
     setTerminateOrganization(organization)
     setTerminateModalOpen(true)
   }
 
-  const handleBillingSettings = (organization: any, contractId: string | null = null, scopeSite: any = null) => {
-    // Multisite med enhetsavtal: öppna alltid enhet-scopad (aldrig HK-läget,
-    // vars spara-flöde propagerar avtalsdatum till ALLA enheter).
-    setBillingSettingsOrg(scopeSite ? scopeOrgToSite(organization, scopeSite) : organization)
+  const handleBillingSettings = (organization: ConsolidatedCustomer, contractId: string | null = null) => {
+    setBillingSettingsOrg(organization)
     setBillingSettingsContractId(contractId)
     setBillingSettingsOpen(true)
   }
 
-  const handleContacts = (organization: any) => {
+  const handleContacts = (organization: ConsolidatedCustomer) => {
     setContactsOrg(organization)
     setContactsModalOpen(true)
   }
@@ -866,13 +431,35 @@ export default function Customers() {
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4">
-      {/* Sidtitel + åtgärdsknappar */}
-      <div className="flex items-center justify-between">
-        <div>
+      {/* Sidtitel + portföljrad + åtgärdsknappar */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-white">Befintliga kunder</h1>
-          <p className="text-sm text-slate-400 mt-1">Hantera kundrelationer och maximera kundvärde</p>
+          {/* Portföljrad — ersätter KPI-korten */}
+          <p className="text-sm text-slate-400 mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <span className="text-slate-200 tabular-nums">{formatAnnualSum(portfolio.annualSum)}</span>
+            <span className="text-slate-700">·</span>
+            <span>
+              <span className="text-slate-200 tabular-nums">{portfolio.contractCount}</span> avtal hos{' '}
+              <span className="text-slate-200 tabular-nums">{portfolio.customerCount}</span> kunder
+            </span>
+            <span className="text-slate-700">·</span>
+            <button
+              onClick={() => applyPreset('expiring')}
+              className="hover:text-[#20c58f] transition-colors"
+            >
+              <span className="text-slate-200 tabular-nums">{portfolio.renewals}</span> periodskiften inom 90 dgr
+            </button>
+            <span className="text-slate-700">·</span>
+            <button
+              onClick={() => applyPreset('fortnox')}
+              className="hover:text-[#20c58f] transition-colors"
+            >
+              <span className="text-slate-200 tabular-nums">{portfolio.missingFortnox}</span> saknar Fortnox-nr
+            </button>
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="relative" ref={importDropdownRef}>
             <button
               onClick={() => setImportDropdownOpen(prev => !prev)}
@@ -977,57 +564,6 @@ export default function Customers() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <CustomerKpiCards analytics={consolidatedAnalytics} />
-
-      {/* Varningsbanner för utgående avtal */}
-      {consolidatedAnalytics.upcomingRenewals.length > 0 && (
-        <div className={`flex items-center justify-between p-4 rounded-lg border mb-4 ${
-          consolidatedAnalytics.upcomingRenewals.some(r => (r.daysToNextRenewal || 0) <= 30)
-            ? 'bg-red-500/10 border-red-500/20'
-            : 'bg-amber-500/10 border-amber-500/20'
-        }`}>
-          <div className="flex items-center gap-3">
-            <AlertTriangle className={`w-5 h-5 flex-shrink-0 ${
-              consolidatedAnalytics.upcomingRenewals.some(r => (r.daysToNextRenewal || 0) <= 30)
-                ? 'text-red-400'
-                : 'text-amber-400'
-            }`} />
-            <div>
-              <p className={`text-sm font-medium ${
-                consolidatedAnalytics.upcomingRenewals.some(r => (r.daysToNextRenewal || 0) <= 30)
-                  ? 'text-red-400'
-                  : 'text-amber-400'
-              }`}>
-                {consolidatedAnalytics.upcomingRenewals.length} avtal löper ut inom 90 dagar
-              </p>
-              <p className="text-xs text-slate-400">
-                Totalt värde: {formatCurrency(consolidatedAnalytics.renewalValue90Days)}
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setStatusFilter('expiring')
-              setSearchInput('')
-              setHealthFilter('all')
-              setPortalFilter('all')
-              setOrganizationTypeFilter('all')
-              setManagerFilter('all')
-            }}
-            className={`${
-              consolidatedAnalytics.upcomingRenewals.some(r => (r.daysToNextRenewal || 0) <= 30)
-                ? 'text-red-400 hover:text-red-300'
-                : 'text-amber-400 hover:text-amber-300'
-            }`}
-          >
-            Visa utgående avtal
-          </Button>
-        </div>
-      )}
-
       {/* Main content */}
       <div className="space-y-4">
           {/* Filters */}
@@ -1061,8 +597,6 @@ export default function Customers() {
                   </span>
                 )}
               </button>
-              {/* Kolumnväljare */}
-              <ColumnSelector visibleColumns={visibleColumns} onToggle={toggleColumn} onReset={resetToDefaults} />
             </div>
 
             {/* Collapsible filter dropdowns */}
@@ -1150,7 +684,17 @@ export default function Customers() {
                   : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
               }`}
             >
-              Alla ({sortedCustomers.length})
+              Alla ({consolidatedCustomers.length})
+            </button>
+            <button
+              onClick={() => applyPreset('atgard')}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                activePreset === 'atgard'
+                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-red-400 hover:border-red-500/30'
+              }`}
+            >
+              Kräver åtgärd ({atgardCount})
             </button>
             <button
               onClick={() => applyPreset('expiring')}
@@ -1163,21 +707,11 @@ export default function Customers() {
               Utgående avtal ({expiringCount})
             </button>
             <button
-              onClick={() => applyPreset('highrisk')}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                activePreset === 'highrisk'
-                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-red-400 hover:border-red-500/30'
-              }`}
-            >
-              Hög risk ({highRiskCount})
-            </button>
-            <button
               onClick={() => applyPreset('multisite')}
               className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                 activePreset === 'multisite'
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-blue-400 hover:border-blue-500/30'
+                  ? 'bg-[#20c58f]/20 text-[#20c58f] border border-[#20c58f]/30'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
               }`}
             >
               Multisite ({multisiteCount})
@@ -1196,397 +730,75 @@ export default function Customers() {
             )}
           </div>
 
-          {/* === MOBIL: Kortvy === */}
-          <div className="md:hidden space-y-2">
-            {paginatedCustomers.map((organization) => {
-              const isExpanded = expandedRows.has(organization.id)
-              const orgContacts = getContactsForOrganization(organization)
-              const isMultisite = organization.organizationType === 'multisite'
-              const isTerminated = organization.isTerminated
-              const isHighlighted = activeCustomerId === organization.id
-              const showOverflow = mobileOverflowId === organization.id
-
-              // Urgency border
-              const urgencyBorder =
-                (organization.daysToNextRenewal != null && organization.daysToNextRenewal <= 30)
-                  || organization.highestChurnRisk.risk === 'high'
-                  ? 'border-l-[3px] border-l-red-500'
-                  : 'border-l-[3px] border-l-transparent'
-
-              // Contract period helpers
-              const getRemainingText = () => {
-                if (!organization.nextRenewalDate) return null
-                const endDate = new Date(organization.nextRenewalDate)
-                const diffTime = endDate.getTime() - Date.now()
-                const monthsRemaining = Math.max(0, Math.round(diffTime / (1000 * 60 * 60 * 24 * 30.44)))
-                if (diffTime < 0) return { text: 'Utgånget', color: 'text-red-400' }
-                if (monthsRemaining <= 6) return { text: `${monthsRemaining} mån kvar`, color: 'text-red-400' }
-                if (monthsRemaining <= 12) return { text: `${monthsRemaining} mån kvar`, color: 'text-amber-400' }
-                return { text: `${monthsRemaining} mån kvar`, color: 'text-green-400' }
-              }
-              const remaining = getRemainingText()
-
-              // Health score helpers
-              const getHealthLabel = (level: string) => {
-                switch (level) {
-                  case 'excellent': return 'Utmärkt'
-                  case 'good': return 'Bra'
-                  case 'fair': return 'Ok'
-                  case 'poor': return 'Risk'
-                  default: return 'Okänd'
-                }
-              }
-              const getHealthColor = (level: string) => {
-                switch (level) {
-                  case 'excellent': return 'bg-green-500/20 text-green-400 border-green-500/30'
-                  case 'good': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                  case 'fair': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                  case 'poor': return 'bg-red-500/20 text-red-400 border-red-500/30'
-                  default: return 'bg-slate-500/20 text-slate-400 border-slate-500/30'
-                }
-              }
-
-              // Show renewal button
-              const showRenewalButton = !isTerminated
-                && organization.daysToNextRenewal != null
-                && organization.daysToNextRenewal > 0
-                && organization.daysToNextRenewal <= 90
-
-              return (
-                <div
-                  key={organization.id}
-                  className={`bg-slate-800/40 border border-slate-700/40 rounded-xl overflow-hidden ${urgencyBorder} ${
-                    isHighlighted ? 'bg-[#20c58f]/10 !border-l-[#20c58f]' : ''
-                  }`}
-                >
-                  {/* Huvudrad: Expand + Namn + Actions */}
-                  <div className="p-3">
-                    <div className="flex items-start gap-2">
+          {/* Grupperad kundlista — samma radkomponent för desktop och mobil */}
+          <div className="border border-slate-800 bg-slate-900/30 rounded-xl overflow-visible">
+            <ul>
+              {groups.map((group, groupIndex) => {
+                const collapsed = collapsedGroups[group.key] === true
+                const rowsOnPage = group.rows.filter(r => pageIdSet.has(r.id))
+                return (
+                  <React.Fragment key={group.key}>
+                    {/* Whisper header med räknare */}
+                    <li className={`list-none ${groupIndex > 0 ? 'border-t border-slate-800' : ''}`}>
                       <button
-                        onClick={() => toggleExpandedRow(organization.id)}
-                        className="p-1 mt-0.5 text-slate-400 hover:text-white flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+                        onClick={() => toggleGroup(group.key)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium uppercase tracking-wide text-slate-500 hover:text-slate-300 transition-colors"
                       >
-                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        {collapsed
+                          ? <ChevronRight className="w-3 h-3" />
+                          : <ChevronDown className="w-3 h-3" />
+                        }
+                        <span>{group.label}</span>
+                        <span className="tabular-nums">({group.rows.length})</span>
+                        {group.sum != null && group.sum > 0 && (
+                          <span className="tabular-nums normal-case tracking-normal text-slate-600">
+                            · {formatAnnualSum(group.sum)}
+                          </span>
+                        )}
                       </button>
+                    </li>
 
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {isMultisite && <Building2 className="w-4 h-4 text-blue-400 flex-shrink-0" />}
-                          <span className="font-semibold text-sm text-white truncate">{organization.company_name}</span>
-                          {isMultisite && (
-                            <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full border border-blue-500/30 flex-shrink-0">
-                              {organization.totalSites} enheter
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-400 mt-0.5 truncate">
-                          {organization.contact_person && <span>{organization.contact_person} • </span>}
-                          {organization.contact_email}
-                        </div>
-                        {orgContacts.length > 0 && (
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <Users className="w-3 h-3 text-slate-500" />
-                            <span className="text-[10px] text-slate-500">{orgContacts.length} kontaktperson{orgContacts.length > 1 ? 'er' : ''}</span>
-                          </div>
-                        )}
-                        {isTerminated && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-500/20 text-red-400 border border-red-500/30 mt-1">
-                            Uppsagt
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-0.5 flex-shrink-0">
-                        <button
-                          onClick={() => isMultisite
-                            ? handleViewMultiSiteDetails(organization)
-                            : handleViewSingleCustomerDetails(organization)
-                          }
-                          className="p-2 rounded-lg text-blue-400 hover:text-blue-300 hover:bg-blue-400/10 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleEditCustomer(organization)}
-                          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700/50 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        {showRenewalButton && (
-                          <button
-                            onClick={() => handleStartRenewal(organization)}
-                            className="relative p-2 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                            <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-400 rounded-full" />
-                          </button>
-                        )}
-                        <div className="relative">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setMobileOverflowId(showOverflow ? null : organization.id)
-                            }}
-                            className="p-2 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                          {showOverflow && (
-                            <div className="absolute right-0 top-full mt-1 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-30 py-1">
-                              <button
-                                onClick={() => { handleViewRevenue(organization); setMobileOverflowId(null) }}
-                                className="w-full px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 min-h-[44px]"
-                              >
-                                <TrendingUp className="w-4 h-4 text-green-400" />
-                                Intäktsöversikt
-                              </button>
-                              <button
-                                onClick={() => { handleBillingSettings(organization); setMobileOverflowId(null) }}
-                                className="w-full px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 min-h-[44px]"
-                              >
-                                <Receipt className="w-4 h-4 text-emerald-400" />
-                                Inställningar fakturering
-                              </button>
-                              <button
-                                onClick={() => { handleContacts(organization); setMobileOverflowId(null) }}
-                                className="w-full px-3 py-2.5 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white flex items-center gap-2.5 min-h-[44px]"
-                              >
-                                <Users className="w-4 h-4 text-blue-400" />
-                                Kontaktpersoner
-                                {orgContacts.length > 0 && (
-                                  <span className="ml-auto text-xs text-slate-500 bg-slate-700/50 px-1.5 py-0.5 rounded">
-                                    {orgContacts.length}
-                                  </span>
-                                )}
-                              </button>
-                              {!isTerminated && (
-                                <>
-                                  <div className="border-t border-slate-700 my-1" />
-                                  <button
-                                    onClick={() => { handleTerminate(organization); setMobileOverflowId(null) }}
-                                    className="w-full px-3 py-2.5 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2.5 min-h-[44px]"
-                                  >
-                                    <XCircle className="w-4 h-4" />
-                                    Säg upp avtal
-                                  </button>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ekonomisk data */}
-                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-700/30">
-                      {visibleColumns.has('annualValue') && (
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase">Årspremie</p>
-                          <p className="text-sm font-semibold text-white">{formatCurrency(organization.totalAnnualValue || 0)}</p>
-                        </div>
-                      )}
-                      {visibleColumns.has('contractValue') && (
-                        <div>
-                          <p className="text-[10px] text-slate-500 uppercase">Avtalsvärde</p>
-                          <p className="text-sm font-semibold text-white">{formatCurrency(organization.totalContractValue)}</p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Status rad: Kontraktsperiod + Health */}
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/30">
-                      <div>
-                        {remaining && (
-                          <span className={`text-xs font-medium ${remaining.color}`}>{remaining.text}</span>
-                        )}
-                        {isTerminated && organization.effectiveEndDate && (
-                          <span className="text-xs text-red-400">
-                            Slutar {new Date(organization.effectiveEndDate).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          </span>
-                        )}
-                      </div>
-                      {visibleColumns.has('healthScore') && (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${getHealthColor(organization.overallHealthScore.level)}`}>
-                          {getHealthLabel(organization.overallHealthScore.level)} ({organization.overallHealthScore.score})
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Expanderad sektion — [&_tr]:block [&_td]:block overrides table display for non-table context */}
-                  {isExpanded && organization.organizationType === 'multisite' && (
-                    <div className="border-t border-slate-700/50 bg-slate-900/30 p-3 [&_tr]:block [&_td]:block [&_td]:p-0">
-                      <MultisiteExpandedTabs organization={organization} colSpan={1} contacts={orgContacts} />
-                    </div>
-                  )}
-                  {isExpanded && organization.organizationType === 'single' && (
-                    <div className="border-t border-slate-700/50 bg-slate-900/30 p-3 [&_tr]:block [&_td]:block [&_td]:p-0">
-                      <ExpandedCustomerRow customer={organization.sites[0]} colSpan={1} contacts={orgContacts} />
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                    {!collapsed && rowsOnPage.map(org => (
+                      <CustomerListRow
+                        key={org.id}
+                        organization={org}
+                        expanded={expandedRows.has(org.id)}
+                        onToggleExpand={() => toggleExpandedRow(org.id)}
+                        onPeek={() => openPeek(org)}
+                        onOpenUnit={(unitId) => navigate(`${basePath}/${unitId}`)}
+                        contactCount={getContactsForOrganization(org).length}
+                        highlighted={
+                          activeCustomerId === org.id ||
+                          (peekCustomerId != null && peekIdFor(org) === peekCustomerId)
+                        }
+                        actions={{
+                          onEdit: () => handleEditCustomer(org),
+                          onRevenue: () => handleViewRevenue(org),
+                          onBillingSettings: () => handleBillingSettings(org),
+                          onContacts: () => handleContacts(org),
+                          onTerminate: () => handleTerminate(org),
+                        }}
+                      />
+                    ))}
+                  </React.Fragment>
+                )
+              })}
+            </ul>
           </div>
 
-          {/* === DESKTOP: Tabellvy === */}
-          <div className="hidden md:block overflow-hidden border border-slate-700 bg-slate-800/30 rounded-xl">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-900 border-b border-slate-700 sticky top-0 z-10">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('company_name')}>
-                      <div className="flex items-center gap-2">
-                        Organisation & Kontakt
-                        {sortField === 'company_name' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                      </div>
-                    </th>
-                    {visibleColumns.has('annualValue') && (
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalAnnualValue')}>
-                        <div className="flex items-center justify-end gap-2">
-                          Årspremie
-                          {sortField === 'totalAnnualValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                    )}
-                    {visibleColumns.has('casesValue') && (
-                      <th className="hidden lg:table-cell px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalCasesValue')}>
-                        <div className="flex items-center justify-end gap-2">
-                          Utöver avtal
-                          {sortField === 'totalCasesValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                    )}
-                    {visibleColumns.has('contractValue') && (
-                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('totalContractValue')}>
-                        <div className="flex items-center justify-end gap-2">
-                          Avtalsvärde
-                          {sortField === 'totalContractValue' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                    )}
-                    {visibleColumns.has('contractPeriod') && (
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('daysToNextRenewal')}>
-                        <div className="flex items-center gap-2">
-                          Kontraktsperiod
-                          {sortField === 'daysToNextRenewal' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                    )}
-                    {visibleColumns.has('healthScore') && (
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('healthScore')}>
-                        <div className="flex items-center gap-2">
-                          Health
-                          {sortField === 'healthScore' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                    )}
-                    {visibleColumns.has('churnRisk') && (
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('churnRisk')}>
-                        <div className="flex items-center gap-2">
-                          Churn
-                          {sortField === 'churnRisk' && (sortDirection === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
-                        </div>
-                      </th>
-                    )}
-                    {visibleColumns.has('manager') && (
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Säljare
-                      </th>
-                    )}
-                    <th className="px-4 py-3 w-10" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupedCustomers.map((group) => {
-                    const collapsed = collapsedGroups[group.key] === true
-                    const groupColSpan = 2 + [...visibleColumns].filter(c => ['annualValue','casesValue','contractValue','contractPeriod','healthScore','churnRisk','manager'].includes(c)).length
-                    return (
-                      <React.Fragment key={group.key}>
-                        {/* Statusgrupp-header */}
-                        <tr className="bg-slate-800/40 border-y border-slate-700/50">
-                          <td colSpan={groupColSpan} className="px-4 py-1.5">
-                            <button
-                              onClick={() => toggleGroup(group.key)}
-                              className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400 hover:text-white transition-colors"
-                            >
-                              {collapsed
-                                ? <ChevronRight className="w-3 h-3" />
-                                : <ChevronDown className="w-3 h-3" />
-                              }
-                              <span className={`w-2 h-2 rounded-full ${group.dot}`} />
-                              <span>{group.label}</span>
-                              <span className="text-slate-500 normal-case font-normal">({group.rows.length})</span>
-                            </button>
-                          </td>
-                        </tr>
-
-                        {/* Rader i gruppen */}
-                        {!collapsed && group.rows.map((organization: any) => {
-                          const isExpanded = expandedRows.has(organization.id)
-                          const orgContacts = getContactsForOrganization(organization)
-
-                          return (
-                            <React.Fragment key={organization.id}>
-                              <ExpandableOrganizationRow
-                                organization={organization}
-                                isExpanded={isExpanded}
-                                onToggleMultisiteSites={() => toggleExpandedRow(organization.id)}
-                                onOpenPanel={(org) => {
-                                  // Multi-kontrakt: splittade rader bär __contractId.
-                                  // Hitta original-org så sidopanelen får full data
-                                  // (med alla avtal) men startar med rätt valt.
-                                  const splitContractId = (org as any).__contractId ?? null
-                                  const originalOrgId = (org as any).__originalOrgId ?? org.id
-                                  const originalOrg = consolidatedCustomers.find(c => c.id === originalOrgId) ?? org
-                                  setSidePanelOrg(originalOrg)
-                                  setSidePanelContractId(splitContractId)
-                                }}
-                                visibleColumns={visibleColumns}
-                                contactCount={orgContacts.length}
-                                isHighlighted={activeCustomerId === organization.id}
-                              />
-
-                              {/* Multisite-enheter inline-expand */}
-                              {isExpanded && organization.organizationType === 'multisite' && (
-                                <MultisiteExpandedTabs
-                                  organization={organization}
-                                  colSpan={groupColSpan}
-                                  contacts={orgContacts}
-                                  onSiteClick={(site) => {
-                                    // Öppna sidopanelen med enhetens avtal förvalt
-                                    const siteContract = (organization.allContracts ?? [])
-                                      .find((c: any) => c.siteId === site.id)
-                                    setSidePanelOrg(organization)
-                                    setSidePanelContractId(siteContract?.id ?? null)
-                                  }}
-                                />
-                              )}
-                            </React.Fragment>
-                          )
-                        })}
-                      </React.Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Tom-state + Pagination (visas för både mobil och desktop) */}
-          {sortedCustomers.length === 0 && (
+          {/* Tom-state */}
+          {orderedRows.length === 0 && (
             <div className="text-center py-20 bg-slate-800/20 rounded-xl">
               <div className="mx-auto w-fit p-4 rounded-full bg-slate-700/30 border border-slate-600/50 mb-6">
                 <Building2 className="w-16 h-16 text-slate-500" />
               </div>
               <h3 className="text-lg font-semibold text-slate-300 mb-2">
-                {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all'
+                {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all' || quickView !== 'all'
                   ? 'Inga organisationer matchar dina filter'
                   : 'Inga organisationer registrerade'}
               </h3>
               <p className="text-slate-500 text-sm max-w-md mx-auto">
-                {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all'
+                {searchTerm || statusFilter !== 'all' || healthFilter !== 'all' || organizationTypeFilter !== 'all' || quickView !== 'all'
                   ? 'Prova att justera dina filterkriterier för att hitta organisationer.'
                   : 'Organisationer kommer att visas här när de läggs till i systemet.'}
               </p>
@@ -1596,7 +808,7 @@ export default function Customers() {
           {totalPages > 1 && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 sm:px-6 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl mt-2">
               <span className="text-sm text-slate-400">
-                Visar {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, sortedCustomers.length)} av {sortedCustomers.length}
+                Visar {((currentPage - 1) * pageSize) + 1}–{Math.min(currentPage * pageSize, orderedRows.length)} av {orderedRows.length}
               </span>
               <div className="flex items-center gap-2">
                 <button
@@ -1657,26 +869,6 @@ export default function Customers() {
         onSave={handleCustomerSaved}
       />
 
-      {/* MultiSite Customer Detail Modal */}
-      <MultiSiteCustomerDetailModal
-        organization={selectedMultiSiteOrg}
-        isOpen={multiSiteDetailOpen}
-        onClose={() => {
-          setMultiSiteDetailOpen(false)
-          setSelectedMultiSiteOrg(null)
-        }}
-      />
-
-      {/* Single Customer Detail Modal */}
-      <SingleCustomerDetailModal
-        customer={selectedSingleCustomer}
-        isOpen={singleCustomerDetailOpen}
-        onClose={() => {
-          setSingleCustomerDetailOpen(false)
-          setSelectedSingleCustomer(null)
-        }}
-      />
-
       {/* Revenue Modal */}
       <CustomerRevenueModal
         customer={revenueCustomer}
@@ -1689,15 +881,6 @@ export default function Customers() {
         }}
       />
 
-      {/* Renewal Workflow Modal */}
-      <RenewalWorkflowModal
-        organization={renewalOrganization}
-        isOpen={renewalModalOpen}
-        onClose={() => {
-          setRenewalModalOpen(false)
-          setRenewalOrganization(null)
-        }}
-      />
 
       {/* Terminate Contract Modal */}
       <TerminateContractModal
@@ -1860,32 +1043,11 @@ export default function Customers() {
         />
       )}
 
-      {/* Sidopanel för kunddetaljer */}
-      <CustomerDetailSidePanel
-        organization={sidePanelOrg}
-        initialContractId={sidePanelContractId}
-        contacts={sidePanelOrg ? getContactsForOrganization(sidePanelOrg) : []}
-        isOpen={sidePanelOpen}
-        dimmed={
-          revenueModalOpen || editModalOpen || multiSiteDetailOpen ||
-          singleCustomerDetailOpen || renewalModalOpen || terminateModalOpen ||
-          billingSettingsOpen || contactsModalOpen
-        }
-        onClose={() => {
-          setSidePanelOrg(null)
-          setSidePanelContractId(null)
-        }}
-        onViewFullDetails={(org) => {
-          if (org.organizationType === 'multisite') handleViewMultiSiteDetails(org)
-          else handleViewSingleCustomerDetails(org)
-        }}
-        onEdit={handleEditCustomer}
-        onEditSite={handleEditSite}
-        onViewRevenue={handleViewRevenue}
-        onRenewal={handleStartRenewal}
-        onTerminate={handleTerminate}
-        onBillingSettings={handleBillingSettings}
-        onContacts={handleContacts}
+      {/* Peek-panel — radklick, ersätter gamla CustomerDetailSidePanel */}
+      <CustomerPeekPanel
+        customerId={peekCustomerId}
+        basePath={basePath}
+        onClose={closePeek}
       />
     </div>
   )

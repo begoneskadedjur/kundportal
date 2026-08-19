@@ -213,14 +213,14 @@ export default function EditCustomerModal({
       size="lg"
       preventClose={loading}
       footer={
-        <div className="flex items-center justify-between p-4">
+        <div className="flex items-center justify-between px-4 py-2.5">
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <AlertCircle className="w-3.5 h-3.5" />
             Obligatoriska fält markeras med *
           </div>
           <div className="flex items-center gap-3">
             <Button
-              variant="secondary"
+              variant="outline"
               onClick={handleClose}
               disabled={loading}
             >
@@ -242,11 +242,11 @@ export default function EditCustomerModal({
         </div>
       }
     >
-      <div className="p-5 space-y-5">
+      <div className="p-4 space-y-3">
         {/* Företagsinformation */}
-        <div>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-            <Building2 className="w-3.5 h-3.5" />
+        <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
+            <Building2 className="w-4 h-4 text-slate-400" />
             Företagsinformation
           </h3>
           <div className="grid grid-cols-2 gap-3">
@@ -264,7 +264,7 @@ export default function EditCustomerModal({
               placeholder="XXXXXX-XXXX"
             />
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Avtalstyp</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Avtalstyp</label>
               <Select
                 value={formData.contract_type || ''}
                 onChange={(v) => handleInputChange('contract_type', v)}
@@ -273,7 +273,7 @@ export default function EditCustomerModal({
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Kundstorlek</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Kundstorlek</label>
               <Select
                 value={formData.customer_size || ''}
                 onChange={(v) => handleInputChange('customer_size', v || null)}
@@ -289,14 +289,14 @@ export default function EditCustomerModal({
         </div>
 
         {/* Kundnummer & Grupp */}
-        <div className="border-t border-slate-700/50 pt-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-            <Hash className="w-3.5 h-3.5" />
+        <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
+            <Hash className="w-4 h-4 text-slate-400" />
             Kundnummer & Grupp
           </h3>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">Kundgrupp</label>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Kundgrupp</label>
               <Select
                 value={formData.customer_group_id as string || ''}
                 onChange={(v) => handleInputChange('customer_group_id', v || null)}
@@ -315,8 +315,8 @@ export default function EditCustomerModal({
         </div>
 
         {/* Kontaktinformation */}
-        <div className="border-t border-slate-700/50 pt-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+        <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <h3 className="text-sm font-semibold text-slate-300 mb-2">
             Kontakt
           </h3>
           <div className="grid grid-cols-2 gap-3">
@@ -350,8 +350,8 @@ export default function EditCustomerModal({
         </div>
 
         {/* Account Management */}
-        <div className="border-t border-slate-700/50 pt-5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">
+        <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <h3 className="text-sm font-semibold text-slate-300 mb-2">
             Account Management
           </h3>
           <div className="grid grid-cols-2 gap-3">
@@ -385,35 +385,36 @@ export default function EditCustomerModal({
         </div>
 
         {/* Kontraktsinformation — skrivskyddad */}
-        <div className="border-t border-slate-700/50 pt-5">
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-xs uppercase tracking-wide text-slate-500 font-medium">
               Kontraktsinformation
             </h3>
-            <span className="text-[10px] px-1.5 py-0.5 bg-slate-700/50 text-slate-500 rounded">
+            <span className="text-[10px] uppercase tracking-wide text-slate-500 border border-slate-700 rounded px-1.5 py-0.5">
               Skrivskyddad
             </span>
           </div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
             <div className="flex justify-between">
               <span className="text-slate-500">Kontraktsstart</span>
-              <span className="text-slate-300">{formatDate(customer.contract_start_date)}</span>
+              <span className="text-slate-300 tabular-nums">{formatDate(customer.contract_start_date)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Kontraktsslut</span>
-              <span className="text-slate-300">{formatDate(customer.contract_end_date)}</span>
+              <span className="text-slate-300 tabular-nums">{formatDate(customer.contract_end_date)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Årsvärde</span>
-              <span className="text-slate-300">{formatCurrency(customer.annual_value)}</span>
+              <span className="text-slate-300 tabular-nums">{formatCurrency(customer.annual_value)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-500">Månadsvärde</span>
-              <span className="text-slate-300">{formatCurrency(customer.monthly_value)}</span>
+              <span className="text-slate-300 tabular-nums">{formatCurrency(customer.monthly_value)}</span>
             </div>
             <div className="flex justify-between col-span-2">
               <span className="text-slate-500">Totalt kontraktsvärde</span>
-              <span className="text-slate-300 font-medium">{formatCurrency(customer.total_contract_value)}</span>
+              <span className="text-slate-300 font-medium tabular-nums">{formatCurrency(customer.total_contract_value)}</span>
+
             </div>
           </div>
           <p className="text-[11px] text-slate-600 mt-2">
@@ -422,12 +423,12 @@ export default function EditCustomerModal({
         </div>
 
         {/* Servicedetaljer — skrivskyddad */}
-        <div className="border-t border-slate-700/50 pt-5">
-          <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="text-xs uppercase tracking-wide text-slate-500 font-medium">
               Servicedetaljer
             </h3>
-            <span className="text-[10px] px-1.5 py-0.5 bg-slate-700/50 text-slate-500 rounded">
+            <span className="text-[10px] uppercase tracking-wide text-slate-500 border border-slate-700 rounded px-1.5 py-0.5">
               Skrivskyddad
             </span>
           </div>

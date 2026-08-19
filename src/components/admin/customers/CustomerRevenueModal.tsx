@@ -2,7 +2,7 @@
 // Modal för att visa ackumulerat avtalsvärde och intäktsöversikt per kund
 
 import { useState, useEffect, useMemo } from 'react'
-import { X, Coins, FileText, Briefcase, TrendingUp, Calendar } from 'lucide-react'
+import { X, Coins, Calendar } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import { supabase } from '../../../lib/supabase'
 
@@ -52,24 +52,15 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
   cancelled: 'Avbruten',
 }
 
-const STATUS_COLORS: Record<InvoiceStatus, string> = {
-  paid: 'text-green-400 bg-green-500/10',
-  sent: 'text-purple-400 bg-purple-500/10',
-  booked: 'text-blue-400 bg-blue-500/10',
-  ready: 'text-emerald-400 bg-emerald-500/10',
-  pending_approval: 'text-amber-400 bg-amber-500/10',
-  draft: 'text-slate-400 bg-slate-500/10',
-  cancelled: 'text-slate-400 bg-slate-500/10',
-}
-
-const STATUS_BAR_COLORS: Record<InvoiceStatus, string> = {
-  paid: 'bg-green-500',
-  sent: 'bg-purple-500',
-  booked: 'bg-blue-500',
-  ready: 'bg-emerald-500',
-  pending_approval: 'bg-amber-500',
-  draft: 'bg-slate-500',
-  cancelled: 'bg-slate-500',
+// Statuspunkter i listans stil: ● punkt + text, #20c58f som enda accent
+const STATUS_DOT_COLORS: Record<InvoiceStatus, string> = {
+  paid: 'bg-[#20c58f]',
+  sent: 'bg-slate-400',
+  booked: 'bg-slate-500',
+  ready: 'bg-slate-300',
+  pending_approval: 'bg-amber-400',
+  draft: 'bg-slate-600',
+  cancelled: 'bg-slate-600',
 }
 
 export default function CustomerRevenueModal({ customer, contractId = null, isOpen, onClose }: CustomerRevenueModalProps) {
@@ -209,83 +200,60 @@ export default function CustomerRevenueModal({ customer, contractId = null, isOp
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className="bg-green-500/10 p-2 rounded-lg">
-              <Coins className="w-5 h-5 text-green-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Intäktsöversikt</h2>
-              <p className="text-sm text-slate-400">{customer.company_name}</p>
-            </div>
+        <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-slate-700 shrink-0">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-white truncate">Intäktsöversikt</h2>
+            <p className="text-xs text-slate-400 truncate mt-0.5">{customer.company_name}</p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors shrink-0"
+            aria-label="Stäng"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6">
+        <div className="p-4 space-y-3 overflow-y-auto flex-1">
           {loading ? (
             <div className="text-center py-12">
-              <div className="animate-spin w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full mx-auto mb-3" />
+              <div className="animate-spin w-8 h-8 border-2 border-[#20c58f] border-t-transparent rounded-full mx-auto mb-3" />
               <p className="text-slate-400 text-sm">Laddar intäktsdata...</p>
             </div>
           ) : stats ? (
             <>
-              {/* KPI-kort */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center">
-                  <div className="flex items-center justify-center gap-1.5 mb-2">
-                    <TrendingUp className="w-4 h-4 text-green-400" />
-                    <span className="text-xs text-slate-400 uppercase tracking-wide">Totalt ack. värde</span>
-                  </div>
-                  <div className="text-xl font-bold text-green-400">{formatCurrency(stats.totalAccumulated)}</div>
+              {/* Summering — textrader istället för KPI-kort */}
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-1.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-xs uppercase tracking-wide text-slate-500">Totalt ack. värde</span>
+                  <span className="text-sm font-semibold text-slate-100 tabular-nums">{formatCurrency(stats.totalAccumulated)}</span>
                 </div>
-
-                <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center">
-                  <div className="flex items-center justify-center gap-1.5 mb-2">
-                    <FileText className="w-4 h-4 text-purple-400" />
-                    <span className="text-xs text-slate-400 uppercase tracking-wide">Avtalsintäkter</span>
-                  </div>
-                  <div className="text-xl font-bold text-purple-400">{formatCurrency(stats.recurringRevenue)}</div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-xs uppercase tracking-wide text-slate-500">Avtalsintäkter</span>
+                  <span className="text-sm text-slate-200 tabular-nums">{formatCurrency(stats.recurringRevenue)}</span>
                 </div>
-
-                <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center">
-                  <div className="flex items-center justify-center gap-1.5 mb-2">
-                    <Briefcase className="w-4 h-4 text-blue-400" />
-                    <span className="text-xs text-slate-400 uppercase tracking-wide">Ärendeintäkter</span>
-                  </div>
-                  <div className="text-xl font-bold text-blue-400">{formatCurrency(stats.adHocRevenue)}</div>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-xs uppercase tracking-wide text-slate-500">Ärendeintäkter</span>
+                  <span className="text-sm text-slate-200 tabular-nums">{formatCurrency(stats.adHocRevenue)}</span>
                 </div>
               </div>
 
               {/* Statusfördelning */}
-              <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-white mb-4">Avtalsfakturering per status</h3>
-                <div className="space-y-3">
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                <h3 className="text-sm font-semibold text-slate-300 mb-2">Avtalsfakturering per status</h3>
+                <div className="space-y-1.5">
                   {(['paid', 'sent', 'booked', 'ready', 'pending_approval', 'draft'] as InvoiceStatus[]).map(status => {
                     const amount = stats.byStatus[status] || 0
-                    const barWidth = stats.maxStatus > 0 ? (amount / stats.maxStatus) * 100 : 0
                     return (
-                      <div key={status} className="flex items-center gap-3">
-                        <span className={`text-xs font-medium w-24 px-2 py-1 rounded ${STATUS_COLORS[status]}`}>
-                          {STATUS_LABELS[status]}
-                        </span>
-                        <div className="flex-1 h-5 bg-slate-700/50 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full transition-all ${STATUS_BAR_COLORS[status]}`}
-                            style={{ width: `${barWidth}%` }}
-                          />
-                        </div>
-                        <span className="text-sm text-slate-300 font-mono w-28 text-right">
+                      <div key={status} className="flex items-center gap-2 text-sm">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT_COLORS[status]}`} aria-hidden />
+                        <span className={amount > 0 ? 'text-slate-300' : 'text-slate-500'}>{STATUS_LABELS[status]}</span>
+                        <span className={`ml-auto tabular-nums ${amount > 0 ? 'text-slate-200' : 'text-slate-600'}`}>
                           {formatCurrency(amount)}
                         </span>
                       </div>
@@ -295,44 +263,40 @@ export default function CustomerRevenueModal({ customer, contractId = null, isOp
               </div>
 
               {/* Uppdelning */}
-              <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-white mb-4">Uppdelning</h3>
-                <div className="space-y-2">
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                <h3 className="text-sm font-semibold text-slate-300 mb-2">Uppdelning</h3>
+                <div className="space-y-1.5">
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Avtalsdebitering</span>
-                    <span className="text-white font-medium">{formatCurrency(stats.recurringRevenue)}</span>
+                    <span className="text-slate-200 tabular-nums">{formatCurrency(stats.recurringRevenue)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">Tilläggstjänster</span>
-                    <span className="text-white font-medium">{formatCurrency(stats.adHocRevenue)}</span>
+                    <span className="text-slate-200 tabular-nums">{formatCurrency(stats.adHocRevenue)}</span>
                   </div>
-                  <div className="border-t border-slate-700 pt-2 mt-2 flex justify-between text-sm font-semibold">
-                    <span className="text-white">Totalt</span>
-                    <span className="text-green-400">{formatCurrency(stats.totalAccumulated)}</span>
+                  <div className="border-t border-slate-800 pt-1.5 mt-1.5 flex justify-between text-sm font-semibold">
+                    <span className="text-slate-100">Totalt</span>
+                    <span className="text-[#20c58f] tabular-nums">{formatCurrency(stats.totalAccumulated)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Senaste perioder */}
               {periodGroups.length > 0 && (
-                <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-5">
-                  <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-slate-400" />
                     Senaste faktureringsperioder
                   </h3>
-                  <div className="space-y-2">
+                  <div className="divide-y divide-slate-800/70">
                     {periodGroups.map((group, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between text-sm py-2 px-3 rounded-lg bg-slate-800/50"
-                      >
-                        <span className="text-slate-300">{group.periodLabel}</span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-white font-mono font-medium">{formatCurrency(group.total)}</span>
-                          <span className={`text-xs px-2 py-0.5 rounded ${STATUS_COLORS[group.status]}`}>
-                            {STATUS_LABELS[group.status]}
-                          </span>
-                        </div>
+                      <div key={idx} className="flex items-center gap-3 py-1.5 text-sm">
+                        <span className="text-slate-300 flex-1 truncate">{group.periodLabel}</span>
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT_COLORS[group.status]}`} aria-hidden />
+                          <span className="text-xs text-slate-500">{STATUS_LABELS[group.status]}</span>
+                        </span>
+                        <span className="text-slate-200 tabular-nums shrink-0 w-24 text-right">{formatCurrency(group.total)}</span>
                       </div>
                     ))}
                   </div>
@@ -341,9 +305,9 @@ export default function CustomerRevenueModal({ customer, contractId = null, isOp
 
               {/* Tom state */}
               {billingItems.length === 0 && stats.casesRevenue === 0 && (
-                <div className="text-center py-8">
-                  <Coins className="w-12 h-12 text-slate-600 mx-auto mb-3" />
-                  <p className="text-slate-400">Inga faktureringsdata registrerade för denna kund.</p>
+                <div className="text-center py-4">
+                  <Coins className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400">Inga faktureringsdata registrerade för denna kund.</p>
                 </div>
               )}
             </>
