@@ -99,13 +99,15 @@ export default function Modal({
       <div
         className={`
           w-full ${sizeClasses[size]}
-          ${usePortal ? 'min-h-[600px] max-h-[90vh]' : 'max-h-[95vh]'}
+          ${usePortal ? 'max-h-[90dvh]' : 'max-h-[95dvh]'}
           overflow-hidden flex flex-col
           bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl shadow-black/20
           animate-in zoom-in-95 duration-200
         `}
         style={{
-          minHeight: usePortal ? '600px' : 'auto'
+          // min() gör att modalen aldrig blir högre än den synliga ytan på
+          // mobiler där webbläsarens adressfält krymper viewporten (dvh)
+          minHeight: usePortal ? 'min(600px, 85dvh)' : 'auto'
         }}
         onClick={(e: React.MouseEvent) => e.stopPropagation()}
       >

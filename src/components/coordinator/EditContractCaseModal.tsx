@@ -1625,7 +1625,7 @@ export default function EditContractCaseModal({
 
   // Modal footer
   const modalFooter = (
-    <div className="px-4 py-2.5 flex items-center justify-between">
+    <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
       <div>
         {!isCustomerView && (
           <button
@@ -1638,7 +1638,7 @@ export default function EditContractCaseModal({
           </button>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Button onClick={handleClose} variant="secondary" size="sm">
           Stäng
         </Button>
