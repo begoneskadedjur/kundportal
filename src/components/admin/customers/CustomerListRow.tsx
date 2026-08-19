@@ -145,8 +145,15 @@ export default function CustomerListRow({
     const handler = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
     }
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('keydown', keyHandler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('keydown', keyHandler)
+    }
   }, [menuOpen])
 
   const isMultisite = org.organizationType === 'multisite'
@@ -164,7 +171,7 @@ export default function CustomerListRow({
     org.daysToNextRenewal <= 90
 
   const menuItem =
-    'w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-700/50 hover:text-slate-100 flex items-center gap-2.5'
+    'w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2.5 transition-colors'
 
   return (
     <li className="list-none">
@@ -242,7 +249,7 @@ export default function CustomerListRow({
           </button>
           {menuOpen && (
             <div
-              className="absolute right-0 top-full mt-1 w-56 bg-slate-800 border border-slate-700 rounded-xl shadow-xl z-30 py-1"
+              className="absolute right-0 top-full mt-1 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 py-1"
               onClick={(e) => e.stopPropagation()}
             >
               <button onClick={() => { setMenuOpen(false); actions.onEdit() }} className={menuItem}>
@@ -250,7 +257,7 @@ export default function CustomerListRow({
                 Redigera kund
               </button>
               <button onClick={() => { setMenuOpen(false); actions.onRevenue() }} className={menuItem}>
-                <TrendingUp className="w-4 h-4 text-[#20c58f]" />
+                <TrendingUp className="w-4 h-4 text-slate-400" />
                 Intäktsöversikt
               </button>
               <button onClick={() => { setMenuOpen(false); actions.onBillingSettings() }} className={menuItem}>
@@ -266,16 +273,16 @@ export default function CustomerListRow({
               </button>
               {showRenewalAction && (
                 <button onClick={() => { setMenuOpen(false); actions.onRenewal() }} className={menuItem}>
-                  <RefreshCw className="w-4 h-4 text-amber-400" />
+                  <RefreshCw className="w-4 h-4 text-slate-400" />
                   Starta förnyelse
                 </button>
               )}
               {!org.isTerminated && (
                 <>
-                  <div className="border-t border-slate-700 my-1" />
+                  <div className="border-t border-slate-800 my-1" />
                   <button
                     onClick={() => { setMenuOpen(false); actions.onTerminate() }}
-                    className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2.5"
+                    className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2.5 transition-colors"
                   >
                     <XCircle className="w-4 h-4" />
                     Säg upp avtal

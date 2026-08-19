@@ -4,7 +4,7 @@
 import { useState, useEffect, useId } from 'react'
 import {
   Receipt, Save, Building2, Copy, TrendingUp, Plus,
-  Trash2, Package, CalendarDays, FileSignature, AlertCircle, RefreshCw
+  Trash2, Package, CalendarDays, FileSignature, AlertCircle, RefreshCw, X
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
@@ -645,21 +645,23 @@ export default function BillingSettingsModal({
       <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
 
         {/* Header */}
-        <div className="px-4 py-3 border-b border-slate-700 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 bg-[#20c58f]/10 rounded-full flex items-center justify-center">
-              <Receipt className="w-4 h-4 text-[#20c58f]" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold text-white truncate">
-                Faktureringsinställningar
-                {contractAddressLabel && (
-                  <span className="text-slate-400 font-normal"> — {contractAddressLabel}</span>
-                )}
-              </h2>
-              <p className="text-slate-400 text-xs truncate">{customerName}</p>
-            </div>
+        <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-slate-700 shrink-0">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-white truncate">
+              Faktureringsinställningar
+              {contractAddressLabel && (
+                <span className="text-slate-400 font-normal"> — {contractAddressLabel}</span>
+              )}
+            </h2>
+            <p className="text-slate-400 text-xs truncate mt-0.5">{customerName}</p>
           </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors shrink-0"
+            aria-label="Stäng"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Body */}
@@ -749,8 +751,8 @@ export default function BillingSettingsModal({
                     Dina ändringar påverkar befintliga fakturor
                   </div>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-slate-300">
-                    {liveDiff.create > 0 && <span className="text-emerald-400">{liveDiff.create} nya</span>}
-                    {liveDiff.update > 0 && <span className="text-blue-400">{liveDiff.update} ändras</span>}
+                    {liveDiff.create > 0 && <span className="text-[#20c58f]">{liveDiff.create} nya</span>}
+                    {liveDiff.update > 0 && <span className="text-amber-400">{liveDiff.update} ändras</span>}
                     {liveDiff.delete > 0 && <span className="text-red-400">{liveDiff.delete} tas bort</span>}
                     {liveDiff.locked > 0 && <span className="text-slate-500">{liveDiff.locked} låsta (rörs ej)</span>}
                   </div>
@@ -781,10 +783,10 @@ export default function BillingSettingsModal({
                     const label = date.toLocaleDateString('sv-SE', { month: 'long', year: 'numeric' })
                     const statusLabel = isPaid ? 'Betald' : isNext ? 'Nästa' : 'Väntande'
                     const statusClass = isPaid
-                      ? 'bg-slate-700/50 text-slate-400'
+                      ? 'text-slate-500'
                       : isNext
-                      ? 'bg-[#20c58f]/20 text-[#20c58f]'
-                      : 'bg-slate-700/30 text-slate-500'
+                      ? 'text-[#20c58f]'
+                      : 'text-slate-500'
                     const rowTextClass = isPaid
                       ? 'text-slate-500'
                       : isNext
@@ -802,11 +804,11 @@ export default function BillingSettingsModal({
                           <span className={isNext ? 'font-medium' : ''}>
                             {label.charAt(0).toUpperCase() + label.slice(1)}
                           </span>
-                          <span className={`px-1 py-0.5 text-[10px] rounded ${statusClass}`}>
+                          <span className={`text-[10px] uppercase tracking-wide ${statusClass}`}>
                             {statusLabel}
                           </span>
                         </div>
-                        <span className={isNext ? 'font-semibold text-white' : ''}>
+                        <span className={`tabular-nums ${isNext ? 'font-semibold text-white' : ''}`}>
                           {fmt(p.amount)}
                         </span>
                       </div>
@@ -874,7 +876,7 @@ export default function BillingSettingsModal({
               <div>
                 <Input label="Faktura-email" type="email" value={billingEmail} onChange={e => setBillingEmail(e.target.value)} placeholder="faktura@example.com" />
                 {billingEmail && billingEmail !== contactEmail && (
-                  <p className="text-xs text-yellow-400 mt-1">Skiljer sig från kontakt-email</p>
+                  <p className="text-xs text-amber-400 mt-1">Skiljer sig från kontakt-email</p>
                 )}
               </div>
               <Input label="Fakturaadress" value={billingAddress} onChange={e => setBillingAddress(e.target.value)} placeholder="Gatuadress, Postnr Ort" />
@@ -899,7 +901,7 @@ export default function BillingSettingsModal({
                   <div className="flex items-center gap-1.5 mb-1">
                     <FileSignature className="w-4 h-4 text-[#20c58f]" />
                     <h4 className="text-sm font-semibold text-white">Ingår i avtalet</h4>
-                    <span className="px-1.5 py-0.5 text-xs rounded-full bg-[#20c58f]/20 text-[#20c58f]">
+                    <span className="text-xs text-slate-500 tabular-nums">
                       {contractServices.length}
                     </span>
                   </div>
@@ -910,7 +912,7 @@ export default function BillingSettingsModal({
                           <span className="text-sm font-medium text-white">
                             {s.service_name} × {s.quantity}
                           </span>
-                          <span className="text-sm text-[#20c58f] font-medium">
+                          <span className="text-sm text-[#20c58f] font-medium tabular-nums">
                             {fmt(s.total_price)}
                           </span>
                         </div>
@@ -973,7 +975,7 @@ export default function BillingSettingsModal({
               </p>
               {hasAdjustment && (
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Efter justering ({adjustPct > 0 ? '+' : ''}{adjustPct}%): <span className="text-emerald-400 font-medium">{fmt(adjustedTotal)}</span>
+                  Efter justering ({adjustPct > 0 ? '+' : ''}{adjustPct}%): <span className="text-[#20c58f] font-medium tabular-nums">{fmt(adjustedTotal)}</span>
                   {freqMonths > 0 && freqMonths !== 12 && (
                     <> — {fmt(perPeriodAdj)} per faktura ({BILLING_FREQUENCY_CONFIG[billingFrequency]?.label.toLowerCase()})</>
                   )}
@@ -1032,7 +1034,7 @@ export default function BillingSettingsModal({
                         className="flex-1 px-2 py-0.5 text-xs bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                       />
                       {adj.adjustment_percent !== 0 && baseTotal > 0 && (
-                        <span className="text-xs text-emerald-400 shrink-0">
+                        <span className="text-xs text-[#20c58f] tabular-nums shrink-0">
                           {fmt(Math.round(baseTotal * (1 + adj.adjustment_percent / 100)))}
                         </span>
                       )}
@@ -1051,8 +1053,8 @@ export default function BillingSettingsModal({
 
             {/* Aktuell justering (används vid fakturering) */}
             {hasAdjustment && baseTotal > 0 && (
-              <div className="flex items-center gap-2 p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                <span className="text-xs text-emerald-400 font-medium">{fmt(baseTotal)} → {fmt(adjustedTotal)}</span>
+              <div className="flex items-center gap-2 p-2 bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-lg">
+                <span className="text-xs text-[#20c58f] font-medium tabular-nums">{fmt(baseTotal)} → {fmt(adjustedTotal)}</span>
                 <span className="text-xs text-slate-400">(aktuell justering: {adjustPct > 0 ? '+' : ''}{adjustPct}%)</span>
               </div>
             )}
@@ -1062,7 +1064,7 @@ export default function BillingSettingsModal({
           {isMultisite && (
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
               <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-1.5">
-                <Building2 className="w-4 h-4 text-blue-400" />Faktureringssätt
+                <Building2 className="w-4 h-4 text-slate-400" />Faktureringssätt
               </h3>
               <div className="space-y-2">
                 {(['consolidated', 'per_site'] as const).map(type => (
@@ -1120,18 +1122,24 @@ export default function BillingSettingsModal({
 
         {/* Footer */}
         <div className="px-4 py-2.5 border-t border-slate-700/50 flex items-center justify-end gap-2 shrink-0">
-          <Button variant="secondary" onClick={onClose} disabled={saving}>Avbryt</Button>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 text-sm font-medium border border-slate-700 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
+          >
+            Avbryt
+          </button>
           {liveDiff && (liveDiff.create + liveDiff.update + liveDiff.delete) > 0 && (
-            <Button
-              variant="secondary"
+            <button
               onClick={handleApplyInvoices}
               disabled={saving}
-              className="flex items-center gap-2 border-amber-500/50 text-amber-300 hover:bg-amber-500/10"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium border border-amber-500/50 rounded-lg text-amber-300 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
             >
               <RefreshCw className="w-4 h-4" />
               Uppdatera fakturor ({liveDiff.create + liveDiff.update + liveDiff.delete})
-            </Button>
+            </button>
           )}
+
           <Button onClick={handleSave} disabled={saving} className="flex items-center gap-2">
             {saving ? <LoadingSpinner /> : <Save className="w-4 h-4" />}
             Spara

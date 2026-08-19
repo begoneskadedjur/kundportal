@@ -1,7 +1,7 @@
 // src/components/admin/customers/TerminateContractModal.tsx - Modal för avtalsuppsägning
 
 import React, { useState, useMemo } from 'react'
-import { X, AlertTriangle, Calendar, DollarSign } from 'lucide-react'
+import { X, AlertTriangle } from 'lucide-react'
 import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -159,149 +159,150 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-700">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">Säg upp avtal</h2>
-              <p className="text-sm text-slate-400">{organization.company_name}</p>
-            </div>
+        <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-slate-700 shrink-0">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-white truncate flex items-center gap-1.5">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              Säg upp avtal
+            </h2>
+            <p className="text-xs text-slate-400 truncate mt-0.5">{organization.company_name}</p>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors">
-            <X className="w-5 h-5" />
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors shrink-0"
+            aria-label="Stäng"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Nuvarande avtal */}
-        <div className="p-5 border-b border-slate-700">
-          <h3 className="text-sm font-medium text-slate-300 mb-3">Nuvarande avtal</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
-                <DollarSign className="w-3 h-3" />
-                Avtalsvärde
+        {/* Body */}
+        <div className="p-4 space-y-3 overflow-y-auto flex-1">
+          {/* Nuvarande avtal — textrader med whisper header */}
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+            <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">Nuvarande avtal</h3>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-slate-400">Avtalsvärde</span>
+                <span className="text-slate-200 tabular-nums">
+                  {formatCurrency(organization.totalContractValue)}
+                  <span className="text-slate-500"> · {formatCurrency(organization.totalAnnualValue || 0)}/år</span>
+                </span>
               </div>
-              <div className="text-sm font-semibold text-white">{formatCurrency(organization.totalContractValue)}</div>
-              <div className="text-xs text-slate-500">{formatCurrency(organization.totalAnnualValue || 0)}/år</div>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-slate-400">Avtalets slutdatum</span>
+                <span className="text-slate-200 tabular-nums">
+                  {contractEnd ? formatDate(contractEnd) : 'Ej angivet'}
+                  {contractEnd && (
+                    <span className={`ml-2 text-xs ${today > contractEnd ? 'text-amber-400' : 'text-slate-500'}`}>
+                      {today > contractEnd ? 'Avtalet har löpt vidare' : `${organization.daysToNextRenewal} dagar kvar`}
+                    </span>
+                  )}
+                </span>
+              </div>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3">
-              <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
-                <Calendar className="w-3 h-3" />
-                Avtalets slutdatum
+          </div>
+
+          {/* Uppsägningsinfo */}
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
+            <h3 className="text-sm font-semibold text-slate-300">Uppsägningsberäkning</h3>
+
+            {customEndDate ? (
+              <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
+                <p className="text-sm text-slate-300 font-medium mb-1">Manuellt angivet slutdatum</p>
+                <p className="text-xs text-slate-400">
+                  Avtalet avslutas: <strong className="text-white tabular-nums">{formatDate(resolvedEndDate)}</strong>
+                </p>
               </div>
-              <div className="text-sm font-semibold text-white">
-                {contractEnd ? formatDate(contractEnd) : 'Ej angivet'}
+            ) : isWithinContractPeriod ? (
+              <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
+                <p className="text-sm text-slate-300 font-medium mb-1">Uppsägning inom avtalstiden</p>
+                <p className="text-xs text-slate-400">
+                  Avtalet avslutas vid nuvarande slutdatum: <strong className="text-white tabular-nums">{formatDate(resolvedEndDate)}</strong>
+                </p>
               </div>
-              {contractEnd && (
-                <div className={`text-xs font-medium ${today > contractEnd ? 'text-amber-400' : 'text-slate-500'}`}>
-                  {today > contractEnd ? 'Avtalet har löpt vidare' : `${organization.daysToNextRenewal} dagar kvar`}
-                </div>
+            ) : (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                <p className="text-sm text-amber-300 font-medium mb-1">Avtalet har löpt vidare efter avtalstiden</p>
+                <p className="text-xs text-slate-400">
+                  Uppsägningstid 2 månader. Avtalet avslutas: <strong className="text-white tabular-nums">{formatDate(resolvedEndDate)}</strong>
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">
+                Slutdatum (valfritt — åsidosätter beräknat datum)
+              </label>
+              <input
+                type="text"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                placeholder="ÅÅÅÅ-MM-DD"
+                maxLength={10}
+                className={`w-full bg-slate-800 border rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 transition-colors ${
+                  customEndDate && !customDateValid
+                    ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500/20'
+                    : 'border-slate-700 focus:ring-[#20c58f]'
+                }`}
+              />
+              {customEndDate && !customDateValid && (
+                <p className="mt-1 text-xs text-red-400">Ogiltigt datumformat — använd ÅÅÅÅ-MM-DD</p>
+              )}
+              {customEndDate && (
+                <button
+                  type="button"
+                  onClick={() => setCustomEndDate('')}
+                  className="mt-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Återställ till beräknat datum
+                </button>
               )}
             </div>
           </div>
-        </div>
 
-        {/* Uppsägningsinfo */}
-        <div className="p-5 border-b border-slate-700">
-          <h3 className="text-sm font-medium text-slate-300 mb-3">Uppsägningsberäkning</h3>
+          {/* Anledning */}
+          <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">Anledning (valfritt)</label>
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                placeholder="Anledning till uppsägningen..."
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] resize-none"
+              />
+            </div>
 
-          {customEndDate ? (
-            <div className="rounded-lg p-4 border bg-slate-700/30 border-slate-600">
-              <p className="text-sm text-slate-300 font-medium mb-1">Manuellt angivet slutdatum</p>
-              <p className="text-xs text-slate-400">
-                Avtalet avslutas: <strong className="text-white">{formatDate(resolvedEndDate)}</strong>
-              </p>
-            </div>
-          ) : isWithinContractPeriod ? (
-            <div className="rounded-lg p-4 border bg-blue-500/10 border-blue-500/30">
-              <p className="text-sm text-blue-300 font-medium mb-1">Uppsägning inom avtalstiden</p>
-              <p className="text-xs text-blue-200/70">
-                Avtalet avslutas vid nuvarande slutdatum: <strong className="text-white">{formatDate(resolvedEndDate)}</strong>
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-lg p-4 border bg-amber-500/10 border-amber-500/30">
-              <p className="text-sm text-amber-300 font-medium mb-1">Avtalet har löpt vidare efter avtalstiden</p>
-              <p className="text-xs text-amber-200/70">
-                Uppsägningstid 2 månader. Avtalet avslutas: <strong className="text-white">{formatDate(resolvedEndDate)}</strong>
-              </p>
-            </div>
-          )}
-
-          <div className="mt-3">
-            <label className="block text-xs text-slate-400 mb-1">
-              Slutdatum (valfritt — åsidosätter beräknat datum)
+            {/* Bekräftelse checkbox */}
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                className="mt-0.5 rounded bg-slate-700 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
+              />
+              <span className="text-xs text-slate-300">
+                Jag bekräftar att avtalet med <strong>{organization.company_name}</strong> ska sägas upp med slutdatum <strong className="tabular-nums">{formatDate(resolvedEndDate)}</strong>.
+              </span>
             </label>
-            <input
-              type="text"
-              value={customEndDate}
-              onChange={(e) => setCustomEndDate(e.target.value)}
-              placeholder="ÅÅÅÅ-MM-DD"
-              maxLength={10}
-              className={`w-full bg-slate-800 border rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors ${
-                customEndDate && !customDateValid
-                  ? 'border-red-500/70 focus:border-red-500 focus:ring-red-500/20'
-                  : 'border-slate-700 focus:border-red-500/50 focus:ring-red-500/20'
-              }`}
-            />
-            {customEndDate && !customDateValid && (
-              <p className="mt-1 text-xs text-red-400">Ogiltigt datumformat — använd ÅÅÅÅ-MM-DD</p>
-            )}
-            {customEndDate && (
-              <button
-                type="button"
-                onClick={() => setCustomEndDate('')}
-                className="mt-1 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                Återställ till beräknat datum
-              </button>
-            )}
           </div>
-        </div>
-
-        {/* Anledning */}
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Anledning (valfritt)</label>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={3}
-              placeholder="Anledning till uppsägningen..."
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-red-500/50 focus:ring-1 focus:ring-red-500/20 resize-none"
-            />
-          </div>
-
-          {/* Bekräftelse checkbox */}
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
-              className="mt-0.5 rounded bg-slate-700 border-slate-600 text-red-500 focus:ring-red-500"
-            />
-            <span className="text-xs text-slate-300">
-              Jag bekräftar att avtalet med <strong>{organization.company_name}</strong> ska sägas upp med slutdatum <strong>{formatDate(resolvedEndDate)}</strong>.
-            </span>
-          </label>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-5 border-t border-slate-700">
+        <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-700/50 shrink-0">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-sm font-medium border border-slate-700 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
           >
             Avbryt
           </button>
           <button
             onClick={handleTerminate}
             disabled={!confirmed || saving || !customDateValid}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-red-500 text-[#fff] rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <AlertTriangle className="w-4 h-4" />
             {saving ? 'Säger upp...' : 'Säg upp avtal'}
