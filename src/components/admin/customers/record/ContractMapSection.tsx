@@ -1349,6 +1349,40 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 }
 
 // ---------------------------------------------------------------------------
+// Avtalsobjekt: avtalstexten från Oneflow (vad som ingår, stationer per plats)
+// ---------------------------------------------------------------------------
+
+const AGREEMENT_PREVIEW_CHARS = 340
+
+function AgreementObjectText({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const trimmed = text.trim()
+  const isLong = trimmed.length > AGREEMENT_PREVIEW_CHARS
+
+  // Radbrytningar bär strukturen (en rad per anläggning i Oneflow-mallen)
+  const shown = expanded || !isLong ? trimmed : trimmed.slice(0, AGREEMENT_PREVIEW_CHARS).trimEnd() + '…'
+
+  return (
+    <div className="mt-3">
+      <div className="flex items-baseline gap-2 border-b border-[#d9d3c2] pb-1">
+        <h4 className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] text-[#8a9099]">
+          Avtalsobjekt
+        </h4>
+        {isLong && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="ml-auto font-sans text-[10px] text-[#8a9099] hover:text-[#262e38] underline decoration-dotted"
+          >
+            {expanded ? 'visa mindre' : 'visa hela'}
+          </button>
+        )}
+      </div>
+      <p className="text-[12.5px] leading-relaxed text-[#5d6672] pt-1.5 whitespace-pre-line">{shown}</p>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Besöksfrekvens: hur ofta kunden ska besökas enligt avtalet
 // ---------------------------------------------------------------------------
 
@@ -1823,6 +1857,12 @@ function PaperContract({
           </>
         )}
       </div>
+
+      {/* Avtalsobjekt — texten från Oneflow-avtalet: vad som ingår, antal
+          stationer per plats, besöksintervall. Lång text fälls ihop. */}
+      {contract.agreement_text && contract.agreement_text.trim().length > 0 && (
+        <AgreementObjectText text={contract.agreement_text} />
+      )}
 
       {/* § 2 Prislista */}
       <div className="mt-3.5">

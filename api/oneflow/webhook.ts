@@ -499,11 +499,14 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
   }
   console.log(`  💰 Totalt värde: ${totalValue} kr`)
 
-  // Bygg agreement text från data fields
+  // Bygg agreement text från data fields. Detta är "Avtalsobjekt" i mallen:
+  // vad som ingår, antal stationer per plats, besöksintervall. Visas under
+  // § 1 Omfattning på avtalskartan.
   const agreementParts = [
     dataFields['stycke-1'],
     dataFields['stycke-2'],
-    dataFields['arbetsbeskrivning']
+    dataFields['arbetsbeskrivning'],
+    dataFields['ovrig-info']
   ].filter(Boolean)
 
   return {
