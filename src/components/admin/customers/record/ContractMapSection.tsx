@@ -1224,7 +1224,7 @@ function PaperContract({
           <div className="font-sans text-[9.5px] uppercase tracking-[0.2em] text-[#8a9099] mb-0.5">
             {isUnitContract ? 'Enhetsavtal' : 'Organisationsavtal'} · BeGone Skadedjur &amp; Sanering
           </div>
-          <h3 className="text-lg font-bold leading-snug">{contractDisplayName(contract)}</h3>
+          <h3 className="text-lg font-bold leading-snug text-[#262e38]">{contractDisplayName(contract)}</h3>
           <div className="text-[11.5px] italic text-[#5d6672] mt-0.5">
             mellan BeGone Skadedjur &amp; Sanering AB och {isUnitContract && owner ? customerRowName(owner) + ', ' : ''}
             {root.company_name}
@@ -1253,7 +1253,7 @@ function PaperContract({
 
       {/* Värderad */}
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-3.5 mb-1 px-3 py-2.5 rounded-md bg-black/[.035]">
-        <span className="text-xl font-bold tabular-nums">
+        <span className="text-xl font-bold tabular-nums text-[#262e38]">
           {annual > 0 ? formatKr(annual) : 'Avrop'}
           <span className="text-xs font-normal text-[#5d6672]">
             {annual > 0 ? `/år${frequency ? ` · faktureras ${frequency}` : ''}` : ' — fasta priser per ärende'}
@@ -1276,7 +1276,7 @@ function PaperContract({
       {/* § 1 Omfattning */}
       <div className="mt-3">
         <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
-          <h4 className="text-xs font-bold uppercase tracking-[0.12em]">§ 1 · Omfattning</h4>
+          <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 1 · Omfattning</h4>
           <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
             {contract.covers_all_sites
               ? 'hela verksamheten'
@@ -1288,7 +1288,7 @@ function PaperContract({
         {contract.covers_all_sites ? (
           <div className="flex items-center gap-2.5 py-2 text-[13.5px] border-b border-dotted border-[#d9d3c2]">
             <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">1.1</span>
-            <span className="font-semibold">Hela verksamheten</span>
+            <span className="font-semibold text-[#262e38]">Hela verksamheten</span>
             <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
             <span className="text-[11.5px] text-[#5d6672] whitespace-nowrap">
               samtliga nuvarande och framtida enheter
@@ -1305,7 +1305,7 @@ function PaperContract({
         ) : isUnitContract && owner ? (
           <div className="flex items-center gap-2.5 py-2 text-[13.5px] border-b border-dotted border-[#d9d3c2]">
             <span className="w-6 text-[11px] text-[#8a9099] tabular-nums">1.1</span>
-            <span className="font-semibold">{customerRowName(owner)}</span>
+            <span className="font-semibold text-[#262e38]">{customerRowName(owner)}</span>
             <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1" />
             <span className="text-[11.5px] text-[#5d6672]">avtalet bor på enheten</span>
           </div>
@@ -1322,7 +1322,7 @@ function PaperContract({
                   title="Dra till ett annat avtal för att flytta täckningen"
                 >
                   <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">1.{i + 1}</span>
-                  <span className="font-semibold truncate">{unit ? customerRowName(unit) : 'Okänd enhet'}</span>
+                  <span className="font-semibold truncate text-[#262e38]">{unit ? customerRowName(unit) : 'Okänd enhet'}</span>
                   <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
                   <span
                     className={`text-[11.5px] tabular-nums whitespace-nowrap shrink-0 ${
@@ -1357,11 +1357,11 @@ function PaperContract({
       {/* § 2 Prislista */}
       <div className="mt-3.5">
         <div className="border-b-[1.5px] border-[#262e38] pb-1">
-          <h4 className="text-xs font-bold uppercase tracking-[0.12em]">§ 2 · Prislista för avrop</h4>
+          <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 2 · Prislista för avrop</h4>
         </div>
         <div className="flex items-center gap-3 pt-2">
           <div className="min-w-0">
-            <div className="font-bold text-[13.5px]">{priceListLabel ?? 'Ingen egen prislista'}</div>
+            <div className="font-bold text-[13.5px] text-[#262e38]">{priceListLabel ?? 'Ingen egen prislista'}</div>
             <div className="font-sans text-[11px] text-[#8a9099]">
               {priceListLabel
                 ? 'Styr tjänstepriser för avrop och tillägg per ärende — följer med till fakturan.'
@@ -1382,7 +1382,7 @@ function PaperContract({
       {/* § 3 Uppföljning */}
       <div className="mt-3.5">
         <div className="border-b-[1.5px] border-[#262e38] pb-1">
-          <h4 className="text-xs font-bold uppercase tracking-[0.12em]">§ 3 · Uppföljning</h4>
+          <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 3 · Uppföljning</h4>
         </div>
         <div className="flex flex-wrap gap-2.5 pt-2.5 font-sans">
           <button
@@ -1392,7 +1392,7 @@ function PaperContract({
             <span className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-widest font-bold text-[#8a9099]">
               <Calendar className="w-3 h-3" /> Nästa kontrollbesök
             </span>
-            <span className="block text-[12.5px] font-semibold mt-0.5">
+            <span className="block text-[12.5px] font-semibold mt-0.5 text-[#262e38]">
               {followup.nextVisit
                 ? `${formatDateSv(followup.nextVisit.scheduled_at)} · ${customerRowName(
                     customerById.get(followup.nextVisit.customer_id) ?? root
@@ -1407,7 +1407,7 @@ function PaperContract({
             <span className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-widest font-bold text-[#8a9099]">
               <CalendarCheck className="w-3 h-3" /> Kontrollbesök
             </span>
-            <span className="block text-[12.5px] font-semibold mt-0.5">
+            <span className="block text-[12.5px] font-semibold mt-0.5 text-[#262e38]">
               {followup.visitsDone === 0 && followup.visitsBooked === 0 ? (
                 <span className="text-[#8a9099]">Inga registrerade</span>
               ) : (
@@ -1427,7 +1427,7 @@ function PaperContract({
             <span className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-widest font-bold text-[#8a9099]">
               <Clock className="w-3 h-3" /> Ärenden
             </span>
-            <span className="block text-[12.5px] font-semibold mt-0.5">
+            <span className="block text-[12.5px] font-semibold mt-0.5 text-[#262e38]">
               <span className="text-[#157a5b]">{followup.casesDone} utförda</span>
               {followup.casesOpen > 0 && <span className="text-[#b45309]"> · {followup.casesOpen} öppna</span>}
             </span>
