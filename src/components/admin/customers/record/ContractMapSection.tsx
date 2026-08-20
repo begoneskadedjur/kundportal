@@ -191,29 +191,39 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       billingByCustomer.set(b.customer_id, list)
     }
 
-    // Vilka avtal täcker en enhet? Avtalet äger raden, står i omfattningen,
+    // Lokaler = de platser avtalen kan omfatta. Har kunden enheter är det de;
+    // saknas enheter är KUNDEN SJÄLV lokalen (en vanlig kund utan multisite —
+    // organisationen och platsen är samma sak).
+    const isSingleSite = units.length === 0
+    const locations: RecordCustomer[] = isSingleSite ? [root] : units
+    const locationIds = new Set(locations.map((l) => l.id))
+
+    // Vilka avtal täcker en lokal? Avtalet äger raden, står i omfattningen,
     // ELLER har covers_all_sites (täcker allt inkl. framtida enheter).
     const coverage = new Map<string, RecordContract[]>()
-    for (const u of units) coverage.set(u.id, [])
-    const addCoverage = (unitId: string, c: RecordContract) => {
-      const list = coverage.get(unitId)
+    for (const l of locations) coverage.set(l.id, [])
+    const addCoverage = (locationId: string, c: RecordContract) => {
+      const list = coverage.get(locationId)
       if (list && !list.some((x) => x.id === c.id)) list.push(c)
     }
     for (const c of papers) {
       if (c.covers_all_sites) {
-        for (const u of units) addCoverage(u.id, c)
+        for (const l of locations) addCoverage(l.id, c)
         continue
       }
-      if (unitIds.has(c.customer_id ?? '')) addCoverage(c.customer_id as string, c)
+      if (locationIds.has(c.customer_id ?? '')) addCoverage(c.customer_id as string, c)
       for (const cs of activeScopeByContract.get(c.id) ?? []) {
-        if (unitIds.has(cs.customer_id)) addCoverage(cs.customer_id, c)
+        if (locationIds.has(cs.customer_id)) addCoverage(cs.customer_id, c)
       }
     }
-    const uncoveredUnits = units.filter((u) => (coverage.get(u.id) ?? []).length === 0)
+    const uncoveredUnits = locations.filter((l) => (coverage.get(l.id) ?? []).length === 0)
 
     return {
       customerById,
       unitIds,
+      locations,
+      locationIds,
+      isSingleSite,
       papers,
       leftovers,
       customerRowContracts,
@@ -231,6 +241,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const {
     customerById,
     unitIds,
+    locations,
+    locationIds,
+    isSingleSite,
     papers,
     leftovers,
     customerRowContracts,
@@ -267,11 +280,11 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       const color = accentByContract.get(c.id) ?? ACCENTS[0]
       const sources = new Set<string>()
       if (c.covers_all_sites) {
-        for (const u of units) sources.add(u.id)
+        for (const l of locations) sources.add(l.id)
       } else {
-        if (unitIds.has(c.customer_id ?? '')) sources.add(c.customer_id as string)
+        if (locationIds.has(c.customer_id ?? '')) sources.add(c.customer_id as string)
         for (const cs of activeScopeByContract.get(c.id) ?? []) {
-          if (unitIds.has(cs.customer_id)) sources.add(cs.customer_id)
+          if (locationIds.has(cs.customer_id)) sources.add(cs.customer_id)
         }
       }
       for (const unitId of sources) {
@@ -293,7 +306,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       }
     }
     setWires(next)
-  }, [papers, units, unitIds, activeScopeByContract, accentByContract])
+  }, [papers, locations, locationIds, activeScopeByContract, accentByContract])
 
   useLayoutEffect(() => {
     recomputeWires()
@@ -321,13 +334,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       if (contract.covers_all_sites) return 'Omfattar redan hela verksamheten'
       if (payload.type === 'org') return null
       const unitId = payload.unitId
-      if (contract.customer_id === unitId) return 'Avtalet bor redan på enheten'
+      // Enkelkund: avtalet bor på kundraden som ÄR lokalen. Då ska lokalen
+      // ändå kunna skrivas in i omfattningen — det är hela poängen.
+      if (!isSingleSite && contract.customer_id === unitId) return 'Avtalet bor redan på enheten'
       if (payload.type === 'scoperow' && payload.fromContractId === contract.id) return 'Står redan i detta avtal'
       const scope = activeScopeByContract.get(contract.id) ?? []
       if (scope.some((cs) => cs.customer_id === unitId)) return 'Står redan i § 1 Omfattning'
       return null
     },
-    [activeScopeByContract]
+    [activeScopeByContract, isSingleSite]
   )
 
   const findPaperAt = (x: number, y: number): RecordContract | null => {
@@ -444,7 +459,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     setBusy(true)
     try {
       if (payload.type === 'org') {
-        const added = await ContractScopeService.coverAll(contract.id, units.map((u) => u.id), date)
+        const added = await ContractScopeService.coverAll(contract.id, locations.map((l) => l.id), date)
         if (added === 0) {
           toast('Alla enheter täcks redan av avtalet.', { icon: 'ℹ️' })
         } else {
@@ -586,7 +601,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       // när avtalet täcker hela verksamheten)
       const covered = (
         contract.covers_all_sites
-          ? [contract.customer_id as string, ...units.map((u) => u.id)]
+          ? [contract.customer_id as string, ...locations.map((l) => l.id)]
           : [
               contract.customer_id as string,
               ...(activeScopeByContract.get(contract.id) ?? []).map((cs) => cs.customer_id),
@@ -622,7 +637,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         covered,
       }
     },
-    [activeScopeByContract, cases, inspections, units]
+    [activeScopeByContract, cases, inspections, locations]
   )
 
   // -------------------------------------------------------------------------
@@ -650,9 +665,11 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           <div className="text-lg font-bold tabular-nums">{papers.length}</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-500">Täckta enheter</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-500">
+            {isSingleSite ? 'Täckt lokal' : 'Täckta enheter'}
+          </div>
           <div className={`text-lg font-bold tabular-nums ${uncoveredUnits.length ? 'text-amber-400' : 'text-[#20c58f]'}`}>
-            {units.length - uncoveredUnits.length} av {units.length}
+            {locations.length - uncoveredUnits.length} av {locations.length}
           </div>
         </div>
         {endedCount > 0 && (
@@ -749,7 +766,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           {units.length > 0 && <hr className="border-slate-700/50 my-3" />}
 
           <div className="space-y-2">
-            {units.map((u) => {
+            {locations.map((u) => {
               const cov = coverage.get(u.id) ?? []
               const uncovered = cov.length === 0
               return (
@@ -778,7 +795,14 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                     <Home className={`w-4 h-4 ${uncovered ? 'text-amber-400' : 'text-slate-400'}`} />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-slate-200 truncate">{customerRowName(u)}</div>
+                    <div className="text-sm font-semibold text-slate-200 truncate">
+                      {isSingleSite ? u.company_name : customerRowName(u)}
+                    </div>
+                    {isSingleSite && (
+                      <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">
+                        Kundens lokal
+                      </div>
+                    )}
                     {uncovered ? (
                       <div className="text-[11px] text-amber-300">Ingen avtalstäckning — dra in i ett avtal</div>
                     ) : (
@@ -805,12 +829,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                 </div>
               )
             })}
-            {units.length === 0 && (
-              <p className="text-xs text-slate-500 py-1">
-                Kunden har inga enheter. Lägg till en enhet för att dela upp avtalen per plats.
-              </p>
-            )}
           </div>
+
+          {isSingleSite && (
+            <p className="text-[11px] text-slate-500 mt-2.5 leading-relaxed">
+              Kunden har en lokal. Lägg till enheter först om verksamheten ska delas upp per plats.
+            </p>
+          )}
 
           {uncoveredUnits.length > 0 && (
             <div className="mt-3 flex items-start gap-2 text-[11px] text-amber-300 bg-amber-400/10 border border-amber-400/30 rounded-xl px-3 py-2">
@@ -869,7 +894,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onEndCoverage={(cs, x, y) => endCoverage(c, cs, x, y)}
               onEditPriceList={(x, y) => setPricePrompt({ x, y, contract: c })}
               onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
-              isUnitContract={unitIds.has(c.customer_id ?? '')}
+              isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
+              isSingleSite={isSingleSite}
             />
           ))}
 
@@ -1233,6 +1259,8 @@ interface PaperProps {
   awaiting: boolean
   dragSubject: string | null
   isUnitContract: boolean
+  /** Kunden saknar enheter — kundraden ÄR lokalen */
+  isSingleSite: boolean
   registerRef: (el: HTMLElement | null) => void
   onHover: (on: boolean) => void
   onScopeRowDrag: (e: React.PointerEvent, cs: RecordContractSite) => void
@@ -1259,6 +1287,7 @@ function PaperContract({
   awaiting,
   dragSubject,
   isUnitContract,
+  isSingleSite,
   registerRef,
   onHover,
   onScopeRowDrag,
@@ -1399,7 +1428,9 @@ function PaperContract({
               ? 'hela verksamheten'
               : isUnitContract
                 ? 'enhetsavtal'
-                : `${scope.length} enhet${scope.length === 1 ? '' : 'er'}`}
+                : isSingleSite
+                  ? `${scope.length} av 1 lokal`
+                  : `${scope.length} enhet${scope.length === 1 ? '' : 'er'}`}
           </span>
         </div>
         {contract.covers_all_sites ? (
@@ -1439,7 +1470,9 @@ function PaperContract({
                   title="Dra till ett annat avtal för att flytta täckningen"
                 >
                   <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">1.{i + 1}</span>
-                  <span className="font-semibold truncate text-[#262e38]">{unit ? customerRowName(unit) : 'Okänd enhet'}</span>
+                  <span className="font-semibold truncate text-[#262e38]">
+                    {unit ? (isSingleSite ? unit.company_name : customerRowName(unit)) : 'Okänd enhet'}
+                  </span>
                   <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
                   <span
                     className={`text-[11.5px] tabular-nums whitespace-nowrap shrink-0 ${
@@ -1464,7 +1497,9 @@ function PaperContract({
             {scope.length === 0 && (
               <div className="flex items-center gap-2 py-3 text-[12.5px] italic text-[#8a9099]">
                 <Home className="w-3.5 h-3.5" />
-                Inga enheter omfattas ännu — dra in dem från vänster.
+                {isSingleSite
+                  ? `${root.company_name} omfattas inte ännu — dra in lokalen från vänster.`
+                  : 'Inga enheter omfattas ännu — dra in dem från vänster.'}
               </div>
             )}
           </>
