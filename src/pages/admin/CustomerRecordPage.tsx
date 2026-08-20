@@ -13,7 +13,7 @@ export default function CustomerRecordPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
-  const { data, loading, error } = useCustomerRecord(id)
+  const { data, loading, error, refetch } = useCustomerRecord(id)
 
   // Fungerar för /admin, /koordinator och /saljare — samma sidkomponent
   const basePath = `${location.pathname.split('/befintliga-kunder')[0]}/befintliga-kunder`
@@ -60,7 +60,7 @@ export default function CustomerRecordPage() {
           Befintliga kunder
         </button>
 
-        <CustomerRecordContent data={data} basePath={basePath} density="full" />
+        <CustomerRecordContent data={data} basePath={basePath} density="full" onDataChanged={refetch} />
       </div>
     </div>
   )

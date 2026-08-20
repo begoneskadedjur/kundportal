@@ -281,7 +281,22 @@ export class PriceListService {
   static async getEffectiveServicePrice(
     serviceId: string,
     customerId?: string | null
-  ): Promise<{ price: number; source: 'customer_list' | 'default' } | null> {
+  ): Promise<{ price: number; source: 'contract_list' | 'customer_list' | 'default' } | null> {
+    // 0. Avtalets prislista (avtal som bor på/täcker kundraden)
+    if (customerId) {
+      const contractListId = await this.resolveContractPriceListId(customerId)
+      if (contractListId) {
+        const { data: priceItem } = await supabase
+          .from('price_list_items')
+          .select('custom_price')
+          .eq('price_list_id', contractListId)
+          .eq('service_id', serviceId)
+          .maybeSingle()
+
+        if (priceItem) return { price: priceItem.custom_price, source: 'contract_list' }
+      }
+    }
+
     // 1. Kundens prislista
     if (customerId) {
       const { data: customer } = await supabase
@@ -316,6 +331,73 @@ export class PriceListService {
     }
 
     return null
+  }
+
+  /**
+   * Avtalets prislista för en kundrad: avtal som BOR på raden vinner, därefter
+   * avtal som TÄCKER raden via contract_sites (aktiv täckning idag). Nyaste
+   * avtalet med prislista vinner vid flera träffar. Null = inget avtal styr.
+   */
+  static async resolveContractPriceListId(customerId: string): Promise<string | null> {
+    const today = new Date().toISOString().slice(0, 10)
+
+    // 1. Avtal som bor på kundraden
+    const { data: owned } = await supabase
+      .from('contracts')
+      .select('id, price_list_id, created_at')
+      .eq('customer_id', customerId)
+      .in('status', ['signed', 'active'])
+      .not('price_list_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    const ownedListId = (owned?.[0] as { price_list_id?: string | null } | undefined)?.price_list_id
+    if (ownedListId) return ownedListId
+
+    // 2. Avtal som täcker kundraden via contract_sites
+    const { data: covering } = await supabase
+      .from('contract_sites')
+      .select('active_from, active_to, contract:contracts!inner(id, price_list_id, status, created_at)')
+      .eq('customer_id', customerId)
+    type CoveringRow = {
+      active_from: string | null
+      active_to: string | null
+      contract: { id: string; price_list_id: string | null; status: string; created_at: string } | null
+    }
+    const candidates = ((covering ?? []) as unknown as CoveringRow[])
+      .filter((r) => (!r.active_to || r.active_to >= today) && (!r.active_from || r.active_from <= today))
+      .map((r) => r.contract)
+      .filter(
+        (c): c is NonNullable<CoveringRow['contract']> =>
+          !!c && ['signed', 'active'].includes(c.status) && !!c.price_list_id
+      )
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    return candidates[0]?.price_list_id ?? null
+  }
+
+  /**
+   * Fasta tjänstepriser för ett ÄRENDE på en kundrad, med avtalssteget:
+   * avtalets prislista → kundens prislista. Avtalets rader vinner per tjänst;
+   * kundens rader fyller ut för tjänster avtalslistan saknar.
+   * Tom map → anroparen faller vidare till prisguiden.
+   */
+  static async getServicePricesForCase(customerId: string): Promise<Record<string, number>> {
+    const [contractListId, customerPrices] = await Promise.all([
+      this.resolveContractPriceListId(customerId),
+      this.getCustomerServicePrices(customerId),
+    ])
+    if (!contractListId) return customerPrices
+
+    const { data: items } = await supabase
+      .from('price_list_items')
+      .select('service_id, custom_price')
+      .eq('price_list_id', contractListId)
+      .not('service_id', 'is', null)
+
+    const contractPrices: Record<string, number> = {}
+    for (const item of items || []) {
+      if (item.service_id) contractPrices[item.service_id] = item.custom_price
+    }
+    return { ...customerPrices, ...contractPrices }
   }
 
   /**

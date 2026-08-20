@@ -25,8 +25,9 @@ import ContractTimelineList, {
 import BillingChainSection from './BillingChainSection'
 import UnitsSection from './UnitsSection'
 import AccessAccountsSection, { countAccessPersons } from './AccessAccountsSection'
+import ContractMapSection from './ContractMapSection'
 
-type TabId = 'oversikt' | 'avtal' | 'fakturering' | 'enheter' | 'arenden' | 'atkomst'
+type TabId = 'oversikt' | 'avtal' | 'avtalskarta' | 'fakturering' | 'enheter' | 'arenden' | 'atkomst'
 
 function WhisperHeader({ children }: { children: React.ReactNode }) {
   return <h2 className="text-xs uppercase tracking-wide text-slate-500 mb-3">{children}</h2>
@@ -38,9 +39,11 @@ interface Props {
   basePath: string
   /** 'full' = hela sidan med flikar, 'peek' = kompakt högerpanel */
   density: 'peek' | 'full'
+  /** Refetch efter mutation (Avtalskartan). Saknas den göms kartfliken. */
+  onDataChanged?: () => void | Promise<void>
 }
 
-export default function CustomerRecordContent({ data, basePath, density }: Props) {
+export default function CustomerRecordContent({ data, basePath, density, onDataChanged }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('oversikt')
 
   const derived = useMemo(() => {
@@ -205,6 +208,7 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
   const tabs: { id: TabId; label: string; visible: boolean }[] = [
     { id: 'oversikt', label: 'Översikt', visible: true },
     { id: 'avtal', label: `Avtal (${sortedContracts.length})`, visible: true },
+    { id: 'avtalskarta', label: 'Avtalskarta', visible: !!onDataChanged },
     { id: 'fakturering', label: 'Fakturering', visible: true },
     { id: 'enheter', label: `Enheter (${units.length})`, visible: showUnitsTab },
     { id: 'arenden', label: `Ärenden (${totalCases})`, visible: true },
@@ -258,6 +262,12 @@ export default function CustomerRecordContent({ data, basePath, density }: Props
           <p className="text-sm text-slate-500">Inga avtal registrerade för kunden.</p>
         )}
       </div>
+
+      {onDataChanged && (
+        <div hidden={activeTab !== 'avtalskarta'} className="pt-6">
+          <ContractMapSection data={data} onChanged={onDataChanged} />
+        </div>
+      )}
 
       <div hidden={activeTab !== 'fakturering'} className="pt-6">
         <BillingChainSection root={root} units={units} contracts={sortedContracts} billingItems={billingItems} />

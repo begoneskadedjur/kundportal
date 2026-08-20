@@ -246,7 +246,8 @@ export default function CaseServiceSelector({
           caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
           ServiceCatalogService.getAllActiveServices(),
           PricingSettingsService.get(),
-          customerId ? PriceListService.getCustomerServicePrices(customerId) : Promise.resolve({}),
+          // Avtalssteget: avtalets prislista → kundens prislista (avtalet vinner per tjänst)
+          customerId ? PriceListService.getServicePricesForCase(customerId) : Promise.resolve({}),
           customerId ? PriceListService.getCustomerArticlePrices(customerId) : Promise.resolve({}),
         ])
         setPricingSettings(settingsData)

@@ -165,7 +165,7 @@ export class CaseBillingService {
   static async getEffectiveServicePrice(
     serviceId: string,
     customerId?: string | null
-  ): Promise<{ price: number; source: 'customer_list' | 'default' } | null> {
+  ): Promise<{ price: number; source: 'contract_list' | 'customer_list' | 'default' } | null> {
     return PriceListService.getEffectiveServicePrice(serviceId, customerId)
   }
 
@@ -175,6 +175,15 @@ export class CaseBillingService {
    */
   static async getCustomerServicePrices(customerId: string): Promise<Record<string, number>> {
     return PriceListService.getCustomerServicePrices(customerId)
+  }
+
+  /**
+   * Som ovan men med avtalssteget: prislistan på kundradens täckande avtal
+   * (contracts.price_list_id via ägarskap eller contract_sites) vinner per
+   * tjänst, kundens prislista fyller ut. Används av ärendeflödet.
+   */
+  static async getServicePricesForCase(customerId: string): Promise<Record<string, number>> {
+    return PriceListService.getServicePricesForCase(customerId)
   }
 
   /**

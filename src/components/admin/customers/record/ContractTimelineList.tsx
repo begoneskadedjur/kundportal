@@ -15,13 +15,14 @@ import {
   type RecordAddition,
   type RecordBillingItem,
   type RecordContract,
+  type RecordContractSite,
   type RecordPremiumEvent,
 } from '../../../../hooks/useCustomerRecord'
 
 export interface RecordTimelineEvent {
   /** YYYY-MM-DD (eller full ISO) — används för sortering och datumkolumn */
   date: string
-  kind: 'start' | 'signed' | 'addition' | 'index' | 'terminated' | 'notice' | 'end' | 'invoice' | 'premium'
+  kind: 'start' | 'signed' | 'addition' | 'index' | 'terminated' | 'notice' | 'end' | 'invoice' | 'premium' | 'scope'
   title: string
   detail?: string
   /** Taggning i den fulla strömmen: avtalets label eller kundradens namn */
@@ -129,6 +130,37 @@ export function buildPremiumTimelineEvents(events: RecordPremiumEvent[], tag?: s
     })
 }
 
+/** Omfattningsändringar från contract_sites: enheter som ansluter/lämnar avtalet */
+export function buildScopeEvents(
+  sites: RecordContractSite[],
+  unitNameById: Map<string, string>,
+  tag?: string
+): RecordTimelineEvent[] {
+  const events: RecordTimelineEvent[] = []
+  for (const cs of sites) {
+    const name = unitNameById.get(cs.customer_id) ?? 'Enhet'
+    if (cs.active_from) {
+      events.push({
+        date: toDateKey(cs.active_from),
+        kind: 'scope',
+        title: `${name} ansluter till avtalet`,
+        detail: cs.note ?? undefined,
+        tag,
+      })
+    }
+    if (cs.active_to) {
+      events.push({
+        date: toDateKey(cs.active_to),
+        kind: 'scope',
+        title: `Täckningen för ${name} avslutas`,
+        detail: cs.note ?? undefined,
+        tag,
+      })
+    }
+  }
+  return events
+}
+
 /** Fakturahändelser: aggregerar contract_billing_items per faktureringsperiod */
 export function buildInvoiceEvents(items: RecordBillingItem[], tag?: string): RecordTimelineEvent[] {
   const byPeriod = new Map<string, RecordBillingItem[]>()
@@ -164,12 +196,15 @@ export function buildSingleContractTimeline(
   contract: RecordContract,
   additions: RecordAddition[],
   billingItems: RecordBillingItem[],
-  premiumEvents: RecordPremiumEvent[] = []
+  premiumEvents: RecordPremiumEvent[] = [],
+  contractSites: RecordContractSite[] = [],
+  unitNameById: Map<string, string> = new Map()
 ): RecordTimelineEvent[] {
   return [
     ...buildContractEvents(contract),
     ...buildAdditionEvents(additions),
     ...buildPremiumTimelineEvents(premiumEvents),
+    ...buildScopeEvents(contractSites, unitNameById),
     ...buildInvoiceEvents(billingItems),
   ]
 }

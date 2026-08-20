@@ -15,8 +15,13 @@ export type RecordCustomer = Customer & {
   notice_period_months?: number | null
 }
 
-// contracts.label är ny, backfylld kolumn — används som avtalsnamn
-export type RecordContract = Contract & { label?: string | null; fromCustomerRow?: boolean }
+// contracts.label är ny, backfylld kolumn — används som avtalsnamn.
+// price_list_id finns i DB men saknas i database.ts-typen (avtalets prislista).
+export type RecordContract = Contract & {
+  label?: string | null
+  fromCustomerRow?: boolean
+  price_list_id?: string | null
+}
 
 export interface RecordBillingItem {
   id: string
@@ -72,6 +77,21 @@ export interface RecordContractSite {
   active_from: string | null
   active_to: string | null
   note: string | null
+}
+
+// Avtalskartan: ärenden för familjen (uppföljning + historikmodal)
+export interface RecordCase {
+  id: string
+  customer_id: string | null
+  contract_id: string | null
+  title: string
+  status: string
+  case_type: string | null
+  scheduled_date: string | null
+  completed_date: string | null
+  created_at: string
+  price: number | null
+  assigned_technician_name: string | null
 }
 
 // Etapp 6: Åtkomst & konton — portalanvändare, multisite-roller och inbjudningar.
@@ -132,6 +152,8 @@ export interface CustomerRecordData {
   contractSites: RecordContractSite[]
   /** Antal ärenden (cases) per customer_id i familjen */
   caseCounts: Record<string, number>
+  /** Familjens ärenden (avtalskartan: uppföljning + historik) */
+  cases: RecordCase[]
   /** Åtkomst & konton (etapp 6) — sekundärdata, tomma listor vid fel */
   access: RecordAccessData
 }
@@ -215,8 +237,9 @@ export function useCustomerRecord(customerId: string | undefined) {
         .order('active_from', { ascending: true }),
       supabase
         .from('cases')
-        .select('id, status, customer_id')
-        .in('customer_id', familyIds),
+        .select('id, customer_id, contract_id, title, status, case_type, scheduled_date, completed_date, created_at, price, assigned_technician_name')
+        .in('customer_id', familyIds)
+        .order('created_at', { ascending: false }),
       supabase
         .from('profiles')
         .select('user_id, customer_id, display_name, email, last_login, last_sign_in_at, has_ever_signed_in')
@@ -314,8 +337,9 @@ export function useCustomerRecord(customerId: string | undefined) {
       } as unknown as RecordContract)
     }
 
+    const familyCases = (casesRes.error ? [] : (casesRes.data ?? [])) as unknown as RecordCase[]
     const caseCounts: Record<string, number> = {}
-    for (const row of (casesRes.error ? [] : (casesRes.data ?? [])) as { customer_id: string | null }[]) {
+    for (const row of familyCases) {
       if (!row.customer_id) continue
       caseCounts[row.customer_id] = (caseCounts[row.customer_id] ?? 0) + 1
     }
@@ -330,6 +354,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       premiumEvents,
       contractSites,
       caseCounts,
+      cases: familyCases,
       access: {
         profiles: (profilesRes.error ? [] : (profilesRes.data ?? [])) as RecordAccessProfile[],
         invitations: (invitationsRes.error ? [] : (invitationsRes.data ?? [])) as RecordAccessInvitation[],
@@ -365,7 +390,18 @@ export function useCustomerRecord(customerId: string | undefined) {
     }
   }, [customerId, load])
 
-  return { data, loading, error }
+  /** Tyst omhämtning efter mutation (avtalskartan) — togglar inte loading */
+  const refetch = useCallback(async () => {
+    if (!customerId) return
+    try {
+      const result = await load(customerId)
+      setData(result)
+    } catch {
+      // Behåll gammal data vid refetch-fel — mutationens toast har redan visat resultatet
+    }
+  }, [customerId, load])
+
+  return { data, loading, error, refetch }
 }
 
 // ---------------------------------------------------------------------------
