@@ -1524,12 +1524,15 @@ function SignedAtModal({
           Datumet kunden skrev under — hämtas från Oneflow-dokumentet. Inte samma sak som när avtalet
           lades upp i portalen.
         </p>
+        {/* lang="sv-SE" → ÅÅÅÅ-MM-DD i väljaren, aldrig amerikanskt mm/dd/yyyy */}
         <input
           type="date"
+          lang="sv-SE"
           value={date}
           onChange={(e) => setDate(e.target.value)}
           className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] [color-scheme:dark]"
         />
+        <p className="text-[11px] text-slate-500 mt-1">Format: ÅÅÅÅ-MM-DD</p>
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-700/50">
           {contract.signed_at ? (
             <button
@@ -1701,10 +1704,11 @@ function DatePromptPopover({ prompt, onClose }: { prompt: DatePrompt; onClose: (
         <div className="flex items-center gap-2">
           <input
             type="date"
+            lang="sv-SE"
             value={customDate}
             onChange={(e) => setCustomDate(e.target.value)}
             className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#20c58f] [color-scheme:dark]"
-            aria-label="Annat datum"
+            aria-label="Annat datum (ÅÅÅÅ-MM-DD)"
           />
           <button
             onClick={() => customDate && confirm(customDate)}
