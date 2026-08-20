@@ -636,8 +636,20 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
     }
 
     if (existingContract) {
-      // Uppdatera befintligt kontrakt - bevara fält som sätts via create-contract API
-      const { price_list_id, created_by_email, created_by_name, created_by_role, source_id, source_type, ...webhookData } = contractData as any
+      // Uppdatera befintligt kontrakt - bevara fält som sätts via create-contract API.
+      // notice_period_months/billing_frequency är portalens egna villkor och
+      // finns inte i Oneflow — de får aldrig nollas av en webhook-uppdatering.
+      const {
+        price_list_id,
+        created_by_email,
+        created_by_name,
+        created_by_role,
+        source_id,
+        source_type,
+        notice_period_months,
+        billing_frequency,
+        ...webhookData
+      } = contractData as any
 
       // Skydda livscykel-status från att nedgraderas av content-events
       const LIFECYCLE_STATUSES = ['overdue', 'signed', 'declined', 'ended', 'active', 'trashed']

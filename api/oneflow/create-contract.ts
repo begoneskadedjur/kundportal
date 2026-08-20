@@ -52,6 +52,9 @@ interface ContractRequestBody {
   }>
   // Kundgrupp-ID (vid avtal)
   customerGroupId?: string | null
+  // Portalens avtalsvillkor — sparas på contracts, skickas ALDRIG till Oneflow
+  noticePeriodMonths?: number | null
+  billingFrequency?: string | null
   // Draft-items från wizarden (tjänster + interna artiklar) för persistens i case_billing_items
   draftItems?: Array<{
     draft_id?: string | null
@@ -313,6 +316,8 @@ export default async function handler(
     caseId,
     priceListId,
     customerGroupId,
+    noticePeriodMonths,
+    billingFrequency,
     draftItems
   } = req.body as ContractRequestBody
 
@@ -537,6 +542,18 @@ export default async function handler(
       contact_email: recipient.email || null,
       price_list_id: priceListId || null,
       customer_group_id: customerGroupId || null
+    }
+
+    // Portalens avtalsvillkor (uppsägningstid + faktureringsintervall).
+    // Endast för avtal, och de skickas aldrig vidare till Oneflow — de styr
+    // uppsägningsbevakning och avtalsfakturering i portalen.
+    if (documentType !== 'offer') {
+      if (noticePeriodMonths !== undefined && noticePeriodMonths !== null) {
+        upsertData.notice_period_months = noticePeriodMonths
+      }
+      if (billingFrequency) {
+        upsertData.billing_frequency = billingFrequency
+      }
     }
 
     const { error: upsertError } = await supabase

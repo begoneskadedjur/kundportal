@@ -4,7 +4,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Confetti from 'react-confetti'
-import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin, DollarSign, FileCheck, ShoppingCart, Users } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin, DollarSign, FileCheck, ShoppingCart, Users, Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
 import Button from '../../components/ui/Button'
@@ -39,6 +39,12 @@ interface WizardData {
   'e-post-anstlld': string
   avtalslngd: string
   begynnelsedag: string
+  /** Uppsägningstid i månader. Portalens data — skickas INTE till Oneflow.
+   *  Styr bevakning av sista uppsägningsdag på kundsidan. */
+  noticePeriodMonths: string
+  /** Faktureringsintervall. Portalens data — skickas INTE till Oneflow.
+   *  Styr avtalsfaktureringens perioder. */
+  billingFrequency: string
   
   // Steg 5 - Motpart
   Kontaktperson: string
@@ -181,6 +187,8 @@ export default function OneflowContractCreator() {
     'e-post-anstlld': user?.email || '',
     avtalslngd: '1',
     begynnelsedag: new Date().toISOString().split('T')[0],
+    noticePeriodMonths: '3',
+    billingFrequency: 'annual',
     Kontaktperson: '',
     'e-post-kontaktperson': '',
     'telefonnummer-kontaktperson': '',
@@ -649,6 +657,14 @@ export default function OneflowContractCreator() {
           senderName: wizardData.anstalld,
           selectedProducts: convertedProducts,
           customerGroupId: wizardData.customer_group_id,
+          // Portalens avtalsvillkor — sparas på contracts-raden, skickas
+          // ALDRIG vidare till Oneflow (kunden ser dem inte).
+          noticePeriodMonths:
+            wizardData.documentType === 'contract' && wizardData.noticePeriodMonths !== ''
+              ? parseInt(wizardData.noticePeriodMonths, 10)
+              : null,
+          billingFrequency:
+            wizardData.documentType === 'contract' ? wizardData.billingFrequency : null,
           draftItems: (wizardData.case_id && wizardData.prefillServices?.length > 0
             ? wizardData.prefillServices.map(s => ({
                 draft_id: s.id,
@@ -1466,6 +1482,59 @@ export default function OneflowContractCreator() {
                 })()}
               </div>
             </Card>
+
+            {/* Portalens avtalsvillkor — skickas INTE till Oneflow.
+                Styr uppsägningsbevakning och avtalsfakturering i portalen. */}
+            {wizardData.documentType === 'contract' && (
+              <Card className="p-6">
+                <div className="flex items-start gap-2 mb-4">
+                  <Settings className="w-5 h-5 text-[#20c58f] mt-0.5 shrink-0" />
+                  <div>
+                    <h4 className="text-base font-semibold text-white">Villkor i portalen</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Används för uppsägningsbevakning och fakturering. Skickas inte till Oneflow och
+                      syns inte för kunden.
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-2">Uppsägningstid</label>
+                    <select
+                      value={wizardData.noticePeriodMonths}
+                      onChange={(e) => updateWizardData('noticePeriodMonths', e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                    >
+                      <option value="0">Ingen uppsägningstid</option>
+                      <option value="1">1 månad</option>
+                      <option value="2">2 månader</option>
+                      <option value="3">3 månader</option>
+                      <option value="6">6 månader</option>
+                      <option value="12">12 månader</option>
+                    </select>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Styr när avtalet flaggas för bevakning inför förlängning.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-2">Faktureringsintervall</label>
+                    <select
+                      value={wizardData.billingFrequency}
+                      onChange={(e) => updateWizardData('billingFrequency', e.target.value)}
+                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                    >
+                      <option value="annual">Årsvis (1 gång per år)</option>
+                      <option value="semi_annual">Halvårsvis</option>
+                      <option value="quarterly">Kvartalsvis</option>
+                      <option value="monthly">Månadsvis</option>
+                    </select>
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Styr hur årspremien delas upp i fakturaperioder.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
         )
 
@@ -1822,6 +1891,8 @@ export default function OneflowContractCreator() {
                         'e-post-anstlld': user?.email || '',
                         avtalslngd: '1',
                         begynnelsedag: new Date().toISOString().split('T')[0],
+                        noticePeriodMonths: '3',
+                        billingFrequency: 'annual',
                         Kontaktperson: '',
                         'e-post-kontaktperson': '',
                         'telefonnummer-kontaktperson': '',
