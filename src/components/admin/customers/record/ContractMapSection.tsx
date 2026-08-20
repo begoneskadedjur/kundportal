@@ -498,13 +498,17 @@ export default function ContractMapSection({ data, onChanged }: Props) {
    * Fortnox har premie och datum på kundraden men ingen contracts-rad, och kan
    * därför inte bära omfattning, prislista eller avtalsinnehåll.
    */
-  const materializeContract = async (customerRowContract: RecordContract) => {
-    const owner = customerById.get(customerRowContract.customer_id ?? '') ?? root
+  const materializeContract = async (customerRowContract: RecordContract | null) => {
+    // null = kunden har inga kundkortsavtal (t.ex. bara importrester) → skapa
+    // ett tomt avtal på kundraden som sedan fylls i § 4.
+    const owner = customerRowContract
+      ? (customerById.get(customerRowContract.customer_id ?? '') ?? root)
+      : root
     setBusy(true)
     try {
       await ContractScopeService.createFromCustomerRow(
         owner.id,
-        customerRowContract.label ?? customerRowContract.contract_type ?? undefined
+        customerRowContract?.label ?? customerRowContract?.contract_type ?? undefined
       )
       toast.success(
         `Avtal skapat för ${customerRowName(owner)} — lägg nu in tjänster och kostnader i § 4.`
@@ -872,38 +876,39 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           {papers.length === 0 && (
             <div className="border border-dashed border-slate-700 rounded-2xl p-6 text-center">
               <p className="text-sm text-slate-400">Inga aktiva avtal som dokument.</p>
-              {customerRowContracts.length > 0 ? (
-                <>
-                  <p className="text-xs text-slate-500 mt-2 max-w-md mx-auto">
-                    Kundens avtal finns bara som fält på kundkortet
-                    {customerRowContracts.some((c) => Number(c.annual_value ?? 0) > 0) &&
-                      ` (${formatKr(customerRowContracts.reduce((s, c) => s + Number(c.annual_value ?? 0), 0))}/år)`}
-                    . Skapa ett riktigt avtal för att kunna lägga in tjänster, kostnader, omfattning och prislista.
-                  </p>
-                  <div className="flex flex-wrap justify-center gap-2 mt-4">
-                    {customerRowContracts.map((c) => (
-                      <button
-                        key={c.id}
-                        onClick={() => materializeContract(c)}
-                        disabled={busy}
-                        className="inline-flex items-center gap-2 bg-[#20c58f] text-[#fff] text-sm font-semibold rounded-xl px-4 py-2 hover:brightness-110 transition-all disabled:opacity-50"
-                      >
-                        <FileText className="w-4 h-4" />
-                        Skapa avtal
-                        {customerRowContracts.length > 1 && (
-                          <span className="font-normal opacity-90">
-                            · {customerRowName(customerById.get(c.customer_id ?? '') ?? root)}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <p className="text-xs text-slate-500 mt-2">
-                  Skapa ett avtal för kunden så dyker det upp här som ett dokument.
-                </p>
-              )}
+              <p className="text-xs text-slate-500 mt-2 max-w-md mx-auto">
+                {customerRowContracts.length > 0
+                  ? `Kundens avtal finns bara som fält på kundkortet${
+                      customerRowContracts.some((c) => Number(c.annual_value ?? 0) > 0)
+                        ? ` (${formatKr(
+                            customerRowContracts.reduce((s, c) => s + Number(c.annual_value ?? 0), 0)
+                          )}/år)`
+                        : ''
+                    }. Skapa ett riktigt avtal för att kunna lägga in tjänster, kostnader, omfattning och prislista.`
+                  : leftovers.length > 0
+                    ? 'Kunden har bara importerade avtalsrester. Skapa ett riktigt avtal för att kunna lägga in tjänster, kostnader, omfattning och prislista.'
+                    : 'Skapa ett avtal för kunden så dyker det upp här som ett dokument.'}
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 mt-4">
+                {/* Ett kort per kundkortsavtal (bär premie/datum), annars ett
+                    enda tomt avtal på kundraden. */}
+                {(customerRowContracts.length > 0 ? customerRowContracts : [null]).map((c, i) => (
+                  <button
+                    key={c?.id ?? `new-${i}`}
+                    onClick={() => materializeContract(c)}
+                    disabled={busy}
+                    className="inline-flex items-center gap-2 bg-[#20c58f] text-[#fff] text-sm font-semibold rounded-xl px-4 py-2 hover:brightness-110 transition-all disabled:opacity-50"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Skapa avtal
+                    {customerRowContracts.length > 1 && c && (
+                      <span className="font-normal opacity-90">
+                        · {customerRowName(customerById.get(c.customer_id ?? '') ?? root)}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -923,17 +928,19 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                       · {customerRowName(customerById.get(c.customer_id ?? '') ?? root)}
                       {Number(c.annual_value ?? 0) > 0 && ` · ${formatKr(Number(c.annual_value))}/år`}
                     </span>
-                    {c.fromCustomerRow && (
-                      <button
-                        onClick={() => materializeContract(c)}
-                        disabled={busy}
-                        className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#20c58f] border border-[#20c58f]/40 rounded-lg px-2.5 py-1 hover:bg-[#20c58f]/10 transition-colors disabled:opacity-50"
-                        title="Skapa ett riktigt avtal av kundkortets data"
-                      >
-                        <FileText className="w-3 h-3" />
-                        Skapa avtal
-                      </button>
-                    )}
+                    <button
+                      onClick={() => materializeContract(c.fromCustomerRow ? c : null)}
+                      disabled={busy}
+                      className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#20c58f] border border-[#20c58f]/40 rounded-lg px-2.5 py-1 hover:bg-[#20c58f]/10 transition-colors disabled:opacity-50"
+                      title={
+                        c.fromCustomerRow
+                          ? 'Skapa ett riktigt avtal av kundkortets data'
+                          : 'Skapa ett riktigt avtal på kundraden (importresten lämnas orörd)'
+                      }
+                    >
+                      <FileText className="w-3 h-3" />
+                      Skapa avtal
+                    </button>
                   </li>
                 ))}
               </ul>
