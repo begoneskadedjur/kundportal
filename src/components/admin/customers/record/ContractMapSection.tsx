@@ -556,8 +556,11 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         .filter((id, i, arr) => arr.indexOf(id) === i)
       const coveredSet = new Set(covered)
 
-      // Kontrollbesök: sessioner matchas på kundrad (contract_id är null i DB idag)
-      const visits = inspections.filter((s) => coveredSet.has(s.customer_id))
+      // Kontrollbesök: exakt avtalskoppling när sessionen har contract_id,
+      // annars fallback på kundrad (äldre sessioner som inte kunnat kopplas).
+      const visits = inspections.filter((s) =>
+        s.contract_id ? s.contract_id === contract.id : coveredSet.has(s.customer_id)
+      )
       const visitsDone = visits.filter((s) => s.completed_at).length
       const booked = visits.filter((s) => !s.completed_at && s.scheduled_at)
       const key = todayKey()

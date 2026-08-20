@@ -14,6 +14,7 @@ import type {
 } from '../types/recurringSchedule'
 import { generateInspectionDates } from '../utils/inspectionDateGenerator'
 import { CaseNumberService } from './caseNumberService'
+import { resolveContractForCustomer } from './contractResolver'
 
 // ============================================
 // HELPERS
@@ -134,10 +135,17 @@ export async function createRecurringSchedule(
   }
   const generatedUntil = new Date(input.contract_end_date)
 
+  // Koppla schemat till kundens gällande avtal så alla besök det genererar
+  // kan följas upp per avtal på kundsidan.
+  const contractId =
+    (input as { contract_id?: string | null }).contract_id ??
+    (await resolveContractForCustomer(input.customer_id))
+
   const { data, error } = await supabase
     .from('recurring_schedules')
     .insert([{
       customer_id: input.customer_id,
+      contract_id: contractId,
       technician_id: input.technician_id,
       frequency: input.frequency,
       day_pattern: input.day_pattern,
@@ -506,9 +514,15 @@ export async function generateAndCreateSessions(
     return { created: 0, errors: [] }
   }
 
+  // Avtalskoppling: schemats eget contract_id, annars kundens gällande avtal
+  const scheduleContractId =
+    (schedule as { contract_id?: string | null }).contract_id ??
+    (await resolveContractForCustomer(schedule.customer_id))
+
   // Bulk create sessions
   const sessionsToCreate = newDates.map(d => ({
     customer_id: schedule.customer_id,
+    contract_id: scheduleContractId,
     technician_id: schedule.technician_id,
     scheduled_at: d.date.toISOString(),
     scheduled_end: d.endDate.toISOString(),
@@ -660,11 +674,16 @@ async function createCaseAndSession(
     return { success: false, error: `Kunde inte skapa ärende: ${caseError.message}` }
   }
 
+  const sessionContractId =
+    (schedule as { contract_id?: string | null }).contract_id ??
+    (await resolveContractForCustomer(schedule.customer_id))
+
   const { error: sessionError } = await supabase
     .from('station_inspection_sessions')
     .insert([{
       case_id: createdCase.id,
       customer_id: schedule.customer_id,
+      contract_id: sessionContractId,
       technician_id: schedule.technician_id,
       scheduled_at: d.date.toISOString(),
       scheduled_end: d.endDate.toISOString(),

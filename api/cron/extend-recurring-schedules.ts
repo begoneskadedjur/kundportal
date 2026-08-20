@@ -114,8 +114,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const newDates = dates.filter(d => !existingDateSet.has(d.date.toISOString().split('T')[0]))
 
         if (newDates.length > 0) {
+          // Avtalskoppling ärvs från schemat (select('*') ovan) så besöken kan
+          // följas upp per avtal. Null när schemat saknar koppling.
           const sessionsToCreate = newDates.map(d => ({
             customer_id: schedule.customer_id,
+            contract_id: schedule.contract_id ?? null,
             technician_id: schedule.technician_id,
             scheduled_at: d.date.toISOString(),
             scheduled_end: d.endDate.toISOString(),

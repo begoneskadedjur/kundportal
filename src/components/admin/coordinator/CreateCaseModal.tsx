@@ -17,6 +17,7 @@ import { CaseImageService, CaseImageWithUrl } from '../../../services/caseImageS
 import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSuggestionCard';
 import { CaseNumberService } from '../../../services/caseNumberService';
 import { ContractService } from '../../../services/contractService';
+import { resolveContractForCustomer } from '../../../services/contractResolver';
 import type { ContractWithBilling } from '../../../types/database';
 
 import Modal from '../../ui/Modal';
@@ -947,10 +948,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         const outdoorCount = outdoorResult.count || 0;
         const indoorCount = indoorResult.count || 0;
 
-        // Skapa inspektionssession kopplad till ärendet
+        // Skapa inspektionssession kopplad till ärendet + kundens gällande avtal
+        const sessionContractId = await resolveContractForCustomer(actualCustomerId!);
+
         const sessionData = {
           case_id: createdCase?.id,
           customer_id: actualCustomerId!,
+          contract_id: sessionContractId,
           technician_id: formData.primary_assignee_id,
           scheduled_at: formData.start_date,
           status: 'scheduled' as const,

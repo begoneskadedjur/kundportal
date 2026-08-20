@@ -94,7 +94,8 @@ export default function ContractHistoryModal({
     if (!contract) return []
     const covered = new Set(coveredCustomerIds)
     return inspections
-      .filter((s) => covered.has(s.customer_id))
+      // Exakt avtalskoppling när den finns, annars kundrad (äldre sessioner)
+      .filter((s) => (s.contract_id ? s.contract_id === contract.id : covered.has(s.customer_id)))
       .filter((s) => !unitFilter || s.customer_id === unitFilter)
   }, [contract, inspections, coveredCustomerIds, unitFilter])
 

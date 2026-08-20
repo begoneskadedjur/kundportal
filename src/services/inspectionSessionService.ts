@@ -2,6 +2,7 @@
 // Service för att hantera stationsinspektionssessioner (Fas 5)
 
 import { supabase } from '../lib/supabase'
+import { resolveContractForCustomer } from './contractResolver'
 import { compressToWebP } from '../utils/imageUtils'
 import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
 import {
@@ -531,11 +532,18 @@ export async function getCustomerInspectionOverview(
 export async function createInspectionSession(
   input: CreateInspectionSessionInput
 ): Promise<StationInspectionSession | null> {
+  // Koppla besöket till kundens gällande avtal (uppföljning per avtal på
+  // kundsidan). Null när ingen entydig koppling finns — vi gissar aldrig.
+  const contractId =
+    (input as { contract_id?: string | null }).contract_id ??
+    (await resolveContractForCustomer(input.customer_id))
+
   const { data, error } = await supabase
     .from('station_inspection_sessions')
     .insert([{
       case_id: input.case_id || null,
       customer_id: input.customer_id,
+      contract_id: contractId,
       technician_id: input.technician_id || null,
       scheduled_at: input.scheduled_at || null,
       scheduled_end: input.scheduled_end || null,
