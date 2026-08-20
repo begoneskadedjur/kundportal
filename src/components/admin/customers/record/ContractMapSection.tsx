@@ -44,6 +44,9 @@ import { PriceListService } from '../../../../services/priceListService'
 import type { PriceList } from '../../../../types/articles'
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
 import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
+import ContractContentSection, { useContractContent } from './ContractContentSection'
+import ContractCaseServiceSelector from '../ContractCaseServiceSelector'
+import Modal from '../../../ui/Modal'
 import SiteModal from '../../multisite/SiteModal'
 import { supabase } from '../../../../lib/supabase'
 
@@ -118,6 +121,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [scopeModePrompt, setScopeModePrompt] = useState<ScopeModePrompt | null>(null)
   const [history, setHistory] = useState<HistoryState | null>(null)
   const [siteModalOpen, setSiteModalOpen] = useState(false)
+  /** Avtal vars innehåll (§ 4 tjänster/kostnader) redigeras */
+  const [contentEditor, setContentEditor] = useState<RecordContract | null>(null)
+  /** Bumpas när innehållet sparats så pappren hämtar om tjänster + marginal */
+  const [contentReloadKey, setContentReloadKey] = useState(0)
   const [busy, setBusy] = useState(false)
   const [hover, setHover] = useState<{ kind: 'unit' | 'contract'; id: string } | null>(null)
 
@@ -805,6 +812,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               followup={followupFor(c)}
               priceListLabel={priceListName(c.price_list_id)}
               onClearCoversAll={() => clearCoversAll(c)}
+              contentReloadKey={contentReloadKey}
+              onEditContent={() => setContentEditor(c)}
               isDropTarget={drag?.started ? drag.overContractId === c.id && !drag.invalidReason : false}
               isInvalidTarget={drag?.started ? drag.overContractId === c.id && !!drag.invalidReason : false}
               invalidReason={drag?.overContractId === c.id ? drag?.invalidReason ?? null : null}
@@ -1016,6 +1025,29 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         coveredCustomerIds={history ? followupFor(history.contract).covered : []}
       />
 
+      {/* Avtalsinnehåll: tjänster kunden får + interna kostnader (samma editor
+          som Oneflow-wizarden och faktureringsinställningarna använder) */}
+      {contentEditor && (
+        <Modal
+          isOpen
+          onClose={() => {
+            setContentEditor(null)
+            setContentReloadKey((k) => k + 1)
+          }}
+          usePortal
+          size="xl"
+          title={`Avtalsinnehåll — ${contractDisplayName(contentEditor)}`}
+          subtitle="Tjänster kunden får och de interna kostnaderna de medför. Marginalen räknas automatiskt."
+        >
+          <div className="p-4">
+            <ContractCaseServiceSelector
+              customerId={contentEditor.customer_id as string}
+              contractId={contentEditor.id}
+            />
+          </div>
+        </Modal>
+      )}
+
       {/* Lägg till enhet — riktiga enhetsformuläret */}
       <SiteModal
         isOpen={siteModalOpen}
@@ -1113,6 +1145,9 @@ interface PaperProps {
   }
   priceListLabel: string | null
   onClearCoversAll: () => void
+  /** Bumpas när avtalsinnehållet sparats — tvingar omhämtning av § 4/§ 5 */
+  contentReloadKey: number
+  onEditContent: () => void
   isDropTarget: boolean
   isInvalidTarget: boolean
   invalidReason: string | null
@@ -1137,6 +1172,8 @@ function PaperContract({
   followup,
   priceListLabel,
   onClearCoversAll,
+  contentReloadKey,
+  onEditContent,
   isDropTarget,
   isInvalidTarget,
   invalidReason,
@@ -1151,6 +1188,7 @@ function PaperContract({
   onOpenHistory,
 }: PaperProps) {
   const key = todayKey()
+  const contentData = useContractContent(contract.id, contentReloadKey)
   const annual = contractEffectiveAnnualValue(contract, premiumEvents)
   const nextStep = nextPremiumEvent(premiumEvents)
   const orgnr = contract.organization_number ?? root.organization_number
@@ -1434,6 +1472,13 @@ function PaperContract({
           </button>
         </div>
       </div>
+
+      {/* § 4 Tjänster i avtalet + § 5 Marginal */}
+      <ContractContentSection
+        content={contentData.content}
+        loading={contentData.loading}
+        onEdit={onEditContent}
+      />
 
       {/* Fot */}
       <div className="flex items-end gap-5 mt-4">
