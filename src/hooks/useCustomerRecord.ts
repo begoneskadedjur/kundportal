@@ -27,6 +27,8 @@ export type RecordContract = Contract & {
   visit_frequency?: string | null
   /** Antal ingående besök per år enligt avtalet */
   visits_per_year?: number | null
+  /** Datum då kunden faktiskt signerade (ej samma som created_at) */
+  signed_at?: string | null
 }
 
 /** Besöksfrekvenser — samma värden som recurring_schedules använder */

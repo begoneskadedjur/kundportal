@@ -459,6 +459,27 @@ export class ContractScopeService {
     })
   }
 
+  /**
+   * Datum då kunden faktiskt signerade. Sätts av Oneflow vid signering, men
+   * måste kunna fyllas i för avtal som lagts upp i efterhand — annars visar
+   * tidslinjen dagen raden skapades i portalen som signeringsdatum.
+   */
+  static async setSignedAt(contractId: string, signedAt: string | null): Promise<void> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({ signed_at: signedAt })
+      .eq('id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte spara signeringsdatum: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    await this.logEvent(contractId, {
+      event_type: 'other',
+      title: signedAt ? 'Signeringsdatum satt' : 'Signeringsdatum borttaget',
+      detail: signedAt ?? undefined,
+    })
+  }
+
   /** Sätt avtalstyp: namnet blir både label (visningsnamn) och contract_type */
   static async setContractType(contractId: string, typeName: string): Promise<void> {
     const { data, error } = await supabase

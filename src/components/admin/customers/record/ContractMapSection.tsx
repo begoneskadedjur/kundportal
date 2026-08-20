@@ -136,6 +136,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [deletePrompt, setDeletePrompt] = useState<RecordContract | null>(null)
   /** Avtal vars besöksfrekvens ska sättas */
   const [frequencyPrompt, setFrequencyPrompt] = useState<RecordContract | null>(null)
+  /** Avtal vars signeringsdatum ska sättas */
+  const [signedAtPrompt, setSignedAtPrompt] = useState<RecordContract | null>(null)
   const { options: contractTypes } = useContractTypeOptions()
   const [busy, setBusy] = useState(false)
   const [hover, setHover] = useState<{ kind: 'unit' | 'contract'; id: string } | null>(null)
@@ -973,6 +975,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onChangeType={(t) => changeContractType(c, t)}
               onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
               onEditFrequency={() => setFrequencyPrompt(c)}
+              onEditSignedAt={() => setSignedAtPrompt(c)}
               onSaveAgreementText={async (text) => {
                 try {
                   await ContractScopeService.setAgreementText(c.id, text)
@@ -1148,6 +1151,29 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Signeringsdatum — när kunden faktiskt skrev under */}
+      {signedAtPrompt && (
+        <SignedAtModal
+          contract={signedAtPrompt}
+          busy={busy}
+          onClose={() => setSignedAtPrompt(null)}
+          onSave={async (date) => {
+            const contract = signedAtPrompt
+            setSignedAtPrompt(null)
+            setBusy(true)
+            try {
+              await ContractScopeService.setSignedAt(contract.id, date)
+              toast.success(date ? `Signeringsdatum satt till ${formatDateSv(date)}.` : 'Signeringsdatum borttaget.')
+              await onChanged()
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : 'Kunde inte spara signeringsdatum')
+            } finally {
+              setBusy(false)
+            }
+          }}
+        />
       )}
 
       {/* Besöksfrekvens enligt avtalet */}
@@ -1468,6 +1494,73 @@ function AgreementObjectText({
 }
 
 // ---------------------------------------------------------------------------
+// Signeringsdatum: när kunden faktiskt skrev under
+// ---------------------------------------------------------------------------
+
+function SignedAtModal({
+  contract,
+  busy,
+  onClose,
+  onSave,
+}: {
+  contract: RecordContract
+  busy: boolean
+  onClose: () => void
+  onSave: (date: string | null) => void
+}) {
+  const [date, setDate] = useState(contract.signed_at ?? '')
+
+  return (
+    <div className="fixed inset-0 z-[130] grid place-items-center bg-slate-950/70 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl p-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 className="text-base font-semibold text-slate-100 flex items-center gap-2 mb-1">
+          <Calendar className="w-4 h-4 text-[#20c58f]" />
+          När signerades avtalet?
+        </h4>
+        <p className="text-xs text-slate-400 mb-3">
+          Datumet kunden skrev under — hämtas från Oneflow-dokumentet. Inte samma sak som när avtalet
+          lades upp i portalen.
+        </p>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] [color-scheme:dark]"
+        />
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-700/50">
+          {contract.signed_at ? (
+            <button
+              onClick={() => onSave(null)}
+              disabled={busy}
+              className="text-xs text-slate-400 hover:text-red-400 disabled:opacity-50"
+            >
+              Ta bort datum
+            </button>
+          ) : (
+            <span />
+          )}
+          <div className="flex gap-2">
+            <button onClick={onClose} className="text-xs font-semibold text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-800">
+              Avbryt
+            </button>
+            <button
+              onClick={() => onSave(date || null)}
+              disabled={busy || !date}
+              className="text-xs font-semibold text-[#fff] bg-[#20c58f] px-3 py-2 rounded-lg hover:brightness-110 disabled:opacity-40"
+            >
+              Spara
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Besöksfrekvens: hur ofta kunden ska besökas enligt avtalet
 // ---------------------------------------------------------------------------
 
@@ -1677,6 +1770,8 @@ interface PaperProps {
   onEditFrequency?: () => void
   /** Spara avtalsobjektets text */
   onSaveAgreementText: (text: string | null) => Promise<void>
+  /** Öppna väljaren för signeringsdatum */
+  onEditSignedAt: () => void
 }
 
 function PaperContract({
@@ -1709,6 +1804,7 @@ function PaperContract({
   onDelete,
   onEditFrequency,
   onSaveAgreementText,
+  onEditSignedAt,
 }: PaperProps) {
   const key = todayKey()
   const contentData = useContractContent(contract.id, contentReloadKey)
@@ -2096,7 +2192,25 @@ function PaperContract({
           </div>
         )}
         <div className="ml-auto text-right font-sans text-[10px] leading-relaxed text-[#8a9099]">
-          {contract.created_at && !isImportedContract(contract) && `Signerat ${formatDateSv(contract.created_at)}`}
+          {/* Signeringsdatum — signed_at, aldrig created_at (som bara är när
+              raden skapades i portalen). Går att fylla i för äldre avtal. */}
+          {contract.signed_at ? (
+            <button
+              onClick={onEditSignedAt}
+              className="hover:text-[#262e38] underline decoration-dotted"
+              title="Ändra signeringsdatum"
+            >
+              Signerat {formatDateSv(contract.signed_at)}
+            </button>
+          ) : (
+            <button
+              onClick={onEditSignedAt}
+              className="text-[#b45309] hover:text-[#262e38] underline decoration-dotted"
+              title="Ange när kunden signerade avtalet"
+            >
+              Ange signeringsdatum
+            </button>
+          )}
           {contract.notice_period_months ? ` · Uppsägningstid ${contract.notice_period_months} mån` : ''}
           {onDelete && (
             <>

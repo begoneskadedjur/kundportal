@@ -60,12 +60,17 @@ export function buildContractEvents(contract: RecordContract, tag?: string): Rec
     events.push({ date: toDateKey(startDate), kind: 'start', title: 'Avtalsstart', tag })
   }
 
-  if (contract.created_at && !isImportedContract(contract)) {
+  // Signeringsdatum: signed_at är det verkliga datumet kunden skrev under.
+  // created_at duger INTE som fallback — för avtal som lagts upp i efterhand
+  // är det dagen raden skapades i portalen, inte när avtalet signerades.
+  if (contract.signed_at) {
+    const viaOneflow = !!contract.oneflow_contract_id && !isImportedContract(contract)
+      && !contract.oneflow_contract_id.startsWith('local-')
     events.push({
-      date: toDateKey(contract.created_at),
+      date: toDateKey(contract.signed_at),
       kind: 'signed',
       title: 'Avtalet signerat',
-      detail: 'Via Oneflow',
+      detail: viaOneflow ? 'Via Oneflow' : undefined,
       tag,
     })
   }

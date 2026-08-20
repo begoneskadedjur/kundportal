@@ -1309,6 +1309,8 @@ async function completeContractFieldsOnSign(contractId: string): Promise<void> {
       updates.contract_start_date = contract.start_date
     }
     if (!contract.contract_end_date && endDate) updates.contract_end_date = endDate
+    // Signeringsdatum: nu är avtalet faktiskt signerat
+    updates.signed_at = new Date().toISOString().slice(0, 10)
     if (!contract.contract_type && hasTypeName) updates.contract_type = typeName
     if (!contract.label && hasTypeName) updates.label = typeName
 
