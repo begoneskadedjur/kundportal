@@ -113,10 +113,10 @@ export default function RecordHeader({
           {isUnit && <span className="text-slate-500 text-lg font-normal ml-2">enhet</span>}
         </h1>
         <button
-          onClick={() => navigate(basePath)}
+          onClick={() => navigate(`${basePath}?edit=${(root ?? customer).id}`)}
           className="flex items-center gap-1.5 shrink-0 mt-1 text-xs text-slate-400 hover:text-[#20c58f] transition-colors"
         >
-          Redigera i listan
+          Redigera kund
           <ExternalLink className="w-3 h-3" />
         </button>
       </div>

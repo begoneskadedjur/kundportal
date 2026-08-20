@@ -360,6 +360,22 @@ export default function Customers() {
     refresh()
   }
 
+  // Deep-link: ?edit=<customers.id> öppnar redigeringsmodalen (kundsidans
+  // "Redigera kund"-knapp). Matchar org-id, huvudkontorsrad eller enhetsrad.
+  useEffect(() => {
+    const editId = searchParams.get('edit')
+    if (!editId || consolidatedCustomers.length === 0) return
+    const org = consolidatedCustomers.find(o =>
+      o.id === editId ||
+      o.headquarterCustomer?.id === editId ||
+      o.sites?.some(site => site.id === editId)
+    )
+    if (org) handleEditCustomer(org)
+    searchParams.delete('edit')
+    setSearchParams(searchParams, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, consolidatedCustomers])
+
   const handleViewRevenue = (organization: ConsolidatedCustomer, contractId: string | null = null) => {
     setRevenueCustomer(organization)
     setRevenueContractId(contractId)

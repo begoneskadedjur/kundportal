@@ -771,7 +771,8 @@ export function useConsolidatedCustomers() {
             ? Math.ceil((new Date(customer.effective_end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
             : customer.contractProgress.daysRemaining,
           earliestContractStartDate: customer.contract_start_date,
-          contractCount: customer.contracts.length,
+          contractCount: customer.contracts.length ||
+            ((Number(customer.annual_value) > 0 || customer.contract_start_date) ? 1 : 0),
           allContracts: (customer.contracts ?? [])
             .filter(c => !c.id.startsWith('synth-'))
             .map(c => ({
@@ -829,7 +830,9 @@ export function useConsolidatedCustomers() {
 
         // Aggregera värden — "enheter" räknar bara enheterna, inte HK
         org.totalSites = org.sites.length
-        org.contractCount = sites.reduce((sum, site) => sum + (site.contracts?.length ?? 0), 0)
+        org.contractCount = sites.reduce((sum, site) => sum +
+          ((site.contracts?.length ?? 0) ||
+            ((Number(site.annual_value) > 0 || site.contract_start_date) ? 1 : 0)), 0)
         // Avropsavtal per site → ackumulerad debitering; normalavtal → annual_value × avtalstid
         // Adderar casesValue per site (adhoc) så att totalContractValue = premie × tid + utöver avtal
         org.totalContractValue = sites.reduce((sum, site) => {
