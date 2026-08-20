@@ -520,14 +520,30 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     const owner = customerRowContract
       ? (customerById.get(customerRowContract.customer_id ?? '') ?? root)
       : root
+
+    // Avtalet som ersätts: den klickade importresten, annars kundradens enda
+    // importrest. Historiken (fakturor, ärenden, besök) flyttas till det nya.
+    const ownerLeftovers = leftovers.filter(
+      (c) => !c.fromCustomerRow && c.customer_id === owner.id
+    )
+    const replaces =
+      customerRowContract && !customerRowContract.fromCustomerRow
+        ? customerRowContract.id
+        : ownerLeftovers.length === 1
+          ? ownerLeftovers[0].id
+          : null
+
     setBusy(true)
     try {
       await ContractScopeService.createFromCustomerRow(
         owner.id,
-        customerRowContract?.label ?? customerRowContract?.contract_type ?? undefined
+        customerRowContract?.label ?? customerRowContract?.contract_type ?? undefined,
+        replaces
       )
       toast.success(
-        `Avtal skapat för ${customerRowName(owner)} — lägg nu in tjänster och kostnader i § 4.`
+        replaces
+          ? `Avtal skapat för ${customerRowName(owner)} — historiken följde med. Lägg nu in tjänster och kostnader i § 4.`
+          : `Avtal skapat för ${customerRowName(owner)} — lägg nu in tjänster och kostnader i § 4.`
       )
       await onChanged()
     } catch (err) {

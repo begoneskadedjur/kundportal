@@ -210,7 +210,17 @@ export class ContractScopeService {
    * sätts INTE template_id='imported' — raden ska räknas som ett fullvärdigt
    * avtal i Avtalskartan, inte som importrest.
    */
-  static async createFromCustomerRow(customerId: string, label?: string): Promise<string> {
+  static async createFromCustomerRow(
+    customerId: string,
+    label?: string,
+    /**
+     * Importrest/kundkortsavtal som det nya avtalet ersätter. Historiken
+     * (fakturarader, ärenden, avtalsinnehåll, besök) flyttas över och den
+     * gamla raden markeras som ersatt — annars ligger två avtal kvar och
+     * dubbelräknas, och historiken blir kvar på en rad ingen ser.
+     */
+    replacesContractId?: string | null
+  ): Promise<string> {
     // Explicit typ: den konkatenerade select-strängen bryter Supabase-klientens
     // typinferens, så raden kommer tillbaka otypad.
     type CustomerRow = {
@@ -296,13 +306,74 @@ export class ContractScopeService {
       })
     }
 
+    // Ärv historiken från avtalet som ersätts (importrest med riktig data)
+    let inherited = 0
+    if (replacesContractId && !replacesContractId.startsWith('kundrad-')) {
+      inherited = await this.inheritHistory(replacesContractId, created.id)
+    }
+
     await this.logEvent(created.id, {
       event_type: 'other',
       title: 'Avtalet skapat',
-      detail: 'Materialiserat från kundkortets avtalsdata',
+      detail:
+        inherited > 0
+          ? `Materialiserat från kundkortet · ${inherited} historikrader överförda från tidigare avtalsrad`
+          : 'Materialiserat från kundkortets avtalsdata',
     })
 
     return created.id
+  }
+
+  /**
+   * Flytta historik från en gammal avtalsrad (importrest) till det nya avtalet
+   * och markera den gamla som ersatt.
+   *
+   * Fakturarader, ärenden, avtalsinnehåll och kontrollbesök pekas om så att
+   * allt hänger på det avtal som faktiskt visas. Den gamla raden raderas inte
+   * — den behålls som spår med status 'ended' och en notering.
+   *
+   * Returnerar antalet överförda rader.
+   */
+  static async inheritHistory(fromContractId: string, toContractId: string): Promise<number> {
+    let moved = 0
+    const move = async (table: string, column: string) => {
+      const { data, error } = await supabase
+        .from(table)
+        .update({ [column]: toContractId })
+        .eq(column, fromContractId)
+        .select('id')
+      if (error) {
+        console.error(`Kunde inte flytta ${table}:`, error.message)
+        return
+      }
+      moved += data?.length ?? 0
+    }
+
+    await move('contract_billing_items', 'contract_id')
+    await move('cases', 'contract_id')
+    await move('contract_premium_events', 'contract_id')
+    await move('contract_sites', 'contract_id')
+    await move('station_inspection_sessions', 'contract_id')
+    await move('recurring_schedules', 'contract_id')
+    // Avtalsinnehåll: case_billing_items använder avtalets id som case_id
+    const { data: items } = await supabase
+      .from('case_billing_items')
+      .update({ case_id: toContractId })
+      .eq('case_id', fromContractId)
+      .eq('case_type', 'contract')
+      .select('id')
+    moved += items?.length ?? 0
+
+    // Markera den gamla raden som ersatt så den försvinner ur aktiva vyer
+    await supabase
+      .from('contracts')
+      .update({
+        status: 'ended',
+        termination_reason: 'Ersatt av nytt avtal i portalen',
+      })
+      .eq('id', fromContractId)
+
+    return moved
   }
 
   /** Skriv en händelse i avtalets logg (tidslinjen). Fel sväljs — loggen får aldrig fälla mutationen. */
