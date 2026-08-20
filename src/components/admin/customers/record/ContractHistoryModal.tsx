@@ -4,7 +4,7 @@
 // filtrerbart per enhet. Ren läsvy — all data kommer från useCustomerRecord.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Briefcase, Clock } from 'lucide-react'
+import { Briefcase, CalendarCheck, Clock } from 'lucide-react'
 import Modal from '../../../ui/Modal'
 import {
   contractDisplayName,
@@ -16,14 +16,16 @@ import {
   type RecordBillingItem,
   type RecordCase,
   type RecordContract,
+  type RecordContractEvent,
   type RecordContractSite,
   type RecordCustomer,
+  type RecordInspectionSession,
   type RecordPremiumEvent,
 } from '../../../../hooks/useCustomerRecord'
 import ContractTimelineList, { buildSingleContractTimeline } from './ContractTimelineList'
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
 
-export type HistoryTab = 'tidslinje' | 'arenden'
+export type HistoryTab = 'tidslinje' | 'besok' | 'arenden'
 
 interface Props {
   /** null = stängd */
@@ -36,6 +38,10 @@ interface Props {
   premiumEvents: RecordPremiumEvent[]
   contractSites: RecordContractSite[]
   cases: RecordCase[]
+  /** Loggade avtalsändringar (prislistbyten m.m.) */
+  loggedEvents: RecordContractEvent[]
+  /** Kontrollbesök på avtalets enheter */
+  inspections: RecordInspectionSession[]
   customerById: Map<string, RecordCustomer>
   /** Kundrader avtalet gäller: ägaren + enheter i omfattningen */
   coveredCustomerIds: string[]
@@ -65,6 +71,8 @@ export default function ContractHistoryModal({
   premiumEvents,
   contractSites,
   cases,
+  loggedEvents,
+  inspections,
   customerById,
   coveredCustomerIds,
 }: Props) {
@@ -82,10 +90,27 @@ export default function ContractHistoryModal({
     [customerById]
   )
 
+  const visits = useMemo(() => {
+    if (!contract) return []
+    const covered = new Set(coveredCustomerIds)
+    return inspections
+      .filter((s) => covered.has(s.customer_id))
+      .filter((s) => !unitFilter || s.customer_id === unitFilter)
+  }, [contract, inspections, coveredCustomerIds, unitFilter])
+
   const timelineEvents = useMemo(() => {
     if (!contract) return []
-    return buildSingleContractTimeline(contract, additions, billingItems, premiumEvents, contractSites, nameById)
-  }, [contract, additions, billingItems, premiumEvents, contractSites, nameById])
+    return buildSingleContractTimeline(
+      contract,
+      additions,
+      billingItems,
+      premiumEvents,
+      contractSites,
+      nameById,
+      loggedEvents,
+      visits
+    )
+  }, [contract, additions, billingItems, premiumEvents, contractSites, nameById, loggedEvents, visits])
 
   const contractCases = useMemo(() => {
     if (!contract) return []
@@ -101,9 +126,16 @@ export default function ContractHistoryModal({
   const doneCount = contractCases.filter((c) => caseState(c) === 'done').length
   const openCount = contractCases.filter((c) => caseState(c) !== 'done').length
 
+  const doneVisits = visits.filter((v) => v.completed_at)
+  const bookedVisits = visits.filter((v) => !v.completed_at)
+  const nextVisit = bookedVisits
+    .filter((v) => v.scheduled_at)
+    .sort((a, b) => (a.scheduled_at as string).localeCompare(b.scheduled_at as string))[0]
+
   const tabs: { id: HistoryTab; label: string; icon: React.ReactNode }[] = [
     { id: 'tidslinje', label: 'Tidslinje', icon: <Clock className="w-3.5 h-3.5" /> },
-    { id: 'arenden', label: `Ärenden & besök (${contractCases.length})`, icon: <Briefcase className="w-3.5 h-3.5" /> },
+    { id: 'besok', label: `Kontrollbesök (${visits.length})`, icon: <CalendarCheck className="w-3.5 h-3.5" /> },
+    { id: 'arenden', label: `Ärenden (${contractCases.length})`, icon: <Briefcase className="w-3.5 h-3.5" /> },
   ]
 
   return (
@@ -146,6 +178,68 @@ export default function ContractHistoryModal({
 
         <div hidden={tab !== 'tidslinje'}>
           <ContractTimelineList events={timelineEvents} emptyText="Inga händelser för avtalet ännu." />
+        </div>
+
+        <div hidden={tab !== 'besok'}>
+          {visits.length > 0 && (
+            <div className="flex gap-2 flex-wrap mb-3">
+              <span className="text-xs px-2.5 py-1 rounded-lg border border-[#20c58f]/40 bg-[#20c58f]/10 text-[#20c58f]">
+                {doneVisits.length} utförda
+              </span>
+              {bookedVisits.length > 0 && (
+                <span className="text-xs px-2.5 py-1 rounded-lg border border-sky-400/40 bg-sky-400/10 text-sky-400">
+                  {bookedVisits.length} bokade
+                </span>
+              )}
+              {nextVisit && (
+                <span className="text-xs px-2.5 py-1 rounded-lg border border-slate-700 bg-slate-800 text-slate-300">
+                  Nästa: {formatDateSv(nextVisit.scheduled_at)} ·{' '}
+                  {nameById.get(nextVisit.customer_id) ?? 'enheten'}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="space-y-2">
+            {visits.map((v) => {
+              const done = !!v.completed_at
+              const total = (v.total_outdoor_stations ?? 0) + (v.total_indoor_stations ?? 0)
+              const inspected = (v.inspected_outdoor_stations ?? 0) + (v.inspected_indoor_stations ?? 0)
+              const partial = done && total > 0 && inspected < total
+              return (
+                <div
+                  key={v.id}
+                  className="flex items-center gap-3 px-3 py-2 rounded-xl border border-slate-700/50 bg-slate-800/20 text-sm"
+                >
+                  <span className="text-xs text-slate-500 tabular-nums w-20 shrink-0">
+                    {formatDateSv(v.completed_at ?? v.scheduled_at)}
+                  </span>
+                  <span className="w-32 shrink-0 font-medium text-slate-300 truncate">
+                    {nameById.get(v.customer_id) ?? '–'}
+                  </span>
+                  <span className="flex-1 text-slate-400 text-xs truncate">
+                    {total > 0 ? `${inspected} av ${total} stationer` : 'Stationskontroll'}
+                    {v.technician_name && ` · ${v.technician_name}`}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 ${
+                      done
+                        ? partial
+                          ? 'text-amber-400 border-amber-400/40 bg-amber-400/10'
+                          : 'text-[#20c58f] border-[#20c58f]/40 bg-[#20c58f]/10'
+                        : 'text-sky-400 border-sky-400/40 bg-sky-400/10'
+                    }`}
+                  >
+                    {done ? (partial ? 'Delvis' : 'Utfört') : 'Bokat'}
+                  </span>
+                </div>
+              )
+            })}
+            {visits.length === 0 && (
+              <p className="text-sm text-slate-500 py-4 text-center">
+                Inga kontrollbesök {unitFilter ? 'för den valda enheten' : 'på avtalets enheter'} ännu.
+              </p>
+            )}
+          </div>
         </div>
 
         <div hidden={tab !== 'arenden'}>

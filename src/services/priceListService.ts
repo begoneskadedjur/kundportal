@@ -334,9 +334,11 @@ export class PriceListService {
   }
 
   /**
-   * Avtalets prislista för en kundrad: avtal som BOR på raden vinner, därefter
-   * avtal som TÄCKER raden via contract_sites (aktiv täckning idag). Nyaste
-   * avtalet med prislista vinner vid flera träffar. Null = inget avtal styr.
+   * Avtalets prislista för en kundrad. Prioritet:
+   *   1. Avtal som BOR på raden
+   *   2. Avtal som TÄCKER raden via contract_sites (aktiv täckning idag)
+   *   3. Avtal på huvudkontoret med covers_all_sites (täcker alla enheter)
+   * Nyaste avtalet med prislista vinner inom varje steg. Null = inget avtal styr.
    */
   static async resolveContractPriceListId(customerId: string): Promise<string | null> {
     const today = new Date().toISOString().slice(0, 10)
@@ -371,7 +373,28 @@ export class PriceListService {
           !!c && ['signed', 'active'].includes(c.status) && !!c.price_list_id
       )
       .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    return candidates[0]?.price_list_id ?? null
+    if (candidates[0]?.price_list_id) return candidates[0].price_list_id
+
+    // 3. Avtal på huvudkontoret som täcker hela verksamheten (covers_all_sites).
+    //    Gäller bara när kundraden är en enhet under ett HK.
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('parent_customer_id')
+      .eq('id', customerId)
+      .maybeSingle()
+    const parentId = (customer as { parent_customer_id?: string | null } | null)?.parent_customer_id
+    if (!parentId) return null
+
+    const { data: parentContracts } = await supabase
+      .from('contracts')
+      .select('price_list_id, created_at')
+      .eq('customer_id', parentId)
+      .eq('covers_all_sites', true)
+      .in('status', ['signed', 'active'])
+      .not('price_list_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+    return (parentContracts?.[0] as { price_list_id?: string | null } | undefined)?.price_list_id ?? null
   }
 
   /**

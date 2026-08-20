@@ -14,8 +14,36 @@ export interface ScopeRow {
   note: string | null
 }
 
+export type ContractEventType = 'price_list' | 'scope_mode' | 'note' | 'billing' | 'other'
+
+export interface ContractEventRow {
+  id: string
+  contract_id: string
+  event_type: ContractEventType
+  title: string
+  detail: string | null
+  occurred_at: string
+  created_by_name: string | null
+}
+
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+/** Namnet på inloggad admin — används som signatur på loggade händelser */
+async function currentUserName(): Promise<string | null> {
+  try {
+    const { data: auth } = await supabase.auth.getUser()
+    if (!auth?.user) return null
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name, email')
+      .eq('user_id', auth.user.id)
+      .maybeSingle()
+    return profile?.display_name || profile?.email || auth.user.email || null
+  } catch {
+    return null
+  }
 }
 
 export class ContractScopeService {
@@ -116,8 +144,15 @@ export class ContractScopeService {
     return missing.length
   }
 
-  /** Sätt (eller rensa) avtalets prislista — styr avrops-/tilläggspriser per ärende */
-  static async setPriceList(contractId: string, priceListId: string | null): Promise<void> {
+  /**
+   * Sätt (eller rensa) avtalets prislista — styr avrops-/tilläggspriser per
+   * ärende. Loggas i contract_events så bytet syns i avtalets tidslinje.
+   */
+  static async setPriceList(
+    contractId: string,
+    priceListId: string | null,
+    names?: { from: string | null; to: string | null }
+  ): Promise<void> {
     const { data, error } = await supabase
       .from('contracts')
       .update({ price_list_id: priceListId })
@@ -125,5 +160,60 @@ export class ContractScopeService {
       .select('id')
     if (error) throw new Error(`Kunde inte byta prislista: ${error.message}`)
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    const to = names?.to
+    const from = names?.from
+    await this.logEvent(contractId, {
+      event_type: 'price_list',
+      title: priceListId ? 'Prislista ändrad' : 'Prislista borttagen',
+      detail: priceListId
+        ? from
+          ? `${from} → ${to ?? 'ny prislista'}`
+          : `${to ?? 'Ny prislista'} vald`
+        : `${from ?? 'Prislistan'} togs bort — kundens prislista gäller`,
+      metadata: { from_price_list_id: null, to_price_list_id: priceListId },
+    })
+  }
+
+  /**
+   * Omfattningsläge: true = avtalet täcker alla enheter under huvudkontoret,
+   * även enheter som skapas senare. Loggas i tidslinjen.
+   */
+  static async setCoversAllSites(contractId: string, coversAll: boolean): Promise<void> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({ covers_all_sites: coversAll })
+      .eq('id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte ändra omfattningsläget: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    await this.logEvent(contractId, {
+      event_type: 'scope_mode',
+      title: coversAll ? 'Omfattar hela verksamheten' : 'Omfattning styrs per enhet',
+      detail: coversAll
+        ? 'Avtalet täcker alla nuvarande enheter och enheter som tillkommer senare'
+        : 'Avtalet täcker bara de enheter som står i § 1 Omfattning',
+    })
+  }
+
+  /** Skriv en händelse i avtalets logg (tidslinjen). Fel sväljs — loggen får aldrig fälla mutationen. */
+  static async logEvent(
+    contractId: string,
+    event: { event_type: ContractEventType; title: string; detail?: string | null; metadata?: Record<string, unknown> }
+  ): Promise<void> {
+    try {
+      const createdByName = await currentUserName()
+      await supabase.from('contract_events').insert({
+        contract_id: contractId,
+        event_type: event.event_type,
+        title: event.title,
+        detail: event.detail ?? null,
+        metadata: event.metadata ?? null,
+        created_by_name: createdByName,
+      })
+    } catch (err) {
+      console.error('Kunde inte logga avtalshändelse:', err)
+    }
   }
 }

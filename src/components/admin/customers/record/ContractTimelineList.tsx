@@ -15,14 +15,28 @@ import {
   type RecordAddition,
   type RecordBillingItem,
   type RecordContract,
+  type RecordContractEvent,
   type RecordContractSite,
+  type RecordInspectionSession,
   type RecordPremiumEvent,
 } from '../../../../hooks/useCustomerRecord'
 
 export interface RecordTimelineEvent {
   /** YYYY-MM-DD (eller full ISO) — används för sortering och datumkolumn */
   date: string
-  kind: 'start' | 'signed' | 'addition' | 'index' | 'terminated' | 'notice' | 'end' | 'invoice' | 'premium' | 'scope'
+  kind:
+    | 'start'
+    | 'signed'
+    | 'addition'
+    | 'index'
+    | 'terminated'
+    | 'notice'
+    | 'end'
+    | 'invoice'
+    | 'premium'
+    | 'scope'
+    | 'pricelist'
+    | 'inspection'
   title: string
   detail?: string
   /** Taggning i den fulla strömmen: avtalets label eller kundradens namn */
@@ -161,6 +175,47 @@ export function buildScopeEvents(
   return events
 }
 
+/** Loggade avtalsändringar (contract_events): prislistbyten, omfattningsläge m.m. */
+export function buildContractEventEntries(
+  events: RecordContractEvent[],
+  tag?: string
+): RecordTimelineEvent[] {
+  return events.map((e) => ({
+    date: toDateKey(e.occurred_at),
+    kind: (e.event_type === 'price_list' ? 'pricelist' : 'scope') as RecordTimelineEvent['kind'],
+    title: e.title,
+    detail: [e.detail, e.created_by_name].filter(Boolean).join(' · ') || undefined,
+    tag,
+  }))
+}
+
+/** Kontrollbesök (station_inspection_sessions) som tidslinjehändelser */
+export function buildInspectionEvents(
+  sessions: RecordInspectionSession[],
+  unitNameById: Map<string, string>,
+  tag?: string
+): RecordTimelineEvent[] {
+  return sessions
+    .filter((s) => s.completed_at || s.scheduled_at)
+    .map((s) => {
+      const done = !!s.completed_at
+      const total = (s.total_outdoor_stations ?? 0) + (s.total_indoor_stations ?? 0)
+      const inspected = (s.inspected_outdoor_stations ?? 0) + (s.inspected_indoor_stations ?? 0)
+      const parts: string[] = []
+      const unitName = unitNameById.get(s.customer_id)
+      if (unitName) parts.push(unitName)
+      if (done && total > 0) parts.push(`${inspected} av ${total} stationer kontrollerade`)
+      if (s.technician_name) parts.push(s.technician_name)
+      return {
+        date: toDateKey((s.completed_at ?? s.scheduled_at) as string),
+        kind: 'inspection' as const,
+        title: done ? 'Kontrollbesök utfört' : 'Kontrollbesök bokat',
+        detail: parts.join(' · ') || undefined,
+        tag,
+      }
+    })
+}
+
 /** Fakturahändelser: aggregerar contract_billing_items per faktureringsperiod */
 export function buildInvoiceEvents(items: RecordBillingItem[], tag?: string): RecordTimelineEvent[] {
   const byPeriod = new Map<string, RecordBillingItem[]>()
@@ -198,13 +253,17 @@ export function buildSingleContractTimeline(
   billingItems: RecordBillingItem[],
   premiumEvents: RecordPremiumEvent[] = [],
   contractSites: RecordContractSite[] = [],
-  unitNameById: Map<string, string> = new Map()
+  unitNameById: Map<string, string> = new Map(),
+  loggedEvents: RecordContractEvent[] = [],
+  inspections: RecordInspectionSession[] = []
 ): RecordTimelineEvent[] {
   return [
     ...buildContractEvents(contract),
     ...buildAdditionEvents(additions),
     ...buildPremiumTimelineEvents(premiumEvents),
     ...buildScopeEvents(contractSites, unitNameById),
+    ...buildContractEventEntries(loggedEvents),
+    ...buildInspectionEvents(inspections, unitNameById),
     ...buildInvoiceEvents(billingItems),
   ]
 }

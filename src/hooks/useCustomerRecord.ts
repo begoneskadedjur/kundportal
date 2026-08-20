@@ -21,6 +21,8 @@ export type RecordContract = Contract & {
   label?: string | null
   fromCustomerRow?: boolean
   price_list_id?: string | null
+  /** True = avtalet omfattar alla enheter under HK, även framtida (annars styr contract_sites) */
+  covers_all_sites?: boolean | null
 }
 
 export interface RecordBillingItem {
@@ -77,6 +79,32 @@ export interface RecordContractSite {
   active_from: string | null
   active_to: string | null
   note: string | null
+}
+
+// Avtalskartan: avtalshändelser utan egen tabell (prislistbyten, omfattningsläge)
+export interface RecordContractEvent {
+  id: string
+  contract_id: string
+  event_type: string
+  title: string
+  detail: string | null
+  occurred_at: string
+  created_by_name: string | null
+}
+
+// Avtalskartan: kontrollbesök (station_inspection_sessions) för § 3 Uppföljning
+export interface RecordInspectionSession {
+  id: string
+  customer_id: string
+  contract_id: string | null
+  scheduled_at: string | null
+  completed_at: string | null
+  status: string | null
+  total_outdoor_stations: number | null
+  total_indoor_stations: number | null
+  inspected_outdoor_stations: number | null
+  inspected_indoor_stations: number | null
+  technician_name: string | null
 }
 
 // Avtalskartan: ärenden för familjen (uppföljning + historikmodal)
@@ -154,6 +182,10 @@ export interface CustomerRecordData {
   caseCounts: Record<string, number>
   /** Familjens ärenden (avtalskartan: uppföljning + historik) */
   cases: RecordCase[]
+  /** Avtalshändelser utan egen tabell (prislistbyten m.m.) */
+  contractEvents: RecordContractEvent[]
+  /** Kontrollbesök för familjen (§ 3 Uppföljning) */
+  inspections: RecordInspectionSession[]
   /** Åtkomst & konton (etapp 6) — sekundärdata, tomma listor vid fel */
   access: RecordAccessData
 }
@@ -208,7 +240,18 @@ export function useCustomerRecord(customerId: string | undefined) {
     // 3-8. Avtal, fakturarader, tillägg, premietrappa, omfattning, ärendeantal
     // samt åtkomstdata (etapp 6) parallellt.
     // Premie/omfattning filtreras på avtalets ägare via inner join mot contracts.
-    const [contractsRes, billingRes, additionsRes, premiumRes, sitesRes, casesRes, profilesRes, invitationsRes] = await Promise.all([
+    const [
+      contractsRes,
+      billingRes,
+      additionsRes,
+      premiumRes,
+      sitesRes,
+      casesRes,
+      profilesRes,
+      invitationsRes,
+      contractEventsRes,
+      inspectionsRes,
+    ] = await Promise.all([
       supabase
         .from('contracts')
         .select('*')
@@ -249,6 +292,19 @@ export function useCustomerRecord(customerId: string | undefined) {
         .from('user_invitations')
         .select('id, email, customer_id, accepted_at, expires_at, created_at')
         .in('customer_id', familyIds),
+      // Avtalshändelser (prislistbyten m.m.) för familjens avtal
+      supabase
+        .from('contract_events')
+        .select('id, contract_id, event_type, title, detail, occurred_at, created_by_name, contract:contracts!inner(customer_id)')
+        .in('contract.customer_id', familyIds)
+        .order('occurred_at', { ascending: true }),
+      // Kontrollbesök (§ 3 Uppföljning). OBS: contract_id är null på alla
+      // sessioner i dag — matchning sker på customer_id i konsumenten.
+      supabase
+        .from('station_inspection_sessions')
+        .select('id, customer_id, contract_id, scheduled_at, completed_at, status, total_outdoor_stations, total_indoor_stations, inspected_outdoor_stations, inspected_indoor_stations, technician:technicians(name)')
+        .in('customer_id', familyIds)
+        .order('scheduled_at', { ascending: false }),
     ])
 
     // Multisite-roller kräver organisationens id — hämtas bara när root är multisite.
@@ -338,6 +394,21 @@ export function useCustomerRecord(customerId: string | undefined) {
     }
 
     const familyCases = (casesRes.error ? [] : (casesRes.data ?? [])) as unknown as RecordCase[]
+
+    // Sekundärdata: nya tabeller får aldrig fälla sidan om de saknas/blockeras
+    const contractEvents = (
+      contractEventsRes.error ? [] : (contractEventsRes.data ?? [])
+    ) as unknown as RecordContractEvent[]
+
+    type InspectionRow = Omit<RecordInspectionSession, 'technician_name'> & {
+      technician?: { name?: string | null } | { name?: string | null }[] | null
+    }
+    const inspections = ((inspectionsRes.error ? [] : (inspectionsRes.data ?? [])) as unknown as InspectionRow[]).map(
+      ({ technician, ...row }) => ({
+        ...row,
+        technician_name: Array.isArray(technician) ? (technician[0]?.name ?? null) : (technician?.name ?? null),
+      })
+    ) as RecordInspectionSession[]
     const caseCounts: Record<string, number> = {}
     for (const row of familyCases) {
       if (!row.customer_id) continue
@@ -355,6 +426,8 @@ export function useCustomerRecord(customerId: string | undefined) {
       contractSites,
       caseCounts,
       cases: familyCases,
+      contractEvents,
+      inspections,
       access: {
         profiles: (profilesRes.error ? [] : (profilesRes.data ?? [])) as RecordAccessProfile[],
         invitations: (invitationsRes.error ? [] : (invitationsRes.data ?? [])) as RecordAccessInvitation[],

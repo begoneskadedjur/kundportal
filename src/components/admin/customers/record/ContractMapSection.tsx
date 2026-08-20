@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   Building2,
   Calendar,
+  CalendarCheck,
   CheckCircle2,
   Clock,
   ExternalLink,
@@ -33,10 +34,10 @@ import {
   nextPremiumEvent,
   BILLING_FREQUENCY_LABEL,
   type CustomerRecordData,
-  type RecordCase,
   type RecordContract,
   type RecordContractSite,
   type RecordCustomer,
+  type RecordInspectionSession,
 } from '../../../../hooks/useCustomerRecord'
 import { ContractScopeService } from '../../../../services/contractScopeService'
 import { PriceListService } from '../../../../services/priceListService'
@@ -86,6 +87,13 @@ interface PricePrompt {
   contract: RecordContract
 }
 
+/** Val vid släpp av "Hela verksamheten": bara dagens enheter eller även framtida */
+interface ScopeModePrompt {
+  x: number
+  y: number
+  contract: RecordContract
+}
+
 interface HistoryState {
   contract: RecordContract
   tab: HistoryTab
@@ -100,12 +108,14 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 export default function ContractMapSection({ data, onChanged }: Props) {
-  const { root, units, contracts, additions, billingItems, premiumEvents, contractSites, cases } = data
+  const { root, units, contracts, additions, billingItems, premiumEvents, contractSites, cases, contractEvents, inspections } =
+    data
 
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
   const [drag, setDrag] = useState<DragState | null>(null)
   const [datePrompt, setDatePrompt] = useState<DatePrompt | null>(null)
   const [pricePrompt, setPricePrompt] = useState<PricePrompt | null>(null)
+  const [scopeModePrompt, setScopeModePrompt] = useState<ScopeModePrompt | null>(null)
   const [history, setHistory] = useState<HistoryState | null>(null)
   const [siteModalOpen, setSiteModalOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -171,15 +181,22 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       billingByCustomer.set(b.customer_id, list)
     }
 
-    // Vilka avtal täcker en enhet? (äger avtalet ELLER står i omfattningen)
+    // Vilka avtal täcker en enhet? Avtalet äger raden, står i omfattningen,
+    // ELLER har covers_all_sites (täcker allt inkl. framtida enheter).
     const coverage = new Map<string, RecordContract[]>()
     for (const u of units) coverage.set(u.id, [])
+    const addCoverage = (unitId: string, c: RecordContract) => {
+      const list = coverage.get(unitId)
+      if (list && !list.some((x) => x.id === c.id)) list.push(c)
+    }
     for (const c of papers) {
-      if (unitIds.has(c.customer_id ?? '')) coverage.get(c.customer_id as string)?.push(c)
+      if (c.covers_all_sites) {
+        for (const u of units) addCoverage(u.id, c)
+        continue
+      }
+      if (unitIds.has(c.customer_id ?? '')) addCoverage(c.customer_id as string, c)
       for (const cs of activeScopeByContract.get(c.id) ?? []) {
-        if (unitIds.has(cs.customer_id) && !coverage.get(cs.customer_id)?.some((x) => x.id === c.id)) {
-          coverage.get(cs.customer_id)?.push(c)
-        }
+        if (unitIds.has(cs.customer_id)) addCoverage(cs.customer_id, c)
       }
     }
     const uncoveredUnits = units.filter((u) => (coverage.get(u.id) ?? []).length === 0)
@@ -237,9 +254,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       const ey = pRect.top + pRect.height / 2 - bRect.top
       const color = accentByContract.get(c.id) ?? ACCENTS[0]
       const sources = new Set<string>()
-      if (unitIds.has(c.customer_id ?? '')) sources.add(c.customer_id as string)
-      for (const cs of activeScopeByContract.get(c.id) ?? []) {
-        if (unitIds.has(cs.customer_id)) sources.add(cs.customer_id)
+      if (c.covers_all_sites) {
+        for (const u of units) sources.add(u.id)
+      } else {
+        if (unitIds.has(c.customer_id ?? '')) sources.add(c.customer_id as string)
+        for (const cs of activeScopeByContract.get(c.id) ?? []) {
+          if (unitIds.has(cs.customer_id)) sources.add(cs.customer_id)
+        }
       }
       for (const unitId of sources) {
         const uEl = unitRefs.current.get(unitId)
@@ -260,7 +281,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       }
     }
     setWires(next)
-  }, [papers, unitIds, activeScopeByContract, accentByContract])
+  }, [papers, units, unitIds, activeScopeByContract, accentByContract])
 
   useLayoutEffect(() => {
     recomputeWires()
@@ -285,6 +306,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     (payload: DragPayload, contract: RecordContract): string | null => {
       if (contract.fromCustomerRow) return 'Kundkortsavtal — konvertera till riktigt avtal först'
       if (isImportedContract(contract)) return 'Importrest — konvertera till riktigt avtal först'
+      if (contract.covers_all_sites) return 'Omfattar redan hela verksamheten'
       if (payload.type === 'org') return null
       const unitId = payload.unitId
       if (contract.customer_id === unitId) return 'Avtalet bor redan på enheten'
@@ -358,10 +380,12 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   }, [!!drag, validateDrop, papers])
 
   const openDatePromptForDrop = (payload: DragPayload, contract: RecordContract, x: number, y: number) => {
-    const subject =
-      payload.type === 'org'
-        ? 'Hela verksamheten'
-        : customerRowName(customerById.get(payload.unitId) ?? ({ company_name: 'Enhet' } as RecordCustomer))
+    // "Hela verksamheten" → fråga först om det gäller även framtida enheter
+    if (payload.type === 'org') {
+      setScopeModePrompt({ x, y, contract })
+      return
+    }
+    const subject = customerRowName(customerById.get(payload.unitId) ?? ({ company_name: 'Enhet' } as RecordCustomer))
     setDatePrompt({
       x,
       y,
@@ -371,6 +395,37 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       contractStart: contract.contract_start_date ?? contract.start_date ?? null,
       onConfirm: (date) => runDropAction(payload, contract, date),
     })
+  }
+
+  /** Sätt covers_all_sites (täcker även framtida enheter) */
+  const applyCoversAll = async (contract: RecordContract) => {
+    setScopeModePrompt(null)
+    setBusy(true)
+    try {
+      await ContractScopeService.setCoversAllSites(contract.id, true)
+      toast.success(
+        `${contractDisplayName(contract)} omfattar nu hela verksamheten — alla ${units.length} enheter och enheter som tillkommer senare.`
+      )
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ändra omfattningsläget')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Stäng av covers_all_sites — omfattningen styrs åter av § 1 */
+  const clearCoversAll = async (contract: RecordContract) => {
+    setBusy(true)
+    try {
+      await ContractScopeService.setCoversAllSites(contract.id, false)
+      toast.success(`${contractDisplayName(contract)} styrs nu per enhet — dra in enheterna som ska omfattas.`)
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ändra omfattningsläget')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const runDropAction = async (payload: DragPayload, contract: RecordContract, date: string) => {
@@ -431,7 +486,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     if ((contract.price_list_id ?? null) === priceListId) return
     setBusy(true)
     try {
-      await ContractScopeService.setPriceList(contract.id, priceListId)
+      await ContractScopeService.setPriceList(contract.id, priceListId, {
+        from: priceListName(contract.price_list_id),
+        to: priceListName(priceListId),
+      })
       toast.success(
         priceListId
           ? `Prislistan för ${contractDisplayName(contract)} är nu ${priceListName(priceListId) ?? 'uppdaterad'} — gäller nya ärenden direkt.`
@@ -473,22 +531,55 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   // -------------------------------------------------------------------------
 
   const followupFor = useCallback(
-    (contract: RecordContract): { next: RecordCase | null; done: number; open: number; covered: string[] } => {
-      const covered = [contract.customer_id as string, ...(activeScopeByContract.get(contract.id) ?? []).map((cs) => cs.customer_id)]
+    (
+      contract: RecordContract
+    ): {
+      nextVisit: RecordInspectionSession | null
+      visitsDone: number
+      visitsBooked: number
+      casesDone: number
+      casesOpen: number
+      casesTotal: number
+      covered: string[]
+    } => {
+      // Täckta kundrader: avtalets egen rad + omfattningen (eller alla enheter
+      // när avtalet täcker hela verksamheten)
+      const covered = (
+        contract.covers_all_sites
+          ? [contract.customer_id as string, ...units.map((u) => u.id)]
+          : [
+              contract.customer_id as string,
+              ...(activeScopeByContract.get(contract.id) ?? []).map((cs) => cs.customer_id),
+            ]
+      )
         .filter(Boolean)
         .filter((id, i, arr) => arr.indexOf(id) === i)
       const coveredSet = new Set(covered)
-      const list = cases.filter((c) => c.contract_id === contract.id || (c.customer_id && coveredSet.has(c.customer_id)))
+
+      // Kontrollbesök: sessioner matchas på kundrad (contract_id är null i DB idag)
+      const visits = inspections.filter((s) => coveredSet.has(s.customer_id))
+      const visitsDone = visits.filter((s) => s.completed_at).length
+      const booked = visits.filter((s) => !s.completed_at && s.scheduled_at)
       const key = todayKey()
-      const done = list.filter((c) => c.completed_date || isCompletedStatus(c.status as ClickUpStatus)).length
-      const open = list.length - done
-      const next =
-        list
-          .filter((c) => !c.completed_date && !isCompletedStatus(c.status as ClickUpStatus) && c.scheduled_date && c.scheduled_date.slice(0, 10) >= key)
-          .sort((a, b) => (a.scheduled_date as string).localeCompare(b.scheduled_date as string))[0] ?? null
-      return { next, done, open, covered }
+      const nextVisit =
+        booked
+          .filter((s) => (s.scheduled_at as string).slice(0, 10) >= key)
+          .sort((a, b) => (a.scheduled_at as string).localeCompare(b.scheduled_at as string))[0] ?? null
+
+      const list = cases.filter((c) => c.contract_id === contract.id || (c.customer_id && coveredSet.has(c.customer_id)))
+      const casesDone = list.filter((c) => c.completed_date || isCompletedStatus(c.status as ClickUpStatus)).length
+
+      return {
+        nextVisit,
+        visitsDone,
+        visitsBooked: booked.length,
+        casesDone,
+        casesOpen: list.length - casesDone,
+        casesTotal: list.length,
+        covered,
+      }
     },
-    [activeScopeByContract, cases]
+    [activeScopeByContract, cases, inspections, units]
   )
 
   // -------------------------------------------------------------------------
@@ -710,6 +801,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               premiumEvents={premiumByContract.get(c.id) ?? []}
               followup={followupFor(c)}
               priceListLabel={priceListName(c.price_list_id)}
+              onClearCoversAll={() => clearCoversAll(c)}
               isDropTarget={drag?.started ? drag.overContractId === c.id && !drag.invalidReason : false}
               isInvalidTarget={drag?.started ? drag.overContractId === c.id && !!drag.invalidReason : false}
               invalidReason={drag?.overContractId === c.id ? drag?.invalidReason ?? null : null}
@@ -796,6 +888,60 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         <DatePromptPopover prompt={datePrompt} onClose={() => setDatePrompt(null)} />
       )}
 
+      {/* Omfattningsläge: bara dagens enheter eller även framtida */}
+      {scopeModePrompt && (
+        <div
+          className="fixed z-[130] w-80 bg-slate-950 border border-slate-700 rounded-2xl p-3 shadow-2xl shadow-black/60"
+          style={{
+            left: Math.min(scopeModePrompt.x, window.innerWidth - 340),
+            top: Math.min(scopeModePrompt.y, window.innerHeight - 260),
+          }}
+        >
+          <h4 className="text-sm font-semibold text-slate-100 flex items-center gap-2 mb-0.5">
+            <Building2 className="w-3.5 h-3.5 text-[#20c58f]" />
+            Hur ska avtalet omfatta verksamheten?
+          </h4>
+          <p className="text-[11px] text-slate-400 mb-2.5">{contractDisplayName(scopeModePrompt.contract)}</p>
+          <button
+            onClick={() => applyCoversAll(scopeModePrompt.contract)}
+            className="w-full text-left rounded-lg border border-slate-700/60 px-3 py-2 mb-1.5 hover:border-[#20c58f] hover:bg-[#20c58f]/5 transition-colors"
+          >
+            <span className="block text-xs font-semibold text-slate-100">Hela verksamheten, löpande</span>
+            <span className="block text-[11px] text-slate-400 mt-0.5">
+              Alla {units.length} enheter — och enheter som tillkommer senare täcks automatiskt
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              const contract = scopeModePrompt.contract
+              const { x, y } = scopeModePrompt
+              setScopeModePrompt(null)
+              setDatePrompt({
+                x,
+                y,
+                title: 'Täckning gäller från',
+                subject: `Dagens ${units.length} enheter skrivs in i ${contractDisplayName(contract)}`,
+                contract,
+                contractStart: contract.contract_start_date ?? contract.start_date ?? null,
+                onConfirm: (date) => runDropAction({ type: 'org' }, contract, date),
+              })
+            }}
+            className="w-full text-left rounded-lg border border-slate-700/60 px-3 py-2 hover:border-[#20c58f] hover:bg-[#20c58f]/5 transition-colors"
+          >
+            <span className="block text-xs font-semibold text-slate-100">Bara dagens enheter</span>
+            <span className="block text-[11px] text-slate-400 mt-0.5">
+              Skriver in de {units.length} enheterna i § 1 med startdatum — framtida enheter läggs till manuellt
+            </span>
+          </button>
+          <button
+            onClick={() => setScopeModePrompt(null)}
+            className="mt-2 w-full text-center text-[11px] text-slate-500 hover:text-slate-300"
+          >
+            Avbryt
+          </button>
+        </div>
+      )}
+
       {/* Prislist-popover */}
       {pricePrompt && (
         <div
@@ -861,6 +1007,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         premiumEvents={history ? premiumByContract.get(history.contract.id) ?? [] : []}
         contractSites={history ? contractSites.filter((cs) => cs.contract_id === history.contract.id) : []}
         cases={cases}
+        loggedEvents={history ? contractEvents.filter((e) => e.contract_id === history.contract.id) : []}
+        inspections={inspections}
         customerById={customerById}
         coveredCustomerIds={history ? followupFor(history.contract).covered : []}
       />
@@ -951,8 +1099,17 @@ interface PaperProps {
   customerById: Map<string, RecordCustomer>
   scope: RecordContractSite[]
   premiumEvents: CustomerRecordData['premiumEvents']
-  followup: { next: RecordCase | null; done: number; open: number; covered: string[] }
+  followup: {
+    nextVisit: RecordInspectionSession | null
+    visitsDone: number
+    visitsBooked: number
+    casesDone: number
+    casesOpen: number
+    casesTotal: number
+    covered: string[]
+  }
   priceListLabel: string | null
+  onClearCoversAll: () => void
   isDropTarget: boolean
   isInvalidTarget: boolean
   invalidReason: string | null
@@ -976,6 +1133,7 @@ function PaperContract({
   premiumEvents,
   followup,
   priceListLabel,
+  onClearCoversAll,
   isDropTarget,
   isInvalidTarget,
   invalidReason,
@@ -1117,10 +1275,31 @@ function PaperContract({
         <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
           <h4 className="text-xs font-bold uppercase tracking-[0.12em]">§ 1 · Omfattning</h4>
           <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
-            {isUnitContract ? 'enhetsavtal' : `${scope.length} enhet${scope.length === 1 ? '' : 'er'}`}
+            {contract.covers_all_sites
+              ? 'hela verksamheten'
+              : isUnitContract
+                ? 'enhetsavtal'
+                : `${scope.length} enhet${scope.length === 1 ? '' : 'er'}`}
           </span>
         </div>
-        {isUnitContract && owner ? (
+        {contract.covers_all_sites ? (
+          <div className="flex items-center gap-2.5 py-2 text-[13.5px] border-b border-dotted border-[#d9d3c2]">
+            <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">1.1</span>
+            <span className="font-semibold">Hela verksamheten</span>
+            <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
+            <span className="text-[11.5px] text-[#5d6672] whitespace-nowrap">
+              samtliga nuvarande och framtida enheter
+            </span>
+            <button
+              onClick={onClearCoversAll}
+              className="shrink-0 w-5 h-5 grid place-items-center rounded-full text-[#8a9099] hover:bg-black/10 hover:text-[#262e38] text-sm leading-none"
+              aria-label="Byt till omfattning per enhet"
+              title="Byt till omfattning per enhet"
+            >
+              ×
+            </button>
+          </div>
+        ) : isUnitContract && owner ? (
           <div className="flex items-center gap-2.5 py-2 text-[13.5px] border-b border-dotted border-[#d9d3c2]">
             <span className="w-6 text-[11px] text-[#8a9099] tabular-nums">1.1</span>
             <span className="font-semibold">{customerRowName(owner)}</span>
@@ -1204,21 +1383,38 @@ function PaperContract({
         </div>
         <div className="flex flex-wrap gap-2.5 pt-2.5 font-sans">
           <button
-            onClick={() => onOpenHistory('arenden')}
+            onClick={() => onOpenHistory('besok')}
             className="flex-1 min-w-36 text-left bg-white/55 border border-[#d9d3c2] rounded-lg px-3 py-2 hover:bg-white/85 transition-colors"
-            style={{ borderColor: undefined }}
           >
             <span className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-widest font-bold text-[#8a9099]">
-              <Calendar className="w-3 h-3" /> Nästa besök
+              <Calendar className="w-3 h-3" /> Nästa kontrollbesök
             </span>
             <span className="block text-[12.5px] font-semibold mt-0.5">
-              {followup.next
-                ? `${formatDateSv(followup.next.scheduled_date)} · ${
-                    followup.next.customer_id
-                      ? customerRowName(customerById.get(followup.next.customer_id) ?? root)
-                      : root.company_name
-                  }`
+              {followup.nextVisit
+                ? `${formatDateSv(followup.nextVisit.scheduled_at)} · ${customerRowName(
+                    customerById.get(followup.nextVisit.customer_id) ?? root
+                  )}`
                 : 'Inget bokat'}
+            </span>
+          </button>
+          <button
+            onClick={() => onOpenHistory('besok')}
+            className="flex-1 min-w-36 text-left bg-white/55 border border-[#d9d3c2] rounded-lg px-3 py-2 hover:bg-white/85 transition-colors"
+          >
+            <span className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-widest font-bold text-[#8a9099]">
+              <CalendarCheck className="w-3 h-3" /> Kontrollbesök
+            </span>
+            <span className="block text-[12.5px] font-semibold mt-0.5">
+              {followup.visitsDone === 0 && followup.visitsBooked === 0 ? (
+                <span className="text-[#8a9099]">Inga registrerade</span>
+              ) : (
+                <>
+                  <span className="text-[#157a5b]">{followup.visitsDone} utförda</span>
+                  {followup.visitsBooked > 0 && (
+                    <span className="text-[#5d6672]"> · {followup.visitsBooked} bokade</span>
+                  )}
+                </>
+              )}
             </span>
           </button>
           <button
@@ -1229,8 +1425,8 @@ function PaperContract({
               <Clock className="w-3 h-3" /> Ärenden
             </span>
             <span className="block text-[12.5px] font-semibold mt-0.5">
-              <span className="text-[#157a5b]">{followup.done} utförda</span>
-              {followup.open > 0 && <span className="text-[#b45309]"> · {followup.open} öppna</span>}
+              <span className="text-[#157a5b]">{followup.casesDone} utförda</span>
+              {followup.casesOpen > 0 && <span className="text-[#b45309]"> · {followup.casesOpen} öppna</span>}
             </span>
           </button>
         </div>
