@@ -7,6 +7,7 @@
 // som fallback (markup på interna artiklar).
 
 import { supabase } from '../lib/supabase'
+import { isLiveContract, todayKey } from '../utils/contractLifecycle'
 import {
   PriceList,
   CreatePriceListInput,
@@ -341,39 +342,62 @@ export class PriceListService {
    * Nyaste avtalet med prislista vinner inom varje steg. Null = inget avtal styr.
    */
   static async resolveContractPriceListId(customerId: string): Promise<string | null> {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = todayKey()
+
+    // Avslutade avtal får aldrig styra priset på ett nytt ärende. Statusfiltret
+    // ensamt räcker inte — ett uppsagt avtal ligger kvar på 'signed' fram till
+    // slutdatumet — så varje kandidat körs genom isLiveContract().
+    // OBS: ingen .limit(1) i SQL här; hade den legat kvar kunde den enda
+    // hämtade raden vara ett avslutat avtal och steget falla ut som "ingen
+    // prislista" trots att ett levande avtal fanns.
+    type PriceCandidate = {
+      price_list_id: string | null
+      created_at: string
+      status?: string | null
+      terminated_at?: string | null
+      effective_end_date?: string | null
+      contract_end_date?: string | null
+    }
+    const newestLive = (rows: PriceCandidate[]): string | null =>
+      rows
+        .filter((c) => !!c.price_list_id && isLiveContract(c, today))
+        .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0]?.price_list_id ??
+      null
 
     // 1. Avtal som bor på kundraden
     const { data: owned } = await supabase
       .from('contracts')
-      .select('id, price_list_id, created_at')
+      .select(
+        'id, price_list_id, created_at, status, terminated_at, effective_end_date, contract_end_date'
+      )
       .eq('customer_id', customerId)
       .in('status', ['signed', 'active'])
       .not('price_list_id', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(1)
-    const ownedListId = (owned?.[0] as { price_list_id?: string | null } | undefined)?.price_list_id
+    const ownedListId = newestLive((owned ?? []) as unknown as PriceCandidate[])
     if (ownedListId) return ownedListId
 
     // 2. Avtal som täcker kundraden via contract_sites
     const { data: covering } = await supabase
       .from('contract_sites')
-      .select('active_from, active_to, contract:contracts!inner(id, price_list_id, status, created_at)')
+      .select(
+        'active_from, active_to, contract:contracts!inner(id, price_list_id, status, created_at, terminated_at, effective_end_date, contract_end_date)'
+      )
       .eq('customer_id', customerId)
     type CoveringRow = {
       active_from: string | null
       active_to: string | null
-      contract: { id: string; price_list_id: string | null; status: string; created_at: string } | null
+      contract: (PriceCandidate & { id: string }) | null
     }
     const candidates = ((covering ?? []) as unknown as CoveringRow[])
       .filter((r) => (!r.active_to || r.active_to >= today) && (!r.active_from || r.active_from <= today))
       .map((r) => r.contract)
       .filter(
-        (c): c is NonNullable<CoveringRow['contract']> =>
-          !!c && ['signed', 'active'].includes(c.status) && !!c.price_list_id
+        (c): c is PriceCandidate & { id: string } =>
+          !!c && ['signed', 'active'].includes((c.status ?? '') as string)
       )
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    if (candidates[0]?.price_list_id) return candidates[0].price_list_id
+    const coveredListId = newestLive(candidates)
+    if (coveredListId) return coveredListId
 
     // 3. Avtal på huvudkontoret som täcker hela verksamheten (covers_all_sites).
     //    Gäller bara när kundraden är en enhet under ett HK.
@@ -387,14 +411,15 @@ export class PriceListService {
 
     const { data: parentContracts } = await supabase
       .from('contracts')
-      .select('price_list_id, created_at')
+      .select(
+        'price_list_id, created_at, status, terminated_at, effective_end_date, contract_end_date'
+      )
       .eq('customer_id', parentId)
       .eq('covers_all_sites', true)
       .in('status', ['signed', 'active'])
       .not('price_list_id', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(1)
-    return (parentContracts?.[0] as { price_list_id?: string | null } | undefined)?.price_list_id ?? null
+    return newestLive((parentContracts ?? []) as unknown as PriceCandidate[])
   }
 
   /**

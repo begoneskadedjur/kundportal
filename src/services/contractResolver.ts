@@ -13,8 +13,20 @@
 // hellre än att gissa.
 
 import { supabase as defaultClient } from '../lib/supabase'
+import {
+  LIVE_CONTRACT_STATUSES,
+  isLiveContract,
+  isImportedContractRow,
+  todayKey,
+} from '../utils/contractLifecycle'
 
-const ACTIVE_STATUSES = ['signed', 'active']
+// Grovfilter mot DB. Ett uppsagt avtal ligger kvar på 'signed' fram till sitt
+// slutdatum, så statusen ensam räcker inte — varje kandidat körs dessutom
+// genom isLiveContract() nedan.
+const ACTIVE_STATUSES = [...LIVE_CONTRACT_STATUSES]
+
+/** Fälten varje kandidat måste bära för att livscykeln ska gå att bedöma. */
+const LIFECYCLE_COLUMNS = 'status, terminated_at, effective_end_date, contract_end_date'
 
 /**
  * Resolvern körs både mot browser-klienten och (potentiellt) en
@@ -26,6 +38,19 @@ type AnyClient = typeof defaultClient
 interface ContractCandidate {
   id: string
   created_at: string
+  status?: string | null
+  terminated_at?: string | null
+  effective_end_date?: string | null
+  contract_end_date?: string | null
+}
+
+/**
+ * Avslutade avtal får aldrig plockas upp av resolvern — de ska inte kunna
+ * kopplas till nya besök, ärenden eller priser. Uppsagt-men-löpande behålls:
+ * det fungerar till och med sista giltiga dagen.
+ */
+function liveOnly<T extends ContractCandidate>(rows: T[], today: string): T[] {
+  return rows.filter((r) => isLiveContract(r, today))
 }
 
 function newest(rows: ContractCandidate[]): string | null {
@@ -42,20 +67,21 @@ export async function resolveContractForCustomer(
   client: AnyClient = defaultClient
 ): Promise<string | null> {
   if (!customerId) return null
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayKey()
 
   // 1. Avtal som bor på kundraden. Importrester (template_id='imported' eller
   //    oneflow_contract_id 'imported-…') räknas inte som riktiga avtal.
   const { data: owned } = await client
     .from('contracts')
-    .select('id, created_at, template_id, oneflow_contract_id')
+    .select(`id, created_at, template_id, oneflow_contract_id, ${LIFECYCLE_COLUMNS}`)
     .eq('customer_id', customerId)
     .in('status', ACTIVE_STATUSES)
-  const realOwned = ((owned ?? []) as (ContractCandidate & {
-    template_id?: string | null
-    oneflow_contract_id?: string | null
-  })[]).filter(
-    (c) => c.template_id !== 'imported' && !(c.oneflow_contract_id ?? '').startsWith('imported-')
+  const realOwned = liveOnly(
+    ((owned ?? []) as unknown as (ContractCandidate & {
+      template_id?: string | null
+      oneflow_contract_id?: string | null
+    })[]).filter((c) => !isImportedContractRow(c)),
+    today
   )
   const ownedId = newest(realOwned)
   if (ownedId) return ownedId
@@ -63,18 +89,22 @@ export async function resolveContractForCustomer(
   // 2. Avtal som täcker kundraden via contract_sites (aktiv täckning idag)
   const { data: covering } = await client
     .from('contract_sites')
-    .select('active_from, active_to, contract:contracts!inner(id, status, created_at)')
+    .select(
+      `active_from, active_to, contract:contracts!inner(id, created_at, ${LIFECYCLE_COLUMNS})`
+    )
     .eq('customer_id', customerId)
   type CoveringRow = {
     active_from: string | null
     active_to: string | null
-    contract: { id: string; status: string; created_at: string } | null
+    contract: ContractCandidate | null
   }
   const covered = ((covering ?? []) as unknown as CoveringRow[])
     .filter((r) => (!r.active_from || r.active_from <= today) && (!r.active_to || r.active_to >= today))
     .map((r) => r.contract)
-    .filter((c): c is NonNullable<CoveringRow['contract']> => !!c && ACTIVE_STATUSES.includes(c.status))
-  const coveredId = newest(covered)
+    .filter(
+      (c): c is ContractCandidate => !!c && ACTIVE_STATUSES.includes((c.status ?? '') as (typeof ACTIVE_STATUSES)[number])
+    )
+  const coveredId = newest(liveOnly(covered, today))
   if (coveredId) return coveredId
 
   // 3. Huvudkontorets avtal med covers_all_sites
@@ -88,11 +118,11 @@ export async function resolveContractForCustomer(
 
   const { data: parentContracts } = await client
     .from('contracts')
-    .select('id, created_at')
+    .select(`id, created_at, ${LIFECYCLE_COLUMNS}`)
     .eq('customer_id', parentId)
     .eq('covers_all_sites', true)
     .in('status', ACTIVE_STATUSES)
-  return newest((parentContracts ?? []) as ContractCandidate[])
+  return newest(liveOnly((parentContracts ?? []) as unknown as ContractCandidate[], today))
 }
 
 /**
@@ -106,22 +136,23 @@ export async function resolveContractsForCustomers(
 ): Promise<Record<string, string>> {
   const unique = Array.from(new Set(customerIds.filter(Boolean)))
   if (unique.length === 0) return {}
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayKey()
   const result: Record<string, string> = {}
 
   // 1. Egna avtal
   const { data: owned } = await client
     .from('contracts')
-    .select('id, customer_id, created_at, template_id, oneflow_contract_id')
+    .select(`id, customer_id, created_at, template_id, oneflow_contract_id, ${LIFECYCLE_COLUMNS}`)
     .in('customer_id', unique)
     .in('status', ACTIVE_STATUSES)
   const ownedByCustomer = new Map<string, ContractCandidate[]>()
-  for (const row of (owned ?? []) as (ContractCandidate & {
+  for (const row of (owned ?? []) as unknown as (ContractCandidate & {
     customer_id: string
     template_id?: string | null
     oneflow_contract_id?: string | null
   })[]) {
-    if (row.template_id === 'imported' || (row.oneflow_contract_id ?? '').startsWith('imported-')) continue
+    if (isImportedContractRow(row)) continue
+    if (!isLiveContract(row, today)) continue
     const list = ownedByCustomer.get(row.customer_id) ?? []
     list.push(row)
     ownedByCustomer.set(row.customer_id, list)
@@ -136,19 +167,27 @@ export async function resolveContractsForCustomers(
   if (remaining.length > 0) {
     const { data: covering } = await client
       .from('contract_sites')
-      .select('customer_id, active_from, active_to, contract:contracts!inner(id, status, created_at)')
+      .select(
+        `customer_id, active_from, active_to, contract:contracts!inner(id, created_at, ${LIFECYCLE_COLUMNS})`
+      )
       .in('customer_id', remaining)
     type CoveringRow = {
       customer_id: string
       active_from: string | null
       active_to: string | null
-      contract: { id: string; status: string; created_at: string } | null
+      contract: ContractCandidate | null
     }
     const byCustomer = new Map<string, ContractCandidate[]>()
     for (const r of (covering ?? []) as unknown as CoveringRow[]) {
       if (r.active_from && r.active_from > today) continue
       if (r.active_to && r.active_to < today) continue
-      if (!r.contract || !ACTIVE_STATUSES.includes(r.contract.status)) continue
+      if (
+        !r.contract ||
+        !ACTIVE_STATUSES.includes((r.contract.status ?? '') as (typeof ACTIVE_STATUSES)[number])
+      ) {
+        continue
+      }
+      if (!isLiveContract(r.contract, today)) continue
       const list = byCustomer.get(r.customer_id) ?? []
       list.push(r.contract)
       byCustomer.set(r.customer_id, list)
@@ -174,12 +213,15 @@ export async function resolveContractsForCustomers(
     if (parentIds.length > 0) {
       const { data: parentContracts } = await client
         .from('contracts')
-        .select('id, customer_id, created_at')
+        .select(`id, customer_id, created_at, ${LIFECYCLE_COLUMNS}`)
         .in('customer_id', parentIds)
         .eq('covers_all_sites', true)
         .in('status', ACTIVE_STATUSES)
       const byParent = new Map<string, ContractCandidate[]>()
-      for (const row of (parentContracts ?? []) as (ContractCandidate & { customer_id: string })[]) {
+      for (const row of (parentContracts ?? []) as unknown as (ContractCandidate & {
+        customer_id: string
+      })[]) {
+        if (!isLiveContract(row, today)) continue
         const list = byParent.get(row.customer_id) ?? []
         list.push(row)
         byParent.set(row.customer_id, list)

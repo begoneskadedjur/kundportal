@@ -45,7 +45,11 @@ interface WizardData {
   /** Faktureringsintervall. Portalens data — skickas INTE till Oneflow.
    *  Styr avtalsfaktureringens perioder. */
   billingFrequency: string
-  
+  /** Sätts när wizarden öppnats via "Förnya avtal" på ett avslutat avtal.
+   *  Bär id:t på avtalet som förnyas, så det nya kan kopplas till det gamla.
+   *  Det gamla avtalet rörs aldrig — en förnyelse är en NY period. */
+  renewalOfContractId?: string
+
   // Steg 5 - Motpart
   Kontaktperson: string
   'e-post-kontaktperson': string
@@ -288,6 +292,21 @@ export default function OneflowContractCreator() {
             customTotalPrice: customerData.customTotalPrice ?? prev.customTotalPrice,
             // Faktureringstjänster från ärendet (visas i steg 6)
             prefillServices: customerData.prefillServices || prev.prefillServices,
+            // --- Förnyelse av ett tidigare avtal ---------------------------
+            // Fälten nedan mappades inte tidigare, eftersom prefill bara kom
+            // från ärenden. En förnyelse bygger på ett HELT avtal och måste
+            // därför bära med avtalsobjektet, tjänste-/artikelraderna och de
+            // portalinterna villkoren (som aldrig går till Oneflow).
+            agreementText: customerData.agreementText || prev.agreementText,
+            draftItems: customerData.draftItems?.length > 0
+              ? customerData.draftItems
+              : prev.draftItems,
+            draftPriceAssignments:
+              customerData.draftPriceAssignments || prev.draftPriceAssignments,
+            customer_group_id: customerData.customer_group_id ?? prev.customer_group_id,
+            noticePeriodMonths: customerData.noticePeriodMonths || prev.noticePeriodMonths,
+            billingFrequency: customerData.billingFrequency || prev.billingFrequency,
+            renewalOfContractId: customerData.renewalOfContractId || undefined,
           }))
           
           // Debug-logging för att spåra prefill-processen

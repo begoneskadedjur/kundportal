@@ -6,6 +6,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { VISIBLE_CONTRACT_STATUSES } from '../utils/contractLifecycle'
 import type { Contract, Customer } from '../types/database'
 
 // customers har kolumner som ännu inte finns i database.ts-typen
@@ -284,7 +285,9 @@ export function useCustomerRecord(customerId: string | undefined) {
         .from('contracts')
         .select('*')
         .in('customer_id', familyIds)
-        .in('status', ['signed', 'active', 'trashed'])
+        // 'ended' måste med: uppsagda avtal ska ligga kvar i vyn för
+        // spårbarhet (renderas som arkiverade papper), inte försvinna.
+        .in('status', VISIBLE_CONTRACT_STATUSES as unknown as string[])
         .order('created_at', { ascending: true }),
       supabase
         .from('contract_billing_items')
@@ -569,23 +572,16 @@ export function contractDisplayName(c: RecordContract): string {
 }
 
 /**
- * Avtalet är avslutat. Rullande modell: ett passerat contract_end_date utan
- * uppsägning betyder INTE att avtalet är slut — det förlängs automatiskt vid
- * periodskifte (generate-continuing-contracts-cronen). Bara uppsagda avtal
- * (terminated_at) eller status 'ended' räknas som avslutade.
+ * Livscykeln bor i src/utils/contractLifecycle.ts — samma definition används av
+ * resolvern, prislistorna, faktureringen och cron-jobben. Återexporteras här
+ * så befintliga importer från hooken fortsätter fungera.
+ *
+ * OBS: jämförelsen sker på datumsträng, inte Date. Tidigare jämfördes mot
+ * new Date() med klockslag, vilket gjorde att ett avtal räknades som avslutat
+ * redan 00:01 på sin sista giltiga dag — en dag före cron-jobbet.
  */
-export function isEndedContract(c: RecordContract, today = new Date()): boolean {
-  if ((c.status as string) === 'ended') return true
-  if (!c.terminated_at) return false
-  const end = c.effective_end_date ?? c.contract_end_date
-  if (!end) return true
-  return new Date(end).getTime() < today.getTime()
-}
-
-/** Uppsagt men löper fortfarande till slutdatum */
-export function isTerminatedButRunning(c: RecordContract, today = new Date()): boolean {
-  return !!c.terminated_at && !isEndedContract(c, today)
-}
+export { isEndedContract, isTerminatedButRunning, contractState } from '../utils/contractLifecycle'
+export type { ContractState } from '../utils/contractLifecycle'
 
 /** annual_value är redan normaliserat årsvärde oavsett billing_frequency */
 export function contractAnnualValue(c: RecordContract): number {

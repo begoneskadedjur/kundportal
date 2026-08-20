@@ -671,6 +671,47 @@ export class ContractInvoiceGenerator {
   }
 
   /**
+   * När ETT avtal sägs upp: ta bort framtida icke-låsta avtalsfakturor som hör
+   * till just det avtalet. Kundens andra avtal rörs aldrig.
+   *
+   * Skopet är contract_id, till skillnad från cancelFutureAfterTermination som
+   * tar hela kunden. Rader UTAN contract_id lämnas medvetet orörda: de kan
+   * tillhöra ett annat av kundens avtal och får inte raderas på gissning.
+   * Är detta kundens sista avtal kör anroparen kundvarianten som fångar dem.
+   *
+   * effectiveEndDate = sista giltiga dagen. En fakturaperiod som STARTAR exakt
+   * på slutdatumet ligger logiskt efter avtalstiden och tas därför bort (gte),
+   * samma regel som kundvarianten ovan.
+   */
+  static async cancelFutureForContract(
+    contractId: string,
+    effectiveEndDate: string
+  ): Promise<number> {
+    // Syntetiska avtal har inga egna invoices-rader — kundnivån äger dem.
+    if (!contractId || contractId.startsWith('synth-') || contractId.startsWith('kundrad-')) {
+      return 0
+    }
+
+    const { data: toDelete, error } = await supabase
+      .from('invoices')
+      .select('id, status, billing_period_start')
+      .eq('contract_id', contractId)
+      .eq('invoice_type', 'contract')
+      .gte('billing_period_start', effectiveEndDate)
+
+    if (error) throw new Error(`Kunde inte hämta framtida fakturor: ${error.message}`)
+
+    let deleted = 0
+    for (const inv of toDelete ?? []) {
+      if (LOCKED_STATUSES.has(inv.status ?? '')) continue
+      await supabase.from('invoice_items').delete().eq('invoice_id', inv.id)
+      const { error: dErr } = await supabase.from('invoices').delete().eq('id', inv.id)
+      if (!dErr) deleted++
+    }
+    return deleted
+  }
+
+  /**
    * Skapa/uppdatera en adhoc-faktura för contract_billing_items (item_type=ad_hoc).
    */
   static async generateAdhocInvoiceForCase(params: {

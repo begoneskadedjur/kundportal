@@ -105,27 +105,33 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
         // Avbryt inte — customers-uppdateringen lyckades; logga och fortsätt.
       }
 
-      // Cancel future inspection sessions past the effective end date
+      // Avboka inbokade besök EFTER sista giltiga dagen.
+      // TIDSZONSFÄLLA: scheduled_at är timestamptz. Utan T23:59:59 jämförs
+      // datumsträngen mot midnatt, och besök PÅ sista giltiga dagen avbokas
+      // felaktigt — de ska genomföras.
       const { error: sessionsError } = await supabase
         .from('station_inspection_sessions')
         .update({ status: 'cancelled' })
         .in('customer_id', siteIds)
         .eq('status', 'scheduled')
-        .gt('scheduled_at', effectiveDateStr)
+        .gt('scheduled_at', `${effectiveDateStr}T23:59:59`)
 
       if (sessionsError) {
         console.error('Error cancelling future inspection sessions:', sessionsError)
       }
 
-      // Cancel all active/paused recurring schedules for this customer
+      // Pausa löpande scheman. ALDRIG 'cancelled': den vägen är irreversibel
+      // och sätter kopplade ärenden till 'Borttaget'. 'paused' stoppar
+      // extend-recurring-schedules (som bara plockar status='active') och går
+      // att ångra om uppsägningen visar sig vara fel.
       const { error: schedulesError } = await supabase
         .from('recurring_schedules')
-        .update({ status: 'cancelled' })
+        .update({ status: 'paused' })
         .in('customer_id', siteIds)
-        .in('status', ['active', 'paused'])
+        .eq('status', 'active')
 
       if (schedulesError) {
-        console.error('Error cancelling recurring schedules:', schedulesError)
+        console.error('Error pausing recurring schedules:', schedulesError)
       }
 
       // Radera framtida icke-låsta avtalsfakturor efter uppsägningstidens slut

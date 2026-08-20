@@ -1,6 +1,7 @@
 // src/services/contractService.ts - Service för contracts CRUD-operationer
 import { supabase } from '../lib/supabase'
 import { Contract, ContractInsert, ContractUpdate, ContractWithBilling } from '../types/database'
+import { isLiveContract } from '../utils/contractLifecycle'
 import { OneflowTemplateService } from './oneflowTemplateService'
 import toast from 'react-hot-toast'
 
@@ -1857,9 +1858,16 @@ export class ContractService {
   // med _synthetic: true och får aldrig skrivas till DB.
 
   /**
-   * Hämtar aktiva avtal (status signed/active, billing_active != false) för en kund.
-   * Vid tom resultatlista byggs en syntetisk rad från customers-fälten om kunden
-   * har avtalsdata där (annual_value, oneflow_contract_id eller contract_start_date).
+   * Hämtar avtal som fortfarande lever för en kund — inklusive uppsagda vars
+   * slutdatum inte passerat. Vid tom resultatlista byggs en syntetisk rad från
+   * customers-fälten om kunden har avtalsdata där.
+   *
+   * Filtret gick tidigare på billing_active !== false. Det var fel på två sätt:
+   * ett avtal som sagts upp med tre månaders varsel fick billing_active=false
+   * direkt och försvann därför OMEDELBART ur ärendeskaparen och
+   * fakturaplaneringen, trots att det ska löpa till slutdatumet. Och flaggan
+   * betyder egentligen "fakturering pausad" (kreditstopp, tvist), inte
+   * "avslutat" — se contractLifecycle.ts.
    */
   static async getActiveContracts(customerId: string): Promise<ContractWithBilling[]> {
     const { data, error } = await supabase
@@ -1872,10 +1880,16 @@ export class ContractService {
 
     if (error) throw new Error(`Kunde inte hämta kontrakt: ${error.message}`)
 
-    const rows = (data ?? []).filter((c: any) => c.billing_active !== false) as ContractWithBilling[]
+    const rows = ((data ?? []) as unknown as ContractWithBilling[]).filter((c) =>
+      isLiveContract(c)
+    )
     if (rows.length > 0) return rows
 
     const synth = await ContractService.buildSyntheticContract(customerId)
+    // Synth-raden går INTE genom filtret ovan, så den måste kontrolleras här:
+    // den byggs ur customers.terminated_at/annual_value och skulle annars
+    // återuppliva faktureringen för en kund vars sista avtal just sagts upp.
+    if (synth && !isLiveContract(synth)) return []
     return synth ? [synth] : []
   }
 
@@ -1943,13 +1957,25 @@ export class ContractService {
   }
 
   /**
-   * Markera ett kontrakt som uppsagt.
+   * @deprecated Använd ContractScopeService.terminateContract i stället.
+   *
+   * Den här varianten sätter BARA terminated_at och termination_reason. Den
+   * saknar effective_end_date (så avtalet räknas som avslutat omedelbart),
+   * pausar inga scheman, avbokar inga besök, tar inte bort planerade fakturor
+   * och synkar inte kundfälten — ett avtal som sagts upp den här vägen blir
+   * halvt uppsagt och fortsätter generera besök.
+   *
+   * Har noll anropare idag. Behålls bara tills det är bekräftat att inget
+   * externt kallar på den.
    */
   static async terminateContract(
     contractId: string,
     reason: string | null,
     terminatedAt: string | Date = new Date(),
   ): Promise<ContractWithBilling> {
+    console.warn(
+      '[contractService.terminateContract] Utfasad — använd ContractScopeService.terminateContract'
+    )
     const iso = terminatedAt instanceof Date ? terminatedAt.toISOString() : terminatedAt
     const { data, error } = await supabase
       .from('contracts')

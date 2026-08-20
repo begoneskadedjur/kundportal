@@ -82,8 +82,11 @@ function marginInk(margin: number | null, settings: PricingSettings | null): str
 interface Props {
   content: ContractContent
   loading: boolean
-  /** Öppna redigeringsmodalen */
-  onEdit: () => void
+  /**
+   * Öppna redigeringsmodalen. Utelämnas på arkiverade avtal — innehållet i ett
+   * avslutat avtal ska stå som det stod när avtalet gällde.
+   */
+  onEdit?: () => void
 }
 
 /**
@@ -130,15 +133,19 @@ export default function ContractContentSection({ content, loading, onEdit }: Pro
         ) : services.length === 0 ? (
           <div className="flex items-center gap-3 py-3">
             <span className="font-sans text-[12.5px] italic text-[#8a9099]">
-              Inga tjänster registrerade — lägg in vad kunden får och vad det kostar oss.
+              {onEdit
+                ? 'Inga tjänster registrerade — lägg in vad kunden får och vad det kostar oss.'
+                : 'Inga tjänster registrerade.'}
             </span>
-            <button
-              onClick={onEdit}
-              className="ml-auto shrink-0 inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#5d6672] border border-[#d9d3c2] rounded-md px-2.5 py-1.5 bg-white/50 hover:text-[#262e38] transition-colors"
-            >
-              <Plus className="w-3 h-3" />
-              Lägg till tjänster
-            </button>
+            {onEdit && (
+              <button
+                onClick={onEdit}
+                className="ml-auto shrink-0 inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#5d6672] border border-[#d9d3c2] rounded-md px-2.5 py-1.5 bg-[#fff]/50 hover:text-[#262e38] transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+                Lägg till tjänster
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -212,15 +219,17 @@ export default function ContractContentSection({ content, loading, onEdit }: Pro
               </div>
             )}
 
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={onEdit}
-                className="inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#5d6672] border border-[#d9d3c2] rounded-md px-2.5 py-1.5 bg-white/50 hover:text-[#262e38] transition-colors"
-              >
-                <Pencil className="w-3 h-3" />
-                Redigera innehåll
-              </button>
-            </div>
+            {onEdit && (
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={onEdit}
+                  className="inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#5d6672] border border-[#d9d3c2] rounded-md px-2.5 py-1.5 bg-[#fff]/50 hover:text-[#262e38] transition-colors"
+                >
+                  <Pencil className="w-3 h-3" />
+                  Redigera innehåll
+                </button>
+              </div>
+            )}
           </>
         )}
       </div>

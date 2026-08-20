@@ -34,7 +34,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select(`
         *,
         technician:technicians(id, name, work_schedule),
-        customer:customers(id, contract_status, effective_end_date)
+        customer:customers(id, contract_status, effective_end_date),
+        contract:contracts(id, status, terminated_at, effective_end_date)
       `)
       .eq('status', 'active')
       .lt('generated_until', format(thresholdDate, 'yyyy-MM-dd'))
@@ -58,6 +59,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         const currentEnd = new Date(schedule.generated_until)
         let newEnd = addMonths(currentEnd, EXTENSION_MONTHS)
+
+        // Avtalet först: ett uppsagt avtal ska inte generera besök efter sin
+        // sista giltiga dag, även om KUNDEN fortfarande är aktiv (kunder med
+        // flera avtal behåller contract_status 'active' när ett sägs upp).
+        const contract = schedule.contract as any
+        if (contract?.status === 'ended') {
+          console.log(`[extend-schedules] Schedule ${schedule.id}: avtalet avslutat, hoppar över`)
+          continue
+        }
+        if (contract?.terminated_at) {
+          const contractEnd = contract.effective_end_date
+            ? new Date(contract.effective_end_date)
+            : null
+          if (!contractEnd || currentEnd >= contractEnd) {
+            console.log(`[extend-schedules] Schedule ${schedule.id}: avtalet uppsagt, hoppar över`)
+            continue
+          }
+          // Kapa förlängningen vid avtalets slutdatum
+          if (newEnd > contractEnd) newEnd = contractEnd
+        }
 
         // Check if customer has been terminated — respect effective_end_date, not binding period
         const customer = schedule.customer as any

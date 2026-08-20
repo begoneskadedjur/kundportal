@@ -9,15 +9,19 @@
 // onChanged (refetch i useCustomerRecord) så vyn visar databasens sanning.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   AlertTriangle,
+  Archive,
   Building2,
   Calendar,
   CalendarCheck,
   CheckCircle2,
   Clock,
+  ClockAlert,
   ExternalLink,
+  FileSignature,
   FileText,
   Home,
   Pencil,
@@ -42,7 +46,10 @@ import {
   type RecordCustomer,
   type RecordInspectionSession,
 } from '../../../../hooks/useCustomerRecord'
+import { daysUntilEnd, isTerminatedButRunning } from '../../../../utils/contractLifecycle'
+import { buildRenewalPrefill } from '../../../../utils/contractRenewalPrefill'
 import { ContractScopeService } from '../../../../services/contractScopeService'
+import ContractStamp from './ContractStamp'
 import { PriceListService } from '../../../../services/priceListService'
 import { useContractTypeOptions } from '../../../../hooks/useContractTypeOptions'
 import type { PriceList } from '../../../../types/articles'
@@ -118,6 +125,7 @@ interface Props {
 export default function ContractMapSection({ data, onChanged }: Props) {
   const { root, units, contracts, additions, billingItems, premiumEvents, contractSites, cases, contractEvents, inspections } =
     data
+  const navigate = useNavigate()
 
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -663,6 +671,74 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     }
   }
 
+  const reactivate = async (contract: RecordContract) => {
+    setBusy(true)
+    try {
+      await ContractScopeService.reactivateContract(contract.id)
+      toast.success(
+        `${contractDisplayName(contract)} är aktivt igen — scheman återupptagna och avbokade besök återställda.`
+      )
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte återaktivera avtalet')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Vem som sade upp avtalet. contracts saknar terminated_by-kolumn, så namnet
+   * härleds ur uppsägningshändelsen i tidslinjen. Saknas den returneras null
+   * och frasen utelämnas helt — skriv aldrig "okänd".
+   */
+  const terminatedByFor = useCallback(
+    (contractId: string): string | null => {
+      const ev = contractEvents
+        .filter(
+          (e) =>
+            e.contract_id === contractId &&
+            (e.title === 'Avtalet uppsagt' || e.title === 'Avtalet avslutat')
+        )
+        .sort((a, b) => (b.occurred_at ?? '').localeCompare(a.occurred_at ?? ''))[0]
+      const name = ev?.created_by_name ?? null
+      // Cron-jobbet som stänger utlöpta avtal är ingen person
+      if (!name || name.startsWith('System')) return null
+      return name
+    },
+    [contractEvents]
+  )
+
+  /**
+   * Förnya ett avslutat avtal: öppna avtalswizzarden förifylld med det gamla
+   * avtalets uppgifter, så ett nytt förslag kan skickas till kunden via
+   * Oneflow. Det gamla avtalet ligger kvar orört som historik — en förnyelse
+   * är en NY period, inte samma avtal återupplivat.
+   */
+  const renewContract = async (contract: RecordContract) => {
+    setBusy(true)
+    try {
+      const prefill = await buildRenewalPrefill(contract.id)
+      sessionStorage.setItem('prefill_customer_data', JSON.stringify(prefill))
+      if (prefill.templateSource === 'none') {
+        toast('Det gamla avtalet saknar Oneflow-mall — välj mall i steg 2.', {
+          icon: '📄',
+          duration: 6000,
+        })
+      } else if (prefill.templateSource === 'derived') {
+        toast('Mallen är härledd ur avtalstypen — kontrollera att den stämmer.', {
+          icon: '📄',
+          duration: 6000,
+        })
+      }
+      // Avtalskartan renderas bara under /admin, så rutten är fast här.
+      navigate('/admin/skapa-avtal?prefill=contract')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte förbereda förnyelsen')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const changePriceList = async (contract: RecordContract, priceListId: string | null) => {
     setPricePrompt(null)
     if ((contract.price_list_id ?? null) === priceListId) return
@@ -1025,7 +1101,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
               onEditFrequency={() => setFrequencyPrompt(c)}
               onEditSignedAt={() => setSignedAtPrompt(c)}
-              onTerminate={() => setTerminatePrompt(c)}
+              // Uppsagt-men-löpande avtal ligger kvar bland de aktiva (de
+              // fungerar till slutdatumet) och ska kunna ångras direkt — inte
+              // först när uppsägningstiden hunnit löpa ut.
+              state={isTerminatedButRunning(c) ? 'terminated-running' : 'active'}
+              onTerminate={isTerminatedButRunning(c) ? undefined : () => setTerminatePrompt(c)}
+              onReactivate={isTerminatedButRunning(c) ? () => reactivate(c) : undefined}
+              terminatedBy={terminatedByFor(c.id)}
               onSaveAgreementText={async (text) => {
                 try {
                   await ContractScopeService.setAgreementText(c.id, text)
@@ -1082,11 +1164,27 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 
           {/* Avslutade avtal — historiken ska gå att öppna, inte bara räknas */}
           {endedPapers.length > 0 && (
-            <details className="border border-slate-700/50 rounded-2xl text-slate-400 mb-4">
-              <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-500 select-none">
-                Avslutade avtal ({endedPapers.length}) — historik
+            <details
+              className="border border-slate-700/50 rounded-2xl text-slate-400 mb-4"
+              // Är arkivet allt som finns att visa ska det inte ligga dolt
+              open={papers.length === 0}
+            >
+              <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-400 select-none flex items-center gap-2 hover:text-slate-200 transition-colors">
+                <Archive className="w-3.5 h-3.5 text-slate-500" />
+                Avslutade avtal ({endedPapers.length})
+                <span className="font-normal text-slate-500">— historik, inga aktiva funktioner</span>
               </summary>
-              <div className="px-4 pb-4 space-y-4 opacity-60 hover:opacity-100 transition-opacity">
+              {/*
+                Ingen opacity här. Arkivkänslan sitter i papprets egna färger
+                (se PAPER_INK.archived) — halvtransparent text läser som trasig
+                och blir dessutom svår att läsa, vilket motverkar hela syftet
+                med att spara avtalen för spårbarhet.
+
+                Alla skrivcallbacks utelämnas medvetet: eftersom de är valfria i
+                PaperProps renderas knapparna inte alls, och låsningen blir
+                typstyrd i stället för villkorsstyrd.
+              */}
+              <div className="px-4 pb-4 space-y-4">
                 {endedPapers.map((c) => (
                   <PaperContract
                     key={c.id}
@@ -1098,9 +1196,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                     premiumEvents={premiumByContract.get(c.id) ?? []}
                     followup={followupFor(c)}
                     priceListLabel={priceListName(c.price_list_id)}
-                    onClearCoversAll={() => clearCoversAll(c)}
                     contentReloadKey={contentReloadKey}
-                    onEditContent={() => setContentEditor(c)}
+                    state="archived"
                     isDropTarget={false}
                     isInvalidTarget={false}
                     invalidReason={null}
@@ -1108,38 +1205,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                     dragSubject={null}
                     registerRef={() => {}}
                     onHover={() => {}}
-                    onScopeRowDrag={() => {}}
-                    onEndCoverage={() => {}}
-                    onEditPriceList={(x, y) => setPricePrompt({ x, y, contract: c })}
                     onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
                     isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
                     isSingleSite={isSingleSite}
                     contractTypes={contractTypes.map((t) => t.value)}
-                    onChangeType={(t) => changeContractType(c, t)}
-                    onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
-                    onEditFrequency={() => setFrequencyPrompt(c)}
-                    onSaveAgreementText={async (text) => {
-                      try {
-                        await ContractScopeService.setAgreementText(c.id, text)
-                        toast.success('Avtalsobjektet sparat.')
-                        await onChanged()
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : 'Kunde inte spara avtalsobjektet')
-                      }
-                    }}
-                    onEditSignedAt={() => setSignedAtPrompt(c)}
-                    onReactivate={async () => {
-                      setBusy(true)
-                      try {
-                        await ContractScopeService.reactivateContract(c.id)
-                        toast.success(`${contractDisplayName(c)} är aktivt igen.`)
-                        await onChanged()
-                      } catch (err) {
-                        toast.error(err instanceof Error ? err.message : 'Kunde inte återaktivera avtalet')
-                      } finally {
-                        setBusy(false)
-                      }
-                    }}
+                    terminatedBy={terminatedByFor(c.id)}
+                    onRenew={() => renewContract(c)}
+                    onReactivate={() => reactivate(c)}
                   />
                 ))}
               </div>
@@ -1526,9 +1598,12 @@ const AGREEMENT_PREVIEW_CHARS = 340
 function AgreementObjectText({
   text,
   onSave,
+  ink,
 }: {
   text: string | null
-  onSave: (text: string | null) => Promise<void>
+  /** Utelämnas på arkiverade avtal — texten blir då ren läsning. */
+  onSave?: (text: string | null) => Promise<void>
+  ink: (typeof PAPER_INK)['live' | 'archived']
 }) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -1541,6 +1616,7 @@ function AgreementObjectText({
   const shown = expanded || !isLong ? trimmed : trimmed.slice(0, AGREEMENT_PREVIEW_CHARS).trimEnd() + '…'
 
   const save = async () => {
+    if (!onSave) return
     setSaving(true)
     try {
       await onSave(draft)
@@ -1550,22 +1626,31 @@ function AgreementObjectText({
     }
   }
 
+  // Ett arkiverat avtal utan avtalsobjekt har inget att visa och inget att
+  // fylla i — då hoppar vi över hela sektionen i stället för att visa en
+  // död rubrik.
+  if (!onSave && !trimmed) return null
+
   return (
     <div className="mt-3">
-      <div className="flex items-baseline gap-2 border-b border-[#d9d3c2] pb-1">
-        <h4 className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] text-[#8a9099]">
+      <div className="flex items-baseline gap-2 pb-1" style={{ borderBottom: `1px solid ${ink.rule}` }}>
+        <h4
+          className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em]"
+          style={{ color: ink.muted }}
+        >
           Avtalsobjekt
         </h4>
         <span className="ml-auto flex items-baseline gap-2">
           {isLong && !editing && (
             <button
               onClick={() => setExpanded((v) => !v)}
-              className="font-sans text-[10px] text-[#8a9099] hover:text-[#262e38] underline decoration-dotted"
+              className="font-sans text-[10px] underline decoration-dotted hover:opacity-70 transition-opacity"
+              style={{ color: ink.muted }}
             >
               {expanded ? 'visa mindre' : 'visa hela'}
             </button>
           )}
-          {!editing && (
+          {onSave && !editing && (
             <button
               onClick={() => {
                 setDraft(text ?? '')
@@ -1611,8 +1696,13 @@ function AgreementObjectText({
           </div>
         </div>
       ) : trimmed ? (
-        <p className="text-[12.5px] leading-relaxed text-[#5d6672] pt-1.5 whitespace-pre-line">{shown}</p>
-      ) : (
+        <p
+          className="text-[12.5px] leading-relaxed pt-1.5 whitespace-pre-line"
+          style={{ color: ink.secondary }}
+        >
+          {shown}
+        </p>
+      ) : onSave ? (
         <button
           onClick={() => {
             setDraft('')
@@ -1622,6 +1712,10 @@ function AgreementObjectText({
         >
           Inget avtalsobjekt registrerat — beskriv vad som ingår och vad som är installerat.
         </button>
+      ) : (
+        <p className="font-sans text-[11.5px] italic pt-1.5" style={{ color: ink.muted }}>
+          Inget avtalsobjekt registrerat.
+        </p>
       )}
     </div>
   )
@@ -1938,6 +2032,57 @@ function DatePromptPopover({ prompt, onClose }: { prompt: DatePrompt; onClose: (
 // Avtalsdokumentet
 // ---------------------------------------------------------------------------
 
+/**
+ * Papprets tre tillstånd. 'terminated-running' behåller det LEVANDE pappret —
+ * ett avtal som sagts upp med tre månaders varsel faktureras och schemaläggs
+ * fortfarande fram till sista giltiga dagen, och ska därför inte se arkiverat
+ * ut. Det får i stället en uppsägningsremsa med nedräkning.
+ */
+type PaperState = 'active' | 'terminated-running' | 'archived'
+
+/**
+ * Papperspalett. Arkiverade avtal dämpas genom FÄRGVAL, aldrig genom opacity:
+ * halvtransparent text läser som trasig, inte som arkiverad — och blir dessutom
+ * oläslig. Bläcket #2f3540 mot #e4e2dc ger ~9,9:1, långt över AAA-kravet.
+ *
+ * Alla värden är literala hex, aldrig temavariabler. Pappret ska se likadant ut
+ * i ljust och mörkt tema — det är ett dokument, inte en portalyta. Därav också
+ * bg-[#fff]/xx i stället för bg-white/xx: --color-white remappas i ljust tema
+ * och skulle göra fältytorna mörkblå.
+ */
+const PAPER_INK = {
+  live: {
+    sheet: '#f6f3ea',
+    primary: '#262e38',
+    secondary: '#5d6672',
+    muted: '#8a9099',
+    rule: '#d9d3c2',
+    field: 'bg-[#fff]/55',
+    fieldStrong: 'bg-[#fff]/70',
+    positive: '#157a5b',
+    warn: '#b45309',
+    danger: '#9b3535',
+    corner: '#ded9c8',
+    valueBox: 'bg-black/[.035]',
+  },
+  archived: {
+    sheet: '#e4e2dc',
+    primary: '#2f3540',
+    secondary: '#5a626e',
+    muted: '#767d87',
+    rule: '#c9c6be',
+    field: 'bg-[#fff]/35',
+    fieldStrong: 'bg-[#fff]/45',
+    // Dämpade accenter: på ett avslutat avtal finns inget kvar att åtgärda,
+    // så varken grönt eller bärnsten ska ropa på uppmärksamhet.
+    positive: '#4a6b60',
+    warn: '#7a6a4e',
+    danger: '#9b3535',
+    corner: '#cfccc4',
+    valueBox: 'bg-black/[.05]',
+  },
+} as const
+
 interface PaperProps {
   contract: RecordContract
   accent: string
@@ -1955,10 +2100,18 @@ interface PaperProps {
     covered: string[]
   }
   priceListLabel: string | null
-  onClearCoversAll: () => void
+  /**
+   * Papprets livscykel. Styr både utseende och vilka åtgärder som finns:
+   *   'active'             — ljust papper, allt öppet
+   *   'terminated-running' — ljust papper + uppsägningsremsa med nedräkning.
+   *                          Avtalet fungerar fortfarande till slutdatumet.
+   *   'archived'           — dämpat papper, alla skrivåtgärder borta
+   */
+  state: PaperState
+  onClearCoversAll?: () => void
   /** Bumpas när avtalsinnehållet sparats — tvingar omhämtning av § 4/§ 5 */
   contentReloadKey: number
-  onEditContent: () => void
+  onEditContent?: () => void
   isDropTarget: boolean
   isInvalidTarget: boolean
   invalidReason: string | null
@@ -1969,25 +2122,49 @@ interface PaperProps {
   isSingleSite: boolean
   registerRef: (el: HTMLElement | null) => void
   onHover: (on: boolean) => void
-  onScopeRowDrag: (e: React.PointerEvent, cs: RecordContractSite) => void
-  onEndCoverage: (cs: RecordContractSite, x: number, y: number) => void
-  onEditPriceList: (x: number, y: number) => void
+  onScopeRowDrag?: (e: React.PointerEvent, cs: RecordContractSite) => void
+  onEndCoverage?: (cs: RecordContractSite, x: number, y: number) => void
+  onEditPriceList?: (x: number, y: number) => void
   onOpenHistory: (tab: HistoryTab, unitFilter?: string) => void
   /** Avtalstyper (tjänster med is_contract_service) */
   contractTypes: string[]
-  onChangeType: (typeName: string) => void
+  onChangeType?: (typeName: string) => void
   /** Endast portalskapade avtal går att radera */
   onDelete?: () => void
   /** Öppna besöksfrekvens-väljaren */
   onEditFrequency?: () => void
   /** Spara avtalsobjektets text */
-  onSaveAgreementText: (text: string | null) => Promise<void>
+  onSaveAgreementText?: (text: string | null) => Promise<void>
   /** Öppna väljaren för signeringsdatum */
-  onEditSignedAt: () => void
+  onEditSignedAt?: () => void
   /** Säg upp avtalet (saknas för redan avslutade) */
   onTerminate?: () => void
   /** Ångra uppsägning */
   onReactivate?: () => void
+  /** Skicka ett nytt avtalsförslag till kunden via Oneflow, baserat på detta avtal */
+  onRenew?: () => void
+  /**
+   * Vem som sade upp avtalet. contracts har ingen terminated_by-kolumn, så
+   * namnet härleds ur uppsägningshändelsen i contract_events. Saknas det
+   * utelämnas frasen helt — skriv aldrig "okänd".
+   */
+  terminatedBy?: string | null
+}
+
+/** "3 år 2 mån" — hur länge avtalet faktiskt varade. */
+function contractDurationLabel(start: string | null, end: string | null): string | null {
+  if (!start || !end) return null
+  const s = new Date(start)
+  const e = new Date(end)
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime()) || e < s) return null
+  let months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth())
+  if (e.getDate() < s.getDate()) months -= 1
+  if (months < 1) return 'under 1 mån'
+  const years = Math.floor(months / 12)
+  const rest = months % 12
+  return [years > 0 ? `${years} år` : null, rest > 0 ? `${rest} mån` : null]
+    .filter(Boolean)
+    .join(' ')
 }
 
 function PaperContract({
@@ -2023,8 +2200,14 @@ function PaperContract({
   onEditSignedAt,
   onTerminate,
   onReactivate,
+  onRenew,
+  state,
+  terminatedBy,
 }: PaperProps) {
   const key = todayKey()
+  const archived = state === 'archived'
+  const terminatedRunning = state === 'terminated-running'
+  const ink = PAPER_INK[archived ? 'archived' : 'live']
   const contentData = useContractContent(contract.id, contentReloadKey)
   // Avtalets prislista styr vad kunden kan avropa och till vilket pris.
   // Saknas prislista på avtalet gäller kundens — samma uppslag som ärendena gör.
@@ -2046,29 +2229,41 @@ function PaperContract({
   const periodLabel = startDate
     ? `${formatDateSv(startDate)} – ${contract.contract_end_date ? formatDateSv(contract.contract_end_date) : 'tills vidare'}`
     : null
+  const durationLabel = archived
+    ? contractDurationLabel(startDate, contract.effective_end_date ?? contract.contract_end_date)
+    : null
 
   return (
     <section
       ref={registerRef}
-      data-paper-id={contract.id}
+      // Arkiverade papper får INGET data-paper-id: findPaperAt() letar efter
+      // attributet vid släpp, så utan det kan de inte ens träffas av en dragning.
+      {...(archived ? {} : { 'data-paper-id': contract.id })}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
-      className={`relative rounded-md rounded-tr-xl bg-[#f6f3ea] text-[#262e38] font-serif px-6 py-5 transition-all ${
+      className={`relative rounded-md rounded-tr-xl font-serif px-6 py-5 transition-all ${
         isDropTarget ? 'scale-[1.008]' : ''
       }`}
       style={{
-        borderLeft: `5px solid ${accent}`,
+        background: ink.sheet,
+        color: ink.primary,
+        // Uppsagt men löpande får bärnstenskant — då syns det redan i
+        // kopplingslinjen till enheten att täckningen tar slut.
+        borderLeft: `5px solid ${archived ? ink.muted : terminatedRunning ? '#b45309' : accent}`,
         boxShadow: isDropTarget
           ? `0 0 0 4px ${accent}55, 0 18px 48px rgba(0,0,0,.55)`
           : isInvalidTarget
             ? '0 0 0 4px rgba(248,113,113,.3), 0 16px 44px rgba(0,0,0,.5)'
-            : '0 2px 0 rgba(0,0,0,.35), 0 16px 44px rgba(0,0,0,.5)',
+            : archived
+              // Platt skugga: arkiverade dokument ligger ner, de svävar inte.
+              ? '0 1px 0 rgba(0,0,0,.28), inset 0 0 0 1px rgba(47,53,64,.07)'
+              : '0 2px 0 rgba(0,0,0,.35), 0 16px 44px rgba(0,0,0,.5)',
       }}
     >
       {/* Vikt hörn */}
       <span
         className="absolute top-0 right-0 w-6 h-6 rounded-tr-xl rounded-bl-md"
-        style={{ background: 'linear-gradient(225deg, #0f172a 0 50%, #ded9c8 50% 100%)' }}
+        style={{ background: `linear-gradient(225deg, #0f172a 0 50%, ${ink.corner} 50% 100%)` }}
         aria-hidden
       />
 
@@ -2102,17 +2297,23 @@ function PaperContract({
           <ShieldCheck className="w-5 h-5" style={{ color: accent }} />
         </span>
         <div className="min-w-0">
-          <div className="font-sans text-[9.5px] uppercase tracking-[0.2em] text-[#8a9099] mb-0.5">
+          <div
+            className="font-sans text-[9.5px] uppercase tracking-[0.2em] mb-0.5"
+            style={{ color: ink.muted }}
+          >
             {isUnitContract ? 'Enhetsavtal' : 'Organisationsavtal'} · BeGone Skadedjur &amp; Sanering
           </div>
           <div className="flex items-baseline gap-2">
-            <h3 className="text-lg font-bold leading-snug text-[#262e38]">{contractDisplayName(contract)}</h3>
-            {/* Avtalstyp går att sätta/byta på portalskapade avtal */}
-            {onDelete && contractTypes.length > 0 && (
+            <h3 className="text-lg font-bold leading-snug" style={{ color: ink.primary }}>
+              {contractDisplayName(contract)}
+            </h3>
+            {/* Avtalstyp går att byta på portalskapade avtal — men aldrig på
+                arkiverade: ett avslutat avtal ska stå som det stod. */}
+            {onChangeType && contractTypes.length > 0 && (
               <select
                 value={contractTypes.includes(contract.label ?? '') ? (contract.label as string) : ''}
                 onChange={(e) => e.target.value && onChangeType(e.target.value)}
-                className="font-sans text-[10px] text-[#5d6672] bg-white/60 border border-[#d9d3c2] rounded px-1.5 py-0.5 cursor-pointer hover:text-[#262e38] focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                className="font-sans text-[10px] text-[#5d6672] bg-[#fff]/60 border border-[#d9d3c2] rounded px-1.5 py-0.5 cursor-pointer hover:text-[#262e38] focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                 title="Byt avtalstyp"
                 aria-label="Avtalstyp"
               >
@@ -2125,38 +2326,75 @@ function PaperContract({
               </select>
             )}
           </div>
-          <div className="text-[11.5px] italic text-[#5d6672] mt-0.5">
+          <div className="text-[11.5px] italic mt-0.5" style={{ color: ink.secondary }}>
             mellan BeGone Skadedjur &amp; Sanering AB och {isUnitContract && owner ? customerRowName(owner) + ', ' : ''}
             {root.company_name}
             {orgnr ? ` (${orgnr})` : ''}
           </div>
         </div>
         <div className="ml-auto shrink-0 text-center self-center">
-          {(() => {
-            const ended = isEndedContract(contract)
-            const terminated = !!contract.terminated_at && !ended
-            const stampColor = ended ? '#9b3535' : terminated ? '#b45309' : accent
-            return (
-              <span
-                className="inline-block -rotate-6 font-sans text-[10.5px] font-extrabold uppercase tracking-[0.16em] border-2 rounded-md px-2.5 py-0.5 opacity-85"
-                style={{ borderColor: stampColor, color: stampColor }}
-              >
-                {ended ? 'Avslutat' : terminated ? 'Uppsagt' : 'Aktivt'}
-              </span>
-            )
-          })()}
+          <ContractStamp
+            variant={archived ? 'ended' : terminatedRunning ? 'terminated' : 'active'}
+            color={state === 'active' ? accent : undefined}
+            subLabel={
+              terminatedRunning && contract.effective_end_date
+                ? `T.O.M. ${formatDateSv(contract.effective_end_date)}`
+                : archived
+                  ? formatDateSv(contract.effective_end_date ?? contract.contract_end_date)
+                  : null
+            }
+          />
           {oneflowUrl && (
             <a
               href={oneflowUrl}
               target="_blank"
               rel="noreferrer"
-              className="mt-1.5 flex items-center justify-center gap-1 font-sans text-[10px] text-[#8a9099] hover:text-[#262e38]"
+              className="mt-1.5 flex items-center justify-center gap-1 font-sans text-[10px] hover:opacity-70 transition-opacity"
+              style={{ color: ink.muted }}
             >
               Signerat via Oneflow <ExternalLink className="w-2.5 h-2.5" />
             </a>
           )}
         </div>
       </div>
+
+      {/* Uppsägningsremsa: bara på avtal som sagts upp men fortfarande löper.
+          Avtalet fungerar som vanligt till slutdatumet — remsan säger när det
+          upphör, och nedräkningen blir röd sista månaden. */}
+      {terminatedRunning && contract.effective_end_date && (() => {
+        const left = daysUntilEnd(contract)
+        const urgent = left !== null && left <= 30
+        return (
+          <div
+            className="mt-3 flex items-center gap-2.5 rounded-md px-3 py-2 font-sans"
+            style={{
+              border: '1px solid rgba(180,83,9,.45)',
+              background: 'rgba(180,83,9,.08)',
+            }}
+          >
+            <ClockAlert className="w-3.5 h-3.5 shrink-0" style={{ color: '#b45309' }} />
+            <span className="text-[11.5px] leading-relaxed" style={{ color: '#7a3c07' }}>
+              Uppsagt{contract.terminated_at ? ` ${formatDateSv(contract.terminated_at.slice(0, 10))}` : ''} — avtalet gäller till och med{' '}
+              <b className="tabular-nums">{formatDateSv(contract.effective_end_date)}</b>.
+              Fakturering och schemaläggning fortsätter till dess.
+            </span>
+            <span className="ml-auto shrink-0 text-right">
+              <span
+                className={`block text-[15px] tabular-nums leading-none ${urgent ? 'font-extrabold' : 'font-bold'}`}
+                style={{ color: urgent ? '#9b3535' : '#b45309' }}
+              >
+                {left === 0 ? 'Idag' : left}
+              </span>
+              <span
+                className="block text-[9px] uppercase tracking-[0.14em]"
+                style={{ color: ink.muted }}
+              >
+                {left === 0 ? 'sista dagen' : 'dagar kvar'}
+              </span>
+            </span>
+          </div>
+        )
+      })()}
 
       {/* Värderad */}
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-3.5 mb-1 px-3 py-2.5 rounded-md bg-black/[.035]">
@@ -2202,14 +2440,16 @@ function PaperContract({
             <span className="text-[11.5px] text-[#5d6672] whitespace-nowrap">
               samtliga nuvarande och framtida enheter
             </span>
-            <button
-              onClick={onClearCoversAll}
-              className="shrink-0 w-5 h-5 grid place-items-center rounded-full text-[#8a9099] hover:bg-black/10 hover:text-[#262e38] text-sm leading-none"
-              aria-label="Byt till omfattning per enhet"
-              title="Byt till omfattning per enhet"
-            >
-              ×
-            </button>
+            {onClearCoversAll && (
+              <button
+                onClick={onClearCoversAll}
+                className="shrink-0 w-5 h-5 grid place-items-center rounded-full text-[#8a9099] hover:bg-black/10 hover:text-[#262e38] text-sm leading-none"
+                aria-label="Byt till omfattning per enhet"
+                title="Byt till omfattning per enhet"
+              >
+                ×
+              </button>
+            )}
           </div>
         ) : isUnitContract && owner ? (
           <div className="flex items-center gap-2.5 py-2 text-[13.5px] border-b border-dotted border-[#d9d3c2]">
@@ -2226,32 +2466,52 @@ function PaperContract({
               return (
                 <div
                   key={cs.id}
-                  onPointerDown={(e) => onScopeRowDrag(e, cs)}
-                  className="group flex items-center gap-2.5 py-2 text-[13.5px] border-b border-dotted border-[#d9d3c2] cursor-grab select-none touch-none hover:bg-black/[.04] rounded-sm"
-                  title="Dra till ett annat avtal för att flytta täckningen"
+                  onPointerDown={onScopeRowDrag ? (e) => onScopeRowDrag(e, cs) : undefined}
+                  className={`group flex items-center gap-2.5 py-2 text-[13.5px] border-b border-dotted rounded-sm ${
+                    onScopeRowDrag
+                      ? 'cursor-grab select-none touch-none hover:bg-black/[.04]'
+                      : 'cursor-default'
+                  }`}
+                  style={{ borderColor: ink.rule }}
+                  title={onScopeRowDrag ? 'Dra till ett annat avtal för att flytta täckningen' : undefined}
                 >
-                  <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">1.{i + 1}</span>
-                  <span className="font-semibold truncate text-[#262e38]">
+                  <span
+                    className="w-6 text-[11px] tabular-nums shrink-0"
+                    style={{ color: ink.muted }}
+                  >
+                    1.{i + 1}
+                  </span>
+                  <span className="font-semibold truncate" style={{ color: ink.primary }}>
                     {unit ? (isSingleSite ? unit.company_name : customerRowName(unit)) : 'Okänd enhet'}
                   </span>
-                  <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
+                  <span
+                    className="flex-1 border-b border-dotted translate-y-1 min-w-4"
+                    style={{ borderColor: ink.rule }}
+                  />
+                  {/* Framtidsmarkeringen neutraliseras på arkiverade avtal —
+                      där finns inget kommande att bevaka. */}
                   <span
                     className={`text-[11.5px] tabular-nums whitespace-nowrap shrink-0 ${
-                      isFuture ? 'text-[#b45309] font-semibold' : 'text-[#5d6672]'
+                      isFuture && !archived ? 'font-semibold' : ''
                     }`}
+                    style={{
+                      color: isFuture && !archived ? '#b45309' : archived ? ink.muted : ink.secondary,
+                    }}
                   >
                     gäller fr. {formatDateSv(cs.active_from)}
                   </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onEndCoverage(cs, e.clientX, e.clientY)
-                    }}
-                    className="shrink-0 w-5 h-5 grid place-items-center rounded-full text-[#8a9099] hover:bg-black/10 hover:text-[#262e38] text-sm leading-none"
-                    aria-label={`Avsluta täckning för ${unit ? customerRowName(unit) : 'enheten'}`}
-                  >
-                    ×
-                  </button>
+                  {onEndCoverage && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onEndCoverage(cs, e.clientX, e.clientY)
+                      }}
+                      className="shrink-0 w-5 h-5 grid place-items-center rounded-full text-[#8a9099] hover:bg-black/10 hover:text-[#262e38] text-sm leading-none"
+                      aria-label={`Avsluta täckning för ${unit ? customerRowName(unit) : 'enheten'}`}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               )
             })}
@@ -2270,7 +2530,11 @@ function PaperContract({
       {/* Avtalsobjekt — vad som ingår, antal stationer per plats,
           besöksintervall. Kommer från Oneflow vid signering, men går att
           fylla i för hand på äldre och manuella avtal. */}
-      <AgreementObjectText text={contract.agreement_text ?? null} onSave={onSaveAgreementText} />
+      <AgreementObjectText
+        text={contract.agreement_text ?? null}
+        onSave={onSaveAgreementText}
+        ink={ink}
+      />
 
       {/* § 2 Prislista */}
       <div className="mt-3.5">
@@ -2291,13 +2555,15 @@ function PaperContract({
                 : 'Kundens prislista (eller prisguiden) gäller för avrop på avtalets enheter.'}
             </div>
           </div>
-          <button
-            onClick={(e) => onEditPriceList(e.clientX, e.clientY)}
-            className="ml-auto shrink-0 inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#5d6672] border border-[#d9d3c2] rounded-md px-2.5 py-1.5 bg-white/50 hover:text-[#262e38] transition-colors"
-          >
-            <Pencil className="w-3 h-3" />
-            Byt prislista
-          </button>
+          {onEditPriceList && (
+            <button
+              onClick={(e) => onEditPriceList(e.clientX, e.clientY)}
+              className="ml-auto shrink-0 inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#5d6672] border border-[#d9d3c2] rounded-md px-2.5 py-1.5 bg-[#fff]/50 hover:text-[#262e38] transition-colors"
+            >
+              <Pencil className="w-3 h-3" />
+              Byt prislista
+            </button>
+          )}
         </div>
 
         {/* Vad kunden kan avropa: fasta priser + övriga mot offert */}
@@ -2316,14 +2582,17 @@ function PaperContract({
               och i uppföljningen. Avropsavtal har ingen fast frekvens. */}
           <span className="ml-auto flex items-center gap-1.5">
             {contract.visits_per_year ? (
-              <span className="font-sans text-[10.5px] text-[#157a5b] font-semibold tabular-nums">
+              <span
+                className="font-sans text-[10.5px] font-semibold tabular-nums"
+                style={{ color: ink.positive }}
+              >
                 {contract.visits_per_year} besök/år ingår
               </span>
             ) : contract.visit_frequency ? (
-              <span className="font-sans text-[10.5px] text-[#157a5b] font-semibold">
+              <span className="font-sans text-[10.5px] font-semibold" style={{ color: ink.positive }}>
                 {VISIT_FREQUENCY_LABEL[contract.visit_frequency]}
               </span>
-            ) : (
+            ) : onEditFrequency ? (
               <button
                 onClick={onEditFrequency}
                 className="font-sans text-[10.5px] text-[#b45309] hover:text-[#262e38] underline decoration-dotted"
@@ -2331,6 +2600,10 @@ function PaperContract({
               >
                 Ange besöksfrekvens
               </button>
+            ) : (
+              <span className="font-sans text-[10.5px] italic" style={{ color: ink.muted }}>
+                Ingen fast frekvens
+              </span>
             )}
             {onEditFrequency && (contract.visit_frequency || contract.visits_per_year) && (
               <button
@@ -2401,73 +2674,189 @@ function PaperContract({
         onEdit={onEditContent}
       />
 
+      {/* Avslutsnotis — bara på arkiverade avtal. Sammanfattar vad som hände
+          och hur länge relationen varade, plus den enda framåtriktade
+          åtgärden: skicka ett nytt förslag byggt på det här avtalet. */}
+      {archived && (
+        <div className="mt-4 pt-3" style={{ borderTop: `1.5px solid ${ink.rule}` }}>
+          <div className="flex items-start gap-3">
+            <span
+              className="shrink-0 w-7 h-7 rounded-full grid place-items-center"
+              style={{
+                border: '1px solid rgba(155,53,53,.35)',
+                background: 'rgba(155,53,53,.07)',
+              }}
+            >
+              <Archive className="w-3.5 h-3.5" style={{ color: ink.danger }} />
+            </span>
+            <div className="min-w-0 font-sans">
+              <div
+                className="text-[9.5px] font-bold uppercase tracking-[0.16em] mb-1"
+                style={{ color: ink.muted }}
+              >
+                Avtalet är avslutat
+              </div>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[11.5px] leading-relaxed">
+                {contract.terminated_at && (
+                  <>
+                    <dt style={{ color: ink.muted }}>Uppsagt</dt>
+                    <dd className="tabular-nums" style={{ color: ink.primary }}>
+                      {formatDateSv(contract.terminated_at.slice(0, 10))}
+                      {terminatedBy ? ` av ${terminatedBy}` : ''}
+                    </dd>
+                  </>
+                )}
+                <dt style={{ color: ink.muted }}>Gällde t.o.m.</dt>
+                <dd className="font-semibold tabular-nums" style={{ color: ink.primary }}>
+                  {formatDateSv(contract.effective_end_date ?? contract.contract_end_date)}
+                </dd>
+                {periodLabel && (
+                  <>
+                    <dt style={{ color: ink.muted }}>Löptid</dt>
+                    <dd className="tabular-nums" style={{ color: ink.secondary }}>
+                      {periodLabel}
+                      {durationLabel ? ` · ${durationLabel}` : ''}
+                    </dd>
+                  </>
+                )}
+                <dt style={{ color: ink.muted }}>Signerat</dt>
+                <dd className="tabular-nums" style={{ color: ink.secondary }}>
+                  {contract.signed_at ? formatDateSv(contract.signed_at) : '–'}
+                </dd>
+                {contract.termination_reason && (
+                  <>
+                    <dt style={{ color: ink.muted }}>Orsak</dt>
+                    <dd style={{ color: ink.primary }}>{contract.termination_reason}</dd>
+                  </>
+                )}
+              </dl>
+              {!contract.termination_reason && (
+                <p className="text-[10.5px] italic mt-1" style={{ color: ink.muted }}>
+                  Ingen orsak registrerad.
+                </p>
+              )}
+              {onReactivate && (
+                <button
+                  onClick={onReactivate}
+                  className="mt-1.5 text-[10px] underline decoration-dotted transition-colors hover:opacity-70"
+                  style={{ color: ink.muted }}
+                  title="Ångra uppsägningen — avtalet blir aktivt igen"
+                >
+                  Ångra uppsägningen
+                </button>
+              )}
+            </div>
+
+            {/* Enda knappen på hela det arkiverade pappret. Att den lyser
+                brandgrönt mot dämpat papper är hela poängen — allt annat här
+                är historik, det här är vägen framåt. */}
+            {onRenew && (
+              <div className="ml-auto shrink-0 self-center text-right">
+                <button
+                  onClick={onRenew}
+                  className="inline-flex items-center gap-2 font-sans text-[11.5px] font-semibold text-[#fff] bg-[#20c58f] rounded-lg px-3.5 py-2 shadow-sm hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] focus-visible:ring-offset-2 transition-all"
+                  style={{ ['--tw-ring-offset-color' as string]: ink.sheet }}
+                  title="Skapa ett nytt avtalsförslag i Oneflow baserat på det här avtalet"
+                >
+                  <FileSignature className="w-3.5 h-3.5" />
+                  Förnya avtal
+                </button>
+                <p
+                  className="text-[10px] mt-1 max-w-[9.5rem] leading-snug"
+                  style={{ color: ink.muted }}
+                >
+                  Nytt förslag till kunden via Oneflow, baserat på detta avtal
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Fot */}
       <div className="flex items-end gap-5 mt-4">
         {(contract.begone_employee_name || root.sales_person) && (
           <div className="shrink-0">
             <span
-              className="inline-block -rotate-2 text-[17px] text-[#2f3a46]"
-              style={{ fontFamily: "'Segoe Script', 'Brush Script MT', cursive" }}
+              className="inline-block -rotate-2 text-[17px]"
+              style={{
+                fontFamily: "'Segoe Script', 'Brush Script MT', cursive",
+                color: archived ? '#3a424f' : '#2f3a46',
+              }}
             >
               {contract.begone_employee_name ?? root.sales_person}
             </span>
-            <div className="border-t border-[#5d6672] mt-0.5 pt-0.5 font-sans text-[9.5px] text-[#8a9099] tracking-wide">
+            <div
+              className="mt-0.5 pt-0.5 font-sans text-[9.5px] tracking-wide"
+              style={{ borderTop: `1px solid ${ink.secondary}`, color: ink.muted }}
+            >
               {contract.begone_employee_name ?? root.sales_person} · BeGone Skadedjur &amp; Sanering AB
             </div>
           </div>
         )}
-        <div className="ml-auto text-right font-sans text-[10px] leading-relaxed text-[#8a9099]">
-          {/* Signeringsdatum — signed_at, aldrig created_at (som bara är när
-              raden skapades i portalen). Går att fylla i för äldre avtal. */}
-          {contract.signed_at ? (
-            <button
-              onClick={onEditSignedAt}
-              className="hover:text-[#262e38] underline decoration-dotted"
-              title="Ändra signeringsdatum"
-            >
-              Signerat {formatDateSv(contract.signed_at)}
-            </button>
-          ) : (
-            <button
-              onClick={onEditSignedAt}
-              className="text-[#b45309] hover:text-[#262e38] underline decoration-dotted"
-              title="Ange när kunden signerade avtalet"
-            >
-              Ange signeringsdatum
-            </button>
-          )}
-          {contract.notice_period_months ? ` · Uppsägningstid ${contract.notice_period_months} mån` : ''}
-          <br />
-          <span className="inline-flex items-center gap-2">
-            {onTerminate && (
-              <button
-                onClick={onTerminate}
-                className="text-[10px] text-[#8a9099] hover:text-[#b45309] underline decoration-dotted transition-colors"
-                title="Säg upp avtalet — det bevaras som historik"
-              >
-                Säg upp avtalet
-              </button>
-            )}
-            {onReactivate && (
-              <button
-                onClick={onReactivate}
-                className="text-[10px] text-[#8a9099] hover:text-[#157a5b] underline decoration-dotted transition-colors"
-                title="Ångra uppsägningen"
-              >
-                Ångra uppsägning
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={onDelete}
-                className="text-[10px] text-[#8a9099] hover:text-[#9b3535] underline decoration-dotted transition-colors"
-                title="Radera avtalet"
-              >
-                Radera avtalet
-              </button>
-            )}
-          </span>
-        </div>
+        {/* Signeringsdatum och åtgärder flyttar in i avslutsnotisen på
+            arkiverade avtal — inget att redigera där. */}
+        {!archived && (
+          <div
+            className="ml-auto text-right font-sans text-[10px] leading-relaxed"
+            style={{ color: ink.muted }}
+          >
+            {/* Signeringsdatum — signed_at, aldrig created_at (som bara är när
+                raden skapades i portalen). Går att fylla i för äldre avtal. */}
+            {onEditSignedAt &&
+              (contract.signed_at ? (
+                <button
+                  onClick={onEditSignedAt}
+                  className="hover:text-[#262e38] underline decoration-dotted"
+                  title="Ändra signeringsdatum"
+                >
+                  Signerat {formatDateSv(contract.signed_at)}
+                </button>
+              ) : (
+                <button
+                  onClick={onEditSignedAt}
+                  className="text-[#b45309] hover:text-[#262e38] underline decoration-dotted"
+                  title="Ange när kunden signerade avtalet"
+                >
+                  Ange signeringsdatum
+                </button>
+              ))}
+            {contract.notice_period_months ? ` · Uppsägningstid ${contract.notice_period_months} mån` : ''}
+            <br />
+            <span className="inline-flex items-center gap-2">
+              {onTerminate && (
+                <button
+                  onClick={onTerminate}
+                  className="text-[10px] text-[#8a9099] hover:text-[#b45309] underline decoration-dotted transition-colors"
+                  title="Säg upp avtalet — det bevaras som historik"
+                >
+                  Säg upp avtalet
+                </button>
+              )}
+              {/* Ångra måste finnas redan här: ett avtal som sagts upp med tre
+                  månaders varsel gick tidigare inte att ångra förrän
+                  uppsägningstiden hunnit löpa ut. */}
+              {onReactivate && (
+                <button
+                  onClick={onReactivate}
+                  className="text-[10px] text-[#8a9099] hover:text-[#157a5b] underline decoration-dotted transition-colors"
+                  title="Ångra uppsägningen"
+                >
+                  Ångra uppsägning
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={onDelete}
+                  className="text-[10px] text-[#8a9099] hover:text-[#9b3535] underline decoration-dotted transition-colors"
+                  title="Radera avtalet"
+                >
+                  Radera avtalet
+                </button>
+              )}
+            </span>
+          </div>
+        )}
       </div>
     </section>
   )

@@ -323,9 +323,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 2. Hämta alla kontrakt från DB
     const { data: dbContracts } = await supabase
       .from('contracts')
-      .select('oneflow_contract_id, status, signing_deadline')
+      .select('oneflow_contract_id, status, signing_deadline, terminated_at')
 
-    const dbMap = new Map<string, { oneflow_contract_id: string; status: string; signing_deadline: string | null }>()
+    const dbMap = new Map<string, {
+      oneflow_contract_id: string
+      status: string
+      signing_deadline: string | null
+      terminated_at?: string | null
+    }>()
     for (const c of dbContracts || []) {
       if (c.oneflow_contract_id) {
         dbMap.set(c.oneflow_contract_id, c)
@@ -348,6 +353,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const driftedContracts = oneflowContracts.filter(c => {
       const dbRecord = dbMap.get(c.id.toString())
       if (!dbRecord || TERMINAL_STATUSES.has(dbRecord.status)) return false
+      // Lokalt uppsagda avtal rörs aldrig. Statusen ligger kvar på 'signed'
+      // fram till effective_end_date (avtalet löper ut), så TERMINAL_STATUSES
+      // fångar dem inte — men en statusdrift från Oneflow får ändå inte skriva
+      // över uppsägningen.
+      if (dbRecord.terminated_at) return false
       const expectedStatus = STATUS_MAP[c.state] || 'pending'
       return dbRecord.status !== expectedStatus
     })

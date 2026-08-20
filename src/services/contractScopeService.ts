@@ -4,6 +4,10 @@
 // avslutas genom att active_to sätts — rader raderas aldrig.
 
 import { supabase } from '../lib/supabase'
+import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
+import { isLiveContract, type ContractLifecycleFields } from '../utils/contractLifecycle'
+import { resolveContractsForCustomers } from './contractResolver'
+import { ContractInvoiceGenerator } from './contractInvoiceGenerator'
 
 export interface ScopeRow {
   id: string
@@ -595,13 +599,123 @@ export class ContractScopeService {
   }
 
   /**
+   * Finns det något ANNAT avtal kvar som lever på kunden?
+   *
+   * Styr om kundraden ska nollas vid uppsägning. Säkerhetsdefault vid fel är
+   * true = "rör inte kundfälten": att felaktigt tro att avtalet var det sista
+   * skulle nolla kundens annual_value och slå ut faktureringen för avtal som
+   * fortfarande gäller.
+   */
+  static async hasRemainingActiveContract(
+    customerId: string,
+    excludeContractId: string
+  ): Promise<boolean> {
+    try {
+      const { data, error } = await supabase
+        .from('contracts')
+        .select('id, status, terminated_at, effective_end_date, contract_end_date')
+        .eq('customer_id', customerId)
+        .in('status', ['signed', 'active'])
+        .neq('id', excludeContractId)
+      if (error) {
+        console.error('Kunde inte kontrollera kvarvarande avtal:', error.message)
+        return true
+      }
+      return (data ?? []).some((c) => isLiveContract(c as ContractLifecycleFields))
+    } catch (err) {
+      console.error('Kunde inte kontrollera kvarvarande avtal:', err)
+      return true
+    }
+  }
+
+  /**
+   * Pausa löpande scheman som hör till avtalet.
+   *
+   * TVÅSTEGSREGEL, därför att långt ifrån alla avtal finns som rader: hälften
+   * av beståndet är PDF-avtal som aldrig funnits i något system, och de kunder
+   * som saknar avtalsrad har scheman utan contract_id.
+   *   1. Scheman med contract_id = avtalet → pausas direkt.
+   *   2. Scheman UTAN contract_id på kundens rader → resolvern får avgöra om
+   *      avtalet ändå gäller dem (via omfattning eller HK:s heltäckande avtal).
+   * Träffar ingetdera lämnas schemat i fred — det tillhör en kund utan
+   * registrerat avtal och ska fortsätta löpa.
+   *
+   * ALDRIG 'cancelled': den vägen är irreversibel och sätter kopplade ärenden
+   * till 'Borttaget' (se recurringScheduleService.cancelRecurringSchedule).
+   * 'paused' stoppar extend-recurring-schedules-cronen, som bara plockar
+   * status='active', och går att ångra.
+   */
+  private static async pauseSchedulesForContract(
+    contractId: string,
+    customerId: string | null
+  ): Promise<number> {
+    let paused = 0
+    try {
+      // Steg 1: direkt kopplade scheman
+      const { data: direct, error } = await supabase
+        .from('recurring_schedules')
+        .update({ status: 'paused', updated_at: new Date().toISOString() })
+        .eq('contract_id', contractId)
+        .eq('status', 'active')
+        .select('id')
+      if (error) console.error('Kunde inte pausa avtalets scheman:', error.message)
+      paused += (direct ?? []).length
+
+      if (!customerId) return paused
+
+      // Steg 2: okopplade scheman på kundens familj — fråga resolvern
+      const { data: family } = await supabase
+        .from('customers')
+        .select('id')
+        .or(`id.eq.${customerId},parent_customer_id.eq.${customerId}`)
+      const familyIds = ((family ?? []) as { id: string }[]).map((r) => r.id)
+      if (familyIds.length === 0) return paused
+
+      const { data: orphans } = await supabase
+        .from('recurring_schedules')
+        .select('id, customer_id')
+        .in('customer_id', familyIds)
+        .is('contract_id', null)
+        .eq('status', 'active')
+      const orphanRows = (orphans ?? []) as { id: string; customer_id: string }[]
+      if (orphanRows.length === 0) return paused
+
+      const resolved = await resolveContractsForCustomers(
+        orphanRows.map((r) => r.customer_id)
+      )
+      const toPause = orphanRows.filter((r) => resolved[r.customer_id] === contractId)
+      if (toPause.length === 0) return paused
+
+      const { data: pausedOrphans, error: orphanErr } = await supabase
+        .from('recurring_schedules')
+        .update({
+          status: 'paused',
+          // Knyt raden till avtalet nu när vi vet vilket det är, så nästa
+          // uppsägning inte behöver gissa om igen.
+          contract_id: contractId,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', toPause.map((r) => r.id))
+        .select('id')
+      if (orphanErr) console.error('Kunde inte pausa okopplade scheman:', orphanErr.message)
+      paused += (pausedOrphans ?? []).length
+    } catch (err) {
+      console.error('Kunde inte pausa scheman:', err)
+    }
+    return paused
+  }
+
+  /**
    * Säg upp ETT avtal. Till skillnad från TerminateContractModal, som säger upp
    * alla kundens avtal samtidigt, träffar detta bara den valda raden — kunder
    * med flera avtal ska kunna avsluta ett och behålla resten.
    *
    * effectiveEndDate = sista dag avtalet gäller. Har den redan passerat blir
    * avtalet direkt avslutat (status 'ended'); annars löper det vidare som
-   * uppsagt fram till dess.
+   * uppsagt fram till dess, och expire-contracts-cronen stänger det på natten.
+   *
+   * Avtalet ligger kvar VISUELLT för spårbarhet men blir funktionellt dött:
+   * scheman pausas, framtida besök avbokas och planerade fakturor tas bort.
    */
   static async terminateContract(
     contractId: string,
@@ -609,32 +723,107 @@ export class ContractScopeService {
     reason?: string | null
   ): Promise<void> {
     const alreadyPassed = effectiveEndDate < todayKey()
+
+    // 1. Avtalsraden — sanningskällan
     const { data, error } = await supabase
       .from('contracts')
       .update({
-        terminated_at: new Date().toISOString(),
+        terminated_at: toLocalISOStringWithOffset(new Date()),
         effective_end_date: effectiveEndDate,
         termination_reason: reason ?? null,
         billing_active: false,
         // Passerat slutdatum → avtalet är slut nu. Annars behålls statusen så
         // det syns som "uppsagt, löper till <datum>".
         ...(alreadyPassed ? { status: 'ended' } : {}),
+        updated_at: new Date().toISOString(),
       })
       .eq('id', contractId)
-      .select('id')
+      .select('id, customer_id')
     if (error) throw new Error(`Kunde inte säga upp avtalet: ${error.message}`)
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+    const customerId = (data[0] as { customer_id: string | null }).customer_id
+
+    // 2. Pausa löpande scheman (tvåstegsregeln ovan)
+    const pausedSchedules = await this.pauseSchedulesForContract(contractId, customerId)
+
+    // 3. Avboka inbokade besök EFTER sista giltiga dagen.
+    //    TIDSZONSFÄLLA: scheduled_at är timestamptz. Utan T23:59:59 jämförs
+    //    datumsträngen mot midnatt, och besök PÅ sista giltiga dagen avbokas
+    //    felaktigt — de ska ju genomföras.
+    const { error: sessErr } = await supabase
+      .from('station_inspection_sessions')
+      .update({ status: 'cancelled' })
+      .eq('contract_id', contractId)
+      .eq('status', 'scheduled')
+      .gt('scheduled_at', `${effectiveEndDate}T23:59:59`)
+    if (sessErr) console.error('Kunde inte avboka framtida kontrollbesök:', sessErr.message)
+
+    // 4. Ta bort framtida icke-låsta avtalsfakturor för DETTA avtal
+    let deletedInvoices = 0
+    try {
+      deletedInvoices = await ContractInvoiceGenerator.cancelFutureForContract(
+        contractId,
+        effectiveEndDate
+      )
+    } catch (err) {
+      console.error('Kunde inte ta bort framtida fakturor:', err)
+    }
+
+    // 5. Kundfälten synkas BARA när detta var kundens sista levande avtal.
+    //    Kontrollen måste ske EFTER steg 1, annars räknas avtalet vi just sagt
+    //    upp som kvarvarande. Utan synken återuppstår faktureringen via
+    //    buildSyntheticContract, som läser customers.annual_value när inga
+    //    aktiva avtalsrader finns.
+    if (customerId) {
+      const stillActive = await this.hasRemainingActiveContract(customerId, contractId)
+      if (!stillActive) {
+        const { error: custErr } = await supabase
+          .from('customers')
+          .update({
+            terminated_at: toLocalISOStringWithOffset(new Date()),
+            effective_end_date: effectiveEndDate,
+            termination_reason: reason ?? null,
+            billing_active: false,
+            contract_status: 'terminated',
+          })
+          .eq('id', customerId)
+        if (custErr) console.error('Kunde inte synka kundfälten:', custErr.message)
+      }
+    }
 
     await this.logEvent(contractId, {
       event_type: 'other',
       title: alreadyPassed ? 'Avtalet avslutat' : 'Avtalet uppsagt',
-      detail: [reason, `Gäller t.o.m. ${effectiveEndDate}`].filter(Boolean).join(' · '),
+      detail: [
+        reason,
+        `Gäller t.o.m. ${effectiveEndDate}`,
+        pausedSchedules > 0 ? `${pausedSchedules} schema pausade` : null,
+        deletedInvoices > 0 ? `${deletedInvoices} planerade fakturor borttagna` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
     })
   }
 
-  /** Ångra uppsägning — avtalet blir aktivt igen */
+  /**
+   * Ångra uppsägning — avtalet blir aktivt igen och allt uppsägningen stängde
+   * av öppnas: scheman återupptas och avbokade framtida besök bokas om.
+   *
+   * Fakturaplanen återskapas INTE automatiskt. Kör om fakturagenereringen från
+   * faktureringsvyn i stället, så inga oväntade fakturor dyker upp i tysthet.
+   */
   static async reactivateContract(contractId: string): Promise<void> {
-    const { error } = await supabase
+    // Läs sista giltiga dagen INNAN den nollas — den behövs för att veta vilka
+    // besök uppsägningen avbokade.
+    const { data: before } = await supabase
+      .from('contracts')
+      .select('customer_id, effective_end_date')
+      .eq('id', contractId)
+      .maybeSingle()
+    const prevEnd = (before as { effective_end_date: string | null } | null)?.effective_end_date ?? null
+    const customerId = (before as { customer_id: string | null } | null)?.customer_id ?? null
+
+    const { data, error } = await supabase
       .from('contracts')
       .update({
         terminated_at: null,
@@ -642,11 +831,60 @@ export class ContractScopeService {
         termination_reason: null,
         billing_active: true,
         status: 'active',
+        updated_at: new Date().toISOString(),
       })
       .eq('id', contractId)
+      .select('id')
     if (error) throw new Error(`Kunde inte återaktivera avtalet: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
 
-    await this.logEvent(contractId, { event_type: 'other', title: 'Uppsägning ångrad' })
+    // Återuppta scheman som uppsägningen pausade
+    const { error: schedErr } = await supabase
+      .from('recurring_schedules')
+      .update({ status: 'active', updated_at: new Date().toISOString() })
+      .eq('contract_id', contractId)
+      .eq('status', 'paused')
+    if (schedErr) console.error('Kunde inte återuppta avtalets scheman:', schedErr.message)
+
+    // Boka om besök som avbokades efter det gamla slutdatumet. Samma
+    // T23:59:59-gräns som vid uppsägningen, annars träffas fel rader.
+    if (prevEnd) {
+      const { error: sessErr } = await supabase
+        .from('station_inspection_sessions')
+        .update({ status: 'scheduled' })
+        .eq('contract_id', contractId)
+        .eq('status', 'cancelled')
+        .gt('scheduled_at', `${prevEnd}T23:59:59`)
+      if (sessErr) console.error('Kunde inte återställa avbokade besök:', sessErr.message)
+    }
+
+    // Kundfälten återställs bara om uppsägningen faktiskt nollade dem
+    if (customerId) {
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('terminated_at')
+        .eq('id', customerId)
+        .maybeSingle()
+      if ((cust as { terminated_at: string | null } | null)?.terminated_at) {
+        const { error: custErr } = await supabase
+          .from('customers')
+          .update({
+            terminated_at: null,
+            effective_end_date: null,
+            termination_reason: null,
+            billing_active: true,
+            contract_status: 'active',
+          })
+          .eq('id', customerId)
+        if (custErr) console.error('Kunde inte återställa kundfälten:', custErr.message)
+      }
+    }
+
+    await this.logEvent(contractId, {
+      event_type: 'other',
+      title: 'Uppsägning ångrad',
+      detail: 'Scheman återupptagna och avbokade besök återställda. Kör om fakturagenereringen vid behov.',
+    })
   }
 
   /** Sätt avtalstyp: namnet blir både label (visningsnamn) och contract_type */

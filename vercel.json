@@ -9,6 +9,10 @@
   },
   "crons": [
     {
+      "path": "/api/cron/expire-contracts",
+      "schedule": "30 1 * * *"
+    },
+    {
       "path": "/api/cron/sync-embeddings",
       "schedule": "0 2 * * *"
     },
