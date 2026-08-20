@@ -46,6 +46,7 @@ import type { PriceList } from '../../../../types/articles'
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
 import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
 import ContractContentSection, { useContractContent } from './ContractContentSection'
+import ContractPriceListSection, { useAvropCatalog } from './ContractPriceListSection'
 import ContractCaseServiceSelector from '../ContractCaseServiceSelector'
 import Modal from '../../../ui/Modal'
 import SiteModal from '../../multisite/SiteModal'
@@ -1297,6 +1298,12 @@ function PaperContract({
 }: PaperProps) {
   const key = todayKey()
   const contentData = useContractContent(contract.id, contentReloadKey)
+  // Avtalets prislista styr vad kunden kan avropa och till vilket pris.
+  // Saknas prislista på avtalet gäller kundens — samma uppslag som ärendena gör.
+  const avropCatalog = useAvropCatalog(
+    contract.price_list_id ?? root.price_list_id ?? null,
+    contentData.content.services.map((s) => s.service_id).filter((id): id is string => !!id)
+  )
   const annual = contractEffectiveAnnualValue(contract, premiumEvents)
   const nextStep = nextPremiumEvent(premiumEvents)
   const orgnr = contract.organization_number ?? root.organization_number
@@ -1508,27 +1515,38 @@ function PaperContract({
 
       {/* § 2 Prislista */}
       <div className="mt-3.5">
-        <div className="border-b-[1.5px] border-[#262e38] pb-1">
+        <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
           <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 2 · Prislista för avrop</h4>
+          {avropCatalog.catalog.priced.length > 0 && (
+            <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
+              {avropCatalog.catalog.priced.length} till fast pris
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3 pt-2">
           <div className="min-w-0">
             <div className="font-bold text-[13.5px] text-[#262e38]">{priceListLabel ?? 'Ingen egen prislista'}</div>
             <div className="font-sans text-[11px] text-[#8a9099]">
               {priceListLabel
-                ? 'Styr tjänstepriser för avrop och tillägg per ärende — följer med till fakturan.'
+                ? 'Gäller avrop och tillägg per ärende — följer med till fakturan.'
                 : 'Kundens prislista (eller prisguiden) gäller för avrop på avtalets enheter.'}
             </div>
           </div>
           <button
             onClick={(e) => onEditPriceList(e.clientX, e.clientY)}
             className="ml-auto shrink-0 inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#5d6672] border border-[#d9d3c2] rounded-md px-2.5 py-1.5 bg-white/50 hover:text-[#262e38] transition-colors"
-            style={{ borderColor: undefined }}
           >
             <Pencil className="w-3 h-3" />
             Byt prislista
           </button>
         </div>
+
+        {/* Vad kunden kan avropa: fasta priser + övriga mot offert */}
+        <ContractPriceListSection
+          catalog={avropCatalog.catalog}
+          loading={avropCatalog.loading}
+          priceListLabel={priceListLabel}
+        />
       </div>
 
       {/* § 3 Uppföljning */}
