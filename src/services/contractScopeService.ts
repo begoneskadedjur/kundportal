@@ -376,6 +376,59 @@ export class ContractScopeService {
     return moved
   }
 
+  /**
+   * Radera ett avtal som skapats i portalen.
+   *
+   * Skyddar historiken: avtal med fakturerade rader, ärenden eller
+   * kontrollbesök raderas ALDRIG — de måste sägas upp i stället. Endast
+   * avtalets eget innehåll (tjänster/artiklar), omfattning, premietrappa och
+   * händelselogg städas bort tillsammans med raden.
+   */
+  static async deleteContract(contractId: string): Promise<void> {
+    // Blockera om avtalet bär historik som skulle gå förlorad
+    const [billing, cases, sessions] = await Promise.all([
+      supabase.from('contract_billing_items').select('id').eq('contract_id', contractId).limit(1),
+      supabase.from('cases').select('id').eq('contract_id', contractId).limit(1),
+      supabase.from('station_inspection_sessions').select('id').eq('contract_id', contractId).limit(1),
+    ])
+    if ((billing.data?.length ?? 0) > 0) {
+      throw new Error('Avtalet har fakturarader och kan inte raderas — säg upp det i stället.')
+    }
+    if ((cases.data?.length ?? 0) > 0) {
+      throw new Error('Avtalet har kopplade ärenden och kan inte raderas — säg upp det i stället.')
+    }
+    if ((sessions.data?.length ?? 0) > 0) {
+      throw new Error('Avtalet har kontrollbesök och kan inte raderas — säg upp det i stället.')
+    }
+
+    // Städa beroenden i ordning (inga kaskader på dessa)
+    await supabase.from('case_billing_items').delete().eq('case_id', contractId).eq('case_type', 'contract')
+    await supabase.from('contract_sites').delete().eq('contract_id', contractId)
+    await supabase.from('contract_premium_events').delete().eq('contract_id', contractId)
+    await supabase.from('recurring_schedules').update({ contract_id: null }).eq('contract_id', contractId)
+
+    const { data, error } = await supabase.from('contracts').delete().eq('id', contractId).select('id')
+    if (error) throw new Error(`Kunde inte radera avtalet: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte raderas (0 rader)')
+  }
+
+  /** Sätt avtalstyp: namnet blir både label (visningsnamn) och contract_type */
+  static async setContractType(contractId: string, typeName: string): Promise<void> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({ label: typeName, contract_type: typeName })
+      .eq('id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte ändra avtalstyp: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    await this.logEvent(contractId, {
+      event_type: 'other',
+      title: 'Avtalstyp ändrad',
+      detail: typeName,
+    })
+  }
+
   /** Skriv en händelse i avtalets logg (tidslinjen). Fel sväljs — loggen får aldrig fälla mutationen. */
   static async logEvent(
     contractId: string,

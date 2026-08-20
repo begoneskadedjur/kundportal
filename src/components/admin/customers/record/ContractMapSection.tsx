@@ -42,6 +42,7 @@ import {
 } from '../../../../hooks/useCustomerRecord'
 import { ContractScopeService } from '../../../../services/contractScopeService'
 import { PriceListService } from '../../../../services/priceListService'
+import { useContractTypeOptions } from '../../../../hooks/useContractTypeOptions'
 import type { PriceList } from '../../../../types/articles'
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
 import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
@@ -127,6 +128,11 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [contentEditor, setContentEditor] = useState<RecordContract | null>(null)
   /** Bumpas när innehållet sparats så pappren hämtar om tjänster + marginal */
   const [contentReloadKey, setContentReloadKey] = useState(0)
+  /** Val av avtalstyp innan ett nytt avtal skapas */
+  const [typePrompt, setTypePrompt] = useState<{ source: RecordContract | null } | null>(null)
+  /** Avtal som ska raderas (bekräftelse) */
+  const [deletePrompt, setDeletePrompt] = useState<RecordContract | null>(null)
+  const { options: contractTypes } = useContractTypeOptions()
   const [busy, setBusy] = useState(false)
   const [hover, setHover] = useState<{ kind: 'unit' | 'contract'; id: string } | null>(null)
 
@@ -514,7 +520,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
    * Fortnox har premie och datum på kundraden men ingen contracts-rad, och kan
    * därför inte bära omfattning, prislista eller avtalsinnehåll.
    */
-  const materializeContract = async (customerRowContract: RecordContract | null) => {
+  const materializeContract = async (customerRowContract: RecordContract | null, typeName?: string) => {
     // null = kunden har inga kundkortsavtal (t.ex. bara importrester) → skapa
     // ett tomt avtal på kundraden som sedan fylls i § 4.
     const owner = customerRowContract
@@ -537,7 +543,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     try {
       await ContractScopeService.createFromCustomerRow(
         owner.id,
-        customerRowContract?.label ?? customerRowContract?.contract_type ?? undefined,
+        typeName ?? customerRowContract?.label ?? customerRowContract?.contract_type ?? undefined,
         replaces
       )
       toast.success(
@@ -548,6 +554,33 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       await onChanged()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Kunde inte skapa avtalet')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const deleteContract = async (contract: RecordContract) => {
+    setDeletePrompt(null)
+    setBusy(true)
+    try {
+      await ContractScopeService.deleteContract(contract.id)
+      toast.success(`${contractDisplayName(contract)} raderat.`)
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte radera avtalet')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const changeContractType = async (contract: RecordContract, typeName: string) => {
+    setBusy(true)
+    try {
+      await ContractScopeService.setContractType(contract.id, typeName)
+      toast.success(`Avtalstyp satt till ${typeName}.`)
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ändra avtalstyp')
     } finally {
       setBusy(false)
     }
@@ -910,6 +943,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               }
               onEndCoverage={(cs, x, y) => endCoverage(c, cs, x, y)}
               onEditPriceList={(x, y) => setPricePrompt({ x, y, contract: c })}
+              contractTypes={contractTypes.map((t) => t.value)}
+              onChangeType={(t) => changeContractType(c, t)}
+              onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
               onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
               isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
               isSingleSite={isSingleSite}
@@ -938,7 +974,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                 {(customerRowContracts.length > 0 ? customerRowContracts : [null]).map((c, i) => (
                   <button
                     key={c?.id ?? `new-${i}`}
-                    onClick={() => materializeContract(c)}
+                    onClick={() => setTypePrompt({ source: c })}
                     disabled={busy}
                     className="inline-flex items-center gap-2 bg-[#20c58f] text-[#fff] text-sm font-semibold rounded-xl px-4 py-2 hover:brightness-110 transition-all disabled:opacity-50"
                   >
@@ -972,7 +1008,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                       {Number(c.annual_value ?? 0) > 0 && ` · ${formatKr(Number(c.annual_value))}/år`}
                     </span>
                     <button
-                      onClick={() => materializeContract(c.fromCustomerRow ? c : null)}
+                      onClick={() => setTypePrompt({ source: c.fromCustomerRow ? c : null })}
                       disabled={busy}
                       className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#20c58f] border border-[#20c58f]/40 rounded-lg px-2.5 py-1 hover:bg-[#20c58f]/10 transition-colors disabled:opacity-50"
                       title={
@@ -1020,6 +1056,95 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       {/* Datum-popover */}
       {datePrompt && (
         <DatePromptPopover prompt={datePrompt} onClose={() => setDatePrompt(null)} />
+      )}
+
+      {/* Avtalstyp innan nytt avtal skapas — samma typer som Oneflow-wizarden */}
+      {typePrompt && (
+        <div className="fixed inset-0 z-[130] grid place-items-center bg-slate-950/70 p-4" onClick={() => setTypePrompt(null)}>
+          <div
+            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 className="text-base font-semibold text-slate-100 flex items-center gap-2 mb-1">
+              <FileText className="w-4 h-4 text-[#20c58f]" />
+              Vilken typ av avtal?
+            </h4>
+            <p className="text-xs text-slate-400 mb-3">
+              Samma avtalstyper som i avtalswizarden. Namnet blir avtalets rubrik.
+            </p>
+            <div className="space-y-1.5 max-h-72 overflow-y-auto">
+              {contractTypes.map((t) => (
+                <button
+                  key={t.serviceId}
+                  onClick={() => {
+                    const source = typePrompt.source
+                    setTypePrompt(null)
+                    void materializeContract(source, t.value)
+                  }}
+                  disabled={busy}
+                  className="w-full flex items-center gap-2 text-left text-sm rounded-xl border border-slate-700/60 px-3 py-2.5 text-slate-200 hover:border-[#20c58f] hover:bg-[#20c58f]/5 transition-colors disabled:opacity-50"
+                >
+                  <span className="flex-1">{t.value}</span>
+                  {t.code && <span className="text-[10px] text-slate-500 tabular-nums">{t.code}</span>}
+                </button>
+              ))}
+              {contractTypes.length === 0 && (
+                <p className="text-xs text-slate-500 py-2">
+                  Inga avtalstyper hittades. Markera tjänster som avtalstyp i tjänstekatalogen.
+                </p>
+              )}
+            </div>
+            <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-700/50">
+              <button
+                onClick={() => {
+                  const source = typePrompt.source
+                  setTypePrompt(null)
+                  void materializeContract(source)
+                }}
+                disabled={busy}
+                className="text-xs text-slate-400 hover:text-slate-200"
+              >
+                Hoppa över — sätt typ senare
+              </button>
+              <button onClick={() => setTypePrompt(null)} className="text-xs text-slate-500 hover:text-slate-300">
+                Avbryt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Radera avtal — bekräftelse */}
+      {deletePrompt && (
+        <div className="fixed inset-0 z-[130] grid place-items-center bg-slate-950/70 p-4" onClick={() => setDeletePrompt(null)}>
+          <div
+            className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 className="text-base font-semibold text-slate-100 mb-1">
+              Radera {contractDisplayName(deletePrompt)}?
+            </h4>
+            <p className="text-xs text-slate-400 mb-4">
+              Avtalet och dess innehåll, omfattning och premietrappa tas bort permanent. Avtal med
+              fakturarader, ärenden eller kontrollbesök går inte att radera — säg upp dem i stället.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeletePrompt(null)}
+                className="text-xs font-semibold text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-800"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={() => deleteContract(deletePrompt)}
+                disabled={busy}
+                className="text-xs font-semibold text-[#fff] bg-red-600 px-3 py-2 rounded-lg hover:bg-red-500 disabled:opacity-50"
+              >
+                Radera avtalet
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Omfattningsläge: bara dagens enheter eller även framtida */}
@@ -1284,6 +1409,11 @@ interface PaperProps {
   onEndCoverage: (cs: RecordContractSite, x: number, y: number) => void
   onEditPriceList: (x: number, y: number) => void
   onOpenHistory: (tab: HistoryTab, unitFilter?: string) => void
+  /** Avtalstyper (tjänster med is_contract_service) */
+  contractTypes: string[]
+  onChangeType: (typeName: string) => void
+  /** Endast portalskapade avtal går att radera */
+  onDelete?: () => void
 }
 
 function PaperContract({
@@ -1311,6 +1441,9 @@ function PaperContract({
   onEndCoverage,
   onEditPriceList,
   onOpenHistory,
+  contractTypes,
+  onChangeType,
+  onDelete,
 }: PaperProps) {
   const key = todayKey()
   const contentData = useContractContent(contract.id, contentReloadKey)
@@ -1393,7 +1526,26 @@ function PaperContract({
           <div className="font-sans text-[9.5px] uppercase tracking-[0.2em] text-[#8a9099] mb-0.5">
             {isUnitContract ? 'Enhetsavtal' : 'Organisationsavtal'} · BeGone Skadedjur &amp; Sanering
           </div>
-          <h3 className="text-lg font-bold leading-snug text-[#262e38]">{contractDisplayName(contract)}</h3>
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-lg font-bold leading-snug text-[#262e38]">{contractDisplayName(contract)}</h3>
+            {/* Avtalstyp går att sätta/byta på portalskapade avtal */}
+            {onDelete && contractTypes.length > 0 && (
+              <select
+                value={contractTypes.includes(contract.label ?? '') ? (contract.label as string) : ''}
+                onChange={(e) => e.target.value && onChangeType(e.target.value)}
+                className="font-sans text-[10px] text-[#5d6672] bg-white/60 border border-[#d9d3c2] rounded px-1.5 py-0.5 cursor-pointer hover:text-[#262e38] focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                title="Byt avtalstyp"
+                aria-label="Avtalstyp"
+              >
+                <option value="">Välj avtalstyp…</option>
+                {contractTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
           <div className="text-[11.5px] italic text-[#5d6672] mt-0.5">
             mellan BeGone Skadedjur &amp; Sanering AB och {isUnitContract && owner ? customerRowName(owner) + ', ' : ''}
             {root.company_name}
@@ -1646,6 +1798,18 @@ function PaperContract({
         <div className="ml-auto text-right font-sans text-[10px] leading-relaxed text-[#8a9099]">
           {contract.created_at && !isImportedContract(contract) && `Signerat ${formatDateSv(contract.created_at)}`}
           {contract.notice_period_months ? ` · Uppsägningstid ${contract.notice_period_months} mån` : ''}
+          {onDelete && (
+            <>
+              <br />
+              <button
+                onClick={onDelete}
+                className="text-[10px] text-[#8a9099] hover:text-[#9b3535] underline decoration-dotted transition-colors"
+                title="Radera avtalet"
+              >
+                Radera avtalet
+              </button>
+            </>
+          )}
         </div>
       </div>
     </section>
