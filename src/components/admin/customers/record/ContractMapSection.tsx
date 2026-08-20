@@ -973,6 +973,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onChangeType={(t) => changeContractType(c, t)}
               onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
               onEditFrequency={() => setFrequencyPrompt(c)}
+              onSaveAgreementText={async (text) => {
+                try {
+                  await ContractScopeService.setAgreementText(c.id, text)
+                  toast.success('Avtalsobjektet sparat.')
+                  await onChanged()
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Kunde inte spara avtalsobjektet')
+                }
+              }}
               onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
               isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
               isSingleSite={isSingleSite}
@@ -1354,13 +1363,32 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 
 const AGREEMENT_PREVIEW_CHARS = 340
 
-function AgreementObjectText({ text }: { text: string }) {
+function AgreementObjectText({
+  text,
+  onSave,
+}: {
+  text: string | null
+  onSave: (text: string | null) => Promise<void>
+}) {
   const [expanded, setExpanded] = useState(false)
-  const trimmed = text.trim()
-  const isLong = trimmed.length > AGREEMENT_PREVIEW_CHARS
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(text ?? '')
+  const [saving, setSaving] = useState(false)
 
+  const trimmed = (text ?? '').trim()
+  const isLong = trimmed.length > AGREEMENT_PREVIEW_CHARS
   // Radbrytningar bär strukturen (en rad per anläggning i Oneflow-mallen)
   const shown = expanded || !isLong ? trimmed : trimmed.slice(0, AGREEMENT_PREVIEW_CHARS).trimEnd() + '…'
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      await onSave(draft)
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="mt-3">
@@ -1368,16 +1396,73 @@ function AgreementObjectText({ text }: { text: string }) {
         <h4 className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] text-[#8a9099]">
           Avtalsobjekt
         </h4>
-        {isLong && (
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="ml-auto font-sans text-[10px] text-[#8a9099] hover:text-[#262e38] underline decoration-dotted"
-          >
-            {expanded ? 'visa mindre' : 'visa hela'}
-          </button>
-        )}
+        <span className="ml-auto flex items-baseline gap-2">
+          {isLong && !editing && (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="font-sans text-[10px] text-[#8a9099] hover:text-[#262e38] underline decoration-dotted"
+            >
+              {expanded ? 'visa mindre' : 'visa hela'}
+            </button>
+          )}
+          {!editing && (
+            <button
+              onClick={() => {
+                setDraft(text ?? '')
+                setEditing(true)
+              }}
+              className="font-sans text-[10px] text-[#8a9099] hover:text-[#262e38] underline decoration-dotted"
+            >
+              {trimmed ? 'redigera' : 'lägg till'}
+            </button>
+          )}
+        </span>
       </div>
-      <p className="text-[12.5px] leading-relaxed text-[#5d6672] pt-1.5 whitespace-pre-line">{shown}</p>
+
+      {editing ? (
+        <div className="pt-2">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={7}
+            autoFocus
+            placeholder={
+              'Beskriv vad som ingår — t.ex.\n\nAnläggning A, 5 st Aurocon digital fälla, 10 st betade lådor utvändigt, 8 st invändiga kontrollstationer\nAnläggning B, 2 st Aurocon, 4 st utv betade lådor'
+            }
+            className="w-full font-sans text-[12px] leading-relaxed text-[#262e38] bg-white/70 border border-[#d9d3c2] rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50 resize-y"
+          />
+          <div className="flex items-center gap-2 mt-1.5">
+            <button
+              onClick={save}
+              disabled={saving}
+              className="font-sans text-[11px] font-semibold text-[#fff] bg-[#20c58f] rounded-md px-3 py-1.5 hover:brightness-110 disabled:opacity-50"
+            >
+              {saving ? 'Sparar…' : 'Spara'}
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              className="font-sans text-[11px] text-[#5d6672] hover:text-[#262e38] px-2 py-1.5"
+            >
+              Avbryt
+            </button>
+            <span className="ml-auto font-sans text-[10px] text-[#8a9099]">
+              En rad per anläggning håller strukturen
+            </span>
+          </div>
+        </div>
+      ) : trimmed ? (
+        <p className="text-[12.5px] leading-relaxed text-[#5d6672] pt-1.5 whitespace-pre-line">{shown}</p>
+      ) : (
+        <button
+          onClick={() => {
+            setDraft('')
+            setEditing(true)
+          }}
+          className="w-full text-left font-sans text-[11.5px] italic text-[#8a9099] hover:text-[#5d6672] pt-1.5"
+        >
+          Inget avtalsobjekt registrerat — beskriv vad som ingår och vad som är installerat.
+        </button>
+      )}
     </div>
   )
 }
@@ -1590,6 +1675,8 @@ interface PaperProps {
   onDelete?: () => void
   /** Öppna besöksfrekvens-väljaren */
   onEditFrequency?: () => void
+  /** Spara avtalsobjektets text */
+  onSaveAgreementText: (text: string | null) => Promise<void>
 }
 
 function PaperContract({
@@ -1621,6 +1708,7 @@ function PaperContract({
   onChangeType,
   onDelete,
   onEditFrequency,
+  onSaveAgreementText,
 }: PaperProps) {
   const key = todayKey()
   const contentData = useContractContent(contract.id, contentReloadKey)
@@ -1858,11 +1946,10 @@ function PaperContract({
         )}
       </div>
 
-      {/* Avtalsobjekt — texten från Oneflow-avtalet: vad som ingår, antal
-          stationer per plats, besöksintervall. Lång text fälls ihop. */}
-      {contract.agreement_text && contract.agreement_text.trim().length > 0 && (
-        <AgreementObjectText text={contract.agreement_text} />
-      )}
+      {/* Avtalsobjekt — vad som ingår, antal stationer per plats,
+          besöksintervall. Kommer från Oneflow vid signering, men går att
+          fylla i för hand på äldre och manuella avtal. */}
+      <AgreementObjectText text={contract.agreement_text ?? null} onSave={onSaveAgreementText} />
 
       {/* § 2 Prislista */}
       <div className="mt-3.5">
@@ -1911,16 +1998,24 @@ function PaperContract({
               <span className="font-sans text-[10.5px] text-[#157a5b] font-semibold tabular-nums">
                 {contract.visits_per_year} besök/år ingår
               </span>
-            ) : (
-              <span className="font-sans text-[10.5px] text-[#8a9099] italic">
-                {contract.visit_frequency ? VISIT_FREQUENCY_LABEL[contract.visit_frequency] : 'Ingen fast frekvens'}
+            ) : contract.visit_frequency ? (
+              <span className="font-sans text-[10.5px] text-[#157a5b] font-semibold">
+                {VISIT_FREQUENCY_LABEL[contract.visit_frequency]}
               </span>
+            ) : (
+              <button
+                onClick={onEditFrequency}
+                className="font-sans text-[10.5px] text-[#b45309] hover:text-[#262e38] underline decoration-dotted"
+                title="Ange hur ofta kunden ska besökas enligt avtalet"
+              >
+                Ange besöksfrekvens
+              </button>
             )}
-            {onEditFrequency && (
+            {onEditFrequency && (contract.visit_frequency || contract.visits_per_year) && (
               <button
                 onClick={onEditFrequency}
                 className="font-sans text-[10px] text-[#8a9099] hover:text-[#262e38] underline decoration-dotted"
-                title="Ange besöksfrekvens enligt avtalet"
+                title="Ändra besöksfrekvens"
               >
                 ändra
               </button>

@@ -438,6 +438,27 @@ export class ContractScopeService {
     })
   }
 
+  /**
+   * Avtalsobjektet: fritext som beskriver vad som ingår — antal stationer per
+   * anläggning, besöksintervall, vad som täcks. Kommer från Oneflow-mallen vid
+   * signering, men måste kunna fyllas i för hand på äldre och manuella avtal.
+   */
+  static async setAgreementText(contractId: string, text: string | null): Promise<void> {
+    const value = text?.trim() ? text.trim() : null
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({ agreement_text: value })
+      .eq('id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte spara avtalsobjektet: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    await this.logEvent(contractId, {
+      event_type: 'note',
+      title: value ? 'Avtalsobjekt uppdaterat' : 'Avtalsobjekt borttaget',
+    })
+  }
+
   /** Sätt avtalstyp: namnet blir både label (visningsnamn) och contract_type */
   static async setContractType(contractId: string, typeName: string): Promise<void> {
     const { data, error } = await supabase
