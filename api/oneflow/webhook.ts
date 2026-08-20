@@ -1196,6 +1196,140 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
   }
 }
 
+/**
+ * Fyll avtalsfälten på contracts-raden vid signering.
+ *
+ * Oneflow-flödet skrev historiskt bara metadata (parter, mall, avtalstext,
+ * total_value, start_date) till contracts och lade de faktiska avtalsvärdena
+ * på KUNDRADEN. Följden blev att portalens avtalsvyer — Avtalskartan,
+ * premietrappan, faktureringsunderlaget — stod tomma för signerade avtal, och
+ * att någon fick fylla i dem för hand i faktureringsinställningarna efteråt.
+ *
+ * Här skrivs samma värden till avtalet direkt vid signering, så manuellt
+ * skapade och signerade avtal ser likadana ut. Endast tomma fält fylls —
+ * befintliga värden (t.ex. manuellt justerad premie) skrivs aldrig över.
+ */
+async function completeContractFieldsOnSign(contractId: string): Promise<void> {
+  try {
+    // Explicit typ: den konkatenerade select-strängen bryter Supabase-klientens
+    // typinferens, så raden kommer tillbaka otypad.
+    type ContractRow = {
+      id: string
+      type: string | null
+      template_id: string | null
+      total_value: number | string | null
+      start_date: string | null
+      contract_length: string | null
+      annual_value: number | null
+      contract_start_date: string | null
+      contract_end_date: string | null
+      contract_type: string | null
+      label: string | null
+      total_contract_value: number | null
+    }
+
+    const { data, error } = await supabase
+      .from('contracts')
+      .select(
+        'id, type, status, template_id, total_value, start_date, contract_length, ' +
+          'annual_value, contract_start_date, contract_end_date, contract_type, label, ' +
+          'total_contract_value, contact_address'
+      )
+      .eq('oneflow_contract_id', contractId)
+      .single()
+
+    if (error || !data) return
+    const contract = data as unknown as ContractRow
+    if (contract.type !== 'contract') return // offerter har inga avtalsfält
+
+    const annualValue = contract.total_value ? parseFloat(contract.total_value.toString()) : null
+    const contractLengthMonths = parseContractLength(contract.contract_length)
+    const endDate = calculateEndDate(contract.start_date, contract.contract_length)
+
+    let totalContractValue: number | null = null
+    if (annualValue && annualValue > 0) {
+      totalContractValue =
+        contractLengthMonths && contractLengthMonths >= 12
+          ? Math.round(annualValue * (contractLengthMonths / 12))
+          : Math.round(annualValue)
+    }
+
+    // Avtalstypens namn. Sanningen är avtalets egen tjänsterad — den pekar på
+    // en tjänst i katalogen (services.is_contract_service) med rätt namn och id.
+    // Mallmappningen används bara som fallback; den har egna namnformer
+    // ("Mekaniska fällor") som inte matchar katalogen ("Avtal mekaniska fällor").
+    let typeName: string | null = null
+    const { data: contractServices } = await supabase
+      .from('case_billing_items')
+      .select('service_name, service_id, total_price, service:services!inner(is_contract_service)')
+      .eq('case_id', contract.id)
+      .eq('case_type', 'contract')
+      .eq('item_type', 'service')
+      .order('total_price', { ascending: false })
+
+    type ServiceRow = {
+      service_name: string | null
+      service: { is_contract_service: boolean } | { is_contract_service: boolean }[] | null
+    }
+    const rows = (contractServices ?? []) as unknown as ServiceRow[]
+    const isContractService = (r: ServiceRow) => {
+      const s = Array.isArray(r.service) ? r.service[0] : r.service
+      return !!s?.is_contract_service
+    }
+    // Avtalstjänsten först, annars den dyraste tjänsteraden
+    typeName = rows.find(isContractService)?.service_name ?? rows[0]?.service_name ?? null
+
+    if (!typeName) {
+      const fromTemplate = getContractTypeName(contract.template_id)
+      typeName = fromTemplate && fromTemplate !== 'Okänt avtal' ? fromTemplate : null
+    }
+    const hasTypeName = !!typeName
+
+    const updates: Record<string, unknown> = {}
+    if (contract.annual_value == null && annualValue) updates.annual_value = annualValue
+    if (contract.total_contract_value == null && totalContractValue) {
+      updates.total_contract_value = totalContractValue
+    }
+    if (!contract.contract_start_date && contract.start_date) {
+      updates.contract_start_date = contract.start_date
+    }
+    if (!contract.contract_end_date && endDate) updates.contract_end_date = endDate
+    if (!contract.contract_type && hasTypeName) updates.contract_type = typeName
+    if (!contract.label && hasTypeName) updates.label = typeName
+
+    if (Object.keys(updates).length > 0) {
+      const { error: updateError } = await supabase.from('contracts').update(updates).eq('id', contract.id)
+      if (updateError) {
+        console.error('⚠️ Kunde inte komplettera avtalsfält:', updateError.message)
+        return
+      }
+      console.log('✅ Avtalsfält kompletterade vid signering:', Object.keys(updates).join(', '))
+    }
+
+    // Premietrappans startpunkt — underlag för tidslinje och kommande höjningar
+    const startDate = contract.contract_start_date ?? contract.start_date
+    if (annualValue && annualValue > 0 && startDate) {
+      const { data: existing } = await supabase
+        .from('contract_premium_events')
+        .select('id')
+        .eq('contract_id', contract.id)
+        .limit(1)
+      if (!existing || existing.length === 0) {
+        await supabase.from('contract_premium_events').insert({
+          contract_id: contract.id,
+          effective_from: startDate,
+          annual_value: annualValue,
+          event_type: 'start',
+          note: 'Avtalet signerat via Oneflow',
+        })
+      }
+    }
+  } catch (err) {
+    // Aldrig kritiskt: signeringen får inte fallera på detta
+    console.error('⚠️ Fel vid komplettering av avtalsfält:', err)
+  }
+}
+
 // Logga Oneflow-händelse som systemevent i ärendets kommunikationspanel
 const logOfferEventToCase = async (
   contractId: string,
@@ -1687,6 +1821,11 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
             // Invalidera offer-statistik cache vid signering
             await invalidateOfferStatsCache()
+
+            // Fyll avtalsfälten (premie, datum, avtalstyp) på contracts-raden
+            // så signerade avtal blir kompletta som manuellt skapade. Måste
+            // köras FÖRE kundregistreringen, som läser contract_start_date.
+            await completeContractFieldsOnSign(contractId)
 
             // Automatisk kundregistrering för signerade avtal
             await createCustomerFromSignedContract(contractId)

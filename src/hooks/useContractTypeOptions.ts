@@ -9,6 +9,10 @@ import { supabase } from '../lib/supabase'
 export interface ContractTypeOption {
   value: string
   label: string
+  /** services.id — behövs för att skapa avtalets tjänsterad som wizarden gör */
+  serviceId: string
+  /** services.code */
+  code: string | null
 }
 
 export function useContractTypeOptions() {
@@ -20,7 +24,7 @@ export function useContractTypeOptions() {
     setLoading(true)
     supabase
       .from('services')
-      .select('name')
+      .select('id, code, name')
       .eq('is_contract_service', true)
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
@@ -31,7 +35,14 @@ export function useContractTypeOptions() {
           console.error('Kunde inte hämta avtalstyper:', error)
           setOptions([])
         } else {
-          setOptions((data ?? []).map(s => ({ value: s.name, label: s.name })))
+          setOptions(
+            (data ?? []).map((s) => ({
+              value: s.name,
+              label: s.name,
+              serviceId: s.id,
+              code: s.code ?? null,
+            }))
+          )
         }
         setLoading(false)
       })
