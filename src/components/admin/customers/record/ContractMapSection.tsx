@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   Clock,
   ExternalLink,
+  FileText,
   Home,
   Pencil,
   Plus,
@@ -155,6 +156,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     // sektion nedanför — de kan inte ta emot omfattning (ingen riktig avtalsrad).
     const papers = contracts.filter((c) => !c.fromCustomerRow && !isImportedContract(c) && !isEndedContract(c))
     const leftovers = contracts.filter((c) => (c.fromCustomerRow || isImportedContract(c)) && !isEndedContract(c))
+    // Kundkortsavtal som kan materialiseras till riktiga avtalsrader
+    const customerRowContracts = leftovers.filter((c) => c.fromCustomerRow)
     const endedCount = contracts.filter((c) => isEndedContract(c)).length
 
     const accentByContract = new Map<string, string>()
@@ -213,6 +216,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       unitIds,
       papers,
       leftovers,
+      customerRowContracts,
       endedCount,
       accentByContract,
       activeScopeByContract,
@@ -229,6 +233,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     unitIds,
     papers,
     leftovers,
+    customerRowContracts,
     endedCount,
     accentByContract,
     activeScopeByContract,
@@ -486,6 +491,30 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         }
       },
     })
+  }
+
+  /**
+   * Gör ett riktigt avtal av kundkortets avtalsdata. Kunder importerade från
+   * Fortnox har premie och datum på kundraden men ingen contracts-rad, och kan
+   * därför inte bära omfattning, prislista eller avtalsinnehåll.
+   */
+  const materializeContract = async (customerRowContract: RecordContract) => {
+    const owner = customerById.get(customerRowContract.customer_id ?? '') ?? root
+    setBusy(true)
+    try {
+      await ContractScopeService.createFromCustomerRow(
+        owner.id,
+        customerRowContract.label ?? customerRowContract.contract_type ?? undefined
+      )
+      toast.success(
+        `Avtal skapat för ${customerRowName(owner)} — lägg nu in tjänster och kostnader i § 4.`
+      )
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte skapa avtalet')
+    } finally {
+      setBusy(false)
+    }
   }
 
   const changePriceList = async (contract: RecordContract, priceListId: string | null) => {
@@ -841,9 +870,41 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           ))}
 
           {papers.length === 0 && (
-            <p className="text-sm text-slate-500 border border-dashed border-slate-700 rounded-2xl p-6 text-center">
-              Inga aktiva avtal. Skapa ett avtal för kunden så dyker det upp här som ett dokument.
-            </p>
+            <div className="border border-dashed border-slate-700 rounded-2xl p-6 text-center">
+              <p className="text-sm text-slate-400">Inga aktiva avtal som dokument.</p>
+              {customerRowContracts.length > 0 ? (
+                <>
+                  <p className="text-xs text-slate-500 mt-2 max-w-md mx-auto">
+                    Kundens avtal finns bara som fält på kundkortet
+                    {customerRowContracts.some((c) => Number(c.annual_value ?? 0) > 0) &&
+                      ` (${formatKr(customerRowContracts.reduce((s, c) => s + Number(c.annual_value ?? 0), 0))}/år)`}
+                    . Skapa ett riktigt avtal för att kunna lägga in tjänster, kostnader, omfattning och prislista.
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2 mt-4">
+                    {customerRowContracts.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => materializeContract(c)}
+                        disabled={busy}
+                        className="inline-flex items-center gap-2 bg-[#20c58f] text-[#fff] text-sm font-semibold rounded-xl px-4 py-2 hover:brightness-110 transition-all disabled:opacity-50"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Skapa avtal
+                        {customerRowContracts.length > 1 && (
+                          <span className="font-normal opacity-90">
+                            · {customerRowName(customerById.get(c.customer_id ?? '') ?? root)}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-slate-500 mt-2">
+                  Skapa ett avtal för kunden så dyker det upp här som ett dokument.
+                </p>
+              )}
+            </div>
           )}
 
           {leftovers.length > 0 && (
@@ -853,15 +914,26 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               </summary>
               <ul className="px-4 pb-3 space-y-1.5 text-xs">
                 {leftovers.map((c) => (
-                  <li key={c.id} className="flex items-baseline gap-2">
+                  <li key={c.id} className="flex items-center gap-2">
                     <span className="uppercase tracking-wide text-[9px] border border-slate-700 rounded-full px-2 py-0.5 shrink-0">
                       {c.fromCustomerRow ? 'Kundkort' : 'Importerad'}
                     </span>
                     <span className="text-slate-300">{contractDisplayName(c)}</span>
-                    <span className="text-slate-500">
+                    <span className="text-slate-500 truncate">
                       · {customerRowName(customerById.get(c.customer_id ?? '') ?? root)}
                       {Number(c.annual_value ?? 0) > 0 && ` · ${formatKr(Number(c.annual_value))}/år`}
                     </span>
+                    {c.fromCustomerRow && (
+                      <button
+                        onClick={() => materializeContract(c)}
+                        disabled={busy}
+                        className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#20c58f] border border-[#20c58f]/40 rounded-lg px-2.5 py-1 hover:bg-[#20c58f]/10 transition-colors disabled:opacity-50"
+                        title="Skapa ett riktigt avtal av kundkortets data"
+                      >
+                        <FileText className="w-3 h-3" />
+                        Skapa avtal
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

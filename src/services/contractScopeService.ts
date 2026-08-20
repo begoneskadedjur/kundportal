@@ -197,6 +197,114 @@ export class ContractScopeService {
     })
   }
 
+  /**
+   * Materialisera kundradens avtalsdata till en riktig contracts-rad.
+   *
+   * ~95 importerade kunder har premie, datum och uppsägningstid direkt på
+   * customers-raden men ingen contracts-rad alls. Kundsidan visar dem via en
+   * syntetisk "kundrads"-fallback, men den kan inte bära omfattning, prislista
+   * eller avtalsinnehåll. Detta skapar det riktiga avtalet med kundradens data
+   * som utgångspunkt.
+   *
+   * Till skillnad från ImportedCustomerContractService.getOrCreateContract
+   * sätts INTE template_id='imported' — raden ska räknas som ett fullvärdigt
+   * avtal i Avtalskartan, inte som importrest.
+   */
+  static async createFromCustomerRow(customerId: string, label?: string): Promise<string> {
+    // Explicit typ: den konkatenerade select-strängen bryter Supabase-klientens
+    // typinferens, så raden kommer tillbaka otypad.
+    type CustomerRow = {
+      company_name: string | null
+      organization_number: string | null
+      contact_email: string | null
+      contact_person: string | null
+      contact_address: string | null
+      annual_value: number | null
+      contract_type: string | null
+      contract_start_date: string | null
+      contract_end_date: string | null
+      contract_length: string | null
+      billing_frequency: string | null
+      notice_period_months: number | null
+      agreement_text: string | null
+      price_list_id: string | null
+      billing_email: string | null
+      billing_address: string | null
+    }
+
+    const { data, error: readError } = await supabase
+      .from('customers')
+      .select(
+        'company_name, organization_number, contact_email, contact_person, contact_address, ' +
+          'annual_value, contract_type, contract_start_date, contract_end_date, contract_length, ' +
+          'billing_frequency, notice_period_months, agreement_text, price_list_id, billing_email, billing_address'
+      )
+      .eq('id', customerId)
+      .single()
+    if (readError || !data) {
+      throw new Error(`Kunde inte läsa kunden: ${readError?.message ?? 'okänt fel'}`)
+    }
+    const customer = data as unknown as CustomerRow
+
+    const annual = Number(customer.annual_value ?? 0)
+    const { data: created, error } = await supabase
+      .from('contracts')
+      .insert({
+        customer_id: customerId,
+        // oneflow_contract_id är NOT NULL + unikt. Avtalet kommer inte från
+        // Oneflow, så vi sätter ett spårbart eget id. Prefixet får INTE vara
+        // 'imported-' — då skulle Avtalskartan filtrera bort raden som importrest.
+        oneflow_contract_id: `local-${crypto.randomUUID()}`,
+        // NOT NULL. Annars Oneflow-mallens id — 'local' markerar avtal skapade
+        // i portalen. INTE 'imported' (filtreras bort som importrest).
+        template_id: 'local',
+        source_type: 'manual',
+        type: 'contract',
+        status: 'active',
+        label: label || customer.contract_type || 'Avtal',
+        contract_type: customer.contract_type ?? null,
+        company_name: customer.company_name ?? null,
+        organization_number: customer.organization_number ?? null,
+        contact_email: customer.contact_email ?? null,
+        contact_person: customer.contact_person ?? null,
+        contact_address: customer.contact_address ?? null,
+        billing_email: customer.billing_email ?? null,
+        billing_address: customer.billing_address ?? null,
+        annual_value: annual > 0 ? annual : null,
+        total_value: annual > 0 ? annual : null,
+        billing_frequency: customer.billing_frequency ?? null,
+        contract_start_date: customer.contract_start_date ?? null,
+        contract_end_date: customer.contract_end_date ?? null,
+        start_date: customer.contract_start_date ?? null,
+        contract_length: customer.contract_length ?? null,
+        notice_period_months: customer.notice_period_months ?? null,
+        agreement_text: customer.agreement_text ?? null,
+        price_list_id: customer.price_list_id ?? null,
+      })
+      .select('id')
+      .single()
+    if (error || !created) throw new Error(`Kunde inte skapa avtalet: ${error?.message ?? 'okänt fel'}`)
+
+    // Premietrappans startpunkt så tidslinjen och årsvärdet stämmer direkt
+    if (annual > 0 && customer.contract_start_date) {
+      await supabase.from('contract_premium_events').insert({
+        contract_id: created.id,
+        effective_from: customer.contract_start_date,
+        annual_value: annual,
+        event_type: 'start',
+        note: 'Skapat från kundkortets avtalsdata',
+      })
+    }
+
+    await this.logEvent(created.id, {
+      event_type: 'other',
+      title: 'Avtalet skapat',
+      detail: 'Materialiserat från kundkortets avtalsdata',
+    })
+
+    return created.id
+  }
+
   /** Skriv en händelse i avtalets logg (tidslinjen). Fel sväljs — loggen får aldrig fälla mutationen. */
   static async logEvent(
     contractId: string,
