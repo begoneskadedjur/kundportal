@@ -6,7 +6,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, ChevronLeft, ChevronRight, Clock, Check,
-  AlertTriangle, Loader2, CalendarDays, Repeat, Settings, MapPin
+  AlertTriangle, Loader2, CalendarDays, Repeat, Settings, MapPin, FileText
 } from 'lucide-react'
 import { format, addMonths, addMinutes } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -49,6 +49,10 @@ interface RecurringScheduleWizardProps {
   contractStartDate?: string | null
   contractEndDate?: string | null
   serviceFrequency?: string | null
+  /** Besöksfrekvens enligt kundens avtal (contracts.visit_frequency) — förväljs och visas som facit */
+  contractVisitFrequency?: RecurringFrequency | null
+  /** Antal besök per år enligt avtalet (contracts.visits_per_year) */
+  contractVisitsPerYear?: number | null
   batchUnits?: BatchScheduleUnit[]
   serviceType?: string
 }
@@ -106,6 +110,8 @@ export function RecurringScheduleWizard({
   contractStartDate,
   contractEndDate,
   serviceFrequency,
+  contractVisitFrequency,
+  contractVisitsPerYear,
   batchUnits,
   serviceType
 }: RecurringScheduleWizardProps) {
@@ -155,8 +161,9 @@ export function RecurringScheduleWizard({
   const [unitDurations, setUnitDurations] = useState<Record<string, number>>({})
 
   // Step 3: Frequency + Day pattern (merged)
+  // Avtalets frekvens vinner över den fritextparsade service_frequency
   const [frequency, setFrequency] = useState<RecurringFrequency | null>(
-    parseServiceFrequency(serviceFrequency) || null
+    contractVisitFrequency || parseServiceFrequency(serviceFrequency) || null
   )
   const [dayPattern, setDayPattern] = useState<RecurringDayPattern | null>(null)
   const [preferredDayOfMonth, setPreferredDayOfMonth] = useState(1)
@@ -716,9 +723,30 @@ export function RecurringScheduleWizard({
                     <p className="text-slate-300 text-sm">
                       Hur ofta ska kontroller genomföras?
                     </p>
+
+                    {/* Facit från avtalet — vad kunden faktiskt betalat för */}
+                    {(contractVisitFrequency || contractVisitsPerYear) && (
+                      <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-[#20c58f]/10 border border-[#20c58f]/30">
+                        <FileText className="w-4 h-4 text-[#20c58f] shrink-0 mt-0.5" />
+                        <p className="text-xs text-[#7fe0bf]">
+                          Enligt avtalet:{' '}
+                          <b className="text-[#20c58f]">
+                            {contractVisitsPerYear
+                              ? `${contractVisitsPerYear} besök per år`
+                              : FREQUENCY_CONFIG[contractVisitFrequency as RecurringFrequency]?.label}
+                          </b>
+                          {contractVisitsPerYear && contractVisitFrequency && (
+                            <> ({FREQUENCY_CONFIG[contractVisitFrequency]?.label.toLowerCase()})</>
+                          )}
+                          . Förvalt nedan — ändra om schemat ska läggas annorlunda.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                       {STANDARD_FREQUENCIES.map(key => {
                         const config = FREQUENCY_CONFIG[key]
+                        const perContract = contractVisitFrequency === key
                         return (
                           <button
                             key={key}
@@ -733,6 +761,11 @@ export function RecurringScheduleWizard({
                               {config.label}
                             </span>
                             <span className="text-xs text-slate-500 ml-2">{config.description}</span>
+                            {perContract && (
+                              <span className="text-[10px] font-semibold text-[#20c58f] ml-2 uppercase tracking-wide">
+                                enligt avtalet
+                              </span>
+                            )}
                           </button>
                         )
                       })}

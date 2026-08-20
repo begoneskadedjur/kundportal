@@ -59,7 +59,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { IndoorStationDetailSheet } from '../shared/indoor/IndoorStationDetailSheet'
 import { EquipmentDetailSheet } from '../shared/equipment/EquipmentDetailSheet'
 import { RecurringScheduleManagement } from './RecurringScheduleManagement'
-import { RecurringScheduleWizard } from './RecurringScheduleWizard'
+import { RecurringScheduleWizardWithContract as RecurringScheduleWizard } from './RecurringScheduleWizardWithContract'
 import toast from 'react-hot-toast'
 
 interface CustomerStationsModalProps {

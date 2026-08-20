@@ -19,7 +19,7 @@ import {
   resumeRecurringSchedule,
   cancelRecurringSchedule
 } from '../../services/recurringScheduleService'
-import { RecurringScheduleWizard } from '../../components/technician/RecurringScheduleWizard'
+import { RecurringScheduleWizardWithContract as RecurringScheduleWizard } from '../../components/technician/RecurringScheduleWizardWithContract'
 import { EditScheduleModal } from '../../components/technician/EditScheduleModal'
 import DistributeTechniciansModal from '../../components/coordinator/DistributeTechniciansModal'
 import EditContractCaseModal from '../../components/coordinator/EditContractCaseModal'

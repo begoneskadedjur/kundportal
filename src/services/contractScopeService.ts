@@ -412,6 +412,32 @@ export class ContractScopeService {
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte raderas (0 rader)')
   }
 
+  /**
+   * Besöksfrekvens enligt avtalet. Styr vad schemaläggaren föreslår och är
+   * facit i uppföljningen. Avropsavtal har ingen frekvens → skicka null.
+   */
+  static async setVisitFrequency(
+    contractId: string,
+    frequency: string | null,
+    visitsPerYear: number | null
+  ): Promise<void> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({ visit_frequency: frequency, visits_per_year: visitsPerYear })
+      .eq('id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte spara besöksfrekvensen: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    await this.logEvent(contractId, {
+      event_type: 'other',
+      title: frequency ? 'Besöksfrekvens satt' : 'Besöksfrekvens borttagen',
+      detail: frequency
+        ? `${visitsPerYear ? `${visitsPerYear} besök/år` : frequency}`
+        : 'Avtalet har ingen fast besöksfrekvens',
+    })
+  }
+
   /** Sätt avtalstyp: namnet blir både label (visningsnamn) och contract_type */
   static async setContractType(contractId: string, typeName: string): Promise<void> {
     const { data, error } = await supabase

@@ -23,6 +23,27 @@ export type RecordContract = Contract & {
   price_list_id?: string | null
   /** True = avtalet omfattar alla enheter under HK, även framtida (annars styr contract_sites) */
   covers_all_sites?: boolean | null
+  /** Besöksfrekvens enligt avtalet (samma värden som recurring_schedules.frequency) */
+  visit_frequency?: string | null
+  /** Antal ingående besök per år enligt avtalet */
+  visits_per_year?: number | null
+}
+
+/** Besöksfrekvenser — samma värden som recurring_schedules använder */
+export const VISIT_FREQUENCY_LABEL: Record<string, string> = {
+  monthly: 'Månadsvis',
+  quarterly: 'Kvartalsvis',
+  semi_annual: 'Halvårsvis',
+  annual: 'Årsvis',
+  custom: 'Anpassad',
+}
+
+/** Standardantal besök per år för en frekvens (custom har inget) */
+export const VISITS_PER_YEAR_BY_FREQUENCY: Record<string, number> = {
+  monthly: 12,
+  quarterly: 4,
+  semi_annual: 2,
+  annual: 1,
 }
 
 export interface RecordBillingItem {

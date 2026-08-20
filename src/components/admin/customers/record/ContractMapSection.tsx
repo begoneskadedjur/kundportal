@@ -34,6 +34,8 @@ import {
   isImportedContract,
   nextPremiumEvent,
   BILLING_FREQUENCY_LABEL,
+  VISIT_FREQUENCY_LABEL,
+  VISITS_PER_YEAR_BY_FREQUENCY,
   type CustomerRecordData,
   type RecordContract,
   type RecordContractSite,
@@ -132,6 +134,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [typePrompt, setTypePrompt] = useState<{ source: RecordContract | null } | null>(null)
   /** Avtal som ska raderas (bekräftelse) */
   const [deletePrompt, setDeletePrompt] = useState<RecordContract | null>(null)
+  /** Avtal vars besöksfrekvens ska sättas */
+  const [frequencyPrompt, setFrequencyPrompt] = useState<RecordContract | null>(null)
   const { options: contractTypes } = useContractTypeOptions()
   const [busy, setBusy] = useState(false)
   const [hover, setHover] = useState<{ kind: 'unit' | 'contract'; id: string } | null>(null)
@@ -573,6 +577,28 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     }
   }
 
+  const saveFrequency = async (
+    contract: RecordContract,
+    frequency: string | null,
+    visitsPerYear: number | null
+  ) => {
+    setFrequencyPrompt(null)
+    setBusy(true)
+    try {
+      await ContractScopeService.setVisitFrequency(contract.id, frequency, visitsPerYear)
+      toast.success(
+        frequency
+          ? `Besöksfrekvens sparad${visitsPerYear ? ` — ${visitsPerYear} besök/år` : ''}. Syns nu vid schemaläggning.`
+          : 'Avtalet har ingen fast besöksfrekvens.'
+      )
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara besöksfrekvensen')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const changeContractType = async (contract: RecordContract, typeName: string) => {
     setBusy(true)
     try {
@@ -946,6 +972,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               contractTypes={contractTypes.map((t) => t.value)}
               onChangeType={(t) => changeContractType(c, t)}
               onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
+              onEditFrequency={() => setFrequencyPrompt(c)}
               onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
               isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
               isSingleSite={isSingleSite}
@@ -1112,6 +1139,16 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Besöksfrekvens enligt avtalet */}
+      {frequencyPrompt && (
+        <VisitFrequencyModal
+          contract={frequencyPrompt}
+          busy={busy}
+          onClose={() => setFrequencyPrompt(null)}
+          onSave={(freq, visits) => saveFrequency(frequencyPrompt, freq, visits)}
+        />
       )}
 
       {/* Radera avtal — bekräftelse */}
@@ -1312,6 +1349,109 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 }
 
 // ---------------------------------------------------------------------------
+// Besöksfrekvens: hur ofta kunden ska besökas enligt avtalet
+// ---------------------------------------------------------------------------
+
+function VisitFrequencyModal({
+  contract,
+  busy,
+  onClose,
+  onSave,
+}: {
+  contract: RecordContract
+  busy: boolean
+  onClose: () => void
+  onSave: (frequency: string | null, visitsPerYear: number | null) => void
+}) {
+  const [frequency, setFrequency] = useState<string | null>(contract.visit_frequency ?? null)
+  const [visits, setVisits] = useState<string>(
+    contract.visits_per_year != null ? String(contract.visits_per_year) : ''
+  )
+
+  // Byt frekvens → förvälj standardantalet (12/4/2/1), custom behåller inmatat
+  const pickFrequency = (f: string) => {
+    setFrequency(f)
+    const preset = VISITS_PER_YEAR_BY_FREQUENCY[f]
+    if (preset) setVisits(String(preset))
+  }
+
+  return (
+    <div className="fixed inset-0 z-[130] grid place-items-center bg-slate-950/70 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 className="text-base font-semibold text-slate-100 flex items-center gap-2 mb-1">
+          <CalendarCheck className="w-4 h-4 text-[#20c58f]" />
+          Besöksfrekvens enligt avtalet
+        </h4>
+        <p className="text-xs text-slate-400 mb-3">
+          Visas för den som lägger upp ronderingsschemat och används som facit i uppföljningen.
+        </p>
+
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {Object.entries(VISIT_FREQUENCY_LABEL).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => pickFrequency(value)}
+              className={`text-left text-sm rounded-xl border px-3 py-2 transition-colors ${
+                frequency === value
+                  ? 'border-[#20c58f] bg-[#20c58f]/10 text-[#20c58f] font-semibold'
+                  : 'border-slate-700/60 text-slate-200 hover:border-[#20c58f]/60'
+              }`}
+            >
+              {label}
+              {VISITS_PER_YEAR_BY_FREQUENCY[value] && (
+                <span className="block text-[10px] font-normal text-slate-500">
+                  {VISITS_PER_YEAR_BY_FREQUENCY[value]} besök/år
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <label className="block text-xs font-medium text-slate-400 mb-1">Antal besök per år</label>
+        <input
+          type="number"
+          min={1}
+          max={52}
+          value={visits}
+          onChange={(e) => setVisits(e.target.value)}
+          placeholder="t.ex. 6"
+          className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+        />
+        <p className="text-[11px] text-slate-500 mt-1">
+          Fyll i om avtalet anger ett antal som inte matchar intervallet, t.ex. 6 besök per år.
+        </p>
+
+        <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-700/50">
+          <button
+            onClick={() => onSave(null, null)}
+            disabled={busy}
+            className="text-xs text-slate-400 hover:text-slate-200 disabled:opacity-50"
+            title="Avropsavtal och liknande har ingen fast besöksfrekvens"
+          >
+            Ingen fast frekvens (avrop)
+          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="text-xs font-semibold text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-800">
+              Avbryt
+            </button>
+            <button
+              onClick={() => onSave(frequency, visits ? parseInt(visits, 10) : null)}
+              disabled={busy || !frequency}
+              className="text-xs font-semibold text-[#fff] bg-[#20c58f] px-3 py-2 rounded-lg hover:brightness-110 disabled:opacity-40"
+            >
+              Spara
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Datum-popover: Idag / Avtalsstart / valfritt datum
 // ---------------------------------------------------------------------------
 
@@ -1414,6 +1554,8 @@ interface PaperProps {
   onChangeType: (typeName: string) => void
   /** Endast portalskapade avtal går att radera */
   onDelete?: () => void
+  /** Öppna besöksfrekvens-väljaren */
+  onEditFrequency?: () => void
 }
 
 function PaperContract({
@@ -1444,6 +1586,7 @@ function PaperContract({
   contractTypes,
   onChangeType,
   onDelete,
+  onEditFrequency,
 }: PaperProps) {
   const key = todayKey()
   const contentData = useContractContent(contract.id, contentReloadKey)
@@ -1719,8 +1862,30 @@ function PaperContract({
 
       {/* § 3 Uppföljning */}
       <div className="mt-3.5">
-        <div className="border-b-[1.5px] border-[#262e38] pb-1">
+        <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
           <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 3 · Uppföljning</h4>
+          {/* Besöksfrekvens: vad kunden betalat för. Facit vid schemaläggning
+              och i uppföljningen. Avropsavtal har ingen fast frekvens. */}
+          <span className="ml-auto flex items-center gap-1.5">
+            {contract.visits_per_year ? (
+              <span className="font-sans text-[10.5px] text-[#157a5b] font-semibold tabular-nums">
+                {contract.visits_per_year} besök/år ingår
+              </span>
+            ) : (
+              <span className="font-sans text-[10.5px] text-[#8a9099] italic">
+                {contract.visit_frequency ? VISIT_FREQUENCY_LABEL[contract.visit_frequency] : 'Ingen fast frekvens'}
+              </span>
+            )}
+            {onEditFrequency && (
+              <button
+                onClick={onEditFrequency}
+                className="font-sans text-[10px] text-[#8a9099] hover:text-[#262e38] underline decoration-dotted"
+                title="Ange besöksfrekvens enligt avtalet"
+              >
+                ändra
+              </button>
+            )}
+          </span>
         </div>
         <div className="flex flex-wrap gap-2.5 pt-2.5 font-sans">
           <button
