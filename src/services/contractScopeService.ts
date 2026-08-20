@@ -325,6 +325,120 @@ export class ContractScopeService {
   }
 
   /**
+   * Skapa ett riktigt avtal från en IMPORTREST, med importrestens egen data
+   * (belopp, datum, avtalstext) i stället för kundkortets.
+   *
+   * Kunder med flera avtal över tid har en importrest per avtal — kundkortet
+   * bär bara ett av dem. Utan detta går det inte att bygga upp historiken rätt.
+   */
+  static async createFromImportedContract(importedContractId: string, label?: string): Promise<string> {
+    type ImportedRow = {
+      customer_id: string
+      label: string | null
+      contract_type: string | null
+      company_name: string | null
+      organization_number: string | null
+      contact_person: string | null
+      contact_email: string | null
+      contact_phone: string | null
+      contact_address: string | null
+      billing_email: string | null
+      billing_address: string | null
+      annual_value: number | null
+      total_value: number | null
+      billing_frequency: string | null
+      contract_start_date: string | null
+      contract_end_date: string | null
+      start_date: string | null
+      contract_length: string | null
+      notice_period_months: number | null
+      agreement_text: string | null
+      price_list_id: string | null
+      begone_employee_name: string | null
+      begone_employee_email: string | null
+      signed_at: string | null
+      visit_frequency: string | null
+      visits_per_year: number | null
+    }
+
+    const { data: src, error: readError } = await supabase
+      .from('contracts')
+      .select(
+        'customer_id, label, contract_type, company_name, organization_number, contact_person, ' +
+          'contact_email, contact_phone, contact_address, billing_email, billing_address, ' +
+          'annual_value, total_value, billing_frequency, contract_start_date, contract_end_date, ' +
+          'start_date, contract_length, notice_period_months, agreement_text, price_list_id, ' +
+          'begone_employee_name, begone_employee_email, signed_at, visit_frequency, visits_per_year'
+      )
+      .eq('id', importedContractId)
+      .single()
+    if (readError || !src) {
+      throw new Error(`Kunde inte läsa avtalsraden: ${readError?.message ?? 'okänt fel'}`)
+    }
+    const row = src as unknown as ImportedRow
+
+    const { data: created, error } = await supabase
+      .from('contracts')
+      .insert({
+        customer_id: row.customer_id,
+        oneflow_contract_id: `local-${crypto.randomUUID()}`,
+        template_id: 'local',
+        source_type: 'manual',
+        type: 'contract',
+        status: 'active',
+        label: label || row.label || row.contract_type || 'Avtal',
+        contract_type: row.contract_type,
+        company_name: row.company_name,
+        organization_number: row.organization_number,
+        contact_person: row.contact_person,
+        contact_email: row.contact_email,
+        contact_phone: row.contact_phone,
+        contact_address: row.contact_address,
+        billing_email: row.billing_email,
+        billing_address: row.billing_address,
+        annual_value: row.annual_value,
+        total_value: row.total_value ?? row.annual_value,
+        billing_frequency: row.billing_frequency,
+        contract_start_date: row.contract_start_date ?? row.start_date,
+        contract_end_date: row.contract_end_date,
+        start_date: row.start_date ?? row.contract_start_date,
+        contract_length: row.contract_length,
+        notice_period_months: row.notice_period_months,
+        agreement_text: row.agreement_text,
+        price_list_id: row.price_list_id,
+        begone_employee_name: row.begone_employee_name,
+        begone_employee_email: row.begone_employee_email,
+        signed_at: row.signed_at,
+        visit_frequency: row.visit_frequency,
+        visits_per_year: row.visits_per_year,
+      })
+      .select('id')
+      .single()
+    if (error || !created) throw new Error(`Kunde inte skapa avtalet: ${error?.message ?? 'okänt fel'}`)
+
+    const annual = Number(row.annual_value ?? 0)
+    const startDate = row.contract_start_date ?? row.start_date
+    if (annual > 0 && startDate) {
+      await supabase.from('contract_premium_events').insert({
+        contract_id: created.id,
+        effective_from: startDate,
+        annual_value: annual,
+        event_type: 'start',
+        note: 'Skapat från importerat avtal',
+      })
+    }
+
+    const inherited = await this.inheritHistory(importedContractId, created.id)
+    await this.logEvent(created.id, {
+      event_type: 'other',
+      title: 'Avtalet skapat',
+      detail: `Från importerad avtalsrad${inherited > 0 ? ` · ${inherited} historikrader överförda` : ''}`,
+    })
+
+    return created.id
+  }
+
+  /**
    * Flytta historik från en gammal avtalsrad (importrest) till det nya avtalet
    * och markera den gamla som ersatt.
    *
@@ -478,6 +592,61 @@ export class ContractScopeService {
       title: signedAt ? 'Signeringsdatum satt' : 'Signeringsdatum borttaget',
       detail: signedAt ?? undefined,
     })
+  }
+
+  /**
+   * Säg upp ETT avtal. Till skillnad från TerminateContractModal, som säger upp
+   * alla kundens avtal samtidigt, träffar detta bara den valda raden — kunder
+   * med flera avtal ska kunna avsluta ett och behålla resten.
+   *
+   * effectiveEndDate = sista dag avtalet gäller. Har den redan passerat blir
+   * avtalet direkt avslutat (status 'ended'); annars löper det vidare som
+   * uppsagt fram till dess.
+   */
+  static async terminateContract(
+    contractId: string,
+    effectiveEndDate: string,
+    reason?: string | null
+  ): Promise<void> {
+    const alreadyPassed = effectiveEndDate < todayKey()
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({
+        terminated_at: new Date().toISOString(),
+        effective_end_date: effectiveEndDate,
+        termination_reason: reason ?? null,
+        billing_active: false,
+        // Passerat slutdatum → avtalet är slut nu. Annars behålls statusen så
+        // det syns som "uppsagt, löper till <datum>".
+        ...(alreadyPassed ? { status: 'ended' } : {}),
+      })
+      .eq('id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte säga upp avtalet: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    await this.logEvent(contractId, {
+      event_type: 'other',
+      title: alreadyPassed ? 'Avtalet avslutat' : 'Avtalet uppsagt',
+      detail: [reason, `Gäller t.o.m. ${effectiveEndDate}`].filter(Boolean).join(' · '),
+    })
+  }
+
+  /** Ångra uppsägning — avtalet blir aktivt igen */
+  static async reactivateContract(contractId: string): Promise<void> {
+    const { error } = await supabase
+      .from('contracts')
+      .update({
+        terminated_at: null,
+        effective_end_date: null,
+        termination_reason: null,
+        billing_active: true,
+        status: 'active',
+      })
+      .eq('id', contractId)
+    if (error) throw new Error(`Kunde inte återaktivera avtalet: ${error.message}`)
+
+    await this.logEvent(contractId, { event_type: 'other', title: 'Uppsägning ångrad' })
   }
 
   /** Sätt avtalstyp: namnet blir både label (visningsnamn) och contract_type */

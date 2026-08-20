@@ -138,6 +138,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [frequencyPrompt, setFrequencyPrompt] = useState<RecordContract | null>(null)
   /** Avtal vars signeringsdatum ska sättas */
   const [signedAtPrompt, setSignedAtPrompt] = useState<RecordContract | null>(null)
+  /** Avtal som ska sägas upp */
+  const [terminatePrompt, setTerminatePrompt] = useState<RecordContract | null>(null)
   const { options: contractTypes } = useContractTypeOptions()
   const [busy, setBusy] = useState(false)
   const [hover, setHover] = useState<{ kind: 'unit' | 'contract'; id: string } | null>(null)
@@ -171,10 +173,17 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     const leftovers = contracts.filter((c) => (c.fromCustomerRow || isImportedContract(c)) && !isEndedContract(c))
     // Kundkortsavtal som kan materialiseras till riktiga avtalsrader
     const customerRowContracts = leftovers.filter((c) => c.fromCustomerRow)
+    // Avslutade avtal visas som gråtonade dokument — historiken ska synas,
+    // inte bara räknas. Importrester/kundrader hör inte hit.
+    const endedPapers = contracts.filter(
+      (c) => !c.fromCustomerRow && !isImportedContract(c) && isEndedContract(c)
+    )
     const endedCount = contracts.filter((c) => isEndedContract(c)).length
 
     const accentByContract = new Map<string, string>()
     papers.forEach((c, i) => accentByContract.set(c.id, ACCENTS[i % ACCENTS.length]))
+    // Avslutade avtal får neutral grå accent
+    endedPapers.forEach((c) => accentByContract.set(c.id, '#8a9099'))
 
     const key = todayKey()
     // Aktiva + framtida omfattningsrader per avtal
@@ -240,6 +249,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       papers,
       leftovers,
       customerRowContracts,
+      endedPapers,
       endedCount,
       accentByContract,
       activeScopeByContract,
@@ -260,6 +270,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     papers,
     leftovers,
     customerRowContracts,
+    endedPapers,
     endedCount,
     accentByContract,
     activeScopeByContract,
@@ -609,6 +620,44 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       await onChanged()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Kunde inte ändra avtalstyp')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Befordra en importrest till ett riktigt avtal med RADENS egen data.
+   * Kunder med flera avtal över tid har en importrest per avtal — kundkortet
+   * bär bara ett av dem, så "skapa från kundkortet" ger fel avtal.
+   */
+  const promoteImported = async (imported: RecordContract) => {
+    setBusy(true)
+    try {
+      await ContractScopeService.createFromImportedContract(imported.id)
+      toast.success(
+        `Avtal skapat från ${contractDisplayName(imported)} — belopp, datum och historik följde med.`
+      )
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte skapa avtalet')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const terminateContract = async (contract: RecordContract, endDate: string, reason: string | null) => {
+    setTerminatePrompt(null)
+    setBusy(true)
+    try {
+      await ContractScopeService.terminateContract(contract.id, endDate, reason)
+      toast.success(
+        endDate < todayKey()
+          ? `${contractDisplayName(contract)} är avslutat (gällde t.o.m. ${formatDateSv(endDate)}).`
+          : `${contractDisplayName(contract)} uppsagt — löper till ${formatDateSv(endDate)}.`
+      )
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte säga upp avtalet')
     } finally {
       setBusy(false)
     }
@@ -976,6 +1025,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
               onEditFrequency={() => setFrequencyPrompt(c)}
               onEditSignedAt={() => setSignedAtPrompt(c)}
+              onTerminate={() => setTerminatePrompt(c)}
               onSaveAgreementText={async (text) => {
                 try {
                   await ContractScopeService.setAgreementText(c.id, text)
@@ -1030,6 +1080,72 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             </div>
           )}
 
+          {/* Avslutade avtal — historiken ska gå att öppna, inte bara räknas */}
+          {endedPapers.length > 0 && (
+            <details className="border border-slate-700/50 rounded-2xl text-slate-400 mb-4">
+              <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-500 select-none">
+                Avslutade avtal ({endedPapers.length}) — historik
+              </summary>
+              <div className="px-4 pb-4 space-y-4 opacity-60 hover:opacity-100 transition-opacity">
+                {endedPapers.map((c) => (
+                  <PaperContract
+                    key={c.id}
+                    contract={c}
+                    accent="#8a9099"
+                    root={root}
+                    customerById={customerById}
+                    scope={activeScopeByContract.get(c.id) ?? []}
+                    premiumEvents={premiumByContract.get(c.id) ?? []}
+                    followup={followupFor(c)}
+                    priceListLabel={priceListName(c.price_list_id)}
+                    onClearCoversAll={() => clearCoversAll(c)}
+                    contentReloadKey={contentReloadKey}
+                    onEditContent={() => setContentEditor(c)}
+                    isDropTarget={false}
+                    isInvalidTarget={false}
+                    invalidReason={null}
+                    awaiting={false}
+                    dragSubject={null}
+                    registerRef={() => {}}
+                    onHover={() => {}}
+                    onScopeRowDrag={() => {}}
+                    onEndCoverage={() => {}}
+                    onEditPriceList={(x, y) => setPricePrompt({ x, y, contract: c })}
+                    onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
+                    isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
+                    isSingleSite={isSingleSite}
+                    contractTypes={contractTypes.map((t) => t.value)}
+                    onChangeType={(t) => changeContractType(c, t)}
+                    onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
+                    onEditFrequency={() => setFrequencyPrompt(c)}
+                    onSaveAgreementText={async (text) => {
+                      try {
+                        await ContractScopeService.setAgreementText(c.id, text)
+                        toast.success('Avtalsobjektet sparat.')
+                        await onChanged()
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : 'Kunde inte spara avtalsobjektet')
+                      }
+                    }}
+                    onEditSignedAt={() => setSignedAtPrompt(c)}
+                    onReactivate={async () => {
+                      setBusy(true)
+                      try {
+                        await ContractScopeService.reactivateContract(c.id)
+                        toast.success(`${contractDisplayName(c)} är aktivt igen.`)
+                        await onChanged()
+                      } catch (err) {
+                        toast.error(err instanceof Error ? err.message : 'Kunde inte återaktivera avtalet')
+                      } finally {
+                        setBusy(false)
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            </details>
+          )}
+
           {leftovers.length > 0 && (
             <details className="border border-slate-700/50 rounded-2xl text-slate-400">
               <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-500 select-none">
@@ -1045,15 +1161,23 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                     <span className="text-slate-500 truncate">
                       · {customerRowName(customerById.get(c.customer_id ?? '') ?? root)}
                       {Number(c.annual_value ?? 0) > 0 && ` · ${formatKr(Number(c.annual_value))}/år`}
+                      {c.contract_start_date &&
+                        ` · ${formatDateSv(c.contract_start_date)}${
+                          c.contract_end_date ? ` – ${formatDateSv(c.contract_end_date)}` : ''
+                        }`}
                     </span>
                     <button
-                      onClick={() => setTypePrompt({ source: c.fromCustomerRow ? c : null })}
+                      onClick={() =>
+                        c.fromCustomerRow
+                          ? setTypePrompt({ source: c })
+                          : void promoteImported(c)
+                      }
                       disabled={busy}
                       className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#20c58f] border border-[#20c58f]/40 rounded-lg px-2.5 py-1 hover:bg-[#20c58f]/10 transition-colors disabled:opacity-50"
                       title={
                         c.fromCustomerRow
                           ? 'Skapa ett riktigt avtal av kundkortets data'
-                          : 'Skapa ett riktigt avtal på kundraden (importresten lämnas orörd)'
+                          : 'Skapa ett riktigt avtal med den här radens belopp och datum — historiken följer med'
                       }
                     >
                       <FileText className="w-3 h-3" />
@@ -1151,6 +1275,16 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Säg upp avtalet */}
+      {terminatePrompt && (
+        <TerminateModal
+          contract={terminatePrompt}
+          busy={busy}
+          onClose={() => setTerminatePrompt(null)}
+          onConfirm={(endDate, reason) => terminateContract(terminatePrompt, endDate, reason)}
+        />
       )}
 
       {/* Signeringsdatum — när kunden faktiskt skrev under */}
@@ -1494,6 +1628,80 @@ function AgreementObjectText({
 }
 
 // ---------------------------------------------------------------------------
+// Säg upp avtal — per avtal, inte per kund
+// ---------------------------------------------------------------------------
+
+function TerminateModal({
+  contract,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  contract: RecordContract
+  busy: boolean
+  onClose: () => void
+  onConfirm: (endDate: string, reason: string | null) => void
+}) {
+  // Förval: avtalets slutdatum om det finns, annars idag
+  const [endDate, setEndDate] = useState(contract.contract_end_date ?? todayKey())
+  const [reason, setReason] = useState('')
+  const alreadyPassed = endDate < todayKey()
+
+  return (
+    <div className="fixed inset-0 z-[130] grid place-items-center bg-slate-950/70 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h4 className="text-base font-semibold text-slate-100 mb-1">
+          Säg upp {contractDisplayName(contract)}
+        </h4>
+        <p className="text-xs text-slate-400 mb-3">
+          Avtalet bevaras som historik med all fakturering och alla ärenden. Endast detta avtal
+          påverkas — kundens övriga avtal löper vidare.
+        </p>
+
+        <label className="block text-xs font-medium text-slate-400 mb-1">Gäller till och med</label>
+        <input
+          type="date"
+          lang="sv-SE"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] [color-scheme:dark]"
+        />
+        <p className="text-[11px] text-slate-500 mt-1 mb-3">
+          {alreadyPassed
+            ? 'Datumet har passerat — avtalet markeras som avslutat direkt.'
+            : 'Avtalet visas som uppsagt och löper till detta datum.'}
+        </p>
+
+        <label className="block text-xs font-medium text-slate-400 mb-1">Anledning (valfritt)</label>
+        <input
+          type="text"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="t.ex. Ersatt av nytt avtal"
+          className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+        />
+
+        <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-slate-700/50">
+          <button onClick={onClose} className="text-xs font-semibold text-slate-300 px-3 py-2 rounded-lg hover:bg-slate-800">
+            Avbryt
+          </button>
+          <button
+            onClick={() => onConfirm(endDate, reason.trim() || null)}
+            disabled={busy || !endDate}
+            className="text-xs font-semibold text-[#fff] bg-amber-600 px-3 py-2 rounded-lg hover:bg-amber-500 disabled:opacity-40"
+          >
+            {alreadyPassed ? 'Markera som avslutat' : 'Säg upp avtalet'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Signeringsdatum: när kunden faktiskt skrev under
 // ---------------------------------------------------------------------------
 
@@ -1776,6 +1984,10 @@ interface PaperProps {
   onSaveAgreementText: (text: string | null) => Promise<void>
   /** Öppna väljaren för signeringsdatum */
   onEditSignedAt: () => void
+  /** Säg upp avtalet (saknas för redan avslutade) */
+  onTerminate?: () => void
+  /** Ångra uppsägning */
+  onReactivate?: () => void
 }
 
 function PaperContract({
@@ -1809,6 +2021,8 @@ function PaperContract({
   onEditFrequency,
   onSaveAgreementText,
   onEditSignedAt,
+  onTerminate,
+  onReactivate,
 }: PaperProps) {
   const key = todayKey()
   const contentData = useContractContent(contract.id, contentReloadKey)
@@ -1918,12 +2132,19 @@ function PaperContract({
           </div>
         </div>
         <div className="ml-auto shrink-0 text-center self-center">
-          <span
-            className="inline-block -rotate-6 font-sans text-[10.5px] font-extrabold uppercase tracking-[0.16em] border-2 rounded-md px-2.5 py-0.5 opacity-85"
-            style={{ borderColor: accent, color: accent }}
-          >
-            Aktivt
-          </span>
+          {(() => {
+            const ended = isEndedContract(contract)
+            const terminated = !!contract.terminated_at && !ended
+            const stampColor = ended ? '#9b3535' : terminated ? '#b45309' : accent
+            return (
+              <span
+                className="inline-block -rotate-6 font-sans text-[10.5px] font-extrabold uppercase tracking-[0.16em] border-2 rounded-md px-2.5 py-0.5 opacity-85"
+                style={{ borderColor: stampColor, color: stampColor }}
+              >
+                {ended ? 'Avslutat' : terminated ? 'Uppsagt' : 'Aktivt'}
+              </span>
+            )
+          })()}
           {oneflowUrl && (
             <a
               href={oneflowUrl}
@@ -2216,9 +2437,27 @@ function PaperContract({
             </button>
           )}
           {contract.notice_period_months ? ` · Uppsägningstid ${contract.notice_period_months} mån` : ''}
-          {onDelete && (
-            <>
-              <br />
+          <br />
+          <span className="inline-flex items-center gap-2">
+            {onTerminate && (
+              <button
+                onClick={onTerminate}
+                className="text-[10px] text-[#8a9099] hover:text-[#b45309] underline decoration-dotted transition-colors"
+                title="Säg upp avtalet — det bevaras som historik"
+              >
+                Säg upp avtalet
+              </button>
+            )}
+            {onReactivate && (
+              <button
+                onClick={onReactivate}
+                className="text-[10px] text-[#8a9099] hover:text-[#157a5b] underline decoration-dotted transition-colors"
+                title="Ångra uppsägningen"
+              >
+                Ångra uppsägning
+              </button>
+            )}
+            {onDelete && (
               <button
                 onClick={onDelete}
                 className="text-[10px] text-[#8a9099] hover:text-[#9b3535] underline decoration-dotted transition-colors"
@@ -2226,8 +2465,8 @@ function PaperContract({
               >
                 Radera avtalet
               </button>
-            </>
-          )}
+            )}
+          </span>
         </div>
       </div>
     </section>
