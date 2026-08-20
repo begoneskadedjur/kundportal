@@ -257,6 +257,10 @@ export function useCustomerRecord(customerId: string | undefined) {
     const units = (unitRows ?? []) as RecordCustomer[]
 
     const familyIds = [root.id, ...units.map((u) => u.id)]
+    // business_cases kopplas till kunden via org.nr (ingen customer_id finns)
+    const orgNumbers = Array.from(
+      new Set([root, ...units].map((c) => c.organization_number).filter((n): n is string => !!n))
+    )
 
     // 3-8. Avtal, fakturarader, tillägg, premietrappa, omfattning, ärendeantal
     // samt åtkomstdata (etapp 6) parallellt.
@@ -272,6 +276,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       invitationsRes,
       contractEventsRes,
       inspectionsRes,
+      businessCasesRes,
     ] = await Promise.all([
       supabase
         .from('contracts')
@@ -326,6 +331,16 @@ export function useCustomerRecord(customerId: string | undefined) {
         .select('id, customer_id, contract_id, scheduled_at, completed_at, status, total_outdoor_stations, total_indoor_stations, inspected_outdoor_stations, inspected_indoor_stations, technician:technicians(name)')
         .in('customer_id', familyIds)
         .order('scheduled_at', { ascending: false }),
+      // Företagsärenden. business_cases saknar customer_id — kopplingen till
+      // kunden går via org.nr. Utan detta ser avtalskunder ut att sakna
+      // ärenden trots utförda besök (135 ärenden matchar kunder i dag).
+      orgNumbers.length > 0
+        ? supabase
+            .from('business_cases')
+            .select('id, title, status, org_nr, start_date, completed_date, created_at, pris, primary_assignee_name, skadedjur')
+            .in('org_nr', orgNumbers)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
     ])
 
     // Multisite-roller kräver organisationens id — hämtas bara när root är multisite.
@@ -414,7 +429,44 @@ export function useCustomerRecord(customerId: string | undefined) {
       } as unknown as RecordContract)
     }
 
-    const familyCases = (casesRes.error ? [] : (casesRes.data ?? [])) as unknown as RecordCase[]
+    const legacyCases = (casesRes.error ? [] : (casesRes.data ?? [])) as unknown as RecordCase[]
+
+    // Företagsärenden mappas till samma form. De hör till org-raden eftersom
+    // business_cases bara känner org.nr, inte vilken enhet det gäller.
+    type BusinessCaseRow = {
+      id: string
+      title: string | null
+      status: string | null
+      org_nr: string | null
+      start_date: string | null
+      completed_date: string | null
+      created_at: string
+      pris: number | null
+      primary_assignee_name: string | null
+      skadedjur: string | null
+    }
+    const orgToCustomerId = new Map(
+      [root, ...units]
+        .filter((c) => c.organization_number)
+        .map((c) => [c.organization_number as string, c.id])
+    )
+    const businessCases: RecordCase[] = (
+      (businessCasesRes.error ? [] : (businessCasesRes.data ?? [])) as unknown as BusinessCaseRow[]
+    ).map((b) => ({
+      id: b.id,
+      customer_id: orgToCustomerId.get(b.org_nr ?? '') ?? root.id,
+      contract_id: null,
+      title: b.title ?? 'Företagsärende',
+      status: b.status ?? '',
+      case_type: b.skadedjur ?? null,
+      scheduled_date: b.start_date,
+      completed_date: b.completed_date,
+      created_at: b.created_at,
+      price: b.pris != null ? Number(b.pris) : null,
+      assigned_technician_name: b.primary_assignee_name,
+    }))
+
+    const familyCases = [...legacyCases, ...businessCases]
 
     // Sekundärdata: nya tabeller får aldrig fälla sidan om de saknas/blockeras
     const contractEvents = (
