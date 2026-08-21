@@ -35,11 +35,12 @@ import CustomerCasesSection from './CustomerCasesSection'
 import RevenueSection from './RevenueSection'
 import CustomerPulseRow from './CustomerPulseRow'
 import CaseDetailPanel from './CaseDetailPanel'
+import CustomerEquipmentDualView from '../CustomerEquipmentDualView'
 import { EmptyContractsIllustration } from './ContractGlyphs'
 import { contractState } from '../../../../utils/contractLifecycle'
 
 
-type TabId = 'oversikt' | 'avtal' | 'avtalskarta' | 'fakturering' | 'intakter' | 'enheter' | 'arenden' | 'atkomst'
+type TabId = 'oversikt' | 'avtal' | 'avtalskarta' | 'fakturering' | 'intakter' | 'enheter' | 'arenden' | 'utrustning' | 'atkomst'
 
 function WhisperHeader({ children }: { children: React.ReactNode }) {
   return <h2 className="text-xs uppercase tracking-wide text-slate-500 mb-3">{children}</h2>
@@ -263,6 +264,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     { id: 'intakter', label: 'Intäkter', visible: true },
     { id: 'enheter', label: `Enheter (${units.length})`, visible: showUnitsTab },
     { id: 'arenden', label: `Ärenden (${totalCases})`, visible: true },
+    { id: 'utrustning', label: 'Utrustning', visible: true },
     { id: 'atkomst', label: `Åtkomst & konton (${accessCount})`, visible: true },
   ]
 
@@ -438,6 +440,15 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
           onOpenCase={setOpenCase}
         />
       </div>
+
+      {/* Utrustning hör till KUNDEN, inte till ärendet som råkade skapa den:
+          en station står kvar i åratal, inspekteras och flyttas. Renderas bara
+          när fliken är vald — kartan drar in Google Maps-scriptet. */}
+      {activeTab === 'utrustning' && (
+        <div className="pt-6">
+          <CustomerEquipmentDualView customerId={root.id} customerName={root.company_name ?? ''} />
+        </div>
+      )}
 
       <div hidden={activeTab !== 'atkomst'} className="pt-6">
         <AccessAccountsSection access={access} customerById={customerById} />
