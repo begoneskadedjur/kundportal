@@ -6,6 +6,7 @@ import { supabase } from '../../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart, Search, X } from 'lucide-react';
 import Button from '../../ui/Button';
+import DateField from '../../ui/DateField';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 import { BeGoneCaseRow } from '../../../types/database'; // Importera din typ för flexibilitet
 import { formatCurrency } from '../../../utils/formatters';
@@ -112,8 +113,10 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
                         </header>
                         <div className="p-4 bg-slate-950/50 border-b border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                             <div className="md:col-span-2 grid grid-cols-2 gap-4">
-                                <div><label className="text-xs font-semibold text-slate-400 block mb-1">Startdatum</label><input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm"/></div>
-                                <div><label className="text-xs font-semibold text-slate-400 block mb-1">Slutdatum</label><input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-sm"/></div>
+                                {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
+                                    och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets */}
+                                <div><label className="text-xs font-semibold text-slate-400 block mb-1">Startdatum</label><DateField value={startDate} onChange={setStartDate} className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-2 py-2 text-sm"/></div>
+                                <div><label className="text-xs font-semibold text-slate-400 block mb-1">Slutdatum</label><DateField value={endDate} onChange={setEndDate} className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-2 py-2 text-sm"/></div>
                             </div>
                             <div><Button onClick={fetchReportData} disabled={loading} className="w-full">{loading ? 'Hämtar...' : 'Hämta Rapport'}</Button></div>
                         </div>

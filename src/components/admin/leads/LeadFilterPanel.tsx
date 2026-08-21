@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import Button from '../../ui/Button'
 import Select from '../../ui/Select'
+import DateField from '../../ui/DateField'
 import { LeadStatus, LeadPriority, LEAD_STATUS_DISPLAY } from '../../../types/database'
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -468,22 +469,24 @@ const LeadFilterPanel: React.FC<LeadFilterPanelProps> = ({
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Från datum
             </label>
-            <input
-              type="date"
+            {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
+                och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets */}
+            <DateField
               value={localFilters.customStartDate}
-              onChange={(e) => handleFilterChange('customStartDate', e.target.value)}
-              className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
+              onChange={(v) => handleFilterChange('customStartDate', v)}
+              clearable
+              className="w-full pl-9 pr-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Till datum
             </label>
-            <input
-              type="date"
+            <DateField
               value={localFilters.customEndDate}
-              onChange={(e) => handleFilterChange('customEndDate', e.target.value)}
-              className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
+              onChange={(v) => handleFilterChange('customEndDate', v)}
+              clearable
+              className="w-full pl-9 pr-3 py-2 bg-slate-700/50 border border-slate-600/50 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
             />
           </div>
         </div>

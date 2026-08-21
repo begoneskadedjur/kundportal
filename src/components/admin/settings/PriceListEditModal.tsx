@@ -10,6 +10,7 @@ import {
   Loader2,
   Star
 } from 'lucide-react'
+import DateField from '../../ui/DateField'
 import { PriceListService } from '../../../services/priceListService'
 import { PriceList, CreatePriceListInput } from '../../../types/articles'
 import toast from 'react-hot-toast'
@@ -182,22 +183,22 @@ export function PriceListEditModal({
               <label className="block text-sm font-medium text-white mb-1">
                 Giltig från
               </label>
-              <input
-                type="date"
+              {/* DateField istället för type="date": Chrome ignorerar lang="sv-SE" och
+                  visar mm/dd/yyyy efter webbläsarens språk. DateField ger alltid ÅÅÅÅ-MM-DD. */}
+              <DateField
                 value={validFrom}
-                onChange={(e) => setValidFrom(e.target.value)}
-                className="w-full px-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                onChange={setValidFrom}
+                className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-white mb-1">
                 Giltig till
               </label>
-              <input
-                type="date"
+              <DateField
                 value={validTo}
-                onChange={(e) => setValidTo(e.target.value)}
-                className={`w-full px-4 py-2 bg-slate-900 border rounded-lg text-white focus:outline-none focus:ring-2 ${
+                onChange={setValidTo}
+                className={`w-full pl-9 pr-4 py-2 bg-slate-900 border rounded-lg text-white focus:outline-none focus:ring-2 ${
                   errors.validTo ? 'border-red-500 focus:ring-red-500' : 'border-slate-700 focus:ring-purple-500'
                 }`}
               />

@@ -50,6 +50,7 @@ import { daysUntilEnd, isTerminatedButRunning } from '../../../../utils/contract
 import { buildRenewalPrefill } from '../../../../utils/contractRenewalPrefill'
 import { ContractScopeService } from '../../../../services/contractScopeService'
 import ContractStamp from './ContractStamp'
+import DateField from '../../../ui/DateField'
 import { PriceListService } from '../../../../services/priceListService'
 import { useContractTypeOptions } from '../../../../hooks/useContractTypeOptions'
 import type { PriceList } from '../../../../types/articles'
@@ -1756,12 +1757,11 @@ function TerminateModal({
         </p>
 
         <label className="block text-xs font-medium text-slate-400 mb-1">Gäller till och med</label>
-        <input
-          type="date"
-          lang="sv-SE"
+        <DateField
           value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] [color-scheme:dark]"
+          onChange={setEndDate}
+          aria-label="Sista giltiga dag"
+          className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
         />
         <p className="text-[11px] text-slate-500 mt-1 mb-3">
           {alreadyPassed
@@ -1826,15 +1826,15 @@ function SignedAtModal({
           Datumet kunden skrev under — hämtas från Oneflow-dokumentet. Inte samma sak som när avtalet
           lades upp i portalen.
         </p>
-        {/* lang="sv-SE" → ÅÅÅÅ-MM-DD i väljaren, aldrig amerikanskt mm/dd/yyyy */}
-        <input
-          type="date"
-          lang="sv-SE"
+        {/* DateField, inte <input type="date">: Chrome struntar i lang="sv-SE"
+            och visar mm/dd/yyyy efter webbläsarens språk. */}
+        <DateField
           value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f] [color-scheme:dark]"
+          onChange={setDate}
+          autoFocus
+          aria-label="Signeringsdatum"
+          className="w-full pl-9 pr-3 py-2 bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
         />
-        <p className="text-[11px] text-slate-500 mt-1">Format: ÅÅÅÅ-MM-DD</p>
         <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-700/50">
           {contract.signed_at ? (
             <button
@@ -2004,14 +2004,14 @@ function DatePromptPopover({ prompt, onClose }: { prompt: DatePrompt; onClose: (
           </button>
         )}
         <div className="flex items-center gap-2">
-          <input
-            type="date"
-            lang="sv-SE"
-            value={customDate}
-            onChange={(e) => setCustomDate(e.target.value)}
-            className="flex-1 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#20c58f] [color-scheme:dark]"
-            aria-label="Annat datum (ÅÅÅÅ-MM-DD)"
-          />
+          <div className="flex-1">
+            <DateField
+              value={customDate}
+              onChange={setCustomDate}
+              aria-label="Annat datum (ÅÅÅÅ-MM-DD)"
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+            />
+          </div>
           <button
             onClick={() => customDate && confirm(customDate)}
             disabled={!customDate}

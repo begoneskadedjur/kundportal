@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit3, Save, X, Banknote, Calendar, TrendingUp } from 'lucide-react'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import DateField from '../../ui/DateField'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -226,14 +227,18 @@ const MarketingSpendManager: React.FC = () => {
         <div className="mb-3 p-4 bg-slate-800/50 rounded-lg border border-slate-700" data-testid="marketing-spend-form">
           <h3 className="text-white font-medium mb-4">Lägg till marknadsföringskostnad</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Input
-              label="Månad"
-              name="month"
-              type="month"
-              value={formData.month}
-              onChange={handleInputChange}
-              required
-            />
+            {/* DateField, inte <Input type="month">: Chrome följer webbläsarens
+                språk och visar "August 2026" i stället för svenskt format. */}
+            <div className="w-full">
+              <label className="block text-xs font-medium text-slate-400 mb-1">Månad</label>
+              <DateField
+                monthOnly
+                value={formData.month}
+                onChange={(v) => setFormData(prev => ({ ...prev, month: v }))}
+                required
+                aria-label="Månad"
+              />
+            </div>
             <Input
               label="Kostnad (SEK)"
               name="spend"
@@ -297,11 +302,11 @@ const MarketingSpendManager: React.FC = () => {
               {editingId === spend.id ? (
                 // Redigeringsläge
                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input
-                    name="month"
-                    type="month"
+                  <DateField
+                    monthOnly
                     value={formData.month}
-                    onChange={handleInputChange}
+                    onChange={(v) => setFormData(prev => ({ ...prev, month: v }))}
+                    aria-label="Månad"
                   />
                   <Input
                     name="spend"

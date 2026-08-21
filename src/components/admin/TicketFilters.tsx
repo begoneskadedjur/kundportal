@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { Search, X, Filter, Calendar } from 'lucide-react';
 import type { TicketFilter, CommentStatus } from '../../services/communicationService';
+import DateField from '../ui/DateField';
 
 interface TicketFiltersProps {
   filter: TicketFilter;
@@ -119,27 +120,33 @@ export function TicketFilters({ filter, onFilterChange, disabled }: TicketFilter
           <div className="mt-3 flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-400">Från:</label>
-              <input
-                type="date"
-                value={filter.dateFrom || ''}
-                onChange={(e) => onFilterChange({ ...filter, dateFrom: e.target.value || undefined })}
-                disabled={disabled}
-                className="px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg
-                         text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50
-                         disabled:opacity-50"
-              />
+              {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
+                  och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets */}
+              <div className="w-44">
+                <DateField
+                  value={filter.dateFrom || ''}
+                  onChange={(v) => onFilterChange({ ...filter, dateFrom: v || undefined })}
+                  disabled={disabled}
+                  clearable
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg
+                           text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50
+                           disabled:opacity-50"
+                />
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-400">Till:</label>
-              <input
-                type="date"
-                value={filter.dateTo || ''}
-                onChange={(e) => onFilterChange({ ...filter, dateTo: e.target.value || undefined })}
-                disabled={disabled}
-                className="px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg
-                         text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50
-                         disabled:opacity-50"
-              />
+              <div className="w-44">
+                <DateField
+                  value={filter.dateTo || ''}
+                  onChange={(v) => onFilterChange({ ...filter, dateTo: v || undefined })}
+                  disabled={disabled}
+                  clearable
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg
+                           text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50
+                           disabled:opacity-50"
+                />
+              </div>
             </div>
           </div>
         )}

@@ -5,6 +5,7 @@ import { Edit3, Building2, Calendar, AlertCircle, Save, Trash2, Target, Star } f
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import DateField from '../../ui/DateField'
 import Select from '../../ui/Select'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
@@ -837,10 +838,11 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 <label className="block text-xs font-medium text-slate-400 mb-1">
                   Kontaktad datum
                 </label>
-                <Input
-                  type="datetime-local"
+                <DateField
+                  withTime
                   value={formData.contact_date || ''}
-                  onChange={(e) => handleInputChange('contact_date', e.target.value)}
+                  onChange={(v) => handleInputChange('contact_date', v)}
+                  aria-label="Kontaktad datum"
                 />
               </div>
 
@@ -848,10 +850,11 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 <label className="block text-xs font-medium text-slate-400 mb-1">
                   Ta kontakt igen datum
                 </label>
-                <Input
-                  type="datetime-local"
+                <DateField
+                  withTime
                   value={formData.follow_up_date || ''}
-                  onChange={(e) => handleInputChange('follow_up_date', e.target.value)}
+                  onChange={(v) => handleInputChange('follow_up_date', v)}
+                  aria-label="Ta kontakt igen datum"
                 />
               </div>
 
@@ -859,10 +862,12 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                 <label className="block text-xs font-medium text-slate-400 mb-1">
                   Offert lämnad datum
                 </label>
-                <Input
-                  type="date"
+                {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
+                    och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets */}
+                <DateField
                   value={formData.quote_provided_date || ''}
-                  onChange={(e) => handleInputChange('quote_provided_date', e.target.value)}
+                  onChange={(v) => handleInputChange('quote_provided_date', v)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 />
               </div>
 
@@ -934,10 +939,10 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                         Avtal löper ut
                         <span className="text-slate-500 text-xs ml-2">(När avtalet kan sägas upp eller löper ut)</span>
                       </label>
-                      <Input
-                        type="date"
+                      <DateField
                         value={formData.contract_end_date || ''}
-                        onChange={(e) => handleInputChange('contract_end_date', e.target.value)}
+                        onChange={(v) => handleInputChange('contract_end_date', v)}
+                        className="w-full pl-9 pr-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                       />
                     </div>
 
@@ -1133,10 +1138,10 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
                   Förhoppning om att slutföra affär till
                   <span className="text-slate-500 text-xs ml-2">(Ungefärligt datum när affären kan avslutas)</span>
                 </label>
-                <Input
-                  type="date"
+                <DateField
                   value={formData.closing_date_estimate || ''}
-                  onChange={(e) => handleInputChange('closing_date_estimate', e.target.value)}
+                  onChange={(v) => handleInputChange('closing_date_estimate', v)}
+                  className="w-full pl-9 pr-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
                 />
               </div>
 

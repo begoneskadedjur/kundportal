@@ -48,6 +48,7 @@ import type { CaseBillingItem } from '../../../types/caseBilling'
 import { useCaseContext } from '../../../hooks/useCaseContext'
 import type { CaseContext } from '../../../hooks/useCaseContext'
 import { formatSwedishDateTime } from '../../../types/database'
+import DateField from '../../ui/DateField'
 import ServiceCostBreakdown from '../../shared/ServiceCostBreakdown'
 import CaseModalSection from '../../shared/CaseModalSection'
 import InvoiceStatusStepper from '../../shared/InvoiceStatusStepper'
@@ -1022,12 +1023,15 @@ export default function InvoiceDetailModal({
                     </div>
                     {editingDueDate && canEditDueDate ? (
                       <div className="flex items-center gap-1.5">
-                        <input
-                          type="date"
-                          value={dueDateDraft}
-                          onChange={e => setDueDateDraft(e.target.value)}
-                          className="flex-1 px-2 py-0.5 bg-slate-900 border border-slate-600 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-                        />
+                        {/* DateField istället för type="date": Chrome ignorerar lang="sv-SE" och
+                            visar mm/dd/yyyy efter webbläsarens språk. DateField ger alltid ÅÅÅÅ-MM-DD. */}
+                        <div className="flex-1">
+                          <DateField
+                            value={dueDateDraft}
+                            onChange={setDueDateDraft}
+                            className="w-full pl-9 pr-2 py-0.5 bg-slate-900 border border-slate-600 rounded text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
+                          />
+                        </div>
                         <button
                           type="button"
                           onClick={handleSaveDueDate}

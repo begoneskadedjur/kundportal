@@ -10,6 +10,7 @@ import { useAuth } from '../../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINF
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
+import DateField from '../../components/ui/DateField'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import CaseServiceSelector from '../../components/shared/CaseServiceSelector'
 import AnimatedProgressBar from '../../components/ui/AnimatedProgressBar'
@@ -1225,13 +1226,20 @@ export default function OneflowContractCreator() {
                       icon={<Calendar className="w-4 h-4" />}
                     />
                     
-                    <Input
-                      label="Startdatum *"
-                      type="date"
-                      value={wizardData.begynnelsedag}
-                      onChange={e => updateWizardData('begynnelsedag', e.target.value)}
-                      icon={<Calendar className="w-4 h-4" />}
-                    />
+                    {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
+                        och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets.
+                        Labeln lyfts ut hit eftersom DateField saknar label-prop, och
+                        kalenderikonen ingår redan i komponenten. */}
+                    <div className="w-full">
+                      <label className="block text-xs font-medium text-slate-400 mb-1">
+                        Startdatum *
+                      </label>
+                      <DateField
+                        value={wizardData.begynnelsedag}
+                        onChange={(v) => updateWizardData('begynnelsedag', v)}
+                        className="w-full pl-9 pr-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+                      />
+                    </div>
                   </div>
                 )}
                 </div>

@@ -36,6 +36,7 @@ import {
 import { formatAddress } from '../../utils/addressFormatter';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import DateField from '../../components/ui/DateField';
 import EditCaseModal from '../../components/admin/technicians/EditCaseModal';
 import { searchComments } from '../../services/communicationService';
 import { CaseComment } from '../../types/communication';
@@ -562,19 +563,25 @@ export default function CaseSearch() {
                 <div className="md:col-span-2 lg:col-span-3">
                   <label className="block text-sm font-medium text-slate-300 mb-2">Skapad mellan</label>
                   <div className="flex gap-4">
-                    <input
-                      type="date"
-                      value={filters.dateRange.start}
-                      onChange={(e) => updateFilter('dateRange', { ...filters.dateRange, start: e.target.value })}
-                      className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
-                    />
+                    {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
+                        och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets */}
+                    <div className="flex-1">
+                      <DateField
+                        value={filters.dateRange.start}
+                        onChange={(v) => updateFilter('dateRange', { ...filters.dateRange, start: v })}
+                        clearable
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-9 pr-3 py-2 text-white focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
+                      />
+                    </div>
                     <span className="text-slate-400 flex items-center">till</span>
-                    <input
-                      type="date"
-                      value={filters.dateRange.end}
-                      onChange={(e) => updateFilter('dateRange', { ...filters.dateRange, end: e.target.value })}
-                      className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
-                    />
+                    <div className="flex-1">
+                      <DateField
+                        value={filters.dateRange.end}
+                        onChange={(v) => updateFilter('dateRange', { ...filters.dateRange, end: v })}
+                        clearable
+                        className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-9 pr-3 py-2 text-white focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
 

@@ -33,6 +33,7 @@ import toast from 'react-hot-toast'
 import Button from '../../ui/Button'
 import Select from '../../ui/Select'
 import Input from '../../ui/Input'
+import DateField from '../../ui/DateField'
 import Card from '../../ui/Card'
 import ProductSelector from '../ProductSelector'
 import { SelectedProduct } from '../../../types/products'
@@ -1022,11 +1023,11 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Startdatum *
                   </label>
-                  <Input
-                    type="date"
+                  {/* DateField istället för type="date": Chrome ignorerar lang="sv-SE" och
+                      visar mm/dd/yyyy efter webbläsarens språk. DateField ger alltid ÅÅÅÅ-MM-DD. */}
+                  <DateField
                     value={contractData.contract_start_date}
-                    onChange={(e) => setContractData({ ...contractData, contract_start_date: e.target.value })}
-                    className="[&::-webkit-calendar-picker-indicator]:invert"
+                    onChange={(v) => setContractData({ ...contractData, contract_start_date: v })}
                     placeholder="ÅÅÅÅ-MM-DD"
                     required
                   />
@@ -1036,11 +1037,12 @@ export default function MultisiteRegistrationWizard({ onSuccess }: WizardProps) 
                   <label className="block text-sm font-medium text-slate-300 mb-2">
                     Slutdatum (beräknas automatiskt)
                   </label>
-                  <Input
-                    type="date"
+                  {/* Beräknas automatiskt av avtalslängden, därför skrivskyddad */}
+                  <DateField
                     value={contractData.contract_end_date}
+                    onChange={() => {}}
                     disabled
-                    className="bg-slate-900/50 cursor-not-allowed [&::-webkit-calendar-picker-indicator]:invert"
+                    className="w-full pl-9 pr-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 cursor-not-allowed"
                     placeholder="ÅÅÅÅ-MM-DD"
                   />
                 </div>

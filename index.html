@@ -71,6 +71,9 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Fäste för DateField-kalendern. Renderas utanför #root så den aldrig
+         klipps av en modals overflow eller hamnar bakom dess z-index. -->
+    <div id="datefield-portal"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

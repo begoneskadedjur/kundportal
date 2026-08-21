@@ -12,6 +12,7 @@ import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Select from '../../ui/Select'
+import DateField from '../../ui/DateField'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -568,18 +569,22 @@ export default function AddContractCustomerModal({
                 Avtalsinformation
               </h3>
               <div className="grid grid-cols-3 gap-3">
-                <Input
-                  label="Startdatum"
-                  type="date"
-                  value={formData.contract_start_date || ''}
-                  onChange={(e) => handleInputChange('contract_start_date', e.target.value)}
-                />
-                <Input
-                  label="Slutdatum"
-                  type="date"
-                  value={formData.contract_end_date || ''}
-                  onChange={(e) => handleInputChange('contract_end_date', e.target.value)}
-                />
+                {/* DateField istället för type="date": Chrome ignorerar lang="sv-SE" och
+                    visar mm/dd/yyyy efter webbläsarens språk. DateField ger alltid ÅÅÅÅ-MM-DD. */}
+                <div className="w-full">
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Startdatum</label>
+                  <DateField
+                    value={formData.contract_start_date || ''}
+                    onChange={(v) => handleInputChange('contract_start_date', v)}
+                  />
+                </div>
+                <div className="w-full">
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Slutdatum</label>
+                  <DateField
+                    value={formData.contract_end_date || ''}
+                    onChange={(v) => handleInputChange('contract_end_date', v)}
+                  />
+                </div>
                 <Input
                   label="Avtalslängd"
                   value={formData.contract_length || ''}

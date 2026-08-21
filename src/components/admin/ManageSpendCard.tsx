@@ -4,6 +4,7 @@ import { Save, Calendar, DollarSign, FileText, Trash2 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Input from '../ui/Input'
+import DateField from '../ui/DateField'
 import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -180,11 +181,12 @@ export default function ManageSpendCard({
                 <Calendar className="w-4 h-4 inline mr-1" />
                 Datum
               </label>
-              <Input 
-                type="date" 
-                id="month" 
-                value={monthInput} 
-                onChange={(e) => setMonthInput(e.target.value)}
+              {/* DateField istället för type="date": Chrome ignorerar lang="sv-SE" och
+                  visar mm/dd/yyyy efter webbläsarens språk. DateField ger alltid ÅÅÅÅ-MM-DD. */}
+              <DateField
+                id="month"
+                value={monthInput}
+                onChange={setMonthInput}
                 required
               />
             </div>
