@@ -35,6 +35,7 @@ import AccessAccountsSection, { countAccessPersons } from './AccessAccountsSecti
 import ContractMapSection from './ContractMapSection'
 import CustomerCasesSection from './CustomerCasesSection'
 import RevenueSection from './RevenueSection'
+import CustomerPulseRow from './CustomerPulseRow'
 import { EmptyContractsIllustration } from './ContractGlyphs'
 import { contractState } from '../../../../utils/contractLifecycle'
 
@@ -313,6 +314,14 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
 
       {/* Flikpaneler — göms med hidden, avmonteras aldrig */}
       <div hidden={activeTab !== 'oversikt'} className="pt-6 space-y-8">
+        <CustomerPulseRow
+          contracts={realContracts}
+          annualValue={familyAnnualValue}
+          cases={data.cases}
+          inspections={data.inspections}
+          invoices={data.invoices}
+        />
+
         <section>
           <div className="flex items-baseline gap-2 mb-3">
             <h2 className="text-xs uppercase tracking-wide text-slate-500">

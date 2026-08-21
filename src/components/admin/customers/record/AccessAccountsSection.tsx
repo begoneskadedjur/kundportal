@@ -4,7 +4,7 @@
 // (verksamhetschef/regionchef/platsansvarig) och utestående inbjudningar.
 // Inga formulär i v1 — hantering sker via /admin/anvandarkonton-kund.
 
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { ExternalLink } from 'lucide-react'
 import {
@@ -164,6 +164,12 @@ interface Props {
 export default function AccessAccountsSection({ access, customerById }: Props) {
   const persons = useMemo(() => buildAccessPersons(access, customerById), [access, customerById])
 
+  // Grupperas per behörighetsläge — obesvarade inbjudningar är det enda som
+  // kräver handling och ska därför stå överst.
+  const pending = persons.filter((p) => p.status === 'invited')
+  const active = persons.filter((p) => p.status === 'active')
+  const never = persons.filter((p) => p.status === 'never')
+
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
@@ -180,27 +186,152 @@ export default function AccessAccountsSection({ access, customerById }: Props) {
       </div>
 
       {persons.length === 0 ? (
-        <p className="text-sm text-slate-500">Ingen har bjudits in till portalen ännu.</p>
+        <div className="flex items-center gap-4 py-6 px-4 rounded-2xl border border-dashed border-slate-800">
+          <AccessRolesGlyph count={0} />
+          <div>
+            <p className="text-sm text-slate-300 font-medium">Ingen har åtkomst ännu</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Bjud in kunden så syns kontot här med roll och senaste inloggning.
+            </p>
+          </div>
+        </div>
       ) : (
-        <ul className="divide-y divide-slate-800/60">
-          {persons.map((p) => (
-            <li key={p.key} className="flex items-center gap-3 py-2 text-sm min-w-0">
-              <span className={`w-2 h-2 rounded-full shrink-0 ${DOT_CLASS[p.status]}`} aria-hidden />
-              <span className="min-w-0 flex-1">
-                <span className="block text-slate-200 truncate">{p.name}</span>
-                {p.email && p.email !== p.name && (
-                  <span className="block text-xs text-slate-500 truncate">{p.email}</span>
-                )}
-              </span>
-              <span className="text-[10px] uppercase tracking-wide text-slate-400 border border-slate-700 rounded px-1.5 py-0.5 shrink-0">
-                {p.roleLabel}
-              </span>
-              {p.units && <span className="hidden sm:block text-xs text-slate-500 truncate max-w-[220px]">{p.units}</span>}
-              <span className="text-xs text-slate-500 shrink-0">{p.statusText}</span>
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-4">
+          {/* Obesvarade inbjudningar först — de kräver handling och ska sticka
+              i ögat när de finns, men vara osynliga annars. */}
+          {pending.length > 0 && (
+            <AccessGroup
+              title="Väntar på svar"
+              glyph={<PendingInviteGlyph />}
+              persons={pending}
+              tone="warn"
+            />
+          )}
+          {active.length > 0 && (
+            <AccessGroup
+              title="Har åtkomst"
+              glyph={<AccessRolesGlyph count={active.length} />}
+              persons={active}
+            />
+          )}
+          {never.length > 0 && (
+            <AccessGroup
+              title="Aldrig inloggade"
+              glyph={<AccessRolesGlyph count={never.length} dim />}
+              persons={never}
+              tone="muted"
+            />
+          )}
+        </div>
       )}
     </section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+
+function AccessGroup({
+  title,
+  glyph,
+  persons,
+  tone,
+}: {
+  title: string
+  glyph: React.ReactNode
+  persons: AccessPerson[]
+  tone?: 'warn' | 'muted'
+}) {
+  return (
+    <div
+      className={`p-3 rounded-xl border ${
+        tone === 'warn' ? 'border-amber-500/30 bg-amber-500/[0.06]' : 'border-slate-700 bg-slate-800/30'
+      }`}
+    >
+      <div className="flex items-center gap-3 mb-2">
+        {glyph}
+        <h3 className={`text-sm font-semibold ${tone === 'warn' ? 'text-amber-300' : 'text-slate-200'}`}>
+          {title} <span className="font-normal text-slate-500 tabular-nums">({persons.length})</span>
+        </h3>
+      </div>
+      <ul className="divide-y divide-slate-800/60">
+        {persons.map((p) => (
+          <li key={p.key} className="flex items-center gap-3 py-2 text-sm min-w-0">
+            <span className={`w-2 h-2 rounded-full shrink-0 ${DOT_CLASS[p.status]}`} aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block text-slate-200 truncate">{p.name}</span>
+              {p.email && p.email !== p.name && (
+                <span className="block text-xs text-slate-500 truncate">{p.email}</span>
+              )}
+            </span>
+            <span className="text-[10px] uppercase tracking-wide text-slate-400 border border-slate-700 rounded px-1.5 py-0.5 shrink-0">
+              {p.roleLabel}
+            </span>
+            {p.units && (
+              <span className="hidden sm:block text-xs text-slate-500 truncate max-w-[220px]">{p.units}</span>
+            )}
+            <span className="text-xs text-slate-500 shrink-0">{p.statusText}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** Nyckelring — antalet nycklar speglar antalet konton. */
+function AccessRolesGlyph({ count = 1, dim = false }: { count?: number; dim?: boolean }) {
+  const uid = useId().replace(/:/g, '')
+  const keys = Math.max(1, Math.min(4, count))
+  const tone = dim ? '#475569' : '#20c58f'
+  return (
+    <svg width="44" height="44" viewBox="0 0 56 56" role="img" aria-label={`${count} konton`} className="shrink-0">
+      <defs>
+        <filter id={`${uid}-rough`} x="-20%" y="-20%" width="140%" height="140%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.1" numOctaves="2" seed="13" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.0" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </defs>
+      <g filter={`url(#${uid}-rough)`} opacity={dim ? 0.55 : 1}>
+        <circle cx="20" cy="20" r="9" fill="none" stroke={tone} strokeWidth="2.2" />
+        {Array.from({ length: keys }, (_, i) => {
+          const a = ((-40 + i * 26) * Math.PI) / 180
+          const x1 = 20 + 9 * Math.cos(a)
+          const y1 = 20 + 9 * Math.sin(a)
+          const x2 = x1 + 18 * Math.cos(a)
+          const y2 = y1 + 18 * Math.sin(a)
+          return (
+            <g key={i} opacity={0.55 + i * 0.15}>
+              <path d={`M ${x1} ${y1} L ${x2} ${y2}`} stroke={tone} strokeWidth="2" strokeLinecap="round" />
+              <path
+                d={`M ${x2 - 3.5} ${y2} l 0 3.5 M ${x2} ${y2} l 0 4.5`}
+                stroke={tone}
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </g>
+          )
+        })}
+      </g>
+    </svg>
+  )
+}
+
+/** Kuvert med osprättad flik och en streckad väntelinje. */
+function PendingInviteGlyph() {
+  const uid = useId().replace(/:/g, '')
+  return (
+    <svg width="44" height="44" viewBox="0 0 56 56" role="img" aria-label="Obesvarad inbjudan" className="shrink-0">
+      <defs>
+        <filter id={`${uid}-rough`} x="-20%" y="-20%" width="140%" height="140%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.1" numOctaves="2" seed="23" result="n" />
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="1.1" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+      </defs>
+      <g filter={`url(#${uid}-rough)`}>
+        <path d="M 8 18 L 46 16 L 47 40 L 9 42 Z" fill="none" stroke="#fbbf24" strokeWidth="1.9" strokeLinejoin="round" />
+        {/* Fliken — fortfarande stängd */}
+        <path d="M 8 18 L 27 30 L 47 16" fill="none" stroke="#fbbf24" strokeWidth="1.7" strokeLinecap="round" />
+        <path d="M 14 47 h 28" stroke="#fbbf24" strokeWidth="1.6" strokeDasharray="3 4" strokeLinecap="round" opacity="0.6" />
+      </g>
+    </svg>
   )
 }
