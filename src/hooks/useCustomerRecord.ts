@@ -147,6 +147,48 @@ export interface RecordInvoice {
   created_at: string
 }
 
+/**
+ * En rad i arbetsflödet: antingen TJÄNSTEN kunden får eller en ARTIKEL vi
+ * använt för att leverera den.
+ *
+ * item_type='service' → intäkt (vad kunden betalar)
+ * item_type='article' → intern kostnad, kopplad till sin tjänst via
+ *                       mapped_service_id (pekar på tjänsteradens id)
+ *
+ * Skillnaden mellan dem är marginalen. Detta är arbetsflödet som genererar
+ * fakturor — manuellt upplagda och importerade avtal saknar oftast raderna
+ * och har bara en årspremie.
+ */
+export interface RecordWorkItem {
+  id: string
+  customer_id: string
+  case_id: string
+  case_type: string | null
+  item_type: 'service' | 'article' | string
+  service_id: string | null
+  service_name: string | null
+  article_id: string | null
+  article_name: string | null
+  /** På artikelrader: id på TJÄNSTERADEN den hör till (ej services.id) */
+  mapped_service_id: string | null
+  quantity: number | null
+  unit_price: number | null
+  total_price: number | null
+  status: string | null
+  discount_percent: number | null
+  created_at: string
+  /**
+   * Teknikern som utfört arbetet, härledd via ärendet. Finns på 96 % av
+   * raderna som hör till ett verkligt ärende — avtalsinnehåll
+   * (case_type='contract') saknar den, eftersom ingen enskild tekniker äger
+   * ett avtal.
+   */
+  technician_name?: string | null
+  /** Ärendets nummer, för gruppering per ärende */
+  case_number?: string | null
+  case_title?: string | null
+}
+
 /** Löpande schema — bär besöksfrekvensen för leveransmätningen. */
 export interface RecordSchedule {
   id: string
@@ -266,6 +308,8 @@ export interface CustomerRecordData {
   inspections: RecordInspectionSession[]
   schedules: RecordSchedule[]
   invoices: RecordInvoice[]
+  /** Arbetsflödet: tjänster kunden fått + artiklar vi använt, med marginal */
+  workItems: RecordWorkItem[]
   /** Åtkomst & konton (etapp 6) — sekundärdata, tomma listor vid fel */
   access: RecordAccessData
 }
@@ -338,6 +382,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       businessCasesRes,
       schedulesRes,
       invoicesRes,
+      workItemsRes,
     ] = await Promise.all([
       supabase
         .from('contracts')
@@ -419,9 +464,12 @@ export function useCustomerRecord(customerId: string | undefined) {
         .from('recurring_schedules')
         .select('id, customer_id, contract_id, frequency, status, schedule_start_date, generated_until')
         .in('customer_id', familyIds),
-      // FAKTUROR — det kanoniska intäktsspåret. contract_billing_items är
-      // faktureringsUNDERLAG: bara 13 av 73 rader blir fakturor, så en vy som
-      // bara läser underlaget visar en bråkdel av vad kunden fakturerats.
+      // FAKTUROR — sista steget i kedjan.
+      //
+      // Arbetsflödet är: case_billing_items (tjänst kunden får + artiklar vi
+      // använt, med marginal) → contract_billing_items (faktureringsunderlag)
+      // → invoices (färdig faktura). Alla tre behövs: manuellt upplagda och
+      // importerade avtal har oftast bara en årspremie utan artikeldetaljer.
       supabase
         .from('invoices')
         .select(
@@ -431,6 +479,19 @@ export function useCustomerRecord(customerId: string | undefined) {
         )
         .in('customer_id', familyIds)
         .order('billing_period_start', { ascending: false }),
+      // ARBETSFLÖDET: tjänsten kunden fått (item_type='service') och artiklarna
+      // vi använt (item_type='article', kopplade via mapped_service_id).
+      // Här bor interna kostnader och marginalen. Hämtas för familjens ärenden
+      // OCH avtal — avtalsinnehåll använder samma tabell med case_type='contract'.
+      supabase
+        .from('case_billing_items')
+        .select(
+          'id, customer_id, case_id, case_type, item_type, service_id, service_name, ' +
+            'article_id, article_name, mapped_service_id, quantity, unit_price, ' +
+            'total_price, status, discount_percent, created_at'
+        )
+        .in('customer_id', familyIds)
+        .order('created_at', { ascending: false }),
     ])
 
     // Multisite-roller kräver organisationens id — hämtas bara när root är multisite.
@@ -588,6 +649,53 @@ export function useCustomerRecord(customerId: string | undefined) {
     ) as RecordInspectionSession[]
     const schedules = (schedulesRes.error ? [] : (schedulesRes.data ?? [])) as unknown as RecordSchedule[]
     const invoices = (invoicesRes.error ? [] : (invoicesRes.data ?? [])) as unknown as RecordInvoice[]
+    // Arbetsraderna bär inget teknikerfält — det sitter på ärendet. Ärendena
+    // ligger i tre tabeller med olika kolumnnamn: cases.primary_technician_name,
+    // business_cases/private_cases.primary_assignee_name. Berikningen ger 96 %
+    // täckning på rader som hör till ett verkligt ärende.
+    const rawWorkItems = (workItemsRes.error ? [] : (workItemsRes.data ?? [])) as unknown as RecordWorkItem[]
+    const workCaseIds = Array.from(
+      new Set(rawWorkItems.filter((w) => w.case_type !== 'contract').map((w) => w.case_id))
+    )
+    const techByCase = new Map<string, { name: string | null; number: string | null; title: string | null }>()
+    if (workCaseIds.length > 0) {
+      const [cRes, bRes, pRes] = await Promise.all([
+        supabase
+          .from('cases')
+          .select('id, case_number, title, primary_technician_name')
+          .in('id', workCaseIds),
+        supabase
+          .from('business_cases')
+          .select('id, case_number, title, primary_assignee_name')
+          .in('id', workCaseIds),
+        supabase
+          .from('private_cases')
+          .select('id, case_number, title, primary_assignee_name')
+          .in('id', workCaseIds),
+      ])
+      for (const r of (cRes.data ?? []) as { id: string; case_number: string | null; title: string | null; primary_technician_name: string | null }[]) {
+        techByCase.set(r.id, { name: r.primary_technician_name, number: r.case_number, title: r.title })
+      }
+      for (const r of [...((bRes.data ?? []) as never[]), ...((pRes.data ?? []) as never[])] as {
+        id: string
+        case_number: string | null
+        title: string | null
+        primary_assignee_name: string | null
+      }[]) {
+        if (!techByCase.has(r.id)) {
+          techByCase.set(r.id, { name: r.primary_assignee_name, number: r.case_number, title: r.title })
+        }
+      }
+    }
+    const workItems: RecordWorkItem[] = rawWorkItems.map((w) => {
+      const meta = techByCase.get(w.case_id)
+      return {
+        ...w,
+        technician_name: meta?.name ?? null,
+        case_number: meta?.number ?? null,
+        case_title: meta?.title ?? null,
+      }
+    })
     const caseCounts: Record<string, number> = {}
     for (const row of familyCases) {
       if (!row.customer_id) continue
@@ -609,6 +717,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       inspections,
       schedules,
       invoices,
+      workItems,
       access: {
         profiles: (profilesRes.error ? [] : (profilesRes.data ?? [])) as RecordAccessProfile[],
         invitations: (invitationsRes.error ? [] : (invitationsRes.data ?? [])) as RecordAccessInvitation[],

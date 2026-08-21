@@ -25,7 +25,7 @@
 // beloppet är verklig intäkt. Det redovisas som MERFÖRSÄLJNING, samma slag som
 // ett extrabesök hos en avtalskund, inte som en egen kategori.
 
-import type { RecordCase, RecordInvoice } from '../hooks/useCustomerRecord'
+import type { RecordBillingItem, RecordCase, RecordInvoice } from '../hooks/useCustomerRecord'
 
 /** Ärendestatusar som betyder att arbetet är utfört. */
 const DONE_STATUSES = ['avslutat', 'stängt', 'stangt']
@@ -70,7 +70,7 @@ export interface RevenueEntry {
   /** true = importerad historik (Fortnox eller ClickUp-eran) */
   historical: boolean
   /** Varifrån posten kommer, för visning */
-  source: 'invoice' | 'case'
+  source: 'invoice' | 'case' | 'billing_item'
   /** Fakturanummer när det finns */
   reference: string | null
 }
@@ -90,7 +90,8 @@ function invoiceKind(inv: RecordInvoice): RevenueKind {
 export function buildRevenueEntries(
   invoices: RecordInvoice[],
   cases: RecordCase[],
-  fallbackCustomerId: string
+  fallbackCustomerId: string,
+  billingItems: RecordBillingItem[] = []
 ): RevenueEntry[] {
   const entries: RevenueEntry[] = []
   const invoicedCaseIds = new Set(
@@ -109,6 +110,36 @@ export function buildRevenueEntries(
       historical: !!inv.is_historical,
       source: 'invoice',
       reference: inv.invoice_number,
+    })
+  }
+
+  // Fortnox-historik som bara finns i contract_billing_items och aldrig blev
+  // en invoices-rad. 13 fakturor hos 11 kunder (274 394 kr) ligger så — bland
+  // annat Kiabs F-348 och F-440. Utan detta försvinner de helt ur portalen.
+  //
+  // Matchning mot befintliga fakturor sker på kund + periodstart, samma nyckel
+  // som importen använde. Finns raden redan som faktura är fakturan sanningen.
+  const invoiceKeys = new Set(
+    invoices
+      .filter((i) => (i.status ?? '') !== 'cancelled')
+      .map((i) => `${i.customer_id}|${(i.billing_period_start ?? '').slice(0, 10)}`)
+  )
+  for (const b of billingItems) {
+    if (!['paid', 'invoiced', 'sent'].includes(b.status ?? '')) continue
+    const key = `${b.customer_id}|${(b.billing_period_start ?? '').slice(0, 10)}`
+    if (invoiceKeys.has(key)) continue
+    entries.push({
+      id: b.id,
+      // "Historisk engångsfaktura" = avropsjobb utanför avtalet,
+      // "Historisk avtalsfaktura" = årspremien
+      kind: (b.article_name ?? '').toLowerCase().includes('engång') ? 'extra' : 'contract',
+      amount: Number(b.total_price ?? 0),
+      date: b.billing_period_start,
+      label: b.invoice_number ? `F-${b.invoice_number}` : (b.article_name ?? 'Historisk faktura'),
+      customerId: b.customer_id,
+      historical: true,
+      source: 'billing_item',
+      reference: b.fortnox_document_number ?? b.invoice_number,
     })
   }
 

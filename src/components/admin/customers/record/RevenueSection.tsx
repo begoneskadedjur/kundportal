@@ -21,11 +21,14 @@ import {
   formatDateSv,
   formatKr,
   type RecordAddition,
+  type RecordBillingItem,
   type RecordCase,
   type RecordCustomer,
   type RecordInvoice,
+  type RecordWorkItem,
 } from '../../../../hooks/useCustomerRecord'
 import { buildRevenueEntries, sumPipeline, sumRevenue } from '../../../../utils/customerRevenue'
+import WorkChainSection from './WorkChainSection'
 
 interface Props {
   root: RecordCustomer
@@ -34,6 +37,10 @@ interface Props {
   additions: RecordAddition[]
   /** Ärenden — historiska företagsärenden är intäkt som aldrig fakturerats i portalen */
   cases: RecordCase[]
+  /** Faktureringsunderlag — Fortnox-historik som aldrig blev en invoices-rad */
+  billingItems: RecordBillingItem[]
+  /** Arbetsflödet: tjänster + artiklar med marginal och tekniker */
+  workItems: RecordWorkItem[]
 }
 
 const SLAG = [
@@ -41,13 +48,13 @@ const SLAG = [
   { id: 'extra', label: 'Merförsäljning', hint: 'arbete utanför avtalet', dot: 'bg-[#20c58f]/50' },
 ] as const
 
-export default function RevenueSection({ root, units, invoices, additions, cases }: Props) {
+export default function RevenueSection({ root, units, invoices, additions, cases, billingItems, workItems }: Props) {
   const [showHistorical, setShowHistorical] = useState(true)
 
   const model = useMemo(() => {
     // Båda världarna i en ström: portalens fakturor, Fortnox-importen och
     // ClickUp-erans utförda ärenden. De överlappar aldrig.
-    const all = buildRevenueEntries(invoices, cases, root.id)
+    const all = buildRevenueEntries(invoices, cases, root.id, billingItems)
     const entries = showHistorical ? all : all.filter((e) => !e.historical)
     const totals = sumRevenue(entries)
     const pipeline = sumPipeline(cases)
@@ -85,7 +92,7 @@ export default function RevenueSection({ root, units, invoices, additions, cases
       pipeline,
       fromCases: entries.filter((e) => e.source === 'case').length,
     }
-  }, [invoices, cases, showHistorical, root, units])
+  }, [invoices, cases, billingItems, showHistorical, root, units])
 
   const pct = (v: number) => (model.total > 0 ? Math.round((v / model.total) * 100) : 0)
 
@@ -149,6 +156,11 @@ export default function RevenueSection({ root, units, invoices, additions, cases
           </label>
         )}
       </section>
+
+      {/* Arbetsflödet: vilka tjänster kunden fått, vilka artiklar vi använt,
+          vad de kostat och vem som utfört dem. Detta är hur intäkterna faktiskt
+          uppstår — årspremier från importerade avtal saknar raderna. */}
+      <WorkChainSection workItems={workItems} />
 
       {/* Sålt men inte utfört — pipeline, aldrig intäkt. Hålls medvetet
           utanför totalen: offerter och bokningar är inte levererat arbete. */}

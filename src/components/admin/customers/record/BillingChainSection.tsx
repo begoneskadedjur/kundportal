@@ -18,6 +18,7 @@ import {
   formatDateSv,
   formatKr,
   formatMonthSv,
+  type RecordBillingItem,
   type RecordCase,
   type RecordContract,
   type RecordCustomer,
@@ -74,9 +75,11 @@ interface Props {
   invoices: RecordInvoice[]
   /** Utförda ärenden utan faktura — intäkt från tiden före portalen */
   cases: RecordCase[]
+  /** Faktureringsunderlag — Fortnox-rader som aldrig blev invoices */
+  billingItems: RecordBillingItem[]
 }
 
-export default function BillingChainSection({ root, units, contracts, invoices, cases }: Props) {
+export default function BillingChainSection({ root, units, contracts, invoices, cases, billingItems }: Props) {
   const [openInvoiceId, setOpenInvoiceId] = useState<string | null>(null)
 
   const groups = useMemo(() => {
@@ -125,17 +128,33 @@ export default function BillingChainSection({ root, units, contracts, invoices, 
     const caseRevenue = cases
       .filter((c) => Number(c.price ?? 0) > 0 && isCaseCompleted(c) && !invoicedCaseIds.has(c.id))
       .reduce((s, c) => s + Number(c.price ?? 0), 0)
+
+    // Fortnox-historik som bara finns i faktureringsunderlaget. 13 fakturor
+    // hos 11 kunder (274 tkr) blev aldrig invoices-rader — bland annat Kiabs
+    // F-348 och F-440, som annars försvinner helt ur portalen.
+    const invoiceKeys = new Set(
+      live.map((i) => `${i.customer_id}|${(i.billing_period_start ?? '').slice(0, 10)}`)
+    )
+    const orphanItems = billingItems.filter(
+      (b) =>
+        ['paid', 'invoiced', 'sent'].includes(b.status ?? '') &&
+        !invoiceKeys.has(`${b.customer_id}|${(b.billing_period_start ?? '').slice(0, 10)}`)
+    )
+    const orphanRevenue = orphanItems.reduce((s, b) => s + Number(b.total_price ?? 0), 0)
+
     return {
-      all: sum(live) + caseRevenue,
+      all: sum(live) + caseRevenue + orphanRevenue,
       contract: sum(live.filter(isContractRevenue)),
       extra: sum(live.filter((i) => !isContractRevenue(i))) + caseRevenue,
       overdue: sum(live.filter((i) => invoiceStatus(i) === 'overdue')),
-      historical: sum(live.filter((i) => i.is_historical)) + caseRevenue,
+      historical: sum(live.filter((i) => i.is_historical)) + caseRevenue + orphanRevenue,
       caseRevenue,
+      orphanItems,
+      orphanRevenue,
     }
-  }, [invoices, cases])
+  }, [invoices, cases, billingItems])
 
-  if (invoices.length === 0 && totals.caseRevenue === 0) {
+  if (invoices.length === 0 && totals.caseRevenue === 0 && totals.orphanItems.length === 0) {
     return <p className="text-sm text-slate-500">Inga fakturor registrerade för kunden.</p>
   }
 
@@ -170,6 +189,44 @@ export default function BillingChainSection({ root, units, contracts, invoices, 
           rows={groups.unlinked}
           onOpen={setOpenInvoiceId}
         />
+      )}
+
+      {/* Fortnox-fakturor som bara finns i faktureringsunderlaget. Läsbara men
+          inte klickbara — det finns inget underlag i portalen att öppna. */}
+      {totals.orphanItems.length > 0 && (
+        <section>
+          <div className="flex items-baseline gap-3 pb-1.5 border-b border-slate-800">
+            <h3 className="text-sm font-semibold text-slate-100">Importerad historik</h3>
+            <span className="text-xs text-slate-500">från Fortnox</span>
+            <span className="ml-auto text-xs text-slate-400 tabular-nums shrink-0">
+              {formatKr(totals.orphanRevenue)} <span className="text-slate-600">ex moms</span>
+            </span>
+          </div>
+          <ul className="divide-y divide-slate-800/60 mt-1">
+            {totals.orphanItems.map((b) => (
+              <li key={b.id} className="flex items-center gap-3 px-2 py-2 -mx-2 text-sm">
+                <InvoiceSlip variant="historical" size={24} aged />
+                <span className="text-xs text-slate-400 tabular-nums w-[76px] shrink-0">
+                  {formatMonthSv(b.billing_period_start)}
+                </span>
+                <span className="text-sm text-slate-200 tabular-nums w-24 shrink-0 text-right">
+                  {formatKr(Number(b.total_price ?? 0))}
+                </span>
+                <span className="flex items-center gap-1.5 w-24 shrink-0 text-[#20c58f]/70">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span className="text-xs">{b.status === 'paid' ? 'Betald' : 'Skickad'}</span>
+                </span>
+                <span className="text-xs text-slate-500 truncate min-w-0 flex-1">
+                  {b.invoice_number && <span className="font-mono">F-{b.invoice_number}</span>}
+                  {b.article_name && <span> · {b.article_name}</span>}
+                </span>
+                <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-slate-600 border border-slate-700/70 rounded px-1.5 py-0.5">
+                  Fortnox
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {/* Intäkt från tiden före portalen: utförda ärenden som fakturerats
