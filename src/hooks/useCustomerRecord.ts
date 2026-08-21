@@ -707,7 +707,23 @@ export function useCustomerRecord(customerId: string | undefined) {
       })
     }
 
-    const workItems: RecordWorkItem[] = rawWorkItems.map((w) => {
+    // Avtalsinnehåll som ligger kvar på en ERSATT avtalsrad är samma premie en
+    // gång till: när avtalet gjordes om i portalen flyttades fakturorna till
+    // det nya avtalet, men innehållet lämnades kvar — så tjänsten låg på både
+    // det nya och det gamla avtalet och summerades två gånger.
+    //
+    // Bara ersatta rader filtreras bort. Trashade IMPORTERADE avtal (som redan
+    // släpps igenom medvetet ovan) bär sitt innehåll som ENDA kopia och har
+    // riktiga fakturor kopplade — de ska räknas, annars försvinner intäkter
+    // för ett trettiotal kunder.
+    const replacedContractIds = new Set(
+      contracts
+        .filter((c) => c.termination_reason === 'Ersatt av nytt avtal i portalen')
+        .map((c) => c.id)
+    )
+    const workItems: RecordWorkItem[] = rawWorkItems
+      .filter((w) => w.case_type !== 'contract' || !replacedContractIds.has(w.case_id))
+      .map((w) => {
       if (w.case_type === 'contract') {
         const seller = contractSeller.get(w.case_id)
         return {

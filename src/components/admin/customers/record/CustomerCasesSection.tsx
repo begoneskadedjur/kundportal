@@ -20,6 +20,7 @@ import {
   type RecordContract,
   type RecordCustomer,
   type RecordInspectionSession,
+  type RecordInvoice,
   type RecordSchedule,
 } from '../../../../hooks/useCustomerRecord'
 import {
@@ -43,6 +44,8 @@ interface Props {
   inspections: RecordInspectionSession[]
   schedules: RecordSchedule[]
   contracts: RecordContract[]
+  /** Fakturor — för att inte visa säljärendet som merförsäljning */
+  invoices: RecordInvoice[]
   /** Öppnar hela ärendet i ärendemodalen */
   onOpenCase: (c: RecordCase) => void
 }
@@ -64,6 +67,7 @@ export default function CustomerCasesSection({
   inspections,
   schedules,
   contracts,
+  invoices,
   onOpenCase,
 }: Props) {
   const [query, setQuery] = useState('')
@@ -73,6 +77,16 @@ export default function CustomerCasesSection({
     for (const c of [root, ...units]) m.set(c.id, c.company_name ?? c.site_name ?? '')
     return m
   }, [root, units])
+
+  const invoiceAmounts = useMemo(
+    () =>
+      new Set(
+        invoices
+          .filter((i) => (i.status ?? '') !== 'cancelled')
+          .map((i) => Math.round(Number(i.subtotal ?? 0)))
+      ),
+    [invoices]
+  )
 
   const derived = useMemo(() => {
     // Sessionerna nycklas på case_id — kopplingen är 1:1 för kontrollärenden
@@ -174,12 +188,15 @@ export default function CustomerCasesSection({
       // Bara UTFÖRT arbete räknas som intäkt — samma regel som Intäkter och
       // Fakturering använder (se utils/customerRevenue.ts). En signerad offert
       // är sålt, inte levererat, och hörde tidigare felaktigt hit.
+      // Ärenden vars pris exakt motsvarar en faktura är samma pengar —
+      // säljärendet som ledde till avtalet bär premiebeloppet. Samma spärr som
+      // intäktsvyn använder, annars visar flikarna olika siffror.
       extraRevenue: extra
-        .filter((r) => isCaseCompleted(r.case))
+        .filter((r) => isCaseCompleted(r.case) && !invoiceAmounts.has(Math.round(Number(r.case.price ?? 0))))
         .reduce((sum, r) => sum + Number(r.case.price ?? 0), 0),
       extraPipeline: sumPipeline(extra.map((r) => r.case)),
     }
-  }, [cases, inspections, schedules, contracts, units, nameById, query])
+  }, [cases, inspections, schedules, contracts, units, nameById, query, invoiceAmounts])
 
   const totalShown = derived.recurring.length + derived.establishment.length + derived.extra.length
 

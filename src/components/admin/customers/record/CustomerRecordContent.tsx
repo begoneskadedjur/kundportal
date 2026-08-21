@@ -440,6 +440,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
           inspections={data.inspections}
           schedules={data.schedules}
           contracts={realContracts}
+          invoices={data.invoices}
           onOpenCase={setOpenCase}
         />
       </div>
