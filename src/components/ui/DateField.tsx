@@ -104,6 +104,14 @@ const BASE_CLASS =
   'focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed'
 
 /**
+ * Bär vänsterpaddingen som ger kalenderikonen plats. Måste sättas i CSS och
+ * inte som Tailwind-klass: DatePickerDarkTheme.css sätter padding med
+ * !important på alla datepicker-fält, vilket annars slår ut pl-9 och lägger
+ * ikonen ovanpå texten.
+ */
+const ICON_SPACE_CLASS = 'datefield-input'
+
+/**
  * Svenskt datumfält. Veckan börjar på måndag, månadsnamnen är svenska och
  * inmatningen sker som ÅÅÅÅ-MM-DD oavsett webbläsarspråk.
  */
@@ -161,7 +169,7 @@ const DateField = forwardRef<DatePicker, DateFieldProps>(function DateField(
         showPopperArrow={false}
         // Kalendern renderas i body så den aldrig klipps av modalens overflow
         portalId="datefield-portal"
-        className={className ?? BASE_CLASS}
+        className={`${className ?? BASE_CLASS} ${ICON_SPACE_CLASS}`}
         wrapperClassName="w-full"
         aria-label={ariaLabel}
       />
