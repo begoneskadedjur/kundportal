@@ -18,10 +18,12 @@ import {
   formatDateSv,
   formatKr,
   formatMonthSv,
+  type RecordCase,
   type RecordContract,
   type RecordCustomer,
   type RecordInvoice,
 } from '../../../../hooks/useCustomerRecord'
+import { isCaseCompleted } from '../../../../utils/customerRevenue'
 import InvoiceSlip, { type SlipVariant } from './InvoiceSlip'
 
 const InvoiceDetailModal = lazy(() => import('../../invoicing/InvoiceDetailModal'))
@@ -70,9 +72,11 @@ interface Props {
   units: RecordCustomer[]
   contracts: RecordContract[]
   invoices: RecordInvoice[]
+  /** Utförda ärenden utan faktura — intäkt från tiden före portalen */
+  cases: RecordCase[]
 }
 
-export default function BillingChainSection({ root, units, contracts, invoices }: Props) {
+export default function BillingChainSection({ root, units, contracts, invoices, cases }: Props) {
   const [openInvoiceId, setOpenInvoiceId] = useState<string | null>(null)
 
   const groups = useMemo(() => {
@@ -114,16 +118,24 @@ export default function BillingChainSection({ root, units, contracts, invoices }
   const totals = useMemo(() => {
     const live = invoices.filter((i) => (i.status ?? '') !== 'cancelled')
     const sum = (rows: RecordInvoice[]) => rows.reduce((s, i) => s + Number(i.subtotal ?? 0), 0)
+    // Utförda ärenden utan egen faktura är intäkt som aldrig fakturerats i
+    // portalen (ClickUp-eran). De hör till kundens totalsiffra men har ingen
+    // fakturarad att visa — därför bara i summeringen, se noten under.
+    const invoicedCaseIds = new Set(live.filter((i) => i.case_id).map((i) => i.case_id))
+    const caseRevenue = cases
+      .filter((c) => Number(c.price ?? 0) > 0 && isCaseCompleted(c) && !invoicedCaseIds.has(c.id))
+      .reduce((s, c) => s + Number(c.price ?? 0), 0)
     return {
-      all: sum(live),
+      all: sum(live) + caseRevenue,
       contract: sum(live.filter(isContractRevenue)),
-      extra: sum(live.filter((i) => !isContractRevenue(i))),
+      extra: sum(live.filter((i) => !isContractRevenue(i))) + caseRevenue,
       overdue: sum(live.filter((i) => invoiceStatus(i) === 'overdue')),
-      historical: sum(live.filter((i) => i.is_historical)),
+      historical: sum(live.filter((i) => i.is_historical)) + caseRevenue,
+      caseRevenue,
     }
-  }, [invoices])
+  }, [invoices, cases])
 
-  if (invoices.length === 0) {
+  if (invoices.length === 0 && totals.caseRevenue === 0) {
     return <p className="text-sm text-slate-500">Inga fakturor registrerade för kunden.</p>
   }
 
@@ -158,6 +170,25 @@ export default function BillingChainSection({ root, units, contracts, invoices }
           rows={groups.unlinked}
           onOpen={setOpenInvoiceId}
         />
+      )}
+
+      {/* Intäkt från tiden före portalen: utförda ärenden som fakturerats
+          utanför systemet. Ingår i totalen ovan men har ingen fakturarad. */}
+      {totals.caseRevenue > 0 && (
+        <section className="p-3 bg-slate-800/20 border border-slate-700/60 rounded-xl">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs uppercase tracking-wide text-slate-500">
+              Fakturerat utanför portalen
+            </span>
+            <span className="ml-auto text-sm text-slate-300 tabular-nums">
+              {formatKr(totals.caseRevenue)} <span className="text-slate-600">ex moms</span>
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-600 mt-1">
+            Utförda ärenden från tiden före portalen. Ingår i totalen men saknar fakturaunderlag
+            här — se Ärenden för detaljerna.
+          </p>
+        </section>
       )}
 
       {openInvoiceId && (

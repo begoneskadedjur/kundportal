@@ -32,6 +32,7 @@ import {
   type Lateness,
 } from '../../../../utils/caseCategory'
 import { getCaseKindLabel } from '../../../../constants/caseTypeLabels'
+import { isCaseCompleted, sumPipeline } from '../../../../utils/customerRevenue'
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
 import { RecurringGlyph, ExtraGlyph, EstablishmentGlyph, MissedGlyph } from './CaseCategoryGlyph'
 
@@ -169,7 +170,14 @@ export default function CustomerCasesSection({
       frequencyLabel,
       // Merförsäljning mäts per KUND: allt arbete utanför avtalet, oavsett om
       // avtalskopplingen råkar vara satt på raden.
-      extraRevenue: extra.reduce((sum, r) => sum + Number(r.case.price ?? 0), 0),
+      //
+      // Bara UTFÖRT arbete räknas som intäkt — samma regel som Intäkter och
+      // Fakturering använder (se utils/customerRevenue.ts). En signerad offert
+      // är sålt, inte levererat, och hörde tidigare felaktigt hit.
+      extraRevenue: extra
+        .filter((r) => isCaseCompleted(r.case))
+        .reduce((sum, r) => sum + Number(r.case.price ?? 0), 0),
+      extraPipeline: sumPipeline(extra.map((r) => r.case)),
     }
   }, [cases, inspections, schedules, contracts, units, nameById, query])
 
@@ -259,9 +267,18 @@ export default function CustomerCasesSection({
           onOpenCase={onOpenCase}
           emptyText="Inga extraärenden."
           footer={
-            derived.extraRevenue > 0 ? (
-              <span className="tabular-nums">
-                {formatKr(derived.extraRevenue)} <span className="text-slate-500">ex moms</span>
+            derived.extraRevenue > 0 || derived.extraPipeline.amount > 0 ? (
+              <span className="text-right">
+                {derived.extraRevenue > 0 && (
+                  <span className="block tabular-nums">
+                    {formatKr(derived.extraRevenue)} <span className="text-slate-500">utfört</span>
+                  </span>
+                )}
+                {derived.extraPipeline.amount > 0 && (
+                  <span className="block text-xs text-slate-500 tabular-nums">
+                    {formatKr(derived.extraPipeline.amount)} sålt, ej utfört
+                  </span>
+                )}
               </span>
             ) : null
           }

@@ -404,7 +404,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       )}
 
       <div hidden={activeTab !== 'fakturering'} className="pt-6">
-        <BillingChainSection root={root} units={units} contracts={realContracts} invoices={data.invoices} />
+        <BillingChainSection root={root} units={units} contracts={realContracts} invoices={data.invoices} cases={data.cases} />
       </div>
 
       <div hidden={activeTab !== 'intakter'} className="pt-6">
@@ -413,6 +413,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
           units={units}
           invoices={data.invoices}
           additions={data.additions}
+          cases={data.cases}
         />
       </div>
 

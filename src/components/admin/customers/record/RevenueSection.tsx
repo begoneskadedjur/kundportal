@@ -21,15 +21,19 @@ import {
   formatDateSv,
   formatKr,
   type RecordAddition,
+  type RecordCase,
   type RecordCustomer,
   type RecordInvoice,
 } from '../../../../hooks/useCustomerRecord'
+import { buildRevenueEntries, sumPipeline, sumRevenue } from '../../../../utils/customerRevenue'
 
 interface Props {
   root: RecordCustomer
   units: RecordCustomer[]
   invoices: RecordInvoice[]
   additions: RecordAddition[]
+  /** Ärenden — historiska företagsärenden är intäkt som aldrig fakturerats i portalen */
+  cases: RecordCase[]
 }
 
 const SLAG = [
@@ -37,28 +41,25 @@ const SLAG = [
   { id: 'extra', label: 'Merförsäljning', hint: 'arbete utanför avtalet', dot: 'bg-[#20c58f]/50' },
 ] as const
 
-export default function RevenueSection({ root, units, invoices, additions }: Props) {
+export default function RevenueSection({ root, units, invoices, additions, cases }: Props) {
   const [showHistorical, setShowHistorical] = useState(true)
 
   const model = useMemo(() => {
-    const live = invoices.filter(
-      (i) => (i.status ?? '') !== 'cancelled' && (showHistorical || !i.is_historical)
-    )
-    const amount = (i: RecordInvoice) => Number(i.subtotal ?? 0)
-    const isContract = (i: RecordInvoice) => (i.invoice_type ?? '') === 'contract'
-
-    const contractSum = live.filter(isContract).reduce((s, i) => s + amount(i), 0)
-    const extraSum = live.filter((i) => !isContract(i)).reduce((s, i) => s + amount(i), 0)
-    const total = contractSum + extraSum
-    const historicalSum = live.filter((i) => i.is_historical).reduce((s, i) => s + amount(i), 0)
+    // Båda världarna i en ström: portalens fakturor, Fortnox-importen och
+    // ClickUp-erans utförda ärenden. De överlappar aldrig.
+    const all = buildRevenueEntries(invoices, cases, root.id)
+    const entries = showHistorical ? all : all.filter((e) => !e.historical)
+    const totals = sumRevenue(entries)
+    const pipeline = sumPipeline(cases)
 
     // Per år — bara år med data. Ett enda år ger ingen kurva värd namnet.
     const yearMap = new Map<string, { year: string; avtal: number; mer: number }>()
-    for (const i of live) {
-      const y = (i.billing_period_start ?? i.created_at).slice(0, 4)
+    for (const e of entries) {
+      const y = (e.date ?? '').slice(0, 4)
+      if (!y) continue
       const row = yearMap.get(y) ?? { year: y, avtal: 0, mer: 0 }
-      if (isContract(i)) row.avtal += amount(i)
-      else row.mer += amount(i)
+      if (e.kind === 'contract') row.avtal += e.amount
+      else row.mer += e.amount
       yearMap.set(y, row)
     }
     const perYear = Array.from(yearMap.values()).sort((a, b) => a.year.localeCompare(b.year))
@@ -66,19 +67,29 @@ export default function RevenueSection({ root, units, invoices, additions }: Pro
     // Per enhet — bara meningsfullt för multisite
     const nameById = new Map([root, ...units].map((c) => [c.id, customerRowName(c)]))
     const unitMap = new Map<string, number>()
-    for (const i of live) {
-      unitMap.set(i.customer_id, (unitMap.get(i.customer_id) ?? 0) + amount(i))
+    for (const e of entries) {
+      unitMap.set(e.customerId, (unitMap.get(e.customerId) ?? 0) + e.amount)
     }
     const perUnit = Array.from(unitMap.entries())
       .map(([id, value]) => ({ id, name: nameById.get(id) ?? 'Okänd', value }))
       .sort((a, b) => b.value - a.value)
 
-    return { total, contractSum, extraSum, historicalSum, perYear, perUnit, count: live.length }
-  }, [invoices, showHistorical, root, units])
+    return {
+      total: totals.total,
+      contractSum: totals.contract,
+      extraSum: totals.extra,
+      historicalSum: totals.historical,
+      count: totals.count,
+      perYear,
+      perUnit,
+      pipeline,
+      fromCases: entries.filter((e) => e.source === 'case').length,
+    }
+  }, [invoices, cases, showHistorical, root, units])
 
   const pct = (v: number) => (model.total > 0 ? Math.round((v / model.total) * 100) : 0)
 
-  if (invoices.length === 0) {
+  if (model.count === 0 && model.pipeline.count === 0) {
     return <p className="text-sm text-slate-500">Inga intäkter registrerade för kunden.</p>
   }
 
@@ -128,11 +139,35 @@ export default function RevenueSection({ root, units, invoices, additions }: Pro
               onChange={(e) => setShowHistorical(e.target.checked)}
               className="rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f]"
             />
-            Inkludera historik från Fortnox
+            Inkludera historik
             <span className="text-slate-600 tabular-nums">({formatKr(model.historicalSum)})</span>
+            {model.fromCases > 0 && (
+              <span className="text-slate-600">
+                · varav {model.fromCases} ärende{model.fromCases === 1 ? '' : 'n'} före portalen
+              </span>
+            )}
           </label>
         )}
       </section>
+
+      {/* Sålt men inte utfört — pipeline, aldrig intäkt. Hålls medvetet
+          utanför totalen: offerter och bokningar är inte levererat arbete. */}
+      {model.pipeline.count > 0 && (
+        <section className="p-3 bg-slate-800/20 border border-slate-700/60 rounded-xl">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs uppercase tracking-wide text-slate-500">Sålt, ej utfört</span>
+            <span className="text-xs text-slate-600">
+              {model.pipeline.count} ärende{model.pipeline.count === 1 ? '' : 'n'}
+            </span>
+            <span className="ml-auto text-sm text-slate-300 tabular-nums">
+              {formatKr(model.pipeline.amount)}
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-600 mt-1">
+            Bokade besök och signerade offerter. Räknas som intäkt först när arbetet är utfört.
+          </p>
+        </section>
+      )}
 
       {/* Utveckling per år — bara när det finns mer än ett år att jämföra */}
       {model.perYear.length > 1 && (
