@@ -223,6 +223,158 @@ export function ContractStatusMark({
 
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Tidslinjen
+// ---------------------------------------------------------------------------
+
+export type TimelineKind =
+  | 'start'
+  | 'signed'
+  | 'addition'
+  | 'index'
+  | 'terminated'
+  | 'notice'
+  | 'end'
+  | 'invoice'
+  | 'premium'
+  | 'scope'
+  | 'pricelist'
+  | 'inspection'
+
+/**
+ * Färg och etikett per händelsetyp — en enda sanning för hela tidslinjen.
+ * Grönt = bra, bärnsten = varning, rött = avslut, blått = pengar,
+ * lila = besök och justeringar.
+ */
+export const TIMELINE_STYLE: Record<TimelineKind, { color: string; label: string }> = {
+  signed: { color: '#20c58f', label: 'Signering' },
+  start: { color: '#20c58f', label: 'Avtalsstart' },
+  addition: { color: '#34d399', label: 'Avtalstillägg' },
+  premium: { color: '#a78bfa', label: 'Premiejustering' },
+  index: { color: '#a78bfa', label: 'Indexjustering' },
+  pricelist: { color: '#38bdf8', label: 'Prislista' },
+  invoice: { color: '#60a5fa', label: 'Faktura' },
+  inspection: { color: '#c084fc', label: 'Kontrollbesök' },
+  scope: { color: '#38bdf8', label: 'Omfattning' },
+  notice: { color: '#f59e0b', label: 'Uppsägningsfrist' },
+  end: { color: '#f59e0b', label: 'Periodskifte' },
+  terminated: { color: '#ef4444', label: 'Uppsägning' },
+}
+
+/**
+ * Tidslinjemarkör. Ringen är alltid r=9 i viewBoxen så alla markörer ligger
+ * på exakt samma axel — motivet varierar, geometrin aldrig.
+ *
+ * Tidslinjen byggde redan tolv semantiska händelsetyper men renderade dem
+ * identiskt som 2,5px-prickar. All den informationen kastades bort i sista
+ * steget.
+ */
+export function TimelineMarker({
+  kind,
+  isFuture = false,
+  size = 22,
+}: {
+  kind: TimelineKind
+  /** Framtida händelser: ihålig ring med streckad kant */
+  isFuture?: boolean
+  size?: number
+}) {
+  const c = TIMELINE_STYLE[kind].color
+  const fill = isFuture ? '#0f172a' : `${c}1f`
+  const op = isFuture ? 0.6 : 1
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 22 22" fill="none" aria-hidden className="shrink-0 block">
+      <circle
+        cx="11"
+        cy="11"
+        r="9"
+        fill={fill}
+        stroke={c}
+        strokeWidth={isFuture ? 1.2 : 1.6}
+        strokeDasharray={isFuture ? '2.6 2.2' : undefined}
+        opacity={op}
+      />
+      <g stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none" opacity={op}>
+        {kind === 'signed' && (
+          <>
+            {/* Penna som drar en signaturslinga */}
+            <path d="M6.5 13.5 Q8.5 9 10 11.5 T13.5 9.5" />
+            <path d="M14 13.8 L15.8 12" strokeWidth="1.7" />
+          </>
+        )}
+        {kind === 'start' && (
+          <>
+            {/* Flagga: här börjar det */}
+            <path d="M8 6 V16.5" />
+            <path d="M8 6.8 H15 L13 9.4 L15 12 H8 Z" fill={`${c}55`} />
+          </>
+        )}
+        {kind === 'addition' && (
+          <>
+            <path d="M7 6.5 H12.5 L15 9 V15.5 H7 Z" />
+            <path d="M11 10.5 V14 M9.2 12.2 H12.8" />
+          </>
+        )}
+        {(kind === 'premium' || kind === 'index') && (
+          /* Trappsteg uppåt — premietrappan bokstavligt */
+          <path d="M6 15 H9 V12 H12 V9 H16" />
+        )}
+        {kind === 'invoice' && (
+          <>
+            {/* Ark med sågtandad underkant */}
+            <path d="M7 6 H15 V15 L13.7 13.9 L12.3 15 L11 13.9 L9.6 15 L8.3 13.9 L7 15 Z" />
+            <path d="M9 9 H13 M9 11.3 H12" strokeWidth="1.2" />
+          </>
+        )}
+        {kind === 'inspection' && (
+          <>
+            {/* Klämbräda */}
+            <path d="M7 7.5 H15 V16 H7 Z" />
+            <path d="M9.5 6 H12.5 V8 H9.5 Z" fill={`${c}55`} />
+            <path d="M9 11.5 L10.4 13 L13.2 10" strokeWidth="1.4" />
+          </>
+        )}
+        {kind === 'scope' && (
+          <>
+            {/* Kartnål: en enhet ansluter eller lämnar */}
+            <path d="M11 16 C11 16 15 12.4 15 10 A4 4 0 1 0 7 10 C7 12.4 11 16 11 16 Z" />
+            <circle cx="11" cy="10" r="1.5" fill={c} stroke="none" />
+          </>
+        )}
+        {kind === 'pricelist' && (
+          <>
+            {/* Prislapp med hål */}
+            <path d="M11.5 6 H16 V10.5 L10 16.5 L5.5 12 Z" />
+            <circle cx="13.6" cy="8.4" r="1.1" />
+          </>
+        )}
+        {kind === 'notice' && (
+          <>
+            {/* Klocka: sista uppsägningsdag */}
+            <circle cx="11" cy="11.4" r="4.6" />
+            <path d="M11 8.8 V11.6 L13 12.8" />
+          </>
+        )}
+        {kind === 'end' && (
+          <>
+            {/* Cirkelpil: perioden rullar vidare om ingen säger upp */}
+            <path d="M15.4 11 A4.4 4.4 0 1 1 13.6 7.5" />
+            <path d="M13.2 5 L14 7.8 L11.2 8.2" />
+          </>
+        )}
+        {kind === 'terminated' && (
+          <>
+            {/* Brutet ark: avtalet upphör */}
+            <path d="M7 6.5 H12.5 L15 9 V15.5 H7 Z" />
+            <path d="M13.8 6.4 L8.2 15.8" strokeWidth="1.8" />
+          </>
+        )}
+      </g>
+    </svg>
+  )
+}
+
 /** Tomt tillstånd: två tomma ark och ett obrutet sigill. */
 export function EmptyContractsIllustration({ className = '' }: { className?: string }) {
   return (

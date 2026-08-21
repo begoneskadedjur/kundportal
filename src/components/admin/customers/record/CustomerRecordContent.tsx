@@ -24,21 +24,23 @@ import {
 } from '../../../../hooks/useCustomerRecord'
 import RecordHeader from './RecordHeader'
 import ContractCard from './ContractCard'
-import ContractTimelineList, {
+import {
   buildFamilyTimeline,
   nextUpcomingEvent,
 } from './ContractTimelineList'
+import ContractTimeline from './ContractTimeline'
 import BillingChainSection from './BillingChainSection'
 import UnitsSection from './UnitsSection'
 import AccessAccountsSection, { countAccessPersons } from './AccessAccountsSection'
 import ContractMapSection from './ContractMapSection'
 import CustomerCasesSection from './CustomerCasesSection'
+import RevenueSection from './RevenueSection'
 import { EmptyContractsIllustration } from './ContractGlyphs'
 import { contractState } from '../../../../utils/contractLifecycle'
 
 const EditCaseModal = lazy(() => import('../../technicians/EditCaseModal'))
 
-type TabId = 'oversikt' | 'avtal' | 'avtalskarta' | 'fakturering' | 'enheter' | 'arenden' | 'atkomst'
+type TabId = 'oversikt' | 'avtal' | 'avtalskarta' | 'fakturering' | 'intakter' | 'enheter' | 'arenden' | 'atkomst'
 
 function WhisperHeader({ children }: { children: React.ReactNode }) {
   return <h2 className="text-xs uppercase tracking-wide text-slate-500 mb-3">{children}</h2>
@@ -280,6 +282,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     { id: 'avtal', label: `Avtal (${realContracts.length})`, visible: true },
     { id: 'avtalskarta', label: 'Avtalskarta', visible: !!onDataChanged },
     { id: 'fakturering', label: 'Fakturering', visible: true },
+    { id: 'intakter', label: 'Intäkter', visible: true },
     { id: 'enheter', label: `Enheter (${units.length})`, visible: showUnitsTab },
     { id: 'arenden', label: `Ärenden (${totalCases})`, visible: true },
     { id: 'atkomst', label: `Åtkomst & konton (${accessCount})`, visible: true },
@@ -345,7 +348,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
 
         <section>
           <WhisperHeader>Tidslinje</WhisperHeader>
-          <ContractTimelineList events={timelineEvents} emptyText="Inga avtalshändelser ännu." />
+          <ContractTimeline events={timelineEvents} emptyText="Inga avtalshändelser ännu." />
         </section>
       </div>
 
@@ -398,7 +401,16 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       )}
 
       <div hidden={activeTab !== 'fakturering'} className="pt-6">
-        <BillingChainSection root={root} units={units} contracts={realContracts} billingItems={billingItems} />
+        <BillingChainSection root={root} units={units} contracts={realContracts} invoices={data.invoices} />
+      </div>
+
+      <div hidden={activeTab !== 'intakter'} className="pt-6">
+        <RevenueSection
+          root={root}
+          units={units}
+          invoices={data.invoices}
+          additions={data.additions}
+        />
       </div>
 
       {showUnitsTab && (

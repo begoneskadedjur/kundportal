@@ -117,6 +117,36 @@ export interface RecordContractEvent {
 }
 
 // Avtalskartan: kontrollbesök (station_inspection_sessions) för § 3 Uppföljning
+/**
+ * Faktura — det kanoniska intäktsspåret.
+ *
+ * `invoice_type` skiljer årspremie från arbete utanför avtalet:
+ *   'contract' = avtalsintäkt (premien)
+ *   'adhoc' / 'case' / 'private' = merförsäljning
+ *
+ * `is_historical` skiljer Fortnox-importerad historik (ej klickbar) från
+ * fakturor skapade i portalen. Fältet är ifyllt på alla rader.
+ *
+ * Belopp visas ex moms (`subtotal`) enligt beslut — `total_amount` finns kvar
+ * för de fall inkl moms behövs.
+ */
+export interface RecordInvoice {
+  id: string
+  customer_id: string
+  contract_id: string | null
+  case_id: string | null
+  invoice_type: string | null
+  invoice_number: string | null
+  status: string | null
+  subtotal: number | null
+  total_amount: number | null
+  billing_period_start: string | null
+  billing_period_end: string | null
+  is_historical: boolean | null
+  due_date: string | null
+  created_at: string
+}
+
 /** Löpande schema — bär besöksfrekvensen för leveransmätningen. */
 export interface RecordSchedule {
   id: string
@@ -235,6 +265,7 @@ export interface CustomerRecordData {
   /** Kontrollbesök för familjen (§ 3 Uppföljning) */
   inspections: RecordInspectionSession[]
   schedules: RecordSchedule[]
+  invoices: RecordInvoice[]
   /** Åtkomst & konton (etapp 6) — sekundärdata, tomma listor vid fel */
   access: RecordAccessData
 }
@@ -306,6 +337,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       inspectionsRes,
       businessCasesRes,
       schedulesRes,
+      invoicesRes,
     ] = await Promise.all([
       supabase
         .from('contracts')
@@ -387,6 +419,18 @@ export function useCustomerRecord(customerId: string | undefined) {
         .from('recurring_schedules')
         .select('id, customer_id, contract_id, frequency, status, schedule_start_date, generated_until')
         .in('customer_id', familyIds),
+      // FAKTUROR — det kanoniska intäktsspåret. contract_billing_items är
+      // faktureringsUNDERLAG: bara 13 av 73 rader blir fakturor, så en vy som
+      // bara läser underlaget visar en bråkdel av vad kunden fakturerats.
+      supabase
+        .from('invoices')
+        .select(
+          'id, customer_id, contract_id, case_id, invoice_type, invoice_number, status, ' +
+            'subtotal, total_amount, billing_period_start, billing_period_end, ' +
+            'is_historical, due_date, created_at'
+        )
+        .in('customer_id', familyIds)
+        .order('billing_period_start', { ascending: false }),
     ])
 
     // Multisite-roller kräver organisationens id — hämtas bara när root är multisite.
@@ -543,6 +587,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       })
     ) as RecordInspectionSession[]
     const schedules = (schedulesRes.error ? [] : (schedulesRes.data ?? [])) as unknown as RecordSchedule[]
+    const invoices = (invoicesRes.error ? [] : (invoicesRes.data ?? [])) as unknown as RecordInvoice[]
     const caseCounts: Record<string, number> = {}
     for (const row of familyCases) {
       if (!row.customer_id) continue
@@ -563,6 +608,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       contractEvents,
       inspections,
       schedules,
+      invoices,
       access: {
         profiles: (profilesRes.error ? [] : (profilesRes.data ?? [])) as RecordAccessProfile[],
         invitations: (invitationsRes.error ? [] : (invitationsRes.data ?? [])) as RecordAccessInvitation[],
@@ -719,6 +765,12 @@ export function formatDateSv(iso: string | null | undefined): string {
 export function formatMonthSv(iso: string | null | undefined): string {
   if (!iso) return '–'
   return new Date(iso).toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
+}
+
+/** "19 sep" — utan år, för tidslinjen där årsbandet redan bär året. */
+export function formatDayMonthSv(iso: string | null | undefined): string {
+  if (!iso) return '–'
+  return new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
 }
 
 /** Sista uppsägningsdag: contract_end_date − notice_period_months */
