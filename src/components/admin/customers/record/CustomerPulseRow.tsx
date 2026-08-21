@@ -70,8 +70,13 @@ export default function CustomerPulseRow({
       (b.billing_period_start ?? '').localeCompare(a.billing_period_start ?? '')
     )[0] ?? null
   const todayKey = today.slice(0, 10)
+  // Bara SKICKADE fakturor kan förfalla — en faktura som väntar på godkännande
+  // har aldrig nått kunden, hur gammalt förfallodatumet än är.
   const overdue = liveInvoices.filter(
-    (i) => i.due_date && i.due_date < todayKey && (i.status ?? '') !== 'paid'
+    (i) =>
+      i.due_date &&
+      i.due_date < todayKey &&
+      ['sent', 'invoiced', 'booked'].includes((i.status ?? '').toLowerCase())
   ).length
 
   const openCases = cases.filter(

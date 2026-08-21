@@ -167,29 +167,38 @@ export default function ContractTimeline({
 
   return (
     <div>
-      {/* Filterchips — döljer brus och fungerar som färgnyckel */}
+      {/* Filter som en legend, inte som pills: markören själv är knappen och
+          fungerar samtidigt som färgnyckel. En bottenlinje i typens färg
+          markerar vad som är på. */}
       {model.presentKinds.length > 1 && (
-        <div className="flex flex-wrap items-center gap-1.5 mb-4">
-          {model.presentKinds.map((k) => (
-            <button
-              key={k}
-              onClick={() => toggle(k)}
-              aria-pressed={!hidden.has(k)}
-              className={`inline-flex items-center gap-1.5 text-[11px] rounded-full border px-2.5 py-1 transition-colors ${
-                hidden.has(k)
-                  ? 'border-slate-800 text-slate-600 hover:text-slate-400'
-                  : 'border-slate-700 bg-slate-900 text-slate-300'
-              }`}
-            >
-              <span
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ background: TIMELINE_STYLE[k].color, opacity: hidden.has(k) ? 0.3 : 1 }}
-                aria-hidden
-              />
-              {TIMELINE_STYLE[k].label}
-              <span className="tabular-nums text-slate-600">{model.countByKind[k]}</span>
-            </button>
-          ))}
+        <div className="flex flex-wrap items-stretch gap-x-5 gap-y-2 mb-5 pb-3 border-b border-slate-800/70">
+          {model.presentKinds.map((k) => {
+            const off = hidden.has(k)
+            return (
+              <button
+                key={k}
+                onClick={() => toggle(k)}
+                aria-pressed={!off}
+                title={off ? `Visa ${TIMELINE_STYLE[k].label.toLowerCase()}` : `Dölj ${TIMELINE_STYLE[k].label.toLowerCase()}`}
+                className="group flex items-center gap-2 pb-1.5 border-b-2 transition-colors"
+                style={{ borderBottomColor: off ? 'transparent' : TIMELINE_STYLE[k].color }}
+              >
+                <span className={off ? 'opacity-30 grayscale transition-opacity' : 'transition-opacity'}>
+                  <TimelineMarker kind={k} size={18} />
+                </span>
+                <span
+                  className={`text-[11px] transition-colors ${
+                    off ? 'text-slate-600 group-hover:text-slate-400' : 'text-slate-300'
+                  }`}
+                >
+                  {TIMELINE_STYLE[k].label}
+                </span>
+                <span className={`text-[11px] tabular-nums ${off ? 'text-slate-700' : 'text-slate-500'}`}>
+                  {model.countByKind[k]}
+                </span>
+              </button>
+            )
+          })}
         </div>
       )}
 

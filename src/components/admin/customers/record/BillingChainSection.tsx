@@ -38,14 +38,25 @@ const STATUS_META: Record<AggStatus, { label: string; className: string; Icon: t
 
 const STEP_ORDER: AggStatus[] = ['pending', 'sent', 'paid']
 
-/** Fakturans status → visningsstatus. Förfallen härleds ur due_date. */
+/** Statusar där fakturan faktiskt nått kunden och alltså KAN förfalla. */
+const DELIVERED = ['sent', 'invoiced', 'booked']
+
+/**
+ * Fakturans status → visningsstatus.
+ *
+ * Förfallen kräver att fakturan är SKICKAD. Ett passerat förfallodatum ensamt
+ * räcker inte: 40 fakturor på 927 tkr ligger i 'pending_approval' med gammalt
+ * due_date — de har aldrig nått kunden och kan därför inte vara förfallna.
+ * De är osända, vilket är ett internt ärende, inte en betalningspåminnelse.
+ */
 function invoiceStatus(inv: RecordInvoice): AggStatus {
   const s = (inv.status ?? '').toLowerCase()
   if (s === 'cancelled') return 'cancelled'
   if (s === 'paid') return 'paid'
   const today = new Date().toISOString().slice(0, 10)
-  if (inv.due_date && inv.due_date < today && s !== 'paid') return 'overdue'
-  if (['sent', 'invoiced', 'booked'].includes(s)) return 'sent'
+  if (DELIVERED.includes(s)) {
+    return inv.due_date && inv.due_date < today ? 'overdue' : 'sent'
+  }
   return 'pending'
 }
 

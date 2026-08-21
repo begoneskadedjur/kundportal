@@ -4,10 +4,8 @@
 // version: RecordHeader + avtalskorten (kollapsade). Ingen datahämtning här —
 // data kommer från useCustomerRecord via anroparen.
 
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import toast from 'react-hot-toast'
+import { useMemo, useState } from 'react'
 import { Archive } from 'lucide-react'
-import { supabase } from '../../../../lib/supabase'
 import {
   contractEffectiveAnnualValue,
   customerRowName,
@@ -36,10 +34,10 @@ import ContractMapSection from './ContractMapSection'
 import CustomerCasesSection from './CustomerCasesSection'
 import RevenueSection from './RevenueSection'
 import CustomerPulseRow from './CustomerPulseRow'
+import CaseDetailPanel from './CaseDetailPanel'
 import { EmptyContractsIllustration } from './ContractGlyphs'
 import { contractState } from '../../../../utils/contractLifecycle'
 
-const EditCaseModal = lazy(() => import('../../technicians/EditCaseModal'))
 
 type TabId = 'oversikt' | 'avtal' | 'avtalskarta' | 'fakturering' | 'intakter' | 'enheter' | 'arenden' | 'atkomst'
 
@@ -59,44 +57,10 @@ interface Props {
 
 export default function CustomerRecordContent({ data, basePath, density, onDataChanged }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('oversikt')
-  // Ärendemodalen vill ha hela raden, inte bara ett id — den hämtas vid klick
+  // Ärendet visas i en LÄSVY som hämtar sin egen data. Redigering sker i
+  // ärendevyn — de fulla modalerna är arbetsverktyg med tabellspecifika
+  // fältnamn och hör inte hemma här.
   const [openCase, setOpenCase] = useState<RecordCase | null>(null)
-  const [fullCase, setFullCase] = useState<Record<string, unknown> | null>(null)
-
-  useEffect(() => {
-    if (!openCase) {
-      setFullCase(null)
-      return
-    }
-    let cancelled = false
-    void (async () => {
-      // EditCaseModal hanterar båda tabellerna — den skiljer dem åt på
-      // case_type, som CaseSearchCard sätter på samma sätt. Avtalsärenden
-      // (inkl. etablering, stationskontroll och extrabesök) ligger i cases;
-      // företagsärenden i business_cases.
-      const isBusiness = openCase.origin === 'business'
-      const { data: row, error } = isBusiness
-        ? await supabase.from('business_cases').select('*').eq('id', openCase.id).maybeSingle()
-        : await supabase
-            .from('cases')
-            .select('*, customer:customers(company_name, contact_person, contact_email, contact_phone)')
-            .eq('id', openCase.id)
-            .maybeSingle()
-      if (cancelled) return
-      if (error || !row) {
-        toast.error('Kunde inte öppna ärendet')
-        setOpenCase(null)
-        return
-      }
-      setFullCase({
-        ...(row as Record<string, unknown>),
-        ...(isBusiness ? { case_type: 'business' as const } : {}),
-      })
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [openCase])
 
   const derived = useMemo(() => {
     const { customer, root, units, contracts, billingItems, additions, premiumEvents, contractSites, caseCounts } = data
@@ -147,9 +111,16 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     const realContracts = sortedContracts.filter(
       (c) => !isImportedContract(c) && (c.status as string) !== 'trashed'
     )
-    const importLeftovers = sortedContracts.filter(
+    // Importrester delas i två: de som väntar på åtgärd, och de som redan
+    // ersatts av ett portalskapat avtal. De senare är tomma skal — historiken
+    // flyttades vid konverteringen — men får INTE raderas: de bär de riktiga
+    // Oneflow-id:na, och nattsynken återskapar allt som saknas i DB som nya
+    // AKTIVA avtal. Avtalskartan gör redan samma uppdelning.
+    const allLeftovers = sortedContracts.filter(
       (c) => isImportedContract(c) || (c.status as string) === 'trashed'
     )
+    const importLeftovers = allLeftovers.filter((c) => !isEndedContract(c))
+    const replacedLeftovers = allLeftovers.filter((c) => isEndedContract(c))
 
     const activeContracts = realContracts.filter((c) => !isEndedContract(c))
     // Uppsagt-men-löpande räknas som levande: det faktureras och schemaläggs
@@ -197,6 +168,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       liveContracts,
       endedContracts,
       importLeftovers,
+      replacedLeftovers,
       activeContracts,
       familyAnnualValue,
       contractDistribution,
@@ -218,6 +190,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     liveContracts,
     endedContracts,
     importLeftovers,
+    replacedLeftovers,
     activeContracts,
     familyAnnualValue,
     contractDistribution,
@@ -388,20 +361,35 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
             <div className="px-4 pb-4 space-y-3">{renderContractCards(false, endedContracts)}</div>
           </details>
         )}
-        {/* Importrester hör inte ihop med de riktiga avtalen — de är historik
-            från importen och skulle annars se ut som dubbletter. Hopfällda,
-            precis som på Avtalskartan. */}
+        {/* Importrester som väntar på åtgärd — de har ännu inte konverterats
+            till riktiga avtal. */}
         {importLeftovers.length > 0 && (
           <details className="mt-4 border border-slate-700/50 rounded-2xl">
             <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-400 select-none flex items-center gap-2 hover:text-slate-200 transition-colors">
               <Archive className="w-3.5 h-3.5 text-slate-500" />
               Importrester ({importLeftovers.length})
               <span className="font-normal text-slate-500">
-                — historik från importen, inte aktiva avtal
+                — behöver konverteras eller städas
               </span>
             </summary>
             <div className="px-4 pb-4 space-y-3">
               {renderContractCards(false, importLeftovers)}
+            </div>
+          </details>
+        )}
+        {/* Redan ersatta: konverteringen ÄR gjord och historiken ligger på det
+            nya avtalet. Raderna finns kvar bara för att bära Oneflow-id:t —
+            raderas de återskapar nattsynken dem som aktiva avtal. Ingen
+            åtgärd behövs, så de tonas ned ytterligare. */}
+        {replacedLeftovers.length > 0 && (
+          <details className="mt-3 border border-slate-800/60 rounded-2xl">
+            <summary className="cursor-pointer px-4 py-2.5 text-xs text-slate-500 select-none flex items-center gap-2 hover:text-slate-300 transition-colors">
+              <Archive className="w-3 h-3 text-slate-600" />
+              Ersatta av nyare avtal ({replacedLeftovers.length})
+              <span className="text-slate-600">— teknisk koppling till Oneflow, ingen åtgärd behövs</span>
+            </summary>
+            <div className="px-4 pb-4 space-y-3">
+              {renderContractCards(false, replacedLeftovers)}
             </div>
           </details>
         )}
@@ -455,25 +443,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
         <AccessAccountsSection access={access} customerById={customerById} />
       </div>
 
-      {/* Ärendemodalen laddas först vid klick — den är stor (106 kB) och ska
-          inte ligga i kundsidans bundle. */}
-      {fullCase && (
-        <Suspense fallback={null}>
-          <EditCaseModal
-            isOpen
-            onClose={() => {
-              setOpenCase(null)
-              setFullCase(null)
-            }}
-            onSuccess={() => {
-              setOpenCase(null)
-              setFullCase(null)
-              void onDataChanged?.()
-            }}
-            caseData={fullCase as never}
-          />
-        </Suspense>
-      )}
+      {openCase && <CaseDetailPanel caseRow={openCase} onClose={() => setOpenCase(null)} />}
     </div>
   )
 }
