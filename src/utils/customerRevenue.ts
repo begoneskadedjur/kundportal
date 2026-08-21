@@ -3,8 +3,15 @@
 // EN definition av vad kundens intäkt är. Delas av Intäkter, Fakturering och
 // Ärenden så att samma kund aldrig visar olika siffror på olika flikar.
 //
-// REGELN: intäkt är UTFÖRT arbete. Offerter, bokningar och borttagna ärenden
-// räknas aldrig, oavsett vilket pris som står på dem.
+// REGELN: intäkt är UTFÖRT arbete.
+//
+// Men statusen är bara tillförlitlig för ärenden skapade i portalen.
+// Företagsärendena slutade uppdateras när ClickUp avvecklades — inget är
+// skapat efter april 2026, och ett ärende från 2024 som står "Bokad" är i
+// verkligheten gjort och betalt. Därför räknas alla företagsärenden före
+// juni 2026 som utförda, oavsett vad statusfältet säger.
+//
+// Borttagna ärenden är aldrig intäkt, oavsett ålder.
 //
 // Tre källor som aldrig överlappar (verifierat: noll av 290 avslutade
 // företagsärenden har en faktura i portalen):
@@ -23,9 +30,29 @@ import type { RecordCase, RecordInvoice } from '../hooks/useCustomerRecord'
 /** Ärendestatusar som betyder att arbetet är utfört. */
 const DONE_STATUSES = ['avslutat', 'stängt', 'stangt']
 
-export function isCaseCompleted(c: Pick<RecordCase, 'status' | 'completed_date'>): boolean {
+/** Aldrig intäkt, oavsett ålder. */
+const CANCELLED_STATUSES = ['borttaget', 'makulerat']
+
+/**
+ * Efter detta datum speglar företagsärendens status verkligheten igen.
+ * Sätts efter sista skapade business_case (2026-04-20) med marginal.
+ */
+const CLICKUP_CUTOFF = '2026-06-01'
+
+export function isCaseCompleted(
+  c: Pick<RecordCase, 'status' | 'completed_date' | 'origin' | 'created_at'>
+): boolean {
+  if (CANCELLED_STATUSES.includes((c.status ?? '').toLowerCase())) return false
   if (c.completed_date) return true
-  return DONE_STATUSES.includes((c.status ?? '').toLowerCase())
+  if (DONE_STATUSES.includes((c.status ?? '').toLowerCase())) return true
+
+  // ClickUp-eran: företagsärenden slutade uppdateras när ClickUp avvecklades.
+  // Ett ärende från 2024 som står "Bokad" är inte bokat — det är utfört och
+  // betalt, statusen slutade bara följa med. Inget företagsärende har skapats
+  // efter april 2026, så allt äldre är avslutat i verkligheten.
+  if (c.origin === 'business' && c.created_at < CLICKUP_CUTOFF) return true
+
+  return false
 }
 
 export type RevenueKind = 'contract' | 'extra'
@@ -131,7 +158,9 @@ export function sumRevenue(entries: RevenueEntry[]): RevenueTotals {
 
 /**
  * Ärenden som är sålda men INTE utförda — pipeline, aldrig intäkt.
- * Systemomfattande ligger 634 tkr i det läget, inklusive borttagna ärenden.
+ *
+ * Gäller i praktiken bara ärenden som skapats i portalen: företagsärenden
+ * från ClickUp-eran räknas som utförda oavsett status (se isCaseCompleted).
  */
 export function sumPipeline(cases: RecordCase[]): { amount: number; count: number } {
   let amount = 0
@@ -140,7 +169,7 @@ export function sumPipeline(cases: RecordCase[]): { amount: number; count: numbe
     const p = Number(c.price ?? 0)
     if (p <= 0) continue
     if (isCaseCompleted(c)) continue
-    if ((c.status ?? '').toLowerCase() === 'borttaget') continue
+    if (CANCELLED_STATUSES.includes((c.status ?? '').toLowerCase())) continue
     amount += p
     count += 1
   }
