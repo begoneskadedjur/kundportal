@@ -10,6 +10,7 @@ import {
   getContractProgress
 } from '../utils/customerMetrics'
 import { parseContractLengthMonths } from '../utils/contractLength'
+import { isImportedContractRow } from '../utils/contractLifecycle'
 
 // Beräknar totalt avtalsvärde med rätt semantik:
 // ≥12 mån → annual_value × (månader/12), <12 mån → annual_value (ingen halvering)
@@ -341,9 +342,17 @@ export function useConsolidatedCustomers() {
       const { data: contractsData } = contractsResult
 
       // Bygg contracts-map: customer_id -> ContractWithBilling[]
+      //
+      // IMPORTRESTER RÄKNAS INTE. En importrad (template_id='imported' eller
+      // oneflow_contract_id 'imported-…') är ett tomt skal från importen, inte
+      // ett avtal — den saknar belopp och datum och ska konverteras eller
+      // städas. Kundsidan har alltid filtrerat bort dem; utan samma filter här
+      // visade listan "2 avtal" för kunder som bevisligen har ett (12 kunder),
+      // och portföljens totalsumma blev lika mycket för hög.
       const contractsByCustomer = new Map<string, ContractWithBilling[]>()
       ;(contractsData ?? []).forEach((c: any) => {
         if (!c.customer_id) return
+        if (isImportedContractRow(c)) return
         const arr = contractsByCustomer.get(c.customer_id) ?? []
         arr.push(c as ContractWithBilling)
         contractsByCustomer.set(c.customer_id, arr)
