@@ -294,7 +294,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const result = await withCronLog('sync-oneflow', async () => {
-    const stats = { trashed: 0, imported: 0, driftFixed: 0, errors: 0 }
+    // 'missingInOneflow' räknas men åtgärdas aldrig — se punkt 3 nedan.
+    const stats = { missingInOneflow: 0, imported: 0, driftFixed: 0, errors: 0 }
 
     // TRASHING-SKYDD: mallistan MÅSTE läsas färskt från oneflow_templates.
     // fetchTemplatesStrict kastar vid fel/tom tabell => hela körningen loggas
@@ -337,12 +338,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // 3. Hitta borttagna/papperskorgs-kontrakt (i DB men inte i Oneflow)
+    // 3. Avtal som finns i DB men inte i Oneflow.
+    //
+    // Dessa RÖRS INTE. Ett avtal får aldrig försvinna automatiskt: det sägs
+    // upp av oss, avslutas när uppsägningstiden löpt ut, och ligger sedan kvar
+    // tills någon aktivt raderar det. Att någon tar bort dokumentet i Oneflow
+    // ändrar ingenting i portalen.
+    //
+    // Den gamla logiken slog dessutom mot fel population: PORTALSKAPADE avtal
+    // (oneflow_contract_id 'local-<uuid>') finns per definition aldrig i
+    // Oneflow, så varje avtal skapat på Avtalskartan trashades nästa natt.
+    // Tre riktiga avtal förlorades så — Kiab, Vånga Vinteknik och RBFG,
+    // alla inom samma sekund 2026-08-21 03:01.
     const TERMINAL_STATUSES = new Set(['declined', 'ended', 'trashed'])
-    const trashedIds: string[] = []
+    const missingInOneflow: string[] = []
     for (const [id, record] of dbMap) {
       if (!oneflowIdSet.has(id) && !TERMINAL_STATUSES.has(record.status)) {
-        trashedIds.push(id)
+        missingInOneflow.push(id)
       }
     }
 
@@ -362,23 +374,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return dbRecord.status !== expectedStatus
     })
 
-    console.log(`[sync-oneflow] Borttagna: ${trashedIds.length}, Saknade: ${missingContracts.length}, Statusdrift: ${driftedContracts.length}`)
+    console.log(`[sync-oneflow] Saknas i Oneflow: ${missingInOneflow.length} (rörs ej), Saknade i DB: ${missingContracts.length}, Statusdrift: ${driftedContracts.length}`)
 
-    // === Markera borttagna som declined ===
-    for (const id of trashedIds) {
-      const { error } = await supabase
-        .from('contracts')
-        .update({ status: 'trashed', updated_at: new Date().toISOString() })
-        .eq('oneflow_contract_id', id)
-
-      if (error) {
-        console.error(`[sync-oneflow] Fel vid markering av ${id}:`, error.message)
-        stats.errors++
-      } else {
-        stats.trashed++
-        console.log(`[sync-oneflow] Markerade ${id} som trashed (borttagen i Oneflow)`)
-      }
-      await delay(30)
+    // === Avtal som saknas i Oneflow: LOGGAS, ändras aldrig ===
+    // Loggen finns kvar som spårbarhet — man ska kunna se att ett dokument
+    // försvunnit i Oneflow — men portalen är sanningskällan för avtalets
+    // livscykel och rör inte raden.
+    stats.missingInOneflow = missingInOneflow.length
+    if (missingInOneflow.length > 0) {
+      console.log(
+        `[sync-oneflow] Följande finns i portalen men inte i Oneflow (oförändrade): ${missingInOneflow.join(', ')}`
+      )
     }
 
     // === Importera saknade kontrakt ===
