@@ -54,6 +54,7 @@ import ContractStamp from './ContractStamp'
 import DateField from '../../../ui/DateField'
 import { PriceListService } from '../../../../services/priceListService'
 import { useContractTypeOptions } from '../../../../hooks/useContractTypeOptions'
+import { useTechnicians } from '../../../../hooks/useTechnicians'
 import type { PriceList } from '../../../../types/articles'
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
 import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
@@ -128,6 +129,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const { root, units, contracts, additions, billingItems, premiumEvents, contractSites, cases, contractEvents, inspections } =
     data
   const navigate = useNavigate()
+  // Aktiv personal — säljaren väljs ur registret, aldrig som fritext.
+  // Avtalen bar redan 21 unika namn mot 12 i personalregistret.
+  const { technicians } = useTechnicians()
 
   const [priceLists, setPriceLists] = useState<PriceList[]>([])
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -1131,6 +1135,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               }
               onEndCoverage={(cs, x, y) => endCoverage(c, cs, x, y)}
               onEditPriceList={(x, y) => setPricePrompt({ x, y, contract: c })}
+              staff={technicians}
               contractTypes={contractTypes.map((t) => t.value)}
               onChangeType={(t) => changeContractType(c, t)}
               onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
@@ -1252,6 +1257,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                     onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
                     isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
                     isSingleSite={isSingleSite}
+                    staff={technicians}
                     contractTypes={contractTypes.map((t) => t.value)}
                     terminatedBy={terminatedByFor(c.id)}
                     onRenew={() => renewContract(c)}
@@ -2182,6 +2188,8 @@ interface PaperProps {
   onEditSignedAt?: () => void
   /** Spara avtalets säljare (den som skrivit under för BeGone) */
   onSaveSalesPerson?: (name: string | null) => Promise<void>
+  /** Aktiv personal att välja säljare bland — aldrig fritext */
+  staff: { id: string; name: string }[]
   /** Säg upp avtalet (saknas för redan avslutade) */
   onTerminate?: () => void
   /** Ångra uppsägning */
@@ -2209,12 +2217,15 @@ function SignatureLine({
   fallback,
   ink,
   archived,
+  staff,
   onSave,
 }: {
   value: string | null
   fallback: string | null
   ink: (typeof PAPER_INK)['live' | 'archived']
   archived: boolean
+  /** Aktiv personal att välja bland — aldrig fritext */
+  staff: { id: string; name: string }[]
   /** Utelämnas på arkiverade avtal — en avslutad underskrift ändras inte */
   onSave?: (name: string | null) => Promise<void>
 }) {
@@ -2229,9 +2240,9 @@ function SignatureLine({
     color: archived ? '#3a424f' : '#2f3a46',
   }
 
-  const commit = async () => {
+  const commitValue = async (next: string) => {
     if (!onSave) return
-    const clean = draft.trim() || null
+    const clean = next.trim() || null
     if (clean === value) {
       setEditing(false)
       return
@@ -2246,14 +2257,18 @@ function SignatureLine({
   }
 
   if (editing) {
+    // Väljare, aldrig fritext: 21 unika namn hade redan hunnit uppstå i
+    // avtalen mot 12 i personalregistret. Select-elementet ärver skrivstilen
+    // så raden ser ut som en underskrift även medan man väljer.
     return (
-      <div className="shrink-0 min-w-[180px]">
-        <input
+      <div className="shrink-0 min-w-[190px]">
+        <select
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => void commit()}
+          onChange={(e) => {
+            setDraft(e.target.value)
+            void commitValue(e.target.value)
+          }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') void commit()
             if (e.key === 'Escape') {
               setDraft(value ?? fallback ?? '')
               setEditing(false)
@@ -2261,16 +2276,27 @@ function SignatureLine({
           }}
           autoFocus
           disabled={saving}
-          placeholder="Namn"
-          className="inline-block -rotate-2 text-[17px] bg-transparent border-0 border-b border-dashed p-0 focus:outline-none focus:ring-0 w-full"
+          className="inline-block -rotate-2 text-[17px] bg-transparent border-0 border-b border-dashed p-0 pr-5 focus:outline-none focus:ring-0 w-full cursor-pointer appearance-none"
           style={{ ...signatureStyle, borderBottomColor: ink.muted }}
           aria-label="Säljare"
-        />
+        >
+          <option value="">— ingen säljare —</option>
+          {staff.map((s) => (
+            <option key={s.id} value={s.name}>
+              {s.name}
+            </option>
+          ))}
+          {/* Namn som redan står på avtalet men saknas i personalregistret
+              (t.ex. någon som slutat) får inte tappas bort vid redigering */}
+          {value && !staff.some((s) => s.name === value) && (
+            <option value={value}>{value} (ej i personalregistret)</option>
+          )}
+        </select>
         <div
           className="mt-0.5 pt-0.5 font-sans text-[9.5px] tracking-wide"
           style={{ borderTop: `1px solid ${ink.secondary}`, color: ink.muted }}
         >
-          {saving ? 'Sparar…' : 'Enter sparar · Esc avbryter'}
+          {saving ? 'Sparar…' : 'Välj säljare · Esc avbryter'}
         </div>
       </div>
     )
@@ -2366,6 +2392,7 @@ function PaperContract({
   onSaveAgreementText,
   onEditSignedAt,
   onSaveSalesPerson,
+  staff,
   onTerminate,
   onReactivate,
   onRenew,
@@ -2953,6 +2980,7 @@ function PaperContract({
           fallback={root.sales_person ?? null}
           ink={ink}
           archived={archived}
+          staff={staff}
           onSave={onSaveSalesPerson}
         />
         {/* Signeringsdatum och åtgärder flyttar in i avslutsnotisen på

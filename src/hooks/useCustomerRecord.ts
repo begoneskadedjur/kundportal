@@ -178,12 +178,16 @@ export interface RecordWorkItem {
   discount_percent: number | null
   created_at: string
   /**
-   * Teknikern som utfört arbetet, härledd via ärendet. Finns på 96 % av
-   * raderna som hör till ett verkligt ärende — avtalsinnehåll
-   * (case_type='contract') saknar den, eftersom ingen enskild tekniker äger
-   * ett avtal.
+   * Vem intäkten tillhör.
+   *
+   * ÄRENDEN → teknikern som utfört jobbet (via ärendet, 96 % täckning).
+   * AVTALSPREMIE → SÄLJAREN som tecknat avtalet. En premie är inget ärende;
+   * den tillhör den som sålt avtalet, tillsammans med sina kostnader och sin
+   * marginal.
    */
   technician_name?: string | null
+  /** 'contract' = avtalspremie (säljarens), annars utfört arbete (teknikerns) */
+  attribution?: 'sales' | 'technician'
   /** Ärendets nummer, för gruppering per ärende */
   case_number?: string | null
   case_title?: string | null
@@ -687,13 +691,35 @@ export function useCustomerRecord(customerId: string | undefined) {
         }
       }
     }
+    // Avtalsinnehåll (case_type='contract') har case_id = AVTALETS id, inte ett
+    // ärende. Premien tillhör SÄLJAREN som tecknat avtalet — inte någon
+    // tekniker, eftersom en premie inte är utfört arbete.
+    const contractSeller = new Map<string, { name: string | null; label: string | null }>()
+    for (const c of contracts) {
+      contractSeller.set(c.id, {
+        name: c.begone_employee_name ?? root.sales_person ?? null,
+        label: contractDisplayName(c),
+      })
+    }
+
     const workItems: RecordWorkItem[] = rawWorkItems.map((w) => {
+      if (w.case_type === 'contract') {
+        const seller = contractSeller.get(w.case_id)
+        return {
+          ...w,
+          technician_name: seller?.name ?? null,
+          case_number: null,
+          case_title: seller?.label ?? 'Avtalspremie',
+          attribution: 'sales' as const,
+        }
+      }
       const meta = techByCase.get(w.case_id)
       return {
         ...w,
         technician_name: meta?.name ?? null,
         case_number: meta?.number ?? null,
         case_title: meta?.title ?? null,
+        attribution: 'technician' as const,
       }
     })
     const caseCounts: Record<string, number> = {}
