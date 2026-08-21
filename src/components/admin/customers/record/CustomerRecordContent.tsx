@@ -68,26 +68,30 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       setFullCase(null)
       return
     }
-    // Företagsärenden ligger i business_cases och passar inte EditCaseModal
-    if (openCase.origin === 'business') {
-      toast('Företagsärenden öppnas i ärendevyn.', { icon: 'ℹ️' })
-      setOpenCase(null)
-      return
-    }
     let cancelled = false
     void (async () => {
-      const { data: row, error } = await supabase
-        .from('cases')
-        .select('*, customer:customers(company_name, contact_person, contact_email, contact_phone)')
-        .eq('id', openCase.id)
-        .maybeSingle()
+      // EditCaseModal hanterar båda tabellerna — den skiljer dem åt på
+      // case_type, som CaseSearchCard sätter på samma sätt. Avtalsärenden
+      // (inkl. etablering, stationskontroll och extrabesök) ligger i cases;
+      // företagsärenden i business_cases.
+      const isBusiness = openCase.origin === 'business'
+      const { data: row, error } = isBusiness
+        ? await supabase.from('business_cases').select('*').eq('id', openCase.id).maybeSingle()
+        : await supabase
+            .from('cases')
+            .select('*, customer:customers(company_name, contact_person, contact_email, contact_phone)')
+            .eq('id', openCase.id)
+            .maybeSingle()
       if (cancelled) return
       if (error || !row) {
         toast.error('Kunde inte öppna ärendet')
         setOpenCase(null)
         return
       }
-      setFullCase(row as Record<string, unknown>)
+      setFullCase({
+        ...(row as Record<string, unknown>),
+        ...(isBusiness ? { case_type: 'business' as const } : {}),
+      })
     })()
     return () => {
       cancelled = true
@@ -452,8 +456,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       </div>
 
       {/* Ärendemodalen laddas först vid klick — den är stor (106 kB) och ska
-          inte ligga i kundsidans bundle. Företagsärenden hanteras inte av
-          EditCaseModal, så de öppnas inte härifrån. */}
+          inte ligga i kundsidans bundle. */}
       {fullCase && (
         <Suspense fallback={null}>
           <EditCaseModal
