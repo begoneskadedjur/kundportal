@@ -117,10 +117,23 @@ export interface RecordContractEvent {
 }
 
 // Avtalskartan: kontrollbesök (station_inspection_sessions) för § 3 Uppföljning
+/** Löpande schema — bär besöksfrekvensen för leveransmätningen. */
+export interface RecordSchedule {
+  id: string
+  customer_id: string
+  contract_id: string | null
+  frequency: string | null
+  status: string | null
+  schedule_start_date: string | null
+  generated_until: string | null
+}
+
 export interface RecordInspectionSession {
   id: string
   customer_id: string
   contract_id: string | null
+  /** Kontrollärendet sessionen hör till — kopplingen är 1:1 */
+  case_id: string | null
   scheduled_at: string | null
   completed_at: string | null
   status: string | null
@@ -136,14 +149,25 @@ export interface RecordCase {
   id: string
   customer_id: string | null
   contract_id: string | null
+  case_number: string | null
   title: string
   status: string
-  case_type: string | null
-  scheduled_date: string | null
+  /**
+   * Styr ärendekategorin. 'inspection' | 'rondering_trafikkontoret' |
+   * 'egenkontroll_trafikkontoret' = återkommande kontroll, 'establishment' =
+   * avtalets etablering, allt annat = extraärende. Se utils/caseCategory.ts.
+   * Null för företagsärenden, som alltid är engångsjobb.
+   */
+  service_type: string | null
+  pest_type: string | null
+  scheduled_start: string | null
+  scheduled_end: string | null
   completed_date: string | null
   created_at: string
   price: number | null
-  assigned_technician_name: string | null
+  primary_technician_name: string | null
+  /** Vilken tabell raden kom från — business_cases saknar service_type */
+  origin: 'case' | 'business'
 }
 
 // Etapp 6: Åtkomst & konton — portalanvändare, multisite-roller och inbjudningar.
@@ -210,6 +234,7 @@ export interface CustomerRecordData {
   contractEvents: RecordContractEvent[]
   /** Kontrollbesök för familjen (§ 3 Uppföljning) */
   inspections: RecordInspectionSession[]
+  schedules: RecordSchedule[]
   /** Åtkomst & konton (etapp 6) — sekundärdata, tomma listor vid fel */
   access: RecordAccessData
 }
@@ -280,6 +305,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       contractEventsRes,
       inspectionsRes,
       businessCasesRes,
+      schedulesRes,
     ] = await Promise.all([
       supabase
         .from('contracts')
@@ -311,7 +337,15 @@ export function useCustomerRecord(customerId: string | undefined) {
         .order('active_from', { ascending: true }),
       supabase
         .from('cases')
-        .select('id, customer_id, contract_id, title, status, case_type, scheduled_date, completed_date, created_at, price, assigned_technician_name')
+        // VARNING: kolumnnamnen måste stämma exakt. Frågan hade tidigare
+        // case_type, scheduled_date och assigned_technician_name — inget av
+        // dem finns i cases. PostgREST felade då på HELA frågan, och felet
+        // sväljs nedan (casesRes.error ? [] : …), så listan var tyst tom.
+        .select(
+          'id, customer_id, contract_id, case_number, title, status, service_type, ' +
+            'pest_type, scheduled_start, scheduled_end, completed_date, created_at, ' +
+            'price, primary_technician_name'
+        )
         .in('customer_id', familyIds)
         .order('created_at', { ascending: false }),
       supabase
@@ -333,7 +367,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       // sessioner i dag — matchning sker på customer_id i konsumenten.
       supabase
         .from('station_inspection_sessions')
-        .select('id, customer_id, contract_id, scheduled_at, completed_at, status, total_outdoor_stations, total_indoor_stations, inspected_outdoor_stations, inspected_indoor_stations, technician:technicians(name)')
+        .select('id, customer_id, contract_id, case_id, scheduled_at, completed_at, status, total_outdoor_stations, total_indoor_stations, inspected_outdoor_stations, inspected_indoor_stations, technician:technicians(name)')
         .in('customer_id', familyIds)
         .order('scheduled_at', { ascending: false }),
       // Företagsärenden. business_cases saknar customer_id — kopplingen till
@@ -346,6 +380,13 @@ export function useCustomerRecord(customerId: string | undefined) {
             .in('org_nr', orgNumbers)
             .order('created_at', { ascending: false })
         : Promise.resolve({ data: [], error: null }),
+      // Löpande scheman — bär besöksfrekvensen. contracts.visit_frequency är
+      // satt på bara 2 avtal av 524, så schemats frekvens är den praktiska
+      // källan för "hur ofta ska vi vara här".
+      supabase
+        .from('recurring_schedules')
+        .select('id, customer_id, contract_id, frequency, status, schedule_start_date, generated_until')
+        .in('customer_id', familyIds),
     ])
 
     // Multisite-roller kräver organisationens id — hämtas bara när root är multisite.
@@ -434,7 +475,15 @@ export function useCustomerRecord(customerId: string | undefined) {
       } as unknown as RecordContract)
     }
 
-    const legacyCases = (casesRes.error ? [] : (casesRes.data ?? [])) as unknown as RecordCase[]
+    // Felet loggas nu i stället för att sväljas tyst — en trasig fråga gjorde
+    // tidigare listan tom utan att någonstans säga varför.
+    if (casesRes.error) {
+      console.error('Kunde inte hämta ärenden:', casesRes.error.message)
+    }
+    const legacyCases = ((casesRes.error ? [] : (casesRes.data ?? [])) as unknown as Omit<
+      RecordCase,
+      'origin'
+    >[]).map((c) => ({ ...c, origin: 'case' as const }))
 
     // Företagsärenden mappas till samma form. De hör till org-raden eftersom
     // business_cases bara känner org.nr, inte vilken enhet det gäller.
@@ -461,14 +510,20 @@ export function useCustomerRecord(customerId: string | undefined) {
       id: b.id,
       customer_id: orgToCustomerId.get(b.org_nr ?? '') ?? root.id,
       contract_id: null,
+      case_number: null,
       title: b.title ?? 'Företagsärende',
       status: b.status ?? '',
-      case_type: b.skadedjur ?? null,
-      scheduled_date: b.start_date,
+      // business_cases har ingen service_type — de är per definition
+      // engångsjobb och hamnar därför alltid bland extraärendena.
+      service_type: null,
+      pest_type: b.skadedjur ?? null,
+      scheduled_start: b.start_date,
+      scheduled_end: null,
       completed_date: b.completed_date,
       created_at: b.created_at,
       price: b.pris != null ? Number(b.pris) : null,
-      assigned_technician_name: b.primary_assignee_name,
+      primary_technician_name: b.primary_assignee_name,
+      origin: 'business' as const,
     }))
 
     const familyCases = [...legacyCases, ...businessCases]
@@ -487,6 +542,7 @@ export function useCustomerRecord(customerId: string | undefined) {
         technician_name: Array.isArray(technician) ? (technician[0]?.name ?? null) : (technician?.name ?? null),
       })
     ) as RecordInspectionSession[]
+    const schedules = (schedulesRes.error ? [] : (schedulesRes.data ?? [])) as unknown as RecordSchedule[]
     const caseCounts: Record<string, number> = {}
     for (const row of familyCases) {
       if (!row.customer_id) continue
@@ -506,6 +562,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       cases: familyCases,
       contractEvents,
       inspections,
+      schedules,
       access: {
         profiles: (profilesRes.error ? [] : (profilesRes.data ?? [])) as RecordAccessProfile[],
         invitations: (invitationsRes.error ? [] : (invitationsRes.data ?? [])) as RecordAccessInvitation[],

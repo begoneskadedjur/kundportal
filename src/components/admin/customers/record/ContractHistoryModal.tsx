@@ -51,7 +51,7 @@ type CaseState = 'done' | 'booked' | 'open'
 
 function caseState(c: RecordCase): CaseState {
   if (c.completed_date || isCompletedStatus(c.status as ClickUpStatus)) return 'done'
-  if (c.scheduled_date) return 'booked'
+  if (c.scheduled_start) return 'booked'
   return 'open'
 }
 
@@ -260,7 +260,7 @@ export default function ContractHistoryModal({
             {contractCases.map((c) => {
               const state = caseState(c)
               const meta = CASE_STATE_META[state]
-              const date = c.completed_date ?? c.scheduled_date ?? c.created_at
+              const date = c.completed_date ?? c.scheduled_start ?? c.created_at
               return (
                 <div
                   key={c.id}
@@ -271,9 +271,9 @@ export default function ContractHistoryModal({
                     {c.customer_id ? (nameById.get(c.customer_id) ?? '–') : '–'}
                   </span>
                   <span className="flex-1 text-slate-200 truncate">{c.title}</span>
-                  {c.assigned_technician_name && (
+                  {c.primary_technician_name && (
                     <span className="text-xs text-slate-500 truncate hidden sm:block max-w-28">
-                      {c.assigned_technician_name}
+                      {c.primary_technician_name}
                     </span>
                   )}
                   {c.price != null && c.price > 0 && (

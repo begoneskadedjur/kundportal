@@ -4,8 +4,10 @@
 // version: RecordHeader + avtalskorten (kollapsade). Ingen datahämtning här —
 // data kommer från useCustomerRecord via anroparen.
 
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import toast from 'react-hot-toast'
 import { Archive } from 'lucide-react'
+import { supabase } from '../../../../lib/supabase'
 import {
   contractEffectiveAnnualValue,
   customerRowName,
@@ -14,6 +16,7 @@ import {
   type CustomerRecordData,
   type RecordAddition,
   type RecordBillingItem,
+  type RecordCase,
   type RecordContract,
   type RecordContractSite,
   type RecordCustomer,
@@ -29,6 +32,9 @@ import BillingChainSection from './BillingChainSection'
 import UnitsSection from './UnitsSection'
 import AccessAccountsSection, { countAccessPersons } from './AccessAccountsSection'
 import ContractMapSection from './ContractMapSection'
+import CustomerCasesSection from './CustomerCasesSection'
+
+const EditCaseModal = lazy(() => import('../../technicians/EditCaseModal'))
 
 type TabId = 'oversikt' | 'avtal' | 'avtalskarta' | 'fakturering' | 'enheter' | 'arenden' | 'atkomst'
 
@@ -48,6 +54,40 @@ interface Props {
 
 export default function CustomerRecordContent({ data, basePath, density, onDataChanged }: Props) {
   const [activeTab, setActiveTab] = useState<TabId>('oversikt')
+  // Ärendemodalen vill ha hela raden, inte bara ett id — den hämtas vid klick
+  const [openCase, setOpenCase] = useState<RecordCase | null>(null)
+  const [fullCase, setFullCase] = useState<Record<string, unknown> | null>(null)
+
+  useEffect(() => {
+    if (!openCase) {
+      setFullCase(null)
+      return
+    }
+    // Företagsärenden ligger i business_cases och passar inte EditCaseModal
+    if (openCase.origin === 'business') {
+      toast('Företagsärenden öppnas i ärendevyn.', { icon: 'ℹ️' })
+      setOpenCase(null)
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const { data: row, error } = await supabase
+        .from('cases')
+        .select('*, customer:customers(company_name, contact_person, contact_email, contact_phone)')
+        .eq('id', openCase.id)
+        .maybeSingle()
+      if (cancelled) return
+      if (error || !row) {
+        toast.error('Kunde inte öppna ärendet')
+        setOpenCase(null)
+        return
+      }
+      setFullCase(row as Record<string, unknown>)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [openCase])
 
   const derived = useMemo(() => {
     const { customer, root, units, contracts, billingItems, additions, premiumEvents, contractSites, caseCounts } = data
@@ -324,20 +364,41 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       )}
 
       <div hidden={activeTab !== 'arenden'} className="pt-6">
-        <ul className="divide-y divide-slate-800">
-          {[root, ...units].map((row) => (
-            <li key={row.id} className="flex items-baseline justify-between py-2 text-sm">
-              <span className="text-slate-300">{customerRowName(row)}</span>
-              <span className="text-slate-400 tabular-nums">{caseCounts[row.id] ?? 0} ärenden</span>
-            </li>
-          ))}
-        </ul>
-        <p className="text-xs text-slate-600 mt-3">Fullständig ärendelista kommer i en senare etapp.</p>
+        <CustomerCasesSection
+          root={root}
+          units={units}
+          cases={data.cases}
+          inspections={data.inspections}
+          schedules={data.schedules}
+          contracts={realContracts}
+          onOpenCase={setOpenCase}
+        />
       </div>
 
       <div hidden={activeTab !== 'atkomst'} className="pt-6">
         <AccessAccountsSection access={access} customerById={customerById} />
       </div>
+
+      {/* Ärendemodalen laddas först vid klick — den är stor (106 kB) och ska
+          inte ligga i kundsidans bundle. Företagsärenden hanteras inte av
+          EditCaseModal, så de öppnas inte härifrån. */}
+      {fullCase && (
+        <Suspense fallback={null}>
+          <EditCaseModal
+            isOpen
+            onClose={() => {
+              setOpenCase(null)
+              setFullCase(null)
+            }}
+            onSuccess={() => {
+              setOpenCase(null)
+              setFullCase(null)
+              void onDataChanged?.()
+            }}
+            caseData={fullCase as never}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }
