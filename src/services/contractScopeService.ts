@@ -299,21 +299,32 @@ export class ContractScopeService {
       .single()
     if (error || !created) throw new Error(`Kunde inte skapa avtalet: ${error?.message ?? 'okänt fel'}`)
 
-    // Premietrappans startpunkt så tidslinjen och årsvärdet stämmer direkt
-    if (annual > 0 && customer.contract_start_date) {
-      await supabase.from('contract_premium_events').insert({
-        contract_id: created.id,
-        effective_from: customer.contract_start_date,
-        annual_value: annual,
-        event_type: 'start',
-        note: 'Skapat från kundkortets avtalsdata',
-      })
-    }
-
-    // Ärv historiken från avtalet som ersätts (importrest med riktig data)
+    // Ärv historiken FÖRST från avtalet som ersätts (importrest med riktig
+    // data). Skapas premiestartpunkten före arvet kan avtalet få två identiska
+    // startpunkter — den vi skriver och den som följer med raden vi ersätter.
     let inherited = 0
     if (replacesContractId && !replacesContractId.startsWith('kundrad-')) {
       inherited = await this.inheritHistory(replacesContractId, created.id)
+    }
+
+    // Premietrappans startpunkt så tidslinjen och årsvärdet stämmer direkt —
+    // bara om arvet inte redan gav avtalet en.
+    if (annual > 0 && customer.contract_start_date) {
+      const { data: existingStart } = await supabase
+        .from('contract_premium_events')
+        .select('id')
+        .eq('contract_id', created.id)
+        .eq('event_type', 'start')
+        .limit(1)
+      if (!existingStart || existingStart.length === 0) {
+        await supabase.from('contract_premium_events').insert({
+          contract_id: created.id,
+          effective_from: customer.contract_start_date,
+          annual_value: annual,
+          event_type: 'start',
+          note: 'Skapat från kundkortets avtalsdata',
+        })
+      }
     }
 
     await this.logEvent(created.id, {
@@ -420,19 +431,31 @@ export class ContractScopeService {
       .single()
     if (error || !created) throw new Error(`Kunde inte skapa avtalet: ${error?.message ?? 'okänt fel'}`)
 
+    // Arvet FÖRST: importresten kan redan bära en premiestartpunkt (t.ex. från
+    // backfyllningen av signerade Oneflow-avtal). Skapades vår egen dessförinnan
+    // fick avtalet två identiska startpunkter och premietrappan visade varje
+    // steg dubbelt.
+    const inherited = await this.inheritHistory(importedContractId, created.id)
+
     const annual = Number(row.annual_value ?? 0)
     const startDate = row.contract_start_date ?? row.start_date
     if (annual > 0 && startDate) {
-      await supabase.from('contract_premium_events').insert({
-        contract_id: created.id,
-        effective_from: startDate,
-        annual_value: annual,
-        event_type: 'start',
-        note: 'Skapat från importerat avtal',
-      })
+      const { data: existing } = await supabase
+        .from('contract_premium_events')
+        .select('id')
+        .eq('contract_id', created.id)
+        .eq('event_type', 'start')
+        .limit(1)
+      if (!existing || existing.length === 0) {
+        await supabase.from('contract_premium_events').insert({
+          contract_id: created.id,
+          effective_from: startDate,
+          annual_value: annual,
+          event_type: 'start',
+          note: 'Skapat från importerat avtal',
+        })
+      }
     }
-
-    const inherited = await this.inheritHistory(importedContractId, created.id)
     await this.logEvent(created.id, {
       event_type: 'other',
       title: 'Avtalet skapat',
@@ -743,10 +766,21 @@ export class ContractScopeService {
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
     const customerId = (data[0] as { customer_id: string | null }).customer_id
 
-    // 2. Pausa löpande scheman (tvåstegsregeln ovan)
+    // 2. Stäng avtalets omfattning på sista giltiga dagen. Utan detta står
+    //    lokalen kvar som "täckt" av ett avtal som tagit slut, och en enhet
+    //    kan se ut att omfattas av två avtal samtidigt. Rader raderas aldrig —
+    //    active_to bevarar historiken.
+    const { error: scopeErr } = await supabase
+      .from('contract_sites')
+      .update({ active_to: effectiveEndDate })
+      .eq('contract_id', contractId)
+      .is('active_to', null)
+    if (scopeErr) console.error('Kunde inte stänga avtalets omfattning:', scopeErr.message)
+
+    // 3. Pausa löpande scheman (tvåstegsregeln ovan)
     const pausedSchedules = await this.pauseSchedulesForContract(contractId, customerId)
 
-    // 3. Avboka inbokade besök EFTER sista giltiga dagen.
+    // 4. Avboka inbokade besök EFTER sista giltiga dagen.
     //    TIDSZONSFÄLLA: scheduled_at är timestamptz. Utan T23:59:59 jämförs
     //    datumsträngen mot midnatt, och besök PÅ sista giltiga dagen avbokas
     //    felaktigt — de ska ju genomföras.
@@ -758,7 +792,7 @@ export class ContractScopeService {
       .gt('scheduled_at', `${effectiveEndDate}T23:59:59`)
     if (sessErr) console.error('Kunde inte avboka framtida kontrollbesök:', sessErr.message)
 
-    // 4. Ta bort framtida icke-låsta avtalsfakturor för DETTA avtal
+    // 5. Ta bort framtida icke-låsta avtalsfakturor för DETTA avtal
     let deletedInvoices = 0
     try {
       deletedInvoices = await ContractInvoiceGenerator.cancelFutureForContract(
@@ -769,7 +803,7 @@ export class ContractScopeService {
       console.error('Kunde inte ta bort framtida fakturor:', err)
     }
 
-    // 5. Kundfälten synkas BARA när detta var kundens sista levande avtal.
+    // 6. Kundfälten synkas BARA när detta var kundens sista levande avtal.
     //    Kontrollen måste ske EFTER steg 1, annars räknas avtalet vi just sagt
     //    upp som kvarvarande. Utan synken återuppstår faktureringen via
     //    buildSyntheticContract, som läser customers.annual_value när inga
@@ -837,6 +871,16 @@ export class ContractScopeService {
       .select('id')
     if (error) throw new Error(`Kunde inte återaktivera avtalet: ${error.message}`)
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    // Öppna omfattningen igen — uppsägningen stängde den på slutdatumet
+    if (prevEnd) {
+      const { error: scopeErr } = await supabase
+        .from('contract_sites')
+        .update({ active_to: null })
+        .eq('contract_id', contractId)
+        .eq('active_to', prevEnd)
+      if (scopeErr) console.error('Kunde inte öppna avtalets omfattning:', scopeErr.message)
+    }
 
     // Återuppta scheman som uppsägningen pausade
     const { error: schedErr } = await supabase

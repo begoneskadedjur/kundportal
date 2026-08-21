@@ -563,6 +563,26 @@ export function isImportedContract(c: RecordContract): boolean {
   return c.template_id === 'imported' || (c.oneflow_contract_id ?? '').startsWith('imported-')
 }
 
+/** Avtalet är skapat i portalen, inte i Oneflow. */
+export function isLocalContract(c: RecordContract): boolean {
+  return c.template_id === 'local' || (c.oneflow_contract_id ?? '').startsWith('local-')
+}
+
+/**
+ * Länk till avtalet i Oneflow, eller null när det inte finns något dokument
+ * att länka till.
+ *
+ * oneflow_contract_id är NOT NULL och alltid ifylld — även för portalskapade
+ * avtal, där den bär ett syntetiskt 'local-<uuid>'. Att bygga URL:en rakt av
+ * gav därför länkar till app.oneflow.com/contracts/local-83a06968… som alltid
+ * är trasiga. Riktiga Oneflow-id:n är numeriska, så det är det vi kräver.
+ */
+export function oneflowContractUrl(c: RecordContract): string | null {
+  const id = c.oneflow_contract_id ?? ''
+  if (!/^\d+$/.test(id)) return null
+  return `https://app.oneflow.com/contracts/${id}`
+}
+
 /** Avtalsnamn: label (backfylld) → contract_type → 'Avtal #<oneflow-id>' */
 export function contractDisplayName(c: RecordContract): string {
   if (c.label) return c.label

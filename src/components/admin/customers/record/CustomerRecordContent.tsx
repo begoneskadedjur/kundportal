@@ -119,8 +119,11 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       0
     )
 
+    // realContracts, inte sortedContracts: importresterna är samma avtal i sin
+    // gamla form, så varje avtalsstart, periodskifte och slutdatum skrevs två
+    // gånger i tidslinjen.
     const timelineEvents = buildFamilyTimeline(
-      sortedContracts,
+      realContracts,
       additionsByCustomer,
       billingByCustomer,
       nameById,
@@ -304,7 +307,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       )}
 
       <div hidden={activeTab !== 'fakturering'} className="pt-6">
-        <BillingChainSection root={root} units={units} contracts={sortedContracts} billingItems={billingItems} />
+        <BillingChainSection root={root} units={units} contracts={realContracts} billingItems={billingItems} />
       </div>
 
       {showUnitsTab && (
@@ -312,7 +315,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
           <UnitsSection
             root={root}
             units={units}
-            contracts={sortedContracts}
+            contracts={realContracts}
             caseCounts={caseCounts}
             basePath={basePath}
             currentCustomerId={customer.id}

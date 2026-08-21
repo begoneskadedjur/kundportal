@@ -9,6 +9,7 @@ import {
   formatDateSv,
   formatKr,
   formatMonthSv,
+  isEndedContract,
   isImportedContract,
   lastNoticeDate,
   PREMIUM_EVENT_LABEL,
@@ -76,11 +77,23 @@ export function buildContractEvents(contract: RecordContract, tag?: string): Rec
   }
 
   if (contract.terminated_at) {
+    // Uppsägningen dateras på när avtalet UPPHÖR, inte när knappen trycktes.
+    // Ett avtal som sagts upp i efterhand fick annars sin uppsägning placerad
+    // månader efter "Avtalet upphör" — omvänd orsaksordning i tidslinjen.
+    // Registreringsdatumet flyttas till detaljraden när de skiljer sig åt.
+    const effect = contract.effective_end_date ?? contract.contract_end_date
+    const registered = toDateKey(contract.terminated_at)
+    const eventDate = effect ? toDateKey(effect) : registered
     events.push({
-      date: toDateKey(contract.terminated_at),
+      date: eventDate,
       kind: 'terminated',
       title: 'Avtalet uppsagt',
-      detail: contract.termination_reason ?? undefined,
+      detail: [
+        contract.termination_reason ?? null,
+        eventDate !== registered ? `registrerat ${formatDateSv(registered)}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') || undefined,
       tag,
     })
   }
@@ -96,13 +109,25 @@ export function buildContractEvents(contract: RecordContract, tag?: string): Rec
     })
   }
 
-  if (contract.contract_end_date) {
-    events.push({
-      date: toDateKey(contract.contract_end_date),
-      kind: 'end',
-      title: contract.terminated_at ? 'Avtalet upphör' : 'Periodskifte — förlängs automatiskt om ej uppsagt',
-      tag,
-    })
+  // Slutdatum: uppsägningens effective_end_date vinner över contract_end_date.
+  const lastDay = contract.effective_end_date ?? contract.contract_end_date
+  if (lastDay) {
+    // Ett avslutat avtal upphör — det får ALDRIG ett framtida periodskifte.
+    // Kollen gick tidigare bara på terminated_at, vilket missade avtal som
+    // avslutats via status (t.ex. "ersatt av nytt avtal"): de fick falska
+    // periodskiften långt efter att de tagit slut.
+    const isEnded = isEndedContract(contract)
+    // Uppsägningen har redan sin egen rad på samma datum — undvik dubbletten.
+    const alreadyCoveredByTermination =
+      !!contract.terminated_at && toDateKey(lastDay) === toDateKey(contract.effective_end_date ?? lastDay)
+    if (!alreadyCoveredByTermination) {
+      events.push({
+        date: toDateKey(lastDay),
+        kind: 'end',
+        title: isEnded ? 'Avtalet upphör' : 'Periodskifte — förlängs automatiskt om ej uppsagt',
+        tag,
+      })
+    }
   }
 
   return events

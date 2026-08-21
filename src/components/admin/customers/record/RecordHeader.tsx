@@ -135,7 +135,11 @@ export default function RecordHeader({
       <div className="mt-1.5 text-sm text-slate-300 tabular-nums">
         {familyAnnualValue > 0 ? (
           <span>
-            {formatKr(familyAnnualValue)}/år över {activeContractsCount} avtal
+            {/* "aktiva/aktivt" utskrivet: siffran räknar bara LEVANDE avtal,
+                medan fliken "Avtal (n)" även räknar avslutade. Utan ordet ser
+                de två siffrorna ut att motsäga varandra. */}
+            {formatKr(familyAnnualValue)}/år över {activeContractsCount}{' '}
+            {activeContractsCount === 1 ? 'aktivt avtal' : 'aktiva avtal'}
             {contractDistribution ? ` (${contractDistribution})` : ''}
           </span>
         ) : (

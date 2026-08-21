@@ -37,6 +37,7 @@ import {
   isEndedContract,
   isImportedContract,
   nextPremiumEvent,
+  oneflowContractUrl,
   BILLING_FREQUENCY_LABEL,
   VISIT_FREQUENCY_LABEL,
   VISITS_PER_YEAR_BY_FREQUENCY,
@@ -2253,10 +2254,10 @@ function PaperContract({
   const orgnr = contract.organization_number ?? root.organization_number
   const owner = customerById.get(contract.customer_id ?? '')
   const frequency = contract.billing_frequency ? BILLING_FREQUENCY_LABEL[contract.billing_frequency] : null
-  const oneflowUrl =
-    contract.oneflow_contract_id && !isImportedContract(contract)
-      ? `https://app.oneflow.com/contracts/${contract.oneflow_contract_id}`
-      : null
+  // Kräver ett numeriskt Oneflow-id. Den gamla kollen (bara !isImportedContract)
+  // släppte igenom portalskapade avtal, vars syntetiska 'local-<uuid>' gav en
+  // länk till ett dokument som inte finns.
+  const oneflowUrl = oneflowContractUrl(contract)
 
   const startDate = contract.contract_start_date ?? contract.start_date
   const periodLabel = startDate

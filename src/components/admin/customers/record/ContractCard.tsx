@@ -18,6 +18,7 @@ import {
   isImportedContract,
   isTerminatedButRunning,
   nextPremiumEvent,
+  oneflowContractUrl,
   PREMIUM_EVENT_LABEL,
   type RecordAddition,
   type RecordBillingItem,
@@ -97,6 +98,7 @@ export default function ContractCard({
   const terminatedRunning = isTerminatedButRunning(contract)
   const isUnitContract = !!owner.parent_customer_id
   const annual = contractAnnualValue(contract)
+  const oneflowUrl = oneflowContractUrl(contract)
 
   const timelineEvents = useMemo(
     () => buildSingleContractTimeline(contract, additions, billingItems, premiumEvents),
@@ -134,6 +136,10 @@ export default function ContractCard({
   const moneyLine = (() => {
     if (premiumEvents.length > 0) {
       const currentValue = Number(currentStep?.annual_value ?? annual)
+      // "Just nu" bara på avtal som faktiskt gäller. Ett avslutat avtal sa
+      // tidigare både "Just nu: 11 490 kr/år" och "Gällde t.o.m. 1 dec 2025"
+      // på samma kort. Framtida trappsteg är heller inte relevanta då.
+      if (ended) return `Slutpremie: ${inRhythm(currentValue)}`
       const base = `Just nu: ${inRhythm(currentValue)}`
       if (nextStep) {
         return `${base} (→ ${inRhythm(Number(nextStep.annual_value ?? 0))} från ${formatDateSv(nextStep.effective_from)})`
@@ -192,9 +198,13 @@ export default function ContractCard({
                 Importerat
               </span>
             ) : (
-              contract.oneflow_contract_id && (
+              /* oneflowContractUrl ger null för portalskapade avtal. Tidigare
+                 byggdes URL:en rakt av oneflow_contract_id, som är NOT NULL och
+                 bär ett syntetiskt 'local-<uuid>' — länken pekade då alltid på
+                 ett dokument som inte finns. */
+              oneflowUrl && (
                 <a
-                  href={`https://app.oneflow.com/contracts/${contract.oneflow_contract_id}`}
+                  href={oneflowUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 text-xs text-[#20c58f] hover:underline"
