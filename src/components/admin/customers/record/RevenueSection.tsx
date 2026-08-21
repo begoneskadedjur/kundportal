@@ -81,12 +81,19 @@ export default function RevenueSection({ root, units, invoices, additions, cases
       .map(([id, value]) => ({ id, name: nameById.get(id) ?? 'Okänd', value }))
       .sort((a, b) => b.value - a.value)
 
+    // Historiksumman mäts på HELA strömmen, aldrig på de filtrerade raderna:
+    // annars nollas den så fort historiken bockas ur, kryssrutan försvinner
+    // med den och filtret går inte att ångra.
+    const historicalSum = all.reduce((sum, e) => (e.historical ? sum + e.amount : sum), 0)
+
     return {
       total: totals.total,
       contractSum: totals.contract,
       extraSum: totals.extra,
-      historicalSum: totals.historical,
+      historicalSum,
       count: totals.count,
+      // Finns det något alls att visa, oavsett filter? Styr tomma läget.
+      allCount: all.length,
       perYear,
       perUnit,
       pipeline,
@@ -96,7 +103,7 @@ export default function RevenueSection({ root, units, invoices, additions, cases
 
   const pct = (v: number) => (model.total > 0 ? Math.round((v / model.total) * 100) : 0)
 
-  if (model.count === 0 && model.pipeline.count === 0) {
+  if (model.allCount === 0 && model.pipeline.count === 0) {
     return <p className="text-sm text-slate-500">Inga intäkter registrerade för kunden.</p>
   }
 
@@ -154,6 +161,14 @@ export default function RevenueSection({ root, units, invoices, additions, cases
               </span>
             )}
           </label>
+        )}
+
+        {/* Allt kunden har ÄR historik — utan detta ser vyn ut som om kunden
+            saknar intäkter, fast filtret bara döljer dem. */}
+        {model.count === 0 && model.historicalSum > 0 && (
+          <p className="mt-3 text-xs text-slate-500">
+            Kundens samtliga intäkter är importerad historik. Kryssa i rutan ovan för att visa dem.
+          </p>
         )}
       </section>
 
