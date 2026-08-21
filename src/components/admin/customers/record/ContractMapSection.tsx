@@ -187,7 +187,19 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     const endedPapers = contracts.filter(
       (c) => !c.fromCustomerRow && !isImportedContract(c) && isEndedContract(c)
     )
-    const endedCount = contracts.filter((c) => isEndedContract(c)).length
+    // Räknaren MÅSTE spegla endedPapers. Tidigare räknades alla avslutade rader
+    // inklusive importrester, så en kund vars gamla avtal ersatts av nya såg ut
+    // att ha flera avslutade avtal — trots att importresterna är samma avtal i
+    // sin gamla form, inte separata avslutade avtal.
+    const endedCount = endedPapers.length
+    // Ersatta importrester räknas för sig: de är historik från importen, inte
+    // avtal som tagit slut.
+    const replacedLeftovers = contracts.filter(
+      (c) => (c.fromCustomerRow || isImportedContract(c)) && isEndedContract(c)
+    ).length
+    // Uppsagda som fortfarande löper ligger bland papperen (de fungerar till
+    // slutdatumet) men ska räknas separat så det syns att de tar slut.
+    const terminatedRunningCount = papers.filter((c) => isTerminatedButRunning(c)).length
 
     const accentByContract = new Map<string, string>()
     papers.forEach((c, i) => accentByContract.set(c.id, ACCENTS[i % ACCENTS.length]))
@@ -260,6 +272,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       customerRowContracts,
       endedPapers,
       endedCount,
+      replacedLeftovers,
+      terminatedRunningCount,
       accentByContract,
       activeScopeByContract,
       premiumByContract,
@@ -281,6 +295,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     customerRowContracts,
     endedPapers,
     endedCount,
+    replacedLeftovers,
+    terminatedRunningCount,
     accentByContract,
     activeScopeByContract,
     premiumByContract,
@@ -876,10 +892,27 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             {locations.length - uncoveredUnits.length} av {locations.length}
           </div>
         </div>
+        {/* Uppsagda avtal som fortfarande löper — de ingår i "Aktiva avtal"
+            eftersom de faktureras och schemaläggs till sista giltiga dagen,
+            men det ska synas att de tar slut. */}
+        {terminatedRunningCount > 0 && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">Uppsagda, löper ut</div>
+            <div className="text-lg font-bold tabular-nums text-amber-400">{terminatedRunningCount}</div>
+          </div>
+        )}
         {endedCount > 0 && (
           <div>
             <div className="text-[10px] uppercase tracking-wider text-slate-500">Avslutade avtal</div>
             <div className="text-lg font-bold tabular-nums text-slate-500">{endedCount}</div>
+          </div>
+        )}
+        {/* Ersatta importrester är INTE avslutade avtal — det är samma avtal i
+            sin gamla form. Egen ruta så de inte blåser upp avslutade-siffran. */}
+        {replacedLeftovers > 0 && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">Ersatta importrester</div>
+            <div className="text-lg font-bold tabular-nums text-slate-600">{replacedLeftovers}</div>
           </div>
         )}
         <p className="ml-auto self-center text-xs text-slate-500 max-w-md">
