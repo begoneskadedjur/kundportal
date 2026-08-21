@@ -4,7 +4,7 @@
 // ett expanderbart innehåll (avtalstext, produkter, tidslinje, senaste fakturor).
 
 import { useMemo, useState } from 'react'
-import { Building2, ChevronDown, ExternalLink, MapPin } from 'lucide-react'
+import { Archive, Building2, ChevronDown, ExternalLink, MapPin } from 'lucide-react'
 import {
   BILLING_FREQUENCY_LABEL,
   contractAnnualValue,
@@ -247,6 +247,23 @@ export default function ContractCard({
             {contract.notice_period_months != null && <span>Uppsägningstid {contract.notice_period_months} mån</span>}
             {contract.notice_period_months != null && contract.contract_length && <span> · </span>}
             {contract.contract_length && <span>Avtalslängd {contract.contract_length}</span>}
+          </div>
+        )}
+
+        {/* Varför avtalet är avslutat. Utan detta ser flera avslutade avtal på
+            samma kund ut som oförklarade dubbletter. */}
+        {ended && (contract.termination_reason || contract.effective_end_date) && (
+          <div className="mt-1.5 flex items-start gap-1.5 text-xs text-slate-500">
+            <Archive className="w-3 h-3 mt-0.5 shrink-0" aria-hidden />
+            <span>
+              {contract.effective_end_date && (
+                <span className="tabular-nums">
+                  Gällde t.o.m. {formatDateSv(contract.effective_end_date)}
+                </span>
+              )}
+              {contract.effective_end_date && contract.termination_reason && <span> · </span>}
+              {contract.termination_reason}
+            </span>
           </div>
         )}
 

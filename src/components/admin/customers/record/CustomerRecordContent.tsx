@@ -5,13 +5,16 @@
 // data kommer från useCustomerRecord via anroparen.
 
 import { useMemo, useState } from 'react'
+import { Archive } from 'lucide-react'
 import {
   contractEffectiveAnnualValue,
   customerRowName,
   isEndedContract,
+  isImportedContract,
   type CustomerRecordData,
   type RecordAddition,
   type RecordBillingItem,
+  type RecordContract,
   type RecordContractSite,
   type RecordCustomer,
   type RecordPremiumEvent,
@@ -89,7 +92,17 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       return (familyOrder.get(a.customer_id ?? '') ?? 99) - (familyOrder.get(b.customer_id ?? '') ?? 99)
     })
 
-    const activeContracts = sortedContracts.filter((c) => !isEndedContract(c))
+    // Importrester och trashade rader är historik från importen, inte avtal.
+    // Avtalskartan gör samma uppdelning — utan den blandas de rakt av med de
+    // riktiga avtalen och kunden ser ut att ha dubbletter.
+    const realContracts = sortedContracts.filter(
+      (c) => !isImportedContract(c) && (c.status as string) !== 'trashed'
+    )
+    const importLeftovers = sortedContracts.filter(
+      (c) => isImportedContract(c) || (c.status as string) === 'trashed'
+    )
+
+    const activeContracts = realContracts.filter((c) => !isEndedContract(c))
     // Fördelning: var avtalen bor (organisationen vs enheterna)
     const unitIds = new Set(units.map((u) => u.id))
     const contractsOnUnits = activeContracts.filter((c) => unitIds.has(c.customer_id ?? '')).length
@@ -124,6 +137,8 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       premiumByContract,
       sitesByContract,
       sortedContracts,
+      realContracts,
+      importLeftovers,
       activeContracts,
       familyAnnualValue,
       contractDistribution,
@@ -141,6 +156,8 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     premiumByContract,
     sitesByContract,
     sortedContracts,
+    realContracts,
+    importLeftovers,
     activeContracts,
     familyAnnualValue,
     contractDistribution,
@@ -149,8 +166,8 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     totalCases,
   } = derived
 
-  const renderContractCards = (compact: boolean) =>
-    sortedContracts.map((contract) => {
+  const renderContractCards = (compact: boolean, list: RecordContract[] = realContracts) =>
+    list.map((contract) => {
       const owner = customerById.get(contract.customer_id ?? '') ?? root
       return (
         <ContractCard
@@ -188,13 +205,13 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
         {header}
         <section className="mt-5">
           <WhisperHeader>
-            Avtal ({sortedContracts.length})
+            Avtal ({realContracts.length})
             {familyAnnualValue > 0 && (
               <span className="tabular-nums"> · {familyAnnualValue.toLocaleString('sv-SE')} kr/år</span>
             )}
           </WhisperHeader>
           <div className="space-y-3">{renderContractCards(false)}</div>
-          {sortedContracts.length === 0 && (
+          {realContracts.length === 0 && (
             <p className="text-sm text-slate-500">Inga avtal registrerade för kunden.</p>
           )}
         </section>
@@ -207,7 +224,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
 
   const tabs: { id: TabId; label: string; visible: boolean }[] = [
     { id: 'oversikt', label: 'Översikt', visible: true },
-    { id: 'avtal', label: `Avtal (${sortedContracts.length})`, visible: true },
+    { id: 'avtal', label: `Avtal (${realContracts.length})`, visible: true },
     { id: 'avtalskarta', label: 'Avtalskarta', visible: !!onDataChanged },
     { id: 'fakturering', label: 'Fakturering', visible: true },
     { id: 'enheter', label: `Enheter (${units.length})`, visible: showUnitsTab },
@@ -242,7 +259,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       <div hidden={activeTab !== 'oversikt'} className="pt-6 space-y-8">
         <section>
           <WhisperHeader>
-            Avtal ({sortedContracts.length})
+            Avtal ({realContracts.length})
             {familyAnnualValue > 0 && (
               <span className="tabular-nums"> · {familyAnnualValue.toLocaleString('sv-SE')} kr/år</span>
             )}
@@ -258,8 +275,25 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
 
       <div hidden={activeTab !== 'avtal'} className="pt-6">
         <div className="space-y-3">{renderContractCards(false)}</div>
-        {sortedContracts.length === 0 && (
+        {realContracts.length === 0 && (
           <p className="text-sm text-slate-500">Inga avtal registrerade för kunden.</p>
+        )}
+        {/* Importrester hör inte ihop med de riktiga avtalen — de är historik
+            från importen och skulle annars se ut som dubbletter. Hopfällda,
+            precis som på Avtalskartan. */}
+        {importLeftovers.length > 0 && (
+          <details className="mt-4 border border-slate-700/50 rounded-2xl">
+            <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-400 select-none flex items-center gap-2 hover:text-slate-200 transition-colors">
+              <Archive className="w-3.5 h-3.5 text-slate-500" />
+              Importrester ({importLeftovers.length})
+              <span className="font-normal text-slate-500">
+                — historik från importen, inte aktiva avtal
+              </span>
+            </summary>
+            <div className="px-4 pb-4 space-y-3">
+              {renderContractCards(false, importLeftovers)}
+            </div>
+          </details>
         )}
       </div>
 
