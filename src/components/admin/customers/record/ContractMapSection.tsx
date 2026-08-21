@@ -1152,6 +1152,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                   toast.error(err instanceof Error ? err.message : 'Kunde inte spara avtalsobjektet')
                 }
               }}
+              onSaveSalesPerson={async (name) => {
+                try {
+                  await ContractScopeService.setSalesPerson(c.id, name)
+                  toast.success(name ? `Säljare satt till ${name}.` : 'Säljare borttagen.')
+                  await onChanged()
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Kunde inte spara säljare')
+                }
+              }}
               onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
               isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
               isSingleSite={isSingleSite}
@@ -2171,6 +2180,8 @@ interface PaperProps {
   onSaveAgreementText?: (text: string | null) => Promise<void>
   /** Öppna väljaren för signeringsdatum */
   onEditSignedAt?: () => void
+  /** Spara avtalets säljare (den som skrivit under för BeGone) */
+  onSaveSalesPerson?: (name: string | null) => Promise<void>
   /** Säg upp avtalet (saknas för redan avslutade) */
   onTerminate?: () => void
   /** Ångra uppsägning */
@@ -2183,6 +2194,128 @@ interface PaperProps {
    * utelämnas frasen helt — skriv aldrig "okänd".
    */
   terminatedBy?: string | null
+}
+
+/**
+ * Signaturraden på avtalspappret. Klick öppnar en inline-inmatning i SAMMA
+ * skrivstil, samma lutning och samma storlek — pappret ser likadant ut oavsett
+ * om man läser eller skriver. Enter sparar, Escape avbryter.
+ *
+ * Saknas säljare på avtalet visas kundkortets som fallback, men i dämpad ton
+ * så det syns att värdet inte hör till avtalet självt.
+ */
+function SignatureLine({
+  value,
+  fallback,
+  ink,
+  archived,
+  onSave,
+}: {
+  value: string | null
+  fallback: string | null
+  ink: (typeof PAPER_INK)['live' | 'archived']
+  archived: boolean
+  /** Utelämnas på arkiverade avtal — en avslutad underskrift ändras inte */
+  onSave?: (name: string | null) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value ?? fallback ?? '')
+  const [saving, setSaving] = useState(false)
+
+  const shown = value ?? fallback
+  const isFallback = !value && !!fallback
+  const signatureStyle = {
+    fontFamily: "'Segoe Script', 'Brush Script MT', cursive",
+    color: archived ? '#3a424f' : '#2f3a46',
+  }
+
+  const commit = async () => {
+    if (!onSave) return
+    const clean = draft.trim() || null
+    if (clean === value) {
+      setEditing(false)
+      return
+    }
+    setSaving(true)
+    try {
+      await onSave(clean)
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="shrink-0 min-w-[180px]">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void commit()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void commit()
+            if (e.key === 'Escape') {
+              setDraft(value ?? fallback ?? '')
+              setEditing(false)
+            }
+          }}
+          autoFocus
+          disabled={saving}
+          placeholder="Namn"
+          className="inline-block -rotate-2 text-[17px] bg-transparent border-0 border-b border-dashed p-0 focus:outline-none focus:ring-0 w-full"
+          style={{ ...signatureStyle, borderBottomColor: ink.muted }}
+          aria-label="Säljare"
+        />
+        <div
+          className="mt-0.5 pt-0.5 font-sans text-[9.5px] tracking-wide"
+          style={{ borderTop: `1px solid ${ink.secondary}`, color: ink.muted }}
+        >
+          {saving ? 'Sparar…' : 'Enter sparar · Esc avbryter'}
+        </div>
+      </div>
+    )
+  }
+
+  if (!shown) {
+    if (!onSave) return null
+    return (
+      <button
+        onClick={() => {
+          setDraft('')
+          setEditing(true)
+        }}
+        className="shrink-0 font-sans text-[10px] italic hover:opacity-70 transition-opacity"
+        style={{ color: ink.muted }}
+      >
+        Ange säljare
+      </button>
+    )
+  }
+
+  return (
+    <div className="shrink-0">
+      <button
+        onClick={onSave ? () => { setDraft(value ?? fallback ?? ''); setEditing(true) } : undefined}
+        disabled={!onSave}
+        className={onSave ? 'block text-left cursor-text' : 'block text-left cursor-default'}
+        title={onSave ? 'Klicka för att ändra säljare' : undefined}
+      >
+        <span
+          className="inline-block -rotate-2 text-[17px]"
+          style={{ ...signatureStyle, opacity: isFallback ? 0.6 : 1 }}
+        >
+          {shown}
+        </span>
+        <span
+          className="block mt-0.5 pt-0.5 font-sans text-[9.5px] tracking-wide"
+          style={{ borderTop: `1px solid ${ink.secondary}`, color: ink.muted }}
+        >
+          {shown} · BeGone Skadedjur &amp; Sanering AB
+          {isFallback && <span className="italic"> · från kundkortet</span>}
+        </span>
+      </button>
+    </div>
+  )
 }
 
 /** "3 år 2 mån" — hur länge avtalet faktiskt varade. */
@@ -2232,6 +2365,7 @@ function PaperContract({
   onEditFrequency,
   onSaveAgreementText,
   onEditSignedAt,
+  onSaveSalesPerson,
   onTerminate,
   onReactivate,
   onRenew,
@@ -2809,25 +2943,18 @@ function PaperContract({
 
       {/* Fot */}
       <div className="flex items-end gap-5 mt-4">
-        {(contract.begone_employee_name || root.sales_person) && (
-          <div className="shrink-0">
-            <span
-              className="inline-block -rotate-2 text-[17px]"
-              style={{
-                fontFamily: "'Segoe Script', 'Brush Script MT', cursive",
-                color: archived ? '#3a424f' : '#2f3a46',
-              }}
-            >
-              {contract.begone_employee_name ?? root.sales_person}
-            </span>
-            <div
-              className="mt-0.5 pt-0.5 font-sans text-[9.5px] tracking-wide"
-              style={{ borderTop: `1px solid ${ink.secondary}`, color: ink.muted }}
-            >
-              {contract.begone_employee_name ?? root.sales_person} · BeGone Skadedjur &amp; Sanering AB
-            </div>
-          </div>
-        )}
+        {/* Säljaren som skrivit under för BeGone. Wizarden fyller alltid i
+            fältet, men manuellt upplagda och importerade avtal saknar det —
+            då faller signaturen tillbaka på kundkortets säljare, som kan vara
+            fel person för just det avtalet. Klick redigerar direkt i
+            skrivstilen; utseendet är identiskt före och efter. */}
+        <SignatureLine
+          value={contract.begone_employee_name ?? null}
+          fallback={root.sales_person ?? null}
+          ink={ink}
+          archived={archived}
+          onSave={onSaveSalesPerson}
+        />
         {/* Signeringsdatum och åtgärder flyttar in i avslutsnotisen på
             arkiverade avtal — inget att redigera där. */}
         {!archived && (

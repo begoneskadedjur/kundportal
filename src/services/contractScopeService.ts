@@ -605,6 +605,31 @@ export class ContractScopeService {
    * måste kunna fyllas i för avtal som lagts upp i efterhand — annars visar
    * tidslinjen dagen raden skapades i portalen som signeringsdatum.
    */
+  /**
+   * Sätt avtalets säljare — den som skrivit under för BeGone.
+   *
+   * Wizarden fyller alltid i fältet, men manuellt upplagda och importerade
+   * avtal saknar det (0 av 5 portalskapade, 1 av 17 importerade). Signaturen
+   * på avtalskortet faller då tillbaka på kundkortets säljare, vilket kan vara
+   * fel person för just det avtalet.
+   */
+  static async setSalesPerson(contractId: string, name: string | null): Promise<void> {
+    const clean = name?.trim() || null
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({ begone_employee_name: clean })
+      .eq('id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte spara säljare: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    await this.logEvent(contractId, {
+      event_type: 'other',
+      title: clean ? 'Säljare satt' : 'Säljare borttagen',
+      detail: clean ?? undefined,
+    })
+  }
+
   static async setSignedAt(contractId: string, signedAt: string | null): Promise<void> {
     const { data, error } = await supabase
       .from('contracts')
