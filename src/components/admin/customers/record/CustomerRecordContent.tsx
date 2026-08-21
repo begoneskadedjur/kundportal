@@ -35,7 +35,7 @@ import CustomerCasesSection from './CustomerCasesSection'
 import RevenueSection from './RevenueSection'
 import CustomerPulseRow from './CustomerPulseRow'
 import CaseDetailPanel from './CaseDetailPanel'
-import CustomerEquipmentDualView from '../CustomerEquipmentDualView'
+import CustomerEquipmentSection from './CustomerEquipmentSection'
 import { EmptyContractsIllustration } from './ContractGlyphs'
 import { contractState } from '../../../../utils/contractLifecycle'
 
@@ -441,12 +441,13 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
         />
       </div>
 
-      {/* Utrustning hör till KUNDEN, inte till ärendet som råkade skapa den:
-          en station står kvar i åratal, inspekteras och flyttas. Renderas bara
-          när fliken är vald — kartan drar in Google Maps-scriptet. */}
+      {/* Utrustning hör till KUNDEN, inte till ärendet som råkade skapa den.
+          Hela FAMILJEN skickas in: på multisite ligger stationerna på
+          enheterna, aldrig på huvudkontoret. Renderas bara när fliken är vald
+          — kartan drar in Google Maps-scriptet. */}
       {activeTab === 'utrustning' && (
         <div className="pt-6">
-          <CustomerEquipmentDualView customerId={root.id} customerName={root.company_name ?? ''} />
+          <CustomerEquipmentSection root={root} units={units} inspections={data.inspections} />
         </div>
       )}
 

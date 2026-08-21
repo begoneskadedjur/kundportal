@@ -1,6 +1,7 @@
 // src/services/equipmentService.ts - Service för utrustningsplacering
 import { supabase } from '../lib/supabase'
 import { compressToWebP } from '../utils/imageUtils'
+import { canonicalTypeCode } from '../utils/stationTaxonomy'
 import {
   EquipmentPlacement,
   EquipmentPlacementInsert,
@@ -55,14 +56,19 @@ export class EquipmentService {
         .select('id, code, name, color, icon, prefix, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
         .eq('is_active', true)
 
-      // Skapa map för snabb lookup på code
-      const typesByCode = new Map(allStationTypes?.map(t => [t.code, t]) || [])
+      // Nyckla på KANONISK kod. equipment_type är fritext med blandad
+      // skiftlägesform ("Betongstation" vs "betongstation") medan
+      // station_types.code alltid är gemener — rak matchning missade därför
+      // 609 av 749 rader, som då renderades grå i stället för sin rätta färg.
+      const typesByCode = new Map(
+        allStationTypes?.map((t) => [canonicalTypeCode(t.code), t]) || []
+      )
 
-      // Fallback för station_type_data om station_type_id saknas
+      // Fallback för station_type_data om station_type_id saknas (93 % av raderna)
       const equipmentWithFallback = (data || []).map((equipment) => {
         let stationTypeData = equipment.station_type_data
         if (!stationTypeData && equipment.equipment_type) {
-          const matchedType = typesByCode.get(equipment.equipment_type)
+          const matchedType = typesByCode.get(canonicalTypeCode(equipment.equipment_type))
           if (matchedType) stationTypeData = matchedType
         }
         return { ...equipment, station_type_data: stationTypeData }
