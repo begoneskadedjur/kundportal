@@ -428,6 +428,11 @@ export function useCustomerRecord(customerId: string | undefined) {
             'price, primary_technician_name'
         )
         .in('customer_id', familyIds)
+        // Borttagna ärenden ska inte synas — 9 rader i produktion har status
+        // 'Borttaget' utan att deleted_at är satt, och räknades därför som
+        // aktiva ärenden i vyerna.
+        .neq('status', 'Borttaget')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false }),
       supabase
         .from('profiles')

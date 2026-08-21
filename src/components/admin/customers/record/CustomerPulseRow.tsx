@@ -86,8 +86,15 @@ export default function CustomerPulseRow({
   const stats: Stat[] = [
     {
       label: 'Årsvärde',
-      value: annualValue > 0 ? formatKr(annualValue) : '–',
-      hint: annualValue > 0 ? 'ex moms' : 'inget aktivt avtal',
+      value: annualValue > 0 ? formatKr(annualValue) : live.length > 0 ? 'Avrop' : '–',
+      // Ett avropsavtal SAKNAR årspremie — allt prissätts per ärende. Noll
+      // kronor betyder därför inte "inget avtal", vilket det tidigare påstod.
+      hint:
+        annualValue > 0
+          ? 'ex moms'
+          : live.length > 0
+            ? 'fasta priser per ärende'
+            : 'inget aktivt avtal',
       tone: 'neutral',
       icon: <Wallet className="w-3 h-3" />,
     },
