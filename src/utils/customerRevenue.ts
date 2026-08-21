@@ -143,6 +143,16 @@ export function buildRevenueEntries(
     })
   }
 
+  // Ett ärende och en faktura på SAMMA belopp hos samma kund är samma pengar.
+  // Säljärendet som ledde till avtalet bär premiebeloppet, och avtalet
+  // faktureras sedan separat — utan denna spärr räknas premien två gånger.
+  // Systemomfattande: 11 ärenden, 119 078 kr.
+  const invoiceAmounts = new Set(
+    invoices
+      .filter((i) => (i.status ?? '') !== 'cancelled')
+      .map((i) => Math.round(Number(i.subtotal ?? 0)))
+  )
+
   for (const c of cases) {
     const amount = Number(c.price ?? 0)
     if (amount <= 0) continue
@@ -150,6 +160,7 @@ export function buildRevenueEntries(
     if (!isCaseCompleted(c)) continue
     // Har ärendet blivit en faktura är fakturan sanningen
     if (invoicedCaseIds.has(c.id)) continue
+    if (invoiceAmounts.has(Math.round(amount))) continue
     entries.push({
       id: c.id,
       kind: 'extra',
