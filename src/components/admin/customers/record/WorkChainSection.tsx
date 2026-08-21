@@ -168,11 +168,12 @@ export default function WorkChainSection({
       const revenue = groups.reduce((s, g) => s + g.revenue, 0)
       const cost = groups.reduce((s, g) => s + g.cost, 0)
       const first = services[0]
+      // Ett ärendenummer betyder utfört arbete; saknas det är raden avtalets
+      // årspremie. Hooken sätter case_number bara när ett verkligt ärende
+      // hittats, så numret är den pålitliga skiljelinjen — inte case_type.
       cases.push({
         caseId,
-        label:
-          first.case_number ??
-          (first.case_type === 'contract' ? 'Avtalets innehåll' : first.case_title ?? 'Ärende'),
+        label: first.case_number ?? first.case_title ?? 'Årspremie',
         technician: first.technician_name ?? null,
         services: groups,
         revenue,
@@ -183,9 +184,16 @@ export default function WorkChainSection({
     }
     cases.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
 
-    // Teknikernas bidrag
+    // Ärenden utan intäkt hör inte hemma i en INTÄKTSvy. Etableringar är
+    // normalt 0 kr (ingår i avtalet) och fyllde listan med rader som bidrar
+    // med noll och drar ner marginalsnittet. Bär raden en kostnad utan intäkt
+    // behålls den — då finns det något att förklara.
+    const visibleCases = cases.filter((c) => c.revenue > 0 || c.cost > 0)
+
+    // Teknikernas bidrag — räknas på SAMMA urval som listan visar, annars
+    // stämmer inte summorna med raderna under dem.
     const techMap = new Map<string, { revenue: number; cost: number; cases: Set<string> }>()
-    for (const c of cases) {
+    for (const c of visibleCases) {
       const key = c.technician ?? '— ej registrerad'
       const t = techMap.get(key) ?? { revenue: 0, cost: 0, cases: new Set<string>() }
       t.revenue += c.revenue
@@ -203,13 +211,13 @@ export default function WorkChainSection({
       }))
       .sort((a, b) => b.revenue - a.revenue)
 
-    const revenue = cases.reduce((s, c) => s + c.revenue, 0)
+    const revenue = visibleCases.reduce((s, c) => s + c.revenue, 0)
     const cost =
-      cases.reduce((s, c) => s + c.cost, 0) +
+      visibleCases.reduce((s, c) => s + c.cost, 0) +
       unmapped.reduce((s, a) => s + Number(a.total_price ?? 0), 0)
 
     return {
-      cases,
+      cases: visibleCases,
       technicians,
       unmapped,
       revenue,

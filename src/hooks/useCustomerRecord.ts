@@ -663,9 +663,14 @@ export function useCustomerRecord(customerId: string | undefined) {
     // business_cases/private_cases.primary_assignee_name. Berikningen ger 96 %
     // täckning på rader som hör till ett verkligt ärende.
     const rawWorkItems = (workItemsRes.error ? [] : (workItemsRes.data ?? [])) as unknown as RecordWorkItem[]
-    const workCaseIds = Array.from(
-      new Set(rawWorkItems.filter((w) => w.case_type !== 'contract').map((w) => w.case_id))
-    )
+    // ALLA case_id slås upp, även de med case_type='contract'. Anledningen:
+    // case_type kan bara vara 'private' | 'business' | 'contract' (CHECK-
+    // constraint), så ärenden på AVTALSKUNDER — som ligger i tabellen `cases` —
+    // saknar eget värde och märks 'contract' fast case_id pekar på ett ärende.
+    // 133 rader hos 31 kunder ser ut så. Träffen nedan avgör vad raden faktiskt
+    // är: hittas ett ärende är det utfört arbete (tekniker), annars ett avtal
+    // (säljare).
+    const workCaseIds = Array.from(new Set(rawWorkItems.map((w) => w.case_id)))
     const techByCase = new Map<string, { name: string | null; number: string | null; title: string | null }>()
     if (workCaseIds.length > 0) {
       const [cRes, bRes, pRes] = await Promise.all([
@@ -724,23 +729,27 @@ export function useCustomerRecord(customerId: string | undefined) {
     const workItems: RecordWorkItem[] = rawWorkItems
       .filter((w) => w.case_type !== 'contract' || !replacedContractIds.has(w.case_id))
       .map((w) => {
-      if (w.case_type === 'contract') {
-        const seller = contractSeller.get(w.case_id)
+      // Ärendeträffen avgör, inte case_type: finns raden i cases/business_cases/
+      // private_cases är det UTFÖRT ARBETE och tillhör teknikern som gjorde det.
+      // Först när inget ärende hittas är raden avtalsinnehåll, och då tillhör
+      // premien SÄLJAREN — en premie är inte utfört arbete.
+      const meta = techByCase.get(w.case_id)
+      if (meta) {
         return {
           ...w,
-          technician_name: seller?.name ?? null,
-          case_number: null,
-          case_title: seller?.label ?? 'Avtalspremie',
-          attribution: 'sales' as const,
+          technician_name: meta.name ?? null,
+          case_number: meta.number ?? null,
+          case_title: meta.title ?? null,
+          attribution: 'technician' as const,
         }
       }
-      const meta = techByCase.get(w.case_id)
+      const seller = contractSeller.get(w.case_id)
       return {
         ...w,
-        technician_name: meta?.name ?? null,
-        case_number: meta?.number ?? null,
-        case_title: meta?.title ?? null,
-        attribution: 'technician' as const,
+        technician_name: seller?.name ?? null,
+        case_number: null,
+        case_title: seller?.label ?? 'Årspremie',
+        attribution: 'sales' as const,
       }
     })
     const caseCounts: Record<string, number> = {}
