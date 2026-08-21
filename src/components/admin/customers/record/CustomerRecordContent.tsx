@@ -33,6 +33,8 @@ import UnitsSection from './UnitsSection'
 import AccessAccountsSection, { countAccessPersons } from './AccessAccountsSection'
 import ContractMapSection from './ContractMapSection'
 import CustomerCasesSection from './CustomerCasesSection'
+import { EmptyContractsIllustration } from './ContractGlyphs'
+import { contractState } from '../../../../utils/contractLifecycle'
 
 const EditCaseModal = lazy(() => import('../../technicians/EditCaseModal'))
 
@@ -143,6 +145,10 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     )
 
     const activeContracts = realContracts.filter((c) => !isEndedContract(c))
+    // Uppsagt-men-löpande räknas som levande: det faktureras och schemaläggs
+    // till sista giltiga dagen och hör därför hemma bland de aktiva korten.
+    const liveContracts = realContracts.filter((c) => contractState(c) !== 'ended')
+    const endedContracts = realContracts.filter((c) => contractState(c) === 'ended')
     // Fördelning: var avtalen bor (organisationen vs enheterna)
     const unitIds = new Set(units.map((u) => u.id))
     const contractsOnUnits = activeContracts.filter((c) => unitIds.has(c.customer_id ?? '')).length
@@ -181,6 +187,8 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       sitesByContract,
       sortedContracts,
       realContracts,
+      liveContracts,
+      endedContracts,
       importLeftovers,
       activeContracts,
       familyAnnualValue,
@@ -200,6 +208,8 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     sitesByContract,
     sortedContracts,
     realContracts,
+    liveContracts,
+    endedContracts,
     importLeftovers,
     activeContracts,
     familyAnnualValue,
@@ -301,13 +311,36 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       {/* Flikpaneler — göms med hidden, avmonteras aldrig */}
       <div hidden={activeTab !== 'oversikt'} className="pt-6 space-y-8">
         <section>
-          <WhisperHeader>
-            Avtal ({realContracts.length})
-            {familyAnnualValue > 0 && (
-              <span className="tabular-nums"> · {familyAnnualValue.toLocaleString('sv-SE')} kr/år</span>
+          <div className="flex items-baseline gap-2 mb-3">
+            <h2 className="text-xs uppercase tracking-wide text-slate-500">
+              Avtal ({realContracts.length})
+              {familyAnnualValue > 0 && (
+                <span className="tabular-nums"> · {familyAnnualValue.toLocaleString('sv-SE')} kr/år</span>
+              )}
+            </h2>
+            {realContracts.length > 4 && (
+              <button
+                onClick={() => setActiveTab('avtal')}
+                className="ml-auto text-xs text-slate-400 hover:text-[#20c58f] transition-colors"
+              >
+                Visa alla i Avtal →
+              </button>
             )}
-          </WhisperHeader>
-          <div className="space-y-3">{renderContractCards(true)}</div>
+          </div>
+          {/* Två kolumner: kompakta kort är låga och en enkolumnslista lämnade
+              halva bredden tom. */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {renderContractCards(true, liveContracts.slice(0, 4))}
+          </div>
+          {realContracts.length === 0 && (
+            <div className="flex flex-col items-center text-center py-10 rounded-2xl border border-dashed border-slate-800">
+              <EmptyContractsIllustration className="mb-4" />
+              <p className="text-sm text-slate-300 font-medium">Inga avtal registrerade</p>
+              <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
+                Skapa ett avtal i Avtalskartan så syns det här med omfattning, prislista och tidslinje.
+              </p>
+            </div>
+          )}
         </section>
 
         <section>
@@ -317,9 +350,27 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       </div>
 
       <div hidden={activeTab !== 'avtal'} className="pt-6">
-        <div className="space-y-3">{renderContractCards(false)}</div>
+        {/* Levande avtal överst — uppsagt-men-löpande hör hit, det fungerar
+            fortfarande till slutdatumet. */}
+        <div className="space-y-3">{renderContractCards(false, liveContracts)}</div>
         {realContracts.length === 0 && (
-          <p className="text-sm text-slate-500">Inga avtal registrerade för kunden.</p>
+          <div className="flex flex-col items-center text-center py-10 rounded-2xl border border-dashed border-slate-800">
+            <EmptyContractsIllustration className="mb-4" />
+            <p className="text-sm text-slate-300 font-medium">Inga avtal registrerade</p>
+            <p className="text-xs text-slate-500 mt-1 max-w-xs leading-relaxed">
+              Skapa ett avtal i Avtalskartan så syns det här med omfattning, prislista och tidslinje.
+            </p>
+          </div>
+        )}
+        {endedContracts.length > 0 && (
+          <details className="mt-4 border border-slate-800 rounded-2xl">
+            <summary className="cursor-pointer px-4 py-3 text-xs font-semibold text-slate-400 select-none flex items-center gap-2 hover:text-slate-200 transition-colors">
+              <Archive className="w-3.5 h-3.5 text-slate-500" />
+              Avslutade avtal ({endedContracts.length})
+              <span className="font-normal text-slate-500">— historik</span>
+            </summary>
+            <div className="px-4 pb-4 space-y-3">{renderContractCards(false, endedContracts)}</div>
+          </details>
         )}
         {/* Importrester hör inte ihop med de riktiga avtalen — de är historik
             från importen och skulle annars se ut som dubbletter. Hopfällda,

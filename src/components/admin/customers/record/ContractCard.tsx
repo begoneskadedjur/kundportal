@@ -4,7 +4,7 @@
 // ett expanderbart innehåll (avtalstext, produkter, tidslinje, senaste fakturor).
 
 import { useMemo, useState } from 'react'
-import { Archive, Building2, ChevronDown, ExternalLink, MapPin } from 'lucide-react'
+import { Archive, Building2, ChevronDown, ClockAlert, ExternalLink, MapPin, TrendingUp } from 'lucide-react'
 import {
   BILLING_FREQUENCY_LABEL,
   contractAnnualValue,
@@ -28,6 +28,8 @@ import {
   type RecordPremiumEvent,
 } from '../../../../hooks/useCustomerRecord'
 import ContractTimelineList, { buildSingleContractTimeline } from './ContractTimelineList'
+import { ContractSeal, ContractStatusMark, GLYPH_BY_STATE } from './ContractGlyphs'
+import { contractState, daysUntilEnd } from '../../../../utils/contractLifecycle'
 
 interface SelectedProduct {
   name?: string
@@ -99,6 +101,9 @@ export default function ContractCard({
   const isUnitContract = !!owner.parent_customer_id
   const annual = contractAnnualValue(contract)
   const oneflowUrl = oneflowContractUrl(contract)
+  // Livscykeln styr både glyf och kantfärg — aldrig egna if-kedjor på status
+  const glyphState = GLYPH_BY_STATE[contractState(contract)]
+  const edgeColor = { active: '#20c58f', terminated: '#f59e0b', ended: '#475569' }[glyphState]
 
   const timelineEvents = useMemo(
     () => buildSingleContractTimeline(contract, additions, billingItems, premiumEvents),
@@ -133,25 +138,6 @@ export default function ContractCard({
       ? `${Math.round(value / 12).toLocaleString('sv-SE')} kr/mån`
       : `${formatKr(value)}/år`
 
-  const moneyLine = (() => {
-    if (premiumEvents.length > 0) {
-      const currentValue = Number(currentStep?.annual_value ?? annual)
-      // "Just nu" bara på avtal som faktiskt gäller. Ett avslutat avtal sa
-      // tidigare både "Just nu: 11 490 kr/år" och "Gällde t.o.m. 1 dec 2025"
-      // på samma kort. Framtida trappsteg är heller inte relevanta då.
-      if (ended) return `Slutpremie: ${inRhythm(currentValue)}`
-      const base = `Just nu: ${inRhythm(currentValue)}`
-      if (nextStep) {
-        return `${base} (→ ${inRhythm(Number(nextStep.annual_value ?? 0))} från ${formatDateSv(nextStep.effective_from)})`
-      }
-      return base
-    }
-    if (!annual) return 'Avropsavtal — fasta priser per ärende'
-    if (contract.billing_frequency === 'monthly') {
-      return `${Math.round(annual / 12).toLocaleString('sv-SE')} kr/mån (${formatKr(annual)}/år)`
-    }
-    return `${formatKr(annual)}/år`
-  })()
 
   // Omfattning: enheter som avtalet täcker, med namn från familjens kundrader
   const todayKey = new Date().toISOString().slice(0, 10)
@@ -169,26 +155,37 @@ export default function ContractCard({
   const startDate = contract.contract_start_date ?? contract.start_date
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50">
-      <div className={compact ? 'px-4 py-3' : 'px-4 py-3.5'}>
-        {/* Rubrikrad: namn + status + Oneflow/Importerat */}
-        <div className="flex items-center gap-2 min-w-0">
-          <h3 className="text-sm font-semibold text-slate-100 truncate">{contractDisplayName(contract)}</h3>
+    <div
+      className={`relative rounded-xl border overflow-hidden transition-colors ${
+        ended ? 'border-slate-800/60 bg-slate-900/25' : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'
+      }`}
+    >
+      {/* Accentkant i statusfärgen — samma grepp som pappret i Avtalskartan */}
+      <span className="absolute left-0 inset-y-0 w-[3px]" style={{ background: edgeColor }} aria-hidden />
+      <div className={compact ? 'pl-5 pr-4 py-3' : 'pl-5 pr-4 py-4'}>
+        {/* Rubrikrad: glyf + namn + statusmärke */}
+        <div className="flex items-start gap-3 min-w-0">
+          <ContractSeal state={glyphState} size={compact ? 32 : 40} className="mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-[15px] font-semibold text-slate-100 truncate leading-tight">
+              {contractDisplayName(contract)}
+            </h3>
+          </div>
+          <ContractStatusMark
+            state={glyphState}
+            subLabel={
+              terminatedRunning && contract.effective_end_date
+                ? `T.O.M. ${formatDateSv(contract.effective_end_date)}`
+                : ended
+                  ? formatDateSv(contract.effective_end_date ?? contract.contract_end_date)
+                  : null
+            }
+          />
+        </div>
+
+        {/* Ursprungsmärkning: kundkort / importerat / Oneflow-länk */}
+        <div className="flex items-center gap-1.5 mt-1.5">
           <span className="flex items-center gap-1.5 shrink-0 ml-auto">
-            {terminatedRunning && (
-              <span className="text-xs text-amber-400">Uppsagt</span>
-            )}
-            {ended ? (
-              <span className="flex items-center gap-1.5 text-xs text-slate-500">
-                <span className="w-1.5 h-1.5 rounded-full border border-slate-500" aria-hidden />
-                Avslutat
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-xs text-slate-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#20c58f]" aria-hidden />
-                Aktivt
-              </span>
-            )}
             {contract.fromCustomerRow ? (
               <span className="text-[10px] uppercase tracking-wide text-slate-500 border border-slate-700 rounded px-1.5 py-0.5" title="Avtalsdatan kommer från kundkortet — ingen separat avtalsrad finns ännu">
                 Från kundkortet
@@ -240,24 +237,84 @@ export default function ContractCard({
           )}
         </div>
 
-        {/* Belopp + period */}
-        <div className="mt-1.5 text-sm text-slate-200 tabular-nums">
-          {moneyLine}
-          {frequencyLabel && annual > 0 && <span className="text-slate-400"> · {frequencyLabel}</span>}
-          {(startDate || contract.contract_end_date) && (
-            <span className="text-slate-400">
-              {' '}· {startDate ? formatDateSv(startDate) : '?'} → {contract.contract_end_date ? formatDateSv(contract.contract_end_date) : 'tills vidare'}
+        {/* Värdeblocket: beloppet är kortets svar på "vad kostar det" och ska
+            gå att hitta utan att läsa en hel rad. Speglar pappret i § Värde. */}
+        <div className="mt-3 rounded-lg bg-slate-950/40 border border-slate-800/80 px-3.5 py-2.5">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-[21px] font-bold tabular-nums text-slate-50 leading-none">
+              {annual > 0 ? formatKr(Number(currentStep?.annual_value ?? annual)) : 'Avrop'}
             </span>
+            <span className="text-xs text-slate-400">
+              {annual > 0
+                ? `/år${frequencyLabel ? ` · faktureras ${frequencyLabel}` : ''}`
+                : '— fasta priser per ärende'}
+            </span>
+            {contract.billing_frequency === 'monthly' && annual > 0 && (
+              <span className="ml-auto text-xs text-slate-500 tabular-nums">
+                {Math.round(Number(currentStep?.annual_value ?? annual) / 12).toLocaleString('sv-SE')} kr/mån
+              </span>
+            )}
+          </div>
+          {/* Nästa trappsteg — framåtblickande, inte på avslutade avtal */}
+          {nextStep && !ended && (
+            <div className="flex items-center gap-1.5 mt-1.5 text-xs text-[#20c58f]">
+              <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+              <span className="tabular-nums">
+                {formatKr(Number(nextStep.annual_value ?? 0))}/år från {formatDateSv(nextStep.effective_from)}
+              </span>
+            </div>
           )}
         </div>
 
-        {/* Sekundärrad: uppsägningstid m.m. */}
+        {/* Uppsägningsremsa: avtalet FUNGERAR fortfarande till slutdatumet.
+            Tidigare stod bara ordet "Uppsagt" bredvid "Aktivt" i rubriken. */}
+        {terminatedRunning && contract.effective_end_date && (() => {
+          const left = daysUntilEnd(contract)
+          const urgent = left !== null && left <= 30
+          return (
+            <div className="mt-3 flex items-center gap-2.5 rounded-lg px-3 py-2 border border-amber-500/35 bg-amber-500/[0.08]">
+              <ClockAlert className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+              <span className="text-[11.5px] text-amber-200/90 leading-relaxed">
+                Uppsagt — gäller till och med{' '}
+                <b className="tabular-nums text-amber-100">{formatDateSv(contract.effective_end_date)}</b>.
+                Fakturering och schemaläggning fortsätter till dess.
+              </span>
+              <span className="ml-auto shrink-0 text-right">
+                <span
+                  className={`block text-[15px] tabular-nums leading-none font-bold ${
+                    urgent ? 'text-red-400' : 'text-amber-400'
+                  }`}
+                >
+                  {left === 0 ? 'Idag' : left}
+                </span>
+                <span className="block text-[9px] uppercase tracking-[0.14em] text-slate-500">
+                  {left === 0 ? 'sista dagen' : 'dagar kvar'}
+                </span>
+              </span>
+            </div>
+          )
+        })()}
+
+        {/* Faktarader som definitionslista — etiketten i fast bredd gör att
+            flera kort under varandra bildar kolumner */}
         {!compact && (
-          <div className="mt-1 text-xs text-slate-500">
-            {contract.notice_period_months != null && <span>Uppsägningstid {contract.notice_period_months} mån</span>}
-            {contract.notice_period_months != null && contract.contract_length && <span> · </span>}
-            {contract.contract_length && <span>Avtalslängd {contract.contract_length}</span>}
-          </div>
+          <dl className="mt-3 space-y-1 text-xs">
+            <div className="flex gap-2">
+              <dt className="w-[68px] shrink-0 text-slate-600 uppercase tracking-wider text-[10px] pt-px">
+                Löper
+              </dt>
+              <dd className="text-slate-300 tabular-nums min-w-0">
+                {startDate ? formatDateSv(startDate) : '–'} →{' '}
+                {contract.contract_end_date ? formatDateSv(contract.contract_end_date) : 'tills vidare'}
+                {contract.notice_period_months != null && (
+                  <span className="text-slate-500"> · uppsägning {contract.notice_period_months} mån</span>
+                )}
+                {contract.contract_length && (
+                  <span className="text-slate-500"> · {contract.contract_length}</span>
+                )}
+              </dd>
+            </div>
+          </dl>
         )}
 
         {/* Varför avtalet är avslutat. Utan detta ser flera avslutade avtal på
