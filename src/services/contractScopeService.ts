@@ -67,6 +67,12 @@ export class ContractScopeService {
    * Skriv in en enhet i avtalets omfattning.
    * Skyddar mot dubbletter: finns redan en rad utan active_to (eller med
    * framtida active_to) för samma avtal+enhet görs ingenting.
+   *
+   * VIKTIGT: unique-constraintet contract_sites_contract_id_customer_id_key
+   * har INGEN datumdimension — ett avtal+enhet kan bara ha EN rad totalt.
+   * En AVSLUTAD täckning (active_to i det förflutna) blockerar därför en ny
+   * insert med "duplicate key". Den raden återupplivas i stället: samma rad
+   * får nytt active_from och active_to nollställs.
    */
   static async addSite(
     contractId: string,
@@ -83,6 +89,20 @@ export class ContractScopeService {
     const key = todayKey()
     const active = (existing ?? []).find((r) => !r.active_to || r.active_to >= key)
     if (active) throw new Error('Enheten står redan i avtalets omfattning')
+
+    // Avslutad täckning finns kvar → öppna den igen i stället för att insert:a
+    const closed = (existing ?? [])[0]
+    if (closed) {
+      const { data, error } = await supabase
+        .from('contract_sites')
+        .update({ active_from: activeFrom, active_to: null, note: note ?? null })
+        .eq('id', closed.id)
+        .select('id, contract_id, customer_id, active_from, active_to, note')
+        .single()
+      if (error || !data)
+        throw new Error(`Kunde inte öppna täckningen igen: ${error?.message ?? 'okänt fel'}`)
+      return data as ScopeRow
+    }
 
     const { data, error } = await supabase
       .from('contract_sites')
@@ -136,15 +156,35 @@ export class ContractScopeService {
     const covered = new Set(scope.map((r) => r.customer_id))
     const missing = customerIds.filter((id) => !covered.has(id))
     if (missing.length === 0) return 0
-    const { error } = await supabase.from('contract_sites').insert(
-      missing.map((customerId) => ({
-        contract_id: contractId,
-        customer_id: customerId,
-        active_from: activeFrom,
-        note: 'Hela verksamheten',
-      }))
-    )
-    if (error) throw new Error(`Kunde inte skriva in enheterna: ${error.message}`)
+
+    // Samma constraint-fälla som i addSite: enheter med en AVSLUTAD täckning
+    // har redan en rad och måste uppdateras, inte insert:as.
+    const { data: closedRows } = await supabase
+      .from('contract_sites')
+      .select('id, customer_id')
+      .eq('contract_id', contractId)
+      .in('customer_id', missing)
+    const closedByCustomer = new Map((closedRows ?? []).map((r) => [r.customer_id as string, r.id as string]))
+
+    const toInsert = missing.filter((id) => !closedByCustomer.has(id))
+    if (toInsert.length > 0) {
+      const { error } = await supabase.from('contract_sites').insert(
+        toInsert.map((customerId) => ({
+          contract_id: contractId,
+          customer_id: customerId,
+          active_from: activeFrom,
+          note: 'Hela verksamheten',
+        }))
+      )
+      if (error) throw new Error(`Kunde inte skriva in enheterna: ${error.message}`)
+    }
+    for (const rowId of closedByCustomer.values()) {
+      const { error } = await supabase
+        .from('contract_sites')
+        .update({ active_from: activeFrom, active_to: null, note: 'Hela verksamheten' })
+        .eq('id', rowId)
+      if (error) throw new Error(`Kunde inte öppna täckningen igen: ${error.message}`)
+    }
     return missing.length
   }
 
