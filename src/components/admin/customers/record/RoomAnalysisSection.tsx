@@ -15,6 +15,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../../../lib/supabase'
 import { formatDateSv, formatKr, type RecordCase, type RecordCustomer } from '../../../../hooks/useCustomerRecord'
 import { roomsFromString } from '../../../../services/caseRoomService'
+import { useTechnicians } from '../../../../hooks/useTechnicians'
 
 // Kategorifärger — följer ärendetypen, aldrig rang
 const CAT_COLOR: Record<string, string> = {
@@ -118,6 +119,7 @@ interface Props {
 
 export default function RoomAnalysisSection({ root, cases, onOpenCase, dimCategory }: Props) {
   const navigate = useNavigate()
+  const { technicians } = useTechnicians()
   const [expanded, setExpanded] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
   const [popOpen, setPopOpen] = useState(false)
@@ -214,12 +216,24 @@ export default function RoomAnalysisSection({ root, cases, onOpenCase, dimCatego
   const bookInvestigation = (room: Room) => {
     const pest = room.visits.map((v) => v.case.pest_type).filter(Boolean).pop() ?? null
     const history = room.visits.map((v) => v.case.case_number).filter(Boolean).join(', ')
+    // Tjänsten: vanligaste service_id bland rummets besök — modalen härleder
+    // tjänstegruppen automatiskt (t.ex. Krypande insekter → Sanering Vägglöss)
+    const svcCount = new Map<string, number>()
+    for (const v of room.visits) if (v.case.service_id) svcCount.set(v.case.service_id, (svcCount.get(v.case.service_id) ?? 0) + 1)
+    const serviceId = [...svcCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+    // Föreslå bara RIKTIGA tekniker — gamla systemets ärenden kan bära
+    // koordinatorer/säljare som utförare, de ska aldrig föreslås
+    const techNames = new Set(technicians.map((t) => t.name?.toLowerCase()).filter(Boolean))
     const techCount = new Map<string, number>()
-    for (const v of room.visits) if (v.case.primary_technician_name) techCount.set(v.case.primary_technician_name, (techCount.get(v.case.primary_technician_name) ?? 0) + 1)
+    for (const v of room.visits) {
+      const n = v.case.primary_technician_name
+      if (n && techNames.has(n.toLowerCase())) techCount.set(n, (techCount.get(n) ?? 0) + 1)
+    }
     const suggestedTech = [...techCount.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
     sessionStorage.setItem('begone-grundorsak-prefill', JSON.stringify({
       customer_id: root.id,
       case_type: 'contract',
+      service_id: serviceId,
       room_number: room.name,
       pest_type: pest,
       title: `Grundorsaksutredning rum ${room.name}`,

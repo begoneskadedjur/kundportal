@@ -248,6 +248,8 @@ export interface RecordCase {
   room_number?: string | null
   /** Teknikerns trafikljus (0=ej ifyllt/okänt, 1=OK, 2=varning, 3=kritisk) — null för business_cases */
   pest_level?: number | null
+  /** Tjänsten på ärendet — används för att förifylla grundorsaksbokningen */
+  service_id?: string | null
   /** Vilken tabell raden kom från — business_cases saknar service_type */
   origin: 'case' | 'business'
 }
@@ -431,7 +433,7 @@ export function useCustomerRecord(customerId: string | undefined) {
         .select(
           'id, customer_id, contract_id, case_number, title, status, service_type, ' +
             'pest_type, scheduled_start, scheduled_end, completed_date, created_at, ' +
-            'price, primary_technician_name, room_number, pest_level'
+            'price, primary_technician_name, room_number, pest_level, service_id'
         )
         .in('customer_id', familyIds)
         // Borttagna ärenden ska inte synas — 9 rader i produktion har status
