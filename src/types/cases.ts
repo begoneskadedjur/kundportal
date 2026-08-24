@@ -93,6 +93,7 @@ export interface Case {
   // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
   work_order_number?: string | null
   work_object?: string | null
+  room_number?: string | null
 }
 
 // Create case input type (for customer requests)

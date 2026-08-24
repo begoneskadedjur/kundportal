@@ -155,6 +155,7 @@ export default function EditContractCaseModal({
     // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
     work_order_number: '',
     work_object: '',
+    room_number: '',
 
     // 🧾 Märkning faktura — blir "Er referens" på merförsäljningsfakturan
     invoice_marking: '',
@@ -435,6 +436,7 @@ export default function EditContractCaseModal({
         // 🏷️ Ärendemärkning
         work_order_number: caseData.work_order_number || '',
         work_object: caseData.work_object || '',
+        room_number: caseData.room_number || '',
         // 🧾 Märkning faktura
         invoice_marking: caseData.invoice_marking || '',
       })
@@ -570,6 +572,7 @@ export default function EditContractCaseModal({
           invoice_marking: data.invoice_marking ?? prev.invoice_marking,
           work_order_number: data.work_order_number ?? prev.work_order_number,
           work_object: data.work_object ?? prev.work_object,
+          room_number: data.room_number ?? prev.room_number,
         }))
         return data
       }
@@ -609,7 +612,7 @@ export default function EditContractCaseModal({
       if (data && data.is_multisite && data.parent_customer_id) {
         const { data: parentData, error: parentError } = await supabase
           .from('customers')
-          .select('organization_number, company_name, assigned_account_manager, work_order_number_enabled, work_object_enabled')
+          .select('organization_number, company_name, assigned_account_manager, work_order_number_enabled, work_object_enabled, room_number_enabled')
           .eq('id', data.parent_customer_id)
           .single()
 
@@ -620,6 +623,7 @@ export default function EditContractCaseModal({
             assigned_account_manager: data.assigned_account_manager || parentData.assigned_account_manager,
             work_order_number_enabled: data.work_order_number_enabled || parentData.work_order_number_enabled || false,
             work_object_enabled: data.work_object_enabled || parentData.work_object_enabled || false,
+            room_number_enabled: data.room_number_enabled || parentData.room_number_enabled || false,
             parent_organization_number: parentData.organization_number,
             parent_company_name: parentData.company_name
           }
@@ -1157,6 +1161,7 @@ export default function EditContractCaseModal({
         // 🏷️ Ärendemärkning — spara null istället för tom sträng
         work_order_number: formData.work_order_number?.trim() || null,
         work_object: formData.work_object?.trim() || null,
+        room_number: formData.room_number?.trim() || null,
         // 🧾 Märkning faktura — spara null istället för tom sträng
         invoice_marking: formData.invoice_marking?.trim() || null
       }
@@ -1819,6 +1824,18 @@ export default function EditContractCaseModal({
                     type="text"
                     value={formData.work_object}
                     onChange={(e) => setFormData(prev => ({ ...prev, work_object: e.target.value }))}
+                    disabled={isCustomerView}
+                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                  />
+                </div>
+              )}
+              {(customerData?.room_number_enabled || formData.room_number) && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Rum nr</label>
+                  <input
+                    type="text"
+                    value={formData.room_number}
+                    onChange={(e) => setFormData(prev => ({ ...prev, room_number: e.target.value }))}
                     disabled={isCustomerView}
                     className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                   />

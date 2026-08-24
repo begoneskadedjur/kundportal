@@ -447,7 +447,8 @@ const CustomerPortal: React.FC = () => {
             created_at: (selectedCaseForModal as any).created_at,
             // 🏷️ Ärendemärkning
             work_order_number: (selectedCaseForModal as any).work_order_number,
-            work_object: (selectedCaseForModal as any).work_object
+            work_object: (selectedCaseForModal as any).work_object,
+            room_number: (selectedCaseForModal as any).room_number
           }}
         />
       )}

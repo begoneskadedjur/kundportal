@@ -79,6 +79,7 @@ interface Organization {
   portal_access_level?: string
   work_order_number_enabled?: boolean
   work_object_enabled?: boolean
+  room_number_enabled?: boolean
 }
 
 interface OrganizationUser {
@@ -424,6 +425,7 @@ export default function OrganizationsPage() {
           portal_access_level: org.portal_access_level || 'full',
           work_order_number_enabled: org.work_order_number_enabled ?? false,
           work_object_enabled: org.work_object_enabled ?? false,
+          room_number_enabled: org.room_number_enabled ?? false,
         }
       }))
 
@@ -569,6 +571,7 @@ export default function OrganizationsPage() {
           portal_access_level: customer.portal_access_level || 'full',
           work_order_number_enabled: customer.work_order_number_enabled ?? false,
           work_object_enabled: customer.work_object_enabled ?? false,
+          room_number_enabled: customer.room_number_enabled ?? false,
         }
       }))
 
@@ -663,10 +666,13 @@ export default function OrganizationsPage() {
   // Flaggan sätts på huvudkontoret/den fristående kunden — enheter ärver vid läsning.
   const handleToggleWorkOrderField = async (
     org: Organization,
-    field: 'work_order_number_enabled' | 'work_object_enabled'
+    field: 'work_order_number_enabled' | 'work_object_enabled' | 'room_number_enabled'
   ) => {
     const newValue = !(org[field] ?? false)
-    const label = field === 'work_order_number_enabled' ? 'Arbetsorder nr' : 'Objekt'
+    const label =
+      field === 'work_order_number_enabled' ? 'Arbetsorder nr'
+      : field === 'room_number_enabled' ? 'Rum nr'
+      : 'Objekt'
     try {
       const { error } = await supabase
         .from('customers')

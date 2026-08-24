@@ -109,6 +109,7 @@ interface CaseDetailsModalProps {
     // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
     work_order_number?: string | null
     work_object?: string | null
+    room_number?: string | null
   }
 }
 
@@ -967,8 +968,8 @@ export default function CaseDetailsModal({
                 />
               )}
 
-              {/* 🏷️ Ärendemärkning: Arbetsorder nr + Objekt (kunder med inställningen) */}
-              {(fallbackData.work_order_number || fallbackData.work_object) && (
+              {/* 🏷️ Ärendemärkning: Arbetsorder nr + Objekt + Rum nr (kunder med inställningen) */}
+              {(fallbackData.work_order_number || fallbackData.work_object || fallbackData.room_number) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {fallbackData.work_order_number && (
                     <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
@@ -980,6 +981,12 @@ export default function CaseDetailsModal({
                     <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
                       <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Objekt</p>
                       <p className="text-sm text-white font-medium">{fallbackData.work_object}</p>
+                    </div>
+                  )}
+                  {fallbackData.room_number && (
+                    <div className="bg-slate-800/40 rounded-xl px-4 py-3 border border-slate-700/40">
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">Rum nr</p>
+                      <p className="text-sm text-white font-medium">{fallbackData.room_number}</p>
                     </div>
                   )}
                 </div>

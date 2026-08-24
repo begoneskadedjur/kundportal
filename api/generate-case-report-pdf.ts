@@ -173,6 +173,7 @@ export const generateSingleCaseHTML = (
   if (caseData.work_order_number) infoRows.push(['Arbetsorder nr', esc(caseData.work_order_number)])
   if (caseData.invoice_marking) infoRows.push(['Märkning faktura', esc(caseData.invoice_marking)])
   if (caseData.work_object) infoRows.push(['Objekt', esc(caseData.work_object)])
+  if (caseData.room_number) infoRows.push(['Rum nr', esc(caseData.room_number)])
 
   const caseInfoSection = `
     <section class="section">

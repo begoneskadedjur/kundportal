@@ -118,6 +118,7 @@ export type Database = {
           // 🏷️ Ärendemärkning: obligatoriska fält på ärenden (separata inställningar)
           work_order_number_enabled: boolean
           work_object_enabled: boolean
+          room_number_enabled: boolean
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
           contract_status?: 'signed' | 'active' | 'terminated' | 'expired'
@@ -252,6 +253,7 @@ export type Database = {
           // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
           work_order_number: string | null
           work_object: string | null
+          room_number: string | null
           // Fakturamärkning - blir "Er referens" (invoice_marking) på merförsäljningsfakturan
           invoice_marking: string | null
         }

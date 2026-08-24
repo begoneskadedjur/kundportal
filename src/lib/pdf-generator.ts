@@ -174,6 +174,7 @@ export const generateWorkReportHTML = (
   // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
   const workOrderField = getFieldValue(taskDetails, 'work_order_number')
   const workObjectField = getFieldValue(taskDetails, 'work_object')
+  const roomNumberField = getFieldValue(taskDetails, 'room_number')
 
   // Determine if it's a company or private person
   const isCompany = caseTypeField?.value === 'business'
@@ -210,6 +211,7 @@ export const generateWorkReportHTML = (
   ]
   if (workOrderField?.value) infoRows.push(['Arbetsorder nr', esc(workOrderField.value)])
   if (workObjectField?.value) infoRows.push(['Objekt', esc(workObjectField.value)])
+  if (roomNumberField?.value) infoRows.push(['Rum nr', esc(roomNumberField.value)])
 
   const caseInfoSection = `
     <section class="section">

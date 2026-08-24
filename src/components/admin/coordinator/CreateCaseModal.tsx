@@ -799,7 +799,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   // Ärendemärkning: separata per-kund-flaggor kräver Arbetsorder nr resp. Objekt
   // på Servicebesök (contract) och Inspektion stationer (inspection).
   // Enheter ärver flaggorna från huvudkontoret (parent_customer_id).
-  const requiresWorkOrderFlag = (flag: 'work_order_number_enabled' | 'work_object_enabled') => {
+  const requiresWorkOrderFlag = (flag: 'work_order_number_enabled' | 'work_object_enabled' | 'room_number_enabled') => {
     if (caseType !== 'contract' && caseType !== 'inspection') return false
     const cust = contractCustomers.find(c => c.id === selectedContractCustomer)
     if (!cust) return false
@@ -812,6 +812,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   }
   const workOrderNumberRequired = requiresWorkOrderFlag('work_order_number_enabled')
   const workObjectRequired = requiresWorkOrderFlag('work_object_enabled')
+  const roomNumberRequired = requiresWorkOrderFlag('room_number_enabled')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -852,6 +853,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
     if (workObjectRequired && !(formData as any).work_object?.trim()) {
       return toast.error('Objekt måste anges för denna kund');
+    }
+    if (roomNumberRequired && !(formData as any).room_number?.trim()) {
+      return toast.error('Rum nr måste anges för denna kund');
     }
     
     setLoading(true);
@@ -910,6 +914,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           // Ärendemärkning (kunder med aktiverad ärendemärkning)
           work_order_number: (formData as any).work_order_number?.trim() || null,
           work_object: (formData as any).work_object?.trim() || null,
+          room_number: (formData as any).room_number?.trim() || null,
           // Fakturamärkning - fältet visas i skapa-flödet men sparades
           // tidigare bara för business_cases; på cases heter kolumnen
           // invoice_marking (blir Er referens på merförsäljningsfakturan)
@@ -1136,6 +1141,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           // Ärendemärkning (kunder med aktiverad ärendemärkning)
           work_order_number: (formData as any).work_order_number?.trim() || null,
           work_object: (formData as any).work_object?.trim() || null,
+          room_number: (formData as any).room_number?.trim() || null,
           // Fakturamärkning (Er referens på merförsäljningsfakturan)
           invoice_marking: formData.markning_faktura?.trim() || null
         };
@@ -1861,7 +1867,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           onChange={handleChange}
                         />
                       </div>
-                      {(workOrderNumberRequired || workObjectRequired) && (
+                      {(workOrderNumberRequired || workObjectRequired || roomNumberRequired) && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {workOrderNumberRequired && (
                             <Input
@@ -1877,6 +1883,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               label="Objekt *"
                               name="work_object"
                               value={(formData as any).work_object || ''}
+                              onChange={handleChange}
+                              required
+                            />
+                          )}
+                          {roomNumberRequired && (
+                            <Input
+                              label="Rum nr *"
+                              name="room_number"
+                              value={(formData as any).room_number || ''}
                               onChange={handleChange}
                               required
                             />
@@ -2260,13 +2275,16 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               <Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />
                               <Input type="email" label="E-post Faktura" name="e_post_faktura" value={formData.e_post_faktura || ''} onChange={handleChange} />
                             </div>
-                            {(workOrderNumberRequired || workObjectRequired) && (
+                            {(workOrderNumberRequired || workObjectRequired || roomNumberRequired) && (
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {workOrderNumberRequired && (
                                   <Input label="Arbetsorder nr *" name="work_order_number" value={(formData as any).work_order_number || ''} onChange={handleChange} required />
                                 )}
                                 {workObjectRequired && (
                                   <Input label="Objekt *" name="work_object" value={(formData as any).work_object || ''} onChange={handleChange} required />
+                                )}
+                                {roomNumberRequired && (
+                                  <Input label="Rum nr *" name="room_number" value={(formData as any).room_number || ''} onChange={handleChange} required />
                                 )}
                               </div>
                             )}

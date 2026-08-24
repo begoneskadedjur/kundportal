@@ -44,6 +44,7 @@ interface TechnicianCase {
   // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
   work_order_number?: string | null;
   work_object?: string | null;
+  room_number?: string | null;
   invoice_marking?: string | null;
 }
 
@@ -239,6 +240,7 @@ export const useModernWorkReportGeneration = (caseData: TechnicianCase) => {
       // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
       work_order_number: caseData.work_order_number || null,
       work_object: caseData.work_object || null,
+      room_number: caseData.room_number || null,
       invoice_marking: caseData.invoice_marking || null,
       visit_number: await (async () => {
         const { count } = await supabase

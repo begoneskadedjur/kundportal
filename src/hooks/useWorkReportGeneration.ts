@@ -38,6 +38,7 @@ interface TechnicianCase {
   // 🏷️ Ärendemärkning (kunder med aktiverad ärendemärkning)
   work_order_number?: string | null;
   work_object?: string | null;
+  room_number?: string | null;
 }
 
 interface CustomerInfo {
@@ -240,6 +241,13 @@ export const useWorkReportGeneration = (caseData: TechnicianCase) => {
           type: 'text',
           value: caseData.work_object || '',
           has_value: !!(caseData.work_object)
+        },
+        {
+          id: 'room_number',
+          name: 'room_number',
+          type: 'text',
+          value: caseData.room_number || '',
+          has_value: !!(caseData.room_number)
         }
       ]
     }

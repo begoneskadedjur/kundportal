@@ -76,6 +76,7 @@ interface Organization {
   portal_access_level?: string
   work_order_number_enabled?: boolean
   work_object_enabled?: boolean
+  room_number_enabled?: boolean
   primary_contact_email?: string
   contact_email?: string
 }
@@ -111,7 +112,7 @@ interface CompactOrganizationTableProps {
   organizationSites: Record<string, Site[]>
   onToggleExpand: (org: Organization) => void
   onToggleActive: (org: Organization) => void
-  onToggleWorkOrderField: (org: Organization, field: 'work_order_number_enabled' | 'work_object_enabled') => void
+  onToggleWorkOrderField: (org: Organization, field: 'work_order_number_enabled' | 'work_object_enabled' | 'room_number_enabled') => void
   onEdit: (org: Organization) => void
   onDelete: (org: Organization) => void
   onAddUser: (org: Organization) => void
@@ -762,6 +763,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                     {([
                       { field: 'work_order_number_enabled' as const, label: 'Arbetsorder nr' },
                       { field: 'work_object_enabled' as const, label: 'Objekt' },
+                      { field: 'room_number_enabled' as const, label: 'Rum nr' },
                     ]).map(({ field, label }) => (
                       <div key={field} className="flex items-center justify-between pt-2 border-t border-slate-700/50">
                         <span className="text-sm text-slate-400">{label}</span>

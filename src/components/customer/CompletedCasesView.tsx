@@ -564,7 +564,8 @@ export function CompletedCasesView({ customerId, companyName }: CompletedCasesVi
             files: selectedCase.files,
             // 🏷️ Ärendemärkning
             work_order_number: (selectedCase as any).work_order_number,
-            work_object: (selectedCase as any).work_object
+            work_object: (selectedCase as any).work_object,
+            room_number: (selectedCase as any).room_number
           }}
         />
       )}
