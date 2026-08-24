@@ -20,7 +20,13 @@
     "src/lib/supabase-admin.ts",
     "src/lib/pdf-generator.ts",
     "src/lib/begoneLogo.ts",
-    "src/types/database.ts"
+    "src/types/database.ts",
+
+    // Delad schemagenerator (extend-recurring-schedules-cronen) — samma
+    // algoritm som klientens wizard, med timeZone-parameter för servern
+    "src/types/recurringSchedule.ts",
+    "src/utils/inspectionDateGenerator.ts",
+    "src/utils/swedishHolidays.ts"
 
     // OBS: vite.config.ts kan inte typkollas här — Vite är ESM-only och detta
     // projekt använder NodeNext utan "type": "module" i package.json.

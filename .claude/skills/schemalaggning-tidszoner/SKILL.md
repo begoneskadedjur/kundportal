@@ -17,7 +17,7 @@ description: Schemaläggning, kalender och tidszonshantering i BeGone Kundportal
 | `src/utils/dateHelpers.ts` | `toLocalISOStringWithOffset` (:30, korrekt), `toSwedishISOString` (:13, FELKÄLLA vid skrivning), `fromDatabaseDate` (:52) |
 | `src/utils/swedishHolidays.ts` | Röda dagar inkl. Meeus-påsk; jul-/nyårs-/midsommarafton avsiktligt röda |
 | `api/ruttplanerare/assistant-utils.ts` | Delad motor för boknings-/återbesöks-/teamassistent; korrekt DST via `fromZonedTime` |
-| `api/cron/extend-recurring-schedules.ts` | Daglig förlängning 04:00; förenklad generator med kända buggar (se Fallgropar) |
+| `api/cron/extend-recurring-schedules.ts` | Daglig förlängning 04:00; delar sedan 2026-08-24 klientens generator (timeZone-param) och skapar cases+sessions i PAR |
 | `api/schedule-optimizer/analyze.ts` | Omfördelningsanalys för `ScheduleOptimizer.tsx` (läser BARA private+business, ej cases/sessions) |
 | `src/styles/FullCalendar.css` | Rad 32: toolbaren dold GLOBALT; opt-in via `.fc-show-toolbar-wrapper` |
 
@@ -27,7 +27,7 @@ description: Schemaläggning, kalender och tidszonshantering i BeGone Kundportal
 - **Datamodell**: `recurring_schedules` (frekvens, `preferred_time` som `time`-kolumn utan tidszon — "HH:MM"-sträng i appen = svensk väggtid, `generated_until` som date) genererar par av `cases`-rad (status `Bokad`) + `station_inspection_sessions`-rad (med `case_id`). Koordinator/tekniker läser `cases`; kundportalen (`UpcomingVisits`, `InspectionSessionsView`) läser sessions.
 - **Tidszonsmodell**: ALLA tidskolumner är `timestamptz`, DB-sessionen kör UTC. Postgres normaliserar till äkta instanter. Läsning sker via `new Date(str)` + `toLocaleTimeString('sv-SE')` i webbläsaren.
 - **Konfliktdetektering** slår mot fyra källor: `private_cases` + `business_cases` (tre assignee-roller), `cases` (tre technician-roller), `station_inspection_sessions`. Mönstret finns i `fetchTechnicianBookings` (:207) och `assistant-utils.getSchedules` (:85).
-- **Generatorn finns i TVÅ exemplar utan delad kod**: klientens `inspectionDateGenerator.ts` (fullfjädrad) och cronens `generateDatesSimple` (:169, förenklad). Delning mellan `src/` och `api/` sker bara via explicit whitelist i `tsconfig.node.json` (fyra src-filer, detaljer i skill dev-workflow); generatorn ingår inte. Api-projektet ska hållas typfelsfritt.
+- **Generatorn är DELAD sedan 2026-08-24**: `inspectionDateGenerator.ts` används av både wizarden och cronen (whitelist:ad i `tsconfig.node.json` tillsammans med `swedishHolidays.ts` och `types/recurringSchedule.ts`). Generatorn tar `timeZone?: string` — utelämnad = maskinens lokala tid (webbläsaren), cronen MÅSTE skicka `'Europe/Stockholm'` (Vercel kör UTC). Bokningsassistentens `assistant-utils.ts` har fortfarande egen logik. Api-projektet ska hållas typfelsfritt.
 
 ## Invarianter
 
@@ -47,17 +47,18 @@ description: Schemaläggning, kalender och tidszonshantering i BeGone Kundportal
 3. `TechnicianSchedule.tsx`: case_type-härledning (:319) + `handleOpenModal` (:442)
 4. `scheduleConstants.getStatusStyle` (:44) för färg
 
-**Ändra konflikt-/lucklogik:** tre parallella implementationer måste hållas i synk: `inspectionDateGenerator.ts` (preview + skapande), `api/cron/extend-recurring-schedules.ts` (förlängning), ev. `api/ruttplanerare/assistant-utils.ts`.
+**Ändra konflikt-/lucklogik:** `inspectionDateGenerator.ts` delas av wizard + cron (en ändring räcker där); bokningsassistentens `api/ruttplanerare/assistant-utils.ts` är fortfarande egen och måste synkas manuellt.
 
-**Ny röd dag:** bara `swedishHolidays.ts`, men cronen använder den INTE (bara helger). Vill du ha röda dagar i cron måste logiken porteras dit manuellt.
+**Ny röd dag:** bara `swedishHolidays.ts` — delas av wizard och cron sedan 2026-08-24.
 
 **Ändra grid-layout:** konstanter i `scheduleConstants.ts`, positionsmatte i `scheduleUtils.ts`, drop-tid i `TimeGridRow.xToTime`/`WeekGridView.yToTime`. Håll `SNAP_MINUTES` synkat mellan dem.
 
 ## Fallgropar
 
 - **Levande skrivbuggar med `toSwedishISOString`** (naiv väggtid till timestamptz, 1-2 h fel): `RevisitModal.tsx:241-242`, `RonderingCaseModal.tsx:157-158`, `RevisitContractModal.tsx:183-184`, `EditCaseModal.tsx:1023` och `EditContractCaseModal.tsx:1059` (`completed_date`, kan tippa ärenden i fel provisionsmånad vid månadsskifte). Kopiera INTE dessa mönster.
-- ~~**Cronens UTC-bugg**~~ FIXAT 2026-07-05 (`53410f86`): slotStart byggs nu med `fromZonedTime('Europe/Stockholm')` och 17-gränsen jämförs som svensk tid. OBS: redan felskrivna sessioner i DB (2 h-diffar från juni 2026) rättades INTE av fixen - städas med engångs-SQL vid behov.
-- **Cron skapar bara sessions, INTE cases** (:113-132). Cron-förlängda besök syns i kundportalen men är osynliga i koordinator- och teknikerschemat. Klientflödet (`createCaseAndSession` :503) skapar paret.
+- ~~**Cronens UTC-bugg**~~ FIXAT 2026-07-05 (`53410f86`), sedan 2026-08-24 via generatorns `timeZone`-param. OBS: redan felskrivna sessioner i DB (2 h-diffar från juni 2026) rättades INTE av fixen - städas med engångs-SQL vid behov.
+- **Cronen respekterar sedan 2026-08-24**: `day_pattern`, `custom_frequency_config`, röda dagar (delad generator) samt `is_auto_renewing=false` (rullar då inte förbi schemats `contract_end_date`). Bokningshämtningen i cronen använder äkta överlappsfilter; klientens `fetchTechnicianBookings`/`getSchedules` har KVAR startfiltret (Riktning 4).
+- ~~**Cron skapar bara sessions, INTE cases**~~ FIXAT 2026-08-24: cronen skapar paret (case först via RPC `generate_universal_case_number`, session med `case_id`; vid sessionsfel raderas det föräldralösa ärendet). `service_type` ärvs från schemats senaste befintliga ärende, fallback `'inspection'`. `generated_until` uppdateras BARA vid felfri körning — partiella fel körs om nästa natt (datumdedupen stoppar dubbletter). OBS: sessions skapade FÖRE fixen saknar fortfarande case-par i DB.
 - **cases och sessions synkas inte vid flytt**: `handleCaseMoved` (`CoordinatorSchedule.tsx:389`, cases-uppdateringen :430-441) och `InspectionCaseModal` (:271, update :283) uppdaterar bara `cases.scheduled_start/end`; den länkade sessionen behåller gammal tid och kunden ser fel i portalen. (Kontext: 2 h-diffar verifierade i produktions-DB, juni 2026.)
 - **Fönsterfiltret missar överlapp**: `fetchTechnicianBookings` (:221-279) filtrerar på att STARTEN ligger i fönstret; en bokning 30 juni-2 juli syns inte i ett fönster som börjar 1 juli. Frånvarohämtningen (:308) använder `.or(start_date.lte...,end_date.gte...)` och missar inga överlapp (den över-hämtar snarare).
 - **Död kod som lurar**: `src/components/admin/coordinator/CoordinatorSchedule.tsx` + `ScheduleTimeline.tsx` (gammalt schema, inte routat, filhuvudet ljuger om sökvägen), `pages/coordinator/BookingAssistant.tsx` (routen pekar på `ScheduleOptimizer.tsx`), `extendScheduleIfNeeded` (:719) och `validateWorkSchedule` (`database.ts:1350`) saknar anropare. `WorkScheduleEditor` sparar HELT utan validering.
@@ -72,8 +73,8 @@ description: Schemaläggning, kalender och tidszonshantering i BeGone Kundportal
 Dagens läge har fyra kända skulder värda att betala av. Skillens invarianter ska inte hindra dessa fixar, tvärtom.
 
 1. **Deprecatera `toSwedishISOString` i skrivvägar** (dagens läge: fem levande felskrivningar, se Fallgropar). Målbild: byt till `toLocalISOStringWithOffset`, märk funktionen `@deprecated` för allt utom läs/visning, städa redan felskrivna DB-rader med engångs-SQL. Låg risk; verifiera att ett 08:00-återbesök lagras som `06:00Z` sommartid.
-2. ~~**Rätta cronens tidszonsbygge**~~ KLART 2026-07-05 (`53410f86`). KVAR: porta röda dagar till cronen (medveten beteendeförändring - cronen bokar idag på röda dagar som klienten undviker; kräver produktbeslut) och städa redan felskrivna sessioner med engångs-SQL.
+2. ~~**Rätta cronens tidszonsbygge**~~ KLART 2026-07-05 (`53410f86`). ~~Porta röda dagar till cronen~~ KLART 2026-08-24 (delad generator). KVAR: städa redan felskrivna sessioner med engångs-SQL, samt skapa case-par för cron-sessioner skapade före 2026-08-24.
 3. **Synka sessions när länkat case flyttas**: hjälpfunktion `syncSessionTimesForCase(caseId, start, end)` som uppdaterar `scheduled_at/scheduled_end` för `status='scheduled'`, anropad från `handleCaseMoved` och `InspectionCaseModal`. No-op för cases utan session. Rör inte `cancelled`-sessions och krocka inte med `rescheduleExistingSessions` som raderar/återskapar par.
-4. **Byt fönsterfiltret till äkta överlapp** (`.lte('start_date', to)` + `.gte('due_date', from)`) i `fetchTechnicianBookings`, `getSchedules` och cronens bokningshämtning. Fler träffar gör bara förslagen försiktigare.
+4. **Byt fönsterfiltret till äkta överlapp** (`.lte('start_date', to)` + `.gte('due_date', from)`) i `fetchTechnicianBookings` och `getSchedules` — cronens bokningshämtning är KLAR 2026-08-24. Fler träffar gör bara förslagen försiktigare.
 
 Långsiktig målbild för generatorerna: en delad, testbar modul i stället för tre parallella implementationer. Delning är tekniskt möjlig redan i dag — lägg modulen i `tsconfig.node.json`-whitelisten (mönstret finns: `src/types/database.ts` konsumeras av `api/technician/dashboard.ts`). Tills en sådan modul byggts gäller regeln att ändringar porteras till alla tre (se Vanliga uppgifter).

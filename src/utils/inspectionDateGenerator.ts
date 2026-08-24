@@ -3,9 +3,9 @@
 
 import {
   addMonths, addWeeks, addDays, addMinutes,
-  startOfMonth, endOfMonth, getDay, setHours, setMinutes,
-  isWithinInterval, areIntervalsOverlapping, format, subDays
+  getDay, areIntervalsOverlapping, format, subDays
 } from 'date-fns'
+import { fromZonedTime } from 'date-fns-tz'
 import type { WorkSchedule } from '../types/database'
 import type {
   DateGenerationParams,
@@ -15,6 +15,34 @@ import type {
   CustomFrequencyConfig
 } from '../types/recurringSchedule'
 import { isSwedishWorkday, getNextWorkday, getPreviousWorkday, getSwedishHolidayName } from './swedishHolidays'
+
+// ============================================
+// WALL TIME → INSTANT
+// ============================================
+
+/**
+ * Bygger en tidpunkt av (dag, timme, minut). Utan timeZone används maskinens
+ * lokala tidszon — rätt i webbläsaren (svensk väggtid). Med timeZone (cron på
+ * Vercel, som kör UTC) tolkas klockslaget i den zonen i stället.
+ */
+type WallTimeBuilder = (date: Date, hours: number, minutes: number) => Date
+
+function makeWallTimeBuilder(timeZone?: string): WallTimeBuilder {
+  if (!timeZone) {
+    return (date, h, m) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), h, m)
+  }
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return (date, h, m) =>
+    fromZonedTime(
+      `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(h)}:${pad(m)}`,
+      timeZone
+    )
+}
+
+function wallTimeFromString(wallTime: WallTimeBuilder, date: Date, time: string): Date {
+  const [hours, minutes] = time.split(':').map(Number)
+  return wallTime(date, hours, minutes)
+}
 
 // ============================================
 // MAIN GENERATOR
@@ -36,9 +64,11 @@ export function generateInspectionDates(params: DateGenerationParams): Generated
     technicianWorkSchedule,
     technicianAbsences = [],
     existingBookings = [],
-    customFrequencyConfig
+    customFrequencyConfig,
+    timeZone
   } = params
 
+  const wallTime = makeWallTimeBuilder(timeZone)
   const results: GeneratedInspectionDate[] = []
 
   // Calculate all period boundaries
@@ -83,13 +113,13 @@ export function generateInspectionDates(params: DateGenerationParams): Generated
 
         const date = findBestDate(dayPattern, preferredDayOfMonth, preferredTime,
           estimatedDurationMinutes, { start: segStart, end: segEnd }, period, technicianWorkSchedule,
-          technicianAbsences, [...existingBookings, ...results.map(r => ({ start: r.date, end: r.endDate }))])
+          technicianAbsences, [...existingBookings, ...results.map(r => ({ start: r.date, end: r.endDate }))], wallTime)
         if (date) results.push(date)
       }
     } else {
       const date = findBestDate(dayPattern, preferredDayOfMonth, preferredTime,
         estimatedDurationMinutes, period, period, technicianWorkSchedule,
-        technicianAbsences, [...existingBookings, ...results.map(r => ({ start: r.date, end: r.endDate }))])
+        technicianAbsences, [...existingBookings, ...results.map(r => ({ start: r.date, end: r.endDate }))], wallTime)
       if (date) results.push(date)
     }
   }
@@ -180,7 +210,8 @@ function findBestDate(
   fullPeriod: Period,
   workSchedule: WorkSchedule | null | undefined,
   absences: { start_date: string; end_date: string }[],
-  existingBookings: { start: Date; end: Date; title?: string }[]
+  existingBookings: { start: Date; end: Date; title?: string }[],
+  wallTime: WallTimeBuilder
 ): GeneratedInspectionDate | null {
   // Step 1: Find ideal date based on pattern
   const idealDate = findIdealDate(dayPattern, preferredDayOfMonth, searchWindow)
@@ -190,7 +221,7 @@ function findBestDate(
   const result = tryPlaceInspection(
     idealDate, preferredTime, durationMinutes,
     searchWindow, fullPeriod,
-    workSchedule, absences, existingBookings
+    workSchedule, absences, existingBookings, wallTime
   )
 
   return result
@@ -250,7 +281,6 @@ function findIdealDate(
       }
       // If it's a holiday, advance to next occurrence of same weekday
       if (!isSwedishWorkday(date)) {
-        const holidayName = getSwedishHolidayName(date)
         // Try next week same day
         const nextWeek = addDays(date, 7)
         if (nextWeek <= end && isSwedishWorkday(nextWeek)) {
@@ -285,7 +315,8 @@ function tryPlaceInspection(
   fullPeriod: Period,
   workSchedule: WorkSchedule | null | undefined,
   absences: { start_date: string; end_date: string }[],
-  existingBookings: { start: Date; end: Date; title?: string }[]
+  existingBookings: { start: Date; end: Date; title?: string }[],
+  wallTime: WallTimeBuilder
 ): GeneratedInspectionDate | null {
   // Try ideal date first, then scan forward within the period
   const maxDaysToTry = 14
@@ -317,7 +348,7 @@ function tryPlaceInspection(
     // Try to find a free slot on this day
     const slot = findFreeSlotOnDay(
       candidateDate, preferredTime, durationMinutes,
-      workSchedule, existingBookings
+      workSchedule, existingBookings, wallTime
     )
 
     if (slot) {
@@ -348,7 +379,7 @@ function tryPlaceInspection(
   }
 
   // If we couldn't find any slot in the period, force place with warning
-  const forcedDate = setTimeOnDate(idealDate, preferredTime)
+  const forcedDate = wallTimeFromString(wallTime, idealDate, preferredTime)
   return {
     date: forcedDate,
     endDate: addMinutes(forcedDate, durationMinutes),
@@ -376,7 +407,8 @@ function findFreeSlotOnDay(
   preferredTime: string,
   durationMinutes: number,
   workSchedule: WorkSchedule | null | undefined,
-  existingBookings: { start: Date; end: Date; title?: string }[]
+  existingBookings: { start: Date; end: Date; title?: string }[],
+  wallTime: WallTimeBuilder
 ): FoundSlot | null {
   // Determine work hours for this day
   let workStart: Date
@@ -389,24 +421,24 @@ function findFreeSlotOnDay(
 
     const [startH, startM] = daySchedule.start.split(':').map(Number)
     const [endH, endM] = daySchedule.end.split(':').map(Number)
-    workStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), startH, startM)
-    workEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), endH, endM)
+    workStart = wallTime(date, startH, startM)
+    workEnd = wallTime(date, endH, endM)
   } else {
     // Default work hours 07:00 - 17:00
-    workStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 7, 0)
-    workEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 17, 0)
+    workStart = wallTime(date, 7, 0)
+    workEnd = wallTime(date, 17, 0)
   }
 
   // Get preferred start time
-  const preferredStart = setTimeOnDate(date, preferredTime)
+  const preferredStart = wallTimeFromString(wallTime, date, preferredTime)
   const preferredEnd = addMinutes(preferredStart, durationMinutes)
 
   // Constrain to work hours
   const constrainedStart = preferredStart < workStart ? workStart : preferredStart
 
   // Get all bookings on this day, sorted by start time
-  const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0)
-  const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59)
+  const dayStart = wallTime(date, 0, 0)
+  const dayEnd = addMinutes(wallTime(date, 23, 59), 0)
 
   const dayBookings = existingBookings
     .filter(b => {
@@ -505,12 +537,3 @@ function findFreeSlotOnDay(
   return null
 }
 
-// ============================================
-// HELPERS
-// ============================================
-
-function setTimeOnDate(date: Date, time: string): Date {
-  const [hours, minutes] = time.split(':').map(Number)
-  const result = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes)
-  return result
-}

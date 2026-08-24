@@ -14,9 +14,12 @@ import type { RecurringFrequency } from '../types/recurringSchedule'
 export interface ContractVisitFrequency {
   frequency: RecurringFrequency | null
   visitsPerYear: number | null
+  /** Det upplösta avtalets id — satt även när avtalet saknar frekvens, så
+   *  wizarden kan berätta att valet kommer att sparas på avtalet. */
+  contractId: string | null
 }
 
-const EMPTY: ContractVisitFrequency = { frequency: null, visitsPerYear: null }
+const EMPTY: ContractVisitFrequency = { frequency: null, visitsPerYear: null, contractId: null }
 
 export function useContractVisitFrequency(customerId: string | null | undefined) {
   const [data, setData] = useState<ContractVisitFrequency>(EMPTY)
@@ -44,6 +47,7 @@ export function useContractVisitFrequency(customerId: string | null | undefined)
         setData({
           frequency: (row?.visit_frequency as RecurringFrequency | undefined) ?? null,
           visitsPerYear: row?.visits_per_year ?? null,
+          contractId,
         })
       } catch (err) {
         console.error('Kunde inte hämta avtalets besöksfrekvens:', err)

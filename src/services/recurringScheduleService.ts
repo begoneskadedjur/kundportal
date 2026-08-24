@@ -10,11 +10,15 @@ import type {
   UpdateRecurringScheduleInput,
   DateGenerationParams,
   GeneratedInspectionDate,
-  CustomerScheduleInfo
+  CustomerScheduleInfo,
+  RecurringFrequency,
+  CustomFrequencyConfig
 } from '../types/recurringSchedule'
+import { visitsPerYearFromSelection } from '../types/recurringSchedule'
 import { generateInspectionDates } from '../utils/inspectionDateGenerator'
 import { CaseNumberService } from './caseNumberService'
 import { resolveContractForCustomer } from './contractResolver'
+import { ContractScopeService } from './contractScopeService'
 
 // ============================================
 // HELPERS
@@ -77,6 +81,47 @@ export async function resolveScheduleHorizon(
   customerId: string,
   ownEndDate?: string | null
 ): Promise<{ endDate: string | null; rolled: boolean }> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const roll = (iso: string) => {
+    const d = new Date(iso + 'T12:00:00')
+    let rolled = false
+    while (d <= today) {
+      d.setFullYear(d.getFullYear() + 1)
+      rolled = true
+    }
+    return { endDate: format(d, 'yyyy-MM-dd'), rolled }
+  }
+
+  // 1. AVTALET är facit när det finns: kundens gällande avtal löses med samma
+  //    prioritet som resten av systemet (contractResolver). Kundradens datum
+  //    kan tillhöra ett ANNAT avtal för kunder med flera avtal över tid.
+  try {
+    const contractId = await resolveContractForCustomer(customerId)
+    if (contractId) {
+      const { data: contract } = await supabase
+        .from('contracts')
+        .select('start_date, contract_end_date, terminated_at, effective_end_date')
+        .eq('id', contractId)
+        .maybeSingle()
+      if (contract) {
+        if (contract.terminated_at) {
+          return {
+            endDate: contract.effective_end_date ?? contract.contract_end_date ?? null,
+            rolled: false,
+          }
+        }
+        if (contract.contract_end_date) return roll(contract.contract_end_date)
+        if (contract.start_date) return { ...roll(contract.start_date), rolled: true }
+        // Avtal utan datum → fall igenom till kundraden nedan
+      }
+    }
+  } catch (err) {
+    console.error('resolveScheduleHorizon: avtalsuppslag misslyckades, faller tillbaka på kundraden', err)
+  }
+
+  // 2. Fallback: kundradens datum (med arv från huvudkontoret) — för kunder
+  //    utan riktig avtalsrad (PDF-avtal som inte materialiserats ännu).
   const { data: customer } = await supabase
     .from('customers')
     .select('contract_end_date, contract_start_date, terminated_at, parent_customer_id')
@@ -102,18 +147,6 @@ export async function resolveScheduleHorizon(
 
   if (terminated) return { endDate, rolled: false }
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const roll = (iso: string) => {
-    const d = new Date(iso + 'T12:00:00')
-    let rolled = false
-    while (d <= today) {
-      d.setFullYear(d.getFullYear() + 1)
-      rolled = true
-    }
-    return { endDate: format(d, 'yyyy-MM-dd'), rolled }
-  }
-
   if (endDate) return roll(endDate)
   if (startDate) return { ...roll(startDate), rolled: true }
   return { endDate: null, rolled: false }
@@ -128,7 +161,6 @@ export async function createRecurringSchedule(
 ): Promise<RecurringSchedule | null> {
   // Generera till avtalsslutet om det finns, annars 14 månader framåt som fallback.
   // Cron-jobbet hanterar automatisk förlängning om avtalet förnyas (is_auto_renewing = true).
-  const startDate = new Date(input.schedule_start_date)
   if (!input.contract_end_date) {
     console.error('createRecurringSchedule: contract_end_date saknas')
     return null
@@ -169,7 +201,41 @@ export async function createRecurringSchedule(
     return null
   }
 
+  // Avtalet är facit för besöksfrekvensen — men SAKNAR avtalet en frekvens
+  // fyller schemat i den (teknikern som bokar vet takten). Befintliga värden
+  // på avtalet skrivs aldrig över. Icke-fatalt: schemat är redan skapat.
+  if (contractId) {
+    await backfillContractVisitFrequency(
+      contractId,
+      input.frequency,
+      input.custom_frequency_config ?? null
+    )
+  }
+
   return data as RecurringSchedule
+}
+
+/** Skriv schemats frekvens till avtalet när avtalet saknar en — aldrig tvärtom. */
+async function backfillContractVisitFrequency(
+  contractId: string,
+  frequency: RecurringFrequency,
+  customConfig: CustomFrequencyConfig | null
+): Promise<void> {
+  try {
+    const { data: contract } = await supabase
+      .from('contracts')
+      .select('visit_frequency, visits_per_year')
+      .eq('id', contractId)
+      .maybeSingle()
+    if (!contract) return
+    if (contract.visit_frequency || contract.visits_per_year != null) return
+
+    const visits = visitsPerYearFromSelection(frequency, customConfig)
+    // setVisitFrequency loggar händelsen på avtalets tidslinje (contract_events)
+    await ContractScopeService.setVisitFrequency(contractId, frequency, visits)
+  } catch (err) {
+    console.error('Kunde inte backfylla avtalets besöksfrekvens:', err)
+  }
 }
 
 export async function getRecurringSchedule(
@@ -395,7 +461,7 @@ export async function fetchTechnicianBookings(
       const start = new Date(s.scheduled_at)
       const end = new Date(s.scheduled_end)
       if (end.getTime() - start.getTime() > 0) {
-        const customerName = (s.customer as any)?.company_name || ''
+        const customerName = (s.customer as { company_name?: string | null } | null)?.company_name || ''
         bookings.push({ start, end, title: `Stationskontroll - ${customerName}` })
       }
     }
@@ -638,7 +704,7 @@ async function createCaseAndSession(
   ctx: SessionCreationContext,
   d: GeneratedInspectionDate
 ): Promise<{ success: boolean; error?: string }> {
-  const { schedule, technicianName, customerData, outdoorCount, indoorCount, service_type } = ctx
+  const { schedule, technicianName, customerData, outdoorCount, indoorCount } = ctx
 
   const caseNumber = await CaseNumberService.generateUniqueCaseNumber()
 

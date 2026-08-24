@@ -2,7 +2,7 @@
 // Wizard for setting up recurring inspection schedules
 // Supports batch mode: multiple units scheduled back-to-back in a single pass
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, ChevronLeft, ChevronRight, Clock, Check,
@@ -33,7 +33,9 @@ import {
   DAY_PATTERN_CONFIG,
   DURATION_OPTIONS,
   STANDARD_FREQUENCIES,
-  SWEDISH_MONTH_NAMES
+  SWEDISH_MONTH_NAMES,
+  APPROX_VISITS_PER_YEAR,
+  frequencyFromVisitsPerYear
 } from '../../types/recurringSchedule'
 import type { WorkSchedule } from '../../types/database'
 
@@ -53,6 +55,9 @@ interface RecurringScheduleWizardProps {
   contractVisitFrequency?: RecurringFrequency | null
   /** Antal besök per år enligt avtalet (contracts.visits_per_year) */
   contractVisitsPerYear?: number | null
+  /** Kundens upplösta avtal — satt även när avtalet saknar frekvens. Saknar
+   *  avtalet frekvens backfylls den från schemat vid skapandet. */
+  resolvedContractId?: string | null
   batchUnits?: BatchScheduleUnit[]
   serviceType?: string
 }
@@ -112,6 +117,7 @@ export function RecurringScheduleWizard({
   serviceFrequency,
   contractVisitFrequency,
   contractVisitsPerYear,
+  resolvedContractId,
   batchUnits,
   serviceType
 }: RecurringScheduleWizardProps) {
@@ -161,17 +167,40 @@ export function RecurringScheduleWizard({
   const [unitDurations, setUnitDurations] = useState<Record<string, number>>({})
 
   // Step 3: Frequency + Day pattern (merged)
-  // Avtalets frekvens vinner över den fritextparsade service_frequency
+  // Avtalets frekvens vinner över den fritextparsade service_frequency.
+  // ANTALET besök/år är facit: när avtalet bara säger t.ex. "26/år" (frekvensen
+  // står som 'custom') härleds närmaste schemafrekvens ur antalet — annars
+  // förvaldes custom-default 1/vecka = 52/år, dubbelt mot avtalet.
+  const contractDefault = useMemo((): { frequency: RecurringFrequency; customConfig: CustomFrequencyConfig | null } | null => {
+    if (contractVisitFrequency && contractVisitFrequency !== 'custom') {
+      return { frequency: contractVisitFrequency, customConfig: null }
+    }
+    if (contractVisitsPerYear) {
+      const derived = frequencyFromVisitsPerYear(contractVisitsPerYear)
+      if (derived) return { frequency: derived.frequency, customConfig: derived.customConfig ?? null }
+    }
+    if (contractVisitFrequency === 'custom') return { frequency: 'custom', customConfig: null }
+    return null
+  }, [contractVisitFrequency, contractVisitsPerYear])
+
   const [frequency, setFrequency] = useState<RecurringFrequency | null>(
-    contractVisitFrequency || parseServiceFrequency(serviceFrequency) || null
+    contractDefault?.frequency || parseServiceFrequency(serviceFrequency) || null
   )
   const [dayPattern, setDayPattern] = useState<RecurringDayPattern | null>(null)
   const [preferredDayOfMonth, setPreferredDayOfMonth] = useState(1)
-  const [customConfig, setCustomConfig] = useState<CustomFrequencyConfig>({
-    visits_per_period: 1,
-    period_type: 'week'
-  })
+  const [customConfig, setCustomConfig] = useState<CustomFrequencyConfig>(
+    contractDefault?.customConfig ?? { visits_per_period: 1, period_type: 'week' }
+  )
   const [showActivePeriod, setShowActivePeriod] = useState(false)
+
+  // Avtalsfrekvensen hämtas asynkront (wrapper-hooken) och landar ofta EFTER
+  // mount — synka förvalet när den kommer, men skriv aldrig över ett aktivt val.
+  const userTouchedFrequency = useRef(false)
+  useEffect(() => {
+    if (!isOpen || !contractDefault || userTouchedFrequency.current) return
+    setFrequency(contractDefault.frequency)
+    if (contractDefault.customConfig) setCustomConfig(contractDefault.customConfig)
+  }, [isOpen, contractDefault])
 
   // Step 4: Time
   const [preferredHour, setPreferredHour] = useState(9)
@@ -246,6 +275,20 @@ export function RecurringScheduleWizard({
   // Single-unit: count
   const includedCount = previewDates.length - excludedIndices.size
 
+  // Facit mot avtalet i steg 5: avtalets takt (besök/år) omräknad pro rata
+  // till schemats horisont — tiden kvar till avtalets brytpunkt ska synas för
+  // den som planerar, annars ser ett schema som startar i oktober "för kort" ut.
+  const contractYearlyTarget = contractVisitsPerYear
+    ?? (contractDefault && contractDefault.frequency !== 'custom'
+      ? APPROX_VISITS_PER_YEAR[contractDefault.frequency]
+      : null)
+  const expectedForHorizon = useMemo(() => {
+    if (!contractYearlyTarget || !resolvedEndDate) return null
+    const days = Math.round((new Date(resolvedEndDate).getTime() - startDate.getTime()) / 86400000)
+    if (days <= 0) return null
+    return Math.max(1, Math.round((contractYearlyTarget * days) / 365))
+  }, [contractYearlyTarget, resolvedEndDate, startDate])
+
   // Initialize batch unit durations when opening
   useEffect(() => {
     if (isOpen && batchUnits && batchUnits.length > 1) {
@@ -278,9 +321,10 @@ export function RecurringScheduleWizard({
       setStartDate(contractStartDate ? new Date(contractStartDate) : new Date())
       setDurationMinutes(60)
       setUnitDurations({})
-      setFrequency(parseServiceFrequency(serviceFrequency) || null)
+      userTouchedFrequency.current = false
+      setFrequency(contractDefault?.frequency ?? (parseServiceFrequency(serviceFrequency) || null))
       setDayPattern(null)
-      setCustomConfig({ visits_per_period: 1, period_type: 'week' })
+      setCustomConfig(contractDefault?.customConfig ?? { visits_per_period: 1, period_type: 'week' })
       setShowActivePeriod(false)
       setPreferredHour(9)
       setPreferredMinute(0)
@@ -724,6 +768,18 @@ export function RecurringScheduleWizard({
                       Hur ofta ska kontroller genomföras?
                     </p>
 
+                    {/* Avtalet saknar frekvens → teknikerns val blir avtalets facit */}
+                    {resolvedContractId && !contractDefault && (
+                      <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                        <FileText className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-xs text-amber-300">
+                          Avtalet saknar besöksfrekvens. Frekvensen du väljer här{' '}
+                          <b>sparas på avtalet</b> och blir facit för framtida scheman
+                          (syns i § 3 Uppföljning på avtalskartan).
+                        </p>
+                      </div>
+                    )}
+
                     {/* Facit från avtalet — vad kunden faktiskt betalat för */}
                     {(contractVisitFrequency || contractVisitsPerYear) && (
                       <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-[#20c58f]/10 border border-[#20c58f]/30">
@@ -746,11 +802,11 @@ export function RecurringScheduleWizard({
                     <div className="space-y-2">
                       {STANDARD_FREQUENCIES.map(key => {
                         const config = FREQUENCY_CONFIG[key]
-                        const perContract = contractVisitFrequency === key
+                        const perContract = contractDefault?.frequency === key
                         return (
                           <button
                             key={key}
-                            onClick={() => setFrequency(key)}
+                            onClick={() => { userTouchedFrequency.current = true; setFrequency(key) }}
                             className={`w-full p-3 rounded-lg border text-left transition-all ${
                               frequency === key
                                 ? 'border-[#20c58f] bg-[#20c58f]/20'
@@ -778,7 +834,7 @@ export function RecurringScheduleWizard({
                       </div>
 
                       <button
-                        onClick={() => setFrequency('custom')}
+                        onClick={() => { userTouchedFrequency.current = true; setFrequency('custom') }}
                         className={`w-full p-3 rounded-lg border text-left transition-all flex items-center gap-2 ${
                           frequency === 'custom'
                             ? 'border-[#20c58f] bg-[#20c58f]/20'
@@ -1019,12 +1075,12 @@ export function RecurringScheduleWizard({
                     {workSchedule && (
                       <div className="text-xs text-slate-500 text-center space-y-0.5">
                         <p>Dina arbetstider:</p>
-                        {Object.entries(workSchedule)
-                          .filter(([, v]) => (v as any).active)
+                        {(Object.entries(workSchedule) as [string, { active: boolean; start: string; end: string }][])
+                          .filter(([, v]) => v.active)
                           .slice(0, 5)
                           .map(([day, v]) => (
                             <span key={day} className="inline-block mx-1">
-                              {SWEDISH_DAY_NAMES[day] || day}: {(v as any).start}-{(v as any).end}
+                              {SWEDISH_DAY_NAMES[day] || day}: {v.start}-{v.end}
                             </span>
                           ))
                         }
@@ -1035,6 +1091,21 @@ export function RecurringScheduleWizard({
 
                 {step === 5 && (
                   <div className="space-y-4">
+                    {!loadingPreview && expectedForHorizon !== null && resolvedEndDate && (
+                      <div className={`flex items-start gap-2 px-3 py-2 rounded-lg border text-xs ${
+                        Math.abs((isBatch ? batchIncludedDays : includedCount) - expectedForHorizon) <= 1
+                          ? 'bg-[#20c58f]/10 border-[#20c58f]/30 text-[#7fe0bf]'
+                          : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                      }`}>
+                        <FileText className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>
+                          Avtalets takt ({contractYearlyTarget} besök/år) motsvarar{' '}
+                          <b>~{expectedForHorizon} tillfällen</b> fram till{' '}
+                          {format(new Date(resolvedEndDate), 'd MMM yyyy', { locale: sv })} —{' '}
+                          {isBatch ? batchIncludedDays : includedCount} valda.
+                        </span>
+                      </div>
+                    )}
                     {loadingPreview ? (
                       <div className="flex flex-col items-center justify-center py-8 gap-3">
                         <Loader2 className="w-8 h-8 text-[#20c58f] animate-spin" />

@@ -11,12 +11,13 @@ import { useContractVisitFrequency } from '../../hooks/useContractVisitFrequency
 type WizardProps = React.ComponentProps<typeof RecurringScheduleWizard>
 
 export function RecurringScheduleWizardWithContract(props: WizardProps) {
-  const { frequency, visitsPerYear } = useContractVisitFrequency(props.isOpen ? props.customerId : null)
+  const { frequency, visitsPerYear, contractId } = useContractVisitFrequency(props.isOpen ? props.customerId : null)
   return (
     <RecurringScheduleWizard
       {...props}
       contractVisitFrequency={props.contractVisitFrequency ?? frequency}
       contractVisitsPerYear={props.contractVisitsPerYear ?? visitsPerYear}
+      resolvedContractId={props.resolvedContractId ?? contractId}
     />
   )
 }
