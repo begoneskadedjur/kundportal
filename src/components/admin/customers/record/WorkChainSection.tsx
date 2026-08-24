@@ -173,7 +173,9 @@ export default function WorkChainSection({
       // hittats, så numret är den pålitliga skiljelinjen — inte case_type.
       cases.push({
         caseId,
-        label: first.case_number ?? first.case_title ?? 'Årspremie',
+        label:
+          (first.case_number ?? first.case_title ?? 'Årspremie') +
+          (first.case_room ? ` · Rum ${first.case_room}` : ''),
         technician: first.technician_name ?? null,
         services: groups,
         revenue,

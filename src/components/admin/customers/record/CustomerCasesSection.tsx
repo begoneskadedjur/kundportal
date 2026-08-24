@@ -1,13 +1,12 @@
 // src/components/admin/customers/record/CustomerCasesSection.tsx
 //
-// Ärendefliken på kundsidan. Delar upp arbetet i de grupper verksamheten
-// faktiskt tänker i:
-//   Återkommande & kontroll — det kunden betalar avtalet för
-//   Etablering             — utplaceringen vid avtalsstart (engång)
-//   Extraärenden           — arbete utanför avtalet = merförsäljning
+// Ärendefliken på kundsidan — enligt godkänd designskiss (aug 2026):
+//   Ärendetyper   — kategoristripp med graverade glyfer; hovra = filtrera, klicka = lås
+//   Rumsanalys    — för kunder med Rum nr aktiverat (RoomAnalysisSection)
+//   Ärendeflöde   — ett samlat, klickbart flöde med tekniker, trafikljus, pris, status
 //
-// Tabellform, inte kort: största kunden har 36 ärenden och listan ska gå att
-// skanna. Varje rad öppnar hela ärendet.
+// Leveransmätaren mot avtalet behålls överst — den är operativ och ersätts
+// inte av designen.
 
 import { useMemo, useState } from 'react'
 import { ChevronRight, Search } from 'lucide-react'
@@ -23,19 +22,10 @@ import {
   type RecordInvoice,
   type RecordSchedule,
 } from '../../../../hooks/useCustomerRecord'
-import {
-  caseCategory,
-  daysSince,
-  expectedVisitsToDate,
-  sessionLateness,
-  LATENESS_STYLE,
-  type CaseCategory,
-  type Lateness,
-} from '../../../../utils/caseCategory'
-import { getCaseKindLabel } from '../../../../constants/caseTypeLabels'
-import { isCaseCompleted, sumPipeline } from '../../../../utils/customerRevenue'
+import { expectedVisitsToDate, sessionLateness, LATENESS_STYLE, daysSince, type Lateness } from '../../../../utils/caseCategory'
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
-import { RecurringGlyph, ExtraGlyph, EstablishmentGlyph, MissedGlyph } from './CaseCategoryGlyph'
+import { RecurringGlyph, MissedGlyph } from './CaseCategoryGlyph'
+import RoomAnalysisSection, { flowCategory } from './RoomAnalysisSection'
 
 interface Props {
   root: RecordCustomer
@@ -44,33 +34,78 @@ interface Props {
   inspections: RecordInspectionSession[]
   schedules: RecordSchedule[]
   contracts: RecordContract[]
-  /** Fakturor — för att inte visa säljärendet som merförsäljning */
   invoices: RecordInvoice[]
-  /** Öppnar hela ärendet i ärendemodalen */
   onOpenCase: (c: RecordCase) => void
 }
 
-/** Ett ärende som det visas i tabellen — sessionen bär sanningen om utförandet. */
-interface CaseRow {
-  case: RecordCase
-  session: RecordInspectionSession | null
-  lateness: Lateness
-  done: boolean
-  date: string | null
-  unitName: string | null
+type FlowCat = ReturnType<typeof flowCategory>
+const CAT_META: Record<FlowCat, { label: string; color: string }> = {
+  service: { label: 'Servicebesök', color: '#2fc98f' },
+  inspektion: { label: 'Inspektioner', color: '#56a8e8' },
+  extra: { label: 'Saneringar', color: '#b48be8' },
+  etabl: { label: 'Etableringar', color: '#d9a04a' },
+}
+const LIGHTS = { ok: '#34c26b', varning: '#e0a83a', kritisk: '#e46a5f', saknas: '#45566e' }
+
+/** Graverade kategoriglyfer — samma formspråk som avtalskartan */
+function CatGlyph({ cat, size = 42 }: { cat: FlowCat; size?: number }) {
+  const c = CAT_META[cat].color
+  return (
+    <svg width={size} height={size} viewBox="0 0 44 44" fill="none" aria-hidden>
+      {cat === 'service' && (
+        <>
+          <rect x="7" y="9" width="30" height="28" rx="5" stroke={c} strokeWidth="1.6" />
+          <path d="M7 17h30" stroke={c} strokeWidth="1.6" />
+          <path d="M14 6v6M30 6v6" stroke={c} strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M15 27l4.5 4.5L29 22" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+      {cat === 'inspektion' && (
+        <>
+          <circle cx="19" cy="19" r="10.5" stroke={c} strokeWidth="1.6" />
+          <path d="M27 27l8.5 8.5" stroke={c} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M14.5 19c1.5-3 3-4.5 4.5-4.5s3 1.5 4.5 4.5" stroke={c} strokeWidth="1.4" strokeLinecap="round" />
+          <circle cx="19" cy="21.5" r="1.4" fill={c} />
+        </>
+      )}
+      {cat === 'extra' && (
+        <>
+          {/* Ånglansen: 185-gradig vattenånga mot vägglössen */}
+          <path d="M8 37l5-5" stroke={c} strokeWidth="2.8" strokeLinecap="round" />
+          <path d="M12 33L23 22" stroke={c} strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M19 18l7 7" stroke={c} strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M27 19c4 0 4-4 8-4" stroke={c} strokeWidth="1.4" strokeLinecap="round" fill="none" />
+          <path d="M24 14c4 0 4-4 8-4" stroke={c} strokeWidth="1.4" strokeLinecap="round" fill="none" />
+          <path d="M30 24c4 0 4-4 8-4" stroke={c} strokeWidth="1.4" strokeLinecap="round" fill="none" />
+          <circle cx="38" cy="8" r="1.2" fill={c} />
+          <circle cx="41" cy="14" r="1.2" fill={c} />
+        </>
+      )}
+      {cat === 'etabl' && (
+        <>
+          <path d="M9 36h26" stroke={c} strokeWidth="1.6" strokeLinecap="round" />
+          <path d="M13 36V22a9 9 0 0 1 18 0v14" stroke={c} strokeWidth="1.6" />
+          <path d="M22 13V7m0 0 5 2.6L22 12" stroke={c} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+    </svg>
+  )
 }
 
+function lightColor(level: number | null | undefined): string | null {
+  if (level == null || level === 0) return null
+  return level >= 3 ? LIGHTS.kritisk : level === 2 ? LIGHTS.varning : LIGHTS.ok
+}
+
+// invoices tas emot för props-kompatibilitet men används inte längre här —
+// merförsäljningssummorna bor i Intäkter-fliken sedan omdesignen.
 export default function CustomerCasesSection({
-  root,
-  units,
-  cases,
-  inspections,
-  schedules,
-  contracts,
-  invoices,
-  onOpenCase,
+  root, units, cases, inspections, schedules, contracts, onOpenCase,
 }: Props) {
   const [query, setQuery] = useState('')
+  const [hoverCat, setHoverCat] = useState<FlowCat | null>(null)
+  const [lockedCat, setLockedCat] = useState<FlowCat | null>(null)
+  const activeCat = lockedCat ?? hoverCat
 
   const nameById = useMemo(() => {
     const m = new Map<string, string>()
@@ -78,144 +113,92 @@ export default function CustomerCasesSection({
     return m
   }, [root, units])
 
-  const invoiceAmounts = useMemo(
-    () =>
-      new Set(
-        invoices
-          .filter((i) => (i.status ?? '') !== 'cancelled')
-          .map((i) => Math.round(Number(i.subtotal ?? 0)))
-      ),
-    [invoices]
-  )
-
   const derived = useMemo(() => {
-    // Sessionerna nycklas på case_id — kopplingen är 1:1 för kontrollärenden
     const sessionByCase = new Map<string, RecordInspectionSession>()
-    for (const s of inspections) {
-      if (s.case_id) sessionByCase.set(s.case_id, s)
-    }
+    for (const s of inspections) if (s.case_id) sessionByCase.set(s.case_id, s)
 
-    const rows: CaseRow[] = cases.map((c) => {
+    const yearAgo = Date.now() - 365 * 86_400_000
+    const rows = cases.map((c) => {
       const session = sessionByCase.get(c.id) ?? null
-      // För kontrollbesök styr SESSIONEN, inte ärendestatusen: ett ärende kan
-      // stå 'Bokad' medan sessionen passerat sitt datum för länge sedan.
       const done = session
         ? session.status === 'completed' || !!session.completed_at
         : !!c.completed_date || isCompletedStatus(c.status as ClickUpStatus)
-      const when = session?.scheduled_at ?? c.scheduled_start ?? null
-      return {
-        case: c,
-        session,
-        lateness: session
-          ? sessionLateness(session.scheduled_at, session.status ?? '')
-          : done
-            ? 'ontime'
-            : sessionLateness(c.scheduled_start, 'scheduled'),
-        done,
-        date: session?.completed_at ?? when ?? c.completed_date ?? c.created_at,
-        unitName: units.length > 0 ? (nameById.get(c.customer_id ?? '') ?? null) : null,
-      }
+      const date = session?.completed_at ?? session?.scheduled_at ?? c.completed_date ?? c.scheduled_start ?? c.created_at
+      const lateness: Lateness = session
+        ? sessionLateness(session.scheduled_at, session.status ?? '')
+        : done ? 'ontime' : sessionLateness(c.scheduled_start, 'scheduled')
+      return { case: c, cat: flowCategory(c), session, done, date, lateness,
+        unitName: units.length > 0 ? (nameById.get(c.customer_id ?? '') ?? null) : null }
     })
 
+    const counts = { service: 0, inspektion: 0, extra: 0, etabl: 0 } as Record<FlowCat, number>
+    const latest: Partial<Record<FlowCat, string>> = {}
+    for (const r of rows) {
+      if (new Date(r.date ?? 0).getTime() < yearAgo) continue
+      counts[r.cat]++
+      if (!latest[r.cat] || (r.date ?? '') > (latest[r.cat] as string)) latest[r.cat] = r.date ?? undefined
+    }
+
     const q = query.trim().toLowerCase()
-    const match = (r: CaseRow) =>
-      !q ||
-      (r.case.case_number ?? '').toLowerCase().includes(q) ||
-      r.case.title.toLowerCase().includes(q) ||
-      (r.case.primary_technician_name ?? '').toLowerCase().includes(q) ||
-      (r.case.pest_type ?? '').toLowerCase().includes(q) ||
-      (r.unitName ?? '').toLowerCase().includes(q)
+    const flow = rows
+      .filter((r) => !activeCat || r.cat === activeCat)
+      .filter((r) =>
+        !q ||
+        (r.case.case_number ?? '').toLowerCase().includes(q) ||
+        r.case.title.toLowerCase().includes(q) ||
+        (r.case.primary_technician_name ?? '').toLowerCase().includes(q) ||
+        (r.case.pest_type ?? '').toLowerCase().includes(q) ||
+        (r.case.room_number ?? '').toLowerCase().includes(q) ||
+        (r.unitName ?? '').toLowerCase().includes(q)
+      )
+      .sort((a, b) => {
+        const aLate = a.lateness !== 'ontime' && !a.done
+        const bLate = b.lateness !== 'ontime' && !b.done
+        if (aLate !== bLate) return aLate ? -1 : 1
+        return (b.date ?? '').localeCompare(a.date ?? '')
+      })
 
-    const byCategory = (cat: CaseCategory) =>
-      rows
-        .filter((r) => caseCategory(r.case) === cat && match(r))
-        // Nyast först, men försenade alltid överst — de kräver handling
-        .sort((a, b) => {
-          const aLate = a.lateness !== 'ontime' && !a.done
-          const bLate = b.lateness !== 'ontime' && !b.done
-          if (aLate !== bLate) return aLate ? -1 : 1
-          return (b.date ?? '').localeCompare(a.date ?? '')
-        })
-
-    const recurring = byCategory('recurring')
-    const establishment = byCategory('establishment')
-    const extra = byCategory('extra')
-
-    // Leveransmätning: avtalat mot faktiskt utfört senaste 12 månaderna
+    // Leveransmätaren mot avtalet (oförändrad logik)
     const activeSchedule = schedules.find((s) => s.status === 'active') ?? schedules[0] ?? null
     const contractWithFreq = contracts.find((c) => c.visits_per_year || c.visit_frequency)
     const visitsPerYear =
       contractWithFreq?.visits_per_year ??
-      (contractWithFreq?.visit_frequency
-        ? VISITS_PER_YEAR_BY_FREQUENCY[contractWithFreq.visit_frequency]
-        : null) ??
-      (activeSchedule?.frequency ? VISITS_PER_YEAR_BY_FREQUENCY[activeSchedule.frequency] : null) ??
-      null
-
-    const yearAgo = new Date(Date.now() - 365 * 86_400_000).toISOString()
+      (contractWithFreq?.visit_frequency ? VISITS_PER_YEAR_BY_FREQUENCY[contractWithFreq.visit_frequency] : null) ??
+      (activeSchedule?.frequency ? VISITS_PER_YEAR_BY_FREQUENCY[activeSchedule.frequency] : null) ?? null
     const doneLast12 = inspections.filter(
-      (s) => (s.completed_at ?? '') > yearAgo && (s.status === 'completed' || !!s.completed_at)
+      (s) => new Date(s.completed_at ?? 0).getTime() > yearAgo && (s.status === 'completed' || !!s.completed_at)
     ).length
-    const lateCount = inspections.filter(
-      (s) => sessionLateness(s.scheduled_at, s.status ?? '') !== 'ontime'
-    ).length
+    const lateCount = inspections.filter((s) => sessionLateness(s.scheduled_at, s.status ?? '') !== 'ontime').length
     const nextVisit =
       inspections
         .filter((s) => s.status === 'scheduled' && (s.scheduled_at ?? '') >= new Date().toISOString())
         .sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))[0] ?? null
 
-    const frequencyLabel =
-      contractWithFreq?.visit_frequency
-        ? VISIT_FREQUENCY_LABEL[contractWithFreq.visit_frequency]
-        : activeSchedule?.frequency
-          ? VISIT_FREQUENCY_LABEL[activeSchedule.frequency] ?? 'Anpassat schema'
-          : null
-
     return {
-      recurring,
-      establishment,
-      extra,
+      flow, counts, latest,
       hasRecurring: inspections.length > 0 || schedules.length > 0,
       visitsPerYear,
       expected: expectedVisitsToDate(visitsPerYear, activeSchedule?.schedule_start_date ?? null),
-      doneLast12,
-      lateCount,
-      nextVisit,
-      frequencyLabel,
-      // Merförsäljning mäts per KUND: allt arbete utanför avtalet, oavsett om
-      // avtalskopplingen råkar vara satt på raden.
-      //
-      // Bara UTFÖRT arbete räknas som intäkt — samma regel som Intäkter och
-      // Fakturering använder (se utils/customerRevenue.ts). En signerad offert
-      // är sålt, inte levererat, och hörde tidigare felaktigt hit.
-      // Ärenden vars pris exakt motsvarar en faktura är samma pengar —
-      // säljärendet som ledde till avtalet bär premiebeloppet. Samma spärr som
-      // intäktsvyn använder, annars visar flikarna olika siffror.
-      extraRevenue: extra
-        .filter((r) => isCaseCompleted(r.case) && !invoiceAmounts.has(Math.round(Number(r.case.price ?? 0))))
-        .reduce((sum, r) => sum + Number(r.case.price ?? 0), 0),
-      extraPipeline: sumPipeline(extra.map((r) => r.case)),
+      doneLast12, lateCount, nextVisit,
+      frequencyLabel: contractWithFreq?.visit_frequency
+        ? VISIT_FREQUENCY_LABEL[contractWithFreq.visit_frequency]
+        : activeSchedule?.frequency ? (VISIT_FREQUENCY_LABEL[activeSchedule.frequency] ?? 'Anpassat schema') : null,
     }
-  }, [cases, inspections, schedules, contracts, units, nameById, query, invoiceAmounts])
+  }, [cases, inspections, schedules, contracts, units, nameById, query, activeCat])
 
-  const totalShown = derived.recurring.length + derived.establishment.length + derived.extra.length
+  const roomsEnabled =
+    !!(root as { room_number_enabled?: boolean }).room_number_enabled || cases.some((c) => c.room_number)
 
   return (
-    <div className="space-y-4">
-      {/* Leveransmätare — bara för kunder som faktiskt har återkommande besök */}
+    <div className="space-y-8">
+      {/* Leveransmätare mot avtalet */}
       {derived.hasRecurring && (
         <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl flex items-center gap-4">
-          <RecurringGlyph
-            total={derived.visitsPerYear ?? 4}
-            done={derived.doneLast12}
-            late={derived.lateCount}
-          />
+          <RecurringGlyph total={derived.visitsPerYear ?? 4} done={derived.doneLast12} late={derived.lateCount} />
           <div className="min-w-0 flex-1">
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-sm font-semibold text-slate-200">Leverans mot avtal</span>
-              {derived.frequencyLabel && (
-                <span className="text-xs text-slate-500">{derived.frequencyLabel}</span>
-              )}
+              {derived.frequencyLabel && <span className="text-xs text-slate-500">{derived.frequencyLabel}</span>}
             </div>
             <p className="text-xs text-slate-400 mt-0.5 tabular-nums">
               {derived.doneLast12} utförda senaste året
@@ -238,186 +221,133 @@ export default function CustomerCasesSection({
         </div>
       )}
 
-      {/* Sök — börjar löna sig runt 20 ärenden */}
-      {totalShown > 8 && (
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Sök ärendenummer, tekniker, skadedjur…"
-            className="w-full pl-9 pr-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-          />
+      {/* Ärendetyper — kategoristripp utan lådor: siffran bär, färgen är tick */}
+      <section>
+        <div className="flex items-baseline gap-3 border-b-[1.5px] border-slate-700 pb-1.5 mb-3.5">
+          <h2 className="text-[11px] font-bold uppercase tracking-[.15em] text-slate-400">Ärendetyper</h2>
+          <span className="ml-auto text-xs text-slate-500">senaste 12 mån · hovra för att filtrera, klicka för att låsa</span>
         </div>
-      )}
-
-      {derived.establishment.length > 0 && (
-        <CaseGroup
-          title="Etablering"
-          hint="utplacering vid avtalsstart"
-          glyph={<EstablishmentGlyph size={44} />}
-          rows={derived.establishment}
-          showUnit={units.length > 0}
-          onOpenCase={onOpenCase}
-        />
-      )}
-
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
-        <CaseGroup
-          title="Återkommande & kontroll"
-          hint="ingår i avtalet"
-          glyph={<RecurringGlyph total={derived.visitsPerYear ?? 4} done={derived.doneLast12} late={derived.lateCount} size={44} />}
-          rows={derived.recurring}
-          showStations
-          showUnit={units.length > 0}
-          onOpenCase={onOpenCase}
-          emptyText="Inga kontrollbesök registrerade."
-        />
-        <CaseGroup
-          title="Extraärenden"
-          hint="utanför avtalet — merförsäljning"
-          glyph={<ExtraGlyph count={derived.extra.length} size={44} />}
-          rows={derived.extra}
-          showPrice
-          showUnit={units.length > 0}
-          onOpenCase={onOpenCase}
-          emptyText="Inga extraärenden."
-          footer={
-            derived.extraRevenue > 0 || derived.extraPipeline.amount > 0 ? (
-              <span className="text-right">
-                {derived.extraRevenue > 0 && (
-                  <span className="block tabular-nums">
-                    {formatKr(derived.extraRevenue)} <span className="text-slate-500">utfört</span>
-                  </span>
-                )}
-                {derived.extraPipeline.amount > 0 && (
-                  <span className="block text-xs text-slate-500 tabular-nums">
-                    {formatKr(derived.extraPipeline.amount)} sålt, ej utfört
-                  </span>
-                )}
-              </span>
-            ) : null
-          }
-        />
-      </div>
-
-      {totalShown === 0 && (
-        <p className="text-sm text-slate-500 py-8 text-center">
-          {query ? 'Inga ärenden matchar sökningen.' : 'Inga ärenden registrerade för kunden.'}
-        </p>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-
-function CaseGroup({
-  title,
-  hint,
-  glyph,
-  rows,
-  showStations,
-  showPrice,
-  showUnit,
-  onOpenCase,
-  emptyText,
-  footer,
-}: {
-  title: string
-  hint: string
-  glyph: React.ReactNode
-  rows: CaseRow[]
-  showStations?: boolean
-  showPrice?: boolean
-  showUnit?: boolean
-  onOpenCase: (c: RecordCase) => void
-  emptyText?: string
-  footer?: React.ReactNode
-}) {
-  const lateInGroup = rows.filter((r) => !r.done && r.lateness !== 'ontime').length
-
-  return (
-    <section className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
-      <div className="flex items-center gap-3 mb-2">
-        {glyph}
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold text-slate-200">
-            {title} <span className="text-slate-500 tabular-nums font-normal">({rows.length})</span>
-          </h3>
-          <p className="text-xs text-slate-500">{hint}</p>
-        </div>
-        {footer && <span className="shrink-0 text-sm text-slate-300">{footer}</span>}
-      </div>
-
-      {lateInGroup > 0 && (
-        <div className="flex items-center gap-2 px-3 py-2 mb-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs">
-          <MissedGlyph size={24} />
-          {lateInGroup} besök har passerat sin planerade tid
-        </div>
-      )}
-
-      {rows.length === 0 ? (
-        <p className="text-xs italic text-slate-500 py-3">{emptyText}</p>
-      ) : (
-        <ul className="divide-y divide-slate-800/70">
-          {rows.map((r) => (
-            <li key={r.case.id}>
-              <button
-                type="button"
-                onClick={() => onOpenCase(r.case)}
-                className="w-full flex items-center gap-3 px-2 py-2 -mx-2 rounded-lg text-left hover:bg-slate-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] transition-colors group"
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    r.done ? 'bg-[#20c58f]' : LATENESS_STYLE[r.lateness].dot
-                  }`}
-                  aria-hidden
-                />
-                <span className="text-xs text-slate-500 tabular-nums w-[68px] shrink-0">
-                  {formatDateSv(r.date)}
+        <div className="flex items-stretch">
+          {(Object.keys(CAT_META) as FlowCat[]).map((cat, i) => (
+            <button
+              key={cat}
+              onMouseEnter={() => setHoverCat(cat)}
+              onMouseLeave={() => setHoverCat(null)}
+              onClick={() => setLockedCat(lockedCat === cat ? null : cat)}
+              className={`flex flex-1 items-center gap-3.5 py-1 pr-5 text-left ${i > 0 ? 'border-l border-slate-800 pl-5' : ''}`}
+            >
+              <CatGlyph cat={cat} />
+              <div>
+                <span className={`text-[30px] font-light leading-none tabular-nums tracking-tight ${derived.counts[cat] === 0 ? 'text-slate-600' : 'text-slate-100'}`}>
+                  {derived.counts[cat]}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm text-slate-200 truncate">
-                    {r.case.case_number ?? r.case.title}
-                  </span>
-                  <span className="block text-xs text-slate-500 truncate">
-                    {getCaseKindLabel(r.case.service_type)?.short ??
-                      (r.case.origin === 'business' ? 'Företagsärende' : 'Ärende')}
-                    {r.case.pest_type && ` · ${r.case.pest_type}`}
-                    {showUnit && r.unitName && ` · ${r.unitName}`}
-                  </span>
-                </span>
-                {showStations && r.session && (
-                  <span className="hidden sm:block text-xs text-slate-500 tabular-nums shrink-0">
-                    {(r.session.inspected_outdoor_stations ?? 0) + (r.session.inspected_indoor_stations ?? 0)}
-                    {' / '}
-                    {(r.session.total_outdoor_stations ?? 0) + (r.session.total_indoor_stations ?? 0)} st
-                  </span>
-                )}
-                {showPrice && r.case.price != null && Number(r.case.price) > 0 && (
-                  <span className="text-xs text-slate-300 tabular-nums shrink-0">
-                    {formatKr(Number(r.case.price))}
-                  </span>
-                )}
-                <span
-                  className={`hidden md:block text-xs truncate max-w-24 shrink-0 ${
-                    r.done ? 'text-[#20c58f]' : LATENESS_STYLE[r.lateness].text
-                  }`}
-                >
-                  {r.done
-                    ? 'Utfört'
-                    : r.lateness === 'ontime'
-                      ? r.case.status
-                      : `${LATENESS_STYLE[r.lateness].label} · ${daysSince(r.session?.scheduled_at ?? r.case.scheduled_start)} d`}
-                </span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-700 group-hover:text-[#20c58f] transition-colors shrink-0" />
-              </button>
-            </li>
+                <span className="mt-1 block h-0.5 w-4 rounded-full" style={{ background: CAT_META[cat].color, opacity: derived.counts[cat] === 0 ? 0.25 : 1 }} />
+              </div>
+              <div>
+                <div className={`text-[12.5px] ${lockedCat === cat ? 'text-slate-100 font-semibold' : 'text-slate-400'}`}>{CAT_META[cat].label}</div>
+                <div className="text-[11px] text-slate-500">
+                  {derived.latest[cat] ? `senast ${formatDateSv(derived.latest[cat] ?? null)}` : '—'}
+                </div>
+              </div>
+            </button>
           ))}
-        </ul>
+        </div>
+      </section>
+
+      {/* Rumsanalys — bara för kunder med Rum nr */}
+      {roomsEnabled && (
+        <RoomAnalysisSection root={root} cases={cases} onOpenCase={onOpenCase} dimCategory={activeCat} />
       )}
-    </section>
+
+      {/* Ärendeflöde */}
+      <section>
+        <div className="flex items-baseline gap-3 border-b-[1.5px] border-slate-700 pb-1.5 mb-3.5">
+          <h2 className="text-[11px] font-bold uppercase tracking-[.15em] text-slate-400">Ärendeflöde</h2>
+          <span className="ml-auto text-xs text-slate-500">klicka för att öppna i ärendemodalen</span>
+        </div>
+
+        {derived.flow.length > 8 && (
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Sök ärendenummer, tekniker, skadedjur, rum…"
+              className="w-full pl-9 pr-3 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+            />
+          </div>
+        )}
+
+        <div
+          className="overflow-hidden rounded-2xl border border-slate-700"
+          style={{ background: 'linear-gradient(180deg,#14212f,#101b2c 48px)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05), 0 16px 40px -24px rgba(0,0,0,.7)' }}
+        >
+          <div className="grid grid-cols-[74px_30px_1fr_108px_78px_74px_88px_22px] gap-3 border-b border-slate-700 px-4 py-2 text-[10.5px] uppercase tracking-[.1em] text-slate-500 max-md:hidden">
+            <span>Datum</span><span /><span>Ärende</span><span>Tekniker</span><span>Trafikljus</span><span>Pris</span><span>Status</span><span />
+          </div>
+          {derived.flow.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-slate-500">
+              {query || activeCat ? 'Inga ärenden matchar filtret.' : 'Inga ärenden registrerade för kunden.'}
+            </p>
+          ) : (
+            derived.flow.map((r) => (
+              <button
+                key={r.case.id}
+                onClick={() => onOpenCase(r.case)}
+                className="group grid w-full grid-cols-[74px_30px_1fr_108px_78px_74px_88px_22px] items-center gap-3 border-t border-slate-800/70 px-4 py-2.5 text-left transition-colors first:border-t-0 hover:bg-[#121f33] max-md:grid-cols-[74px_1fr]"
+                style={{ opacity: activeCat && r.cat !== activeCat ? 0.18 : 1 }}
+              >
+                <span className="text-xs tabular-nums text-slate-500">{formatDateSv(r.date)}</span>
+                <span className="max-md:hidden"><CatGlyph cat={r.cat} size={28} /></span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[13.5px] font-semibold text-slate-200">
+                    {r.case.title}
+                    {r.case.case_number && <span className="ml-1.5 text-[11px] font-normal text-slate-500">{r.case.case_number}</span>}
+                  </span>
+                  <span className="block truncate text-[11.5px] text-slate-500">
+                    {r.case.room_number && <b className="font-semibold text-slate-400 tabular-nums">Rum {r.case.room_number}</b>}
+                    {r.case.room_number && (r.case.pest_type || r.unitName) && ' · '}
+                    {r.case.pest_type}
+                    {r.unitName && `${r.case.pest_type ? ' · ' : ''}${r.unitName}`}
+                  </span>
+                </span>
+                <span className="truncate text-xs text-slate-400 max-md:hidden">{r.case.primary_technician_name ?? ''}</span>
+                <span className="flex items-center gap-1.5 text-[11px] text-slate-500 max-md:hidden">
+                  {lightColor(r.case.pest_level) ? (
+                    <>
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: lightColor(r.case.pest_level)! }} />
+                      {r.case.pest_level! >= 3 ? 'Kritisk' : r.case.pest_level === 2 ? 'Varning' : 'OK'}
+                    </>
+                  ) : r.case.origin === 'case' && r.done ? (
+                    <>
+                      <span className="h-2.5 w-2.5 rounded-full border border-dashed" style={{ borderColor: LIGHTS.saknas }} />
+                      Ej ifyllt
+                    </>
+                  ) : (
+                    <span className="text-slate-600">—</span>
+                  )}
+                </span>
+                <span className="text-right text-xs tabular-nums text-slate-200 max-md:hidden">
+                  {r.case.price != null && Number(r.case.price) > 0 ? formatKr(Number(r.case.price)) : <span className="text-slate-600">—</span>}
+                </span>
+                <span className="max-md:hidden">
+                  {r.done ? (
+                    <span className="rounded-full bg-[#34c26b]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#34c26b]">Avslutat</span>
+                  ) : r.lateness !== 'ontime' ? (
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${LATENESS_STYLE[r.lateness].text} bg-amber-500/10`}>
+                      {LATENESS_STYLE[r.lateness].label} · {daysSince(r.session?.scheduled_at ?? r.case.scheduled_start)} d
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-[#56a8e8]/10 px-2.5 py-0.5 text-[11px] font-semibold text-[#56a8e8]">{r.case.status}</span>
+                  )}
+                </span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-700 transition-colors group-hover:text-[#20c58f] max-md:hidden" />
+              </button>
+            ))
+          )}
+        </div>
+      </section>
+    </div>
   )
 }

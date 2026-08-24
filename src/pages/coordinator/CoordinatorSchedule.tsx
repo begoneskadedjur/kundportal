@@ -273,6 +273,17 @@ export default function CoordinatorSchedule() {
     const openCaseId = searchParams.get('openCase')
     const scheduleCaseId = searchParams.get('scheduleCase')
 
+    // Grundorsaksutredning från kundkortets rumsanalys — öppna bokningen förifylld
+    const grundorsak = sessionStorage.getItem('begone-grundorsak-prefill')
+    if (grundorsak) {
+      sessionStorage.removeItem('begone-grundorsak-prefill')
+      try {
+        setSelectedCase(JSON.parse(grundorsak))
+        setIsCreateModalOpen(true)
+      } catch { /* trasig prefill ignoreras */ }
+      return
+    }
+
     // Öppna bokningsmodulen (CreateCaseModal) från Offerthantering "Boka"-knapp
     if (scheduleCaseId && allCases.length > 0) {
       const foundCase = allCases.find(c => c.id === scheduleCaseId)

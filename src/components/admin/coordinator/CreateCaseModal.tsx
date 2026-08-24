@@ -29,6 +29,7 @@ import type { GeocodeResult } from '../../../services/geocoding';
 import { reverseGeocode } from '../../../services/geocoding';
 import toast from 'react-hot-toast';
 import LoadingSpinner from '../../shared/LoadingSpinner';
+import RoomNumberFields from '../../shared/RoomNumberFields';
 
 import DatePicker from 'react-datepicker';
 import { registerLocale } from 'react-datepicker';
@@ -424,6 +425,22 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       }
     }
   }, [initialCaseData, contractCustomers]);
+
+  // Förifyllda formulärfält — t.ex. "Boka grundorsaksutredning" från
+  // kundkortets rumsanalys (title, description, rum, skadedjur)
+  useEffect(() => {
+    const p = initialCaseData as {
+      title?: string; description?: string; room_number?: string; pest_type?: string
+    } | null | undefined
+    if (!p || (!p.description && !p.room_number)) return
+    setFormData(prev => ({
+      ...prev,
+      ...(p.title ? { title: p.title } : {}),
+      ...(p.description ? { description: p.description } : {}),
+      ...(p.room_number ? { room_number: p.room_number } : {}),
+      ...(p.pest_type ? { skadedjur: p.pest_type } : {}),
+    }));
+  }, [initialCaseData]);
 
   // Separat useEffect för att fylla i kunddata när selectedContractCustomer eller selectedSiteId ändras
   useEffect(() => {
@@ -1888,11 +1905,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                             />
                           )}
                           {roomNumberRequired && (
-                            <Input
-                              label="Rum nr *"
-                              name="room_number"
+                            <RoomNumberFields
                               value={(formData as any).room_number || ''}
-                              onChange={handleChange}
+                              onChange={(v) => handleChange({ target: { name: 'room_number', value: v } } as React.ChangeEvent<HTMLInputElement>)}
                               required
                             />
                           )}
@@ -2284,7 +2299,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                                   <Input label="Objekt *" name="work_object" value={(formData as any).work_object || ''} onChange={handleChange} required />
                                 )}
                                 {roomNumberRequired && (
-                                  <Input label="Rum nr *" name="room_number" value={(formData as any).room_number || ''} onChange={handleChange} required />
+                                  <RoomNumberFields value={(formData as any).room_number || ''} onChange={(v) => handleChange({ target: { name: 'room_number', value: v } } as React.ChangeEvent<HTMLInputElement>)} required />
                                 )}
                               </div>
                             )}

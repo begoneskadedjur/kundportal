@@ -190,6 +190,8 @@ export interface RecordWorkItem {
   attribution?: 'sales' | 'technician'
   /** Ärendets nummer, för gruppering per ärende */
   case_number?: string | null
+  /** Rumsnummer från ärendet ("105, 107") — kunder med Rum nr aktiverat */
+  case_room?: string | null
   case_title?: string | null
 }
 
@@ -242,6 +244,10 @@ export interface RecordCase {
   created_at: string
   price: number | null
   primary_technician_name: string | null
+  /** Ärendemärkning: rumsnummer som kommaseparerad sträng ("105, 107") — null för business_cases */
+  room_number?: string | null
+  /** Teknikerns trafikljus (0=ej ifyllt/okänt, 1=OK, 2=varning, 3=kritisk) — null för business_cases */
+  pest_level?: number | null
   /** Vilken tabell raden kom från — business_cases saknar service_type */
   origin: 'case' | 'business'
 }
@@ -425,7 +431,7 @@ export function useCustomerRecord(customerId: string | undefined) {
         .select(
           'id, customer_id, contract_id, case_number, title, status, service_type, ' +
             'pest_type, scheduled_start, scheduled_end, completed_date, created_at, ' +
-            'price, primary_technician_name'
+            'price, primary_technician_name, room_number, pest_level'
         )
         .in('customer_id', familyIds)
         // Borttagna ärenden ska inte synas — 9 rader i produktion har status
@@ -671,12 +677,12 @@ export function useCustomerRecord(customerId: string | undefined) {
     // är: hittas ett ärende är det utfört arbete (tekniker), annars ett avtal
     // (säljare).
     const workCaseIds = Array.from(new Set(rawWorkItems.map((w) => w.case_id)))
-    const techByCase = new Map<string, { name: string | null; number: string | null; title: string | null }>()
+    const techByCase = new Map<string, { name: string | null; number: string | null; title: string | null; room: string | null }>()
     if (workCaseIds.length > 0) {
       const [cRes, bRes, pRes] = await Promise.all([
         supabase
           .from('cases')
-          .select('id, case_number, title, primary_technician_name')
+          .select('id, case_number, title, primary_technician_name, room_number')
           .in('id', workCaseIds),
         supabase
           .from('business_cases')
@@ -687,8 +693,8 @@ export function useCustomerRecord(customerId: string | undefined) {
           .select('id, case_number, title, primary_assignee_name')
           .in('id', workCaseIds),
       ])
-      for (const r of (cRes.data ?? []) as { id: string; case_number: string | null; title: string | null; primary_technician_name: string | null }[]) {
-        techByCase.set(r.id, { name: r.primary_technician_name, number: r.case_number, title: r.title })
+      for (const r of (cRes.data ?? []) as { id: string; case_number: string | null; title: string | null; primary_technician_name: string | null; room_number: string | null }[]) {
+        techByCase.set(r.id, { name: r.primary_technician_name, number: r.case_number, title: r.title, room: r.room_number })
       }
       for (const r of [...((bRes.data ?? []) as never[]), ...((pRes.data ?? []) as never[])] as {
         id: string
@@ -697,7 +703,7 @@ export function useCustomerRecord(customerId: string | undefined) {
         primary_assignee_name: string | null
       }[]) {
         if (!techByCase.has(r.id)) {
-          techByCase.set(r.id, { name: r.primary_assignee_name, number: r.case_number, title: r.title })
+          techByCase.set(r.id, { name: r.primary_assignee_name, number: r.case_number, title: r.title, room: null })
         }
       }
     }
@@ -740,6 +746,7 @@ export function useCustomerRecord(customerId: string | undefined) {
           technician_name: meta.name ?? null,
           case_number: meta.number ?? null,
           case_title: meta.title ?? null,
+          case_room: meta.room ?? null,
           attribution: 'technician' as const,
         }
       }

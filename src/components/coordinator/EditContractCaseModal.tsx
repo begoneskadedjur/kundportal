@@ -27,6 +27,7 @@ import ServiceArticleSelector from '../shared/ServiceArticleSelector'
 import type { Service } from '../../types/services'
 import TechnicianDropdown from '../admin/TechnicianDropdown'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
+import RoomNumberFields from '../shared/RoomNumberFields'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
 import { toLocalISOStringWithOffset, fromDatabaseDate } from '../../utils/dateHelpers'
 import CaseImageGallery, { CaseImageGalleryRef } from '../shared/CaseImageGallery'
@@ -1830,16 +1831,11 @@ export default function EditContractCaseModal({
                 </div>
               )}
               {(customerData?.room_number_enabled || formData.room_number) && (
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Rum nr</label>
-                  <input
-                    type="text"
-                    value={formData.room_number}
-                    onChange={(e) => setFormData(prev => ({ ...prev, room_number: e.target.value }))}
-                    disabled={isCustomerView}
-                    className="w-full px-3 py-1.5 bg-slate-800/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                  />
-                </div>
+                <RoomNumberFields
+                  value={formData.room_number}
+                  onChange={(v) => setFormData(prev => ({ ...prev, room_number: v }))}
+                  disabled={isCustomerView}
+                />
               )}
             </div>
           </CaseModalSection>
