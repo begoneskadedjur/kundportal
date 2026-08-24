@@ -58,7 +58,7 @@ import { useTechnicians } from '../../../../hooks/useTechnicians'
 import type { PriceList } from '../../../../types/articles'
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
 import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
-import ContractContentSection, { useContractContent } from './ContractContentSection'
+import ContractContentSection, { useContractContent, useAccumulatedCaseOutcome } from './ContractContentSection'
 import ContractPriceListSection, { useAvropCatalog } from './ContractPriceListSection'
 import ContractCaseServiceSelector from '../ContractCaseServiceSelector'
 import Modal from '../../../ui/Modal'
@@ -821,6 +821,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       casesOpen: number
       casesTotal: number
       covered: string[]
+      caseIds: string[]
     } => {
       // Täckta kundrader: avtalets egen rad + omfattningen (eller alla enheter
       // när avtalet täcker hela verksamheten)
@@ -860,6 +861,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         casesOpen: list.length - casesDone,
         casesTotal: list.length,
         covered,
+        caseIds: list.map((c) => c.id),
       }
     },
     [activeScopeByContract, cases, inspections, locations]
@@ -2147,6 +2149,7 @@ interface PaperProps {
     casesOpen: number
     casesTotal: number
     covered: string[]
+    caseIds: string[]
   }
   priceListLabel: string | null
   /**
@@ -2404,6 +2407,10 @@ function PaperContract({
   const terminatedRunning = state === 'terminated-running'
   const ink = PAPER_INK[archived ? 'archived' : 'live']
   const contentData = useContractContent(contract.id, contentReloadKey)
+  // Avropsavtal: § 5 visar ackumulerat utfall från avtalets ärenden i stället
+  // för avtalsinnehållet (som är 0 kr på avrop). Samma ärendemängd som § 3.
+  const isAvrop = contract.contract_type === 'Avropsavtal' || contract.label === 'Avropsavtal'
+  const accumulatedOutcome = useAccumulatedCaseOutcome(isAvrop ? followup.caseIds : null, contentReloadKey)
   // Avtalets prislista styr vad kunden kan avropa och till vilket pris.
   // Saknas prislista på avtalet gäller kundens — samma uppslag som ärendena gör.
   const avropCatalog = useAvropCatalog(
@@ -2867,6 +2874,9 @@ function PaperContract({
         content={contentData.content}
         loading={contentData.loading}
         onEdit={onEditContent}
+        showAccumulated={isAvrop}
+        accumulated={accumulatedOutcome.summary}
+        accumulatedLoading={accumulatedOutcome.loading}
       />
 
       {/* Avslutsnotis — bara på arkiverade avtal. Sammanfattar vad som hände

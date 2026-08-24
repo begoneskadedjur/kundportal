@@ -14,7 +14,11 @@ import { useEffect, useState } from 'react'
 import { Loader2, Pencil, Plus } from 'lucide-react'
 import { CaseBillingService } from '../../../../services/caseBillingService'
 import { PricingSettingsService } from '../../../../services/pricingSettingsService'
-import type { CaseBillingItemWithRelations, CaseServiceSummary } from '../../../../types/caseBilling'
+import type {
+  CaseBillingItemWithRelations,
+  CaseServiceSummary,
+  AccumulatedCaseSummary,
+} from '../../../../types/caseBilling'
 import type { PricingSettings } from '../../../../types/pricingSettings'
 import { formatKr } from '../../../../hooks/useCustomerRecord'
 
@@ -69,6 +73,39 @@ export function useContractContent(contractId: string | null, reloadKey = 0) {
   return { content, loading }
 }
 
+/**
+ * Ackumulerat utfall från avtalets ärenden — § 5 på avropsavtal. Hämtar
+ * faktureringsraderna för ALLA ärenden som hör till avtalet (samma ärendemängd
+ * som § 3 Uppföljning räknar) och summerar dem med ärendemodalens prisregler.
+ * Ärenden från gamla systemet saknar rader och bidrar med noll — avsiktligt.
+ */
+export function useAccumulatedCaseOutcome(caseIds: string[] | null, reloadKey = 0) {
+  const [summary, setSummary] = useState<AccumulatedCaseSummary | null>(null)
+  const [loading, setLoading] = useState(false)
+  const idsKey = caseIds ? caseIds.slice().sort().join(',') : ''
+
+  useEffect(() => {
+    if (!caseIds || caseIds.length === 0) {
+      setSummary(null)
+      return
+    }
+    let cancelled = false
+    setLoading(true)
+    CaseBillingService.getAccumulatedSummaryForCases(caseIds)
+      .then((s) => { if (!cancelled) setSummary(s) })
+      .catch((err) => {
+        console.error('Kunde inte ackumulera ärendenas faktureringsrader:', err)
+        if (!cancelled) setSummary(null)
+      })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+    // idsKey representerar caseIds-innehållet — arrayreferensen byts varje render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idsKey, reloadKey])
+
+  return { summary, loading }
+}
+
 /** Marginalfärg på papper (mörkare toner än portalens — ljus bakgrund) */
 function marginInk(margin: number | null, settings: PricingSettings | null): string {
   if (margin === null) return '#5d6672'
@@ -87,6 +124,13 @@ interface Props {
    * avslutat avtal ska stå som det stod när avtalet gällde.
    */
   onEdit?: () => void
+  /**
+   * Avropsavtal: § 5 visar ackumulerat utfall från avtalets ärenden i stället
+   * för avtalsinnehållet (som är 0 kr på avrop). Sätts av avtalskartan.
+   */
+  accumulated?: AccumulatedCaseSummary | null
+  accumulatedLoading?: boolean
+  showAccumulated?: boolean
 }
 
 /**
@@ -94,7 +138,14 @@ interface Props {
  * avtalsdokumentet. Artiklarna visas som indragna kostnadsrader under den
  * tjänst de hör till — de är interna och når aldrig kunden.
  */
-export default function ContractContentSection({ content, loading, onEdit }: Props) {
+export default function ContractContentSection({
+  content,
+  loading,
+  onEdit,
+  accumulated,
+  accumulatedLoading,
+  showAccumulated,
+}: Props) {
   const { services, articles, summary, settings } = content
 
   // Artiklar grupperade per tjänsterad (mapped_service_id → tjänstens item-id)
@@ -234,8 +285,122 @@ export default function ContractContentSection({ content, loading, onEdit }: Pro
         )}
       </div>
 
+      {/* § 5 Marginal — avropsavtal: ackumulerat utfall från avtalets ärenden */}
+      {showAccumulated && (
+        <div className="mt-3.5">
+          <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
+            <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">
+              § 5 · Marginal — ackumulerat från ärenden
+            </h4>
+            <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
+              {accumulatedLoading ? '…' : accumulated ? `${accumulated.case_count} ärenden` : ''}
+            </span>
+          </div>
+
+          {accumulatedLoading ? (
+            <div className="flex items-center gap-2 py-3 font-sans text-[12px] text-[#8a9099]">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Summerar ärendenas faktureringsrader…
+            </div>
+          ) : !accumulated || (accumulated.groups.length === 0 && accumulated.unmapped_articles.length === 0) ? (
+            <p className="py-3 font-sans text-[12.5px] italic text-[#8a9099]">
+              Inga faktureringsrader från ärenden ännu — fylls på när ärenden prissätts i ärendemodalen.
+            </p>
+          ) : (
+            <>
+              {accumulated.groups.map((g, i) => (
+                <div key={g.service_name} className="border-b border-dotted border-[#d9d3c2] py-2">
+                  <div className="flex items-center gap-2.5 text-[13.5px]">
+                    <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.{i + 1}</span>
+                    <span className="font-semibold text-[#262e38] truncate">{g.service_name}</span>
+                    {g.occurrences !== 1 && (
+                      <span className="font-sans text-[11px] text-[#8a9099] shrink-0">× {g.occurrences}</span>
+                    )}
+                    <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
+                    <span className="tabular-nums text-[#262e38] whitespace-nowrap shrink-0">
+                      {formatKr(g.revenue)}
+                    </span>
+                  </div>
+                  {g.articles.length > 0 && (
+                    <div className="pl-8 pt-1 space-y-0.5">
+                      {g.articles.map((a) => (
+                        <div key={a.article_name} className="flex items-center gap-2 font-sans text-[11px] text-[#8a9099]">
+                          <span className="truncate">
+                            {a.article_name}
+                            {a.quantity !== 1 && ` × ${a.quantity}`}
+                          </span>
+                          <span className="flex-1" />
+                          <span className="tabular-nums shrink-0">−{formatKr(a.cost)}</span>
+                        </div>
+                      ))}
+                      {g.margin_percent !== null && (
+                        <div className="flex items-center gap-2 font-sans text-[10.5px] pt-0.5">
+                          <span className="flex-1" />
+                          <span className="tabular-nums" style={{ color: marginInk(g.margin_percent, settings) }}>
+                            {g.margin_percent.toFixed(1)} % marginal
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {accumulated.unmapped_articles.length > 0 && (
+                <div className="pt-2 pl-8 space-y-0.5">
+                  <div className="font-sans text-[10px] uppercase tracking-wider text-[#8a9099] mb-0.5">
+                    Övriga interna kostnader
+                  </div>
+                  {accumulated.unmapped_articles.map((a) => (
+                    <div key={a.article_name} className="flex items-center gap-2 font-sans text-[11px] text-[#8a9099]">
+                      <span className="truncate">
+                        {a.article_name}
+                        {a.quantity !== 1 && ` × ${a.quantity}`}
+                      </span>
+                      <span className="flex-1" />
+                      <span className="tabular-nums shrink-0">−{formatKr(a.cost)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 pt-2 font-sans">
+                <span className="text-[12px] text-[#5d6672]">
+                  Fakturerat värde{' '}
+                  <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(accumulated.revenue)}</b>
+                </span>
+                <span className="text-[12px] text-[#5d6672]">
+                  Vår kostnad{' '}
+                  <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(accumulated.cost)}</b>
+                </span>
+                <span className="text-[12px] text-[#5d6672]">
+                  Täckningsbidrag{' '}
+                  <b
+                    className="text-[13px] tabular-nums"
+                    style={{ color: marginInk(accumulated.margin_percent, settings) }}
+                  >
+                    {formatKr(accumulated.revenue - accumulated.cost)}
+                  </b>
+                </span>
+                <span
+                  className="ml-auto text-[15px] font-bold tabular-nums"
+                  style={{ color: marginInk(accumulated.margin_percent, settings) }}
+                >
+                  {accumulated.margin_percent !== null ? `${accumulated.margin_percent.toFixed(1)} %` : '–'}
+                  <span className="text-[10.5px] font-normal text-[#8a9099]"> marginal</span>
+                </span>
+              </div>
+            </>
+          )}
+          <p className="mt-1 font-sans text-[10.5px] italic text-[#8a9099]">
+            Ackumulerat från avtalets ärenden, prissatta i ärendemodalen. Ärenden från gamla
+            systemet utan faktureringsrader ingår inte.
+          </p>
+        </div>
+      )}
+
       {/* § 5 Marginal — bara när det finns tjänster att räkna på */}
-      {!loading && services.length > 0 && summary && (
+      {!showAccumulated && !loading && services.length > 0 && summary && (
         <div className="mt-3.5">
           <div className="border-b-[1.5px] border-[#262e38] pb-1">
             <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 5 · Marginal</h4>

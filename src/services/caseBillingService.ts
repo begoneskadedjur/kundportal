@@ -13,6 +13,9 @@ import type {
   ArticlesByCategory,
   CaseBillingSummary,
   CaseServiceSummary,
+  AccumulatedCaseSummary,
+  AccumulatedServiceGroup,
+  AccumulatedArticleLine,
   BillableCaseType,
   PriceSource,
   CaseBillingItemStatus
@@ -493,6 +496,103 @@ export class CaseBillingService {
       },
       margin_percent: marginPercent,
       margin_ok: marginPercent === null || marginPercent >= minMarginPercent,
+    }
+  }
+
+  /**
+   * Ackumulerat utfall över flera ärendens faktureringsrader — § 5 på
+   * avropsavtal i Avtalskartan. Samma beräkningsregler som per-ärende-
+   * summeringen ovan: tjänsterader = intäkt, artikelrader = intern kostnad.
+   *
+   * Källan är enbart case_billing_items, så ärenden från gamla systemet
+   * (prissatta via ClickUp-fältet, utan rader) bidrar med noll — avsiktligt.
+   * Ingen filtrering på case_type: rader på avtalskunders ärenden är märkta
+   * 'contract' av modellskäl (CHECK-constrainten saknar eget värde för dem).
+   */
+  static async getAccumulatedSummaryForCases(caseIds: string[]): Promise<AccumulatedCaseSummary> {
+    const empty: AccumulatedCaseSummary = {
+      case_count: 0, groups: [], unmapped_articles: [], revenue: 0, cost: 0, margin_percent: null,
+    }
+    const unique = Array.from(new Set(caseIds.filter(Boolean)))
+    if (unique.length === 0) return empty
+
+    type Row = {
+      id: string
+      case_id: string
+      item_type: 'service' | 'article'
+      service_name: string | null
+      article_name: string | null
+      quantity: number | null
+      total_price: number | null
+      mapped_service_id: string | null
+      status: string | null
+    }
+    const rows: Row[] = []
+    for (let i = 0; i < unique.length; i += 150) {
+      const { data, error } = await supabase
+        .from('case_billing_items')
+        .select('id, case_id, item_type, service_name, article_name, quantity, total_price, mapped_service_id, status')
+        .in('case_id', unique.slice(i, i + 150))
+        .neq('status', 'cancelled')
+      if (error) throw new Error(`Databasfel: ${error.message}`)
+      rows.push(...((data ?? []) as Row[]))
+    }
+    if (rows.length === 0) return empty
+
+    // Tjänsteradens id → gruppnamn, så artiklar (mapped_service_id) hamnar
+    // under rätt tjänst även när samma tjänst förekommer i många ärenden
+    const groupNameByServiceRow = new Map<string, string>()
+    const groups = new Map<string, AccumulatedServiceGroup>()
+    for (const r of rows) {
+      if (r.item_type !== 'service') continue
+      const name = r.service_name || r.article_name || 'Tjänst utan namn'
+      groupNameByServiceRow.set(r.id, name)
+      const g = groups.get(name) ?? { service_name: name, occurrences: 0, revenue: 0, articles: [], cost: 0, margin_percent: null }
+      g.occurrences += Number(r.quantity ?? 1)
+      g.revenue += Number(r.total_price ?? 0)
+      groups.set(name, g)
+    }
+
+    const addArticle = (list: AccumulatedArticleLine[], r: Row) => {
+      const name = r.article_name || 'Artikel utan namn'
+      const line = list.find((a) => a.article_name === name)
+      const qty = Number(r.quantity ?? 1)
+      const cost = Number(r.total_price ?? 0)
+      if (line) {
+        line.quantity += qty
+        line.cost += cost
+      } else {
+        list.push({ article_name: name, quantity: qty, cost })
+      }
+    }
+
+    const unmapped: AccumulatedArticleLine[] = []
+    for (const r of rows) {
+      if (r.item_type !== 'article') continue
+      const groupName = r.mapped_service_id ? groupNameByServiceRow.get(r.mapped_service_id) : undefined
+      if (groupName) {
+        const g = groups.get(groupName)!
+        addArticle(g.articles, r)
+        g.cost += Number(r.total_price ?? 0)
+      } else {
+        addArticle(unmapped, r)
+      }
+    }
+
+    const sorted = Array.from(groups.values()).sort((a, b) => b.revenue - a.revenue)
+    for (const g of sorted) {
+      g.margin_percent = g.revenue > 0 ? calculateMarginPercent(g.revenue, g.cost) : null
+    }
+    const revenue = sorted.reduce((s, g) => s + g.revenue, 0)
+    const cost = sorted.reduce((s, g) => s + g.cost, 0) + unmapped.reduce((s, a) => s + a.cost, 0)
+
+    return {
+      case_count: new Set(rows.map((r) => r.case_id)).size,
+      groups: sorted,
+      unmapped_articles: unmapped,
+      revenue,
+      cost,
+      margin_percent: revenue > 0 ? calculateMarginPercent(revenue, cost) : null,
     }
   }
 

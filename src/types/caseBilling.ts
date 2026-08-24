@@ -338,3 +338,41 @@ export interface CaseServiceSummary {
   margin_percent: number | null   // null om inga tjänster
   margin_ok: boolean
 }
+
+// ============================================
+// ACKUMULERAT UTFALL PER AVTAL (avropsavtal)
+// ============================================
+
+/** Intern kostnadsrad, summerad per artikelnamn över flera ärenden */
+export interface AccumulatedArticleLine {
+  article_name: string
+  quantity: number
+  cost: number
+}
+
+/** Tjänst summerad över flera ärenden, med sina interna kostnader */
+export interface AccumulatedServiceGroup {
+  service_name: string
+  /** Summerad kvantitet över alla ärenden (oftast = antal förekomster) */
+  occurrences: number
+  revenue: number
+  articles: AccumulatedArticleLine[]
+  cost: number
+  margin_percent: number | null
+}
+
+/**
+ * Ackumulerat utfall från ärendenas faktureringsrader — § 5 på avropsavtal.
+ * Källan är enbart case_billing_items (samma rader som ärendemodalerna
+ * prissätter med); ärenden utan rader (gamla systemet) bidrar med noll.
+ */
+export interface AccumulatedCaseSummary {
+  /** Antal ärenden som bidrog med minst en rad */
+  case_count: number
+  groups: AccumulatedServiceGroup[]
+  /** Kostnadsrader utan tjänstekoppling, summerade per artikelnamn */
+  unmapped_articles: AccumulatedArticleLine[]
+  revenue: number
+  cost: number
+  margin_percent: number | null
+}
