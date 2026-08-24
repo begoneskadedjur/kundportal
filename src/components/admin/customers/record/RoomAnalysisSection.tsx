@@ -261,6 +261,8 @@ export default function RoomAnalysisSection({ root, cases, onOpenCase, dimCatego
         <span className="ml-auto text-xs text-slate-500">bygger på våra egna besök — inte kundens data</span>
       </div>
 
+      <div className="mb-4 grid items-start gap-6 lg:grid-cols-[1fr_460px]">
+      <div>
       {/* Lede — integrerad summering, inga KPI-kort */}
       <p className="text-sm text-slate-400 max-w-[66ch]">
         <b className="text-slate-200 tabular-nums">{rooms.length} rum</b> har haft besök av oss det senaste året.{' '}
@@ -354,6 +356,62 @@ export default function RoomAnalysisSection({ root, cases, onOpenCase, dimCatego
           .
         </p>
       )}
+      </div>
+
+      {/* Problemrums-kvadranten: frekvens × riktning — var ska vi agera först? */}
+      <div
+        className="rounded-2xl border border-slate-700 px-3 pb-1.5 pt-2.5"
+        style={{ background: 'linear-gradient(180deg,#14212f,#101b2c 48px)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05), 0 16px 40px -24px rgba(0,0,0,.7)' }}
+      >
+        <h3 className="px-1 pb-1.5 text-[10.5px] font-bold uppercase tracking-[.12em] text-slate-500">Var ska vi agera först?</h3>
+        {(() => {
+          const withTrend = rooms.filter((r) => r.trendRatio != null)
+          const noTrend = rooms.filter((r) => r.trendRatio == null)
+          const maxX = Math.max(6, ...rooms.map((r) => r.visits.length)) + 1
+          const qx = (n: number) => 46 + (n / maxX) * (448 - 46)
+          const qy = (ratio: number) => Math.max(18, Math.min(208, 114 + Math.max(-1.5, Math.min(1.5, Math.log2(ratio))) * 68))
+          return (
+            <svg viewBox="0 0 460 268" width="100%" role="img" aria-label="Problemrums-kvadrant">
+              <line x1="46" y1="12" x2="46" y2="216" stroke="#223247" strokeWidth="1" />
+              <line x1="46" y1="216" x2="448" y2="216" stroke="#223247" strokeWidth="1" />
+              <line x1={qx(thresholds.minVisits)} y1="12" x2={qx(thresholds.minVisits)} y2="216" stroke="#223247" strokeWidth="1" strokeDasharray="3 4" />
+              <line x1="46" y1="114" x2="448" y2="114" stroke="#223247" strokeWidth="1" strokeDasharray="3 4" />
+              <text x="52" y="24" fontSize="9" letterSpacing="1.5" fill="#5d6f88">TIDIG ESKALATION</text>
+              <text x="392" y="24" fontSize="9" letterSpacing="1.5" fill={LIGHT.kritisk} textAnchor="end" fontWeight="700">AKUT</text>
+              <text x="52" y="208" fontSize="9" letterSpacing="1.5" fill="#5d6f88">UNDER KONTROLL</text>
+              <text x="392" y="208" fontSize="9" letterSpacing="1.5" fill="#5d6f88" textAnchor="end">BEVAKA</text>
+              <text x="247" y="240" fontSize="9" fill="#5d6f88" textAnchor="middle">antal besök av oss under perioden →</text>
+              <text x="16" y="114" fontSize="9" fill="#5d6f88" transform="rotate(-90 16 114)" textAnchor="middle">tiden mellan besöken krymper ↑</text>
+              <text x={qx(thresholds.minVisits)} y="228" fontSize="8.5" fill="#5d6f88" textAnchor="middle">{thresholds.minVisits}</text>
+              {withTrend.map((r) => {
+                const cat = r.visits[r.visits.length - 1]?.cat ?? 'extra'
+                return (
+                  <g key={r.name} style={{ cursor: 'pointer', opacity: dim(cat) }} onClick={() => setExpanded(r.name)}>
+                    <circle cx={qx(r.visits.length)} cy={qy(r.trendRatio!)} r="7" fill={CAT_COLOR[cat]} stroke="#101b2c" strokeWidth="2" />
+                    <text x={qx(r.visits.length) + 12} y={qy(r.trendRatio!) + 4} fontSize="11" fontWeight="700" fill="#e8eef6">{r.name}</text>
+                  </g>
+                )
+              })}
+              {noTrend.length > 0 && (
+                <>
+                  <line x1="46" y1="248" x2="448" y2="248" stroke="#1a2940" strokeWidth="1" />
+                  <text x="52" y="262" fontSize="9" fill="#5d6f88">FÖR FÅ BESÖK FÖR TREND:</text>
+                  {noTrend.slice(0, 4).map((r, i) => {
+                    const cat = r.visits[r.visits.length - 1]?.cat ?? 'service'
+                    return (
+                      <g key={r.name} style={{ cursor: 'pointer', opacity: dim(cat) }} onClick={() => setExpanded(r.name)}>
+                        <circle cx={200 + i * 62} cy="258" r="5" fill={CAT_COLOR[cat]} stroke="#101b2c" strokeWidth="2" />
+                        <text x={209 + i * 62} y="262" fontSize="10" fill="#8fa0b5">{r.name}</text>
+                      </g>
+                    )
+                  })}
+                </>
+              )}
+            </svg>
+          )
+        })()}
+      </div>
+      </div>
 
       {/* Rumsmatrisen */}
       <div
