@@ -243,7 +243,11 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           visit_number: visitNumber,
           status: caseData.status ?? null,
         })
-        if (visitError) console.error('[RevisitContractModal] Failed to save visit snapshot:', visitError)
+        if (visitError) {
+          // Snapshotet ÄR historiken — ett tyst fel här betyder förlorad rapport/trafikljusdata
+          console.error('[RevisitContractModal] Failed to save visit snapshot:', visitError)
+          toast.error(`Besökshistoriken kunde inte sparas: ${visitError.message}. Bokningen fortsätter, men kontakta admin.`, { duration: 10000 })
+        }
 
         // Stämpla billing-items utan visit_number med detta besöks visit_number
         const { error: billingError } = await supabase
