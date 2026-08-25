@@ -52,6 +52,12 @@ import DateField from '../../ui/DateField'
 import ServiceCostBreakdown from '../../shared/ServiceCostBreakdown'
 import CaseModalSection from '../../shared/CaseModalSection'
 import InvoiceStatusStepper from '../../shared/InvoiceStatusStepper'
+import InvoicePulseRow from './InvoicePulseRow'
+import InvoiceMarkingSection from './InvoiceMarkingSection'
+import InvoiceCaseChainSection, { UnbilledRowsNotice } from './InvoiceCaseChain'
+import { useInvoicePulse } from '../../../hooks/useInvoicePulse'
+import { useInvoiceMarking } from '../../../hooks/useInvoiceMarking'
+import { useInvoiceCaseChain } from '../../../hooks/useInvoiceCaseChain'
 import CommentSection from '../../communication/CommentSection'
 import CaseContextImagePreview from '../../communication/CaseContextImagePreview'
 import EmbeddedMapPreview from '../../communication/EmbeddedMapPreview'
@@ -200,6 +206,9 @@ export default function InvoiceDetailModal({
   const [staleInfo, setStaleInfo] = useState<{ stale: boolean; reason?: string } | null>(null)
   const [regenerating, setRegenerating] = useState(false)
   const [caseBillingItems, setCaseBillingItems] = useState<CaseBillingItem[]>([])
+  // Kundens importerade avtalsärende (contracts-raden) — används både av
+  // billing-uppslaget och kommunikationspanelen för årspremiefakturor utan case_id
+  const [importedContractId, setImportedContractId] = useState<string | null>(null)
   const [contractCustomer, setContractCustomer] = useState<{
     contact_person: string | null
     contact_email: string | null
@@ -266,7 +275,8 @@ export default function InvoiceDetailModal({
 
   // Hämta case_billing_items (interna kostnader + tjänster) för att bygga kostnadsuppdelning
   useEffect(() => {
-    if (!invoice) { setCaseBillingItems([]); return }
+    if (!invoice) { setCaseBillingItems([]); setImportedContractId(null); return }
+    if (invoice.invoice_type !== 'contract') setImportedContractId(null)
     const fetchCaseBilling = async () => {
       // Ad-hoc/merförsäljning: kostnaderna ligger på det avslutade ärendets case_billing_items.
       // Vägen dit går via fakturans rader → contract_billing_items.case_id (det riktiga ärendet).
@@ -306,6 +316,7 @@ export default function InvoiceDetailModal({
           .eq('customer_id', invoice.customer_id)
           .eq('oneflow_contract_id', `imported-${invoice.customer_id}`)
           .maybeSingle()
+        setImportedContractId(contract?.id ?? null)
         if (contract) {
           const { data } = await supabase
             .from('case_billing_items')
@@ -790,6 +801,11 @@ export default function InvoiceDetailModal({
     }
   }
 
+  // Faktureringsmodaler 2.0 — read-only-insikter, påverkar inte Fortnox-flödet
+  const pulse = useInvoicePulse(isOpen ? invoice : null)
+  const marking = useInvoiceMarking(isOpen ? invoice : null, effectiveCaseType)
+  const chain = useInvoiceCaseChain(isOpen ? invoice : null, effectiveCaseType)
+
   if (!isOpen) return null
 
   const isOverdue = invoice ? isInvoiceOverdue(invoice.due_date, invoice.status) : false
@@ -818,6 +834,32 @@ export default function InvoiceDetailModal({
   const statusConfig = invoice ? INVOICE_STATUS_CONFIG[invoice.status] : null
   // Privat = visa pris inkl. moms i UI. Företag/avtal = exkl. moms. (Lagring/Fortnox påverkas inte.)
   const isPrivate = invoice?.case_type === 'private'
+  const isPartialInvoice = (invoice?.invoice_type as string | undefined) === 'partial'
+
+  // Spärrindikator vid primärknappen: hinder i fast ordning. Read-only —
+  // knappen förblir klickbar och klick-logiken är oförändrad.
+  const showBlockers = !!invoice && ['pending_approval', 'ready'].includes(invoice.status)
+  const blockers: { label: string; severe?: boolean }[] = []
+  if (showBlockers && invoice) {
+    if (marking && marking.missing.length > 0) {
+      blockers.push({ label: `${marking.missing[0]} saknas på ärendet` })
+    }
+    if ((pulse.overdueTotal ?? 0) > 0) {
+      blockers.push({ label: `${formatInvoiceAmount(pulse.overdueTotal ?? 0)} förfallet hos kunden`, severe: true })
+    }
+    if (invoice.rot_rut_type && !invoice.fastighetsbeteckning) {
+      blockers.push({ label: 'fastighetsbeteckning saknas för ROT/RUT' })
+    }
+    if (pulse.termsDeviation) blockers.push({ label: 'förfallodatum avviker från betalvillkor' })
+    if (pulse.premiumMismatch) blockers.push({ label: 'premien avviker från avtalet' })
+  }
+  const severeBlocker = blockers.some(b => b.severe)
+
+  // Kommunikation: case-fakturor via case_id; årspremiefakturor utan case_id
+  // binds till kundens importerade avtalsärende (samma contracts-rad som
+  // billing-uppslaget använder)
+  const commCaseId = invoice?.case_id ?? (invoice?.invoice_type === 'contract' ? importedContractId : null)
+  const commCaseType: CaseType | null = invoice?.case_id ? effectiveCaseType : commCaseId ? 'contract' : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -836,17 +878,16 @@ export default function InvoiceDetailModal({
                   {invoice?.invoice_number || '...'}
                 </h2>
                 {invoice && statusConfig && (
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${statusConfig.bgColor} ${statusConfig.color} ${statusConfig.borderColor}`}>
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusConfig.color}`}>
                     <span className="w-1.5 h-1.5 rounded-full bg-current" />
                     {statusConfig.label}
                   </span>
                 )}
+                {isPartialInvoice && (
+                  <span className="text-xs font-semibold text-teal-400">◔ Delfaktura</span>
+                )}
                 {linkedCaseNumber && (
-                  <span
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium font-mono border bg-blue-500/20 text-blue-300 border-blue-500/30"
-                    title="Fakturans kopplade ärende"
-                  >
-                    <ClipboardCheck className="w-3 h-3" />
+                  <span className="text-xs font-medium font-mono text-slate-400" title="Fakturans kopplade ärende">
                     {linkedCaseNumber}
                   </span>
                 )}
@@ -855,7 +896,7 @@ export default function InvoiceDetailModal({
                 <p className="text-xs text-slate-400 mt-1 truncate">
                   {invoice.customer_name}
                   {invoice.organization_number && <> · {invoice.organization_number}</>}
-                  <> · {formatInvoiceAmount(invoice.total_amount)}</>
+                  {caseContext?.status === 'Återbesök' && <> · Ärendestatus: Återbesök</>}
                 </p>
               )}
             </div>
@@ -885,6 +926,16 @@ export default function InvoiceDetailModal({
               nextStepText={INVOICE_STATUS_CONFIG[invoice.status]?.description}
             />
           </div>
+        )}
+
+        {/* Pulsrad — nyckeltal med fast slotordning, read-only */}
+        {invoice && (
+          <InvoicePulseRow
+            invoice={invoice}
+            pulse={pulse}
+            caseBillingItems={caseBillingItems}
+            caseContext={caseContext}
+          />
         )}
 
         {/* Content — split-view desktop, stacked mobile */}
@@ -986,6 +1037,9 @@ export default function InvoiceDetailModal({
                     <WorkPerformedContent caseContext={caseContext} preparations={preparations} />
                   )}
                 </CaseModalSection>
+
+                {/* Fakturakedja — delfakturerade ärenden: vad är fakturerat, vad väntar */}
+                {invoice.case_id && <InvoiceCaseChainSection chain={chain} currentInvoiceId={invoice.id} />}
 
                 {/* Datum — kompakt */}
                 <div className="grid grid-cols-3 gap-3">
@@ -1119,6 +1173,9 @@ export default function InvoiceDetailModal({
                   </div>
                 </div>
 
+                {/* Rader utanför fakturan — pending tjänsterader som inte kom med */}
+                <UnbilledRowsNotice chain={chain} />
+
                 {/* Summering */}
                 <div className="bg-slate-800/50 rounded-lg p-3">
                   {(() => {
@@ -1231,7 +1288,7 @@ export default function InvoiceDetailModal({
                       articleItems={caseBillingItems.filter(i => i.item_type === 'article')}
                       totalRevenue={invoice.subtotal}
                       formatAmount={formatInvoiceAmount}
-                      defaultCollapsed
+                      defaultCollapsed={false}
                       neutralMargin={allAdditionRows}
                     />
                   )
@@ -1267,6 +1324,9 @@ export default function InvoiceDetailModal({
               <div className="hidden lg:flex lg:flex-col lg:h-full lg:min-h-0">
                 {/* Faktureringsuppgifter + avtal + säljare + karta */}
                 <div className="flex-shrink-0 overflow-y-auto border-b border-slate-700 p-3 space-y-3">
+                  {/* Ärendemärkning — kundens obligatoriska fält + strängen som blir Er referens */}
+                  {marking && <InvoiceMarkingSection marking={marking} customerName={invoice.customer_name} />}
+
                   {/* Faktureringsuppgifter — fakturans snapshot, det som skickas till Fortnox */}
                   <CaseModalSection icon={Building2} iconClassName="text-blue-400" title="Faktureringsuppgifter">
                     <div className="space-y-1.5">
@@ -1424,8 +1484,8 @@ export default function InvoiceDetailModal({
                   )}
                 </div>
 
-                {/* Kommunikation — endast för fakturor med case-koppling */}
-                {invoice.case_id && effectiveCaseType && (
+                {/* Kommunikation — case-fakturor via ärendet, årspremiefakturor via avtalsärendet */}
+                {commCaseId && commCaseType && (
                   <div className="flex-1 min-h-0 flex flex-col">
                     <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700 bg-slate-800/30">
                       <MessageSquare className="w-3.5 h-3.5 text-purple-400" />
@@ -1433,8 +1493,8 @@ export default function InvoiceDetailModal({
                     </div>
                     <div className="flex-1 min-h-0 flex flex-col px-3 py-2">
                       <CommentSection
-                        caseId={invoice.case_id}
-                        caseType={effectiveCaseType}
+                        caseId={commCaseId}
+                        caseType={commCaseType}
                         caseTitle={caseContext?.title || invoice.customer_name}
                         compact={true}
                       />
@@ -1458,6 +1518,9 @@ export default function InvoiceDetailModal({
 
                 {contextExpanded && (
                   <div className="px-4 pb-4 space-y-3">
+                    {/* Ärendemärkning — samma panel som desktop */}
+                    {marking && <InvoiceMarkingSection marking={marking} customerName={invoice.customer_name} />}
+
                     {/* Utfört arbete — samma innehåll som desktop-sektionen */}
                     <CaseModalSection icon={ClipboardCheck} iconClassName="text-amber-400" title="Utfört arbete">
                       <WorkPerformedContent caseContext={caseContext} preparations={preparations} />
@@ -1480,12 +1543,12 @@ export default function InvoiceDetailModal({
                       </div>
                     )}
 
-                    {/* Kommunikation — endast för fakturor med case-koppling */}
-                    {invoice.case_id && effectiveCaseType && (
+                    {/* Kommunikation — case-fakturor via ärendet, årspremiefakturor via avtalsärendet */}
+                    {commCaseId && commCaseType && (
                       <div className="min-h-[200px]">
                         <CommentSection
-                          caseId={invoice.case_id}
-                          caseType={effectiveCaseType}
+                          caseId={commCaseId}
+                          caseType={commCaseType}
                           caseTitle={caseContext?.title || invoice.customer_name}
                           compact={true}
                         />
@@ -1534,12 +1597,24 @@ export default function InvoiceDetailModal({
               )}
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {/* Spärrindikator — read-only, knappen förblir klickbar */}
+              {showBlockers && blockers.length > 0 && (
+                <span className={`text-[11px] max-w-[280px] truncate ${severeBlocker ? 'text-red-400' : 'text-amber-400'}`}>
+                  ⚠ {blockers.length} att kontrollera · {blockers[0].label}
+                </span>
+              )}
               {(invoice.status === 'pending_approval' || invoice.status === 'ready') && (
                 <button
                   onClick={handleSendToFortnox}
                   disabled={sendingToFortnox}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07e] text-sm text-[#fff] rounded-lg transition-colors disabled:opacity-50"
+                  className={`flex items-center gap-2 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07e] text-sm text-[#fff] rounded-lg transition-colors disabled:opacity-50 ${
+                    blockers.length > 0
+                      ? severeBlocker
+                        ? 'border border-red-400/60'
+                        : 'border border-amber-400/50'
+                      : ''
+                  }`}
                 >
                   {sendingToFortnox
                     ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
