@@ -19,6 +19,8 @@ interface CaseInvoice {
   fortnox_document_number: string | null
   created_at: string
   paid_at: string | null
+  /** null = månadsbatchad samlingsfaktura utan direkt ärendekoppling */
+  case_id: string | null
 }
 
 interface HistoryEvent {
@@ -106,7 +108,7 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [visitsRes, billingRes, invoicesRes, eventsRes] = await Promise.all([
+      const [visitsRes, billingRes, invoicesRes, eventsRes, cbItemsRes] = await Promise.all([
         supabase
           .from('visits')
           .select('id, visit_date, visit_number, technician_name, work_performed, findings, recommendations, time_spent_minutes, materials_used, pest_level, problem_rating, status')
@@ -119,7 +121,7 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
           .not('visit_number', 'is', null),
         supabase
           .from('invoices')
-          .select('id, invoice_number, invoice_type, status, total_amount, fortnox_document_number, created_at, paid_at')
+          .select('id, invoice_number, invoice_type, status, total_amount, fortnox_document_number, created_at, paid_at, case_id')
           .eq('case_id', caseId)
           .order('created_at', { ascending: false }),
         supabase
@@ -128,6 +130,11 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
           .eq('case_id', caseId)
           .in('update_type', ['revisit_scheduled', 'partial_invoice_created'])
           .order('created_at', { ascending: false }),
+        // Underlag för samlingsfaktura-bakvägen nedan
+        supabase
+          .from('contract_billing_items')
+          .select('id')
+          .eq('case_id', caseId),
       ])
 
       if (visitsRes.error) console.error('[VisitHistoryPanel] visits:', visitsRes.error)
@@ -135,9 +142,32 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
       if (invoicesRes.error) console.error('[VisitHistoryPanel] invoices:', invoicesRes.error)
       if (eventsRes.error) console.error('[VisitHistoryPanel] events:', eventsRes.error)
 
+      // Månadsbatchade samlingsfakturor saknar case_id och missas av queryn
+      // ovan. Bakvägen: contract_billing_items på ärendet → invoice_items
+      // (contract_billing_item_id) → distinkta fakturor.
+      let allInvoices: CaseInvoice[] = (invoicesRes.data as CaseInvoice[] | null) || []
+      const cbIds = ((cbItemsRes.data as { id: string }[] | null) || []).map(r => r.id)
+      if (cbIds.length > 0) {
+        const { data: invItems } = await supabase
+          .from('invoice_items')
+          .select('invoice_id')
+          .in('contract_billing_item_id', cbIds)
+        const known = new Set(allInvoices.map(i => i.id))
+        const extraIds = [...new Set(((invItems as { invoice_id: string }[] | null) || []).map(r => r.invoice_id))]
+          .filter(id => !known.has(id))
+        if (extraIds.length > 0) {
+          const { data: extra } = await supabase
+            .from('invoices')
+            .select('id, invoice_number, invoice_type, status, total_amount, fortnox_document_number, created_at, paid_at, case_id')
+            .in('id', extraIds)
+          allInvoices = [...allInvoices, ...((extra as CaseInvoice[] | null) || [])]
+            .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        }
+      }
+
       if (visitsRes.data) setVisits(visitsRes.data)
       if (billingRes.data) setBillingItems(billingRes.data)
-      if (invoicesRes.data) setInvoices(invoicesRes.data)
+      setInvoices(allInvoices)
       if (eventsRes.data) setEvents(eventsRes.data)
       setLoading(false)
     }
@@ -219,6 +249,7 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
                         <div className="flex items-center justify-between gap-2 mt-0.5 text-xs text-slate-500">
                           <span>
                             {format(new Date(inv.created_at), 'yyyy-MM-dd', { locale: sv })}
+                            {inv.case_id == null && ' · samlingsfaktura'}
                             {isPartial && ' · delfaktura'}
                             {inv.fortnox_document_number && ` · Fortnox ${inv.fortnox_document_number}`}
                             {inv.paid_at && ` · betald ${format(new Date(inv.paid_at), 'yyyy-MM-dd', { locale: sv })}`}

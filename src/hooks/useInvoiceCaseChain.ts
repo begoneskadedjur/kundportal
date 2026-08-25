@@ -15,6 +15,8 @@ export interface ChainInvoice {
   status: InvoiceStatus
   total_amount: number
   created_at: string
+  /** null = månadsbatchad samlingsfaktura utan direkt ärendekoppling */
+  case_id: string | null
 }
 
 export interface CaseChainData {
@@ -66,7 +68,7 @@ export function useInvoiceCaseChain(
         const [invoicesRes, pendingRes, caseRes] = await Promise.all([
           supabase
             .from('invoices')
-            .select('id, invoice_number, invoice_type, status, total_amount, created_at')
+            .select('id, invoice_number, invoice_type, status, total_amount, created_at, case_id')
             .eq('case_id', caseId)
             .order('created_at', { ascending: true }),
           // Contract-fakturor (årspremie) har ingen radkoppling till ärendet — hoppa över
@@ -83,7 +85,39 @@ export function useInvoiceCaseChain(
         ])
         if (cancelled) return
 
-        const invoices = (invoicesRes.data as ChainInvoice[] | null) || []
+        let invoices = (invoicesRes.data as ChainInvoice[] | null) || []
+
+        // Månadsbatchade samlingsfakturor saknar case_id och missas av queryn
+        // ovan. Bakvägen: contract_billing_items på ärendet → invoice_items
+        // (contract_billing_item_id) → distinkta fakturor. Bara relevant för
+        // contract-ärenden — det är de som batchfaktureras.
+        if (effectiveCaseType === 'contract') {
+          const { data: cbItems } = await supabase
+            .from('contract_billing_items')
+            .select('id')
+            .eq('case_id', caseId)
+          const cbIds = ((cbItems as { id: string }[] | null) || []).map(r => r.id)
+          if (cbIds.length > 0) {
+            const { data: invItems } = await supabase
+              .from('invoice_items')
+              .select('invoice_id')
+              .in('contract_billing_item_id', cbIds)
+            const known = new Set(invoices.map(i => i.id))
+            const extraIds = Array.from(
+              new Set(((invItems as { invoice_id: string }[] | null) || []).map(r => r.invoice_id))
+            ).filter(id => !known.has(id))
+            if (extraIds.length > 0) {
+              const { data: extra } = await supabase
+                .from('invoices')
+                .select('id, invoice_number, invoice_type, status, total_amount, created_at, case_id')
+                .in('id', extraIds)
+              invoices = [...invoices, ...((extra as ChainInvoice[] | null) || [])].sort((a, b) =>
+                a.created_at.localeCompare(b.created_at)
+              )
+            }
+          }
+          if (cancelled) return
+        }
 
         // Rader som redan ligger på denna faktura räknas inte som "utanför"
         const linkedIds = new Set(

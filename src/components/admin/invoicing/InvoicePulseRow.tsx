@@ -17,6 +17,7 @@ import {
   localDateKey,
   type InvoicePulse,
   type PayDot,
+  type PriceListCheck,
 } from '../../../hooks/useInvoicePulse'
 
 const formatPercentSv = (v: number): string =>
@@ -53,9 +54,11 @@ interface InvoicePulseRowProps {
   /** Ärendets billing-rader (intern kalkyl) — redan hämtade av modalen */
   caseBillingItems: CaseBillingItem[]
   caseContext: CaseContext | null
+  /** Prisavstämning mot kundens avtalsprislista (adhoc) — null = ej tillämpligt */
+  priceCheck?: PriceListCheck | null
 }
 
-export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, caseContext }: InvoicePulseRowProps) {
+export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, caseContext, priceCheck }: InvoicePulseRowProps) {
   const invoiceType = invoice.invoice_type as string
   const isContract = invoiceType === 'contract'
   const todayKey = localDateKey()
@@ -154,6 +157,23 @@ export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, case
             </>
           )}
         </PulseCell>
+      ) : priceCheck?.mode === 'agreement' ? (
+        /* Priset stämmer mot kundens avtalsprislista — marginalen visas men larmar inte */
+        <PulseCell label="Pris">
+          <div className="text-sm font-bold text-[#20c58f] tabular-nums">Enligt avtal ✓</div>
+          <div className="text-[11px] text-slate-500 tabular-nums truncate">
+            {marginPercent != null
+              ? `marginal ${formatPercentSv(marginPercent)} · avtalat pris`
+              : 'avtalat pris'}
+          </div>
+        </PulseCell>
+      ) : priceCheck?.mode === 'deviation' ? (
+        <PulseCell label="Pris">
+          <div className="text-sm font-bold text-red-400 tabular-nums">
+            Avviker {formatInvoiceAmount(priceCheck.diffTotal)}
+          </div>
+          <div className="text-[11px] text-red-400/80 truncate">mot avtalsprislistan</div>
+        </PulseCell>
       ) : (
         <PulseCell label="Marginal">
           {marginPercent == null ? (
@@ -222,6 +242,12 @@ export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, case
             {pulse.avgPayDiffDays != null && (
               <div className="text-[11px] text-slate-500 tabular-nums truncate mt-0.5">
                 snitt {Math.abs(pulse.avgPayDiffDays)} dgr {pulse.avgPayDiffDays <= 0 ? 'före' : 'efter'} förfall
+              </div>
+            )}
+            {pulse.upsellYearTotal != null && pulse.upsellYearCount != null && (
+              <div className="text-[11px] text-slate-500 tabular-nums truncate mt-0.5">
+                merförsäljning i år: {formatInvoiceAmount(pulse.upsellYearTotal)} (
+                {pulse.upsellYearCount} {pulse.upsellYearCount === 1 ? 'faktura' : 'fakturor'})
               </div>
             )}
           </>

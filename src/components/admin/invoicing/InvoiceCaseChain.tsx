@@ -75,6 +75,7 @@ export default function InvoiceCaseChainSection({ chain, currentInvoiceId }: Inv
             <div className="flex items-baseline gap-2 flex-wrap text-xs">
               <span className="font-mono font-semibold text-white">{inv.invoice_number || 'Faktura'}</span>
               <span className="text-slate-500 tabular-nums">{formatInvoiceDate(inv.created_at)}</span>
+              {inv.case_id == null && <span className="text-slate-400 font-medium">samlingsfaktura</span>}
               {isPartial && <span className="text-teal-400 font-medium">delfaktura</span>}
               {statusConfig && (
                 <span className={`inline-flex items-center gap-1 font-medium ${statusConfig.color}`}>

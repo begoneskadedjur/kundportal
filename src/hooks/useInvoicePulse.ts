@@ -6,9 +6,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { PaymentTermsService, type BillingCategory } from '../services/paymentTermsService'
+import { PriceListService } from '../services/priceListService'
 import { resolveFortnoxCustomerNumber } from '../utils/fortnoxCustomerResolver'
 import type { InvoiceWithItems } from '../types/invoice'
 import { formatInvoiceAmount } from '../types/invoice'
+import type { CaseBillingItem } from '../types/caseBilling'
 
 // Marginaltrösklar för ekonomisignalen: < BAD röd, BAD–WARN amber, > WARN grön
 export const MARGIN_BAD_BELOW = 0
@@ -76,6 +78,10 @@ export interface InvoicePulse {
   fortnoxCustomerNumber: number | null
   /** Resolvern kastade — visa "–" i stället för "saknas" */
   fortnoxLookupFailed: boolean
+  /** Ackumulerad merförsäljning (adhoc, ej makulerade) under innevarande avtalsår
+   *  inkl. denna faktura. null = ej adhoc eller contract_start_date saknas */
+  upsellYearTotal: number | null
+  upsellYearCount: number | null
 }
 
 const EMPTY_PULSE: InvoicePulse = {
@@ -90,6 +96,8 @@ const EMPTY_PULSE: InvoicePulse = {
   avgPayDiffDays: null,
   fortnoxCustomerNumber: null,
   fortnoxLookupFailed: false,
+  upsellYearTotal: null,
+  upsellYearCount: null,
 }
 
 export function useInvoicePulse(invoice: InvoiceWithItems | null): InvoicePulse {
@@ -139,6 +147,43 @@ export function useInvoicePulse(invoice: InvoiceWithItems | null): InvoicePulse 
       return (data as CustomerInvoiceRow[] | null) ?? []
     }
 
+    // Merförsäljning under innevarande avtalsår (adhoc-fakturor). Avtalsåret
+    // ankras i customers.contract_start_date — årsdagen närmast bakåt i tiden.
+    // Saknas datumet returneras null (ingen gissning, raden döljs i UI:t).
+    const fetchUpsellYear = async (): Promise<{ total: number; count: number } | null> => {
+      if (invoice.invoice_type !== 'adhoc' || !invoice.customer_id) return null
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('contract_start_date')
+        .eq('id', invoice.customer_id)
+        .maybeSingle()
+      const startRaw = (cust as { contract_start_date: string | null } | null)?.contract_start_date
+      if (!startRaw) return null
+      const [sy, sm, sd] = startRaw.slice(0, 10).split('-').map(Number)
+      if (!sy || !sm || !sd) return null
+      const today = new Date()
+      // Årsdagen närmast bakåt i tiden
+      let anchor = new Date(today.getFullYear(), sm - 1, sd)
+      if (anchor.getTime() > today.getTime()) anchor = new Date(today.getFullYear() - 1, sm - 1, sd)
+      // Avtalsstart i framtiden → inget innevarande avtalsår att summera
+      if (anchor.getTime() < new Date(sy, sm - 1, sd).getTime()) return null
+      const nextAnchor = new Date(anchor.getFullYear() + 1, anchor.getMonth(), anchor.getDate())
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('id, total_amount')
+        .eq('invoice_type', 'adhoc')
+        .eq('customer_id', invoice.customer_id)
+        .neq('status', 'cancelled')
+        .gte('created_at', localDateKey(anchor))
+        .lt('created_at', localDateKey(nextAnchor))
+      if (error || !data) return null
+      const rows = data as { id: string; total_amount: number | null }[]
+      return {
+        total: rows.reduce((s, r) => s + Number(r.total_amount || 0), 0),
+        count: rows.length,
+      }
+    }
+
     // Read-only-uppslag av Fortnox-kundnummer; fel får aldrig krascha modalen
     const fetchFortnoxNumber = async (): Promise<{ value: number | null; failed: boolean }> => {
       if (!invoice.customer_id) return { value: null, failed: false }
@@ -152,11 +197,12 @@ export function useInvoicePulse(invoice: InvoiceWithItems | null): InvoicePulse 
 
     const load = async () => {
       setPulse({ ...EMPTY_PULSE, loading: true })
-      const [termsDays, annualValue, customerRows, fortnox] = await Promise.all([
+      const [termsDays, annualValue, customerRows, fortnox, upsellYear] = await Promise.all([
         PaymentTermsService.getDays(billingCategory(invoice)).catch(() => null),
         fetchAnnualValue().catch(() => null),
         fetchCustomerInvoices().catch(() => null),
         fetchFortnoxNumber(),
+        fetchUpsellYear().catch(() => null),
       ])
       if (cancelled) return
 
@@ -220,6 +266,8 @@ export function useInvoicePulse(invoice: InvoiceWithItems | null): InvoicePulse 
         avgPayDiffDays,
         fortnoxCustomerNumber: fortnox.value,
         fortnoxLookupFailed: fortnox.failed,
+        upsellYearTotal: upsellYear?.total ?? null,
+        upsellYearCount: upsellYear?.count ?? null,
       })
     }
 
@@ -231,4 +279,119 @@ export function useInvoicePulse(invoice: InvoiceWithItems | null): InvoicePulse 
   }, [invoice?.id, invoice?.status, invoice?.due_date])
 
   return pulse
+}
+
+// ============================================================================
+// Prisavstämning mot kundens avtalsprislista (adhoc-fakturor)
+//
+// Negativ marginal på ett avtalat fast pris ska inte larma rött. Fakturans
+// tjänsterader (case_billing_items, item_type 'service') jämförs mot kundens
+// fasta tjänstepriser (avtalets prislista → kundens prislista, samma
+// fallback-kedja som ärendeflödet via PriceListService.getServicePricesForCase).
+// Prisguiden är ett FÖRSLAG, inte avtalat pris — den ingår inte i checken.
+// ============================================================================
+
+// Tolerans per rad: fakturerat radbelopp får avvika så här mycket från avtalat
+const PRICE_LIST_TOLERANCE_KR = 1
+
+export interface PriceCheckRow {
+  id: string
+  name: string
+  /** Radens fakturerade totalbelopp (exkl. moms) */
+  invoiceTotal: number
+  /** Avtalat pris × antal */
+  listTotal: number
+  diff: number
+}
+
+export interface PriceListCheck {
+  loading: boolean
+  /** 'agreement' = ALLA tjänsterader har prislistepris och matchar (±1 kr/rad).
+   *  'deviation' = minst en rad med prislistepris avviker.
+   *  'none' = ingen rad har prislistepris / kund saknar prislista → dagens beteende. */
+  mode: 'agreement' | 'deviation' | 'none'
+  /** Summa |raddiff| för avvikande rader */
+  diffTotal: number
+  /** Vid avvikelse: de avvikande raderna. Vid enligt avtal: alla matchade rader. */
+  rows: PriceCheckRow[]
+}
+
+const EMPTY_PRICE_CHECK: PriceListCheck = { loading: false, mode: 'none', diffTotal: 0, rows: [] }
+
+export function usePriceListCheck(
+  invoice: InvoiceWithItems | null,
+  caseBillingItems: CaseBillingItem[]
+): PriceListCheck {
+  const [check, setCheck] = useState<PriceListCheck>(EMPTY_PRICE_CHECK)
+
+  const serviceRows =
+    invoice?.invoice_type === 'adhoc'
+      ? caseBillingItems.filter(i => i.item_type === 'service')
+      : []
+  // Stabil nyckel så effekten bara körs om när tjänsteraderna faktiskt ändras
+  const rowsKey = serviceRows
+    .map(r => `${r.id}:${r.service_id}:${r.total_price}:${r.quantity}`)
+    .join('|')
+
+  useEffect(() => {
+    if (!invoice || invoice.invoice_type !== 'adhoc' || !invoice.customer_id || serviceRows.length === 0) {
+      setCheck(EMPTY_PRICE_CHECK)
+      return
+    }
+    let cancelled = false
+    const customerId = invoice.customer_id
+
+    const load = async () => {
+      setCheck({ ...EMPTY_PRICE_CHECK, loading: true })
+      let prices: Record<string, number>
+      try {
+        prices = await PriceListService.getServicePricesForCase(customerId)
+      } catch {
+        if (!cancelled) setCheck(EMPTY_PRICE_CHECK)
+        return
+      }
+      if (cancelled) return
+
+      const withList = serviceRows.filter(r => r.service_id && prices[r.service_id] != null)
+      if (withList.length === 0) {
+        setCheck(EMPTY_PRICE_CHECK)
+        return
+      }
+
+      const rows: PriceCheckRow[] = withList.map(r => {
+        const listTotal = prices[r.service_id as string] * (Number(r.quantity) || 1)
+        const invoiceTotal = Number(r.total_price || 0)
+        return {
+          id: r.id,
+          name: r.service_name || r.article_name,
+          invoiceTotal,
+          listTotal,
+          diff: invoiceTotal - listTotal,
+        }
+      })
+      const deviating = rows.filter(r => Math.abs(r.diff) > PRICE_LIST_TOLERANCE_KR)
+
+      if (deviating.length > 0) {
+        setCheck({
+          loading: false,
+          mode: 'deviation',
+          diffTotal: deviating.reduce((s, r) => s + Math.abs(r.diff), 0),
+          rows: deviating,
+        })
+      } else if (withList.length === serviceRows.length) {
+        // Alla tjänsterader har avtalat pris och matchar
+        setCheck({ loading: false, mode: 'agreement', diffTotal: 0, rows })
+      } else {
+        // Delvis täckning utan avvikelse → inget läge, dagens beteende
+        setCheck(EMPTY_PRICE_CHECK)
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoice?.id, invoice?.invoice_type, invoice?.customer_id, rowsKey])
+
+  return check
 }

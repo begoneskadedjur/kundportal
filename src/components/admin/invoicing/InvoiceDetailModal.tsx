@@ -55,7 +55,8 @@ import InvoiceStatusStepper from '../../shared/InvoiceStatusStepper'
 import InvoicePulseRow from './InvoicePulseRow'
 import InvoiceMarkingSection from './InvoiceMarkingSection'
 import InvoiceCaseChainSection, { UnbilledRowsNotice } from './InvoiceCaseChain'
-import { useInvoicePulse } from '../../../hooks/useInvoicePulse'
+import InvoiceVisitTimeline from './InvoiceVisitTimeline'
+import { useInvoicePulse, usePriceListCheck } from '../../../hooks/useInvoicePulse'
 import { useInvoiceMarking } from '../../../hooks/useInvoiceMarking'
 import { useInvoiceCaseChain } from '../../../hooks/useInvoiceCaseChain'
 import CommentSection from '../../communication/CommentSection'
@@ -805,6 +806,9 @@ export default function InvoiceDetailModal({
   const pulse = useInvoicePulse(isOpen ? invoice : null)
   const marking = useInvoiceMarking(isOpen ? invoice : null, effectiveCaseType)
   const chain = useInvoiceCaseChain(isOpen ? invoice : null, effectiveCaseType)
+  // Prisavstämning mot kundens avtalsprislista (adhoc) — negativ marginal på
+  // avtalat fast pris ska inte larma rött
+  const priceCheck = usePriceListCheck(isOpen ? invoice : null, caseBillingItems)
 
   if (!isOpen) return null
 
@@ -852,6 +856,11 @@ export default function InvoiceDetailModal({
     }
     if (pulse.termsDeviation) blockers.push({ label: 'förfallodatum avviker från betalvillkor' })
     if (pulse.premiumMismatch) blockers.push({ label: 'premien avviker från avtalet' })
+    // Enligt avtal-läget är INTE ett hinder — negativ marginal på avtalat
+    // fast pris är avtalad. Bara faktisk avvikelse mot prislistan flaggas.
+    if (priceCheck.mode === 'deviation') {
+      blockers.push({ label: 'pris avviker från avtalsprislistan' })
+    }
   }
   const severeBlocker = blockers.some(b => b.severe)
 
@@ -935,6 +944,7 @@ export default function InvoiceDetailModal({
             pulse={pulse}
             caseBillingItems={caseBillingItems}
             caseContext={caseContext}
+            priceCheck={priceCheck}
           />
         )}
 
@@ -1293,6 +1303,57 @@ export default function InvoiceDetailModal({
                     />
                   )
                 })()}
+
+                {/* Prisavstämning mot kundens avtalsprislista (adhoc):
+                    grön förklaring när negativ marginal är ett avtalat fast pris,
+                    röd per-rad-differens när priset avviker */}
+                {priceCheck.mode === 'agreement' && (() => {
+                  const articleCost = caseBillingItems
+                    .filter(i => i.item_type === 'article')
+                    .reduce((s, i) => s + Number(i.total_price || 0), 0)
+                  const negativeMargin = Number(invoice.subtotal || 0) > 0 && articleCost > Number(invoice.subtotal || 0)
+                  if (!negativeMargin) return null
+                  return (
+                    <div className="p-3 bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-xl">
+                      <p className="text-sm font-medium text-[#20c58f]">Pris enligt kundens avtalsprislista ✓</p>
+                      <p className="text-xs text-slate-300 mt-1">
+                        Avtalat fast pris — den negativa marginalen är avtalad, inte ett inmatningsfel.
+                      </p>
+                    </div>
+                  )
+                })()}
+                {priceCheck.mode === 'deviation' && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+                    <p className="text-sm font-medium text-red-400">
+                      Priset avviker {formatInvoiceAmount(priceCheck.diffTotal)} från kundens avtalsprislista
+                    </p>
+                    <div className="mt-1.5 space-y-1">
+                      {priceCheck.rows.map(r => (
+                        <div key={r.id} className="flex items-baseline justify-between gap-3 text-xs">
+                          <span className="text-slate-300 truncate">{r.name}</span>
+                          <span className="text-slate-400 tabular-nums whitespace-nowrap">
+                            {formatInvoiceAmount(r.invoiceTotal)} mot avtalat {formatInvoiceAmount(r.listTotal)} ·{' '}
+                            <span className="text-red-400">
+                              {r.diff > 0 ? '+' : '−'}{formatInvoiceAmount(Math.abs(r.diff))}
+                            </span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Besök under avtalsåret — vad kunden fått för premien */}
+                {invoice.invoice_type === 'contract' &&
+                  invoice.customer_id &&
+                  invoice.billing_period_start &&
+                  invoice.billing_period_end && (
+                    <InvoiceVisitTimeline
+                      customerId={invoice.customer_id}
+                      periodStart={invoice.billing_period_start}
+                      periodEnd={invoice.billing_period_end}
+                    />
+                  )}
 
                 {/* Märkning faktura */}
                 {invoice.invoice_marking && (
