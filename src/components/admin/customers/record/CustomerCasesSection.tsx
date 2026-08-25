@@ -26,6 +26,7 @@ import { expectedVisitsToDate, sessionLateness, LATENESS_STYLE, daysSince, type 
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
 import { RecurringGlyph, MissedGlyph } from './CaseCategoryGlyph'
 import RoomAnalysisSection, { flowCategory } from './RoomAnalysisSection'
+import ClassicCasesSection from './ClassicCasesSection'
 
 interface Props {
   root: RecordCustomer
@@ -97,9 +98,18 @@ function lightColor(level: number | null | undefined): string | null {
   return level >= 3 ? LIGHTS.kritisk : level === 2 ? LIGHTS.varning : LIGHTS.ok
 }
 
-// invoices tas emot för props-kompatibilitet men används inte längre här —
-// merförsäljningssummorna bor i Intäkter-fliken sedan omdesignen.
-export default function CustomerCasesSection({
+// VÄXELN: kunder med Rum nr aktiverat får den nya rumsdesignen nedan —
+// alla andra får den klassiska grupperade vyn (stationsräkning,
+// merförsäljningssummor). Nya designen är RUMSKUNDERNAS vy, inte en global.
+export default function CustomerCasesSection(props: Props) {
+  const roomsView =
+    !!(props.root as { room_number_enabled?: boolean }).room_number_enabled ||
+    props.cases.some((c) => c.room_number)
+  if (!roomsView) return <ClassicCasesSection {...props} />
+  return <RoomCasesView {...props} />
+}
+
+function RoomCasesView({
   root, units, cases, inspections, schedules, contracts, onOpenCase,
 }: Props) {
   const [query, setQuery] = useState('')
@@ -303,7 +313,9 @@ export default function CustomerCasesSection({
                 <span className="min-w-0">
                   <span className="block truncate text-[13.5px] font-semibold text-slate-200">
                     {r.case.title}
-                    {r.case.case_number && <span className="ml-1.5 text-[11px] font-normal text-slate-500">{r.case.case_number}</span>}
+                    {r.case.case_number && r.case.case_number !== r.case.title && (
+                      <span className="ml-1.5 text-[11px] font-normal text-slate-500">{r.case.case_number}</span>
+                    )}
                   </span>
                   <span className="block truncate text-[11.5px] text-slate-500">
                     {r.case.room_number && <b className="font-semibold text-slate-400 tabular-nums">Rum {r.case.room_number}</b>}
