@@ -10,9 +10,11 @@ import { AlertTriangle, Link2 } from 'lucide-react'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate } from '../../../types/invoice'
 import type { CaseChainData } from '../../../hooks/useInvoiceCaseChain'
 
-/** Amber-varning under fakturarad-tabellen: pending-rader som inte kom med */
+/** Amber-varning under fakturarad-tabellen: pending-rader som inte kom med.
+ *  Varnar BARA när raderna har belopp — tomma 0 kr-rader är normalfallet för
+ *  ett bokat återbesök (teknikern fyller i tjänsten vid utförandet), inget läckage. */
 export function UnbilledRowsNotice({ chain }: { chain: CaseChainData }) {
-  if (chain.loading || chain.pendingCount === 0) return null
+  if (chain.loading || chain.pendingCount === 0 || chain.pendingAmount <= 0) return null
   const plural = chain.pendingCount !== 1
   return (
     <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400">
@@ -50,9 +52,18 @@ function ChainRow({ orb, isLast, children }: { orb: OrbKind; isLast: boolean; ch
 interface InvoiceCaseChainSectionProps {
   chain: CaseChainData
   currentInvoiceId: string
+  /** Ärendet har ett bokat framtida besök (status Återbesök eller framtida starttid) */
+  upcomingVisitBooked?: boolean
+  /** Det bokade besökets datum (timestamp från ärendet) — null om okänt */
+  upcomingVisitDate?: string | null
 }
 
-export default function InvoiceCaseChainSection({ chain, currentInvoiceId }: InvoiceCaseChainSectionProps) {
+export default function InvoiceCaseChainSection({
+  chain,
+  currentInvoiceId,
+  upcomingVisitBooked = false,
+  upcomingVisitDate = null
+}: InvoiceCaseChainSectionProps) {
   if (!chain.show) return null
 
   const rows: { orb: OrbKind; node: ReactNode; key: string }[] = chain.invoices.map(inv => {
@@ -96,14 +107,27 @@ export default function InvoiceCaseChainSection({ chain, currentInvoiceId }: Inv
 
   if (chain.pendingCount > 0) {
     const plural = chain.pendingCount !== 1
+    // Tomma rader + bokat återbesök = nästa besöks tjänst som teknikern fyller i
+    // vid utförandet. Ingen skuld att flagga — visa vad som väntar på utförande
+    // istället för ett missvisande "0 kr".
+    const emptyRevisitRows = chain.pendingAmount <= 0 && upcomingVisitBooked
     rows.push({
       key: 'pending',
       orb: 'waiting',
-      node: (
+      node: emptyRevisitRows ? (
+        <div className="flex items-baseline justify-between gap-3 text-xs">
+          <span className="text-slate-300">
+            Återbesök{upcomingVisitDate ? ` ${formatInvoiceDate(upcomingVisitDate)}` : ' bokat'}
+            {chain.pendingNames.length > 0 && <> · {chain.pendingNames.join(' + ')}</>}
+            <span className="text-slate-500"> — inga rader att fakturera ännu</span>
+          </span>
+          <span className="text-slate-500 tabular-nums whitespace-nowrap">–</span>
+        </div>
+      ) : (
         <div className="flex items-baseline justify-between gap-3 text-xs">
           <span className="text-slate-300">
             {chain.pendingCount} ofakturerad{plural ? 'e' : ''} tjänsterad{plural ? 'er' : ''} på ärendet
-            <span className="text-slate-500"> · väntar</span>
+            <span className="text-slate-500"> · kvar att fakturera</span>
           </span>
           <span className="font-semibold text-slate-300 tabular-nums whitespace-nowrap">
             {formatInvoiceAmount(chain.pendingAmount)}

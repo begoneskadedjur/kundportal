@@ -25,6 +25,8 @@ export interface CaseChainData {
   /** Tjänsterader (status pending) på ärendet som inte ligger på denna faktura */
   pendingCount: number
   pendingAmount: number
+  /** Tjänstenamn på de väntande raderna — för kedjans väntar-rad när raderna är tomma */
+  pendingNames: string[]
   /** Ärendet är avslutat — ingen slutfaktura-rad ska utlovas */
   caseClosed: boolean
   /** Kedjesektionen ska visas (delfaktura, flera fakturor eller väntande rader) */
@@ -36,6 +38,7 @@ const EMPTY_CHAIN: CaseChainData = {
   invoices: [],
   pendingCount: 0,
   pendingAmount: 0,
+  pendingNames: [],
   caseClosed: false,
   show: false,
 }
@@ -76,7 +79,7 @@ export function useInvoiceCaseChain(
             ? Promise.resolve({ data: null })
             : supabase
                 .from('case_billing_items')
-                .select('id, total_price')
+                .select('id, total_price, service_name, article_name')
                 .eq('case_id', caseId)
                 .eq('case_type', effectiveCaseType)
                 .eq('item_type', 'service')
@@ -123,10 +126,18 @@ export function useInvoiceCaseChain(
         const linkedIds = new Set(
           (invoice.items || []).map(i => i.case_billing_item_id).filter(Boolean) as string[]
         )
-        const pendingRows = ((pendingRes.data as { id: string; total_price: number }[] | null) || []).filter(
-          r => !linkedIds.has(r.id)
-        )
+        const pendingRows = (
+          (pendingRes.data as {
+            id: string
+            total_price: number
+            service_name: string | null
+            article_name: string | null
+          }[] | null) || []
+        ).filter(r => !linkedIds.has(r.id))
         const pendingAmount = pendingRows.reduce((s, r) => s + Number(r.total_price || 0), 0)
+        const pendingNames = Array.from(
+          new Set(pendingRows.map(r => r.service_name || r.article_name).filter(Boolean) as string[])
+        )
 
         const caseRow = caseRes.data as { status: string | null; completed_date: string | null } | null
         const caseClosed = !!caseRow && (caseRow.status === 'Avslutat' || caseRow.completed_date != null)
@@ -139,6 +150,7 @@ export function useInvoiceCaseChain(
           invoices,
           pendingCount: pendingRows.length,
           pendingAmount,
+          pendingNames,
           caseClosed,
           show,
         })

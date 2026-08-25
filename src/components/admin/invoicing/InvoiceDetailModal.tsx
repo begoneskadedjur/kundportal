@@ -840,6 +840,15 @@ export default function InvoiceDetailModal({
   const isPrivate = invoice?.case_type === 'private'
   const isPartialInvoice = (invoice?.invoice_type as string | undefined) === 'partial'
 
+  // Bokat framtida besök på ärendet: status Återbesök (starttiden är då nästa
+  // besök, samma tolkning som pulsraden) eller en starttid som ligger framåt.
+  // Styr fakturakedjans väntar-rad när nästa besöks tjänsterader ännu är tomma.
+  const upcomingVisitBooked = !!caseContext && (
+    caseContext.status === 'Återbesök' ||
+    (!!caseContext.startDate && new Date(caseContext.startDate).getTime() > Date.now())
+  )
+  const upcomingVisitDate = upcomingVisitBooked ? (caseContext?.startDate ?? null) : null
+
   // Spärrindikator vid primärknappen: hinder i fast ordning. Read-only —
   // knappen förblir klickbar och klick-logiken är oförändrad.
   const showBlockers = !!invoice && ['pending_approval', 'ready'].includes(invoice.status)
@@ -882,21 +891,25 @@ export default function InvoiceDetailModal({
           <div className="flex items-center gap-3 min-w-0">
             <FileText className="w-5 h-5 text-blue-400 flex-shrink-0" />
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base font-semibold font-mono text-white">
+              {/* Baseline-linjerad titelrad som radbryter per tagg: varje span är
+                  obrytbar (whitespace-nowrap) så långa statusar som "Kräver
+                  godkännande" flyttas hela till nästa rad istället för att
+                  bryta sin egen text under statuspunkten */}
+              <div className="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap">
+                <h2 className="text-base font-semibold font-mono text-white whitespace-nowrap">
                   {invoice?.invoice_number || '...'}
                 </h2>
                 {invoice && statusConfig && (
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${statusConfig.color}`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap ${statusConfig.color}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
                     {statusConfig.label}
                   </span>
                 )}
                 {isPartialInvoice && (
-                  <span className="text-xs font-semibold text-teal-400">◔ Delfaktura</span>
+                  <span className="text-xs font-semibold text-teal-400 whitespace-nowrap">◔ Delfaktura</span>
                 )}
                 {linkedCaseNumber && (
-                  <span className="text-xs font-medium font-mono text-slate-400" title="Fakturans kopplade ärende">
+                  <span className="text-xs font-medium font-mono text-slate-400 whitespace-nowrap" title="Fakturans kopplade ärende">
                     {linkedCaseNumber}
                   </span>
                 )}
@@ -1002,9 +1015,11 @@ export default function InvoiceDetailModal({
                   </div>
                 )}
 
-                {/* Kräver godkännande - rabatt-text bara när det finns faktisk rabatt */}
-                {invoice.requires_approval && invoice.status === 'pending_approval' && (
-                  realDiscountRows.length > 0 ? (
+                {/* Rabattgodkännande — rutan visas BARA när det finns faktiska rabattrader
+                    (den bär rabatt + motivering, unik info). Fallet utan rabattrader
+                    behöver ingen egen ruta: headerstatus + footerknappen täcker det. */}
+                {invoice.requires_approval && invoice.status === 'pending_approval' &&
+                  realDiscountRows.length > 0 && (
                     <div className="flex items-start gap-3 p-3 bg-orange-500/20 border border-orange-500/30 rounded-lg">
                       <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
                       <div className="space-y-1.5 min-w-0">
@@ -1023,18 +1038,6 @@ export default function InvoiceDetailModal({
                         <p className="text-xs text-orange-300/80">Godkänns av rabattansvarig under Godkännanden.</p>
                       </div>
                     </div>
-                  ) : (
-                    <div className="flex items-start gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-lg">
-                      <AlertCircle className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <div className="text-sm font-medium text-slate-300">Kräver godkännande</div>
-                        <p className="text-xs text-slate-400 mt-0.5">
-                          Fakturan måste godkännas innan den kan skickas.
-                          {contractAdditions.length > 0 && ' Det låga radpriset är pro rata för ett avtalstillägg - ingen rabatt har lämnats.'}
-                        </p>
-                      </div>
-                    </div>
-                  )
                 )}
 
                 {/* Utfört arbete — ärendekontext från teknikern */}
@@ -1049,7 +1052,14 @@ export default function InvoiceDetailModal({
                 </CaseModalSection>
 
                 {/* Fakturakedja — delfakturerade ärenden: vad är fakturerat, vad väntar */}
-                {invoice.case_id && <InvoiceCaseChainSection chain={chain} currentInvoiceId={invoice.id} />}
+                {invoice.case_id && (
+                  <InvoiceCaseChainSection
+                    chain={chain}
+                    currentInvoiceId={invoice.id}
+                    upcomingVisitBooked={upcomingVisitBooked}
+                    upcomingVisitDate={upcomingVisitDate}
+                  />
+                )}
 
                 {/* Datum — kompakt */}
                 <div className="grid grid-cols-3 gap-3">
@@ -1680,7 +1690,13 @@ export default function InvoiceDetailModal({
                   {sendingToFortnox
                     ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                     : <FileEdit className="w-3.5 h-3.5" />}
-                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast i Fortnox'}
+                  {/* Vid pending_approval ÄR klicket godkännandebeslutet — etiketten
+                      säger det rakt ut. Logiken är oförändrad (samma handleSendToFortnox). */}
+                  {sendingToFortnox
+                    ? 'Skapar utkast...'
+                    : invoice.status === 'pending_approval'
+                      ? 'Godkänn & skicka till Fortnox'
+                      : 'Skapa utkast i Fortnox'}
                 </button>
               )}
               {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
