@@ -241,7 +241,9 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           pest_level: caseData.pest_level ?? null,
           problem_rating: caseData.problem_rating ?? null,
           visit_number: visitNumber,
-          status: caseData.status ?? null,
+          // visits_status_check tillåter bara scheduled/completed/cancelled/no_show —
+          // ett snapshot vid ombokning är per definition ett genomfört besök
+          status: 'completed',
         })
         if (visitError) {
           // Snapshotet ÄR historiken — ett tyst fel här betyder förlorad rapport/trafikljusdata
@@ -286,6 +288,10 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
             updated_by_name: authorName,
             user_role: 'koordinator',
             user_name: authorName,
+            // field_changes är NOT NULL i case_updates_log
+            field_changes: {
+              partial_invoice: { old: null, new: `${pendingBillingItems.length} rader` },
+            },
             previous_value: null,
             new_value: JSON.stringify({
               items: pendingBillingItems.length,
