@@ -144,6 +144,20 @@ export default function EgenkontrollCaseModal({
   const [showActionDialog, setShowActionDialog] = useState(false)
   const [annotations, setAnnotations] = useState<RonderingAnnotation[]>([])
 
+  // Nollställ alla overlay/dialog-states när modalen stängs. Modalen förblir
+  // monterad i föräldern (styrs via isOpen-prop) så kvarglömda flaggor skulle
+  // annars auto-öppna overlays när nästa ärende öppnas.
+  useEffect(() => {
+    if (!isOpen) {
+      setShowDeleteDialog(false)
+      setShowCommunicationPanel(false)
+      setShowVisitHistoryPanel(false)
+      setShowActionDialog(false)
+      setShowStationPicker(false)
+      setLightbox(null)
+    }
+  }, [isOpen])
+
   // Memoizad för att undvika att RonderingMapSection re-renderar markörer vid varje knapptryckning
   const stationLogsForMap = useMemo(() => Array.from(latestLogs.values()), [latestLogs])
 

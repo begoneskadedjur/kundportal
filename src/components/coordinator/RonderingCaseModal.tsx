@@ -390,6 +390,25 @@ export default function RonderingCaseModal({
   const [followUpLoading, setFollowUpLoading] = useState(false)
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
 
+  // Nollställ alla overlay/dialog-states när modalen stängs. Modalen förblir
+  // monterad i föräldern (styrs via isOpen-prop) så kvarglömda flaggor skulle
+  // annars auto-öppna overlays när nästa ärende öppnas.
+  useEffect(() => {
+    if (!isOpen) {
+      setOpenStatusMenu(null)
+      setNoteModal(null)
+      setBaitDialog(null)
+      setShowDeleteDialog(false)
+      setShowCommunicationPanel(false)
+      setShowVisitHistoryPanel(false)
+      setShowActionDialog(false)
+      setShowAddSubVisit(false)
+      setNestedSubVisit(null)
+      setShowFollowUpDialog(false)
+      setShowDuplicateDialog(false)
+    }
+  }, [isOpen])
+
   // Provision (samma mönster som EditContractCaseModal)
   const [commissionEligible, setCommissionEligible] = useState(false)
   const [billingSummary, setBillingSummary] = useState<CaseBillingSummary | null>(null)

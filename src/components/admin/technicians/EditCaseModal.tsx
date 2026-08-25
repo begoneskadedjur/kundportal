@@ -473,6 +473,21 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // Radering state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
+  // Nollställ alla overlay/dialog-states när modalen stängs. Modalen förblir
+  // monterad i föräldern (styrs via isOpen-prop) så kvarglömda flaggor skulle
+  // annars auto-öppna overlays när nästa ärende öppnas.
+  useEffect(() => {
+    if (!isOpen) {
+      setShowFollowUpDialog(false)
+      setShowActionDialog(false)
+      setShowRevisitModal(false)
+      setShowDuplicateDialog(false)
+      setShowCommunicationPanel(false)
+      setShowHistoryPanel(false)
+      setShowDeleteDialog(false)
+    }
+  }, [isOpen])
+
   // Provision state
   const [commissionEligible, setCommissionEligible] = useState(false)
   const [billingSummary, setBillingSummary] = useState<CaseBillingSummary | null>(null)

@@ -262,6 +262,23 @@ export default function EditContractCaseModal({
   // Besökshistorik-panel state
   const [showVisitHistoryPanel, setShowVisitHistoryPanel] = useState(false)
 
+  // Nollställ alla overlay/dialog-states när modalen stängs. Modalen förblir
+  // monterad i föräldern (styrs via isOpen-prop) så kvarglömda flaggor skulle
+  // annars auto-öppna overlays när nästa ärende öppnas.
+  useEffect(() => {
+    if (!isOpen) {
+      setShowActionDialog(false)
+      setShowRevisitModal(false)
+      setShowDuplicateDialog(false)
+      setShowFollowUpDialog(false)
+      setShowDeleteDialog(false)
+      setShowCommunicationPanel(false)
+      setShowVisitHistoryPanel(false)
+      setShowQuoteDropdown(false)
+      setShowReportDropdown(false)
+    }
+  }, [isOpen])
+
   // Fliknavigering — ren UI-state. Alla flikpaneler förblir monterade vid
   // flikbyte (göms med display:none) så att timer, pågående uppladdningar
   // och barnkomponenternas state bevaras.
