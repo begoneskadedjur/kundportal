@@ -71,15 +71,11 @@ function CatGlyph({ cat, size = 42 }: { cat: FlowCat; size?: number }) {
       )}
       {cat === 'extra' && (
         <>
-          {/* Ånglansen: 185-gradig vattenånga mot vägglössen */}
-          <path d="M8 37l5-5" stroke={c} strokeWidth="2.8" strokeLinecap="round" />
-          <path d="M12 33L23 22" stroke={c} strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M19 18l7 7" stroke={c} strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M27 19c4 0 4-4 8-4" stroke={c} strokeWidth="1.4" strokeLinecap="round" fill="none" />
-          <path d="M24 14c4 0 4-4 8-4" stroke={c} strokeWidth="1.4" strokeLinecap="round" fill="none" />
-          <path d="M30 24c4 0 4-4 8-4" stroke={c} strokeWidth="1.4" strokeLinecap="round" fill="none" />
-          <circle cx="38" cy="8" r="1.2" fill={c} />
-          <circle cx="41" cy="14" r="1.2" fill={c} />
+          {/* Avtalsdokument med plus utanfor kanten: arbete utover avtalet */}
+          <path d="M9 10a3 3 0 0 1 3-3h11l6 6v21a3 3 0 0 1-3 3H12a3 3 0 0 1-3-3z" stroke={c} strokeWidth="1.6" strokeLinejoin="round" />
+          <path d="M23 7v6h6" stroke={c} strokeWidth="1.4" strokeLinejoin="round" />
+          <path d="M13 19h12M13 24h12M13 29h7" stroke={c} strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M35 25.5v13M28.5 32H41.5" stroke={c} strokeWidth="2" strokeLinecap="round" />
         </>
       )}
       {cat === 'etabl' && (
