@@ -26,7 +26,7 @@ import { expectedVisitsToDate, sessionLateness, LATENESS_STYLE, daysSince, type 
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
 import { RecurringGlyph, MissedGlyph } from './CaseCategoryGlyph'
 import RoomAnalysisSection, { flowCategory } from './RoomAnalysisSection'
-import ClassicCasesSection from './ClassicCasesSection'
+import ContractCasesSection from './ContractCasesSection'
 
 interface Props {
   root: RecordCustomer
@@ -94,14 +94,14 @@ function lightColor(level: number | null | undefined): string | null {
   return level >= 3 ? LIGHTS.kritisk : level === 2 ? LIGHTS.varning : LIGHTS.ok
 }
 
-// VÄXELN: kunder med Rum nr aktiverat får den nya rumsdesignen nedan —
-// alla andra får den klassiska grupperade vyn (stationsräkning,
-// merförsäljningssummor). Nya designen är RUMSKUNDERNAS vy, inte en global.
+// VÄXELN: kunder med Rum nr aktiverat får rumsdesignen nedan — alla andra
+// får vaktrond-vyn (ContractCasesSection: ronden mot avtalet, stationstäckning,
+// extraärendeflöde, tempo). Två olika vyer för två olika kundbehov.
 export default function CustomerCasesSection(props: Props) {
   const roomsView =
     !!(props.root as { room_number_enabled?: boolean }).room_number_enabled ||
     props.cases.some((c) => c.room_number)
-  if (!roomsView) return <ClassicCasesSection {...props} />
+  if (!roomsView) return <ContractCasesSection {...props} />
   return <RoomCasesView {...props} />
 }
 
