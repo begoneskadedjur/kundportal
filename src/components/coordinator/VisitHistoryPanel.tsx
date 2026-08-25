@@ -9,6 +9,7 @@ import { format } from 'date-fns'
 import sv from 'date-fns/locale/sv'
 import { INVOICE_STATUS_CONFIG } from '../../types/invoice'
 import type { InvoiceStatus } from '../../types/invoice'
+import CaseContextImagePreview from '../communication/CaseContextImagePreview'
 
 interface CaseInvoice {
   id: string
@@ -54,6 +55,7 @@ interface BillingItem {
   unit_price: number
   total_price: number
   visit_number: number | null
+  status: string | null
 }
 
 interface VisitHistoryPanelProps {
@@ -62,12 +64,13 @@ interface VisitHistoryPanelProps {
   onClose: () => void
 }
 
+// Färgad text med punkt (inga piller) — samma färgskala som tidigare
 const pestLevelColors: Record<number, string> = {
-  0: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-  1: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  2: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-  3: 'bg-red-500/20 text-red-400 border-red-500/30',
-  4: 'bg-red-700/20 text-red-300 border-red-700/30',
+  0: 'text-emerald-400',
+  1: 'text-yellow-400',
+  2: 'text-orange-400',
+  3: 'text-red-400',
+  4: 'text-red-300',
 }
 
 const pestLevelLabels: Record<number, string> = {
@@ -76,6 +79,24 @@ const pestLevelLabels: Record<number, string> = {
   2: 'Medel',
   3: 'Hög',
   4: 'Kritisk',
+}
+
+// Problembild 1-5 — samma värdemängd och toner som EditContractCaseModal
+// (1-2 grönt, 3 amber, 4-5 rött)
+const problemRatingColors: Record<number, string> = {
+  1: 'text-emerald-400',
+  2: 'text-emerald-400',
+  3: 'text-amber-400',
+  4: 'text-red-400',
+  5: 'text-red-300',
+}
+
+const problemRatingLabels: Record<number, string> = {
+  1: 'Utmärkt',
+  2: 'Bra',
+  3: 'OK',
+  4: 'Allvarligt',
+  5: 'Kritiskt',
 }
 
 function formatMinutes(minutes: number | null): string {
@@ -114,11 +135,12 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
           .select('id, visit_date, visit_number, technician_name, work_performed, findings, recommendations, time_spent_minutes, materials_used, pest_level, problem_rating, status')
           .eq('case_id', caseId)
           .order('visit_date', { ascending: false }),
+        // Alla rader hämtas — rader med visit_number visas per besök, fakturerade
+        // rader UTAN visit_number visas i gruppen "Fakturerat (ej besökskopplat)"
         supabase
           .from('case_billing_items')
-          .select('id, service_name, article_name, quantity, unit_price, total_price, visit_number')
-          .eq('case_id', caseId)
-          .not('visit_number', 'is', null),
+          .select('id, service_name, article_name, quantity, unit_price, total_price, visit_number, status')
+          .eq('case_id', caseId),
         supabase
           .from('invoices')
           .select('id, invoice_number, invoice_type, status, total_amount, fortnox_document_number, created_at, paid_at, case_id')
@@ -176,6 +198,12 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
 
   const getBillingForVisit = (visitNumber: number | null) =>
     visitNumber != null ? billingItems.filter(b => b.visit_number === visitNumber) : []
+
+  // Fakturerade rader utan besöksstämpel — får inte försvinna ur historiken.
+  // Bara billed/invoiced visas här; pending ska inte se fakturerat ut.
+  const unlinkedBilledItems = billingItems.filter(
+    b => b.visit_number == null && (b.status === 'billed' || b.status === 'invoiced')
+  )
 
   return (
     <>
@@ -331,12 +359,31 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
                           {formatMinutes(visit.time_spent_minutes)}
                         </span>
                       )}
-                      {visit.pest_level != null && (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border ${pestLevelColors[visit.pest_level] ?? pestLevelColors[0]}`}>
-                          {pestLevelLabels[visit.pest_level] ?? `Nivå ${visit.pest_level}`}
-                        </span>
-                      )}
                     </div>
+
+                    {/* Trafikljus: skadedjursnivå + problembild med label */}
+                    {(visit.pest_level != null || visit.problem_rating != null) && (
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                        {visit.pest_level != null && (
+                          <span>
+                            <span className="text-slate-500">Skadedjursnivå: </span>
+                            <span className={`inline-flex items-center gap-1.5 font-medium ${pestLevelColors[visit.pest_level] ?? 'text-slate-300'}`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                              {visit.pest_level} · {pestLevelLabels[visit.pest_level] ?? `Nivå ${visit.pest_level}`}
+                            </span>
+                          </span>
+                        )}
+                        {visit.problem_rating != null && (
+                          <span>
+                            <span className="text-slate-500">Problembild: </span>
+                            <span className={`inline-flex items-center gap-1.5 font-medium ${problemRatingColors[visit.problem_rating] ?? 'text-slate-300'}`}>
+                              <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                              {visit.problem_rating} · {problemRatingLabels[visit.problem_rating] ?? `Nivå ${visit.problem_rating}`}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Work report */}
                     {visit.work_performed && (
@@ -346,6 +393,14 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
                           Arbetsrapport
                         </p>
                         <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{visit.work_performed}</p>
+                      </div>
+                    )}
+
+                    {/* Findings */}
+                    {visit.findings && (
+                      <div>
+                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">Iakttagelser</p>
+                        <p className="text-sm text-slate-300 whitespace-pre-wrap leading-relaxed">{visit.findings}</p>
                       </div>
                     )}
 
@@ -394,6 +449,39 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
                 </div>
               )
             })}
+
+            {/* Förklaring när besökssnapshot saknas trots aktivitet på ärendet */}
+            {visits.length === 0 && (invoices.length > 0 || events.length > 0) && (
+              <p className="text-xs text-slate-500">
+                Besöksdata saknas för tidigare besök — teknikern fyllde inte i rapport innan återbesöket bokades
+              </p>
+            )}
+
+            {/* Fakturerade rader utan besökskoppling */}
+            {invoices.length > 0 && unlinkedBilledItems.length > 0 && (
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-slate-700/40 flex items-center gap-2">
+                  <Receipt className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-sm font-medium text-white">Fakturerat (ej besökskopplat)</span>
+                </div>
+                <div className="px-4 py-3 space-y-1.5">
+                  {unlinkedBilledItems.map(item => (
+                    <div key={item.id} className="flex items-center justify-between text-xs">
+                      <span className="text-slate-300 truncate mr-2">
+                        {item.service_name || item.article_name}
+                        {item.quantity !== 1 && <span className="text-slate-500 ml-1">× {item.quantity}</span>}
+                      </span>
+                      <span className="text-slate-400 flex-shrink-0">
+                        {item.total_price.toLocaleString('sv-SE')} kr
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Bilder från ärendet — komponenten döljer sig själv om inga finns */}
+            <CaseContextImagePreview caseId={caseId} caseType="contract" compact />
             </>
           )}
         </div>

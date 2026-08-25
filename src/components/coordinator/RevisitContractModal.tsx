@@ -212,11 +212,14 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
       const newScheduledStart = toLocalISOStringWithOffset(startDate)
       const newScheduledEnd = endDate ? toLocalISOStringWithOffset(endDate) : newScheduledStart
 
-      // 0. Spara snapshot av nuvarande besök om det finns besöksdata
+      // 0. Spara snapshot av nuvarande besök om det finns besöksdata,
+      // ELLER om delfakturering körs — annars tappar historiken kopplingen
+      // mellan besök och fakturerade rader (visit_number-stämpeln nedan)
       const hasVisitData = caseData.work_report || caseData.time_spent_minutes ||
                            caseData.pest_level != null || caseData.materials_used
+      const willPartialInvoice = invoiceNow && pendingBillingItems.length > 0
 
-      if (hasVisitData) {
+      if (hasVisitData || willPartialInvoice) {
         // Räkna befintliga besök för att sätta visit_number
         const { count: existingCount } = await supabase
           .from('visits')
