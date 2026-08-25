@@ -13,7 +13,8 @@
 // Panelen läser BÅDA tabellerna och normaliserar fältnamnen på ett ställe.
 
 import { useEffect, useId, useState } from 'react'
-import { Check, Copy, Mail, MapPin, Phone, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { CalendarDays, Check, Copy, Mail, MapPin, Phone, X } from 'lucide-react'
 import { supabase } from '../../../../lib/supabase'
 import { formatDateSv, formatKr, type RecordCase } from '../../../../hooks/useCustomerRecord'
 import { getCaseKindLabel } from '../../../../constants/caseTypeLabels'
@@ -350,6 +351,7 @@ interface Placement {
 }
 
 export default function CaseDetailPanel({ caseRow, onClose }: Props) {
+  const navigate = useNavigate()
   const [detail, setDetail] = useState<CaseDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [placements, setPlacements] = useState<Placement[]>([])
@@ -659,14 +661,29 @@ export default function CaseDetailPanel({ caseRow, onClose }: Props) {
           </div>
         )}
 
-        <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-700/70">
-          <span className="text-[11px] text-slate-600">Läsvy — ärendet redigeras i ärendevyn</span>
-          <button
-            onClick={onClose}
-            className="text-xs font-semibold text-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
-          >
-            Stäng
-          </button>
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-t border-slate-700/70">
+          <span className="text-[11px] text-slate-600">Läsvy — ärendet hanteras i schemat</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                // Schemat plockar upp nyckeln och öppnar ärendets riktiga
+                // hanteringsmodal (rätt modal väljs av schemats modalroutning)
+                sessionStorage.setItem('begone-oppna-arende', JSON.stringify({ id: caseRow.id }))
+                onClose()
+                navigate('/koordinator/schema')
+              }}
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#20c58f] px-3 py-1.5 rounded-lg hover:bg-[#20c58f]/10 transition-colors"
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              Öppna i schemat
+            </button>
+            <button
+              onClick={onClose}
+              className="text-xs font-semibold text-slate-300 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              Stäng
+            </button>
+          </div>
         </div>
       </div>
     </div>

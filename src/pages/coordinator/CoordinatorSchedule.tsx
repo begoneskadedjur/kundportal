@@ -376,6 +376,26 @@ export default function CoordinatorSchedule() {
     handleOpenCaseModal(caseData)
   }, [handleOpenCaseModal])
 
+  // Öppna ett befintligt ärende i sin hanteringsmodal — från kundkortets läsvy
+  // ("Öppna i schemat"). Nyckeln konsumeras först när ärendelistan är laddad.
+  useEffect(() => {
+    const raw = sessionStorage.getItem('begone-oppna-arende')
+    if (!raw || allCases.length === 0) return
+    try {
+      const target = JSON.parse(raw) as { id?: string }
+      const found = allCases.find(c => c.id === target.id)
+      if (found) {
+        sessionStorage.removeItem('begone-oppna-arende')
+        handleOpenCaseModal(found)
+      } else if (!loading) {
+        sessionStorage.removeItem('begone-oppna-arende')
+        toast.error('Ärendet kunde inte öppnas i schemat — det ligger utanför schemats statusar.')
+      }
+    } catch {
+      sessionStorage.removeItem('begone-oppna-arende')
+    }
+  }, [allCases, loading, handleOpenCaseModal])
+
   const handleSchedulePendingCase = (caseData: Case & { customer?: any }) => {
     const adaptedCase = adaptCaseToBeGoneRow(caseData)
     setSelectedCase(adaptedCase)
