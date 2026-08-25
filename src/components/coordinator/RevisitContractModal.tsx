@@ -58,8 +58,10 @@ interface ContractCase {
 
 interface PendingBillingItem {
   id: string
-  description: string
+  service_name: string | null
+  article_name: string | null
   quantity: number
+  total_price: number
   item_type: string
 }
 
@@ -116,8 +118,10 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
   // Anteckning
   const [revisitNote, setRevisitNote] = useState('')
 
-  // Delfakturering
+  // Delfakturering — sektionen visas bara när interna kostnader (artiklar) ligger
+  // mappade mot en ofakturerad tjänsterad, dvs. när det finns utfört arbete att debitera
   const [pendingBillingItems, setPendingBillingItems] = useState<PendingBillingItem[]>([])
+  const [hasMappedCosts, setHasMappedCosts] = useState(false)
   const [invoiceNow, setInvoiceNow] = useState(false)
 
   // Historik
@@ -128,13 +132,20 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
   useEffect(() => {
     async function fetchPendingItems() {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('case_billing_items')
-          .select('id, description, quantity, item_type')
+          .select('id, service_id, mapped_service_id, service_name, article_name, quantity, total_price, item_type')
           .eq('case_id', caseData.id)
           .eq('status', 'pending')
-          .eq('item_type', 'service')
-        setPendingBillingItems(data || [])
+        if (error) throw error
+        const rows = data || []
+        const services = rows.filter(r => r.item_type === 'service')
+        // mapped_service_id på artikelrader pekar på tjänsteradens id i case_billing_items
+        const serviceKeys = new Set(services.flatMap(s => [s.id, s.service_id].filter(Boolean)))
+        setPendingBillingItems(services)
+        setHasMappedCosts(rows.some(r =>
+          r.item_type === 'article' && r.mapped_service_id && serviceKeys.has(r.mapped_service_id)
+        ))
       } catch (e) {
         console.error('[RevisitContractModal] Failed to fetch pending billing items:', e)
       }
@@ -238,24 +249,25 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           .eq('case_id', caseData.id)
           .is('visit_number', null)
         if (billingError) console.error('[RevisitContractModal] Failed to stamp billing items:', billingError)
+      }
 
-        // Delfakturering: kopiera service-items till contract_billing_items och markera som billed
-        if (invoiceNow && caseData.customer_id && pendingBillingItems.length > 0) {
-          try {
-            const adhocResult = await ContractBillingService.createAdHocItemsFromCase(
-              caseData.id,
-              caseData.customer_id,
-              new Date()
-            )
-            if (adhocResult.invoiceError) {
-              toast.error(`Raderna sparades men fakturan kunde inte skapas: ${adhocResult.invoiceError}. Kontakta admin.`, { duration: 10000 })
-            } else {
-              toast.success(`${pendingBillingItems.length} artikel(er) skickade till fakturering.`)
-            }
-          } catch (e: any) {
-            console.error('[RevisitContractModal] Delfakturering misslyckades:', e)
-            toast.error(`Delfakturering misslyckades: ${e.message}`)
+      // Delfakturering: kopiera service-items till contract_billing_items och markera
+      // som billed. Körs oavsett om besöksdata finns — kryssrutan ska alltid gälla.
+      if (invoiceNow && caseData.customer_id && pendingBillingItems.length > 0) {
+        try {
+          const adhocResult = await ContractBillingService.createAdHocItemsFromCase(
+            caseData.id,
+            caseData.customer_id,
+            new Date()
+          )
+          if (adhocResult.invoiceError) {
+            toast.error(`Raderna sparades men fakturan kunde inte skapas: ${adhocResult.invoiceError}. Kontakta admin.`, { duration: 10000 })
+          } else {
+            toast.success(`${pendingBillingItems.length} artikel(er) skickade till fakturering.`)
           }
+        } catch (e: any) {
+          console.error('[RevisitContractModal] Delfakturering misslyckades:', e)
+          toast.error(`Delfakturering misslyckades: ${e.message}`)
         }
       }
 
@@ -492,8 +504,8 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
             </div>
           )}
 
-          {/* Delfakturering — visas om det finns pending service-artiklar */}
-          {pendingBillingItems.length > 0 && (
+          {/* Delfakturering — visas när ofakturerade tjänsterader har interna kostnader mappade */}
+          {pendingBillingItems.length > 0 && hasMappedCosts && (
             <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-4">
               <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-3 flex items-center gap-2">
                 <Receipt className="w-4 h-4 text-slate-500" />
@@ -502,12 +514,21 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
               <div className="space-y-1.5 mb-4">
                 {pendingBillingItems.map(item => (
                   <div key={item.id} className="flex items-center justify-between text-sm">
-                    <span className="text-slate-300">{item.description}</span>
-                    {item.quantity !== 1 && (
-                      <span className="text-slate-500 text-xs ml-2">× {item.quantity}</span>
-                    )}
+                    <span className="text-slate-300">
+                      {item.service_name || item.article_name}
+                      {item.quantity !== 1 && (
+                        <span className="text-slate-500 text-xs ml-2">× {item.quantity}</span>
+                      )}
+                    </span>
+                    <span className="text-white font-medium">{Number(item.total_price).toLocaleString('sv-SE')} kr</span>
                   </div>
                 ))}
+                <div className="flex items-center justify-between text-sm pt-1.5 border-t border-slate-700/50">
+                  <span className="text-slate-400">Totalt (exkl. moms)</span>
+                  <span className="text-[#20c58f] font-semibold">
+                    {pendingBillingItems.reduce((sum, i) => sum + Number(i.total_price), 0).toLocaleString('sv-SE')} kr
+                  </span>
+                </div>
               </div>
               <label className="flex items-center gap-3 cursor-pointer group">
                 <div className="relative flex-shrink-0">
