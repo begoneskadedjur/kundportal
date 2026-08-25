@@ -265,6 +265,27 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           } else {
             toast.success(`${pendingBillingItems.length} artikel(er) skickade till fakturering.`)
           }
+
+          // Logga delfaktureringen så den syns i Ärendehistorik-panelen
+          // (samma update_type som privat/företag använder i RevisitModal)
+          const authorName = (profile as { full_name?: string }).full_name || profile.display_name || 'Okänd'
+          const { error: logErr } = await supabase.from('case_updates_log').insert({
+            case_id: caseData.id,
+            case_table: 'cases',
+            case_type: 'contract',
+            update_type: 'partial_invoice_created',
+            updated_by: profile.id,
+            updated_by_id: profile.id,
+            updated_by_name: authorName,
+            user_role: 'koordinator',
+            user_name: authorName,
+            previous_value: null,
+            new_value: JSON.stringify({
+              items: pendingBillingItems.length,
+              amount: pendingBillingItems.reduce((sum, i) => sum + Number(i.total_price), 0),
+            }),
+          })
+          if (logErr) console.error('[RevisitContractModal] Kunde inte logga delfakturering:', logErr)
         } catch (e: any) {
           console.error('[RevisitContractModal] Delfakturering misslyckades:', e)
           toast.error(`Delfakturering misslyckades: ${e.message}`)

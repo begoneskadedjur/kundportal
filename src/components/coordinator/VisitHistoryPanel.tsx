@@ -1,11 +1,33 @@
 // src/components/coordinator/VisitHistoryPanel.tsx
-// Slide-in panel som visar per-besökshistorik för ett serviceärende
+// Slide-in panel med ärendehistorik för serviceärenden: besök, fakturor med
+// betalstatus (synkad från Fortnox) och bokningshändelser (återbesök/delfaktura)
 
 import React, { useEffect, useRef, useState } from 'react'
-import { X, History, Clock, User, FlaskConical, FileText, Package, Receipt } from 'lucide-react'
+import { X, History, Clock, User, FlaskConical, FileText, Receipt, CalendarClock } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { format } from 'date-fns'
 import sv from 'date-fns/locale/sv'
+import { INVOICE_STATUS_CONFIG } from '../../types/invoice'
+import type { InvoiceStatus } from '../../types/invoice'
+
+interface CaseInvoice {
+  id: string
+  invoice_number: string | null
+  invoice_type: string | null
+  status: string
+  total_amount: number
+  fortnox_document_number: string | null
+  created_at: string
+  paid_at: string | null
+}
+
+interface HistoryEvent {
+  id: string
+  update_type: string
+  new_value: string | null
+  updated_by_name: string | null
+  created_at: string
+}
 
 interface Visit {
   id: string
@@ -24,7 +46,8 @@ interface Visit {
 
 interface BillingItem {
   id: string
-  description: string
+  service_name: string | null
+  article_name: string | null
   quantity: number
   unit_price: number
   total_price: number
@@ -66,6 +89,8 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
   const panelRef = useRef<HTMLDivElement>(null)
   const [visits, setVisits] = useState<Visit[]>([])
   const [billingItems, setBillingItems] = useState<BillingItem[]>([])
+  const [invoices, setInvoices] = useState<CaseInvoice[]>([])
+  const [events, setEvents] = useState<HistoryEvent[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -81,7 +106,7 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [visitsRes, billingRes] = await Promise.all([
+      const [visitsRes, billingRes, invoicesRes, eventsRes] = await Promise.all([
         supabase
           .from('visits')
           .select('id, visit_date, visit_number, technician_name, work_performed, findings, recommendations, time_spent_minutes, materials_used, pest_level, problem_rating, status')
@@ -89,13 +114,31 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
           .order('visit_date', { ascending: false }),
         supabase
           .from('case_billing_items')
-          .select('id, description, quantity, unit_price, total_price, visit_number')
+          .select('id, service_name, article_name, quantity, unit_price, total_price, visit_number')
           .eq('case_id', caseId)
           .not('visit_number', 'is', null),
+        supabase
+          .from('invoices')
+          .select('id, invoice_number, invoice_type, status, total_amount, fortnox_document_number, created_at, paid_at')
+          .eq('case_id', caseId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('case_updates_log')
+          .select('id, update_type, new_value, updated_by_name, created_at')
+          .eq('case_id', caseId)
+          .in('update_type', ['revisit_scheduled', 'partial_invoice_created'])
+          .order('created_at', { ascending: false }),
       ])
+
+      if (visitsRes.error) console.error('[VisitHistoryPanel] visits:', visitsRes.error)
+      if (billingRes.error) console.error('[VisitHistoryPanel] billing:', billingRes.error)
+      if (invoicesRes.error) console.error('[VisitHistoryPanel] invoices:', invoicesRes.error)
+      if (eventsRes.error) console.error('[VisitHistoryPanel] events:', eventsRes.error)
 
       if (visitsRes.data) setVisits(visitsRes.data)
       if (billingRes.data) setBillingItems(billingRes.data)
+      if (invoicesRes.data) setInvoices(invoicesRes.data)
+      if (eventsRes.data) setEvents(eventsRes.data)
       setLoading(false)
     }
     load()
@@ -124,7 +167,7 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
               <History className="w-4 h-4 text-teal-400" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-sm font-medium text-slate-100">Besökshistorik</h2>
+              <h2 className="text-sm font-medium text-slate-100">Ärendehistorik</h2>
               <p className="text-xs text-slate-500 truncate max-w-[260px]">{caseTitle}</p>
             </div>
           </div>
@@ -143,14 +186,90 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
               <div className="w-5 h-5 border-2 border-slate-600 border-t-teal-400 rounded-full animate-spin mr-2" />
               <span className="text-sm">Hämtar historik...</span>
             </div>
-          ) : visits.length === 0 ? (
+          ) : visits.length === 0 && invoices.length === 0 && events.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-slate-500">
               <History className="w-10 h-10 mb-3 opacity-30" />
-              <p className="text-sm">Inga besök registrerade ännu</p>
-              <p className="text-xs mt-1 text-slate-600">Historik skapas vid återbokning</p>
+              <p className="text-sm">Ingen historik ännu</p>
+              <p className="text-xs mt-1 text-slate-600">Besök, fakturor och bokningar samlas här</p>
             </div>
           ) : (
-            visits.map((visit) => {
+            <>
+            {/* Fakturor på ärendet — vem/när/vad + betalstatus (synkas från Fortnox) */}
+            {invoices.length > 0 && (
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-slate-700/40 flex items-center gap-2">
+                  <Receipt className="w-3.5 h-3.5 text-[#20c58f]" />
+                  <span className="text-sm font-medium text-white">Fakturor ({invoices.length})</span>
+                </div>
+                <div className="divide-y divide-slate-700/40">
+                  {invoices.map(inv => {
+                    const cfg = INVOICE_STATUS_CONFIG[inv.status as InvoiceStatus]
+                    const isPartial = inv.invoice_type === 'partial' || inv.invoice_type === 'adhoc'
+                    return (
+                      <div key={inv.id} className="px-4 py-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-mono font-semibold text-slate-200 truncate">
+                            {inv.invoice_number || 'Faktura'}
+                          </span>
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${cfg?.color ?? 'text-slate-400'}`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                            {cfg?.label ?? inv.status}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 mt-0.5 text-xs text-slate-500">
+                          <span>
+                            {format(new Date(inv.created_at), 'yyyy-MM-dd', { locale: sv })}
+                            {isPartial && ' · delfaktura'}
+                            {inv.fortnox_document_number && ` · Fortnox ${inv.fortnox_document_number}`}
+                            {inv.paid_at && ` · betald ${format(new Date(inv.paid_at), 'yyyy-MM-dd', { locale: sv })}`}
+                          </span>
+                          <span className="text-slate-300 font-medium whitespace-nowrap">
+                            {Number(inv.total_amount).toLocaleString('sv-SE')} kr
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Bokningshändelser — återbesök och delfakturor med vem/när */}
+            {events.length > 0 && (
+              <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-slate-700/40 flex items-center gap-2">
+                  <CalendarClock className="w-3.5 h-3.5 text-teal-400" />
+                  <span className="text-sm font-medium text-white">Händelser ({events.length})</span>
+                </div>
+                <div className="divide-y divide-slate-700/40">
+                  {events.map(ev => {
+                    let parsed: { scheduled_start?: string; start_date?: string; note?: string; invoice_number?: string; amount?: number } = {}
+                    try { parsed = JSON.parse(ev.new_value || '{}') } catch { /* råtext */ }
+                    const isPartialEvent = ev.update_type === 'partial_invoice_created'
+                    const bookedTo = parsed.scheduled_start || parsed.start_date
+                    return (
+                      <div key={ev.id} className="px-4 py-2.5 text-xs">
+                        <div className="text-slate-200">
+                          {isPartialEvent ? (
+                            <>Delfaktura {parsed.invoice_number ? <span className="font-mono">{parsed.invoice_number}</span> : ''} skapad
+                            {parsed.amount != null && <> · {Number(parsed.amount).toLocaleString('sv-SE')} kr</>}</>
+                          ) : (
+                            <>Återbesök bokat{bookedTo && <> till {format(new Date(bookedTo), 'd MMM yyyy HH:mm', { locale: sv })}</>}</>
+                          )}
+                        </div>
+                        <div className="text-slate-500 mt-0.5">
+                          {format(new Date(ev.created_at), 'yyyy-MM-dd HH:mm', { locale: sv })}
+                          {ev.updated_by_name && ` · av ${ev.updated_by_name}`}
+                          {!isPartialEvent && parsed.note && ` · "${parsed.note}"`}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {visits.map((visit) => {
               const items = getBillingForVisit(visit.visit_number)
               const visitLabel = visit.visit_number ? `Besök #${visit.visit_number}` : 'Besök'
               return (
@@ -229,7 +348,7 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
                           {items.map(item => (
                             <div key={item.id} className="flex items-center justify-between text-xs">
                               <span className="text-slate-300 truncate mr-2">
-                                {item.description}
+                                {item.service_name || item.article_name}
                                 {item.quantity !== 1 && <span className="text-slate-500 ml-1">× {item.quantity}</span>}
                               </span>
                               <span className="text-slate-400 flex-shrink-0">
@@ -243,7 +362,8 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
                   </div>
                 </div>
               )
-            })
+            })}
+            </>
           )}
         </div>
       </div>
