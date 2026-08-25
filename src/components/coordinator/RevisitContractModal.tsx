@@ -218,6 +218,7 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
       const hasVisitData = caseData.work_report || caseData.time_spent_minutes ||
                            caseData.pest_level != null || caseData.materials_used
       const willPartialInvoice = invoiceNow && pendingBillingItems.length > 0
+      let snapshotSaved = false
 
       if (hasVisitData || willPartialInvoice) {
         // Räkna befintliga besök för att sätta visit_number
@@ -249,6 +250,8 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           // Snapshotet ÄR historiken — ett tyst fel här betyder förlorad rapport/trafikljusdata
           console.error('[RevisitContractModal] Failed to save visit snapshot:', visitError)
           toast.error(`Besökshistoriken kunde inte sparas: ${visitError.message}. Bokningen fortsätter, men kontakta admin.`, { duration: 10000 })
+        } else {
+          snapshotSaved = true
         }
 
         // Stämpla billing-items utan visit_number med detta besöks visit_number
@@ -312,14 +315,18 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           scheduled_start: newScheduledStart,
           scheduled_end: newScheduledEnd,
           status: 'Återbesök',
-          work_report: null,
-          time_spent_minutes: null,
-          materials_used: null,
-          pest_level: null,
-          problem_rating: null,
-          recommendations: null,
-          assessment_date: null,
-          assessed_by: null,
+          // Nollställ besöksdata BARA om snapshotet sparades — annars vore
+          // rapporten/trafikljusen förlorade för alltid (hänt två gånger)
+          ...(snapshotSaved ? {
+            work_report: null,
+            time_spent_minutes: null,
+            materials_used: null,
+            pest_level: null,
+            problem_rating: null,
+            recommendations: null,
+            assessment_date: null,
+            assessed_by: null,
+          } : {}),
         })
         .eq('id', caseData.id)
         .select()
