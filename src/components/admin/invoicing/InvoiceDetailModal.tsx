@@ -38,6 +38,8 @@ import {
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
 import { InvoiceService } from '../../../services/invoiceService'
+import { ProvisionService } from '../../../services/provisionService'
+import type { CommissionPost } from '../../../types/provision'
 import { FortnoxService } from '../../../services/fortnoxService'
 import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerResolver'
 import { isPersonnummer } from '../../../services/fortnoxService'
@@ -210,6 +212,11 @@ export default function InvoiceDetailModal({
   const [staleInfo, setStaleInfo] = useState<{ stale: boolean; reason?: string } | null>(null)
   const [regenerating, setRegenerating] = useState(false)
   const [caseBillingItems, setCaseBillingItems] = useState<CaseBillingItem[]>([])
+  // Provisionsposter för fakturans ärende — visas som underlag i
+  // godkännandepanelen (read-only, ingen provisionslogik ändras här).
+  // Posterna skapas redan vid ärendeavslut med status pending_invoice
+  // och flyttas till utbetalning av DB-triggern när fakturan betalas.
+  const [commissionPosts, setCommissionPosts] = useState<CommissionPost[]>([])
   // Kundens importerade avtalsärende (contracts-raden) — används både av
   // billing-uppslaget och kommunikationspanelen för årspremiefakturor utan case_id
   const [importedContractId, setImportedContractId] = useState<string | null>(null)
@@ -355,6 +362,29 @@ export default function InvoiceDetailModal({
     }
     fetchCaseBilling()
   }, [invoice?.case_id, invoice?.case_type, invoice?.invoice_type, invoice?.customer_id, invoice?.items])
+
+  // Hämta provisionsposter för fakturans ärende medan fakturan väntar på
+  // godkännande. commission_posts.case_id är TEXT och matchar invoice.case_id
+  // rakt av för både privat/företag och avtalsärenden (adhoc). Fel sväljs -
+  // provisionsvisningen får aldrig blockera fakturamodalen.
+  useEffect(() => {
+    if (!invoice?.case_id || invoice.status !== 'pending_approval') {
+      setCommissionPosts([])
+      return
+    }
+    let cancelled = false
+    ProvisionService.getPostsByCase(invoice.case_id)
+      .then(posts => {
+        if (cancelled) return
+        // 'cancelled' finns i DB men inte i CommissionStatus-typen
+        setCommissionPosts(posts.filter(p => (p.status as string) !== 'cancelled'))
+      })
+      .catch(err => {
+        console.warn('Kunde inte hämta provisionsposter:', err)
+        if (!cancelled) setCommissionPosts([])
+      })
+    return () => { cancelled = true }
+  }, [invoice?.case_id, invoice?.status])
 
   // Ärendenumret för fakturans kopplade ärende - visas i headern så att
   // kopplingen faktura ↔ ärende alltid är synlig (fakturanumret i sig är
@@ -507,6 +537,14 @@ export default function InvoiceDetailModal({
     try {
       await InvoiceService.approveInvoice(invoice.id, user.id, approverName)
 
+      // EN kvittering täcker både rabatt och provision - systemkommentaren
+      // nämner rabatten uttryckligen när sådan finns på fakturans rader
+      const discountNote = realDiscountRows.length > 0
+        ? ' inkl. rabatt ' + [...new Set(realDiscountRows.map(row =>
+            `-${Number(row.discount_percent)} %${row.added_by_technician_name ? ` av ${row.added_by_technician_name}` : ''}`
+          ))].join(', ')
+        : ''
+
       // Logga godkännandet i ärendets kommunikationspanel
       if (invoice.case_id) {
         try {
@@ -514,7 +552,7 @@ export default function InvoiceDetailModal({
             invoice.case_id,
             invoice.case_type as CaseType,
             'status_change',
-            `Faktura godkänd av ${approverName} (${invoice.invoice_number})`,
+            `Faktura godkänd av ${approverName}${discountNote} (${invoice.invoice_number})`,
             user.id,
             approverName
           )
@@ -523,7 +561,7 @@ export default function InvoiceDetailModal({
         }
       }
 
-      toast.success('Faktura godkänd')
+      toast.success(realDiscountRows.length > 0 ? 'Faktura godkänd inkl. rabatt' : 'Faktura godkänd')
       await loadInvoice()
       onStatusChange?.()
     } catch (error) {
@@ -1067,28 +1105,68 @@ export default function InvoiceDetailModal({
                   </div>
                 )}
 
-                {/* Rabattgodkännande — rutan visas BARA när det finns faktiska rabattrader
-                    (den bär rabatt + motivering, unik info). Fallet utan rabattrader
-                    behöver ingen egen ruta: headerstatus + footerknappen täcker det. */}
-                {invoice.requires_approval && invoice.status === 'pending_approval' &&
-                  realDiscountRows.length > 0 && (
-                    <div className="flex items-start gap-3 p-3 bg-orange-500/20 border border-orange-500/30 rounded-lg">
-                      <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0 mt-0.5" />
-                      <div className="space-y-1.5 min-w-0">
-                        <div className="text-sm font-medium text-orange-400">Rabatt kräver godkännande</div>
-                        {realDiscountRows.map(row => (
-                          <div key={row.id} className="text-xs text-orange-300">
-                            <span className="font-medium">{row.service_name || row.article_name}</span>
-                            {' '}-{Number(row.discount_percent)}%
+                {/* Godkännandepanel — allt godkännaren behöver innan Godkänn-klicket:
+                    rabattrader (ordinarie → rabatterat pris, vem, motivering) och
+                    provisionsunderlag för fakturans ärende. Visas bara i
+                    pending_approval och bara när det finns något att granska.
+                    Årspremiefakturor utan rabatt/provision täcks som förut av
+                    headerstatus + footerknappen. */}
+                {invoice.status === 'pending_approval' &&
+                  (realDiscountRows.length > 0 || commissionPosts.length > 0) && (
+                    <div className="p-3 bg-slate-800/30 border border-orange-500/30 rounded-xl space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <AlertCircle className="w-4 h-4 text-orange-400" />
+                        <span className="text-sm font-semibold text-white">Att granska innan godkännande</span>
+                      </div>
+
+                      {/* Rabattrader */}
+                      {realDiscountRows.map(row => {
+                        const ordinaryPrice = Number(row.unit_price) * Number(row.quantity || 1)
+                        return (
+                          <div key={row.id} className="px-3 py-2 bg-slate-900/40 rounded-lg">
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                              <span className="text-sm text-white">{row.service_name || row.article_name}</span>
+                              <span className="text-sm font-mono text-slate-300">
+                                {formatInvoiceAmount(ordinaryPrice)} {'→'} {formatInvoiceAmount(Number(row.total_price))}
+                                <span className="text-orange-400 ml-2">-{Number(row.discount_percent)} %</span>
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              Rabatt given av {row.added_by_technician_name || 'okänd tekniker'}
+                            </p>
                             {row.discount_motivation?.trim() ? (
-                              <span className="block text-slate-300 mt-0.5">Motivering: {row.discount_motivation}</span>
+                              <p className="text-xs text-slate-300 italic mt-0.5">"{row.discount_motivation}"</p>
                             ) : (
-                              <span className="block text-amber-400 mt-0.5">Motivering saknas</span>
+                              <p className="text-xs text-amber-400 mt-0.5">Motivering saknas</p>
                             )}
                           </div>
-                        ))}
-                        <p className="text-xs text-orange-300/80">Godkänns av rabattansvarig under Godkännanden.</p>
-                      </div>
+                        )
+                      })}
+
+                      {/* Provisionsunderlag — read-only, posterna ägs av provisionsflödet */}
+                      {commissionPosts.length > 0 && (
+                        <div className={`space-y-1 ${realDiscountRows.length > 0 ? 'pt-2 border-t border-slate-700/50' : ''}`}>
+                          {commissionPosts.map(post => (
+                            <div key={post.id} className="flex items-center justify-between gap-3 flex-wrap text-xs">
+                              <span className="text-slate-300">
+                                Provision · {post.technician_name}
+                                {Number(post.share_percentage) < 100 ? ` (${Number(post.share_percentage)} % andel)` : ''}
+                              </span>
+                              <span className="font-mono text-slate-300">
+                                {formatInvoiceAmount(Number(post.commission_amount))}
+                                <span className="text-slate-500 ml-1.5">({Number(post.commission_percentage)} %{post.is_rot_rut ? ' på belopp före ROT/RUT' : ''})</span>
+                              </span>
+                            </div>
+                          ))}
+                          <p className="text-xs text-slate-500">
+                            Provisionsgrundande - provisionen flyttas till utbetalning automatiskt när fakturan betalas.
+                          </p>
+                        </div>
+                      )}
+
+                      <p className="text-xs text-slate-400 pt-2 border-t border-slate-700/50">
+                        Godkänn-knappen är en kvittering som täcker både rabatt och provision och låser upp Fortnox-knappen.
+                      </p>
                     </div>
                 )}
 
