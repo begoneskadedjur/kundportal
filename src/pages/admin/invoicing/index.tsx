@@ -3,15 +3,8 @@
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Receipt,
-  Users,
-  Building2,
-  TrendingUp,
-  Plus
-} from 'lucide-react'
+import { Receipt, TrendingUp } from 'lucide-react'
 import PrivateBusinessInvoicing from './PrivateBusinessInvoicing'
-import BillingSummaryLedge from '../../../components/admin/invoicing/BillingSummaryLedge'
 import UnbilledAdhocBanner from '../../../components/admin/invoicing/UnbilledAdhocBanner'
 
 type InvoicingTab = 'private-business' | 'contracts' | 'adhoc'
@@ -20,22 +13,10 @@ export default function InvoicingPage() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<InvoicingTab>('private-business')
 
-  const tabs = [
-    {
-      id: 'private-business' as InvoicingTab,
-      label: 'Privat & Företag',
-      icon: Users
-    },
-    {
-      id: 'contracts' as InvoicingTab,
-      label: 'Avtalskunder',
-      icon: Building2
-    },
-    {
-      id: 'adhoc' as InvoicingTab,
-      label: 'Merförsäljning Avtal',
-      icon: Plus
-    }
+  const tabs: { id: InvoicingTab; label: string }[] = [
+    { id: 'private-business', label: 'Privat & Företag' },
+    { id: 'contracts', label: 'Avtalskunder' },
+    { id: 'adhoc', label: 'Merförsäljning Avtal' }
   ]
 
   return (
@@ -55,10 +36,9 @@ export default function InvoicingPage() {
         </button>
       </div>
 
-      {/* Fliknavigering */}
-      <div className="flex gap-1 border-b border-slate-700 mb-4">
+      {/* Fliknavigering – understrukna tabbar utan ikoner */}
+      <div className="flex gap-6 border-b border-slate-700 mb-4">
         {tabs.map(tab => {
-          const Icon = tab.icon
           const isActive = activeTab === tab.id
 
           return (
@@ -66,23 +46,19 @@ export default function InvoicingPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`
-                flex items-center gap-2 px-4 py-3 text-sm font-medium
+                px-0.5 py-3 text-sm font-semibold -mb-px
                 border-b-2 transition-colors min-h-[44px]
                 ${isActive
-                  ? 'text-emerald-400 border-emerald-400 bg-slate-800/50'
-                  : 'text-slate-400 border-transparent hover:text-white hover:bg-slate-700/30'
+                  ? 'text-[#20c58f] border-[#20c58f]'
+                  : 'text-slate-400 border-transparent hover:text-white'
                 }
               `}
             >
-              <Icon className="w-4 h-4" />
               {tab.label}
             </button>
           )
         })}
       </div>
-
-      {/* Billing summary ledge */}
-      <BillingSummaryLedge />
 
       {/* Tab Content */}
       <div className="mt-4">
