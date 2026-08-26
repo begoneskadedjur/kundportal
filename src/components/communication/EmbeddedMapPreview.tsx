@@ -1,8 +1,20 @@
 // src/components/communication/EmbeddedMapPreview.tsx
-// Inbäddad kartpreview med Google Maps iframe
+// Kartpreview via officiella Maps Static API (img med riktig onload/onerror).
+// Fallback till inofficiella embed-iframen bara om API-nyckel saknas — den
+// rate-limitas av Google och iframes avfyrar aldrig error, därav timeouten.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapPin, ExternalLink, Loader2 } from 'lucide-react';
+
+const MAPS_KEY: string | undefined = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
+// Statisk kartbild med brandgrön markör — markers-parametern sätter center själv
+const generateStaticUrl = (lat: number | null, lng: number | null, address: string | null): string | null => {
+  if (!MAPS_KEY) return null;
+  const marker = lat && lng ? `${lat},${lng}` : address ? encodeURIComponent(address) : null;
+  if (!marker) return null;
+  return `https://maps.googleapis.com/maps/api/staticmap?size=640x320&scale=2&zoom=9&markers=color:0x20c58f%7C${marker}&key=${MAPS_KEY}`;
+};
 
 interface EmbeddedMapPreviewProps {
   lat: number | null;
@@ -45,11 +57,23 @@ export default function EmbeddedMapPreview({
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
 
+  const staticUrl = generateStaticUrl(lat, lng, address);
   const embedUrl = generateEmbedUrl(lat, lng, address);
   const mapsLink = generateMapsLink(lat, lng, address);
 
+  // Iframe-fallbacken avfyrar aldrig error vid blockerad request — utan
+  // timeout snurrar spinnern för evigt. Img-vägen har riktiga load/error.
+  useEffect(() => {
+    if (staticUrl || !isLoading) return;
+    const t = setTimeout(() => {
+      setIsLoading(false);
+      setHasError(true);
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [staticUrl, isLoading]);
+
   // Om varken koordinater eller adress finns, visa ingenting
-  if (!embedUrl) {
+  if (!embedUrl && !staticUrl) {
     return null;
   }
 
@@ -67,30 +91,39 @@ export default function EmbeddedMapPreview({
           </div>
         )}
 
-        {/* Felmeddelande */}
+        {/* Felmeddelande — Maps-länken ligger som overlay så platsen alltid nås */}
         {hasError && (
           <div className="absolute inset-0 bg-slate-800 flex flex-col items-center justify-center z-10">
             <MapPin className="w-6 h-6 text-slate-500 mb-2" />
-            <p className="text-xs text-slate-500">Kunde inte ladda kartan</p>
+            <p className="text-xs text-slate-500">Kunde inte ladda kartan – öppna i Maps</p>
           </div>
         )}
 
-        {/* Iframe med karta */}
-        <iframe
-          src={embedUrl}
-          width="100%"
-          height="100%"
-          style={{ border: 0 }}
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          title="Karta som visar ärendets plats"
-          onLoad={() => setIsLoading(false)}
-          onError={() => {
-            setIsLoading(false);
-            setHasError(true);
-          }}
-          className={`${isLoading || hasError ? 'invisible' : 'visible'}`}
-        />
+        {staticUrl ? (
+          /* Officiella Static Maps API — img har fungerande load/error-events */
+          <img
+            src={staticUrl}
+            alt="Karta som visar ärendets plats"
+            className={`w-full h-full object-cover ${isLoading || hasError ? 'invisible' : 'visible'}`}
+            onLoad={() => setIsLoading(false)}
+            onError={() => {
+              setIsLoading(false);
+              setHasError(true);
+            }}
+          />
+        ) : (
+          <iframe
+            src={embedUrl ?? undefined}
+            width="100%"
+            height="100%"
+            style={{ border: 0 }}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            title="Karta som visar ärendets plats"
+            onLoad={() => setIsLoading(false)}
+            className={`${isLoading || hasError ? 'invisible' : 'visible'}`}
+          />
+        )}
 
         {/* Dark theme overlay för att matcha designen */}
         <div

@@ -899,18 +899,20 @@ export default function InvoiceDetailModal({
                 <h2 className="text-base font-semibold font-mono text-white whitespace-nowrap">
                   {invoice?.invoice_number || '...'}
                 </h2>
-                {invoice && statusConfig && (
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap ${statusConfig.color}`}>
-                    <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
-                    {statusConfig.label}
-                  </span>
-                )}
                 {isPartialInvoice && (
                   <span className="text-xs font-semibold text-teal-400 whitespace-nowrap">◔ Delfaktura</span>
                 )}
                 {linkedCaseNumber && (
                   <span className="text-xs font-medium font-mono text-slate-400 whitespace-nowrap" title="Fakturans kopplade ärende">
                     {linkedCaseNumber}
+                  </span>
+                )}
+                {/* items-baseline i spannet: med punkten först exporterar items-center
+                    punktens underkant som baslinje och texten "svävar" över raden */}
+                {invoice && statusConfig && (
+                  <span className={`inline-flex items-baseline gap-1.5 text-xs font-semibold whitespace-nowrap ${statusConfig.color}`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-current flex-shrink-0" />
+                    {statusConfig.label}
                   </span>
                 )}
               </div>

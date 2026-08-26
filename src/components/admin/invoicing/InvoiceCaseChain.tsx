@@ -89,7 +89,7 @@ export default function InvoiceCaseChainSection({
               {inv.case_id == null && <span className="text-slate-400 font-medium">samlingsfaktura</span>}
               {isPartial && <span className="text-teal-400 font-medium">delfaktura</span>}
               {statusConfig && (
-                <span className={`inline-flex items-center gap-1 font-medium ${statusConfig.color}`}>
+                <span className={`inline-flex items-baseline gap-1 font-medium ${statusConfig.color}`}>
                   <span className="w-1.5 h-1.5 rounded-full bg-current" />
                   {statusConfig.label}
                 </span>
