@@ -68,7 +68,6 @@ export default function InvoiceCaseChainSection({
 
   const rows: { orb: OrbKind; node: ReactNode; key: string }[] = chain.invoices.map(inv => {
     const isCurrent = inv.id === currentInvoiceId
-    const statusConfig = INVOICE_STATUS_CONFIG[inv.status]
     const orb: OrbKind = isCurrent
       ? 'current'
       : inv.status === 'cancelled'
@@ -87,14 +86,9 @@ export default function InvoiceCaseChainSection({
               <span className="font-mono font-semibold text-white">{inv.invoice_number || 'Faktura'}</span>
               <span className="text-slate-500 tabular-nums">{formatInvoiceDate(inv.created_at)}</span>
               {inv.case_id == null && <span className="text-slate-400 font-medium">samlingsfaktura</span>}
+              {/* Status + "· denna" medvetet borttagna: ringen till vänster pekar
+                  redan ut aktuell faktura och statusen visas i header och lista */}
               {isPartial && <span className="text-teal-400 font-medium">delfaktura</span>}
-              {statusConfig && (
-                <span className={`inline-flex items-baseline gap-1 font-medium ${statusConfig.color}`}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                  {statusConfig.label}
-                </span>
-              )}
-              {isCurrent && <span className="text-teal-400">· denna</span>}
             </div>
           </div>
           <span className="text-xs font-semibold text-white tabular-nums whitespace-nowrap">
