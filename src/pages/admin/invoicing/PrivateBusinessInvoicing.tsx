@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
+import { useAuth } from '../../../contexts/AuthContext'
 import { InvoiceService } from '../../../services/invoiceService'
 import type { Invoice, InvoiceStatus, InvoiceFilters } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
@@ -47,6 +48,11 @@ const compactAmount = (n: number): string =>
   n >= 10000 ? `${Math.round(n / 1000).toLocaleString('sv-SE')} tkr` : formatInvoiceAmount(n)
 
 export default function PrivateBusinessInvoicing({ invoiceType = 'private-business' }: Props) {
+  // Godkännande-åtgärder visas bara för faktureringsansvariga
+  const { user, profile } = useAuth()
+  const canApproveInvoices = !!profile?.can_approve_invoices
+  const approverName = profile?.display_name || profile?.technicians?.name || profile?.email || 'Okänd'
+
   // State
   const [invoices, setInvoices] = useState<Invoice[]>([])
   // Ärendenummer per case_id - fakturanumret är en obruten löpande serie
@@ -230,8 +236,22 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
     }
   }
 
+  // Godkänn enskild faktura (endast faktureringsansvarig)
+  const handleApproveInvoice = async (id: string) => {
+    if (!user || !canApproveInvoices) return
+    try {
+      await InvoiceService.approveInvoice(id, user.id, approverName)
+      toast.success('Faktura godkänd')
+      loadData()
+    } catch (error) {
+      console.error('Fel vid godkännande:', error)
+      toast.error('Kunde inte godkänna fakturan')
+    }
+  }
+
   // Batch-godkänn markerade fakturor som väntar på godkännande
   const handleBatchApprove = async () => {
+    if (!user || !canApproveInvoices) return
     const toApprove = invoices.filter(
       i => selectedIds.includes(i.id) && i.status === 'pending_approval'
     )
@@ -240,7 +260,7 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
       return
     }
     try {
-      await Promise.all(toApprove.map(i => InvoiceService.updateInvoiceStatus(i.id, 'ready')))
+      await Promise.all(toApprove.map(i => InvoiceService.approveInvoice(i.id, user.id, approverName)))
       toast.success(`${toApprove.length} ${toApprove.length === 1 ? 'faktura godkänd' : 'fakturor godkända'}`)
       loadData()
     } catch (error) {
@@ -381,9 +401,9 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
         </td>
         <td className="px-3 py-2">
           <div className="flex items-center justify-end gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity">
-            {invoice.status === 'pending_approval' && (
+            {invoice.status === 'pending_approval' && canApproveInvoices && (
               <button
-                onClick={() => handleStatusChange(invoice.id, 'ready')}
+                onClick={() => handleApproveInvoice(invoice.id)}
                 className="p-1 text-slate-500 hover:text-[#20c58f] hover:bg-slate-700/50 rounded"
                 title="Godkänn"
               >
@@ -533,13 +553,17 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
       {selectedIds.length > 0 && (
         <div className="flex items-center gap-3 px-4 py-2 rounded-lg border border-[#20c58f]/30 bg-[#20c58f]/10 text-sm">
           <span className="font-semibold text-white">{selectedIds.length} markerade</span>
-          <span className="text-[#20c58f]/40">·</span>
-          <button
-            onClick={handleBatchApprove}
-            className="font-semibold text-[#20c58f] hover:underline"
-          >
-            Godkänn
-          </button>
+          {canApproveInvoices && (
+            <>
+              <span className="text-[#20c58f]/40">·</span>
+              <button
+                onClick={handleBatchApprove}
+                className="font-semibold text-[#20c58f] hover:underline"
+              >
+                Godkänn
+              </button>
+            </>
+          )}
           <span className="text-[#20c58f]/40">·</span>
           <button
             onClick={handleExport}

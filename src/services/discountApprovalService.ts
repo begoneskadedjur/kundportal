@@ -181,9 +181,10 @@ export class DiscountApprovalService {
       .filter(item => item.discountLines.length > 0 || item.additions.length > 0)
   }
 
-  /** Godkänn: faktura → ready, tekniker med rabattrader notifieras */
-  static async approve(item: ApprovalItem, approvedBy: string): Promise<void> {
-    await InvoiceService.updateInvoiceStatus(item.invoice.id, 'ready')
+  /** Godkänn: faktura → ready (via approveInvoice så approved_by loggas),
+   *  tekniker med rabattrader notifieras */
+  static async approve(item: ApprovalItem, approvedById: string, approvedBy: string): Promise<void> {
+    await InvoiceService.approveInvoice(item.invoice.id, approvedById, approvedBy)
     const caseType = (item.invoice.invoice_type === 'adhoc' ? 'contract' : item.invoice.case_type) || 'contract'
     for (const line of item.discountLines) {
       await DiscountNotificationService.notifyDiscountApproved({

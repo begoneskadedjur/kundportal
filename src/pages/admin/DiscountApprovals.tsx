@@ -136,10 +136,10 @@ export default function DiscountApprovals() {
   }, [canApprove, fetchItems, fetchPremiums])
 
   const handleApprove = async (item: ApprovalItem) => {
-    if (approvingId) return
+    if (approvingId || !user) return
     setApprovingId(item.invoice.id)
     try {
-      await DiscountApprovalService.approve(item, approverName)
+      await DiscountApprovalService.approve(item, user.id, approverName)
       setItems(prev => prev.filter(i => i.invoice.id !== item.invoice.id))
       toast.success(
         item.discountLines.length > 0
@@ -174,10 +174,10 @@ export default function DiscountApprovals() {
   // === Årspremier ===
 
   const handleApprovePremium = async (item: PremiumApprovalItem) => {
-    if (approvingPremiumId) return
+    if (approvingPremiumId || !user) return
     setApprovingPremiumId(item.invoice.id)
     try {
-      await InvoiceService.updateInvoiceStatus(item.invoice.id, 'ready')
+      await InvoiceService.approveInvoice(item.invoice.id, user.id, approverName)
       setPremiumItems(prev => prev.filter(i => i.invoice.id !== item.invoice.id))
       toast.success('Premiefaktura godkänd')
     } catch (error) {

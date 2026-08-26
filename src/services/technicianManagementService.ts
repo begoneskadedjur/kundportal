@@ -46,6 +46,7 @@ export type Technician = {
   extra_roles?: ExtraPortalRole[]
   incident_recipient_types?: IncidentType[]
   can_approve_discounts?: boolean
+  can_approve_invoices?: boolean
 }
 
 export type TechnicianFormData = {
@@ -144,6 +145,25 @@ export const technicianManagementService = {
     }
   },
 
+  /**
+   * Sätter/tar bort faktureringsansvar (profiles.can_approve_invoices) för
+   * personens profil. Kräver att personen har aktiv inloggning (profil).
+   */
+  async updateCanApproveInvoices(technicianId: string, canApprove: boolean): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ can_approve_invoices: canApprove })
+        .eq('technician_id', technicianId)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating invoice approver:', error)
+      toast.error('Kunde inte uppdatera faktureringsansvar')
+      throw error
+    }
+  },
+
   async updateDisplayName(technicianId: string, displayName: string): Promise<void> {
     const { error } = await supabase
       .from('profiles')
@@ -202,7 +222,7 @@ export const technicianManagementService = {
     try {
       const [techniciansRes, profilesRes, recipientsRes] = await Promise.all([
         supabase.from('technicians').select('*').order('name', { ascending: true }),
-        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, extra_roles, can_approve_discounts'),
+        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, extra_roles, can_approve_discounts, can_approve_invoices'),
         supabase.from('incident_recipients').select('user_id, incident_type')
       ]);
       if (techniciansRes.error) throw techniciansRes.error;
@@ -232,6 +252,7 @@ export const technicianManagementService = {
           is_admin: profile?.is_admin || false,
           extra_roles: (profile?.extra_roles as ExtraPortalRole[] | null) || [],
           can_approve_discounts: profile?.can_approve_discounts || false,
+          can_approve_invoices: profile?.can_approve_invoices || false,
           incident_recipient_types: profile?.user_id
             ? (recipientTypesByUserId.get(profile.user_id) || [])
             : []
@@ -506,7 +527,7 @@ export const technicianManagementService = {
 
   async getTechnicianById(id: string): Promise<Technician> {
     try {
-      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, extra_roles, can_approve_discounts)`).eq('id', id).single();
+      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, extra_roles, can_approve_discounts, can_approve_invoices)`).eq('id', id).single();
       if (error) throw error;
 
       // FK-join hittar profiler direkt (alla roller har nu technician_id)
@@ -529,6 +550,7 @@ export const technicianManagementService = {
         is_admin: profile?.is_admin || false,
         extra_roles: (profile?.extra_roles as ExtraPortalRole[] | null) || [],
         can_approve_discounts: profile?.can_approve_discounts || false,
+        can_approve_invoices: profile?.can_approve_invoices || false,
         incident_recipient_types: incidentRecipientTypes
       };
     } catch (error: any) {

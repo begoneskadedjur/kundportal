@@ -165,6 +165,13 @@ export default function TechnicianManagement() {
     ))
   }
 
+  // Uppdatera lokalt state när faktureringsansvar togglas direkt på ett kort
+  const handleInvoiceApproverChange = (technicianId: string, canApprove: boolean) => {
+    setTechnicians(prev => prev.map(t =>
+      t.id === technicianId ? { ...t, can_approve_invoices: canApprove } : t
+    ))
+  }
+
   const handleDeleteTechnician = async (id: string) => {
     try {
       await technicianManagementService.deleteTechnician(id)
@@ -404,6 +411,7 @@ export default function TechnicianManagement() {
               onRecipientTypesChange={handleRecipientTypesChange}
               onExtraRolesChange={handleExtraRolesChange}
               onDiscountApproverChange={handleDiscountApproverChange}
+              onInvoiceApproverChange={handleInvoiceApproverChange}
             />
           ))}
         </div>

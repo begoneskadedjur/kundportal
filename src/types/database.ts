@@ -439,6 +439,8 @@ export type Database = {
           region_access: string | null  // För regional managers
           // Rabattansvarig: får godkänna/avslå fakturor med rabatterade rader
           can_approve_discounts: boolean
+          // Faktureringsansvarig: får godkänna fakturor innan Fortnox
+          can_approve_invoices: boolean
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>

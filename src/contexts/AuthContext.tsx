@@ -13,6 +13,7 @@ export type Profile = {
   role?: 'admin' | 'customer' | 'technician' | 'koordinator' | 'säljare'; display_name?: string | null;
   extra_roles?: string[] | null;
   can_approve_discounts?: boolean;
+  can_approve_invoices?: boolean;
   theme_preference?: 'dark' | 'light' | 'system' | null;
   technicians?: { name: string; role: string; email: string; } | null;
 };

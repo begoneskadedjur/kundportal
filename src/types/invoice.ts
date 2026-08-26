@@ -40,6 +40,10 @@ export interface Invoice {
   status: InvoiceStatus
   requires_approval: boolean
 
+  // Godkännande (faktureringsansvarig)
+  approved_by: string | null
+  approved_by_name: string | null
+
   // Datum
   created_at: string
   approved_at: string | null

@@ -32,7 +32,8 @@ import {
   Trash2,
   FileEdit,
   ExternalLink,
-  BookCheck
+  BookCheck,
+  Lock
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
@@ -197,6 +198,7 @@ export default function InvoiceDetailModal({
   const [invoice, setInvoice] = useState<InvoiceWithItems | null>(null)
   const [loading, setLoading] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [approving, setApproving] = useState(false)
   const [sendingToFortnox, setSendingToFortnox] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [editingDueDate, setEditingDueDate] = useState(false)
@@ -492,6 +494,42 @@ export default function InvoiceDetailModal({
       toast.error('Kunde inte uppdatera status')
     } finally {
       setUpdating(false)
+    }
+  }
+
+  // Godkännande (faktureringsansvarig) — kvittering som låser upp Fortnox-knappen
+  const handleApprove = async () => {
+    if (!invoice || !user || !profile?.can_approve_invoices) return
+
+    setApproving(true)
+    const approverName = profile?.display_name || profile?.technicians?.name || profile?.email || 'Okänd'
+    try {
+      await InvoiceService.approveInvoice(invoice.id, user.id, approverName)
+
+      // Logga godkännandet i ärendets kommunikationspanel
+      if (invoice.case_id) {
+        try {
+          await createSystemComment(
+            invoice.case_id,
+            invoice.case_type as CaseType,
+            'status_change',
+            `Faktura godkänd av ${approverName} (${invoice.invoice_number})`,
+            user.id,
+            approverName
+          )
+        } catch (err) {
+          console.warn('Kunde inte logga godkännandet:', err)
+        }
+      }
+
+      toast.success('Faktura godkänd')
+      await loadInvoice()
+      onStatusChange?.()
+    } catch (error) {
+      console.error('Kunde inte godkänna fakturan:', error)
+      toast.error('Kunde inte godkänna fakturan')
+    } finally {
+      setApproving(false)
     }
   }
 
@@ -1677,11 +1715,35 @@ export default function InvoiceDetailModal({
                   ⚠ {blockers.length} att kontrollera · {blockers[0].label}
                 </span>
               )}
+              {/* Diskret godkännandekvitto — vem och när */}
+              {invoice.approved_by_name && invoice.approved_at && (
+                <span className="text-[11px] text-slate-500 whitespace-nowrap">
+                  Godkänd av {invoice.approved_by_name} · {invoice.approved_at.slice(0, 10)}
+                </span>
+              )}
+              {invoice.status === 'pending_approval' && (
+                <button
+                  onClick={handleApprove}
+                  disabled={approving || !profile?.can_approve_invoices}
+                  title={!profile?.can_approve_invoices
+                    ? 'Endast faktureringsansvarig kan godkänna'
+                    : undefined}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-transparent border border-[#20c58f] text-[#20c58f] hover:bg-[#20c58f]/10 text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {approving
+                    ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    : <CheckCircle className="w-3.5 h-3.5" />}
+                  {approving ? 'Godkänner...' : 'Godkänn'}
+                </button>
+              )}
               {(invoice.status === 'pending_approval' || invoice.status === 'ready') && (
                 <button
                   onClick={handleSendToFortnox}
-                  disabled={sendingToFortnox}
-                  className={`flex items-center gap-2 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07e] text-sm text-[#fff] rounded-lg transition-colors disabled:opacity-50 ${
+                  disabled={sendingToFortnox || invoice.status === 'pending_approval'}
+                  title={invoice.status === 'pending_approval'
+                    ? 'Låst tills fakturan godkänts av faktureringsansvarig'
+                    : undefined}
+                  className={`flex items-center gap-2 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07e] text-sm text-[#fff] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                     blockers.length > 0
                       ? severeBlocker
                         ? 'border border-red-400/60'
@@ -1691,14 +1753,10 @@ export default function InvoiceDetailModal({
                 >
                   {sendingToFortnox
                     ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    : <FileEdit className="w-3.5 h-3.5" />}
-                  {/* Vid pending_approval ÄR klicket godkännandebeslutet — etiketten
-                      säger det rakt ut. Logiken är oförändrad (samma handleSendToFortnox). */}
-                  {sendingToFortnox
-                    ? 'Skapar utkast...'
                     : invoice.status === 'pending_approval'
-                      ? 'Godkänn & skicka till Fortnox'
-                      : 'Skapa utkast i Fortnox'}
+                      ? <Lock className="w-3.5 h-3.5" />
+                      : <FileEdit className="w-3.5 h-3.5" />}
+                  {sendingToFortnox ? 'Skapar utkast...' : 'Skapa utkast i Fortnox'}
                 </button>
               )}
               {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (

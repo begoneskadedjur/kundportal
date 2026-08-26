@@ -459,10 +459,19 @@ export class InvoiceService {
   }
 
   /**
-   * Godkänn faktura (för rabatterade)
+   * Godkänn faktura — enda godkännandevägen (faktureringsansvarig).
+   * Sätter status ready, approved_at (via updateInvoiceStatus), samt
+   * loggar vem som godkände i approved_by/approved_by_name.
    */
-  static async approveInvoice(id: string): Promise<Invoice> {
-    return this.updateInvoiceStatus(id, 'ready')
+  static async approveInvoice(
+    id: string,
+    approverId: string,
+    approverName: string
+  ): Promise<Invoice> {
+    return this.updateInvoiceStatus(id, 'ready', {
+      approved_by: approverId,
+      approved_by_name: approverName
+    })
   }
 
   /**

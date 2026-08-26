@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react' // useEffect lades till för att hantera klick utanför
 import {
   User, Mail, Phone, MapPin, MoreVertical, Edit,
-  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle, BadgeCheck
+  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle, BadgeCheck, Receipt
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '../../../ui/Button'
@@ -34,6 +34,7 @@ type TechnicianCardProps = {
   onRecipientTypesChange?: (technicianId: string, types: IncidentType[]) => void
   onExtraRolesChange?: (technicianId: string, roles: ExtraPortalRole[]) => void
   onDiscountApproverChange?: (technicianId: string, canApprove: boolean) => void
+  onInvoiceApproverChange?: (technicianId: string, canApprove: boolean) => void
 }
 
 export default function TechnicianCard({
@@ -46,7 +47,8 @@ export default function TechnicianCard({
   onManageNotifications,
   onRecipientTypesChange,
   onExtraRolesChange,
-  onDiscountApproverChange
+  onDiscountApproverChange,
+  onInvoiceApproverChange
 }: TechnicianCardProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [recipientTypes, setRecipientTypes] = useState<Set<IncidentType>>(
@@ -60,6 +62,8 @@ export default function TechnicianCard({
   const [sendingPassword, setSendingPassword] = useState(false)
   const [isDiscountApprover, setIsDiscountApprover] = useState(!!technician.can_approve_discounts)
   const [savingDiscountApprover, setSavingDiscountApprover] = useState(false)
+  const [isInvoiceApprover, setIsInvoiceApprover] = useState(!!technician.can_approve_invoices)
+  const [savingInvoiceApprover, setSavingInvoiceApprover] = useState(false)
 
   const handleSendNewPassword = async () => {
     if (!technician.user_id || sendingPassword) return
@@ -90,6 +94,10 @@ export default function TechnicianCard({
     setIsDiscountApprover(!!technician.can_approve_discounts)
   }, [technician.can_approve_discounts])
 
+  useEffect(() => {
+    setIsInvoiceApprover(!!technician.can_approve_invoices)
+  }, [technician.can_approve_invoices])
+
   const toggleDiscountApprover = async () => {
     if (!technician.user_id || savingDiscountApprover) return
     const previous = isDiscountApprover
@@ -107,6 +115,26 @@ export default function TechnicianCard({
       setIsDiscountApprover(previous)
     } finally {
       setSavingDiscountApprover(false)
+    }
+  }
+
+  const toggleInvoiceApprover = async () => {
+    if (!technician.user_id || savingInvoiceApprover) return
+    const previous = isInvoiceApprover
+    const next = !previous
+
+    setIsInvoiceApprover(next)
+    setSavingInvoiceApprover(true)
+    try {
+      await technicianManagementService.updateCanApproveInvoices(technician.id, next)
+      onInvoiceApproverChange?.(technician.id, next)
+      toast.success(next
+        ? `${technician.name} är nu faktureringsansvarig`
+        : `${technician.name} är inte längre faktureringsansvarig`)
+    } catch {
+      setIsInvoiceApprover(previous)
+    } finally {
+      setSavingInvoiceApprover(false)
     }
   }
 
@@ -485,6 +513,48 @@ export default function TechnicianCard({
         ) : (
           <p className="text-xs text-slate-500">
             Kräver aktiverad inloggning - bara personer med konto kan vara rabattansvariga
+          </p>
+        )}
+      </div>
+
+      {/* Faktureringsansvarig - togglas direkt på kortet */}
+      <div className="mt-4 pt-3 border-t border-slate-700">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Receipt className="w-3.5 h-3.5 text-[#20c58f]" />
+          <span className="text-xs font-medium text-slate-400">Faktureringsansvarig</span>
+        </div>
+        {technician.has_login && technician.user_id ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-slate-500">
+              {isInvoiceApprover
+                ? 'Godkänner fakturor innan de skickas till Fortnox'
+                : 'Kan tilldelas rätt att godkänna fakturor'}
+            </p>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isInvoiceApprover}
+              onClick={toggleInvoiceApprover}
+              disabled={savingInvoiceApprover}
+              title={isInvoiceApprover
+                ? 'Klicka för att ta bort faktureringsansvaret'
+                : 'Klicka för att göra personen faktureringsansvarig'}
+              className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${
+                isInvoiceApprover
+                  ? 'bg-[#20c58f] border-[#20c58f]'
+                  : 'bg-slate-700 border-slate-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-[#fff] transition-transform ${
+                  isInvoiceApprover ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">
+            Kräver aktiverad inloggning - bara personer med konto kan vara faktureringsansvariga
           </p>
         )}
       </div>
