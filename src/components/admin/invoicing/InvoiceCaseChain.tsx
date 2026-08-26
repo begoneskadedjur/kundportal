@@ -7,7 +7,7 @@
 
 import type { ReactNode } from 'react'
 import { AlertTriangle, Link2 } from 'lucide-react'
-import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate } from '../../../types/invoice'
+import { formatInvoiceAmount, formatInvoiceDate } from '../../../types/invoice'
 import type { CaseChainData } from '../../../hooks/useInvoiceCaseChain'
 
 /** Amber-varning under fakturarad-tabellen: pending-rader som inte kom med.
