@@ -1,4 +1,10 @@
 // src/services/provisionService.ts - Databasoperationer för provisionssystemet
+//
+// Provisioner 2.0: utbetalningsmånaden ÄGS AV DATABASEN
+// (commission_posts.payout_month, satt av compute_payout_month() via
+// trg_invoice_paid). Servicen räknar ALDRIG ut månaden själv — behövs en
+// preliminär månad för en ännu obetald post importeras den från
+// utils/provisionPayout (getPostPayoutMonth).
 import { supabase } from '../lib/supabase'
 import type {
   CommissionPost,
@@ -223,31 +229,132 @@ export class ProvisionService {
 
   // ─── Hämta poster ────────────────────────────────────────
 
-  static async getPostsForMonth(
-    month: string,
-    filters?: ProvisionFilters
+  /**
+   * Poster som tillhör en UTBETALNINGSMÅNAD ('YYYY-MM'), enligt DB-kolumnen
+   * payout_month.
+   *
+   * Poster utan payout_month (pending_invoice / obetald kundfaktura) har ingen
+   * bestämd månad ännu. Med `includePending` (default) hämtas de i en separat
+   * fråga och läggs sist i resultatet — UI:t placerar dem preliminärt via
+   * provisionPayout.getPostPayoutMonth / groupPostsByPayoutMonth. De filtreras
+   * alltså INTE bort här, annars försvinner obetald provision ur vyn.
+   */
+  static async getPostsForPayoutMonth(
+    monthKey: string,
+    filters?: ProvisionFilters,
+    options?: { includePending?: boolean }
   ): Promise<CommissionPost[]> {
-    const monthStart = `${month}-01`
-    const [year, m] = month.split('-').map(Number)
-    const nextMonth = m === 12 ? `${year + 1}-01-01` : `${year}-${String(m + 1).padStart(2, '0')}-01`
+    const includePending = options?.includePending !== false
 
-    let query = supabase
-      .from('commission_posts')
-      .select('*')
-      .gte('created_at', monthStart)
-      .lt('created_at', nextMonth)
-      .order('created_at', { ascending: false })
-
-    if (filters?.technician_id && filters.technician_id !== 'all') {
-      query = query.eq('technician_id', filters.technician_id)
-    }
-    if (filters?.status && filters.status !== 'all') {
-      query = query.eq('status', filters.status)
+    const applyFilters = <T extends { eq: (col: string, val: string) => T }>(q: T): T => {
+      let out = q
+      if (filters?.technician_id && filters.technician_id !== 'all') {
+        out = out.eq('technician_id', filters.technician_id)
+      }
+      if (filters?.status && filters.status !== 'all') {
+        out = out.eq('status', filters.status)
+      }
+      return out
     }
 
-    const { data, error } = await query
-    if (error) throw error
-    return data as CommissionPost[]
+    const monthQuery = applyFilters(
+      supabase
+        .from('commission_posts')
+        .select('*')
+        .eq('payout_month', monthKey)
+        .order('created_at', { ascending: false })
+    )
+
+    const pendingQuery = includePending
+      ? applyFilters(
+          supabase
+            .from('commission_posts')
+            .select('*')
+            .is('payout_month', null)
+            .order('created_at', { ascending: false })
+        )
+      : null
+
+    const [monthRes, pendingRes] = await Promise.all([
+      monthQuery,
+      pendingQuery ?? Promise.resolve({ data: [], error: null })
+    ])
+
+    if (monthRes.error) throw monthRes.error
+    if (pendingRes.error) throw pendingRes.error
+
+    return [
+      ...((monthRes.data || []) as CommissionPost[]),
+      ...((pendingRes.data || []) as CommissionPost[])
+    ]
+  }
+
+  /**
+   * Alla poster som kan höra hemma i ett år: allt med payout_month inom året
+   * PLUS poster utan payout_month (preliminära) PLUS poster skapade under året.
+   * Underlag för KPI:er ("intjänat i år" / "utbetalt i år") och sparklines —
+   * anroparen filtrerar/grupperar själv via utils/provisionPayout.
+   */
+  static async getAllPostsForYear(year: number): Promise<CommissionPost[]> {
+    const [byPayoutMonth, byCreated] = await Promise.all([
+      supabase
+        .from('commission_posts')
+        .select('*')
+        .or(`payout_month.gte.${year}-01,payout_month.is.null`)
+        .lte('payout_month', `${year}-12`)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('commission_posts')
+        .select('*')
+        .gte('created_at', `${year}-01-01`)
+        .lt('created_at', `${year + 1}-01-01`)
+        .order('created_at', { ascending: false })
+    ])
+
+    if (byPayoutMonth.error) throw byPayoutMonth.error
+    if (byCreated.error) throw byCreated.error
+
+    return this.dedupePosts([
+      ...((byPayoutMonth.data || []) as CommissionPost[]),
+      ...((byCreated.data || []) as CommissionPost[])
+    ])
+  }
+
+  /**
+   * Rullande fönster: innevarande månad + de föregående `months` månaderna.
+   * Räcker för 6/12-månaders sparklines utan att hämta hela ledgern.
+   */
+  static async getPostsForRecentMonths(months: number = 12, now: Date = new Date()): Promise<CommissionPost[]> {
+    const start = new Date(now.getFullYear(), now.getMonth() - months, 1)
+    const startMonthKey = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`
+    const startDate = `${startMonthKey}-01`
+
+    const [byPayoutMonth, byCreated] = await Promise.all([
+      supabase
+        .from('commission_posts')
+        .select('*')
+        .or(`payout_month.gte.${startMonthKey},payout_month.is.null`)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('commission_posts')
+        .select('*')
+        .gte('created_at', startDate)
+        .order('created_at', { ascending: false })
+    ])
+
+    if (byPayoutMonth.error) throw byPayoutMonth.error
+    if (byCreated.error) throw byCreated.error
+
+    return this.dedupePosts([
+      ...((byPayoutMonth.data || []) as CommissionPost[]),
+      ...((byCreated.data || []) as CommissionPost[])
+    ])
+  }
+
+  private static dedupePosts(posts: CommissionPost[]): CommissionPost[] {
+    const byId = new Map<string, CommissionPost>()
+    for (const p of posts) if (!byId.has(p.id)) byId.set(p.id, p)
+    return Array.from(byId.values())
   }
 
   static async getPostsByCase(caseId: string): Promise<CommissionPost[]> {
@@ -263,11 +370,12 @@ export class ProvisionService {
 
   // ─── Aggregerad data ─────────────────────────────────────
 
+  /** Summering per tekniker för en UTBETALNINGSMÅNAD (inkl. preliminära poster). */
   static async getTechnicianSummaries(
     month: string,
     filters?: ProvisionFilters
   ): Promise<ProvisionTechnicianSummary[]> {
-    const posts = await this.getPostsForMonth(month, filters)
+    const posts = await this.getPostsForPayoutMonth(month, filters)
 
     const map = new Map<string, ProvisionTechnicianSummary>()
 
@@ -292,8 +400,9 @@ export class ProvisionService {
     return Array.from(map.values()).sort((a, b) => b.total_commission - a.total_commission)
   }
 
+  /** KPI:er för en UTBETALNINGSMÅNAD (inkl. preliminära poster). */
   static async getKpis(month: string): Promise<ProvisionKpi> {
-    const posts = await this.getPostsForMonth(month)
+    const posts = await this.getPostsForPayoutMonth(month)
 
     const kpi: ProvisionKpi = {
       pending_invoice_total: 0,
@@ -332,10 +441,19 @@ export class ProvisionService {
 
   // ─── Statusändringar ─────────────────────────────────────
 
+  /**
+   * Statusbyte i det normala batch-flödet (ready_for_payout → approved → paid_out).
+   *
+   * Sätter ALDRIG payout_month eller invoice_paid_date — de ägs av DB-triggern
+   * trg_invoice_paid / compute_payout_month. Vill du undantagsvis flytta en post
+   * till ready_for_payout utan betald kundfaktura, använd
+   * markReadyForPayoutManually.
+   */
   static async updateStatus(
     ids: string[],
     newStatus: CommissionStatus,
-    approvedBy?: string
+    approvedBy?: string,
+    paidOutBy?: { userId: string | null; name: string | null }
   ): Promise<void> {
     const updateData: Record<string, unknown> = {
       status: newStatus,
@@ -349,14 +467,8 @@ export class ProvisionService {
 
     if (newStatus === 'paid_out') {
       updateData.paid_out_at = new Date().toISOString()
-    }
-
-    if (newStatus === 'ready_for_payout') {
-      // Beräkna payout_month = månaden efter nu
-      const now = new Date()
-      const payoutDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-      updateData.payout_month = `${payoutDate.getFullYear()}-${String(payoutDate.getMonth() + 1).padStart(2, '0')}`
-      updateData.invoice_paid_date = now.toISOString().split('T')[0]
+      updateData.paid_out_by = paidOutBy?.userId ?? null
+      updateData.paid_out_by_name = paidOutBy?.name ?? null
     }
 
     const { error } = await supabase
@@ -367,25 +479,65 @@ export class ProvisionService {
     if (error) throw error
   }
 
-  static async markInvoicePaid(
+  /**
+   * Markerar poster som utbetalda och sparar VEM som gjorde det (spårbarhet
+   * mot löneunderlaget).
+   */
+  static async markAsPaidOut(
     ids: string[],
-    paidDate: string
+    paidOutBy: { userId: string | null; name: string | null }
   ): Promise<void> {
-    const date = new Date(paidDate)
-    const payoutDate = new Date(date.getFullYear(), date.getMonth() + 1, 1)
-    const payoutMonth = `${payoutDate.getFullYear()}-${String(payoutDate.getMonth() + 1).padStart(2, '0')}`
+    return this.updateStatus(ids, 'paid_out', undefined, paidOutBy)
+  }
 
-    const { error } = await supabase
+  /**
+   * ⚠️ UNDANTAGSVÄG — KRINGGÅR REGELN "provision betalas först när kundfakturan
+   * är betald".
+   *
+   * Normalvägen är DB-triggern trg_invoice_paid: när kundfakturan får status
+   * 'paid' flyttas posten till ready_for_payout och payout_month sätts av
+   * compute_payout_month(). Den här metoden flyttar posten manuellt, t.ex. vid
+   * en betalning som aldrig registrerades i Fortnox.
+   *
+   * Därför:
+   *  - invoice_paid_date sätts INTE (lämnas null) — vi fejkar aldrig ett
+   *    betaldatum som inte finns.
+   *  - payout_month sätts INTE — posten saknar månad och UI:t placerar den
+   *    preliminärt tills en riktig betalning kommer in.
+   *  - notes får en spårbar rad om att statusen satts manuellt.
+   *
+   * Använd bara efter medvetet beslut, inte som del av batch-flödet.
+   */
+  static async markReadyForPayoutManually(
+    postIds: string[],
+    opts: { reason?: string; byName?: string } = {}
+  ): Promise<void> {
+    if (postIds.length === 0) return
+
+    const { data: existing, error: readError } = await supabase
       .from('commission_posts')
-      .update({
-        status: 'ready_for_payout',
-        invoice_paid_date: paidDate,
-        payout_month: payoutMonth,
-        updated_at: new Date().toISOString()
-      })
-      .in('id', ids)
+      .select('id, notes')
+      .in('id', postIds)
 
-    if (error) throw error
+    if (readError) throw readError
+
+    const stamp = new Date().toISOString().split('T')[0]
+    const who = opts.byName ? ` av ${opts.byName}` : ''
+    const why = opts.reason ? ` Orsak: ${opts.reason}` : ''
+    const note = `[${stamp}] Manuellt satt till redo för utbetalning${who} utan registrerad fakturabetalning.${why}`
+
+    for (const row of (existing || []) as Array<{ id: string; notes: string | null }>) {
+      const { error } = await supabase
+        .from('commission_posts')
+        .update({
+          status: 'ready_for_payout',
+          notes: row.notes ? `${row.notes}\n${note}` : note,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', row.id)
+
+      if (error) throw error
+    }
   }
 
   // ─── Radera ──────────────────────────────────────────────

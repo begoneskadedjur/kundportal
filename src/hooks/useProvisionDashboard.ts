@@ -1,3 +1,10 @@
+// src/hooks/useProvisionDashboard.ts — Provisioner 2.0
+//
+// Utbetalningsmånaden ÄGS AV DATABASEN (commission_posts.payout_month).
+// Hooken räknar ALDRIG ut månaden själv: grupperingen görs av den delade
+// groupPostsByPayoutMonth i utils/provisionPayout, exakt samma funktion som
+// teknikervyn använder — så att lön och tekniker per konstruktion ser samma
+// summa för samma månad.
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { ProvisionService } from '../services/provisionService'
 import type {
@@ -7,45 +14,89 @@ import type {
   ProvisionKpi,
   ProvisionTechnicianSummary,
   ProvisionFilters,
-  MonthSelection,
-  PayoutTechnicianSummary,
-  MonthlyProvisionSummary,
-  TechnicianPayoutEntry
+  MonthSelection
 } from '../types/provision'
-import { getCurrentMonth, getMonthOptions, formatSwedishMonth } from '../types/provision'
+import { getCurrentMonth, getMonthOptions } from '../types/provision'
+import {
+  DEFAULT_PAYOUT_CUTOFF_DAY,
+  UNPAID_AGE_WARNING_DAYS,
+  groupPostsByPayoutMonth,
+  monthlyEarnedSeries,
+  daysSince,
+  type PayoutMonthGroup
+} from '../utils/provisionPayout'
+
+/** En tekniker inom en payout-månadsgrupp (adminvyns teknikerrader). */
+export interface PayoutMonthTechnician {
+  technician_id: string
+  technician_name: string
+  posts: CommissionPost[]
+  post_count: number
+  total_commission: number
+  statuses: { pending: number; ready: number; approved: number; paid: number }
+  /** 6 månaders intjänandeserie för teknikerns sparkline */
+  spark: number[]
+}
+
+/** Månadsgrupp med teknikeruppdelning + andel utbetalt (procentringen). */
+export interface PayoutMonthView extends PayoutMonthGroup {
+  technicians: PayoutMonthTechnician[]
+  technician_count: number
+  /** utbetald andel av gruppens totala provision, 0..1 */
+  paid_ratio: number
+}
+
+/** Arbetskön: de fem cellerna högst upp på adminsidan. */
+export interface ProvisionWorkQueue {
+  pending: { count: number; total: number; oldestDays: number; warn: boolean }
+  ready: { count: number; total: number }
+  approved: { count: number; total: number }
+  paidThisYear: { count: number; total: number }
+  earnedThisYear: { count: number; total: number }
+}
+
+const emptyKpis = (): ProvisionKpi => ({
+  pending_invoice_total: 0, pending_invoice_count: 0,
+  ready_for_payout_total: 0, ready_for_payout_count: 0,
+  approved_total: 0, approved_count: 0,
+  paid_out_total: 0, paid_out_count: 0
+})
 
 export function useProvisionDashboard() {
   const [selectedMonth, setSelectedMonth] = useState<MonthSelection>(getCurrentMonth())
   const [filters, setFilters] = useState<ProvisionFilters>({})
   const [searchQuery, setSearchQuery] = useState('')
-  const [kpis, setKpis] = useState<ProvisionKpi>({
-    pending_invoice_total: 0, pending_invoice_count: 0,
-    ready_for_payout_total: 0, ready_for_payout_count: 0,
-    approved_total: 0, approved_count: 0,
-    paid_out_total: 0, paid_out_count: 0
-  })
+  const [kpis, setKpis] = useState<ProvisionKpi>(emptyKpis())
   const [summaries, setSummaries] = useState<ProvisionTechnicianSummary[]>([])
   const [settings, setSettings] = useState<CommissionSettings | null>(null)
+  const [yearPosts, setYearPosts] = useState<CommissionPost[]>([])
+  const [trendPosts, setTrendPosts] = useState<CommissionPost[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [actionLoading, setActionLoading] = useState(false)
   const [availableTechnicians, setAvailableTechnicians] = useState<Array<{ id: string; name: string }>>([])
 
   const monthOptions = getMonthOptions(12)
+  const cutoffDay = settings?.payout_cutoff_day ?? DEFAULT_PAYOUT_CUTOFF_DAY
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [kpiData, summaryData, settingsData, techsData] = await Promise.all([
+      const year = new Date().getFullYear()
+      const [kpiData, summaryData, settingsData, techsData, yearData, trendData] = await Promise.all([
         ProvisionService.getKpis(selectedMonth.value),
         ProvisionService.getTechnicianSummaries(selectedMonth.value, filters),
         ProvisionService.getSettings(),
-        ProvisionService.getAvailableTechnicians()
+        ProvisionService.getAvailableTechnicians(),
+        ProvisionService.getAllPostsForYear(year),
+        ProvisionService.getPostsForRecentMonths(6)
       ])
       setKpis(kpiData)
       setSummaries(summaryData)
       setSettings(settingsData)
       setAvailableTechnicians(techsData)
+      setYearPosts(yearData)
+      setTrendPosts(trendData)
     } catch (err) {
       console.error('Kunde inte ladda provisionsdata:', err)
     } finally {
@@ -57,7 +108,8 @@ export function useProvisionDashboard() {
     loadData()
   }, [loadData])
 
-  // Navigation
+  // ─── Navigation ────────────────────────────────────────────
+
   const navigateMonth = useCallback((direction: 'prev' | 'next') => {
     const currentIdx = monthOptions.findIndex(m => m.value === selectedMonth.value)
     if (direction === 'prev' && currentIdx < monthOptions.length - 1) {
@@ -77,7 +129,8 @@ export function useProvisionDashboard() {
   const canNavigatePrev = monthOptions.findIndex(m => m.value === selectedMonth.value) < monthOptions.length - 1
   const canNavigateNext = monthOptions.findIndex(m => m.value === selectedMonth.value) > 0
 
-  // Flat list of all posts with search filtering
+  // ─── Poster i vald payout-månad (+ sökfilter) ──────────────
+
   const allPosts: CommissionPost[] = useMemo(() => {
     const posts = summaries.flatMap(s => s.posts)
     if (!searchQuery.trim()) return posts
@@ -89,129 +142,120 @@ export function useProvisionDashboard() {
     )
   }, [summaries, searchQuery])
 
-  // Aggregerad utbetalningsöversikt per tekniker
-  const payoutSummary: PayoutTechnicianSummary[] = useMemo(() => {
-    const cutoff = settings?.payout_cutoff_day ?? 20
-    const byTech = new Map<string, PayoutTechnicianSummary>()
+  // ─── Månadsgrupper på payout_month (DELAD logik) ───────────
 
-    for (const post of allPosts) {
-      let existing = byTech.get(post.technician_id)
-      if (!existing) {
-        existing = {
-          technician_id: post.technician_id,
-          technician_name: post.technician_name,
-          post_count: 0,
-          total_commission: 0,
-          payout_month: null,
-          statuses: { pending: 0, ready: 0, approved: 0, paid: 0 }
-        }
-        byTech.set(post.technician_id, existing)
-      }
-      existing.post_count++
-      existing.total_commission += post.commission_amount
-      if (post.status === 'pending_invoice') existing.statuses.pending++
-      else if (post.status === 'ready_for_payout') existing.statuses.ready++
-      else if (post.status === 'approved') existing.statuses.approved++
-      else if (post.status === 'paid_out') existing.statuses.paid++
+  const payoutMonths: PayoutMonthView[] = useMemo(() => {
+    const groups = groupPostsByPayoutMonth(allPosts, cutoffDay)
 
-      // Beräkna utbetalningsmånad baserat på invoice_paid_date + brytdatum
-      if (post.invoice_paid_date) {
-        const paidDate = new Date(post.invoice_paid_date)
-        const day = paidDate.getDate()
-        let payoutYear = paidDate.getFullYear()
-        let payoutMonth = paidDate.getMonth() // 0-indexed
-        if (day > cutoff) {
-          payoutMonth++
-          if (payoutMonth > 11) { payoutMonth = 0; payoutYear++ }
-        }
-        const pm = `${payoutYear}-${String(payoutMonth + 1).padStart(2, '0')}`
-        if (!existing.payout_month || pm < existing.payout_month) {
-          existing.payout_month = pm
-        }
-      }
+    // 6-månaderstrend per tekniker, från det rullande fönstret
+    const trendByTech = new Map<string, CommissionPost[]>()
+    for (const p of trendPosts) {
+      const list = trendByTech.get(p.technician_id)
+      if (list) list.push(p)
+      else trendByTech.set(p.technician_id, [p])
     }
 
-    return Array.from(byTech.values()).sort((a, b) => a.technician_name.localeCompare(b.technician_name))
-  }, [allPosts, settings?.payout_cutoff_day])
+    return groups.map(group => {
+      const byTech = new Map<string, PayoutMonthTechnician>()
 
-  // Månadsaggregerad utbetalningsvy
-  const monthlyPayouts: MonthlyProvisionSummary[] = useMemo(() => {
-    const cutoff = settings?.payout_cutoff_day ?? 20
-    const byMonth = new Map<string, Map<string, CommissionPost[]>>()
-
-    for (const post of allPosts) {
-      let monthKey: string
-      if (post.invoice_paid_date && post.status !== 'pending_invoice') {
-        const paidDate = new Date(post.invoice_paid_date)
-        const day = paidDate.getDate()
-        let year = paidDate.getFullYear()
-        let month = paidDate.getMonth() // 0-indexed
-        if (day > cutoff) {
-          month++
-          if (month > 11) { month = 0; year++ }
+      for (const post of group.posts) {
+        let entry = byTech.get(post.technician_id)
+        if (!entry) {
+          entry = {
+            technician_id: post.technician_id,
+            technician_name: post.technician_name,
+            posts: [],
+            post_count: 0,
+            total_commission: 0,
+            statuses: { pending: 0, ready: 0, approved: 0, paid: 0 },
+            spark: monthlyEarnedSeries(trendByTech.get(post.technician_id) || [], 6)
+          }
+          byTech.set(post.technician_id, entry)
         }
-        monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
-      } else {
-        // pending_invoice: grupperas per skapad-månad
-        const created = new Date(post.created_at)
-        monthKey = `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`
+        entry.posts.push(post)
+        entry.post_count++
+        entry.total_commission += post.commission_amount
+        if (post.status === 'pending_invoice') entry.statuses.pending++
+        else if (post.status === 'ready_for_payout') entry.statuses.ready++
+        else if (post.status === 'approved') entry.statuses.approved++
+        else if (post.status === 'paid_out') entry.statuses.paid++
       }
 
-      if (!byMonth.has(monthKey)) byMonth.set(monthKey, new Map())
-      const techMap = byMonth.get(monthKey)!
-      if (!techMap.has(post.technician_id)) techMap.set(post.technician_id, [])
-      techMap.get(post.technician_id)!.push(post)
-    }
+      const technicians = Array.from(byTech.values())
+        .sort((a, b) => a.technician_name.localeCompare(b.technician_name, 'sv'))
 
-    const result: MonthlyProvisionSummary[] = []
-    for (const [monthKey, techMap] of byMonth) {
-      const technicians: TechnicianPayoutEntry[] = []
-      const monthStatuses = { pending: 0, ready: 0, approved: 0, paid: 0 }
-
-      for (const [techId, posts] of techMap) {
-        const statuses = { pending: 0, ready: 0, approved: 0, paid: 0 }
-        let total = 0
-        for (const p of posts) {
-          total += p.commission_amount
-          if (p.status === 'pending_invoice') statuses.pending++
-          else if (p.status === 'ready_for_payout') statuses.ready++
-          else if (p.status === 'approved') statuses.approved++
-          else if (p.status === 'paid_out') statuses.paid++
-        }
-        monthStatuses.pending += statuses.pending
-        monthStatuses.ready += statuses.ready
-        monthStatuses.approved += statuses.approved
-        monthStatuses.paid += statuses.paid
-
-        technicians.push({
-          technician_id: techId,
-          technician_name: posts[0].technician_name,
-          posts,
-          total_commission: total,
-          post_count: posts.length,
-          statuses
-        })
-      }
-
-      technicians.sort((a, b) => a.technician_name.localeCompare(b.technician_name, 'sv'))
-
-      result.push({
-        month_key: monthKey,
-        month_label: formatSwedishMonth(monthKey),
+      return {
+        ...group,
         technicians,
-        total_technicians: technicians.length,
-        total_posts: technicians.reduce((s, t) => s + t.post_count, 0),
-        total_commission: technicians.reduce((s, t) => s + t.total_commission, 0),
-        statuses: monthStatuses
-      })
+        technician_count: technicians.length,
+        paid_ratio: group.total_commission > 0
+          ? group.status_totals.paid / group.total_commission
+          : 0
+      }
+    })
+  }, [allPosts, cutoffDay, trendPosts])
+
+  // ─── Arbetskön (fem celler) ────────────────────────────────
+
+  const workQueue: ProvisionWorkQueue = useMemo(() => {
+    const now = new Date()
+    const queue: ProvisionWorkQueue = {
+      pending: { count: 0, total: 0, oldestDays: 0, warn: false },
+      ready: { count: 0, total: 0 },
+      approved: { count: 0, total: 0 },
+      paidThisYear: { count: 0, total: 0 },
+      earnedThisYear: { count: 0, total: 0 }
+    }
+    const year = now.getFullYear()
+
+    for (const post of yearPosts) {
+      const createdYear = new Date(post.created_at).getFullYear()
+
+      if (createdYear === year) {
+        queue.earnedThisYear.count++
+        queue.earnedThisYear.total += post.commission_amount
+      }
+
+      switch (post.status) {
+        case 'pending_invoice': {
+          queue.pending.count++
+          queue.pending.total += post.commission_amount
+          const age = daysSince(post.created_at, now)
+          if (age > queue.pending.oldestDays) queue.pending.oldestDays = age
+          break
+        }
+        case 'ready_for_payout':
+          queue.ready.count++
+          queue.ready.total += post.commission_amount
+          break
+        case 'approved':
+          queue.approved.count++
+          queue.approved.total += post.commission_amount
+          break
+        case 'paid_out':
+          if (post.payout_month?.startsWith(String(year)) || createdYear === year) {
+            queue.paidThisYear.count++
+            queue.paidThisYear.total += post.commission_amount
+          }
+          break
+      }
     }
 
-    // Sortera senaste månad först
-    result.sort((a, b) => b.month_key.localeCompare(a.month_key))
-    return result
-  }, [allPosts, settings?.payout_cutoff_day])
+    queue.pending.warn = queue.pending.oldestDays > UNPAID_AGE_WARNING_DAYS
+    return queue
+  }, [yearPosts])
 
-  // Selection
+  // ─── Flödesband i sidhuvudet ───────────────────────────────
+
+  const flowSegments = useMemo(() => ([
+    { label: 'Väntar', value: workQueue.pending.total, tone: 'slate' as const },
+    { label: 'Redo', value: workQueue.ready.total, tone: 'brand' as const },
+    { label: 'Godkänt', value: workQueue.approved.total, tone: 'amber' as const },
+    { label: 'Utbetalt i år', value: workQueue.paidThisYear.total, tone: 'dim' as const }
+  ]), [workQueue])
+
+  // ─── Selection ─────────────────────────────────────────────
+
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev)
@@ -223,67 +267,53 @@ export function useProvisionDashboard() {
 
   const toggleAll = useCallback(() => {
     const allIds = summaries.flatMap(s => s.posts.map(p => p.id))
-    const allSelected = allIds.every(id => selectedIds.has(id))
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
     setSelectedIds(allSelected ? new Set() : new Set(allIds))
   }, [summaries, selectedIds])
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
 
-  // Actions
+  // ─── Statusfilter via arbetskön ────────────────────────────
+
+  const setStatusFilter = useCallback((status: CommissionStatus | null) => {
+    setFilters(prev => ({ ...prev, status: status ?? undefined }))
+    setSelectedIds(new Set())
+  }, [])
+
+  // ─── Åtgärder ──────────────────────────────────────────────
+
+  const runAction = useCallback(async (fn: () => Promise<void>) => {
+    setActionLoading(true)
+    try {
+      await fn()
+      setSelectedIds(new Set())
+      await loadData()
+    } finally {
+      setActionLoading(false)
+    }
+  }, [loadData])
+
   const approveSelected = useCallback(async (approvedBy: string) => {
     if (selectedIds.size === 0) return
-    setActionLoading(true)
-    try {
-      await ProvisionService.updateStatus(
-        Array.from(selectedIds),
-        'approved',
-        approvedBy
-      )
-      setSelectedIds(new Set())
-      await loadData()
-    } catch (err) {
-      console.error('Kunde inte godkänna:', err)
-      throw err
-    } finally {
-      setActionLoading(false)
-    }
-  }, [selectedIds, loadData])
+    await runAction(() => ProvisionService.updateStatus(Array.from(selectedIds), 'approved', approvedBy))
+  }, [selectedIds, runAction])
 
-  const markPaidOut = useCallback(async () => {
+  const markPaidOut = useCallback(async (paidOutBy?: { userId: string | null; name: string | null }) => {
     if (selectedIds.size === 0) return
-    setActionLoading(true)
-    try {
-      await ProvisionService.updateStatus(
-        Array.from(selectedIds),
-        'paid_out'
-      )
-      setSelectedIds(new Set())
-      await loadData()
-    } catch (err) {
-      console.error('Kunde inte markera utbetalda:', err)
-      throw err
-    } finally {
-      setActionLoading(false)
-    }
-  }, [selectedIds, loadData])
+    await runAction(() => ProvisionService.markAsPaidOut(
+      Array.from(selectedIds),
+      paidOutBy ?? { userId: null, name: null }
+    ))
+  }, [selectedIds, runAction])
 
-  const markReadyForPayout = useCallback(async () => {
+  /**
+   * ⚠️ Undantagsväg: kringgår regeln "provision betalas först när kundfakturan
+   * är betald". Sätter varken invoice_paid_date eller payout_month.
+   */
+  const markReadyForPayout = useCallback(async (opts: { reason?: string; byName?: string } = {}) => {
     if (selectedIds.size === 0) return
-    setActionLoading(true)
-    try {
-      await ProvisionService.updateStatus(
-        Array.from(selectedIds),
-        'ready_for_payout'
-      )
-      setSelectedIds(new Set())
-      await loadData()
-    } catch (err) {
-      console.error('Kunde inte markera redo:', err)
-      throw err
-    } finally {
-      setActionLoading(false)
-    }
-  }, [selectedIds, loadData])
+    await runAction(() => ProvisionService.markReadyForPayoutManually(Array.from(selectedIds), opts))
+  }, [selectedIds, runAction])
 
   return {
     // State
@@ -293,8 +323,11 @@ export function useProvisionDashboard() {
     kpis,
     summaries,
     allPosts,
-    payoutSummary,
-    monthlyPayouts,
+    payoutMonths,
+    workQueue,
+    flowSegments,
+    cutoffDay,
+    yearPosts,
     settings,
     loading,
     selectedIds,
@@ -307,6 +340,7 @@ export function useProvisionDashboard() {
     navigateMonth,
     goToMonth,
     setFilters,
+    setStatusFilter,
     setSearchQuery,
     toggleSelect,
     toggleAll,

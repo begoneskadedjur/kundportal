@@ -1,11 +1,45 @@
 // src/services/provisionExportService.ts - Exportfunktioner för provision
+import { supabase } from '../lib/supabase'
 import type { CommissionPost, ProvisionTechnicianSummary } from '../types/provision'
 import { formatSwedishMonth } from '../types/provision'
 
+/** Vem som kör exporten - loggas i commission_export_log för spårbarhet. */
+export interface ProvisionExporter {
+  userId: string | null
+  name: string | null
+}
+
 export class ProvisionExportService {
+  /**
+   * Loggar en genomförd export i commission_export_log.
+   * Ett loggfel får ALDRIG blockera nedladdningen - CSV:n är redan hos
+   * användaren när detta körs, så vi loggar bara till konsolen.
+   */
+  private static async logExport(params: {
+    exporter?: ProvisionExporter
+    payoutMonth: string
+    postIds: string[]
+    totalAmount: number
+  }): Promise<void> {
+    try {
+      const { error } = await supabase.from('commission_export_log').insert({
+        exported_by: params.exporter?.userId ?? null,
+        exported_by_name: params.exporter?.name ?? null,
+        payout_month: params.payoutMonth,
+        post_ids: params.postIds,
+        post_count: params.postIds.length,
+        total_amount: Math.round(params.totalAmount * 100) / 100
+      })
+      if (error) throw error
+    } catch (err) {
+      console.error('Kunde inte logga provisionsexport (nedladdningen påverkas ej):', err)
+    }
+  }
+
   static exportPayrollCSV(
     summaries: ProvisionTechnicianSummary[],
-    month: string
+    month: string,
+    exporter?: ProvisionExporter
   ): void {
     const monthDisplay = formatSwedishMonth(month)
     const headers = [
@@ -37,13 +71,21 @@ export class ProvisionExportService {
     a.download = `provision_loneunderlag_${month}.csv`
     a.click()
     URL.revokeObjectURL(url)
+
+    // Fire-and-forget: loggen får inte hålla upp eller fälla nedladdningen
+    void this.logExport({
+      exporter,
+      payoutMonth: month,
+      postIds: summaries.flatMap(s => s.posts.map(p => p.id)),
+      totalAmount: summaries.reduce((sum, s) => sum + s.total_commission, 0)
+    })
   }
 
   static exportDetailedCSV(
     posts: CommissionPost[],
-    month: string
+    month: string,
+    exporter?: ProvisionExporter
   ): void {
-    const monthDisplay = formatSwedishMonth(month)
     const headers = [
       'Ärendenr',
       'Titel',
@@ -98,5 +140,27 @@ export class ProvisionExportService {
     a.download = `provision_detaljer_${month}.csv`
     a.click()
     URL.revokeObjectURL(url)
+
+    void this.logExport({
+      exporter,
+      payoutMonth: month,
+      postIds: posts.map(p => p.id),
+      totalAmount: posts.reduce((sum, p) => sum + p.commission_amount, 0)
+    })
+  }
+
+  /** Historik: senaste löneunderlagsexporterna (för admin-vyns spårbarhet). */
+  static async getExportHistory(payoutMonth?: string, limit = 20) {
+    let query = supabase
+      .from('commission_export_log')
+      .select('*')
+      .order('exported_at', { ascending: false })
+      .limit(limit)
+
+    if (payoutMonth) query = query.eq('payout_month', payoutMonth)
+
+    const { data, error } = await query
+    if (error) throw error
+    return data || []
   }
 }

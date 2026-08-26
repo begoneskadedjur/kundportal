@@ -25,6 +25,10 @@ export interface CommissionPost {
   approved_by: string | null
   approved_at: string | null
   paid_out_at: string | null
+  /** profiles.user_id för den som markerade posten som utbetald (spårbarhet) */
+  paid_out_by: string | null
+  /** Fryst visningsnamn för den som markerade posten som utbetald */
+  paid_out_by_name: string | null
   notes: string | null
   is_rot_rut: boolean
   rot_rut_original_amount: number | null
@@ -49,6 +53,22 @@ export interface CommissionPostInsert {
   notes?: string
   is_rot_rut?: boolean
   rot_rut_original_amount?: number
+}
+
+/**
+ * En rad i commission_export_log: ett genererat löneunderlag.
+ * Loggas efter lyckad CSV-export så samma post aldrig hamnar i två underlag
+ * utan spårbarhet.
+ */
+export interface CommissionExportLog {
+  id: string
+  exported_by: string | null
+  exported_by_name: string | null
+  exported_at: string
+  payout_month: string | null
+  post_ids: string[]
+  post_count: number
+  total_amount: number
 }
 
 export interface TechnicianShare {
