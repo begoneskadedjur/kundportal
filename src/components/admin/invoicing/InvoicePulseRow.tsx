@@ -12,6 +12,7 @@ import type { CaseContext } from '../../../hooks/useCaseContext'
 import {
   MARGIN_BAD_BELOW,
   MARGIN_WARN_BELOW,
+  PRE_SEND_STATUSES,
   SENT_LIKE_STATUSES,
   daysBetween,
   localDateKey,
@@ -217,8 +218,12 @@ export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, case
             <div className="text-[11px] text-amber-400 tabular-nums truncate">
               avviker från villkor · förfall {invoice.due_date}
             </div>
+          ) : !PRE_SEND_STATUSES.includes(invoice.status) && invoice.due_date ? (
+            /* Skickad till Fortnox (t.ex. utkast) — förfallodatumet är satt */
+            <div className="text-[11px] text-slate-500 tabular-nums truncate">förfall {invoice.due_date}</div>
           ) : (
-            <div className="text-[11px] text-slate-500 truncate">förfall sätts vid utkast</div>
+            /* Före sändning: preliminärt datum — villkoret räknas från sändningen */
+            <div className="text-[11px] text-slate-500 truncate">förfall sätts vid sändning</div>
           )}
         </PulseCell>
       )}

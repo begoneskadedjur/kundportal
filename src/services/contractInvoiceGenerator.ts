@@ -796,7 +796,9 @@ export class ContractInvoiceGenerator {
       await this.recalculateInvoiceTotals(invoiceId)
     } else {
       const invNum = await this.generateInvoiceNumber()
-      const due = parseLocalDate(monthStart)
+      // Preliminärt förfallodatum: skapandedagen + betalningsvillkor. Det
+      // slutliga förfallodatumet sätts om vid sändningen till Fortnox.
+      const due = new Date()
       const paymentTermsDays = await PaymentTermsService.getDays('contract')
       due.setDate(due.getDate() + paymentTermsDays)
       const c = customer as CustomerRow

@@ -17,11 +17,11 @@ export const MARGIN_BAD_BELOW = 0
 export const MARGIN_WARN_BELOW = 15
 // Premieavstämning: fakturans subtotal mot avtalets årspremie, tolerans i kr
 const PREMIUM_TOLERANCE_KR = 1
-// Betalvillkorskontroll: due_date − created_at får avvika så här många dagar
+// Betalvillkorskontroll (efter sändning): due_date − sent_at får avvika så här många dagar
 const TERMS_DEVIATION_TOLERANCE_DAYS = 2
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const PRE_SEND_STATUSES = ['pending_approval', 'ready']
+export const PRE_SEND_STATUSES = ['pending_approval', 'ready']
 export const SENT_LIKE_STATUSES = ['sent', 'booked', 'paid', 'overdue']
 
 // Lokal svensk dagnyckel (toISOString vore UTC och kan ge fel dygn kvällstid)
@@ -63,7 +63,8 @@ export interface InvoicePulse {
   loading: boolean
   /** Betalvillkor i dagar för fakturans kategori, null om uppslag misslyckades */
   termsDays: number | null
-  /** Pre-send: due_date avviker >2 dgr från villkoret */
+  /** Efter sändning till Fortnox: due_date avviker >2 dgr från sent_at + villkoret.
+   *  Före sändning är förfallodatumet preliminärt — då varnas aldrig. */
   termsDeviation: boolean
   /** Avtalets årspremie (endast contract-fakturor), null = saknas/ej tillämpligt */
   annualValue: number | null
@@ -243,11 +244,15 @@ export function useInvoicePulse(invoice: InvoiceWithItems | null): InvoicePulse 
         }
       }
 
+      // Betalningsvillkoret gäller från sändningen till Fortnox — avvikelse
+      // jämförs mot sent_at och bara efter sändning. Före sändning är
+      // förfallodatumet preliminärt (räknas om vid sändningen).
       const termsDeviation =
-        PRE_SEND_STATUSES.includes(invoice.status) &&
+        !PRE_SEND_STATUSES.includes(invoice.status) &&
+        !!invoice.sent_at &&
         !!invoice.due_date &&
         termsDays != null &&
-        Math.abs(daysBetween(invoice.due_date, invoice.created_at) - termsDays) > TERMS_DEVIATION_TOLERANCE_DAYS
+        Math.abs(daysBetween(invoice.due_date, invoice.sent_at) - termsDays) > TERMS_DEVIATION_TOLERANCE_DAYS
 
       const premiumMismatch =
         invoice.invoice_type === 'contract' &&
@@ -276,7 +281,7 @@ export function useInvoicePulse(invoice: InvoiceWithItems | null): InvoicePulse 
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoice?.id, invoice?.status, invoice?.due_date])
+  }, [invoice?.id, invoice?.status, invoice?.due_date, invoice?.sent_at])
 
   return pulse
 }

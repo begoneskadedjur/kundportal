@@ -41,6 +41,7 @@ import { InvoiceService } from '../../../services/invoiceService'
 import { FortnoxService } from '../../../services/fortnoxService'
 import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerResolver'
 import { isPersonnummer } from '../../../services/fortnoxService'
+import { PaymentTermsService, type BillingCategory } from '../../../services/paymentTermsService'
 import type { InvoiceWithItems, InvoiceStatus } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
 import { ROT_RUT_PERCENT } from '../../../types/caseBilling'
@@ -725,9 +726,19 @@ export default function InvoiceDetailModal({
       }))
 
       // 4. Skapa faktura i Fortnox
+      // Betalningsvillkoret gäller FRÅN sändningen till Fortnox: förfallodatum
+      // = idag + kategorins dagar (PaymentTermsService). Ett ev. preliminärt/
+      // manuellt satt due_date på fakturan skrivs medvetet över här.
       const today = new Date().toISOString().split('T')[0]
-      const dueDate = invoice.due_date || new Date(new Date(today).getTime() + 30 * 24 * 60 * 60 * 1000)
-        .toISOString().split('T')[0]
+      const termsCategory: BillingCategory =
+        invoice.case_type === 'private' ? 'private'
+        : invoice.case_type === 'business' ? 'business'
+        : effectiveCaseType === 'contract' ? 'contract'
+        : isPersonnummer(invoice.organization_number) ? 'private' : 'business'
+      const paymentTermsDays = await PaymentTermsService.getDays(termsCategory)
+      const dueDateObj = new Date()
+      dueDateObj.setDate(dueDateObj.getDate() + paymentTermsDays)
+      const dueDate = `${dueDateObj.getFullYear()}-${String(dueDateObj.getMonth() + 1).padStart(2, '0')}-${String(dueDateObj.getDate()).padStart(2, '0')}`
 
       // Leveransdatum: när jobbet utfördes (completed_date primärt, start_date fallback)
       const deliveryDateRaw = (caseMeta as any)?.completed_date || (caseMeta as any)?.start_date
@@ -785,10 +796,10 @@ export default function InvoiceDetailModal({
         }
       }
 
-      // 5. Spara DocumentNumber på fakturan
+      // 5. Spara DocumentNumber + det förfallodatum som skickades till Fortnox
       await supabase
         .from('invoices')
-        .update({ fortnox_document_number: fortnoxInvoice.DocumentNumber })
+        .update({ fortnox_document_number: fortnoxInvoice.DocumentNumber, due_date: dueDate })
         .eq('id', invoice.id)
 
       // 6. Uppdatera status till draft (utkast i Fortnox — ej bokfört, ej skickat ännu)
@@ -901,7 +912,8 @@ export default function InvoiceDetailModal({
     if (invoice.rot_rut_type && !invoice.fastighetsbeteckning) {
       blockers.push({ label: 'fastighetsbeteckning saknas för ROT/RUT' })
     }
-    if (pulse.termsDeviation) blockers.push({ label: 'förfallodatum avviker från betalvillkor' })
+    // Förfallodatum är preliminärt före sändning (sätts om vid sändningen till
+    // Fortnox) — därför är villkorsavvikelse inte längre ett hinder här.
     if (pulse.premiumMismatch) blockers.push({ label: 'premien avviker från avtalet' })
     // Enligt avtal-läget är INTE ett hinder — negativ marginal på avtalat
     // fast pris är avtalad. Bara faktisk avvikelse mot prislistan flaggas.

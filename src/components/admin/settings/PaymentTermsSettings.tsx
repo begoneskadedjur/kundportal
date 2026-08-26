@@ -88,9 +88,9 @@ export default function PaymentTermsSettings() {
           Betalningsvillkor
         </h1>
         <p className="text-sm text-slate-400">
-          Antal dagar från fakturadatum till förfallodatum, per kundkategori. Påverkar
-          alla nya fakturor som skapas. Befintliga fakturor behåller sina datum, men
-          kan justeras manuellt på fakturadetalj-sidan.
+          Antal dagar från att fakturan skickas till Fortnox till förfallodatum, per
+          kundkategori. Förfallodatumet sätts vid sändningen — datum på fakturor som
+          ännu inte skickats är preliminära och räknas om då.
         </p>
       </div>
 
