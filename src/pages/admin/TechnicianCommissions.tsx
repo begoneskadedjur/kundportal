@@ -815,6 +815,9 @@ function PostRow({ post, selected, onToggle, onOpenInvoice, opening, showTechnic
 
       <span className="text-slate-300 truncate min-w-0 flex-1">
         {post.case_title || '—'}
+        {post.visit_number != null && (
+          <span className="text-slate-500 tabular-nums"> · Besök {post.visit_number}</span>
+        )}
         {showTechnician && <span className="text-slate-500"> · {post.technician_name}</span>}
       </span>
 

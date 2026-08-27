@@ -610,7 +610,14 @@ export type Database = {
           materials_used: string | null
           pest_level: number | null
           problem_rating: number | null
-          visit_number: number | null
+          visit_number: number
+          case_type: 'private' | 'business' | 'contract'
+          customer_id: string | null
+          completed_date: string | null
+          revenue: number | null
+          cost: number | null
+          is_final: boolean
+          source: string
         }
         Insert: Omit<Database['public']['Tables']['visits']['Row'], 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['visits']['Insert']>

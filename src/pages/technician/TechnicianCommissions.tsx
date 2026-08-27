@@ -467,6 +467,9 @@ function TechPostRow({ post, monthKey, now }: {
 
       <span className={`truncate min-w-0 flex-1 ${dim ? 'text-slate-500' : 'text-slate-300'}`}>
         {post.case_title || '—'}
+        {post.visit_number != null && (
+          <span className="text-slate-500 tabular-nums"> · Besök {post.visit_number}</span>
+        )}
       </span>
 
       <span className="tabular-nums whitespace-nowrap flex-shrink-0 w-[220px] text-right">

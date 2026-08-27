@@ -32,6 +32,10 @@ export interface CommissionPost {
   notes: string | null
   is_rot_rut: boolean
   rot_rut_original_amount: number | null
+  /** Besöket posten hör till. null = post skapad före besöksmodellen, eller ärende utan besök (t.ex. rondering). */
+  visit_id: string | null
+  /** Besökets nummer i ärendet (1, 2, 3 ...). null när visit_id är null. */
+  visit_number: number | null
   created_at: string
   updated_at: string
 }
@@ -53,6 +57,8 @@ export interface CommissionPostInsert {
   notes?: string
   is_rot_rut?: boolean
   rot_rut_original_amount?: number
+  visit_id?: string | null
+  visit_number?: number | null
 }
 
 /**

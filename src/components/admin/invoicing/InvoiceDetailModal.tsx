@@ -44,7 +44,7 @@ import { FortnoxService } from '../../../services/fortnoxService'
 import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerResolver'
 import { isPersonnummer } from '../../../services/fortnoxService'
 import { PaymentTermsService, type BillingCategory } from '../../../services/paymentTermsService'
-import type { InvoiceWithItems, InvoiceStatus } from '../../../types/invoice'
+import type { InvoiceWithItems, InvoiceStatus, InvoiceItem } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
 import { ROT_RUT_PERCENT } from '../../../types/caseBilling'
 import { calculateRotRutSummary } from '../../../utils/rotRutConstants'
@@ -74,6 +74,69 @@ import type { CaseType } from '../../../types/communication'
 import type { CasePreparationWithDetails } from '../../../types/casePreparations'
 
 // Formatera minuter till "Xh Ym"
+/**
+ * Avgränsar ett ärendes case_billing_items till DEN HÄR fakturan.
+ *
+ * Ett ärende med flera besök har flera omgångar rader. Tar vi alla artiklar på
+ * case_id hamnar besök 2:s inköpskostnader i besök 1:s marginal, och fakturan
+ * ser olönsam ut fast den inte är det.
+ *
+ * Urvalet följer samma mönster som privat/företag redan använder:
+ *   1. Tjänsteraderna som fakturans rader kommer från (matchade på kod/namn,
+ *      det enda contract_billing_items bär vidare).
+ *   2. Artiklar vars mapped_service_id pekar på någon av de tjänsteraderna.
+ *   3. Sekundärt: artiklar med samma visit_id som de matchade tjänsteraderna.
+ *
+ * Artiklar som varken är mappade eller besökskopplade följer med ändå — de
+ * visas som "Ej tilldelade interna kostnader" och räknas INTE in i marginalen.
+ */
+function scopeItemsToInvoice(
+  items: CaseBillingItem[],
+  invoiceRows: Array<{ article_code: string | null; article_name: string | null }>
+): CaseBillingItem[] {
+  const codes = new Set(invoiceRows.map(r => r.article_code).filter(Boolean) as string[])
+  const names = new Set(invoiceRows.map(r => r.article_name).filter(Boolean) as string[])
+
+  const services = items.filter(i => i.item_type === 'service')
+  const matchedServices = services.filter(s => {
+    const code = s.service_code || s.article_code
+    const name = s.service_name || s.article_name
+    return (code && codes.has(code)) || (name && names.has(name))
+  })
+
+  // Ingen träff (t.ex. namn ändrat efter fakturering): returnera bara artiklar
+  // UTAN besöks-/tjänstekoppling. Att visa allt skulle belasta den här fakturans
+  // marginal med ett annat besöks inköp — exakt buggen detta ska lösa. Utan
+  // kopplade artiklar visar konsumenterna "–" i stället för en falsk siffra.
+  if (matchedServices.length === 0) {
+    return items.filter(i =>
+      i.item_type !== 'service' &&
+      !i.mapped_service_id &&
+      !(i as CaseBillingItem & { visit_id?: string | null }).visit_id
+    )
+  }
+
+  const serviceIds = new Set(matchedServices.map(s => s.id))
+  const visitIds = new Set(
+    matchedServices
+      .map(s => (s as CaseBillingItem & { visit_id?: string | null }).visit_id)
+      .filter(Boolean) as string[]
+  )
+
+  const articles = items.filter(i => i.item_type !== 'service')
+  const scopedArticles = articles.filter(a => {
+    if (a.mapped_service_id && serviceIds.has(a.mapped_service_id)) return true
+    const visitId = (a as CaseBillingItem & { visit_id?: string | null }).visit_id
+    if (visitId && visitIds.has(visitId)) return true
+    // Ej kopplad artikel: tas med men hamnar i "Ej tilldelade interna kostnader"
+    // och exkluderas från marginalen. Artiklar som hör till ETT ANNAT besök är
+    // däremot kopplade dit och filtreras bort ovan.
+    return !a.mapped_service_id && !visitId
+  })
+
+  return [...matchedServices, ...scopedArticles]
+}
+
 const formatTimeSpent = (minutes: number | null): string | null => {
   if (!minutes || minutes <= 0) return null
   const h = Math.floor(minutes / 60)
@@ -391,12 +454,11 @@ export default function InvoiceDetailModal({
 
         const { data: cbItems } = await supabase
           .from('contract_billing_items')
-          .select('case_id')
+          .select('case_id, article_code, article_name')
           .in('id', cbItemIds)
+        const rows = (cbItems as { case_id: string | null; article_code: string | null; article_name: string | null }[] | null) || []
         const caseIds = Array.from(
-          new Set(((cbItems as { case_id: string | null }[] | null) || [])
-            .map(c => c.case_id)
-            .filter(Boolean) as string[])
+          new Set(rows.map(c => c.case_id).filter(Boolean) as string[])
         )
         if (caseIds.length === 0) { setCaseBillingItems([]); return }
 
@@ -408,7 +470,9 @@ export default function InvoiceDetailModal({
           // Makulerade rader (t.ex. från ett tidigare avslutsförsök) hör
           // inte till fakturan och ska inte dubblera kostnadsuppdelningen
           .neq('status', 'cancelled')
-        setCaseBillingItems((data as CaseBillingItem[] | null) || [])
+        setCaseBillingItems(
+          scopeItemsToInvoice((data as CaseBillingItem[] | null) || [], rows)
+        )
         return
       }
       // Återkommande avtalsfaktura: hämta från kundens importerade contract.
@@ -496,6 +560,23 @@ export default function InvoiceDetailModal({
       .maybeSingle()
       .then(({ data }) => setLinkedCaseNumber(data?.case_number || null))
   }, [invoice?.case_id, invoice?.case_type])
+
+  // Besöksnummer per fakturarad. Privat/företag länkar direkt via
+  // case_billing_item_id; adhoc/avtal länkar via contract_billing_items som
+  // bara bär kod/namn vidare, så där matchas raden på kod eller namn.
+  const visitNumberForItem = (item: InvoiceItem): number | null => {
+    const direct = item.case_billing_item_id
+      ? caseBillingItems.find(cb => cb.id === item.case_billing_item_id)
+      : undefined
+    const matched = direct ?? caseBillingItems.find(cb =>
+      cb.item_type === 'service' && (
+        (item.article_code && (cb.service_code === item.article_code || cb.article_code === item.article_code)) ||
+        (cb.service_name === item.article_name || cb.article_name === item.article_name)
+      )
+    )
+    const n = (matched as (CaseBillingItem & { visit_number?: number | null }) | undefined)?.visit_number
+    return typeof n === 'number' ? n : null
+  }
 
   // Avtalstillägg på fakturans rader: pro rata-pris, inte rabatt.
   // Detaljerna (premieändring, från-datum) hämtas från tilläggslogen.
@@ -1385,10 +1466,19 @@ export default function InvoiceDetailModal({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700/50">
-                        {invoice.items.map(item => (
+                        {invoice.items.map(item => {
+                          const itemVisitNumber = visitNumberForItem(item)
+                          return (
                           <tr key={item.id}>
                             <td className="px-3 py-2">
-                              <div className="text-sm text-white">{item.article_name}</div>
+                              <div className="text-sm text-white">
+                                {item.article_name}
+                                {itemVisitNumber != null && (
+                                  <span className="ml-2 text-xs text-slate-500 tabular-nums">
+                                    Besök {itemVisitNumber}
+                                  </span>
+                                )}
+                              </div>
                               {item.article_code && (
                                 <div className="text-xs text-slate-500">{item.article_code}</div>
                               )}
@@ -1423,7 +1513,8 @@ export default function InvoiceDetailModal({
                               {formatInvoiceAmount(isPrivate ? item.total_price * (1 + item.vat_rate / 100) : item.total_price)}
                             </td>
                           </tr>
-                        ))}
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>

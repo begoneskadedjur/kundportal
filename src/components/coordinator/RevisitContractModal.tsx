@@ -24,6 +24,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { toLocalISOStringWithOffset } from '../../utils/dateHelpers'
 import { ContractBillingService } from '../../services/contractBillingService'
 import { CaseBillingService } from '../../services/caseBillingService'
+import { VisitService } from '../../services/visitService'
 import toast from 'react-hot-toast'
 import "react-datepicker/dist/react-datepicker.css"
 
@@ -221,46 +222,32 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
       let snapshotSaved = false
 
       if (hasVisitData || willPartialInvoice) {
-        // Räkna befintliga besök för att sätta visit_number
-        const { count: existingCount } = await supabase
-          .from('visits')
-          .select('id', { count: 'exact', head: true })
-          .eq('case_id', caseData.id)
-
-        const visitNumber = (existingCount ?? 0) + 1
-
-        const { error: visitError } = await supabase.from('visits').insert({
-          case_id: caseData.id,
-          visit_date: (caseData.scheduled_start as string) ?? new Date().toISOString(),
-          technician_id: caseData.primary_technician_id ?? null,
-          technician_name: caseData.primary_technician_name ?? null,
-          work_performed: caseData.work_report ?? null,
-          recommendations: caseData.recommendations ?? null,
+        // RPC:n äger numreringen, idempotensen OCH stämplingen av ärendets
+        // ostämplade case_billing_items — räkna aldrig visit_number här.
+        const visit = await VisitService.createVisitSnapshot({
+          caseId: caseData.id,
+          caseType: 'contract',
+          source: 'revisit',
+          isFinal: false,
+          customerId: caseData.customer_id ?? null,
+          visitDate: (caseData.scheduled_start as string) ?? new Date().toISOString(),
+          technicianId: caseData.primary_technician_id ?? null,
+          technicianName: caseData.primary_technician_name ?? null,
+          workPerformed: caseData.work_report,
+          recommendations: caseData.recommendations,
           findings: caseData.pest_level != null ? `Skadedjursnivå: ${caseData.pest_level}` : null,
-          time_spent_minutes: caseData.time_spent_minutes ?? null,
-          materials_used: caseData.materials_used ?? null,
-          pest_level: caseData.pest_level ?? null,
-          problem_rating: caseData.problem_rating ?? null,
-          visit_number: visitNumber,
-          // visits_status_check tillåter bara scheduled/completed/cancelled/no_show —
-          // ett snapshot vid ombokning är per definition ett genomfört besök
-          status: 'completed',
+          materialsUsed: caseData.materials_used,
+          timeSpentMinutes: caseData.time_spent_minutes ?? null,
+          pestLevel: caseData.pest_level ?? null,
+          problemRating: caseData.problem_rating ?? null,
         })
-        if (visitError) {
+
+        if (!visit) {
           // Snapshotet ÄR historiken — ett tyst fel här betyder förlorad rapport/trafikljusdata
-          console.error('[RevisitContractModal] Failed to save visit snapshot:', visitError)
-          toast.error(`Besökshistoriken kunde inte sparas: ${visitError.message}. Bokningen fortsätter, men kontakta admin.`, { duration: 10000 })
+          toast.error('Besökshistoriken kunde inte sparas. Bokningen fortsätter, men kontakta admin.', { duration: 10000 })
         } else {
           snapshotSaved = true
         }
-
-        // Stämpla billing-items utan visit_number med detta besöks visit_number
-        const { error: billingError } = await supabase
-          .from('case_billing_items')
-          .update({ visit_number: visitNumber })
-          .eq('case_id', caseData.id)
-          .is('visit_number', null)
-        if (billingError) console.error('[RevisitContractModal] Failed to stamp billing items:', billingError)
       }
 
       // Delfakturering: kopiera service-items till contract_billing_items och markera

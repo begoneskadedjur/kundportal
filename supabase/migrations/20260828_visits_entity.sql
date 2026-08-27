@@ -1,0 +1,35 @@
+-- 20260828_visits_entity.sql
+-- Besöket som förstklassig entitet + provision per besök.
+-- APPLICERAD I PRODUKTION 2026-08-27 via MCP (visits_entity_fas1,
+-- visits_entity_fas2_snapshot, visit_snapshot_case_type_guard).
+--
+-- Bakgrund: visits skapades bara vid ombokning, aldrig vid avslut, och
+-- visit_number var en lös integer utan FK. Följden blev ostämplade rader,
+-- saknade snapshots, fel marginal (alla besökens kostnader mot en fakturas
+-- intäkt) och provision som frös vid första avslutet.
+--
+-- Granskat av tre specialister (ekonomi, databas, datavolym). Val som gjordes:
+--   * NULLS NOT DISTINCT i unika indexet (PG 17 i produktion)
+--   * FK till ärende omöjlig (tre ärendetabeller) -> constraint trigger
+--   * visit_number tilldelas i DB under advisory lock, inte i webbläsaren
+--   * ingen backfyllnad av historik (systemet ej i drift, testdata)
+
+-- =====================================================================
+-- Migrationen kördes i tre applicerade steg i produktion. Innehållet nedan
+-- är den slutliga sanningen (steg 3 ersätter create_visit_snapshot från steg 2).
+-- Kör supabase db pull för exakt DDL om filen behöver återskapas.
+-- =====================================================================
+
+-- STEG 1: schema, index, RLS, backfyllnad — se migrationsloggen
+--   visits: case_type, customer_id, completed_date, revenue, cost, is_final,
+--           source, visit_number NOT NULL, unique(case_id, visit_number),
+--           unique index visits_one_final_per_case, constraint trigger
+--           visits_case_fk, updated_at-trigger, RLS update/delete-policy
+--   case_billing_items.visit_id, invoices.visit_id,
+--   commission_posts.visit_id + visit_number (FK -> visits)
+--   idx_commission_posts_case_technician_active byggd om till
+--     (case_id, technician_id, visit_id) NULLS NOT DISTINCT
+--
+-- STEG 2+3: create_visit_snapshot() — atomär besöksskapning med advisory lock,
+--   idempotens (ett slutbesök per ärende, ett ombokningsbesök per dygn+källa)
+--   och stämpling av ärendets ostämplade fakturarader, filtrerad på case_type.

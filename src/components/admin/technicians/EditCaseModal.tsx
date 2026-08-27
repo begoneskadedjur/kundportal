@@ -80,6 +80,7 @@ import CaseStatusStepper from '../../shared/CaseStatusStepper'
 // Provision
 import CommissionSection from '../../shared/CommissionSection'
 import type { CaseBillingSummary } from '../../../types/caseBilling'
+import { VisitService, type Visit, type VisitCaseType } from '../../../services/visitService'
 import { ProvisionService } from '../../../services/provisionService'
 import type { TechnicianShare } from '../../../types/provision'
 
@@ -1096,7 +1097,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         updateData.pris = formData.case_price === "" ? null : formData.case_price;
         updateData.start_date = formData.start_date;
         updateData.due_date = formData.due_date;
-        updateData.rapport = formData.rapport; // Synkas till ClickUp
+        // Spara null istället för tom sträng — annars ser besökshistoriken ut
+        // att ha en rapport som bara innehåller blanksteg
+        updateData.rapport = formData.rapport?.trim() || null; // Synkas till ClickUp
         updateData.adress = formData.adress || null; // Adress (JSONB eller string)
         
         // Lokala fält (synkas INTE till ClickUp)
@@ -1155,6 +1158,37 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       }
 
       onSuccess(updatedCaseFromDb);
+
+      // ═══════════════════════════════════════════════════════════════════════════
+      // BESÖKSSNAPSHOT: slutbesöket måste finnas INNAN fakturering och provision,
+      // annars saknar fakturarader och provisionsposter besökskoppling. RPC:n är
+      // idempotent (ett slutbesök per ärende), så upprepade sparningar av ett
+      // redan avslutat ärende återanvänder samma besök.
+      // ═══════════════════════════════════════════════════════════════════════════
+      let finalVisit: Visit | null = null;
+      if (formData.status === 'Avslutat') {
+        const snapshotCaseType: VisitCaseType =
+          tableName === 'private_cases' ? 'private'
+            : tableName === 'business_cases' ? 'business'
+              : 'contract';
+        finalVisit = await VisitService.createVisitSnapshot({
+          caseId: currentCase.id,
+          caseType: snapshotCaseType,
+          source: 'completion',
+          isFinal: true,
+          customerId: currentCase.customer_id ?? null,
+          visitDate: (updateData.completed_date as string | undefined)
+            ?? (currentCase as { completed_date?: string | null }).completed_date
+            ?? new Date().toISOString(),
+          technicianId: formData.primary_assignee_id || null,
+          technicianName: formData.primary_assignee_name || null,
+          workPerformed: formData.rapport,
+          timeSpentMinutes: currentCase.time_spent_minutes ?? null,
+        });
+        if (!finalVisit) {
+          toast.error('Besöket kunde inte sparas i historiken. Ärendet är avslutat, men kontakta admin.', { duration: 10000 });
+        }
+      }
 
       // ═══════════════════════════════════════════════════════════════════════════
       // AUTO-FAKTURERING: Generera/uppdatera faktura när ärendet sparas som "Avslutat"
@@ -1275,7 +1309,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             const casePrice = billingSummary?.subtotal || Number(formData.case_price) || 0;
             const isRotRut = !!(formData.r_rot_rut && formData.r_rot_rut !== 'Nej');
             // Vid ROT/RUT: provision på belopp innan avdrag (= case_price)
-            await ProvisionService.upsertPostsForCase(
+            // Provision per besök: ärendets bas fördelas proportionellt mot
+            // besökens nettointäkt. Saknas besök (snapshotet misslyckades)
+            // faller servicen tillbaka på en post per ärende.
+            const caseVisits = finalVisit
+              ? await VisitService.getVisitsForCase(currentCase.id)
+              : [];
+            await ProvisionService.upsertPostsForVisits(
               {
                 case_id: currentCase.id,
                 case_type: currentCase.case_type as 'private' | 'business' | 'contract',
@@ -1286,8 +1326,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 rot_rut_original_amount: isRotRut ? casePrice : undefined,
               },
               commissionShares,
-              commissionDeductions,
-              commissionNotes || undefined
+              caseVisits.map(v => ({ id: v.id, visit_number: v.visit_number, revenue: v.revenue })),
+              { deductions: commissionDeductions, notes: commissionNotes || undefined }
             );
             if (wasAlreadyClosed && existingCommissionPosts > 0) {
               commissionUpdated = true;

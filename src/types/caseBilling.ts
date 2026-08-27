@@ -64,6 +64,10 @@ export interface CaseBillingItem {
   min_quantity: number | null
   /** För artikel-rader: case_billing_items.id för tjänsteraden som artikeln är mappad mot via Prisguiden. */
   mapped_service_id: string | null
+  /** Besöket raden hör till (visits.id). Stämplas av create_visit_snapshot. null = rad utan besökskoppling. */
+  visit_id?: string | null
+  /** Besökets nummer i ärendet (1, 2, 3 ...). null när visit_id är null. */
+  visit_number?: number | null
   /**
    * Avtalstillägg: årsbelopp (exkl moms) som läggs på kundens årspremie när
    * ärendet avslutas. Radens eget pris är pro rata-beloppet fram till nästa

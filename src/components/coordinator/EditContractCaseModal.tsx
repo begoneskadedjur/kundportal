@@ -61,6 +61,7 @@ import VisitHistoryPanel from './VisitHistoryPanel'
 
 // Provision
 import CommissionSection from '../shared/CommissionSection'
+import { VisitService, type Visit } from '../../services/visitService'
 import { ProvisionService } from '../../services/provisionService'
 import type { TechnicianShare } from '../../types/provision'
 import type { CaseBillingSummary } from '../../types/caseBilling'
@@ -1176,6 +1177,11 @@ export default function EditContractCaseModal({
         completed_date: (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat')
           ? toLocalISOStringWithOffset(new Date())
           : (formData.status !== 'Avslutat' ? null : localCaseData.completed_date || null),
+        // 📝 Besöksrapport — spara null istället för tom sträng, annars ser
+        // besökshistoriken ut att ha en rapport som bara innehåller blanksteg
+        work_report: formData.work_report?.trim() || null,
+        recommendations: formData.recommendations?.trim() || null,
+        materials_used: formData.materials_used?.trim() || null,
         // 🏷️ Ärendemärkning — spara null istället för tom sträng
         work_order_number: formData.work_order_number?.trim() || null,
         work_object: formData.work_object?.trim() || null,
@@ -1267,6 +1273,38 @@ export default function EditContractCaseModal({
       }
 
       // ═══════════════════════════════════════════════════════════════════════════
+      // BESÖKSSNAPSHOT: slutbesöket måste finnas INNAN fakturering och provision,
+      // annars saknar raderna och provisionsposterna besökskoppling. RPC:n är
+      // idempotent (ett slutbesök per ärende) och stämplar ärendets ostämplade
+      // case_billing_items med besöket.
+      // ═══════════════════════════════════════════════════════════════════════════
+      let finalVisit: Visit | null = null
+      if (formData.status === 'Avslutat' && localCaseData.status !== 'Avslutat') {
+        finalVisit = await VisitService.createVisitSnapshot({
+          caseId: localCaseData.id,
+          caseType: 'contract',
+          source: 'completion',
+          isFinal: true,
+          customerId: customerId || formData.customer_id || null,
+          visitDate: cleanedFormData.completed_date || new Date().toISOString(),
+          technicianId: cleanedFormData.primary_technician_id,
+          technicianName: cleanedFormData.primary_technician_name,
+          workPerformed: cleanedFormData.work_report,
+          recommendations: cleanedFormData.recommendations,
+          materialsUsed: cleanedFormData.materials_used,
+          timeSpentMinutes: cleanedFormData.time_spent_minutes ?? null,
+          pestLevel: cleanedFormData.pest_level ?? null,
+          problemRating: cleanedFormData.problem_rating ?? null,
+          findings: cleanedFormData.pest_level != null
+            ? `Skadedjursnivå: ${cleanedFormData.pest_level}`
+            : null,
+        })
+        if (!finalVisit) {
+          toast.error('Besöket kunde inte sparas i historiken. Ärendet är avslutat, men kontakta admin.', { duration: 10000 })
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════════════════
       // AD-HOC BILLING: Kopiera artiklar till avtalsfakturering vid ärendeavslut
       // ═══════════════════════════════════════════════════════════════════════════
       let billingItemsCreated = 0
@@ -1313,7 +1351,13 @@ export default function EditContractCaseModal({
         if (commissionEligible && commissionShares.length > 0 && existingCommissionPosts === 0) {
           try {
             const casePrice = billingSummary?.subtotal || Number(formData.price) || 0
-            await ProvisionService.createPostsForCase(
+            // Provision per besök: ärendets bas fördelas proportionellt mot
+            // besökens nettointäkt. Saknas besök (snapshotet misslyckades)
+            // faller servicen tillbaka på en post per ärende.
+            const caseVisits = finalVisit
+              ? await VisitService.getVisitsForCase(localCaseData.id)
+              : []
+            await ProvisionService.upsertPostsForVisits(
               {
                 case_id: localCaseData.id,
                 case_type: 'contract',
@@ -1322,8 +1366,8 @@ export default function EditContractCaseModal({
                 base_amount: casePrice,
               },
               commissionShares,
-              commissionDeductions,
-              commissionNotes || undefined
+              caseVisits.map(v => ({ id: v.id, visit_number: v.visit_number, revenue: v.revenue })),
+              { deductions: commissionDeductions, notes: commissionNotes || undefined }
             )
             commissionCreated = true
           } catch (commErr: any) {

@@ -107,21 +107,38 @@ export class ProvisionService {
       is_rot_rut?: boolean
       rot_rut_original_amount?: number
     },
-    technicianShares: TechnicianShare[]
+    technicianShares: TechnicianShare[],
+    options: { skipThreshold?: boolean } = {}
   ): Promise<void> {
-    const settings = await this.getSettings()
-
-    const effectiveBase = caseData.is_rot_rut && caseData.rot_rut_original_amount
-      ? caseData.rot_rut_original_amount
-      : caseData.base_amount
-
-    if (effectiveBase < settings.min_commission_base) {
-      throw new Error(`Beloppet ${effectiveBase} kr understiger minsta provisionsgrundande belopp (${settings.min_commission_base} kr exkl moms)`)
+    // Tröskeln prövas på ÄRENDETS totalbas, inte per besök — fyra besök à
+    // 3 000 kr är ett ärende på 12 000 kr och ska ge provision. I
+    // upsertPostsForVisits prövas tröskeln en gång på totalbasen och sedan
+    // hoppas den över per besök (skipThreshold).
+    if (!options.skipThreshold) {
+      await this.assertAboveThreshold(this.effectiveBaseOf(caseData))
     }
 
     const totalShare = technicianShares.reduce((sum, t) => sum + t.share_percentage, 0)
     if (Math.abs(totalShare - 100) > 0.01) {
       throw new Error(`Teknikerandelar summerar till ${totalShare}%, måste vara 100%`)
+    }
+  }
+
+  /** ROT/RUT: provision räknas på beloppet före avdrag. */
+  private static effectiveBaseOf(caseData: {
+    base_amount: number
+    is_rot_rut?: boolean
+    rot_rut_original_amount?: number
+  }): number {
+    return caseData.is_rot_rut && caseData.rot_rut_original_amount
+      ? caseData.rot_rut_original_amount
+      : caseData.base_amount
+  }
+
+  private static async assertAboveThreshold(effectiveBase: number): Promise<void> {
+    const settings = await this.getSettings()
+    if (effectiveBase < settings.min_commission_base) {
+      throw new Error(`Beloppet ${effectiveBase} kr understiger minsta provisionsgrundande belopp (${settings.min_commission_base} kr exkl moms)`)
     }
   }
 
@@ -139,21 +156,31 @@ export class ProvisionService {
     },
     technicianShares: TechnicianShare[],
     deductions: number = 0,
-    notes?: string
+    notes?: string,
+    /** Besökskoppling: posterna hör till ett specifikt besök i ärendet. */
+    visit?: { visit_id: string; visit_number: number } | null,
+    /** Sätts av upsertPostsForVisits — tröskeln har redan prövats på ärendets totalbas. */
+    options: { skipThreshold?: boolean } = {}
   ): Promise<CommissionPost[]> {
     // Validering (tröskel + andelar) delas med upsertPostsForCase
-    await this.validatePostInput(caseData, technicianShares)
+    await this.validatePostInput(caseData, technicianShares, options)
 
     const settings = await this.getSettings()
 
-    const effectiveBase = caseData.is_rot_rut && caseData.rot_rut_original_amount
-      ? caseData.rot_rut_original_amount
-      : caseData.base_amount
+    const effectiveBase = this.effectiveBaseOf(caseData)
 
-    // Kontrollera att poster inte redan finns (använd upsertPostsForCase för re-create-flödet)
+    // Kontrollera att poster inte redan finns (använd upsertPostsForCase för re-create-flödet).
+    // Vakten är per (ärende, besök) — annars skulle besök 1 blockera besök 2.
     const existing = await this.getPostsByCase(caseData.case_id)
-    if (existing.length > 0) {
-      throw new Error('Provisionsposter finns redan för detta ärende')
+    const clash = visit
+      ? existing.filter(p => (p as { visit_id?: string | null }).visit_id === visit.visit_id)
+      : existing
+    if (clash.length > 0) {
+      throw new Error(
+        visit
+          ? `Provisionsposter finns redan för besök ${visit.visit_number} i detta ärende`
+          : 'Provisionsposter finns redan för detta ärende'
+      )
     }
 
     const percentage = settings.engangsjobb_percentage
@@ -178,7 +205,9 @@ export class ProvisionService {
       ),
       notes,
       is_rot_rut: caseData.is_rot_rut || false,
-      rot_rut_original_amount: caseData.rot_rut_original_amount
+      rot_rut_original_amount: caseData.rot_rut_original_amount,
+      visit_id: visit?.visit_id ?? null,
+      visit_number: visit?.visit_number ?? null
     }))
 
     const { data, error } = await supabase
@@ -225,6 +254,153 @@ export class ProvisionService {
     }
 
     return this.createPostsForCase(caseData, technicianShares, deductions, notes)
+  }
+
+  // ─── Upsert per besök: en post per besök och tekniker ────
+  //
+  // Ett ärende med flera besök ska ge provision PER BESÖK, inte en klump på
+  // ärendet. Mekaniken är medvetet enkel (ingen justeringspost, inga negativa
+  // belopp) — poster som redan lämnat 'pending_invoice' rörs aldrig, då kastas
+  // samma fel som upsertPostsForCase gör.
+  //
+  //   1. Tröskeln (min_commission_base) prövas på ÄRENDETS totalbas. Fyra besök
+  //      à 3 000 kr är ett ärende på 12 000 kr och ska ge provision.
+  //   2. Basen fördelas proportionellt mot varje besöks nettointäkt
+  //      (visits.revenue, annars summan av besökets tjänsterader).
+  //   3. Residualen (avrundningsrester) läggs på SISTA besöket så summan av
+  //      besökens baser blir exakt lika med ärendets bas.
+  //   4. Saknas besök helt (t.ex. rondering) faller vi tillbaka på dagens
+  //      beteende: en post per tekniker på ärendet, visit_id null.
+
+  static async upsertPostsForVisits(
+    caseData: Parameters<typeof ProvisionService.createPostsForCase>[0],
+    technicianShares: TechnicianShare[],
+    visits: Array<{ id: string; visit_number: number; revenue?: number | null }>,
+    opts: { deductions?: number; notes?: string } = {}
+  ): Promise<CommissionPost[]> {
+    const deductions = opts.deductions ?? 0
+    const notes = opts.notes
+
+    // Inga besök → dagens beteende (en post per ärende)
+    if (visits.length === 0) {
+      return this.upsertPostsForCase(caseData, technicianShares, deductions, notes)
+    }
+
+    // Validera FÖRE raderingen — kastar valideringen efter delete är intjänad
+    // provision borta. Tröskeln prövas här, på ärendets totalbas.
+    await this.validatePostInput(caseData, technicianShares)
+
+    const existing = await this.getPostsByCase(caseData.case_id)
+    const locked = existing.filter(p => p.status !== 'pending_invoice')
+    if (locked.length > 0) {
+      throw new Error(
+        `Provisionen för ärendet är redan på väg till utbetalning (status: ${locked[0].status}) och kan inte räknas om.`
+      )
+    }
+
+    const weights = await this.getVisitRevenueWeights(caseData.case_id, visits)
+    const totalBase = this.effectiveBaseOf(caseData)
+    const shares = this.splitBaseAcrossVisits(totalBase, weights)
+
+    // Radera ärendets pending-poster och återskapa från besöken
+    if (existing.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('commission_posts')
+        .delete()
+        .in('id', existing.map(p => p.id))
+      if (deleteError) throw deleteError
+    }
+
+    const created: CommissionPost[] = []
+    for (let i = 0; i < visits.length; i++) {
+      const visit = visits[i]
+      const visitBase = shares[i]
+      // Besök utan intäkt ger ingen post — en 0-kr-post är brus i löneunderlaget
+      if (visitBase <= 0) continue
+
+      const posts = await this.createPostsForCase(
+        {
+          ...caseData,
+          base_amount: visitBase,
+          // ROT/RUT-basen är redan fördelad — skicka det fördelade beloppet som
+          // originalbelopp så effectiveBaseOf inte återgår till ärendets totalbas
+          rot_rut_original_amount: caseData.is_rot_rut ? visitBase : undefined
+        },
+        technicianShares,
+        // Underleverantörsavdraget hör till ärendet, inte till ett enskilt
+        // besök — det dras på det första besöket som har utrymme för det
+        i === 0 ? deductions : 0,
+        notes,
+        { visit_id: visit.id, visit_number: visit.visit_number },
+        { skipThreshold: true }
+      )
+      created.push(...posts)
+    }
+
+    return created
+  }
+
+  /**
+   * Nettointäkt per besök: visits.revenue när den är satt, annars summan av
+   * besökets tjänsterader i case_billing_items. Saknas underlag helt får alla
+   * besök samma vikt — hellre jämn fördelning än att provisionen försvinner.
+   */
+  private static async getVisitRevenueWeights(
+    caseId: string,
+    visits: Array<{ id: string; visit_number: number; revenue?: number | null }>
+  ): Promise<number[]> {
+    const needsLookup = visits.some(v => v.revenue == null)
+
+    let byVisitId = new Map<string, number>()
+    if (needsLookup) {
+      const { data, error } = await supabase
+        .from('case_billing_items')
+        .select('visit_id, total_price, item_type, status')
+        .eq('case_id', caseId)
+        .eq('item_type', 'service')
+        .neq('status', 'cancelled')
+
+      if (error) {
+        console.warn('[ProvisionService] Kunde inte läsa besökens fakturarader:', error)
+      } else {
+        byVisitId = new Map<string, number>()
+        for (const row of (data || []) as Array<{ visit_id: string | null; total_price: number | null }>) {
+          if (!row.visit_id) continue
+          byVisitId.set(row.visit_id, (byVisitId.get(row.visit_id) || 0) + Number(row.total_price || 0))
+        }
+      }
+    }
+
+    const weights = visits.map(v =>
+      v.revenue != null ? Number(v.revenue) : (byVisitId.get(v.id) ?? 0)
+    )
+
+    // Inget underlag alls → jämn fördelning
+    if (weights.every(w => w <= 0)) return visits.map(() => 1)
+    return weights.map(w => (w > 0 ? w : 0))
+  }
+
+  /**
+   * Fördelar `totalBase` proportionellt mot vikterna, avrundat till ören.
+   * Residualen läggs på SISTA besöket med vikt > 0 så summan blir exakt.
+   */
+  private static splitBaseAcrossVisits(totalBase: number, weights: number[]): number[] {
+    const weightSum = weights.reduce((s, w) => s + w, 0)
+    if (weightSum <= 0) return weights.map(() => 0)
+
+    const shares = weights.map(w =>
+      w > 0 ? Math.round((totalBase * w / weightSum) * 100) / 100 : 0
+    )
+
+    let lastIdx = -1
+    for (let i = shares.length - 1; i >= 0; i--) {
+      if (weights[i] > 0) { lastIdx = i; break }
+    }
+    if (lastIdx >= 0) {
+      const allocated = shares.reduce((s, v) => s + v, 0)
+      shares[lastIdx] = Math.round((shares[lastIdx] + (totalBase - allocated)) * 100) / 100
+    }
+    return shares
   }
 
   // ─── Hämta poster ────────────────────────────────────────

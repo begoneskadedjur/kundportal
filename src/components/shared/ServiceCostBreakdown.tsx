@@ -76,13 +76,23 @@ export default function ServiceCostBreakdown({
   }
 
   // Total kostnad & marginal — alltid på exkl.-basen (momsen är aldrig bolagets intäkt).
-  const totalCost = articleItems.reduce((sum, a) => sum + a.total_price, 0)
+  // Ej tilldelade kostnader räknas INTE in: de hör inte bevisligen till den här
+  // fakturans tjänster, och att lägga dem i nämnaren gör lönsamma fakturor röda.
+  const assignedArticles = articleItems.filter(a => !unmapped.includes(a))
+  const totalCost = assignedArticles.reduce((sum, a) => sum + a.total_price, 0)
+  const unassignedCost = unmapped.reduce((sum, a) => sum + a.total_price, 0)
+  // Ingen artikel är kopplad till en tjänst → marginalen är okänd, inte 100 %.
+  const marginUnknown = assignedArticles.length === 0
   const totalMargin = calculateMarginPercent(totalRevenue, totalCost)
 
   const totalMarginNode = neutralMargin ? (
     <span className="text-slate-400">Pro rata - marginal ej tillämplig</span>
+  ) : marginUnknown ? (
+    <span className="text-slate-400 tabular-nums" title="Inga interna kostnader är kopplade till fakturans tjänster">
+      – marginal
+    </span>
   ) : (
-    <span className={`font-semibold ${marginColor(totalMargin)}`}>
+    <span className={`font-semibold tabular-nums ${marginColor(totalMargin)}`}>
       {totalMargin.toFixed(1)}% marginal
     </span>
   )
@@ -212,6 +222,11 @@ export default function ServiceCostBreakdown({
             Intern kalkyl
             <span className="ml-2 text-slate-500 font-normal">
               · Inköpskostnad {formatAmount(totalCost)}
+              {unassignedCost > 0 && (
+                <span className="ml-2 text-slate-500">
+                  · {formatAmount(unassignedCost)} ej tilldelad
+                </span>
+              )}
             </span>
           </h3>
           <div className="flex items-center gap-3 text-xs">
@@ -237,7 +252,12 @@ export default function ServiceCostBreakdown({
         </h3>
         <div className="flex items-center gap-3 text-xs">
           <span className="text-slate-400">
-            Inköpskostnad: <span className="text-white font-medium">{formatAmount(totalCost)}</span>
+            Inköpskostnad: <span className="text-white font-medium tabular-nums">{formatAmount(totalCost)}</span>
+            {unassignedCost > 0 && (
+              <span className="ml-2 text-slate-500 tabular-nums">
+                ({formatAmount(unassignedCost)} ej tilldelad)
+              </span>
+            )}
           </span>
           {totalMarginNode}
         </div>

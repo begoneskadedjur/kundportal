@@ -65,11 +65,22 @@ export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, case
   const todayKey = localDateKey()
 
   // --- b) Ekonomisignal: marginal (case-fakturor) eller premieavstämning (contract)
+  //
+  // Bara artiklar som är KOPPLADE till en av fakturans tjänsterader räknas in.
+  // Ett ärende med flera besök har artiklar från alla besök på samma case_id;
+  // tas de med blir besök 1:s marginal belastad med besök 2:s inköp.
+  // Är ingen artikel kopplad går marginalen inte att räkna → "–", aldrig 100 %.
   const articleItems = caseBillingItems.filter(i => i.item_type === 'article')
-  const articleCost = articleItems.reduce((s, i) => s + Number(i.total_price || 0), 0)
+  const serviceItemIds = new Set(
+    caseBillingItems.filter(i => i.item_type === 'service').map(i => i.id)
+  )
+  const assignedArticles = articleItems.filter(
+    i => i.mapped_service_id && serviceItemIds.has(i.mapped_service_id)
+  )
+  const articleCost = assignedArticles.reduce((s, i) => s + Number(i.total_price || 0), 0)
   const subtotal = Number(invoice.subtotal || 0)
   const marginPercent =
-    !isContract && articleItems.length > 0 && subtotal > 0
+    !isContract && assignedArticles.length > 0 && subtotal > 0
       ? ((subtotal - articleCost) / subtotal) * 100
       : null
   const marginClass =

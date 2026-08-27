@@ -28,6 +28,7 @@ import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSug
 import { InvoiceService } from '../../../services/invoiceService'
 import { CaseBillingService } from '../../../services/caseBillingService'
 import { CaseCustomerService } from '../../../services/caseCustomerService'
+import { VisitService } from '../../../services/visitService'
 import toast from 'react-hot-toast'
 import "react-datepicker/dist/react-datepicker.css"
 
@@ -241,7 +242,25 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
       const newStartDate = toLocalISOStringWithOffset(new Date(selectedSuggestion.start_time))
       const newDueDate = toLocalISOStringWithOffset(new Date(selectedSuggestion.end_time))
 
-      // 1. Uppdatera ärendet med nya tider och status
+      // 1. Besökssnapshot av det utförda besöket INNAN ärendet får nya tider.
+      // RPC:n äger numreringen och stämplar ärendets ostämplade fakturarader
+      // med besöket, så delfakturan nedan hamnar på rätt besök.
+      const snapshotCaseType = caseData.case_type === 'contract' ? 'contract' : billingCaseType
+      const visit = await VisitService.createVisitSnapshot({
+        caseId: caseData.id,
+        caseType: snapshotCaseType,
+        source: 'revisit',
+        isFinal: false,
+        visitDate: caseData.start_date ?? new Date().toISOString(),
+        technicianId: caseData.primary_assignee_id ?? null,
+        technicianName: caseData.primary_assignee_name ?? null,
+        workPerformed: caseData.rapport,
+      })
+      if (!visit) {
+        toast.error('Besökshistoriken kunde inte sparas. Bokningen fortsätter, men kontakta admin.', { duration: 10000 })
+      }
+
+      // 1b. Uppdatera ärendet med nya tider och status
       const { data: updatedCase, error } = await supabase
         .from(tableName)
         .update({ start_date: newStartDate, due_date: newDueDate, status: 'Återbesök' })
