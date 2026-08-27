@@ -139,6 +139,24 @@ export interface CreateInvoiceItemInput {
  */
 export type InvoiceType = 'private' | 'business' | 'contract' | 'adhoc'
 
+/**
+ * Härled ärendetyp för en faktura.
+ *
+ * Avtals- och merförsäljningsfakturor (invoice_type 'contract'/'adhoc') lagras med
+ * case_type = null, men deras case_id pekar på cases-tabellen — dvs. 'contract'.
+ * Samma regel som DB-triggern handle_invoice_paid använder (coalesce -> 'contract').
+ *
+ * Returnerar null när typen inte går att härleda; anroparen ska då hoppa över
+ * uppslag i stället för att gissa.
+ */
+export function deriveInvoiceCaseType(
+  invoice: { case_type?: BillableCaseType | string | null; invoice_type?: string | null } | null | undefined
+): BillableCaseType | null {
+  if (!invoice) return null
+  if (invoice.case_type) return invoice.case_type as BillableCaseType
+  return invoice.invoice_type === 'adhoc' || invoice.invoice_type === 'contract' ? 'contract' : null
+}
+
 export interface InvoiceFilters {
   status?: InvoiceStatus | InvoiceStatus[]
   case_type?: 'private' | 'business'

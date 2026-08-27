@@ -131,17 +131,26 @@ export async function deleteComment(commentId: string): Promise<void> {
 
 export async function createSystemComment(
   caseId: string,
-  caseType: CaseType,
+  caseType: CaseType | null,
   eventType: SystemEventType,
   message: string,
   authorId: string,
   authorName: string
 ): Promise<CaseComment> {
+  // case_comments.case_type är NOT NULL med CHECK (private|business|contract).
+  // Avtals- och merförsäljningsfakturor bär case_type = null på invoices, så vi
+  // faller tillbaka på 'contract' precis som DB-triggern handle_invoice_paid gör.
+  // Anroparen bör skicka rätt typ — varningen gör slarv synligt i stället för tyst.
+  const safeCaseType: CaseType = caseType ?? 'contract';
+  if (!caseType) {
+    console.warn('[createSystemComment] case_type saknas, faller tillbaka på contract', { caseId, eventType });
+  }
+
   const { data, error } = await supabase
     .from('case_comments')
     .insert({
       case_id: caseId,
-      case_type: caseType,
+      case_type: safeCaseType,
       author_id: authorId,
       author_name: 'System',
       author_role: 'admin' as AuthorRole, // System använder admin-roll

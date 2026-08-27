@@ -12,7 +12,7 @@ import type {
   InvoiceStats,
   InvoiceStatus
 } from '../types/invoice'
-import { calculateInvoiceTotals, calculateDueDate } from '../types/invoice'
+import { calculateInvoiceTotals, calculateDueDate, deriveInvoiceCaseType } from '../types/invoice'
 import { CaseBillingService } from './caseBillingService'
 import { PaymentTermsService } from './paymentTermsService'
 
@@ -650,7 +650,14 @@ export class InvoiceService {
       .some((item: any) => new Date(item.updated_at).getTime() > invoiceCreatedMs)
 
     // Kolla om anpassat pris ändrats
-    const customPrice = await CaseBillingService.getCustomPrice(invoice.case_id, invoice.case_type)
+    const priceCaseType = deriveInvoiceCaseType(invoice)
+    // Anpassat totalpris är en manuell överskrivning per ärende — hoppa över
+    // uppslaget helt när ärendekopplingen saknas i stället för att gissa typ.
+    // OBS: nyckeln 'contract' delas mellan ärende-id och avtals-id i
+    // case_billing_overrides (ContractCaseServiceSelector skriver med contractId).
+    const customPrice = invoice.case_id && priceCaseType
+      ? await CaseBillingService.getCustomPrice(invoice.case_id, priceCaseType)
+      : null
     const invoiceCustomRow = invoice.items.find(i => i.case_billing_item_id === null && i.article_name === 'Anpassat pris')
     const customPriceChanged = customPrice
       ? (!invoiceCustomRow || invoiceCustomRow.unit_price !== customPrice)
@@ -692,7 +699,14 @@ export class InvoiceService {
     const billingItems = billingItemsData || []
     if (billingItems.length === 0) throw new Error('Inga fakturerbara tjänster på ärendet')
 
-    const customPrice = await CaseBillingService.getCustomPrice(invoice.case_id, invoice.case_type)
+    const priceCaseType = deriveInvoiceCaseType(invoice)
+    // Anpassat totalpris är en manuell överskrivning per ärende — hoppa över
+    // uppslaget helt när ärendekopplingen saknas i stället för att gissa typ.
+    // OBS: nyckeln 'contract' delas mellan ärende-id och avtals-id i
+    // case_billing_overrides (ContractCaseServiceSelector skriver med contractId).
+    const customPrice = invoice.case_id && priceCaseType
+      ? await CaseBillingService.getCustomPrice(invoice.case_id, priceCaseType)
+      : null
 
     // Radera befintliga invoice_items
     const { error: deleteError } = await supabase

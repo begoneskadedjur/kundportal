@@ -308,7 +308,7 @@
   "src/services/equipmentService.ts|TS2741": 2,
   "src/services/inspectionSessionService.ts|TS2322": 4,
   "src/services/inspectionSessionService.ts|TS2345": 1,
-  "src/services/invoiceService.ts|TS2345": 3,
+  "src/services/invoiceService.ts|TS2345": 1,
   "src/services/measurementService.ts|TS2352": 1,
   "src/services/productService.ts|TS2322": 2,
   "src/services/stationTypeService.ts|TS2339": 1,

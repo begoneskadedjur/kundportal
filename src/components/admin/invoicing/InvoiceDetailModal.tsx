@@ -598,7 +598,7 @@ export default function InvoiceDetailModal({
         try {
           await createSystemComment(
             invoice.case_id,
-            invoice.case_type as CaseType,
+            effectiveCaseType,
             'status_change',
             `Fakturastatus ändrad till "${INVOICE_STATUS_CONFIG[newStatus].label}" (${invoice.invoice_number})`,
             user.id,
@@ -642,7 +642,7 @@ export default function InvoiceDetailModal({
         try {
           await createSystemComment(
             invoice.case_id,
-            invoice.case_type as CaseType,
+            effectiveCaseType,
             'status_change',
             `Faktura godkänd av ${approverName}${discountNote} (${invoice.invoice_number})`,
             user.id,
@@ -947,7 +947,7 @@ export default function InvoiceDetailModal({
         try {
           await createSystemComment(
             invoice.case_id,
-            invoice.case_type as CaseType,
+            effectiveCaseType,
             'status_change',
             `Utkast skapat i Fortnox (nr ${fortnoxInvoice.DocumentNumber}) — ${invoice.invoice_number}`,
             user.id,
