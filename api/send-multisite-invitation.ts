@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { getManagerContext, canManageOrganization } from './_lib/multisiteAuth'
+import { logAccountEvent } from './_lib/accountEvents'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -285,7 +286,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // 6. Registrera inbjudan i databas
-    await upsertMultisiteInvitation(supabase, organizationId, email, userId, role)
+    await upsertMultisiteInvitation(supabase, organizationId, email, userId, role, siteIds)
 
     console.log('Multisite invitation sent successfully')
     return res.status(200).json({
@@ -322,18 +323,28 @@ function generateSecurePassword(): string {
   return password
 }
 
-async function upsertMultisiteInvitation(supabase: any, organizationId: string, email: string, userId: string, role: string) {
+async function upsertMultisiteInvitation(
+  supabase: any,
+  organizationId: string,
+  email: string,
+  userId: string,
+  role: string,
+  siteIds?: string[] | null
+) {
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + 7) // 7 dagar utgång
 
+  // Kolumnnamnen måste följa tabellen: role_type (inte role), och varken
+  // user_id eller invited_at finns. Fel namn gav en tyst misslyckad insert -
+  // därför stod tabellen tom trots utskickade inbjudningar. onConflict
+  // förutsätter unique(organization_id, email), tillagd i samma migration.
   const { error } = await supabase
     .from('multisite_user_invitations')
     .upsert({
       organization_id: organizationId,
       email: email,
-      user_id: userId,
-      role: role,
-      invited_at: new Date().toISOString(),
+      role_type: role,
+      site_ids: siteIds ?? [],
       expires_at: expiresAt.toISOString(),
       accepted_at: null // Återställ vid ny inbjudan
     }, {
@@ -343,6 +354,16 @@ async function upsertMultisiteInvitation(supabase: any, organizationId: string, 
   if (error) {
     console.error('Multisite invitation upsert error:', error)
   }
+
+  // Kontohändelsen är det kundkortet läser - inbjudningsraden säger bara att
+  // en inbjudan är öppen, inte att den skickades.
+  await logAccountEvent({
+    user_id: userId,
+    event_type: 'invited',
+    organization_id: organizationId,
+    target_email: email,
+    note: `Inbjudan skickad - ${role}`,
+  })
 }
 
 function getMultisiteInvitationEmailTemplate({

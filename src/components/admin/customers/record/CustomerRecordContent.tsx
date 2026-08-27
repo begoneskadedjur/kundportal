@@ -456,7 +456,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       )}
 
       <div hidden={activeTab !== 'atkomst'} className="pt-6">
-        <AccessAccountsSection access={access} customerById={customerById} />
+        <AccessAccountsSection access={access} customerById={customerById} units={units} />
       </div>
 
       {openCase && <CaseDetailPanel caseRow={openCase} onClose={() => setOpenCase(null)} />}

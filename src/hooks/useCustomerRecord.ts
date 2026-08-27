@@ -286,6 +286,41 @@ export interface RecordMultisiteUser {
   has_ever_signed_in?: boolean | null
 }
 
+/** En månad med minst en inloggning — bygger livstidsbandet i personlistan */
+export interface RecordLoginMonth {
+  month: string
+  count: number
+}
+
+/** Inloggningsstatistik ur auth.audit_log_entries via get_customer_login_stats */
+export interface RecordLoginStats {
+  user_id: string
+  login_count: number
+  first_login: string | null
+  last_login: string | null
+  active_months: number
+  monthly: RecordLoginMonth[]
+}
+
+/** Rad ur customer_account_events — vad som skickats till en person och när */
+export interface RecordAccountEvent {
+  id: string
+  user_id: string
+  event_type:
+    | 'invited'
+    | 'password_sent'
+    | 'email_changed'
+    | 'role_changed'
+    | 'deactivated'
+    | 'reactivated'
+  target_email: string | null
+  target_name: string | null
+  actor_id: string | null
+  actor_email: string | null
+  note: string | null
+  created_at: string
+}
+
 export interface RecordAccessData {
   /** Kundportal-konton (profiles med role='customer') för familjen */
   profiles: RecordAccessProfile[]
@@ -293,6 +328,10 @@ export interface RecordAccessData {
   invitations: RecordAccessInvitation[]
   /** Multisite-roller (verksamhetschef/regionchef/platsansvarig) för organisationen */
   multisiteUsers: RecordMultisiteUser[]
+  /** Inloggningsstatistik per user_id. Tom map om RPC:n inte gick igenom. */
+  loginStats: Map<string, RecordLoginStats>
+  /** Kontohändelser för familjens användare, nyast först */
+  accountEvents: RecordAccountEvent[]
 }
 
 export interface CustomerRecordData {
@@ -544,6 +583,44 @@ export function useCustomerRecord(customerId: string | undefined) {
       }
     }
 
+    // Inloggningsstatistik och kontohändelser. Kräver samtliga user_id:n i
+    // familjen, därför efter multisite-blocket. Båda är sekundärdata: fel får
+    // inte fälla sidan, listan visas då utan rytm och historik.
+    const accessUserIds = Array.from(
+      new Set([
+        ...(profilesRes.error ? [] : (profilesRes.data ?? [])).map((p) => p.user_id),
+        ...multisiteUsers.map((u) => u.user_id),
+      ])
+    ).filter(Boolean)
+
+    let loginStats = new Map<string, RecordLoginStats>()
+    let accountEvents: RecordAccountEvent[] = []
+
+    if (accessUserIds.length > 0) {
+      const [statsRes, eventsRes] = await Promise.all([
+        supabase.rpc('get_customer_login_stats', { p_user_ids: accessUserIds }),
+        supabase
+          .from('customer_account_events')
+          .select(
+            'id, user_id, event_type, target_email, target_name, actor_id, actor_email, note, created_at'
+          )
+          .in('user_id', accessUserIds)
+          .order('created_at', { ascending: false }),
+      ])
+
+      if (!statsRes.error && statsRes.data) {
+        loginStats = new Map(
+          (statsRes.data as RecordLoginStats[]).map((s) => [
+            s.user_id,
+            { ...s, monthly: Array.isArray(s.monthly) ? s.monthly : [] },
+          ])
+        )
+      }
+      if (!eventsRes.error) {
+        accountEvents = (eventsRes.data ?? []) as RecordAccountEvent[]
+      }
+    }
+
     if (contractsRes.error) throw new Error(`Kunde inte hämta avtal: ${contractsRes.error.message}`)
     if (billingRes.error) throw new Error(`Kunde inte hämta fakturarader: ${billingRes.error.message}`)
     // contract_additions/premie/omfattning/cases är sekundärdata — får inte fälla sidan
@@ -787,6 +864,8 @@ export function useCustomerRecord(customerId: string | undefined) {
         profiles: (profilesRes.error ? [] : (profilesRes.data ?? [])) as RecordAccessProfile[],
         invitations: (invitationsRes.error ? [] : (invitationsRes.data ?? [])) as RecordAccessInvitation[],
         multisiteUsers,
+        loginStats,
+        accountEvents,
       },
     }
   }, [])

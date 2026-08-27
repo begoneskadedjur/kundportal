@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { getManagerContext, canManageOrganization, getTargetUserOrganization } from './_lib/multisiteAuth'
+import { logAccountEvent } from './_lib/accountEvents'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -42,11 +43,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+  // Läs den gamla adressen innan bytet - den är hela poängen med händelsen.
+  const { data: before } = await supabaseAdmin
+    .from('profiles')
+    .select('email, display_name, customer_id')
+    .eq('user_id', userId)
+    .maybeSingle()
+
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, { email: newEmail })
   if (error) {
     console.error('Failed to update user email:', error)
     return res.status(500).json({ error: error.message })
   }
+
+  await logAccountEvent({
+    user_id: userId,
+    event_type: 'email_changed',
+    customer_id: before?.customer_id,
+    organization_id: targetOrgId,
+    target_email: newEmail,
+    target_name: before?.display_name,
+    actor_id: ctx.userId,
+    note: before?.email ? `Bytt från ${before.email}` : null,
+  })
 
   return res.status(200).json({ success: true })
 }

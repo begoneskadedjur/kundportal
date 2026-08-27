@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { getManagerContext, canManageOrganization } from './_lib/multisiteAuth'
+import { logAccountEvent } from './_lib/accountEvents'
 
 // Environment variables - Vercel uses different naming
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -331,6 +332,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } else if (!canSendEmails) {
           console.warn('RESEND_API_KEY not configured - skipping email invitation')
         }
+
+        // Spåra att inbjudan gick ut. Tidigare skrevs ingenting här, vilket
+        // gjorde att kundkortet inte kunde skilja "aldrig inbjuden" från
+        // "inbjuden men har aldrig loggat in".
+        await logAccountEvent({
+          user_id: userId,
+          event_type: isNewUser ? 'invited' : 'role_changed',
+          organization_id: organizationId,
+          target_email: userData.email,
+          target_name: userData.name,
+          note: isNewUser
+            ? `Konto skapat - ${roleAssignment.role}`
+            : `Tillagd i ${organizationName} - ${roleAssignment.role}`,
+        })
 
         results.success.push({
           email: userData.email,

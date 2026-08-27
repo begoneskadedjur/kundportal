@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import { logAccountEvent } from './_lib/accountEvents'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
@@ -139,6 +140,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const err = await emailResponse.text()
       throw new Error(`Kunde inte skicka e-post: ${err}`)
     }
+
+    // Spåra utskicket så kundkortet kan visa vad som skickats och när.
+    // Loggningen får inte fälla svaret: lösenordet är redan bytt och mailet
+    // skickat, så anroparen ska få veta att det gick vägen.
+    await logAccountEvent({
+      user_id: profile.user_id,
+      event_type: 'password_sent',
+      customer_id: profile.customer_id,
+      organization_id: profile.organization_id,
+      target_email: email,
+      target_name: profile.display_name,
+      note: 'Välkomstmail med nytt lösenord',
+    })
 
     return res.status(200).json({ success: true, message: 'Välkomstmail skickat' })
 
