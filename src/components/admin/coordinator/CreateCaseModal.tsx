@@ -18,6 +18,7 @@ import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSug
 import { CaseNumberService } from '../../../services/caseNumberService';
 import { ContractService } from '../../../services/contractService';
 import { resolveContractForCustomer } from '../../../services/contractResolver';
+import { resolveSiteContact } from '../../../utils/multisiteHelpers';
 import type { ContractWithBilling } from '../../../types/database';
 
 import Modal from '../../ui/Modal';
@@ -62,6 +63,20 @@ interface CreateCaseModalProps {
   isOpen: boolean; onClose: () => void; onSuccess: () => void;
   technicians: Technician[]; initialCaseData?: BeGoneCaseRow | null;
   initialCaseType?: 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | 'egenkontroll' | null;
+}
+
+/**
+ * Visas när adressen kommer från huvudkontoret för att den valda enheten
+ * saknar egen. Utan den ser koordinatorn en adress som ser rätt ut men pekar
+ * på fel plats.
+ */
+function AddressInheritedHint() {
+  return (
+    <p className="mt-1 flex items-center gap-1.5 text-[11px] text-amber-400">
+      <AlertCircle className="w-3 h-3 shrink-0" />
+      Hämtad från huvudkontoret, enheten saknar egen adress. Kontrollera innan du bokar.
+    </p>
+  );
 }
 
 export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType }: CreateCaseModalProps) {
@@ -113,6 +128,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
   const customerDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Adressen som autofyllet självt skrev in senast. Bara den får ersättas när
+  // kund eller enhet byts: en adress som kommer från en väntande kundförfrågan
+  // (initialCaseData) eller som koordinatorn skrivit för hand ska stå kvar.
+  const autofilledAddressRef = useRef<string | null>(null);
+  // Sant när adressen i fältet kommer från huvudkontoret för att enheten
+  // saknar egen. Styr hjälptexten under fältet.
+  const [addressFromParent, setAddressFromParent] = useState(false);
+
   const handleReset = useCallback(() => {
     setStep('selectType'); setCaseType(null); setFormData({});
     setSuggestions([]); setTeamSuggestions([]);
@@ -126,6 +149,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setGeneratedCaseNumber(null);
     setCustomerSearchTerm('');
     setCustomerDropdownOpen(false);
+    autofilledAddressRef.current = null;
+    setAddressFromParent(false);
     // Städa upp bildförhandsvisningar
     setSelectedImages(prev => {
       prev.forEach(img => URL.revokeObjectURL(img.preview));
@@ -454,6 +479,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
       // Om en site är vald för multisite-kund, använd sitens data där det finns
       let dataSource = customer;
+      // Sant när något fält föll tillbaka på huvudkontoret för att enheten
+      // saknar eget värde. Används för hjälptexten vid adressfältet.
+      let addressInherited = false;
       if (selectedSiteId) {
         // Rondering/egenkontroll: kontaktinfo alltid från HK (customer), inte region-siten
         if (caseType === 'rondering' || caseType === 'egenkontroll') {
@@ -464,42 +492,52 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           console.error('Selected site not found:', selectedSiteId);
           return;
         }
-        
+
         // Hitta platsansvarig för denna enhet
-        const siteManager = multisiteRoles.find(role => 
+        const siteManager = multisiteRoles.find(role =>
           role.site_ids?.includes(selectedSiteId)
         );
-        
+
+        // Enhetens egna uppgifter går först, huvudkontoret fyller bara luckor.
+        // 16 av 65 enheter saknar egen adress, så arvet behövs — men det ska
+        // synas i gränssnittet när det sker.
+        const resolved = resolveSiteContact(site, customer);
+        addressInherited = resolved.inheritedFields.includes('contact_address');
+
         // VIKTIGT: Använd SITE som bas, inte customer
         // Detta säkerställer att vi får rätt kontaktinfo från enheten
         dataSource = {
           ...site, // Använd SITE som bas istället för customer
-          // Överskrid bara med platsansvarigs data om den finns
-          contact_person: siteManager?.user_name || site.contact_person,
-          contact_phone: siteManager?.user_phone || site.contact_phone,
-          contact_email: siteManager?.user_email || site.contact_email,
-          // Behåll vissa fält från huvudkund om de saknas på site
-          billing_email: site.billing_email || customer?.billing_email,
-          billing_address: site.billing_address || customer?.billing_address,
+          // Prioritet: platsansvarig → enhet → huvudkontor (se commit b4f4c658)
+          contact_person: siteManager?.user_name || resolved.contact_person,
+          contact_phone: siteManager?.user_phone || resolved.contact_phone,
+          contact_email: siteManager?.user_email || resolved.contact_email,
+          billing_email: resolved.billing_email,
+          billing_address: resolved.billing_address,
           // Sitens egna uppgifter, fallback till huvudkund (HK)
           company_name: site.company_name,
           organization_number: site.organization_number || customer?.organization_number || parentCustomer?.organization_number,
-          contact_address: site.contact_address
+          contact_address: resolved.contact_address
         };
-        
-        console.log('Site data being used:', {
-          site_name: site.site_name,
-          site_manager: siteManager?.user_name,
-          contact_person: dataSource.contact_person,
-          contact_phone: dataSource.contact_phone,
-          contact_email: dataSource.contact_email,
-          org_nr: dataSource.organization_number
-        });
         } // end else (non-rondering site logic)
       }
 
       if (dataSource) {
-        setFormData(prev => ({
+        const nextAddress = dataSource.contact_address || '';
+        setAddressFromParent(!!nextAddress && addressInherited);
+
+        setFormData(prev => {
+          // Adressen skrivs bara över om fältet är tomt eller innehåller det
+          // värde autofyllet självt satte förra gången. Det skyddar adressen
+          // från en väntande kundförfrågan (initialCaseData) och det
+          // koordinatorn skrivit för hand, men släpper fram enhetens adress
+          // när den tidigare visade huvudkontorets.
+          const addressIsOurs =
+            !prev.adress || prev.adress === autofilledAddressRef.current;
+          const adress = addressIsOurs ? (nextAddress || prev.adress || '') : prev.adress;
+          if (addressIsOurs && nextAddress) autofilledAddressRef.current = nextAddress;
+
+          return {
           ...prev,
           kontaktperson: dataSource.contact_person || '',
           telefon_kontaktperson: dataSource.contact_phone || '',
@@ -507,17 +545,18 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           org_nr: dataSource.organization_number || parentCustomer?.organization_number || '',
           bestallare: dataSource.company_name || '',
           company_name: dataSource.company_name || customer?.company_name || parentCustomer?.company_name || '',
-          adress: prev.adress || dataSource.contact_address || dataSource.service_address || '',
+          adress,
           // Lägg även till faktura-fält om de finns
           e_post_faktura: dataSource.billing_email || dataSource.contact_email || '',
           faktura_adress: dataSource.billing_address || dataSource.contact_address || '',
           // Lägg till fler fält för bättre integration
           telefon: dataSource.contact_phone || '', // För ärendet självt
           email: dataSource.contact_email || '',   // För ärendet självt
-        }));
+          };
+        });
       }
     }
-  }, [selectedContractCustomer, selectedSiteId, contractCustomers, multisiteRoles]);
+  }, [selectedContractCustomer, selectedSiteId, contractCustomers, multisiteRoles, caseType]);
 
   // Multi-kontrakt-refaktor (Fas 8c): hämta aktiva avtal för vald avtalskund.
   // Använder sitens customer_id för multisite (kontrakt hänger på siten).
@@ -642,6 +681,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   };
 
   const handleAddressChange = (val: string | GeocodeResult) => {
+    // Koordinatorn har tagit över adressen: autofyllet får inte skriva över
+    // den när kund eller enhet byts, och hjälptexten om huvudkontoret gäller
+    // inte längre.
+    autofilledAddressRef.current = null;
+    setAddressFromParent(false);
     setFormData(prev => ({
       ...prev,
       adress: typeof val === 'string' ? val : val.formatted_address
@@ -699,7 +743,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       if (!customer) {
         return toast.error('Välj en kund först.');
       }
-      searchAddress = customer.contact_address || customer.service_address || '';
+      // Adressen i formuläret är sanningen: den kan vara enhetens, ärvd från
+      // huvudkontoret eller handskriven av koordinatorn. Läser vi rått från
+      // kundraden söker ruttförslaget på en annan plats än ärendet hamnar på.
+      const formAddress = typeof formData.adress === 'string' ? formData.adress.trim() : '';
+      searchAddress = formAddress || customer.contact_address || '';
       searchPestType = selectedService?.name || null;
 
       if (!searchAddress) {
@@ -864,6 +912,18 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       return toast.error('Du måste välja en region');
     }
 
+    // Kontaktuppgifter att falla tillbaka på när ett fält lämnats tomt.
+    // Enhetens uppgifter först, huvudkontoret bara för luckor. Rondering och
+    // egenkontroll är undantagna: där ska kontakten alltid vara huvudkontoret
+    // (regionen är ett geografiskt område, inte en plats med egen kontakt).
+    const submitSite = selectedSiteId
+      ? contractCustomers.find(c => c.id === selectedSiteId)
+      : null;
+    const contactFallback =
+      submitSite && caseType !== 'rondering' && caseType !== 'egenkontroll'
+        ? resolveSiteContact(submitSite, customer)
+        : customer;
+
     // Ärendemärkning: obligatoriska fält per kundinställning
     if (workOrderNumberRequired && !(formData as any).work_order_number?.trim()) {
       return toast.error('Arbetsorder nr måste anges för denna kund');
@@ -921,9 +981,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           primary_technician_name: formData.primary_assignee_name || null,
           secondary_technician_id: formData.secondary_assignee_id || null,
           tertiary_technician_id: formData.tertiary_assignee_id || null,
-          contact_person: formData.kontaktperson || customer?.contact_person || null,
-          contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
-          contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
+          contact_person: formData.kontaktperson || contactFallback?.contact_person || null,
+          contact_email: formData.e_post_kontaktperson || contactFallback?.contact_email || null,
+          contact_phone: formData.telefon_kontaktperson || contactFallback?.contact_phone || null,
           address: formData.adress ? { formatted_address: formData.adress } : null,
           price: null,
           case_number: caseNumber,
@@ -1021,9 +1081,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           primary_technician_name: formData.primary_assignee_name || null,
           secondary_technician_id: formData.secondary_assignee_id || null,
           tertiary_technician_id: formData.tertiary_assignee_id || null,
-          contact_person: formData.kontaktperson || customer?.contact_person || null,
-          contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
-          contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
+          contact_person: formData.kontaktperson || contactFallback?.contact_person || null,
+          contact_email: formData.e_post_kontaktperson || contactFallback?.contact_email || null,
+          contact_phone: formData.telefon_kontaktperson || contactFallback?.contact_phone || null,
           address: formData.adress ? { formatted_address: formData.adress } : null,
           case_number: caseNumber,
           service_id: serviceId || null,
@@ -1149,9 +1209,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           scheduled_end: formData.due_date,
           primary_technician_id: formData.primary_assignee_id,
           primary_technician_name: formData.primary_assignee_name || null,
-          contact_person: formData.kontaktperson || customer?.contact_person || null,
-          contact_email: formData.e_post_kontaktperson || customer?.contact_email || null,
-          contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
+          contact_person: formData.kontaktperson || contactFallback?.contact_person || null,
+          contact_email: formData.e_post_kontaktperson || contactFallback?.contact_email || null,
+          contact_phone: formData.telefon_kontaktperson || contactFallback?.contact_phone || null,
           address: formData.adress ? { formatted_address: formData.adress } : null,
           price: formData.pris || null,
           case_number: caseNumber,
@@ -1291,7 +1351,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
       // Skicka SMS bokningsbekräftelse om valt
       if (formData.skicka_bokningsbekraftelse && formData.skicka_bokningsbekraftelse !== 'Nej') {
-        const phoneNumber = formData.telefon_kontaktperson || customer?.contact_phone
+        const phoneNumber = formData.telefon_kontaktperson || contactFallback?.contact_phone
         if (phoneNumber) {
           const templateSlug = formData.skicka_bokningsbekraftelse.includes('Tidsspann')
             ? 'booking_timespan'
@@ -1301,7 +1361,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           const endDate = formData.due_date ? new Date(formData.due_date) : null
           const primaryTech = technicians.find(t => t.id === formData.primary_assignee_id)
 
-          const fullName = formData.kontaktperson || customer?.contact_person || customer?.company_name || ''
+          const fullName = formData.kontaktperson || contactFallback?.contact_person || customer?.company_name || ''
           const nameParts = fullName.trim().split(/\s+/)
 
           const variables: Record<string, string> = {
@@ -1714,6 +1774,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       onChange={handleAddressChange}
                       placeholder="Fullständig adress..."
                     />
+                    {addressFromParent && <AddressInheritedHint />}
 
                     {/* Account Manager-info */}
                     {accountManagerName && (
@@ -2095,7 +2156,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Zap className="w-4 h-4 text-blue-400"/>Intelligent Bokning</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {caseType !== 'rondering' && caseType !== 'egenkontroll' && (
-                      <AddressAutocomplete label="Adress *" value={typeof formData.adress === 'string' ? formData.adress : ''} onChange={handleAddressChange} placeholder="Fullständig adress..." required />
+                      <div>
+                        <AddressAutocomplete label="Adress *" value={typeof formData.adress === 'string' ? formData.adress : ''} onChange={handleAddressChange} placeholder="Fullständig adress..." required />
+                        {addressFromParent && <AddressInheritedHint />}
+                      </div>
                     )}
                     <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">Hitta tider från:</label>

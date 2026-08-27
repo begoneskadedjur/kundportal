@@ -195,6 +195,60 @@ export function inheritOrgNr(
   return site.organization_number || parent?.organization_number || null
 }
 
+/** Kontaktuppgifter som kan ärvas från huvudkontoret till en enhet. */
+export interface SiteContactFields {
+  contact_person?: string | null
+  contact_phone?: string | null
+  contact_email?: string | null
+  contact_address?: string | null
+  billing_email?: string | null
+  billing_address?: string | null
+}
+
+export interface ResolvedSiteContact extends SiteContactFields {
+  /** Fälten som saknades på enheten och därför hämtades från huvudkontoret. */
+  inheritedFields: (keyof SiteContactFields)[]
+}
+
+/**
+ * Löser upp en enhets kontaktuppgifter med arv från huvudkontoret, fält för
+ * fält. Enheten vinner alltid där den har ett eget värde; huvudkontoret
+ * används bara för att fylla luckor.
+ *
+ * Arvet redovisas i inheritedFields så att gränssnittet kan säga varifrån en
+ * uppgift kommer. 16 av 65 enheter saknar egen adress, och en koordinator som
+ * ser huvudkontorets adress utan förklaring tror att den gäller besöket.
+ *
+ * Synkron eftersom både enheten och huvudkontoret redan finns i minnet när
+ * ärendet skapas. Samma mönster som inheritOrgNr ovan.
+ */
+export function resolveSiteContact(
+  site: SiteContactFields,
+  parent?: SiteContactFields | null
+): ResolvedSiteContact {
+  const keys: (keyof SiteContactFields)[] = [
+    'contact_person',
+    'contact_phone',
+    'contact_email',
+    'contact_address',
+    'billing_email',
+    'billing_address',
+  ]
+
+  const out: ResolvedSiteContact = { inheritedFields: [] }
+  for (const key of keys) {
+    const own = site[key]
+    if (own) {
+      out[key] = own
+      continue
+    }
+    const inherited = parent?.[key] ?? null
+    out[key] = inherited
+    if (inherited) out.inheritedFields.push(key)
+  }
+  return out
+}
+
 /**
  * Hämtar regioner för en organisation
  */
