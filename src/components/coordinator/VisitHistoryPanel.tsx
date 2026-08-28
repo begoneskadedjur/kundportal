@@ -10,6 +10,7 @@ import sv from 'date-fns/locale/sv'
 import { INVOICE_STATUS_CONFIG } from '../../types/invoice'
 import type { InvoiceStatus } from '../../types/invoice'
 import CaseContextImagePreview from '../communication/CaseContextImagePreview'
+import { formatVisitTechnicians } from '../../services/visitService'
 
 interface CaseInvoice {
   id: string
@@ -37,6 +38,8 @@ interface Visit {
   visit_date: string
   visit_number: number | null
   technician_name: string | null
+  /** Besökets samtliga tekniker i rollordning. Tom lista på äldre besök. */
+  technicians?: Array<{ id: string | null; name: string; role?: string }> | null
   work_performed: string | null
   findings: string | null
   recommendations: string | null
@@ -132,7 +135,7 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
       const [visitsRes, billingRes, invoicesRes, eventsRes, cbItemsRes] = await Promise.all([
         supabase
           .from('visits')
-          .select('id, visit_date, visit_number, technician_name, work_performed, findings, recommendations, time_spent_minutes, materials_used, pest_level, problem_rating, status')
+          .select('id, visit_date, visit_number, technician_name, technicians, work_performed, findings, recommendations, time_spent_minutes, materials_used, pest_level, problem_rating, status')
           .eq('case_id', caseId)
           .order('visit_date', { ascending: false }),
         // Alla rader hämtas — rader med visit_number visas per besök, fakturerade
@@ -331,6 +334,8 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
             {visits.map((visit) => {
               const items = getBillingForVisit(visit.visit_number)
               const visitLabel = visit.visit_number ? `Besök #${visit.visit_number}` : 'Besök'
+              // Alla tekniker som var på besöket, inte bara primärteknikern
+              const technicianLabel = formatVisitTechnicians(visit.technicians, visit.technician_name)
               return (
                 <div
                   key={visit.id}
@@ -347,10 +352,10 @@ export default function VisitHistoryPanel({ caseId, caseTitle, onClose }: VisitH
                   <div className="px-4 py-3 space-y-3">
                     {/* Meta row */}
                     <div className="flex flex-wrap gap-2">
-                      {visit.technician_name && (
+                      {technicianLabel && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-700/50 rounded-full text-xs text-slate-300">
                           <User className="w-3 h-3" />
-                          {visit.technician_name}
+                          {technicianLabel}
                         </span>
                       )}
                       {visit.time_spent_minutes != null && (

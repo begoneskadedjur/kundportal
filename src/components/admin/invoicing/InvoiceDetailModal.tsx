@@ -65,6 +65,7 @@ import { useInvoicePulse, usePriceListCheck } from '../../../hooks/useInvoicePul
 import { useInvoiceMarking } from '../../../hooks/useInvoiceMarking'
 import { useInvoiceCaseChain } from '../../../hooks/useInvoiceCaseChain'
 import { useInvoiceVisit, type VisitSnapshot } from '../../../hooks/useInvoiceVisit'
+import { formatVisitTechnicians } from '../../../services/visitService'
 import CommentSection from '../../communication/CommentSection'
 import CaseContextImagePreview from '../../communication/CaseContextImagePreview'
 import EmbeddedMapPreview from '../../communication/EmbeddedMapPreview'
@@ -203,7 +204,12 @@ function WorkPerformedContent({
     return <p className="text-sm text-slate-500 py-1">Ingen arbetsrapport ännu</p>
   }
 
-  const technicianName = visit?.technician_name || caseContext?.primaryAssigneeName || null
+  // Besöket kan ha utförts av flera tekniker — visa hela laget kommaseparerat.
+  // Saknas listan (äldre besök) gäller primärteknikern som förr.
+  const technicianName =
+    formatVisitTechnicians(visit?.technicians, visit?.technician_name) ||
+    caseContext?.primaryAssigneeName ||
+    null
   const performedAt = visit?.visit_date || caseContext?.startDate || null
   // Besökets tid vinner, men 0 minuter betyder "inte registrerad" — fall då tillbaka
   // på ärendets värde i stället för att dölja en tid som faktiskt finns
@@ -523,24 +529,36 @@ export default function InvoiceDetailModal({
   // godkännande. commission_posts.case_id är TEXT och matchar invoice.case_id
   // rakt av för både privat/företag och avtalsärenden (adhoc). Fel sväljs -
   // provisionsvisningen får aldrig blockera fakturamodalen.
+  //
+  // Posterna filtreras på fakturans besök med EXAKT samma predikat som
+  // DB-triggern handle_invoice_paid (20260828_provision_per_faktura.sql):
+  //   invoice.visit_id is null OR post.visit_id is null OR de matchar
+  // dvs delfaktura -> bara sitt besöks poster, slutfaktura/årspremie utan
+  // besök -> hela ärendet, och besökslösa poster (rondering, historik) följer
+  // alltid ärendets betalning. Håll predikaten identiska - annars kan
+  // godkännandepanelen visa annat underlag än det som faktiskt betalas ut.
   useEffect(() => {
     if (!invoice?.case_id || invoice.status !== 'pending_approval') {
       setCommissionPosts([])
       return
     }
+    const invoiceVisitId = invoice.visit_id
     let cancelled = false
     ProvisionService.getPostsByCase(invoice.case_id)
       .then(posts => {
         if (cancelled) return
-        // 'cancelled' finns i DB men inte i CommissionStatus-typen
-        setCommissionPosts(posts.filter(p => (p.status as string) !== 'cancelled'))
+        setCommissionPosts(posts.filter(p =>
+          // 'cancelled' finns i DB men inte i CommissionStatus-typen
+          (p.status as string) !== 'cancelled' &&
+          (invoiceVisitId === null || p.visit_id === null || p.visit_id === invoiceVisitId)
+        ))
       })
       .catch(err => {
         console.warn('Kunde inte hämta provisionsposter:', err)
         if (!cancelled) setCommissionPosts([])
       })
     return () => { cancelled = true }
-  }, [invoice?.case_id, invoice?.status])
+  }, [invoice?.case_id, invoice?.status, invoice?.visit_id])
 
   // Ärendenumret för fakturans kopplade ärende - visas i headern så att
   // kopplingen faktura ↔ ärende alltid är synlig (fakturanumret i sig är
@@ -1332,6 +1350,7 @@ export default function InvoiceDetailModal({
                               <span className="text-slate-300">
                                 Provision · {post.technician_name}
                                 {Number(post.share_percentage) < 100 ? ` (${Number(post.share_percentage)} % andel)` : ''}
+                                {post.visit_number ? ` · besök ${post.visit_number}` : ''}
                               </span>
                               <span className="font-mono text-slate-300">
                                 {formatInvoiceAmount(Number(post.commission_amount))}

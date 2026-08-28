@@ -254,6 +254,12 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
         visitDate: caseData.start_date ?? new Date().toISOString(),
         technicianId: caseData.primary_assignee_id ?? null,
         technicianName: caseData.primary_assignee_name ?? null,
+        // Hela besökets bemanning, inte bara primärteknikern
+        technicians: [
+          { id: caseData.primary_assignee_id ?? null, name: caseData.primary_assignee_name ?? '', role: 'primary' as const },
+          { id: caseData.secondary_assignee_id ?? null, name: caseData.secondary_assignee_name ?? '', role: 'secondary' as const },
+          { id: caseData.tertiary_assignee_id ?? null, name: caseData.tertiary_assignee_name ?? '', role: 'tertiary' as const },
+        ].filter(t => t.name.trim().length > 0),
         workPerformed: caseData.rapport,
       })
       if (!visit) {

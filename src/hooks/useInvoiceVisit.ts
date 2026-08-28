@@ -25,6 +25,8 @@ export interface VisitSnapshot {
   visit_number: number | null
   visit_date: string
   technician_name: string | null
+  /** Besökets samtliga tekniker i rollordning. Tom lista på äldre besök. */
+  technicians?: Array<{ id: string | null; name: string; role?: string }> | null
   work_performed: string | null
   findings: string | null
   recommendations: string | null
@@ -40,7 +42,7 @@ interface UseInvoiceVisitResult {
 }
 
 const VISIT_COLUMNS =
-  'id, visit_number, visit_date, technician_name, work_performed, findings, recommendations, materials_used, time_spent_minutes, pest_level, problem_rating'
+  'id, visit_number, visit_date, technician_name, technicians, work_performed, findings, recommendations, materials_used, time_spent_minutes, pest_level, problem_rating'
 
 export function useInvoiceVisit(invoice: InvoiceWithItems | null): UseInvoiceVisitResult {
   const [visit, setVisit] = useState<VisitSnapshot | null>(null)

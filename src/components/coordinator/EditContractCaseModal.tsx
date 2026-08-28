@@ -1289,6 +1289,12 @@ export default function EditContractCaseModal({
           visitDate: cleanedFormData.completed_date || new Date().toISOString(),
           technicianId: cleanedFormData.primary_technician_id,
           technicianName: cleanedFormData.primary_technician_name,
+          // Hela besökets bemanning, inte bara primärteknikern
+          technicians: [
+            { id: cleanedFormData.primary_technician_id || null, name: cleanedFormData.primary_technician_name || '', role: 'primary' as const },
+            { id: cleanedFormData.secondary_technician_id || null, name: cleanedFormData.secondary_technician_name || '', role: 'secondary' as const },
+            { id: cleanedFormData.tertiary_technician_id || null, name: cleanedFormData.tertiary_technician_name || '', role: 'tertiary' as const },
+          ].filter(t => t.name.trim().length > 0),
           workPerformed: cleanedFormData.work_report,
           recommendations: cleanedFormData.recommendations,
           materialsUsed: cleanedFormData.materials_used,

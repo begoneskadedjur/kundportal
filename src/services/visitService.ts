@@ -19,6 +19,18 @@ import { supabase } from '../lib/supabase'
 
 export type VisitSource = 'completion' | 'revisit'
 export type VisitCaseType = 'private' | 'business' | 'contract'
+export type VisitTechnicianRole = 'primary' | 'secondary' | 'tertiary'
+
+/**
+ * En tekniker på besöket. Ordningen i listan ÄR rollordningen: element ett är
+ * primärteknikern och speglas i visits.technician_id/technician_name (DB:n
+ * härleder de kolumnerna ur listans första element).
+ */
+export interface VisitTechnician {
+  id: string | null
+  name: string
+  role?: VisitTechnicianRole | string
+}
 
 export interface Visit {
   id: string
@@ -30,6 +42,8 @@ export interface Visit {
   completed_date: string | null
   technician_id: string | null
   technician_name: string | null
+  /** Besökets samtliga tekniker i rollordning. Aldrig null i DB (default []). */
+  technicians: VisitTechnician[]
   work_performed: string | null
   findings: string | null
   recommendations: string | null
@@ -53,6 +67,11 @@ export interface CreateVisitSnapshotParams {
   isFinal: boolean
   technicianId?: string | null
   technicianName?: string | null
+  /**
+   * Ärendets fulla teknikerlista i rollordning (primär, sekundär, tertiär).
+   * Utelämnad eller tom: null skickas och DB:n bygger listan ur primärteknikern.
+   */
+  technicians?: VisitTechnician[]
   /** Besökets datum. Utelämnad = DB:ns now(). */
   visitDate?: string | null
   workPerformed?: string | null
@@ -69,6 +88,46 @@ export interface CreateVisitSnapshotParams {
 const nullIfBlank = (v: string | null | undefined): string | null => {
   const t = typeof v === 'string' ? v.trim() : ''
   return t.length > 0 ? t : null
+}
+
+/** Rollen härleds ur positionen när anroparen inte anger den. */
+const ROLE_BY_INDEX: VisitTechnicianRole[] = ['primary', 'secondary', 'tertiary']
+
+/**
+ * Normaliserar teknikerlistan inför RPC:n: namnlösa poster hoppas över och
+ * rollen fylls i efter position. Tom lista blir null så DB:n i stället bygger
+ * listan ur p_technician_id/p_technician_name.
+ */
+const normalizeTechnicians = (
+  technicians: VisitTechnician[] | undefined
+): VisitTechnician[] | null => {
+  if (!technicians || technicians.length === 0) return null
+  const cleaned: VisitTechnician[] = []
+  for (const t of technicians) {
+    const name = nullIfBlank(t?.name)
+    if (!name) continue
+    cleaned.push({
+      id: t.id ?? null,
+      name,
+      role: t.role ?? ROLE_BY_INDEX[cleaned.length] ?? 'tertiary',
+    })
+  }
+  return cleaned.length > 0 ? cleaned : null
+}
+
+/**
+ * Besökets tekniker som en läsbar rad: "Anna Andersson, Bo Bengtsson".
+ * Faller tillbaka på fallbackName när listan saknas (äldre besök) eller är tom.
+ */
+export function formatVisitTechnicians(
+  technicians: Array<{ name?: string | null }> | null | undefined,
+  fallbackName?: string | null
+): string | null {
+  const names = (technicians || [])
+    .map(t => (typeof t?.name === 'string' ? t.name.trim() : ''))
+    .filter(name => name.length > 0)
+  if (names.length > 0) return names.join(', ')
+  return nullIfBlank(fallbackName)
 }
 
 export class VisitService {
@@ -98,6 +157,7 @@ export class VisitService {
         p_pest_level: params.pestLevel ?? null,
         p_problem_rating: params.problemRating ?? null,
         p_customer_id: params.customerId ?? null,
+        p_technicians: normalizeTechnicians(params.technicians),
       })
 
       if (error) {

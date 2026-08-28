@@ -54,6 +54,10 @@ interface ContractCase {
   assessed_by?: string | null
   primary_technician_id?: string | null
   primary_technician_name?: string | null
+  secondary_technician_id?: string | null
+  secondary_technician_name?: string | null
+  tertiary_technician_id?: string | null
+  tertiary_technician_name?: string | null
   customer_id?: string | null
 }
 
@@ -233,6 +237,12 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           visitDate: (caseData.scheduled_start as string) ?? new Date().toISOString(),
           technicianId: caseData.primary_technician_id ?? null,
           technicianName: caseData.primary_technician_name ?? null,
+          // Hela besökets bemanning, inte bara primärteknikern
+          technicians: [
+            { id: caseData.primary_technician_id ?? null, name: caseData.primary_technician_name ?? '', role: 'primary' as const },
+            { id: caseData.secondary_technician_id ?? null, name: caseData.secondary_technician_name ?? '', role: 'secondary' as const },
+            { id: caseData.tertiary_technician_id ?? null, name: caseData.tertiary_technician_name ?? '', role: 'tertiary' as const },
+          ].filter(t => t.name.trim().length > 0),
           workPerformed: caseData.work_report,
           recommendations: caseData.recommendations,
           findings: caseData.pest_level != null ? `Skadedjursnivå: ${caseData.pest_level}` : null,

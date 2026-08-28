@@ -606,6 +606,9 @@ export type Database = {
           created_at: string
           updated_at: string
           technician_id: string | null
+          // Besökets samtliga tekniker i rollordning (primary/secondary/tertiary).
+          // Element ett speglar technician_id/technician_name. Default [] i DB.
+          technicians: Array<{ id: string | null; name: string; role?: string }>
           time_spent_minutes: number | null
           materials_used: string | null
           pest_level: number | null

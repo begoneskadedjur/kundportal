@@ -1182,6 +1182,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             ?? new Date().toISOString(),
           technicianId: formData.primary_assignee_id || null,
           technicianName: formData.primary_assignee_name || null,
+          // Hela besökets bemanning, inte bara primärteknikern
+          technicians: [
+            { id: formData.primary_assignee_id || null, name: formData.primary_assignee_name || '', role: 'primary' as const },
+            { id: formData.secondary_assignee_id || null, name: formData.secondary_assignee_name || '', role: 'secondary' as const },
+            { id: formData.tertiary_assignee_id || null, name: formData.tertiary_assignee_name || '', role: 'tertiary' as const },
+          ].filter(t => t.name.trim().length > 0),
           workPerformed: formData.rapport,
           timeSpentMinutes: currentCase.time_spent_minutes ?? null,
         });
