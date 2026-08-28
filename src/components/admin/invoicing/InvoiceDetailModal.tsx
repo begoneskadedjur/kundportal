@@ -1,7 +1,7 @@
 // src/components/admin/invoicing/InvoiceDetailModal.tsx
 // Modal för att visa och hantera fakturadetaljer med ärendekontext och kommunikation
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   X,
   FileText,
@@ -199,6 +199,25 @@ function WorkPerformedContent({
   visit?: VisitSnapshot | null
 }) {
   const [reportExpanded, setReportExpanded] = useState(false)
+  // "Visa mer" ska bara finnas när texten faktiskt är avklippt. Antal rader
+  // går inte att räkna i förväg (radbrytning beror på bredd och teckensnitt),
+  // så vi mäter elementets verkliga höjd mot dess synliga höjd.
+  const reportRef = useRef<HTMLParagraphElement>(null)
+  const [reportClamped, setReportClamped] = useState(false)
+  // Beräknas före den tidiga returen nedan: hooks måste anropas i samma
+  // ordning varje render, och effekten beror på rapporttexten.
+  const report = visit?.work_performed || caseContext?.rapport || null
+
+  useEffect(() => {
+    const el = reportRef.current
+    if (!el) { setReportClamped(false); return }
+    const measure = () => setReportClamped(el.scrollHeight > el.clientHeight + 1)
+    measure()
+    // Bredden ändras när modalen öppnas eller fönstret storleksändras
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [report, reportExpanded])
 
   if (!caseContext && !visit) {
     return <p className="text-sm text-slate-500 py-1">Ingen arbetsrapport ännu</p>
@@ -216,7 +235,7 @@ function WorkPerformedContent({
   const timeSpentMinutes = (visit?.time_spent_minutes || null) ?? caseContext?.timeSpentMinutes ?? null
   const timeSpent = formatTimeSpent(timeSpentMinutes)
   const pestType = caseContext?.pestType || null
-  const report = visit?.work_performed || caseContext?.rapport || null
+
   const recommendations = visit?.recommendations?.trim() || null
   const pestLevel = visit?.pest_level ?? null
   const problemRating = visit?.problem_rating ?? null
@@ -280,16 +299,21 @@ function WorkPerformedContent({
       {/* Arbetsrapport */}
       {report ? (
         <div className="bg-slate-900/50 rounded-lg p-2.5">
-          <p className={`text-sm text-slate-300 whitespace-pre-wrap ${reportExpanded ? '' : 'line-clamp-6'}`}>
+          <p
+            ref={reportRef}
+            className={`text-sm text-slate-300 whitespace-pre-wrap ${reportExpanded ? '' : 'line-clamp-6'}`}
+          >
             {report}
           </p>
-          <button
-            type="button"
-            onClick={() => setReportExpanded(!reportExpanded)}
-            className="mt-1.5 text-xs text-[#20c58f] hover:text-[#1bb07e]"
-          >
-            {reportExpanded ? 'Visa mindre' : 'Visa mer'}
-          </button>
+          {(reportClamped || reportExpanded) && (
+            <button
+              type="button"
+              onClick={() => setReportExpanded(!reportExpanded)}
+              className="mt-1.5 text-xs text-[#20c58f] hover:text-[#1bb07e]"
+            >
+              {reportExpanded ? 'Visa mindre' : 'Visa mer'}
+            </button>
+          )}
         </div>
       ) : (
         <p className="text-sm text-slate-500">Ingen arbetsrapport ännu</p>
