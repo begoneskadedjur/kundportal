@@ -1,6 +1,6 @@
 // src/components/customer/PremiumServiceRequest.tsx - Service Request Modal
 import React, { useState, useMemo } from 'react'
-import { X, AlertCircle, Calendar, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info, Trash2 } from 'lucide-react'
+import { X, AlertCircle, Calendar, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info, Trash2, MapPin, Tag } from 'lucide-react'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import toast from 'react-hot-toast'
@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
 import { CaseImageService } from '../../services/caseImageService'
 import { CaseNumberService } from '../../services/caseNumberService'
+import { useCaseMarkingFields, type MarkingFieldKey } from '../../hooks/useCaseMarkingFields'
 
 interface PremiumServiceRequestProps {
   isOpen: boolean
@@ -47,6 +48,23 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
   const [alternativeContactPhone, setAlternativeContactPhone] = useState('')
   const [alternativeContactEmail, setAlternativeContactEmail] = useState('')
 
+  // Adress: kundens adress förifylls, men arbetet kan gälla en annan plats
+  const [useCustomAddress, setUseCustomAddress] = useState(false)
+  const [customAddress, setCustomAddress] = useState('')
+
+  // Ärendemärkning — flaggorna ärvs från huvudkontoret för enheter
+  const { fields: markingFields } = useCaseMarkingFields(customer?.id)
+  const [markingValues, setMarkingValues] = useState<Record<MarkingFieldKey, string>>({
+    work_order_number: '',
+    work_object: '',
+    room_number: '',
+  })
+
+  const siteAddress = customer?.contact_address || ''
+  const effectiveAddress = useCustomAddress ? customAddress.trim() : siteAddress
+  const missingMarking = markingFields.filter(f => !markingValues[f.key].trim())
+
+  // Hooks måste köras innan denna guard — annars bryts hook-ordningen
   if (!isOpen) return null
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -59,6 +77,16 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
 
     if (!customer?.id) {
       toast.error('Kunde inte identifiera kundinformation')
+      return
+    }
+
+    if (useCustomAddress && !customAddress.trim()) {
+      toast.error('Ange adressen där arbetet ska utföras')
+      return
+    }
+
+    if (missingMarking.length > 0) {
+      toast.error(`${missingMarking.map(f => f.label).join(' och ')} måste fyllas i`)
       return
     }
 
@@ -86,9 +114,11 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
           alternative_contact_person: useAlternativeContact ? alternativeContactPerson : null,
           alternative_contact_phone: useAlternativeContact ? alternativeContactPhone : null,
           alternative_contact_email: useAlternativeContact ? alternativeContactEmail : null,
-          address: customer.contact_address ? {
-            formatted_address: customer.contact_address
-          } : null,
+          address: effectiveAddress ? { formatted_address: effectiveAddress } : null,
+          // Ärendemärkning som kunden fyllt i (tomma fält sparas som null)
+          work_order_number: markingValues.work_order_number.trim() || null,
+          work_object: markingValues.work_object.trim() || null,
+          room_number: markingValues.room_number.trim() || null,
           // Files would need separate handling with storage
         })
         .select()
@@ -122,6 +152,9 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
         setSubject('')
         setDescription('')
         setFiles([])
+        setMarkingValues({ work_order_number: '', work_object: '', room_number: '' })
+        setUseCustomAddress(false)
+        setCustomAddress('')
         if (onSuccess) onSuccess()
       }, 2000)
     } catch (error: any) {
@@ -311,6 +344,81 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
               </p>
             </div>
 
+            {/* Adress — kundens adress förifylls, men arbetet kan gälla en annan plats */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Var ska arbetet utföras?
+              </label>
+
+              {!useCustomAddress ? (
+                <div className="p-3 bg-slate-900/50 border border-slate-700 rounded-lg">
+                  <p className="text-sm text-white">
+                    {siteAddress || <span className="text-amber-400">Ingen adress registrerad — ange den nedan</span>}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseCustomAddress(true)
+                      setCustomAddress(siteAddress)
+                    }}
+                    className="text-xs text-emerald-400 hover:text-emerald-300 mt-2 underline"
+                  >
+                    Arbetet ska utföras på en annan adress
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Input
+                    type="text"
+                    value={customAddress}
+                    onChange={(e) => setCustomAddress(e.target.value)}
+                    placeholder="Gatuadress, postnummer och ort"
+                    className="w-full"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUseCustomAddress(false)
+                      setCustomAddress('')
+                    }}
+                    className="text-xs text-slate-400 hover:text-slate-300 underline"
+                  >
+                    Använd registrerad adress igen
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Ärendemärkning — bara för kunder som kräver det (ärvs från huvudkontoret) */}
+            {markingFields.length > 0 && (
+              <div className="p-4 bg-slate-900/50 border border-slate-700 rounded-lg space-y-3">
+                <div className="flex items-center gap-2 text-slate-300">
+                  <Tag className="w-4 h-4" />
+                  <span className="text-sm font-medium">Er märkning</span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Uppgifterna följer med ärendet hela vägen till fakturan.
+                </p>
+                {markingFields.map(field => (
+                  <div key={field.key}>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                      {field.label} <span className="text-red-400">*</span>
+                    </label>
+                    <Input
+                      type="text"
+                      value={markingValues[field.key]}
+                      onChange={(e) =>
+                        setMarkingValues(prev => ({ ...prev, [field.key]: e.target.value }))
+                      }
+                      placeholder={`Ange ${field.label.toLowerCase()}`}
+                      className="w-full"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* File Upload */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -466,7 +574,13 @@ const PremiumServiceRequest: React.FC<PremiumServiceRequestProps> = ({
                 type="submit"
                 variant="primary"
                 className="flex-1 bg-emerald-500 hover:bg-emerald-600"
-                disabled={submitting || !subject.trim() || !description.trim()}
+                disabled={
+                  submitting ||
+                  !subject.trim() ||
+                  !description.trim() ||
+                  missingMarking.length > 0 ||
+                  (useCustomAddress && !customAddress.trim())
+                }
               >
                 {submitting ? 'Skickar...' : 'Skicka förfrågan'}
               </Button>

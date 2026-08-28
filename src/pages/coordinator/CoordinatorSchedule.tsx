@@ -119,10 +119,23 @@ export default function CoordinatorSchedule() {
       title: displayTitle,
       status: contractCase.status,
       priority: contractCase.priority,
-      adress: customer?.contact_address || (contractCase as any).address_formatted,
-      kontaktperson: customer?.contact_person || contractCase.contact_person,
-      telefon: customer?.contact_phone || contractCase.contact_phone,
-      email: customer?.contact_email || contractCase.contact_email,
+      // Ärendets egen adress vinner — kunden kan ha angett en annan plats än
+      // den som står på kundkortet. Adressen sparas som JSONB {formatted_address}
+      // men äldre rader kan ha en rå sträng, så båda formaten hanteras.
+      adress: (typeof contractCase.address === 'string'
+        ? contractCase.address
+        : contractCase.address?.formatted_address)
+        || (contractCase as any).address_formatted
+        || customer?.contact_address,
+      // Ärendets kontaktuppgifter vinner över kundkortets — kunden kan ha angett
+      // en annan kontaktperson för just detta ärende
+      kontaktperson: contractCase.contact_person || customer?.contact_person,
+      telefon: contractCase.contact_phone || customer?.contact_phone,
+      email: contractCase.contact_email || customer?.contact_email,
+      // Alternativ kontakt som kunden angett i anmälan
+      alternative_contact_person: (contractCase as any).alternative_contact_person || null,
+      alternative_contact_phone: (contractCase as any).alternative_contact_phone || null,
+      alternative_contact_email: (contractCase as any).alternative_contact_email || null,
       start_date: contractCase.scheduled_start,
       due_date: contractCase.scheduled_end,
       primary_assignee_id: contractCase.primary_technician_id,
@@ -158,6 +171,18 @@ export default function CoordinatorSchedule() {
       faktura_adress: customer?.billing_address || customer?.contact_address || null,
       parent_customer_id: customer?.parent_customer_id || null,
       oneflow_contract_id: contractCase.oneflow_contract_id || null,
+      // Kundens ursprungliga tjänstetyp måste överleva inbokningen — case_type
+      // ovan är en grövre gruppering och räcker inte för att skriva tillbaka rätt
+      service_type: contractCase.service_type || null,
+      // Enheten kunden valde i anmälan — avgör vilken enhet bokningsmodalen förväljer
+      site_id: (contractCase as any).site_id || null,
+      contract_id: (contractCase as any).contract_id || null,
+      service_id: (contractCase as any).service_id || null,
+      // Ärendemärkning som kunden fyllt i — koordinatorn ska slippa fråga efter den
+      work_order_number: (contractCase as any).work_order_number || null,
+      work_object: (contractCase as any).work_object || null,
+      room_number: (contractCase as any).room_number || null,
+      markning_faktura: (contractCase as any).invoice_marking || null,
     } as BeGoneCaseRow
   }
 

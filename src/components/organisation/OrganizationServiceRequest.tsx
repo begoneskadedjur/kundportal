@@ -1,6 +1,6 @@
 // src/components/organisation/OrganizationServiceRequest.tsx - Service Request för organisationsportalen
 import React, { useState, useEffect } from 'react'
-import { X, AlertCircle, Calendar, MessageSquare, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info, Building2, Trash2 } from 'lucide-react'
+import { X, AlertCircle, Calendar, MessageSquare, Search, HelpCircle, Phone, Mail, Upload, CheckCircle, Clock, Info, Building2, Trash2, MapPin, Tag } from 'lucide-react'
 import Button from '../ui/Button'
 import Input from '../ui/Input'
 import Select from '../ui/Select'
@@ -12,6 +12,7 @@ import { ServiceType, CasePriority, serviceTypeConfig } from '../../types/cases'
 import { ClickUpStatus } from '../../types/database'
 import { CaseImageService } from '../../services/caseImageService'
 import { CaseNumberService } from '../../services/caseNumberService'
+import { useCaseMarkingFields, type MarkingFieldKey } from '../../hooks/useCaseMarkingFields'
 
 interface OrganizationServiceRequestProps {
   isOpen: boolean
@@ -27,7 +28,11 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
   onSuccess 
 }) => {
   const { profile } = useAuth()
-  const { organization, sites, userRole } = useMultisite()
+  const { organization, accessibleSites, userRole, canAccessSite } = useMultisite()
+
+  // Endast enheter användaren får anmäla för: verksamhetschef = alla i organisationen,
+  // regionchef och platsansvarig = de enheter som ligger på deras roll.
+  const sites = accessibleSites
   
   // Form state
   const [serviceType, setServiceType] = useState<ServiceType>('inspection')
@@ -49,6 +54,23 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
   const [alternativeContactPhone, setAlternativeContactPhone] = useState('')
   const [alternativeContactEmail, setAlternativeContactEmail] = useState('')
 
+  // Adress: förifylls från vald enhet men kunden kan ange en annan plats
+  const [useCustomAddress, setUseCustomAddress] = useState(false)
+  const [customAddress, setCustomAddress] = useState('')
+
+  // Ärendemärkning — flaggorna sätts på huvudkontoret och ärvs av enheterna
+  const { fields: markingFields } = useCaseMarkingFields(chosenSiteId || null)
+  const [markingValues, setMarkingValues] = useState<Record<MarkingFieldKey, string>>({
+    work_order_number: '',
+    work_object: '',
+    room_number: '',
+  })
+
+  // Enhetens adress visas förifylld och används när kunden inte anger en egen
+  const siteAddress = customer?.contact_address || sites.find(s => s.id === chosenSiteId)?.address || ''
+  const effectiveAddress = useCustomAddress ? customAddress.trim() : siteAddress
+  const missingMarking = markingFields.filter(f => !markingValues[f.key].trim())
+
   // Auto-välj enhet om bara en finns
   useEffect(() => {
     if (!chosenSiteId && sites.length === 1) {
@@ -61,6 +83,13 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
     if (chosenSiteId) {
       fetchCustomerData(chosenSiteId)
     }
+  }, [chosenSiteId])
+
+  // Byte av enhet får inte släpa med föregående enhets märkning eller adress
+  useEffect(() => {
+    setMarkingValues({ work_order_number: '', work_object: '', room_number: '' })
+    setUseCustomAddress(false)
+    setCustomAddress('')
   }, [chosenSiteId])
 
   const fetchCustomerData = async (customerId: string) => {
@@ -94,16 +123,30 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
       return
     }
 
+    // Behörighetsspärr: enheten måste ligga inom användarens roll
+    if (!canAccessSite(chosenSiteId)) {
+      toast.error('Du har inte behörighet att anmäla ärenden för den enheten')
+      return
+    }
+
     if (!customer) {
       toast.error('Kunde inte identifiera kundinformation')
+      return
+    }
+
+    if (useCustomAddress && !customAddress.trim()) {
+      toast.error('Ange adressen där arbetet ska utföras')
+      return
+    }
+
+    if (missingMarking.length > 0) {
+      toast.error(`${missingMarking.map(f => f.label).join(' och ')} måste fyllas i`)
       return
     }
 
     setSubmitting(true)
     
     try {
-      const chosenSite = sites.find(s => s.id === chosenSiteId)
-      
       // Generate case number
       const caseNumber = await CaseNumberService.generateCaseNumber()
       
@@ -132,10 +175,15 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
           alternative_contact_person: useAlternativeContact ? alternativeContactPerson : null,
           alternative_contact_phone: useAlternativeContact ? alternativeContactPhone : null,
           alternative_contact_email: useAlternativeContact ? alternativeContactEmail : null,
-          // Address som JSONB objekt
-          address: (chosenSite?.address || customer.contact_address) ? {
-            formatted_address: chosenSite?.address || customer.contact_address
-          } : null,
+          // Enheten ärendet gäller — egen kolumn, inte bara metadata i notes.
+          // Koordinatorns bokningsmodal och faktureringen läser site_id.
+          site_id: chosenSiteId,
+          // Address som JSONB objekt — koordinatorsidan läser address.formatted_address
+          address: effectiveAddress ? { formatted_address: effectiveAddress } : null,
+          // Ärendemärkning som kunden fyllt i (tomma fält sparas som null)
+          work_order_number: markingValues.work_order_number.trim() || null,
+          work_object: markingValues.work_object.trim() || null,
+          room_number: markingValues.room_number.trim() || null,
           // Metadata för organisationsärenden (kan läggas i notes eller custom field om det finns)
           notes: JSON.stringify({
             created_by_organization_user: profile?.id,
@@ -143,7 +191,8 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
             organization_id: organization?.id,
             site_id: chosenSiteId,
             source: 'organization_portal',
-            contact_method: contactMethod
+            contact_method: contactMethod,
+            address_overridden: useCustomAddress
           })
         })
         .select()
@@ -179,6 +228,9 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
         setSubject('')
         setDescription('')
         setFiles([])
+        setMarkingValues({ work_order_number: '', work_object: '', room_number: '' })
+        setUseCustomAddress(false)
+        setCustomAddress('')
         setChosenSiteId(selectedSiteId || '')
         if (onSuccess) onSuccess()
       }, 2000)
@@ -289,6 +341,83 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
                     {sites.find(s => s.id === selectedSiteId)?.site_name} - {sites.find(s => s.id === selectedSiteId)?.region}
                   </span>
                 </div>
+              </div>
+            )}
+
+            {/* Adress — enhetens adress förifylls, kunden kan ange en annan plats */}
+            {chosenSiteId && (
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Var ska arbetet utföras?
+                </label>
+
+                {!useCustomAddress ? (
+                  <div className="p-3 bg-slate-900/50 border border-slate-700 rounded-lg">
+                    <p className="text-sm text-white">
+                      {siteAddress || <span className="text-amber-400">Enheten saknar adress — ange den nedan</span>}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUseCustomAddress(true)
+                        setCustomAddress(siteAddress)
+                      }}
+                      className="text-xs text-emerald-400 hover:text-emerald-300 mt-2 underline"
+                    >
+                      Arbetet ska utföras på en annan adress
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      type="text"
+                      value={customAddress}
+                      onChange={(e) => setCustomAddress(e.target.value)}
+                      placeholder="Gatuadress, postnummer och ort"
+                      className="w-full"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUseCustomAddress(false)
+                        setCustomAddress('')
+                      }}
+                      className="text-xs text-slate-400 hover:text-slate-300 underline"
+                    >
+                      Använd enhetens adress igen
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Ärendemärkning — bara för kunder som kräver det (ärvs från huvudkontoret) */}
+            {markingFields.length > 0 && (
+              <div className="p-4 bg-slate-900/50 border border-slate-700 rounded-lg space-y-3">
+                <div className="flex items-center gap-2 text-slate-300">
+                  <Tag className="w-4 h-4" />
+                  <span className="text-sm font-medium">Er märkning</span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Uppgifterna följer med ärendet hela vägen till fakturan.
+                </p>
+                {markingFields.map(field => (
+                  <div key={field.key}>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                      {field.label} <span className="text-red-400">*</span>
+                    </label>
+                    <Input
+                      type="text"
+                      value={markingValues[field.key]}
+                      onChange={(e) =>
+                        setMarkingValues(prev => ({ ...prev, [field.key]: e.target.value }))
+                      }
+                      placeholder={`Ange ${field.label.toLowerCase()}`}
+                      className="w-full"
+                    />
+                  </div>
+                ))}
               </div>
             )}
 
@@ -555,7 +684,14 @@ const OrganizationServiceRequest: React.FC<OrganizationServiceRequestProps> = ({
                 type="submit"
                 variant="primary"
                 className="flex-1 bg-emerald-500 hover:bg-emerald-600"
-                disabled={submitting || !subject.trim() || !description.trim() || !chosenSiteId}
+                disabled={
+                  submitting ||
+                  !subject.trim() ||
+                  !description.trim() ||
+                  !chosenSiteId ||
+                  missingMarking.length > 0 ||
+                  (useCustomAddress && !customAddress.trim())
+                }
               >
                 {submitting ? 'Skickar...' : 'Skicka förfrågan'}
               </Button>

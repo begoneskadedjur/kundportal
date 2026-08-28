@@ -302,10 +302,40 @@ const PendingRequestsModal: React.FC<PendingRequestsModalProps> = ({
                       </div>
                     )}
 
-                    {caseItem.address?.formatted_address && (
-                      <div className="flex items-start gap-1 text-xs text-slate-400 mb-3">
-                        <MapPin className="w-3 h-3 mt-0.5" />
-                        <span>{caseItem.address.formatted_address}</span>
+                    {/* Adressen sparas som JSONB men äldre rader kan ha en rå sträng */}
+                    {(() => {
+                      const addr = typeof caseItem.address === 'string'
+                        ? caseItem.address
+                        : caseItem.address?.formatted_address
+                      return addr ? (
+                        <div className="flex items-start gap-1 text-xs text-slate-400 mb-3">
+                          <MapPin className="w-3 h-3 mt-0.5" />
+                          <span>{addr}</span>
+                        </div>
+                      ) : null
+                    })()}
+
+                    {/* Kundens egen märkning — koordinatorn ska slippa fråga efter den */}
+                    {((caseItem as any).work_order_number || (caseItem as any).work_object || (caseItem as any).room_number) && (
+                      <div className="flex flex-wrap gap-4 text-xs mb-3">
+                        {(caseItem as any).work_order_number && (
+                          <div>
+                            <span className="text-slate-500">Arbetsorder nr: </span>
+                            <span className="text-slate-300 font-mono">{(caseItem as any).work_order_number}</span>
+                          </div>
+                        )}
+                        {(caseItem as any).work_object && (
+                          <div>
+                            <span className="text-slate-500">Objekt: </span>
+                            <span className="text-slate-300 font-mono">{(caseItem as any).work_object}</span>
+                          </div>
+                        )}
+                        {(caseItem as any).room_number && (
+                          <div>
+                            <span className="text-slate-500">Rum nr: </span>
+                            <span className="text-slate-300 font-mono">{(caseItem as any).room_number}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
