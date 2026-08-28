@@ -6,6 +6,7 @@
 import { supabase } from '../lib/supabase'
 import { ImportedCustomerContractService } from './importedCustomerContractService'
 import { PaymentTermsService } from './paymentTermsService'
+import { InvoiceService } from './invoiceService'
 import { ContractService, isSyntheticContract } from './contractService'
 import { resolveOrganizationNumber } from '../utils/multisiteHelpers'
 import type { ContractWithBilling } from '../types/database'
@@ -743,7 +744,7 @@ export class ContractInvoiceGenerator {
 
     let q = supabase
       .from('contract_billing_items')
-      .select('id, total_price, article_name, article_code, quantity, unit_price, vat_rate, discount_percent, case_id, billing_period_start')
+      .select('id, total_price, article_name, article_code, quantity, unit_price, vat_rate, discount_percent, case_id, billing_period_start, visit_id, visit_number')
       .eq('customer_id', customerId)
       .eq('item_type', 'ad_hoc')
       .is('invoice_id', null)
@@ -789,6 +790,14 @@ export class ContractInvoiceGenerator {
       invoiceMarking = caseRow?.invoice_marking?.trim() || null
     }
 
+    // Besökskoppling: bara vid per_case-gruppering OCH när samtliga hämtade rader
+    // hör till samma besök. En månadsbatch spänner över flera ärenden och besök och
+    // får alltid null — då frigörs provisionen enligt det gamla, ärendetäckande
+    // beteendet i handle_invoice_paid.
+    const invoiceVisitId = grouping === 'per_case'
+      ? InvoiceService.resolveSharedVisitId(items)
+      : null
+
     let invoiceId: string
     if (existingInvoiceId) {
       invoiceId = existingInvoiceId
@@ -810,6 +819,7 @@ export class ContractInvoiceGenerator {
           customer_id: customerId,
           case_id: grouping === 'per_case' ? caseId : null,
           case_type: null,
+          visit_id: invoiceVisitId,
           customer_name: c.company_name,
           customer_email: c.billing_email ?? c.contact_email,
           customer_phone: c.contact_phone,

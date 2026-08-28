@@ -52,6 +52,18 @@ export class ProvisionExportService {
       'Kommentar'
     ]
 
+    // Specificera ärende och besök i kommentaren. Utan det ser löneadmin bara
+    // en klumpsumma och kan inte förklara varför samma ärende kan ge två poster
+    // i olika månader (delfakturor betalas vid olika tillfällen).
+    const specification = (t: ProvisionTechnicianSummary): string => {
+      const parts = (t.posts || []).map(post => {
+        const caseRef = post.case_number || 'Ärende'
+        const visit = post.visit_number ? ` besök ${post.visit_number}` : ''
+        return `${caseRef}${visit}: ${post.commission_amount.toFixed(2).replace('.', ',')} kr`
+      })
+      return parts.length > 0 ? parts.join(' | ') : `Provision ${monthDisplay}`
+    }
+
     const rows = summaries.map(s => [
       '',
       s.technician_name,
@@ -59,7 +71,7 @@ export class ProvisionExportService {
       String(s.post_count),
       s.total_commission.toFixed(2).replace('.', ','),
       monthDisplay,
-      `Provision ${monthDisplay}`
+      specification(s)
     ])
 
     const csv = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n')
@@ -88,6 +100,7 @@ export class ProvisionExportService {
   ): void {
     const headers = [
       'Ärendenr',
+      'Besök',
       'Titel',
       'Ärendetyp',
       'Tekniker',
@@ -117,6 +130,8 @@ export class ProvisionExportService {
 
     const rows = posts.map(p => [
       p.case_number || '',
+      // Tomt för poster utan besökskoppling (ärendetäckande, gamla poster)
+      p.visit_number != null ? String(p.visit_number) : '',
       p.case_title || '',
       typeLabels[p.case_type] || p.case_type,
       p.technician_name,

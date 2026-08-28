@@ -58,6 +58,11 @@ export interface ContractBillingItem {
   // Faktureringsdatum för ad-hoc items (ärendets completed_date).
   // Null för contract-items (de använder billing_period_start istället).
   invoice_date: string | null
+  // Besöket raden hör till. Ärvs från case_billing_items vid merförsäljning och
+  // styr vilken faktura (och därmed vilken betalning) som frigör besökets provision.
+  visit_id: string | null
+  // Besökets nummer i ärendet (1, 2, 3 ...). Null när visit_id är null.
+  visit_number: number | null
 }
 
 export interface ContractBillingItemWithRelations extends ContractBillingItem {

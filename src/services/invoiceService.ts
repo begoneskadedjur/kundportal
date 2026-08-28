@@ -60,6 +60,20 @@ export class InvoiceService {
   }
 
   /**
+   * Härled fakturans besök från dess rader.
+   *
+   * Returnerar besökets id BARA när samtliga rader bär samma icke-null visit_id.
+   * Saknar någon rad besök, eller spänner raderna över flera besök, är fakturan
+   * ärendetäckande och ska ha visit_id = null.
+   */
+  static resolveSharedVisitId(items: Array<{ visit_id?: string | null }>): string | null {
+    if (items.length === 0) return null
+    const first = items[0].visit_id ?? null
+    if (!first) return null
+    return items.every(i => (i.visit_id ?? null) === first) ? first : null
+  }
+
+  /**
    * Skapa faktura från ärende
    */
   static async createInvoiceFromCase(
@@ -134,6 +148,13 @@ export class InvoiceService {
     // Kontrollera om godkännande krävs
     const requiresApproval = billingItems.some(item => item.requires_approval)
 
+    // Besökskoppling: fakturan pekar på ett besök BARA när samtliga rader hör till
+    // samma besök (en delfaktura). Täcker fakturan flera besök, eller saknar någon
+    // rad besök, är den ärendetäckande och visit_id lämnas null.
+    // Detta styr DB-triggern handle_invoice_paid — provisionen för ett besök frigörs
+    // först när just det besökets faktura betalas.
+    const invoiceVisitId = this.resolveSharedVisitId(billingItems)
+
     // Generera fakturanummer (med retry vid kollision)
     const invoiceNumber = await this.generateInvoiceNumberWithRetry()
 
@@ -161,7 +182,8 @@ export class InvoiceService {
         rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
         fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null,
         invoice_marking: customerInfo.invoice_marking || null,
-        invoice_type: invoiceType
+        invoice_type: invoiceType,
+        visit_id: invoiceVisitId
       })
       .select()
       .single()
@@ -320,7 +342,53 @@ export class InvoiceService {
       if (deleteError) throw new Error(`Databasfel: ${deleteError.message}`)
     }
 
+    // Dubbelfaktureringsspärr: uppslaget ovan hoppar över delfakturor
+    // (invoice_type='partial'), så en delfaktura raderas aldrig här. Om ärendets
+    // kvarvarande fakturerbara rader redan ligger på en levande delfaktura skulle
+    // en ny faktura debitera kunden två gånger för samma arbete. Vägra hellre än
+    // att gissa — den som vill göra om delfakturan får makulera den först.
+    await this.assertNoAlreadyInvoicedItems(caseId, caseType)
+
     return this.createInvoiceFromCase(caseId, caseType, customerInfo)
+  }
+
+  /**
+   * Spärr mot dubbelfakturering: kastar fel om någon av ärendets fakturerbara rader
+   * redan ligger på en levande (ej makulerad) faktura.
+   *
+   * Behövs eftersom upsert-uppslaget medvetet hoppar över delfakturor — utan den här
+   * kontrollen kan samma rad hamna på både delfakturan och den nya fakturan.
+   */
+  private static async assertNoAlreadyInvoicedItems(
+    caseId: string,
+    caseType: 'private' | 'business'
+  ): Promise<void> {
+    const items = await CaseBillingService.getCaseBillingItems(caseId, caseType)
+    const itemIds = items.map(i => i.id)
+    if (itemIds.length === 0) return
+
+    const { data: invoiced, error } = await supabase
+      .from('invoice_items')
+      .select('case_billing_item_id, invoice:invoices!inner(invoice_number, status)')
+      .in('case_billing_item_id', itemIds)
+      .neq('invoice.status', 'cancelled')
+
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    if (!invoiced || invoiced.length === 0) return
+
+    const numbers = Array.from(
+      new Set(
+        invoiced
+          .map(r => (r as { invoice?: { invoice_number?: string | null } }).invoice?.invoice_number)
+          .filter((n): n is string => Boolean(n))
+      )
+    )
+
+    throw new Error(
+      `Ärendet har rader som redan är fakturerade${numbers.length > 0 ? ` (${numbers.join(', ')})` : ''}. ` +
+      `En ny faktura skulle debitera kunden två gånger. Makulera den befintliga fakturan först ` +
+      `om raderna ska faktureras om.`
+    )
   }
 
   /**

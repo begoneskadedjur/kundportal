@@ -432,6 +432,10 @@ export class ContractBillingService {
         billing_period_end: periodEnd,
         invoice_date: invoiceDate,
         status: requiresApproval ? 'pending' : 'approved',
+        // Bär besöket vidare från case_billing_items. Utan det tappar merförsäljnings-
+        // fakturan sin besökskoppling och provisionen frigörs ärendetäckande igen.
+        visit_id: item.visit_id ?? null,
+        visit_number: item.visit_number ?? null,
         notes: item.notes || `Från ärende ${caseId}`
       }
     })

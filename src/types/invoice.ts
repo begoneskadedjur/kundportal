@@ -20,6 +20,15 @@ export interface Invoice {
   case_type: 'private' | 'business' | null
   invoice_type: 'private' | 'business' | 'contract' | 'adhoc'
   customer_id: string | null
+  /**
+   * Besöket fakturan avser. Sätts BARA när samtliga fakturarader hör till ett och
+   * samma besök (delfaktura). En faktura som täcker flera besök, eller vars rader
+   * saknar besök, är ärendetäckande och har visit_id = null.
+   *
+   * Styr DB-triggern handle_invoice_paid: provisionen för ett besök frigörs först
+   * när just det besökets faktura betalas.
+   */
+  visit_id: string | null
   billing_period_start: string | null
   billing_period_end: string | null
   is_historical: boolean

@@ -62,6 +62,20 @@ function todayLocal(): Date {
   return new Date(n.getFullYear(), n.getMonth(), n.getDate())
 }
 
+// Kundens importerade avtal. Speglar webb-tvillingen
+// (contractInvoiceGenerator.insertContractInvoice) så att fortlöpande fakturor
+// får samma contract_id — utan den kopplingen syns de inte i avtalets fakturaplan.
+// null för kunder utan riktig contracts-rad (synth-avtal).
+async function resolveContractId(customerId: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('contracts')
+    .select('id')
+    .eq('customer_id', customerId)
+    .eq('oneflow_contract_id', `imported-${customerId}`)
+    .maybeSingle()
+  return data?.id ?? null
+}
+
 async function getCustomerServiceItems(customerId: string, freq: string): Promise<Array<{
   case_billing_item_id: string
   article_id: string | null
@@ -217,6 +231,7 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
   const totalN = intervals.length
   const today = new Date()
   const orgNr = await resolveOrgNr(customer)
+  const contractId = await resolveContractId(customer.id)
   for (let idx = 0; idx < intervals.length; idx++) {
     const { periodStart, periodEnd } = intervals[idx]
     const key = toLocalIsoDate(periodStart)
@@ -237,6 +252,7 @@ async function regenerateForCustomer(customer: CustomerRow): Promise<number> {
         invoice_number: invNum,
         invoice_type: 'contract',
         customer_id: customer.id,
+        contract_id: contractId,
         case_id: null,
         case_type: null,
         customer_name: customer.company_name,
