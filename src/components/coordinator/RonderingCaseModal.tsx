@@ -148,6 +148,8 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
       })
   }, [technicianId, startDate?.toDateString()])
 
+  const { profile: creatorProfile } = useAuth()
+
   const handleSave = async () => {
     if (!startDate) {
       toast.error('Välj ett startdatum')
@@ -172,6 +174,10 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
           title: `${parentCase.title || 'Rondering'} – Delbesök`,
           case_number: caseNumber,
           description: note || null,
+          // RLS: skaparen behöver läsrätt på raden när delbesöket
+          // tilldelas en kollega (.select() kräver SELECT-policy på nya raden)
+          created_by_technician_id: creatorProfile?.technician_id || null,
+          created_by_technician_name: creatorProfile?.display_name || null,
         })
         .select()
         .single()
