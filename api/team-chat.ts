@@ -18,8 +18,12 @@ export const config = {
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY || '' });
 
 // Supabase klient för att hämta systemdata
+// Fail-closed: aldrig tyst nedgradering till anon-nyckeln om service-nyckeln saknas
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '';
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('team-chat: SUPABASE_SERVICE_ROLE_KEY/SUPABASE_SERVICE_KEY saknas i miljön');
+}
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // RAG: Generera embedding för en sökfråga
