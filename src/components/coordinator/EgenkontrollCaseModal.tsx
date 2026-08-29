@@ -287,7 +287,7 @@ export default function EgenkontrollCaseModal({
   const handleSubmit = async () => {
     setLoading(true)
     try {
-      const { error } = await supabase
+      const { data: updatedRows, error } = await supabase
         .from('cases')
         .update({
           description: formData.description || null,
@@ -304,8 +304,12 @@ export default function EgenkontrollCaseModal({
           work_report: formData.work_report || null,
         })
         .eq('id', caseData.id)
+        .select('id')
 
       if (error) throw error
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Inga rader uppdaterades — behörighet kan saknas')
+      }
 
       toast.success('Egenkontrollen sparad')
       onSuccess?.()
@@ -1100,7 +1104,16 @@ export default function EgenkontrollCaseModal({
           isOpen={showDeleteDialog}
           onClose={() => setShowDeleteDialog(false)}
           onConfirm={async () => {
-            await supabase.from('cases').delete().eq('id', caseData.id)
+            const { data: deletedRows, error: deleteError } = await supabase
+              .from('cases')
+              .delete()
+              .eq('id', caseData.id)
+              .select('id')
+            if (deleteError || !deletedRows || deletedRows.length === 0) {
+              console.error('Kunde inte radera ärendet:', deleteError)
+              toast.error('Ärendet kunde inte raderas — behörighet kan saknas')
+              return
+            }
             setShowDeleteDialog(false)
             onSuccess?.()
             onClose()

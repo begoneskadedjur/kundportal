@@ -319,7 +319,7 @@ export function AddStationWizard({
       // Spara preparat till aktivt etableringsärende om valt
       if (input.preparation_id && input.preparation_quantity && selectedCustomerId) {
         try {
-          const { data: establishmentCase } = await supabase
+          const { data: establishmentCase, error: caseError } = await supabase
             .from('cases')
             .select('id')
             .eq('customer_id', selectedCustomerId)
@@ -327,7 +327,9 @@ export function AddStationWizard({
             .not('status', 'ilike', '%avslutat%')
             .order('created_at', { ascending: false })
             .limit(1)
-            .single()
+            .maybeSingle()
+
+          if (caseError) throw caseError
 
           if (establishmentCase) {
             await CasePreparationService.addPreparation({
@@ -339,9 +341,12 @@ export function AddStationWizard({
               applied_by_technician_id: profile?.technician_id || undefined,
               applied_by_technician_name: profile?.full_name || profile?.email || undefined
             })
+          } else {
+            toast.error('Inget öppet etableringsärende hittades — preparatet sparades inte på ärendet')
           }
         } catch (prepError) {
           console.error('Kunde inte spara preparat till etableringsärende:', prepError)
+          toast.error('Preparatet kunde inte sparas till etableringsärendet')
         }
       }
 

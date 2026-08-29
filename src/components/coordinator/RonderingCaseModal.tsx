@@ -604,7 +604,7 @@ export default function RonderingCaseModal({
 
     setLoading(true)
     try {
-      const { error } = await supabase
+      const { data: updatedRows, error } = await supabase
         .from('cases')
         .update({
           description: formData.description || null,
@@ -624,8 +624,12 @@ export default function RonderingCaseModal({
           is_commission_eligible: commissionEligible,
         })
         .eq('id', caseData.id)
+        .select('id')
 
       if (error) throw error
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('Inga rader uppdaterades — behörighet kan saknas. Fakturering och provision avbröts.')
+      }
 
       const justCompleted = formData.status === 'Avslutat' && originalStatusRef.current !== 'Avslutat'
 
@@ -1552,7 +1556,15 @@ export default function RonderingCaseModal({
             // parent_case_id "delbesök" (kopian skulle annars dela stationsloggar
             // med originalet och listas som delbesök).
             if (result?.id) {
-              await supabase.from('cases').update({ parent_case_id: null }).eq('id', result.id)
+              const { data: clearedRows, error: clearError } = await supabase
+                .from('cases')
+                .update({ parent_case_id: null })
+                .eq('id', result.id)
+                .select('id')
+              if (clearError || !clearedRows || clearedRows.length === 0) {
+                console.error('Kunde inte nollställa parent_case_id på kopian:', clearError)
+                toast.error('Kopian skapades men kunde inte kopplas loss från originalet — den kan visas som delbesök')
+              }
             }
             onSuccess?.()
           }}

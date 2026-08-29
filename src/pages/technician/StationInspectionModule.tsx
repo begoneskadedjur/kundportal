@@ -1228,7 +1228,10 @@ export default function StationInspectionModule() {
       if (updated) {
         // Uppdatera även ärendets status till "Avslutat" om case_id finns
         if (session.case_id) {
-          await updateCaseStatusToCompleted(session.case_id)
+          const caseUpdated = await updateCaseStatusToCompleted(session.case_id)
+          if (!caseUpdated) {
+            toast.error('Inspektionen avslutades men ärendets status kunde inte sättas till Avslutat — kontrollera ärendet')
+          }
         }
         toast.success('Inspektion avslutad!')
         navigate(-1)

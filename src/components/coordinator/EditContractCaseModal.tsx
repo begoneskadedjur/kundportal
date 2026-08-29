@@ -895,15 +895,22 @@ export default function EditContractCaseModal({
     // Save to database immediately
     if (caseData?.id) {
       try {
-        await supabase
+        const { data, error } = await supabase
           .from('cases')
           .update({ work_started_at: now })
           .eq('id', caseData.id)
+          .select('id')
+        if (error) throw error
+        if (!data || data.length === 0) {
+          throw new Error('Inga rader uppdaterades — behörighet kan saknas')
+        }
       } catch (error) {
         console.error('Error starting timer:', error)
+        toast.error('Starttiden kunde inte sparas på ärendet')
+        return
       }
     }
-    
+
     const message = formData.time_spent_minutes > 0 ? 'Tidtagning återupptagen' : 'Tidtagning startad'
     toast.success(message)
   }
@@ -921,18 +928,25 @@ export default function EditContractCaseModal({
     // Save to database immediately
     if (caseData?.id) {
       try {
-        await supabase
+        const { data, error } = await supabase
           .from('cases')
-          .update({ 
+          .update({
             time_spent_minutes: totalMinutes,
-            work_started_at: null 
+            work_started_at: null
           })
           .eq('id', caseData.id)
+          .select('id')
+        if (error) throw error
+        if (!data || data.length === 0) {
+          throw new Error('Inga rader uppdaterades — behörighet kan saknas')
+        }
       } catch (error) {
         console.error('Error saving time:', error)
+        toast.error('Tiden kunde inte sparas på ärendet')
+        return
       }
     }
-    
+
     toast.success(`Tidtagning pausad. Total tid: ${formatTime(totalMinutes)}`)
   }
 
@@ -948,18 +962,25 @@ export default function EditContractCaseModal({
     // Save to database immediately
     if (caseData?.id) {
       try {
-        await supabase
+        const { data, error } = await supabase
           .from('cases')
-          .update({ 
+          .update({
             time_spent_minutes: 0,
-            work_started_at: null 
+            work_started_at: null
           })
           .eq('id', caseData.id)
+          .select('id')
+        if (error) throw error
+        if (!data || data.length === 0) {
+          throw new Error('Inga rader uppdaterades — behörighet kan saknas')
+        }
       } catch (error) {
         console.error('Error resetting time:', error)
+        toast.error('Tidtagningen kunde inte återställas på ärendet')
+        return
       }
     }
-    
+
     toast.success('Tidtagning återställd')
   }
 
@@ -1120,10 +1141,15 @@ export default function EditContractCaseModal({
     // Mark quote as generated
     const now = new Date().toISOString()
     if (caseData?.id) {
-      await supabase
+      const { data: markedRows, error: markError } = await supabase
         .from('cases')
         .update({ quote_generated_at: now })
         .eq('id', caseData.id)
+        .select('id')
+      if (markError || !markedRows || markedRows.length === 0) {
+        console.error('Error marking quote as generated:', markError)
+        toast.error('Kunde inte markera ärendet som offererat — behörighet kan saknas')
+      }
     }
     
     // Reset recipient selection after successful navigation
@@ -1221,6 +1247,9 @@ export default function EditContractCaseModal({
         .select()
 
       if (error) throw error
+      if (!data || data.length === 0) {
+        throw new Error('Inga rader uppdaterades — behörighet kan saknas')
+      }
 
       // 🚦 Logga trafikljusändring om pest_level eller problem_rating har ändrats
       const originalPestLevel = localCaseData.pest_level
@@ -1402,7 +1431,7 @@ export default function EditContractCaseModal({
       onSuccess?.(refreshed || localCaseData)
     } catch (error) {
       console.error('Error updating case:', error)
-      toast.error('Kunde inte uppdatera ärendet')
+      toast.error(error instanceof Error && error.message ? error.message : 'Kunde inte uppdatera ärendet')
     } finally {
       setLoading(false)
     }
@@ -1414,15 +1443,21 @@ export default function EditContractCaseModal({
     if (isTimerRunning && localCaseData?.id) {
       const totalMinutes = formData.time_spent_minutes + sessionMinutes
       try {
-        await supabase
+        const { data, error } = await supabase
           .from('cases')
           .update({
             time_spent_minutes: totalMinutes,
             // Keep work_started_at so timer can resume
           })
           .eq('id', localCaseData.id)
+          .select('id')
+        if (error) throw error
+        if (!data || data.length === 0) {
+          throw new Error('Inga rader uppdaterades — behörighet kan saknas')
+        }
       } catch (error) {
         console.error('Error saving time on close:', error)
+        toast.error('Tiden kunde inte sparas när ärendet stängdes')
       }
     }
     onClose()

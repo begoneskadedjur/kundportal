@@ -359,7 +359,7 @@ export default function TechnicianEquipment() {
         // Spara preparat till aktivt etableringsärende om valt
         if (formData.preparation_id && formData.preparation_quantity) {
           try {
-            const { data: establishmentCase } = await supabase
+            const { data: establishmentCase, error: caseError } = await supabase
               .from('cases')
               .select('id')
               .eq('customer_id', customerId)
@@ -367,7 +367,9 @@ export default function TechnicianEquipment() {
               .not('status', 'ilike', '%avslutat%')
               .order('created_at', { ascending: false })
               .limit(1)
-              .single()
+              .maybeSingle()
+
+            if (caseError) throw caseError
 
             if (establishmentCase) {
               await CasePreparationService.addPreparation({
@@ -379,9 +381,12 @@ export default function TechnicianEquipment() {
                 applied_by_technician_id: profile?.technician_id || undefined,
                 applied_by_technician_name: profile?.full_name || profile?.email || undefined
               })
+            } else {
+              toast.error('Inget öppet etableringsärende hittades — preparatet sparades inte på ärendet')
             }
           } catch (prepError) {
             console.error('Kunde inte spara preparat till etableringsärende:', prepError)
+            toast.error('Preparatet kunde inte sparas till etableringsärendet')
           }
         }
 
@@ -508,7 +513,7 @@ export default function TechnicianEquipment() {
       || allCustomers.find(c => c.customer_id === customerId)?.customer_name
       || ''
 
-    const { data: openCase } = await supabase
+    const { data: openCase, error: openCaseError } = await supabase
       .from('cases')
       .select('id')
       .eq('customer_id', customerId)
@@ -518,11 +523,22 @@ export default function TechnicianEquipment() {
       .limit(1)
       .maybeSingle()
 
+    if (openCaseError) {
+      console.error('Kunde inte hämta etableringsärende:', openCaseError)
+      toast.error('Kunde inte hämta etableringsärendet — status uppdaterades inte')
+    }
+
     if (openCase?.id) {
-      await supabase
+      const { data: updatedRows, error: updateError } = await supabase
         .from('cases')
         .update({ status: 'Avslutat' })
         .eq('id', openCase.id)
+        .select('id')
+
+      if (updateError || !updatedRows || updatedRows.length === 0) {
+        console.error('Kunde inte avsluta etableringsärende:', updateError)
+        toast.error('Etableringsärendet kunde inte avslutas — det kan vara tilldelat en annan tekniker')
+      }
     }
 
     refreshData()
@@ -562,7 +578,7 @@ export default function TechnicianEquipment() {
 
     if (finishedCustomerId) {
       // Markera öppet etableringsärende som avslutat
-      const { data: openCase } = await supabase
+      const { data: openCase, error: openCaseError } = await supabase
         .from('cases')
         .select('id')
         .eq('customer_id', finishedCustomerId)
@@ -572,11 +588,22 @@ export default function TechnicianEquipment() {
         .limit(1)
         .maybeSingle()
 
+      if (openCaseError) {
+        console.error('Kunde inte hämta etableringsärende:', openCaseError)
+        toast.error('Kunde inte hämta etableringsärendet — status uppdaterades inte')
+      }
+
       if (openCase?.id) {
-        await supabase
+        const { data: updatedRows, error: updateError } = await supabase
           .from('cases')
           .update({ status: 'Avslutat' })
           .eq('id', openCase.id)
+          .select('id')
+
+        if (updateError || !updatedRows || updatedRows.length === 0) {
+          console.error('Kunde inte avsluta etableringsärende:', updateError)
+          toast.error('Etableringsärendet kunde inte avslutas — det kan vara tilldelat en annan tekniker')
+        }
       }
 
       await checkAndPromptSchedule(finishedCustomerId, finishedCustomerName)

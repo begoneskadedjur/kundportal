@@ -1418,13 +1418,19 @@ export async function updateSessionPhotoCaption(
 export async function updateCaseStatusToCompleted(
   caseId: string
 ): Promise<boolean> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('cases')
     .update({ status: 'Avslutat' })
     .eq('id', caseId)
+    .select('id')
 
   if (error) {
     console.error('Error updating case status:', error)
+    return false
+  }
+
+  if (!data || data.length === 0) {
+    console.error('Error updating case status: 0 rader uppdaterades (behörighet kan saknas) för case', caseId)
     return false
   }
 

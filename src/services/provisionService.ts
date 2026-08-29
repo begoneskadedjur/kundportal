@@ -246,11 +246,17 @@ export class ProvisionService {
           `Provisionen för ärendet är redan på väg till utbetalning (status: ${locked[0].status}) och kan inte räknas om.`
         )
       }
-      const { error: deleteError } = await supabase
+      const { data: deletedPosts, error: deleteError } = await supabase
         .from('commission_posts')
         .delete()
         .in('id', existing.map(p => p.id))
+        .select('id')
       if (deleteError) throw deleteError
+      if (!deletedPosts || deletedPosts.length < existing.length) {
+        throw new Error(
+          `Befintliga provisionsposter kunde inte raderas (${deletedPosts?.length ?? 0} av ${existing.length} raderade — behörighet kan saknas). Omräkningen avbröts för att undvika dubbletter i löneunderlaget.`
+        )
+      }
     }
 
     return this.createPostsForCase(caseData, technicianShares, deductions, notes)
@@ -304,11 +310,17 @@ export class ProvisionService {
 
     // Radera ärendets pending-poster och återskapa från besöken
     if (existing.length > 0) {
-      const { error: deleteError } = await supabase
+      const { data: deletedPosts, error: deleteError } = await supabase
         .from('commission_posts')
         .delete()
         .in('id', existing.map(p => p.id))
+        .select('id')
       if (deleteError) throw deleteError
+      if (!deletedPosts || deletedPosts.length < existing.length) {
+        throw new Error(
+          `Befintliga provisionsposter kunde inte raderas (${deletedPosts?.length ?? 0} av ${existing.length} raderade — behörighet kan saknas). Omräkningen avbröts för att undvika dubbletter i löneunderlaget.`
+        )
+      }
     }
 
     const created: CommissionPost[] = []
