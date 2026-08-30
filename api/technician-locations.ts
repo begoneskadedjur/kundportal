@@ -1,7 +1,7 @@
 // 📁 api/technician-locations.ts
 // 🗺️ Hämta tekniker-positioner från ABAX API
 
-import { logMissingAuth } from './_lib/auth';
+import { logMissingAuth, requireAuth } from './_lib/auth';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
@@ -130,6 +130,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Endast GET är tillåtet' });
     }
+
+    // Guard etapp 3 (docs/sakerhetsplan-api-auth-vag2.md)
+    const auth = await requireAuth(req, res, ['admin', 'koordinator']);
+    if (!auth) return;
 
     try {
         // 1. Hämta aktiva tekniker med fordons-ID

@@ -1,7 +1,7 @@
 // api/geocode-search.ts
 // Server-side adresssökning — undviker CORS-problem med client-side Geocoding API
 
-import { logMissingAuth } from './_lib/auth'
+import { logMissingAuth, requireAuthenticated } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -9,6 +9,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Guard etapp 3 (docs/sakerhetsplan-api-auth-vag2.md): kostnadsskydd
+  const auth = await requireAuthenticated(req, res)
+  if (!auth) return
 
   const { query } = req.body
   if (!query?.trim()) {

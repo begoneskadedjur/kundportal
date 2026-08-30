@@ -1,5 +1,5 @@
 // api/oneflow/diagnostics.ts - Förbättrad Oneflow Diagnostik och Testing API
-import { logMissingAuth } from '../_lib/auth'
+import { logMissingAuth, requireAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import fetch from 'node-fetch'
 
@@ -250,6 +250,10 @@ export default async function handler(
       error: 'Endast GET-anrop tillåtna'
     })
   }
+
+  // Guard etapp 3 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   try {
     console.log('🔧 Oneflow diagnostik startad')

@@ -1,4 +1,4 @@
-import { logMissingAuth } from '../_lib/auth';
+import { logMissingAuth, requireAuth } from '../_lib/auth';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { startOfDay, addDays, addMinutes, subMinutes, areIntervalsOverlapping, max, min } from 'date-fns';
 
@@ -32,6 +32,11 @@ function getCombinations<T>(array: T[], size: number): T[][] {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   logMissingAuth(req, 'ruttplanerare/find-team-assistant');
+
+  // Guard etapp 3 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin', 'koordinator']);
+  if (!auth) return;
+
   try {
     const { newCaseAddress, pestType, timeSlotDuration = 60, searchStartDate, numberOfTechnicians } = req.body;
 

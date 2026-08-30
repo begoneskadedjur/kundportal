@@ -2,7 +2,7 @@
 // UPPDATERAD: 2025-02-04 - Migrerad från OpenAI till Google Gemini
 // UPPDATERAD: 2026-02-16 - Structured output (responseSchema) för att undvika JSON-trunkering
 
-import { logMissingAuth } from './_lib/auth';
+import { logMissingAuth, requireAuth } from './_lib/auth';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
@@ -196,6 +196,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method Not Allowed' });
   }
+
+  // Guard etapp 3 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin']);
+  if (!auth) return;
 
   try {
     const { technician, allTechnicians, monthlyData, pestSpecialization } = req.body;

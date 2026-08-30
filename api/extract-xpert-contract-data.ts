@@ -1,6 +1,6 @@
 // api/extract-xpert-contract-data.ts
 // Extraherar kunddata från Xpert Bekämpning-avtal med Gemini AI
-import { logMissingAuth } from './_lib/auth'
+import { logMissingAuth, requireAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { GoogleGenAI } from '@google/genai'
 
@@ -53,6 +53,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  // Guard etapp 3 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
 
   try {
     if (!process.env.GOOGLE_AI_API_KEY) {

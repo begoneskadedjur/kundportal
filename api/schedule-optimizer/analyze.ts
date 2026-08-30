@@ -1,7 +1,7 @@
 // api/schedule-optimizer/analyze.ts
 // Backend endpoint för schemaoptimering med Google Maps Distance Matrix API
 
-import { logMissingAuth } from '../_lib/auth';
+import { logMissingAuth, requireAuth } from '../_lib/auth';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
@@ -60,6 +60,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // Guard etapp 3 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin', 'koordinator']);
+  if (!auth) return;
 
   // Verifiera att Supabase är korrekt konfigurerad
   if (!supabaseUrl || !supabaseServiceKey) {

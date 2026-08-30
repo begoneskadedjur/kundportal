@@ -2,7 +2,7 @@
 // En funktion för att lista alla fordon och deras ID:n från ABAX.
 // Används för att enkelt kunna koppla tekniker till fordon i databasen.
 
-import { logMissingAuth } from '../_lib/auth';
+import { logMissingAuth, requireAuth } from '../_lib/auth';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 
@@ -35,6 +35,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Endast GET-förfrågningar är tillåtna för denna endpoint.' });
     }
+
+    // Guard etapp 3 (docs/sakerhetsplan-api-auth-vag2.md)
+    const auth = await requireAuth(req, res, ['admin']);
+    if (!auth) return;
 
     try {
         console.log("Försöker hämta ABAX token för att lista fordon...");

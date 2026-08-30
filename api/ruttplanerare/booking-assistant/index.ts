@@ -1,7 +1,7 @@
 // 📁 api/ruttplanerare/booking-assistant/index.ts
 // ⭐ VERSION 7.5 - Strukturerad origin-data för förbättrad UX
 
-import { logMissingAuth } from '../../_lib/auth';
+import { logMissingAuth, requireAuth } from '../../_lib/auth';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { startOfDay, addDays, subMinutes, max, min, addMinutes } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -94,6 +94,11 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   logMissingAuth(req, 'ruttplanerare/booking-assistant');
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Endast POST är tillåtet' }); }
+
+  // Guard etapp 3 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin', 'koordinator']);
+  if (!auth) return;
+
   try {
     const { newCaseAddress, pestType, timeSlotDuration = 60, searchStartDate, selectedTechnicianIds } = req.body;
     if (!newCaseAddress || !pestType) { return res.status(400).json({ error: 'Adress och skadedjurstyp måste anges.' }); }

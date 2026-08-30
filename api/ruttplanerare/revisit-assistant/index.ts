@@ -2,7 +2,7 @@
 // Separat API för återbesöksmodalen — söker bland teknikerna på befintligt ärende.
 // Intersection-logik: om flera tekniker skickas visas bara tider där ALLA är lediga.
 
-import { logMissingAuth } from '../../_lib/auth';
+import { logMissingAuth, requireAuth } from '../../_lib/auth';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { startOfDay, addDays, subMinutes, max, min, addMinutes } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -119,6 +119,11 @@ async function findAvailableSlots(daySchedule: TechnicianDaySchedule, timeSlotDu
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   logMissingAuth(req, 'ruttplanerare/revisit-assistant');
   if (req.method !== 'POST') { return res.status(405).json({ error: 'Endast POST är tillåtet' }); }
+
+  // Guard etapp 3 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'technician']);
+  if (!auth) return;
+
   try {
     const { newCaseAddress, pestType, timeSlotDuration = 60, searchStartDate, selectedTechnicianIds, excludeCaseId } = req.body;
     if (!newCaseAddress) { return res.status(400).json({ error: 'Adress måste anges.' }); }
