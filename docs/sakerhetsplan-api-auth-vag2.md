@@ -2,7 +2,15 @@
 
 Granskningsdatum: 2026-08-30. Framtagen av två oberoende specialistanalyser (säkerhetsarkitekt + driftingenjör) som syntetiserats av en tredje oberoende granskare med egna stickprov mot kod och databas (läsande SQL). Systemet är inte i skarp drift; planen utnyttjar det för att korta vägen till skydd av de farligaste hålen, men behåller den bevisdrivna sekvensen för allt annat.
 
-STATUS: GODKÄND av Christian 2026-08-30. Etapp 0 (0af2888a), etapp 1 (bbecdb3d) och etapp 2 (b1939456) deployade och verifierade 2026-08-30 med testinloggningar per roll (aktiv testning ersatte observationsfönstret på Christians begäran — 25/25 testfall gröna: positiva flöden per roll, 401 anonymt, 403 fel roll, 403 kund-mot-annan-kund). Kvar: etapp 3–5 (guards personalverktyg/Oneflow-filer/portaler) + etapp 6 (härdning/städning). Testdata: TEST-märkt kund + 3 TEST-tekniker + 5 testanvändare (christiankarlssson+authtest-*@gmail.com) — raderas i etapp 6.
+STATUS: GENOMFÖRD I SIN HELHET 2026-08-30. Alla etapper deployade och verifierade samma dag (aktiv testning med testinloggningar per roll + webbläsartest ersatte observationsfönstren på Christians begäran; systemet var ej i skarp drift):
+- Etapp 0 (0af2888a): report-only-logg, forwarding-fix, teknikerroll i create-contract, artefaktstädning
+- Etapp 1 (bbecdb3d): apiFetch + ~30 anropsställen + ESLint-spärr + blob-nedladdning
+- Etapp 2 (b1939456): kritiska skriv-guards, 25/25 testfall gröna (inkl kolumnbuggfix i update-customer)
+- Etapp 3–5 (f891a7b7): 25 läs-/verktygs-guards, 58/58 testfall gröna (en initial FAIL var fel testmetod, verifierad OK), webbläsartest alla roller utan tokenlösa anrop
+- Etapp 6 (fb91ae3b): rate limiting (verifierad live: räknare + neutral spärr), Fortnox-OAuth-härdning (HMAC-state; återanslutning EJ livetestad — inget fick röra Fortnox live; testas vid nästa planerade anslutning), död kod raderad efter omverifiering, wildcard-CORS bort från nyguardade endpoints
+- All testdata raderad (användare, kund, tekniker, loggrader, räknare)
+
+RESTPUNKTER: (1) Fortnox-återanslutningsflödet livetestas vid nästa planerade anslutning; (2) wildcard-CORS kvarstår på äldre redan-guardade endpoints (accept-invitation m.fl.) — kosmetisk restyta; (3) multisite-users-refaktor till getManagerContext + modulflytt (email-templates/assistant-utils till _lib) uppskjutna — påverkar inte säkerhetsläget; (4) /api/set-password saknas men anropas av SetPassword.tsx (404 sedan tidigare) — separat ärende; (5) AI-/geo-endpoints saknar per-användar-kvot (accepterad restrisk R13).
 
 ## AVVIKELSER UNDER IMPLEMENTATION (dokumenterade i efterhand)
 
