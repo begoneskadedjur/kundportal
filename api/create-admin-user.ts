@@ -104,6 +104,9 @@ export default async function handler(req: any, res: any) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            // send-staff-invitation kräver admin-JWT — vidarebefordra anroparens header
+            // (samma mönster som enable-technician-auth.ts)
+            'Authorization': req.headers.authorization || '',
           },
           body: JSON.stringify({
             technicianId: null, // Admins har ingen technician_id

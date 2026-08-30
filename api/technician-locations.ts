@@ -1,6 +1,7 @@
 // 📁 api/technician-locations.ts
 // 🗺️ Hämta tekniker-positioner från ABAX API
 
+import { logMissingAuth } from './_lib/auth';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 import { createClient } from '@supabase/supabase-js';
@@ -125,6 +126,7 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'technician-locations');
     if (req.method !== 'GET') {
         return res.status(405).json({ error: 'Endast GET är tillåtet' });
     }

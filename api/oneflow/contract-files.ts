@@ -1,4 +1,5 @@
 // api/oneflow/contract-files.ts - Lista filer för ett OneFlow kontrakt
+import { logMissingAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
@@ -136,6 +137,7 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  logMissingAuth(req, 'oneflow/contract-files')
   setCorsHeaders(res)
 
   // Hantera OPTIONS request för CORS

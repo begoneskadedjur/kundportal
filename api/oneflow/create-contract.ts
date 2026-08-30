@@ -299,7 +299,10 @@ export default async function handler(
     return res.status(405).json({ message: 'Method not allowed' })
   }
 
-  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  // technician tillagd 2026-08-30 (beslut B1, docs/sakerhetsplan-api-auth-vag2.md):
+  // tekniker skickar avtalsförslag från /technician/oneflow — attributionslogiken
+  // längre upp i filen är byggd för tekniker, men rollen glömdes när guarden infördes
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare', 'technician'])
   if (!auth) return
 
   const {

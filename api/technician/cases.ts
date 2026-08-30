@@ -1,4 +1,5 @@
 // 📁 api/technician/cases.ts - FIXAD SUPABASE QUERY SYNTAX
+import { logMissingAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -12,6 +13,7 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'technician/cases')
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')

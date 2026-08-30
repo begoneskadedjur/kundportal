@@ -1,3 +1,4 @@
+import { logMissingAuth } from '../_lib/auth';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { startOfDay, addDays, addMinutes, subMinutes, areIntervalsOverlapping, max, min } from 'date-fns';
 
@@ -30,6 +31,7 @@ function getCombinations<T>(array: T[], size: number): T[][] {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'ruttplanerare/find-team-assistant');
   try {
     const { newCaseAddress, pestType, timeSlotDuration = 60, searchStartDate, numberOfTechnicians } = req.body;
 

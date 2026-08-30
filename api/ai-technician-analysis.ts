@@ -2,6 +2,7 @@
 // UPPDATERAD: 2025-02-04 - Migrerad från OpenAI till Google Gemini
 // UPPDATERAD: 2026-02-16 - Structured output (responseSchema) för att undvika JSON-trunkering
 
+import { logMissingAuth } from './_lib/auth';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 
@@ -186,6 +187,7 @@ Analysen ska vara på svenska.`;
 // =================================================================================
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'ai-technician-analysis');
   // Tillåt CORS för OPTIONS-anrop (pre-flight)
   if (req.method === 'OPTIONS') {
     return res.status(200).end();

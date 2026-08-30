@@ -1,7 +1,9 @@
 // api/test-clickup.ts - ENHANCED VERSION WITH DROPDOWN CONFIG + PRIORITY
+import { logMissingAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'test-clickup')
   const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN
 
   res.setHeader('Access-Control-Allow-Origin', '*')

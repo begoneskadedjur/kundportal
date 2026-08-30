@@ -1,4 +1,5 @@
 // API endpoint to get all cases with commission for technician for specific month
+import { logMissingAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -12,6 +13,7 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'technician/monthly-cases')
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

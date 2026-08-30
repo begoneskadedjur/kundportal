@@ -1,6 +1,7 @@
 // api/debug/clickup-users.ts
 // DEBUG ENDPOINT FÖR CLICKUP USER MAPPING
 
+import { logMissingAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -138,6 +139,7 @@ async function createTechnicianMapping(): Promise<any[]> {
 
 // Vercel serverless function format
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'debug/clickup-users')
   // Kontrollera HTTP-metod
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })

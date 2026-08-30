@@ -1,4 +1,5 @@
 // api/clickup-tasks.ts - FÖRBÄTTRAD DEBUG VERSION
+import { logMissingAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
@@ -8,6 +9,7 @@ if (!CLICKUP_API_TOKEN) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'clickup-tasks')
   // Endast GET tillåtet
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })

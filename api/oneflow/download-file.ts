@@ -1,4 +1,5 @@
 // api/oneflow/download-file.ts - Ladda ner fil från OneFlow och spara till Supabase Storage
+import { logMissingAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
@@ -181,6 +182,7 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  logMissingAuth(req, 'oneflow/download-file')
   setCorsHeaders(res)
 
   // Hantera OPTIONS request för CORS

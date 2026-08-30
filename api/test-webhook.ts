@@ -1,7 +1,9 @@
 // api/test-webhook.ts - Test OneFlow webhook manuellt
+import { logMissingAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'test-webhook')
   try {
     console.log('🧪 Testar OneFlow webhook manuellt...')
 

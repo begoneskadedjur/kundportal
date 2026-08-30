@@ -1,5 +1,6 @@
 // api/extract-contract-data.ts
 // Extraherar kunddata från avtals-PDF med Gemini AI
+import { logMissingAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { GoogleGenAI } from '@google/genai'
 
@@ -46,6 +47,7 @@ VIKTIGT:
 - Datumet "Datum för utförande" kan användas som contract_start_date om inget annat anges`
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'extract-contract-data')
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')

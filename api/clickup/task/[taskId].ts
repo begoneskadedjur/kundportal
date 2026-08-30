@@ -73,8 +73,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  // Död endpoint utan UI-anropare - låst till admin (säkerhetsaudit juni 2026)
-  const auth = await requireAuth(req, res, ['admin'])
+  // Breddad från admin-only 2026-08-30 (docs/sakerhetsplan-api-auth-vag2.md etapp 0):
+  // ersätter oskyddade test-clickup som taskdetalj-källa för CaseDetailsModal.
+  // Personalroller räcker — kund-/multisiteflöden anropar aldrig med task-id
+  // (cases-tabellen saknar clickup_task_id; multisite skickar alltid tom sträng)
+  // och en ägarskapskontroll är omöjlig utan den relationen. Kunder får därför 403,
+  // vilket i UI:t ger samma DB-fallback som idag.
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'technician', 'säljare'])
   if (!auth) return
 
   const { taskId } = req.query

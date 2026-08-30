@@ -16,6 +16,31 @@ const supabaseAuth = createClient(supabaseUrl, supabaseServiceKey, {
 
 export type AppRole = 'admin' | 'koordinator' | 'technician' | 'customer' | 'säljare'
 
+/**
+ * Report-only-logg för API-auth-utrullningen (docs/sakerhetsplan-api-auth-vag2.md, etapp 0).
+ * Loggar anrop utan Authorization-header till auth_rollout_log — blockerar aldrig anropet.
+ * Guarden för respektive endpoint slås på först när tabellen varit tom för endpointen
+ * under hela observationsfönstret. Fire-and-forget: får aldrig kasta eller fördröja svaret.
+ * OPTIONS hoppas över — CORS-preflight bär aldrig Authorization.
+ */
+export function logMissingAuth(req: VercelRequest, endpoint: string): void {
+  if (req.headers.authorization || req.method === 'OPTIONS') return
+  try {
+    void supabaseAuth
+      .from('auth_rollout_log')
+      .insert({
+        endpoint,
+        method: req.method ?? null,
+        user_agent: (req.headers['user-agent'] as string | undefined) ?? null
+      })
+      .then(({ error }) => {
+        if (error) console.warn('[auth-rollout] kunde inte logga', endpoint, error.message)
+      })
+  } catch (e) {
+    console.warn('[auth-rollout] loggfel', endpoint, e)
+  }
+}
+
 export interface AuthContext {
   userId: string
   email: string | undefined

@@ -2,6 +2,7 @@
 // En funktion för att lista alla fordon och deras ID:n från ABAX.
 // Används för att enkelt kunna koppla tekniker till fordon i databasen.
 
+import { logMissingAuth } from '../_lib/auth';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import fetch from 'node-fetch';
 
@@ -28,6 +29,7 @@ async function getAbaxToken() {
 
 // --- HUVUDFUNKTION ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'ruttplanerare/get-abax-vehicles');
     // Denna funktion är designad för att vara enkel och säker,
     // så vi tillåter bara GET-förfrågningar.
     if (req.method !== 'GET') {

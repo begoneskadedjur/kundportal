@@ -1,4 +1,5 @@
 // 📁 api/technician/commissions.ts - ANVÄND SAMMA LOGIK SOM ADMIN
+import { logMissingAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -17,6 +18,7 @@ const monthNames = [
 ]
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'technician/commissions')
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')

@@ -1,4 +1,5 @@
 // api/map-clickup-fields.ts - Mappa custom fields för SEPARATA tabeller
+import { logMissingAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
@@ -21,6 +22,7 @@ interface ListAnalysis {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'map-clickup-fields')
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

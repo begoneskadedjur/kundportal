@@ -1,4 +1,5 @@
 // api/oneflow/view-file.ts - Visa fil i webbläsaren utan att markera som nedladdad
+import { logMissingAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
@@ -92,6 +93,7 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  logMissingAuth(req, 'oneflow/view-file')
   setCorsHeaders(res)
 
   // Hantera OPTIONS request för CORS

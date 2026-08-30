@@ -1,4 +1,5 @@
 // api/save-quote-recipient.ts - Save multisite quote recipient after successful quote creation
+import { logMissingAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -20,6 +21,7 @@ interface SaveRecipientRequest {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'save-quote-recipient')
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' })
   }

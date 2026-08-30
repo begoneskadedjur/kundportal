@@ -1,4 +1,5 @@
 // api/oneflow/download-file-direct.ts - Direkt nedladdning med rätta headers
+import { logMissingAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -26,6 +27,7 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  logMissingAuth(req, 'oneflow/download-file-direct')
   setCorsHeaders(res)
 
   // Hantera OPTIONS request för CORS

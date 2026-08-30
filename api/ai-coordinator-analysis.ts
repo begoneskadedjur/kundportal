@@ -1,6 +1,7 @@
 // api/ai-coordinator-analysis.ts
 // UPPDATERAD: 2025-02-04 - Migrerad från OpenAI till Google Gemini
 // UPPDATERAD: 2026-02-04 - Uppgraderad till Gemini 2.5 Flash (2.0 deprecated)
+import { logMissingAuth } from './_lib/auth';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -105,6 +106,7 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  logMissingAuth(req, 'ai-coordinator-analysis');
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

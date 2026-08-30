@@ -1,4 +1,5 @@
 // 📁 api/technician/dashboard.ts - FIXAD VERSION SOM ÅTERGÅR TILL URSPRUNGLIG LOGIK
+import { logMissingAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { isCompletedStatus } from '../../src/types/database'
@@ -197,6 +198,7 @@ async function getRecentCases(technicianId: string) {
 
 // ✅ MAIN HANDLER
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'technician/dashboard')
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')

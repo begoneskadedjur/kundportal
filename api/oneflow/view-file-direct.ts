@@ -1,5 +1,6 @@
 // api/oneflow/view-file-direct.ts
 // Skapar en temporär view-URL för en Oneflow-fil direkt via oneflow_contract_id
+import { logMissingAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import fetch from 'node-fetch'
 
@@ -12,6 +13,7 @@ const setCorsHeaders = (res: VercelResponse) => {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'oneflow/view-file-direct')
   setCorsHeaders(res)
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Endast POST tillåtet' })

@@ -1,0 +1,7 @@
+# Skydd mot att lokala tsc-byggartefakter följer med vid "vercel deploy" från lokal maskin
+# (docs/sakerhetsplan-api-auth-vag2.md, etapp 0 — bl.a. oskyddade debug-sites.js).
+# Git-deploys påverkas inte; artefakterna är redan gitignorerade.
+api/**/*.js
+api/**/*.d.ts
+!api/constants/oneflowTemplates.js
+src/**/*.d.ts

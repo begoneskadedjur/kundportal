@@ -1,4 +1,5 @@
 // 📁 api/technician/commissions/cases.ts - FIXAD SUPABASE QUERY SYNTAX
+import { logMissingAuth } from '../../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -7,6 +8,7 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'technician/commissions/cases')
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

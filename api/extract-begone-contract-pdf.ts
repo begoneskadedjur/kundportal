@@ -1,5 +1,6 @@
 // api/extract-begone-contract-pdf.ts
 // Extraherar kunddata från BeGone-avtal med Gemini AI
+import { logMissingAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { GoogleGenAI } from '@google/genai'
 
@@ -41,6 +42,7 @@ Fält att extrahera (ange null om ej funnet):
 - extraction_notes: Eventuella problem, oklarheter eller saknade fält (på svenska)`
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  logMissingAuth(req, 'extract-begone-contract-pdf')
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
