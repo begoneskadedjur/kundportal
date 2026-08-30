@@ -4,6 +4,7 @@ import { Activity, Clock, CheckCircle, AlertCircle, FileText, User, MessageSquar
 import Card from '../ui/Card'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
+import { apiFetch } from '../../lib/api'
 
 interface ActivityItem {
   id: string
@@ -38,7 +39,7 @@ const RecentActivity: React.FC<RecentActivityProps> = ({ customerId, clickupList
       setError(null)
 
       // Hämta cases från ClickUp för att skapa aktivitetshistorik
-      const response = await fetch(`/api/clickup-tasks?list_id=${clickupListId}`)
+      const response = await apiFetch(`/api/clickup-tasks?list_id=${clickupListId}`)
       
       if (response.ok) {
         const data = await response.json()

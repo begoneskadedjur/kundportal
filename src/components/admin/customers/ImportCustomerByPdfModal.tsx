@@ -16,6 +16,7 @@ import { ContractInvoiceGenerator } from '../../../services/contractInvoiceGener
 import { CustomerGroupService } from '../../../services/customerGroupService'
 import { PriceListService } from '../../../services/priceListService'
 import { supabase, getAuthHeaders } from '../../../lib/supabase'
+import { apiFetch } from '../../../lib/api'
 import type { PriceList } from '../../../types/articles'
 import type { CustomerGroup } from '../../../types/customerGroups'
 import { useContractTypeOptions } from '../../../hooks/useContractTypeOptions'
@@ -273,7 +274,7 @@ export default function ImportCustomerByPdfModal({
       })
 
       // Steg 1: AI extraherar avtalsdata från PDF
-      const aiRes = await fetch('/api/extract-begone-contract-pdf', {
+      const aiRes = await apiFetch('/api/extract-begone-contract-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pdfBase64: base64 }),

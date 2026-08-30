@@ -1,6 +1,7 @@
 // src/hooks/useContracts.ts - Hook för contracts state management
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { apiFetch } from '../lib/api'
 import { Contract, ContractInsert, ContractUpdate, ContractFile } from '../types/database'
 import { 
   ContractService, 
@@ -221,7 +222,7 @@ export function useContracts(): UseContractsReturn {
       }
       
       // Hämta från OneFlow API för att synka nya filer
-      const response = await fetch(`/api/oneflow/contract-files?contractId=${contractId}`)
+      const response = await apiFetch(`/api/oneflow/contract-files?contractId=${contractId}`)
       const apiResponse = await response.json()
       
       if (!apiResponse.success) {
@@ -256,7 +257,7 @@ export function useContracts(): UseContractsReturn {
     try {
       setViewingFiles(prev => ({ ...prev, [fileId]: true })) // 🔧 FIX: Använd viewingFiles istället
       
-      const response = await fetch('/api/oneflow/view-file', {
+      const response = await apiFetch('/api/oneflow/view-file', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -291,7 +292,7 @@ export function useContracts(): UseContractsReturn {
     try {
       setDownloadingFiles(prev => ({ ...prev, [fileId]: true }))
       
-      const response = await fetch('/api/oneflow/download-file', {
+      const response = await apiFetch('/api/oneflow/download-file', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -344,25 +345,33 @@ export function useContracts(): UseContractsReturn {
     }
   }, [])
 
-  // Metod 1: Direktnedladdning med rätta headers (snabbaste)
+  // Metod 1: Direktnedladdning via apiFetch + blob. Ett <a href>-klick kan inte
+  // bära Authorization-headern som endpointen kommer att kräva, och det gamla
+  // upplägget returnerade dessutom optimistiskt true så att fallbacken aldrig
+  // nåddes vid fel — nu returneras false på riktigt så blob-fallbacken tar vid.
   const tryDirectDownload = async (contractId: string, fileId: string, fileName: string): Promise<boolean> => {
     try {
-      // Använd direktnedladdning-endpoint med rätta headers
       const directUrl = `/api/oneflow/download-file-direct?contractId=${contractId}&fileId=${fileId}`
-      
-      // Skapa temporärt <a> element för nedladdning
+      const response = await apiFetch(directUrl)
+      if (!response.ok) {
+        console.warn('Direktnedladdning misslyckades:', response.status)
+        return false
+      }
+
+      const blob = await response.blob()
+      const blobUrl = URL.createObjectURL(blob)
+
       const link = document.createElement('a')
-      link.href = directUrl
+      link.href = blobUrl
       link.download = fileName || 'contract-file.pdf'
       link.style.display = 'none'
-      
-      // Lägg till i DOM, klicka och ta bort
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
-      
+      URL.revokeObjectURL(blobUrl)
+
       return true
-      
+
     } catch (error) {
       console.warn('Direktnedladdning misslyckades:', error)
       return false

@@ -6,6 +6,7 @@ import Card from '../ui/Card';
 import LoadingSpinner from '../shared/LoadingSpinner';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { getStatusColor } from '../../types/database';
+import { apiFetch } from '../../lib/api';
 
 interface Case {
   id: string;
@@ -56,7 +57,7 @@ const MonthlyCommissionModal: React.FC<MonthlyCommissionModalProps> = ({
       setError(null);
       
       // Call API to get cases for specific month with commission
-      const response = await fetch(`/api/technician/monthly-cases?technician_id=${technicianId}&month=${month.month}`);
+      const response = await apiFetch(`/api/technician/monthly-cases?technician_id=${technicianId}&month=${month.month}`);
       
       if (!response.ok) {
         throw new Error(`Failed to fetch monthly cases: ${response.status}`);

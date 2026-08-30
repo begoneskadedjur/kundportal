@@ -5,6 +5,7 @@ import Card from '../ui/Card'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import { supabase } from '../../lib/supabase'
+import { apiFetch } from '../../lib/api'
 
 interface Visit {
   id: string
@@ -96,7 +97,7 @@ const UpcomingVisits: React.FC<UpcomingVisitsProps> = ({ customer, refreshTrigge
           .single()
 
         if (customerData?.clickup_list_id) {
-          const response = await fetch(`/api/clickup-tasks?list_id=${customerData.clickup_list_id}`)
+          const response = await apiFetch(`/api/clickup-tasks?list_id=${customerData.clickup_list_id}`)
 
           if (response.ok) {
             const data = await response.json()

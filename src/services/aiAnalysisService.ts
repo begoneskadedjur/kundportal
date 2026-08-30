@@ -4,6 +4,7 @@
 
 import { toast } from 'react-hot-toast';
 import { formatCurrency } from '../utils/formatters';
+import { apiFetch } from '../lib/api';
 
 // =================================================================================
 // SECTION 1: DATA STRUCTURES & TYPES
@@ -177,7 +178,7 @@ class AIAnalysisService {
     });
 
     try {
-      const response = await fetch(`${this.baseUrl}/ai-technician-analysis`, {
+      const response = await apiFetch(`${this.baseUrl}/ai-technician-analysis`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),

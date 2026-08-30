@@ -15,6 +15,7 @@ import {
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import { supabase } from '../../lib/supabase'
+import { apiFetch } from '../../lib/api'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
@@ -120,7 +121,7 @@ export default function CustomerSettingsModal({
       console.log('Uppdaterar kund med ID:', customer.id)
       
       // Anropa vår nya update-customer API
-      const response = await fetch('/api/update-customer', {
+      const response = await apiFetch('/api/update-customer', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

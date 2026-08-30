@@ -4,6 +4,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { FileText, ExternalLink, Download, Loader2, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { apiFetch } from '../../../lib/api'
 
 interface CustomerContractButtonProps {
   oneflowContractId: string
@@ -43,7 +44,7 @@ export default function CustomerContractButton({
     if (files !== null) return // Redan hämtat
     setLoadingFiles(true)
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/oneflow/contract-files-direct?oneflowContractId=${encodeURIComponent(oneflowContractId)}`
       )
       const data = await res.json()
@@ -71,7 +72,7 @@ export default function CustomerContractButton({
   const handleView = async (file: OneflowFile) => {
     setActionLoading(file.id)
     try {
-      const res = await fetch('/api/oneflow/view-file-direct', {
+      const res = await apiFetch('/api/oneflow/view-file-direct', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ oneflowContractId, fileId: file.id }),
@@ -92,7 +93,7 @@ export default function CustomerContractButton({
   const handleDownload = async (file: OneflowFile) => {
     setActionLoading(file.id * -1) // Negativt ID för nedladdning
     try {
-      const dlRes = await fetch('/api/oneflow/download-file-oneflow', {
+      const dlRes = await apiFetch('/api/oneflow/download-file-oneflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ oneflowContractId, fileId: file.id, fileName: file.name }),

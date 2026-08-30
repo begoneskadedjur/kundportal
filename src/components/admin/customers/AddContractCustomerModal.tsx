@@ -15,6 +15,7 @@ import Select from '../../ui/Select'
 import DateField from '../../ui/DateField'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
+import { apiFetch } from '../../../lib/api'
 import toast from 'react-hot-toast'
 
 interface AddContractCustomerModalProps {
@@ -130,7 +131,7 @@ export default function AddContractCustomerModal({
     setExtractionError(null)
 
     try {
-      const response = await fetch('/api/extract-contract-data', {
+      const response = await apiFetch('/api/extract-contract-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pdfBase64 }),

@@ -7,6 +7,7 @@ import Confetti from 'react-confetti'
 import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin, DollarSign, FileCheck, ShoppingCart, Users, Settings } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
+import { apiFetch } from '../../lib/api'
 import Button from '../../components/ui/Button'
 import Card from '../../components/ui/Card'
 import Input from '../../components/ui/Input'
@@ -752,7 +753,7 @@ export default function OneflowContractCreator() {
       if (wizardData.documentType === 'offer' && wizardData.multisite_recipient && wizardData.case_id) {
         setCreationStep('Sparar mottagare...')
         try {
-          const { error } = await fetch('/api/save-quote-recipient', {
+          const recipientResponse = await apiFetch('/api/save-quote-recipient', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -761,9 +762,10 @@ export default function OneflowContractCreator() {
               organization_id: wizardData.multisite_recipient.organization_id
             })
           })
-          
-          if (error) {
-            console.warn('Could not save quote recipient:', error)
+
+          if (!recipientResponse.ok) {
+            const data = await recipientResponse.json().catch(() => ({}))
+            console.warn('Could not save quote recipient:', data.error || recipientResponse.status)
           } else {
             console.log('✅ Quote recipient saved successfully')
           }

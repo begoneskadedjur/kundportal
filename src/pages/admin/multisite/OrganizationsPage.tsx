@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, getAuthHeaders } from '../../../lib/supabase'
+import { apiFetch } from '../../../lib/api'
 import Button from '../../../components/ui/Button'
 import Select from '../../../components/ui/Select'
 import toast from 'react-hot-toast'
@@ -938,7 +939,7 @@ export default function OrganizationsPage() {
       onConfirm: async () => {
         setConfirmLoading(true)
         try {
-          const response = await fetch('/api/send-welcome-password', {
+          const response = await apiFetch('/api/send-welcome-password', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email })

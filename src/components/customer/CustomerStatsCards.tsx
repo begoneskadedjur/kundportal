@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react'
 import { FileText, Clock, CheckCircle, Calendar, AlertCircle } from 'lucide-react'
 import Card from '../ui/Card'
+import { apiFetch } from '../../lib/api'
 
 type TaskStats = {
   total: number
@@ -35,7 +36,7 @@ const CustomerStatsCards: React.FC<CustomerStatsCardsProps> = ({ customerId, cli
       setLoading(true)
       
       // Här skulle vi hämta från ClickUp API via vår backend
-      const response = await fetch(`/api/clickup-tasks?list_id=${clickupListId}`)
+      const response = await apiFetch(`/api/clickup-tasks?list_id=${clickupListId}`)
       
       if (response.ok) {
         const data = await response.json()

@@ -2,6 +2,7 @@
 // AI-driven analystjänst för koordinatorns analytics dashboard
 
 import { toast } from 'react-hot-toast';
+import { apiFetch } from '../lib/api';
 
 // =================================================================================
 // SECTION 1: DATA STRUCTURES & TYPES
@@ -142,7 +143,7 @@ class AICoordinatorAnalysisService {
     });
 
     try {
-      const response = await fetch(`${this.baseUrl}/ai-coordinator-analysis`, {
+      const response = await apiFetch(`${this.baseUrl}/ai-coordinator-analysis`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),

@@ -5,6 +5,7 @@ import Card from '../ui/Card'
 import Button from '../ui/Button'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import { supabase } from '../../lib/supabase'
+import { apiFetch } from '../../lib/api'
 
 interface Case {
   id: string
@@ -57,7 +58,7 @@ const ActiveCasesList: React.FC<ActiveCasesListProps> = ({ customer, refreshTrig
       }
 
       // Sedan: Hämta ärenden från ClickUp API via backend med list_id
-      const response = await fetch(`/api/clickup-tasks?list_id=${customerData.clickup_list_id}`)
+      const response = await apiFetch(`/api/clickup-tasks?list_id=${customerData.clickup_list_id}`)
       
       if (response.ok) {
         const data = await response.json()

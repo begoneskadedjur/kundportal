@@ -24,6 +24,7 @@ import {
 import Button from '../ui/Button';
 import toast from 'react-hot-toast';
 import { getCoordinatorChatData, CoordinatorChatData } from '../../services/coordinatorChatService';
+import { apiFetch } from '../../lib/api';
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -107,7 +108,7 @@ Vad kan jag hjälpa dig med idag?`,
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/global-coordinator-chat', {
+      const response = await apiFetch('/api/global-coordinator-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

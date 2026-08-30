@@ -10,6 +10,7 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { useOneflowWebhook } from '../../hooks/useOneflowWebhook'
+import { apiFetch } from '../../lib/api'
 import toast from 'react-hot-toast'
 
 interface DiagnosticsResult {
@@ -51,7 +52,7 @@ export default function OneflowDiagnostics() {
 
     try {
       const queryParams = new URLSearchParams({ mode, ...params })
-      const response = await fetch(`/api/oneflow/diagnostics?${queryParams}`)
+      const response = await apiFetch(`/api/oneflow/diagnostics?${queryParams}`)
       const data = await response.json()
 
       setResults(data)

@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { Clock, MapPin, User, Zap, ArrowRight, Check } from 'lucide-react';
 import { PageHeader } from '../../components/shared';
+import { apiFetch } from '../../lib/api';
 
 // Datatyper
 interface Suggestion {
@@ -37,7 +38,7 @@ export default function BookingAssistant() {
 
         try {
             // ✅ KORRIGERAD SÖKVÄG HÄR
-            const response = await fetch('/api/ruttplanerare/booking-assistant', {
+            const response = await apiFetch('/api/ruttplanerare/booking-assistant', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ newCaseAddress: address })

@@ -2,7 +2,12 @@
 
 Granskningsdatum: 2026-08-30. Framtagen av två oberoende specialistanalyser (säkerhetsarkitekt + driftingenjör) som syntetiserats av en tredje oberoende granskare med egna stickprov mot kod och databas (läsande SQL). Systemet är inte i skarp drift; planen utnyttjar det för att korta vägen till skydd av de farligaste hålen, men behåller den bevisdrivna sekvensen för allt annat.
 
-STATUS: VÄNTAR PÅ GODKÄNNANDE — inget implementationsarbete påbörjat.
+STATUS: GODKÄND av Christian 2026-08-30. Etapp 0 deployad (commit 0af2888a, tagg auth-etapp-0).
+
+## AVVIKELSER UNDER IMPLEMENTATION (dokumenterade i efterhand)
+
+1. **`clickup/task/[taskId]` fick personalroller i stället för `requireAuthenticated` + ägarskap.** Granskarens ägarskapsdesign byggde på `customers.clickup_list_id` — kolumnen finns inte längre i databasen (verifierat mot information_schema 2026-08-30; ClickUp-task-id:n finns bara i `private_cases`/`business_cases`, som saknar `customer_id`). Ägarskap per kund är därmed obyggbart. Ofarligt i praktiken: kundportalens `cases`-tabell saknar `clickup_task_id` och multisite-vyerna skickar alltid tom `clickupTaskId` — kund-/multisiteflöden anropar aldrig med task-id utan använder DB-fallbacken i CaseDetailsModal. Guard: `requireAuth(['admin','koordinator','technician','säljare'])`.
+2. **CaseDetailsModal ompekas INTE till `clickup/task/[taskId]`.** Svarsformaten skiljer sig helt (`task_info`/`custom_fields`-array kontra `ProcessedTaskDetails`) — ompekningen hade krävt omskrivning av modalens datamappning för noll säkerhetsvinst. Enda levande anroparen med task-id är admins TeamChat; modalen behåller `test-clickup`-URL:en (nu via apiFetch) och `test-clickup` admin-låses som planerat i etapp 5, vilket inte bryter någon.
 
 ---
 

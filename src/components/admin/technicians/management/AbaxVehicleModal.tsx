@@ -4,6 +4,7 @@ import { Car, X, Copy, Check } from 'lucide-react';
 import Button from '../../../ui/Button';
 import LoadingSpinner from '../../../shared/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { apiFetch } from '../../../../lib/api';
 
 type Vehicle = {
   id: string;
@@ -29,7 +30,7 @@ export default function AbaxVehicleModal({ isOpen, onClose }: AbaxVehicleModalPr
         setLoading(true);
         setError(null);
         try {
-          const response = await fetch('/api/ruttplanerare/get-abax-vehicles');
+          const response = await apiFetch('/api/ruttplanerare/get-abax-vehicles');
           const data = await response.json();
           if (!response.ok) {
             throw new Error(data.details || 'Kunde inte hämta fordonslista från Abax.');

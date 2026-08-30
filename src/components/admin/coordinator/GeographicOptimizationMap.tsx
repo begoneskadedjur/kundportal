@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { CoordinatorKpiData } from '../../../services/coordinatorAnalyticsService';
 import { supabase } from '../../../lib/supabase';
+import { apiFetch } from '../../../lib/api';
 import { useGoogleMaps } from '../../../hooks/useGoogleMaps';
 import toast from 'react-hot-toast';
 import TechnicianDetailsModal from './TechnicianDetailsModal';
@@ -366,7 +367,7 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
   const fetchTechnicianLocations = useCallback(async () => {
     setLoadingLocations(true);
     try {
-      const response = await fetch('/api/technician-locations');
+      const response = await apiFetch('/api/technician-locations');
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);

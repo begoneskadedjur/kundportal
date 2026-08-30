@@ -25,4 +25,33 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Auth-utrullningen (docs/sakerhetsplan-api-auth-vag2.md): alla /api-anrop
+    // ska gå via apiFetch i src/lib/api.ts så att Authorization-headern aldrig
+    // kan glömmas. Naken fetch('/api/…') är förbjuden i src/.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: [
+      // Avsiktligt publika lösenordsflöden — endpointsen kräver ingen inloggning
+      'src/pages/auth/ForgotPassword.tsx',
+      'src/pages/auth/ResetPassword.tsx',
+      'src/pages/auth/SetPassword.tsx',
+      // apiFetch själv får förstås anropa fetch
+      'src/lib/api.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          // esquery avslutar attribut-regexet vid första snedstrecket oavsett
+          // escapning — därför skrivs snedstrecken med unicode-escape (u002F)
+          selector: "CallExpression[callee.name='fetch'] > Literal[value=/^\\u002Fapi\\u002F/]",
+          message: "Använd apiFetch från src/lib/api.ts för /api-anrop — den bifogar Authorization-headern automatiskt.",
+        },
+        {
+          selector: "CallExpression[callee.name='fetch'] > TemplateLiteral[quasis.0.value.raw=/^\\u002Fapi\\u002F/]",
+          message: "Använd apiFetch från src/lib/api.ts för /api-anrop — den bifogar Authorization-headern automatiskt.",
+        },
+      ],
+    },
+  },
 )

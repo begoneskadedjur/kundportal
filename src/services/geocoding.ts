@@ -1,6 +1,8 @@
 // src/services/geocoding.ts
 // Google Maps Geocoding Service för ClickUp Location Fields
 
+import { apiFetch } from '../lib/api'
+
 export interface GeocodeResult {
   location: {
     lat: number
@@ -166,7 +168,7 @@ export async function searchAddresses(query: string, maxResults = 5): Promise<{
   }
 
   try {
-    const response = await fetch('/api/geocode-search', {
+    const response = await apiFetch('/api/geocode-search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: query.trim() }),

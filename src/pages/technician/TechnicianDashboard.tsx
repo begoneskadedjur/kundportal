@@ -11,6 +11,7 @@ import CaseSummaryCard from '../../components/technician/dashboard/CaseSummaryCa
 import OfferSummaryCard from '../../components/technician/dashboard/OfferSummaryCard'
 import { ProvisionService } from '../../services/provisionService'
 import { supabase } from '../../lib/supabase'
+import { apiFetch } from '../../lib/api'
 
 // ─── Types ─────────────────────────────────────
 
@@ -94,7 +95,7 @@ export default function TechnicianDashboard() {
     try {
       setLoading(true)
       setError(null)
-      const response = await fetch(`/api/technician/dashboard?technician_id=${technicianId}`)
+      const response = await apiFetch(`/api/technician/dashboard?technician_id=${technicianId}`)
       if (!response.ok) throw new Error(`API Error: ${response.status}`)
       const dashboardData = await response.json()
       setData(dashboardData)

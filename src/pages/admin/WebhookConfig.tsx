@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { Settings, Webhook, CheckCircle, XCircle, AlertTriangle, RefreshCw, Play } from 'lucide-react'
 import Button from '../../components/ui/Button'
 import { getAuthHeaders } from '../../lib/supabase'
+import { apiFetch } from '../../lib/api'
 import toast from 'react-hot-toast'
 
 interface WebhookAnalysis {
@@ -109,7 +110,7 @@ export default function WebhookConfig() {
       setUpdating(true)
 
       console.log('🧪 Testar webhook endpoint...')
-      const response = await fetch('/api/test-webhook', {
+      const response = await apiFetch('/api/test-webhook', {
         method: 'GET'
       })
 

@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { supabase, getAuthHeaders } from '../../../lib/supabase';
+import { apiFetch } from '../../../lib/api';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
 import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus, ShoppingCart, Map } from 'lucide-react';
@@ -770,7 +771,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         const lng = ring.reduce((s: number, c: number[]) => s + c[0], 0) / ring.length;
         // Server-side reverse geocode (undviker CORS) — fallback på koordinater
         try {
-          const geoRes = await fetch('/api/reverse-geocode', {
+          const geoRes = await apiFetch('/api/reverse-geocode', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ lat, lng })
@@ -797,7 +798,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     const endpoint = isTeamBooking ? '/api/ruttplanerare/find-team-assistant' : '/api/ruttplanerare/booking-assistant';
 
     try {
-      const response = await fetch(endpoint, {
+      const response = await apiFetch(endpoint, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             newCaseAddress: searchAddress, pestType: searchPestType,

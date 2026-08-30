@@ -7,6 +7,7 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Technician } from '../../types/database';
 import { supabase } from '../../lib/supabase';
+import { apiFetch } from '../../lib/api';
 import DatePicker from 'react-datepicker';
 import { registerLocale } from 'react-datepicker';
 import sv from 'date-fns/locale/sv';
@@ -819,7 +820,7 @@ export default function ScheduleOptimizer() {
         optimization_type: optimizationType
       };
 
-      const response = await fetch('/api/schedule-optimizer/analyze', {
+      const response = await apiFetch('/api/schedule-optimizer/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request)

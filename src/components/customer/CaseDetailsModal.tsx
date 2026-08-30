@@ -1,6 +1,7 @@
 // src/components/customer/CaseDetailsModal.tsx - Med kunduppgifter för PDF
 import { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { apiFetch } from '../../lib/api'
 import {
   X,
   Calendar,
@@ -411,7 +412,7 @@ export default function CaseDetailsModal({
     setError(null)
     
     try {
-      const response = await fetch(`/api/test-clickup?task_id=${clickupTaskId}`)
+      const response = await apiFetch(`/api/test-clickup?task_id=${clickupTaskId}`)
       
       if (!response.ok) {
         throw new Error('Kunde inte hämta ärendedetaljer')

@@ -22,6 +22,7 @@ import sv from 'date-fns/locale/sv'
 import { format, addMinutes } from 'date-fns'
 import Button from '../../ui/Button'
 import { supabase } from '../../../lib/supabase'
+import { apiFetch } from '../../../lib/api'
 import { useAuth } from '../../../contexts/AuthContext'
 import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSuggestionCard'
@@ -196,7 +197,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
     setLoadingSlots(true)
     setNoSuggestionsReason(null)
     try {
-      const response = await fetch('/api/ruttplanerare/revisit-assistant', {
+      const response = await apiFetch('/api/ruttplanerare/revisit-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
