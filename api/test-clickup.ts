@@ -6,8 +6,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   logMissingAuth(req, 'test-clickup')
   const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN
 
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
   }

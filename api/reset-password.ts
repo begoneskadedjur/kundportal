@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import * as crypto from 'crypto'
+import { withinRateLimit, clientIp } from './_lib/rateLimit'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -44,6 +45,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
       return res.status(400).json({ error: 'Ogiltig e-postadress' })
+    }
+
+    // Rate limit (etapp 6): 5/15 min per e-post, 20/15 min per IP. Vid spärr
+    // svaras NEUTRALT med samma success-svar som vanligt — en angripare ska
+    // inte kunna se skillnad (endpointen är redan enumeration-säker).
+    const [emailOk, ipOk] = await Promise.all([
+      withinRateLimit(`reset-email:${email.toLowerCase()}`, 5, 900),
+      withinRateLimit(`reset-ip:${clientIp(req)}`, 20, 900)
+    ])
+    if (!emailOk || !ipOk) {
+      console.warn('[rate-limit] reset-password spärrad')
+      return res.status(200).json({
+        success: true,
+        message: 'Om e-postadressen finns i vårt system har ett återställningsmail skickats'
+      })
     }
 
     console.log('Finding user...')

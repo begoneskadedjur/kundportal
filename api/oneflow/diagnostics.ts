@@ -5,7 +5,6 @@ import fetch from 'node-fetch'
 
 // Sätt CORS headers
 const setCorsHeaders = (res: VercelResponse) => {
-  res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS')
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 }

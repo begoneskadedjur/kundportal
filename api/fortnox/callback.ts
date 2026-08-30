@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 import { getFortnoxConfig } from './refresh'
+import { signFortnoxState } from './auth'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
@@ -18,7 +20,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Saknar code eller state' })
   }
 
-  // Validera state mot cookie
+  // Härdad statevalidering (etapp 6, §4.2): HMAC-signatur + TTL bevisar att
+  // flödet startades av en inloggad admin via /api/fortnox/auth — en angripare
+  // kan inte längre tillverka giltig state med sin egen cookie. Cookie-matchning
+  // behålls som extra CSRF-lager (samma webbläsare som startade).
+  const stateStr = String(state)
+  const stateParts = stateStr.split('.')
+  if (stateParts.length !== 3) {
+    return res.status(400).json({ error: 'Ogiltig state-parameter (möjlig CSRF)' })
+  }
+  const [nonce, timestamp, signature] = stateParts
+  const expected = signFortnoxState(nonce, timestamp)
+  const sigBuf = Buffer.from(signature, 'hex')
+  const expBuf = Buffer.from(expected, 'hex')
+  const signatureValid = sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)
+  const withinTtl = Date.now() - Number(timestamp) < 10 * 60 * 1000
+  if (!signatureValid || !withinTtl) {
+    return res.status(400).json({ error: 'Ogiltig eller utgången state-parameter (möjlig CSRF)' })
+  }
+
   const cookieHeader = req.headers.cookie || ''
   const cookies = Object.fromEntries(
     cookieHeader.split(';').map(c => {
@@ -28,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   )
   const savedState = cookies['fortnox_oauth_state']
 
-  if (!savedState || savedState !== state) {
+  if (!savedState || savedState !== stateStr) {
     return res.status(400).json({ error: 'Ogiltig state-parameter (möjlig CSRF)' })
   }
 

@@ -5,6 +5,7 @@ import { FortnoxService, FortnoxCustomer } from '../../../services/fortnoxServic
 import Button from '../../../components/ui/Button'
 import FortnoxCustomerModal from '../../../components/admin/fortnox/FortnoxCustomerModal'
 import toast from 'react-hot-toast'
+import { apiFetch } from '../../../lib/api'
 
 function getCustomerGroup(customerNumber: string): string {
   const num = parseInt(customerNumber)
@@ -143,7 +144,21 @@ export default function FortnoxPage() {
             {!connected && !statusLoading && (
               <Button
                 variant="primary"
-                onClick={() => { window.location.href = '/api/fortnox/auth' }}
+                onClick={async () => {
+                  // Endpointen kräver admin-JWT (härdad OAuth-start, etapp 6) —
+                  // hämta authorize-URL:en med apiFetch och navigera sedan
+                  try {
+                    const res = await apiFetch('/api/fortnox/auth')
+                    const data = await res.json()
+                    if (res.ok && data.authUrl) {
+                      window.location.href = data.authUrl
+                    } else {
+                      toast.error(data.error || 'Kunde inte starta Fortnox-anslutningen')
+                    }
+                  } catch {
+                    toast.error('Kunde inte starta Fortnox-anslutningen')
+                  }
+                }}
               >
                 Anslut till Fortnox
               </Button>

@@ -1,4 +1,5 @@
 import { logMissingAuth, requireAuth } from './_lib/auth'
+import { withinRateLimit } from './_lib/rateLimit'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { logAccountEvent } from './_lib/accountEvents'
@@ -9,10 +10,6 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY!
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   logMissingAuth(req, 'send-welcome-password')
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -21,6 +18,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // kundkontosidan i UI:t (beslut B6: säljare behåller behörigheten).
   const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
   if (!auth) return
+
+  // Rate limit (etapp 6): även behörig personal begränsas — skyddar mot att ett
+  // kapat personalkonto massnollställer lösenord/spammar brevlådor
+  if (!(await withinRateLimit(`welcome-user:${auth.userId}`, 10, 900))) {
+    return res.status(429).json({ error: 'För många utskick — vänta en stund och försök igen' })
+  }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false }

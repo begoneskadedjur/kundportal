@@ -2,6 +2,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import * as crypto from 'crypto'
+import { withinRateLimit, clientIp } from './_lib/rateLimit'
 
 // Environment variables
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -49,6 +50,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!token || !email || !newPassword) {
       console.log('Missing required fields')
       return res.status(400).json({ error: 'Token, e-post och nytt lösenord krävs' })
+    }
+
+    // Rate limit (etapp 6): skydd mot token-gissning. Neutralt fel — samma
+    // formulering som för ogiltig token så spärren inte går att skilja ut.
+    const [emailOk, ipOk] = await Promise.all([
+      withinRateLimit(`verify-email:${String(email).toLowerCase()}`, 5, 900),
+      withinRateLimit(`verify-ip:${clientIp(req)}`, 20, 900)
+    ])
+    if (!emailOk || !ipOk) {
+      console.warn('[rate-limit] verify-reset-token spärrad')
+      return res.status(400).json({ error: 'Ogiltig eller utgången återställningslänk' })
     }
 
     console.log('Finding user by email:', email)
