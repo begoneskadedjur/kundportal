@@ -1,5 +1,5 @@
 // 📁 api/technician/dashboard.ts - FIXAD VERSION SOM ÅTERGÅR TILL URSPRUNGLIG LOGIK
-import { logMissingAuth } from '../_lib/auth'
+import { logMissingAuth, requireAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { isCompletedStatus } from '../../src/types/database'
@@ -212,7 +212,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // Guard etapp 5 (docs/sakerhetsplan-api-auth-vag2.md): provisions- och
+  // prestandadata. Tekniker får bara läsa sitt eget technician_id (stänger
+  // IDOR-hålet); admin/koordinator får läsa alla.
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'technician'])
+  if (!auth) return
+
   const { technician_id } = req.query
+
+  const isStaffOverride = auth.isAdmin || auth.role === 'admin' || auth.role === 'koordinator'
+  if (!isStaffOverride) {
+    const { data: callerProfile } = await supabase
+      .from('profiles')
+      .select('technician_id')
+      .eq('user_id', auth.userId)
+      .single()
+    if (!callerProfile?.technician_id || callerProfile.technician_id !== technician_id) {
+      return res.status(403).json({ error: 'Behörighet saknas för denna tekniker' })
+    }
+  }
 
   if (!technician_id) {
     return res.status(400).json({ 

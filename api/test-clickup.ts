@@ -1,5 +1,5 @@
 // api/test-clickup.ts - ENHANCED VERSION WITH DROPDOWN CONFIG + PRIORITY
-import { logMissingAuth } from './_lib/auth'
+import { logMissingAuth, requireAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -11,6 +11,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
   }
+
+  // Guard etapp 5 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   if (!CLICKUP_API_TOKEN) {
     return res.status(500).json({ 
