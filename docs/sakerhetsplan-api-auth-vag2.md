@@ -2,7 +2,7 @@
 
 Granskningsdatum: 2026-08-30. Framtagen av två oberoende specialistanalyser (säkerhetsarkitekt + driftingenjör) som syntetiserats av en tredje oberoende granskare med egna stickprov mot kod och databas (läsande SQL). Systemet är inte i skarp drift; planen utnyttjar det för att korta vägen till skydd av de farligaste hålen, men behåller den bevisdrivna sekvensen för allt annat.
 
-STATUS: GODKÄND av Christian 2026-08-30. Etapp 0 deployad (commit 0af2888a, tagg auth-etapp-0).
+STATUS: GODKÄND av Christian 2026-08-30. Etapp 0 (0af2888a), etapp 1 (bbecdb3d) och etapp 2 (b1939456) deployade och verifierade 2026-08-30 med testinloggningar per roll (aktiv testning ersatte observationsfönstret på Christians begäran — 25/25 testfall gröna: positiva flöden per roll, 401 anonymt, 403 fel roll, 403 kund-mot-annan-kund). Kvar: etapp 3–5 (guards personalverktyg/Oneflow-filer/portaler) + etapp 6 (härdning/städning). Testdata: TEST-märkt kund + 3 TEST-tekniker + 5 testanvändare (christiankarlssson+authtest-*@gmail.com) — raderas i etapp 6.
 
 ## AVVIKELSER UNDER IMPLEMENTATION (dokumenterade i efterhand)
 
