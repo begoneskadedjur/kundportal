@@ -1,7 +1,7 @@
 // api/debug/clickup-users.ts
 // DEBUG ENDPOINT FÖR CLICKUP USER MAPPING
 
-import { logMissingAuth } from '../_lib/auth'
+import { logMissingAuth, requireAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -144,6 +144,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Död endpoint utan UI-anropare - admin-lås etapp 2, radering planerad etapp 6
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   try {
     // Grundläggande säkerhet - kräver att ADMIN_DEBUG_KEY är satt i miljön,

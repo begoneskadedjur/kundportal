@@ -1,5 +1,5 @@
 // api/save-quote-recipient.ts - Save multisite quote recipient after successful quote creation
-import { logMissingAuth } from './_lib/auth'
+import { logMissingAuth, requireAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -25,6 +25,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' })
   }
+
+  // Guard etapp 2: skriver i quote_recipients. Rollistan är kongruent med
+  // oneflow/create-contract (avtalsskaparsidan), inkl technician (beslut B1).
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare', 'technician'])
+  if (!auth) return
 
   try {
     const { quote_id, recipient, organization_id } = req.body as SaveRecipientRequest

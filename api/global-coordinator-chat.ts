@@ -1,7 +1,7 @@
 // api/global-coordinator-chat.ts
 // UPPDATERAD: 2025-02-04 - Migrerad från OpenAI till Google Gemini
 // UPPDATERAD: 2026-02-04 - Uppgraderad till Gemini 2.5 Flash (2.0 deprecated)
-import { logMissingAuth } from './_lib/auth';
+import { logMissingAuth, requireAuth } from './_lib/auth';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI, Content } from '@google/generative-ai';
 
@@ -201,6 +201,11 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Guard etapp 2 (docs/sakerhetsplan-api-auth-vag2.md): AI-chatten driver
+  // Gemini-kostnad och kan skapa bokningar via coordinator-ai-booking
+  const auth = await requireAuth(req, res, ['admin', 'koordinator']);
+  if (!auth) return;
+
   try {
     const { message, coordinatorData, currentPage, contextData, conversationHistory } = req.body;
 
@@ -318,11 +323,17 @@ Analysera HELA datasetet för optimal rådgivning. Du har tillgång till alla te
                 message: 'AI:n skickade ofullständig bokningsdata'
               };
             } else {
-              // Call our booking API
+              // Call our booking API. Egen origin (inte klientstyrda
+              // req.headers.origin) så att JWT:n aldrig kan lockas till
+              // främmande värd, och Authorization vidarebefordras eftersom
+              // coordinator-ai-booking kräver samma roller som denna endpoint.
               console.log('[Global Chat] Calling booking API...');
-              const bookingResponse = await fetch(`${req.headers.origin || 'http://localhost:3000'}/api/coordinator-ai-booking`, {
+              const bookingResponse = await fetch(`${process.env.VITE_APP_URL || 'https://kundportal.vercel.app'}/api/coordinator-ai-booking`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': req.headers.authorization || ''
+                },
                 body: JSON.stringify(bookingJson.bookingData)
               });
               

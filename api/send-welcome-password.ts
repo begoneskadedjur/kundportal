@@ -1,4 +1,4 @@
-import { logMissingAuth } from './_lib/auth'
+import { logMissingAuth, requireAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { logAccountEvent } from './_lib/accountEvents'
@@ -15,6 +15,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (req.method === 'OPTIONS') return res.status(200).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  // Guard etapp 2: nollställer lösenord och mailar det — utan denna kontroll kan
+  // vem som helst låsa ute valfri användare. Rollistan speglar vilka som når
+  // kundkontosidan i UI:t (beslut B6: säljare behåller behörigheten).
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
     auth: { autoRefreshToken: false, persistSession: false }

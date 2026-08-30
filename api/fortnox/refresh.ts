@@ -1,4 +1,4 @@
-import { logMissingAuth } from '../_lib/auth'
+import { logMissingAuth, requireAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -76,6 +76,12 @@ export async function getValidAccessToken(): Promise<string> {
 // HTTP endpoint för att manuellt trigga refresh (används ej av frontend direkt)
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
   logMissingAuth(_req, 'fortnox/refresh')
+
+  // Guard etapp 2: manuell token-refresh kan rotera sönder Fortnox-integrationen
+  // vid upprepade anrop. Inga frontend-anropare — enbart admin vid felsökning.
+  const auth = await requireAuth(_req, res, ['admin'])
+  if (!auth) return
+
   try {
     await getValidAccessToken()
     return res.status(200).json({ ok: true })

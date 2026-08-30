@@ -1,7 +1,7 @@
 // api/coordinator-ai-booking.ts
 // AI-driven booking endpoint for coordinators to create private_cases and business_cases
 
-import { logMissingAuth } from './_lib/auth'
+import { logMissingAuth, requireAuth } from './_lib/auth'
 import { createClient } from '@supabase/supabase-js'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { Database } from '../src/types/database'
@@ -180,6 +180,13 @@ function validateBookingData(data: BookingRequest): string[] {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   logMissingAuth(req, 'coordinator-ai-booking')
+
+  // Guard etapp 2 (docs/sakerhetsplan-api-auth-vag2.md): skapar riktiga ärenden
+  // med service role. Anropas server-till-server från global-coordinator-chat,
+  // som vidarebefordrar anroparens Authorization-header.
+  const auth = await requireAuth(req, res, ['admin', 'koordinator'])
+  if (!auth) return
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     console.log('[AI Booking] Invalid method:', req.method)

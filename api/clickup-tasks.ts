@@ -1,5 +1,5 @@
 // api/clickup-tasks.ts - FÖRBÄTTRAD DEBUG VERSION
-import { logMissingAuth } from './_lib/auth'
+import { logMissingAuth, requireAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
@@ -14,6 +14,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Guard etapp 2: läser alla ärenden i valfri ClickUp-lista. Inga levande
+  // anropare i frontend (K5 i docs/sakerhetsplan-api-auth-vag2.md) — admin-lås
+  // enligt juni 2026-prejudikatet; radering planerad i etapp 6 (beslut B2).
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   const { list_id } = req.query
 

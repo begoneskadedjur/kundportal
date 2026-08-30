@@ -1,5 +1,5 @@
 // 📁 api/technician/commissions.ts - ANVÄND SAMMA LOGIK SOM ADMIN
-import { logMissingAuth } from '../_lib/auth'
+import { logMissingAuth, requireAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -27,6 +27,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end()
   }
+
+  // Död endpoint utan UI-anropare - admin-lås etapp 2, radering planerad etapp 6
+  const authCheck = await requireAuth(req, res, ['admin'])
+  if (!authCheck) return
 
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })

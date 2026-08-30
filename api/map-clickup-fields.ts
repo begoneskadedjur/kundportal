@@ -1,5 +1,5 @@
 // api/map-clickup-fields.ts - Mappa custom fields för SEPARATA tabeller
-import { logMissingAuth } from './_lib/auth'
+import { logMissingAuth, requireAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const CLICKUP_API_TOKEN = process.env.CLICKUP_API_TOKEN!
@@ -26,6 +26,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Död endpoint utan UI-anropare - admin-lås etapp 2, radering planerad etapp 6
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   const { privatperson_id, foretag_id } = req.query
 

@@ -1,5 +1,5 @@
 // api/update-customer.ts - NY API för säker kunduppdatering
-import { logMissingAuth } from './_lib/auth'
+import { logMissingAuth, requireAuth } from './_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -25,12 +25,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  // Guard etapp 2 (docs/sakerhetsplan-api-auth-vag2.md): endpointen kan byta
+  // lösenord och e-post på kundens konto — kontokapning utan denna kontroll.
+  // Kund får bara röra sin egen customer_id; admin/koordinator får röra alla
+  // (beslut B5 — täcker även impersonationsflödet där admin bär egen JWT).
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'customer'])
+  if (!auth) return
+
   console.log('=== UPDATE CUSTOMER API START ===')
-  console.log('Request body:', JSON.stringify(req.body, null, 2))
-  console.log('Headers:', req.headers)
 
   try {
-    const { 
+    const {
       customer_id,
       contact_person,
       email,
@@ -40,9 +45,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Validera required fields
     if (!customer_id || !contact_person || !email || !phone) {
-      return res.status(400).json({ 
-        error: 'customer_id, contact_person, email och phone är obligatoriska' 
+      return res.status(400).json({
+        error: 'customer_id, contact_person, email och phone är obligatoriska'
       })
+    }
+
+    const isStaff = auth.isAdmin || auth.role === 'admin' || auth.role === 'koordinator'
+    if (!isStaff && auth.customerId !== customer_id) {
+      return res.status(403).json({ error: 'Behörighet saknas för denna kund' })
     }
 
     console.log('Uppdaterar kund med ID:', customer_id)
@@ -61,13 +71,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('Befintlig kund hittad:', existingCustomer.company_name)
 
-    // 2. Uppdatera customers tabellen
+    // 2. Uppdatera customers tabellen (kolumnerna heter contact_email/contact_phone —
+    // gamla namnen email/phone finns inte och gav 500 på varje sparning)
     const { data: updatedCustomer, error: customerError } = await supabase
       .from('customers')
       .update({
         contact_person: contact_person,
-        email: email,
-        phone: phone,
+        contact_email: email,
+        contact_phone: phone,
         updated_at: new Date().toISOString()
       })
       .eq('id', customer_id)
@@ -132,7 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // 6. Uppdatera e-post i auth om den ändrats
-      if (email !== existingCustomer.email) {
+      if (email !== existingCustomer.contact_email) {
         console.log('Uppdaterar e-post i auth...')
         
         const { error: emailError } = await supabase.auth.admin.updateUserById(

@@ -1,5 +1,5 @@
 // 📁 api/technician/cases.ts - FIXAD SUPABASE QUERY SYNTAX
-import { logMissingAuth } from '../_lib/auth'
+import { logMissingAuth, requireAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 
@@ -26,6 +26,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // Död endpoint utan UI-anropare - admin-lås etapp 2, radering planerad etapp 6
+  const auth = await requireAuth(req, res, ['admin'])
+  if (!auth) return
 
   const { technician_id, limit = '100' } = req.query
 
