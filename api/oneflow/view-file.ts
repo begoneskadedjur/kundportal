@@ -1,5 +1,5 @@
 // api/oneflow/view-file.ts - Visa fil i webbläsaren utan att markera som nedladdad
-import { logMissingAuth } from '../_lib/auth'
+import { logMissingAuth, requireAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
@@ -108,6 +108,10 @@ export default async function handler(
       error: 'Endast POST-anrop tillåtna'
     })
   }
+
+  // Guard etapp 4 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
 
   try {
     const { contractId, fileId }: ViewRequest = req.body

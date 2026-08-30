@@ -1,6 +1,6 @@
 // api/oneflow/contract-files-direct.ts
 // Listar filer för ett Oneflow-kontrakt direkt via oneflow_contract_id (utan contracts-tabell)
-import { logMissingAuth } from '../_lib/auth'
+import { logMissingAuth, requireAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import fetch from 'node-fetch'
 
@@ -17,6 +17,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res)
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'GET') return res.status(405).json({ success: false, error: 'Endast GET tillåtet' })
+
+  // Guard etapp 4 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
 
   const { oneflowContractId } = req.query
   if (!oneflowContractId || typeof oneflowContractId !== 'string') {

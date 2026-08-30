@@ -1,5 +1,5 @@
 // api/oneflow/download-file.ts - Ladda ner fil från OneFlow och spara till Supabase Storage
-import { logMissingAuth } from '../_lib/auth'
+import { logMissingAuth, requireAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import fetch from 'node-fetch'
@@ -198,6 +198,10 @@ export default async function handler(
       error: 'Endast POST-anrop tillåtna' 
     })
   }
+
+  // Guard etapp 4 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
 
   try {
     // Parsa request body

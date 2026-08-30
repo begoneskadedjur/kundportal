@@ -1,6 +1,6 @@
 // api/oneflow/download-file-oneflow.ts
 // Streamar en Oneflow-fil direkt till klienten via oneflow_contract_id (utan contracts-tabell)
-import { logMissingAuth } from '../_lib/auth'
+import { logMissingAuth, requireAuth } from '../_lib/auth'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import fetch from 'node-fetch'
 
@@ -17,6 +17,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res)
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Endast POST tillåtet' })
+
+  // Guard etapp 4 (docs/sakerhetsplan-api-auth-vag2.md)
+  const auth = await requireAuth(req, res, ['admin', 'koordinator', 'säljare'])
+  if (!auth) return
 
   const { oneflowContractId, fileId, fileName } = req.body
   if (!oneflowContractId || !fileId) {
