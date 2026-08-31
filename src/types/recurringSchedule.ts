@@ -255,6 +255,11 @@ export interface CreateRecurringScheduleInput {
   estimated_duration_minutes: number
   schedule_start_date: string
   contract_end_date?: string | null
+  /**
+   * Avtalet schemat hör till. Anges när kunden täcks av flera gällande avtal
+   * och användaren valt ett; utelämnas det slår servicen upp avtalet själv.
+   */
+  contract_id?: string | null
   is_auto_renewing?: boolean
   notes?: string
   created_by?: string

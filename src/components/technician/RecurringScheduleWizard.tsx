@@ -15,6 +15,9 @@ import '../../styles/DatePickerDarkTheme.css'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { resolveContractCandidates } from '../../services/contractResolver'
+import type { ContractCandidateInfo } from '../../services/contractResolver'
+import ContractCandidateSelector from '../shared/ContractCandidateSelector'
 import {
   previewScheduleDates,
   createScheduleWithSessions,
@@ -132,11 +135,16 @@ export function RecurringScheduleWizard({
   const [resolvingEndDate, setResolvingEndDate] = useState(true)
   const [horizonRolled, setHorizonRolled] = useState(false)
 
+  // Täcks kunden av flera gällande avtal ska schemat inte tyst hamna på det
+  // systemet råkar välja — besöken följs upp per avtal.
+  const [contractCandidates, setContractCandidates] = useState<ContractCandidateInfo[]>([])
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(null)
+
   useEffect(() => {
     let cancelled = false
     if (!isOpen || !customerId) return
     setResolvingEndDate(true)
-    resolveScheduleHorizon(customerId, contractEndDate)
+    resolveScheduleHorizon(customerId, contractEndDate, selectedContractId)
       .then(({ endDate, rolled }) => {
         if (!cancelled) {
           setResolvedEndDate(endDate)
@@ -145,9 +153,44 @@ export function RecurringScheduleWizard({
       })
       .finally(() => { if (!cancelled) setResolvingEndDate(false) })
     return () => { cancelled = true }
-  }, [customerId, contractEndDate, isOpen])
+  }, [customerId, contractEndDate, isOpen, selectedContractId])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!isOpen || !customerId) return
+    resolveContractCandidates(customerId)
+      .then(candidates => {
+        if (cancelled) return
+        setContractCandidates(candidates)
+        setSelectedContractId(prev => {
+          if (prev && candidates.some(c => c.id === prev)) return prev
+          if (candidates.length === 1) return candidates[0].id
+          // Frekvensen ovan hämtades för resolvedContractId. Utgå från samma
+          // avtal så att "Enligt avtalet: N besök/år" hör ihop med det valda.
+          if (resolvedContractId && candidates.some(c => c.id === resolvedContractId)) {
+            return resolvedContractId
+          }
+          return null
+        })
+      })
+      .catch(() => { if (!cancelled) setContractCandidates([]) })
+    return () => { cancelled = true }
+  }, [customerId, isOpen, resolvedContractId])
+
+  // Batchläget skapar ett schema per enhet och kan inte ha ett gemensamt val.
+  // Räkna hur många enheter som får ett automatiskt valt avtal, så det syns.
+  const [ambiguousBatchUnits, setAmbiguousBatchUnits] = useState(0)
 
   const isBatch = !!batchUnits && batchUnits.length > 1
+
+  useEffect(() => {
+    let cancelled = false
+    if (!isOpen || !isBatch || !batchUnits?.length) { setAmbiguousBatchUnits(0); return }
+    Promise.all(batchUnits.map(u => resolveContractCandidates(u.customerId)))
+      .then(all => { if (!cancelled) setAmbiguousBatchUnits(all.filter(c => c.length > 1).length) })
+      .catch(() => { if (!cancelled) setAmbiguousBatchUnits(0) })
+    return () => { cancelled = true }
+  }, [isOpen, isBatch, batchUnits])
 
   // Step 1: Start date
   // Starta aldrig i det förflutna: avtalsstart används bara om den ligger
@@ -489,6 +532,7 @@ export function RecurringScheduleWizard({
           estimated_duration_minutes: durationMinutes,
           schedule_start_date: format(startDate, 'yyyy-MM-dd'),
           contract_end_date: resolvedEndDate || undefined,
+          contract_id: selectedContractId,
           is_auto_renewing: true,
           created_by: profile?.id,
           custom_frequency_config: resolvedCustomConfig,
@@ -533,7 +577,10 @@ export function RecurringScheduleWizard({
 
   const canProceed = (): boolean => {
     switch (step) {
-      case 1: return !!startDate
+      // Flera gällande avtal: ett måste väljas innan schemat kan byggas.
+      case 1:
+        if (!isBatch && contractCandidates.length > 1 && !selectedContractId) return false
+        return !!startDate
       case 2:
         if (isBatch) {
           return effectiveUnits.every(u => (unitDurations[u.customerId] ?? 0) > 0)
@@ -657,6 +704,17 @@ export function RecurringScheduleWizard({
                     <p className="text-slate-300 text-sm">
                       När ska kontrollerna börja? Välj startdatum för det återkommande schemat.
                     </p>
+                    {/* Renderas bara när kunden täcks av flera gällande avtal.
+                        Batchläget kör en enhet i taget och kan inte ha ett
+                        gemensamt val — där gäller automatiken. */}
+                    {!isBatch && (
+                      <ContractCandidateSelector
+                        candidates={contractCandidates}
+                        value={selectedContractId}
+                        onChange={setSelectedContractId}
+                        hint={`Kunden har ${contractCandidates.length} gällande avtal. Välj vilket schemat hör till.`}
+                      />
+                    )}
                     <div className="flex justify-center">
                       <DatePicker
                         selected={startDate}
@@ -1091,6 +1149,16 @@ export function RecurringScheduleWizard({
 
                 {step === 5 && (
                   <div className="space-y-4">
+                    {isBatch && ambiguousBatchUnits > 0 && (
+                      <div className="flex items-start gap-2 px-3 py-2">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />
+                        <span className="text-xs text-amber-300">
+                          {ambiguousBatchUnits} av {effectiveUnits.length} enheter har flera gällande
+                          avtal — schemat kopplas till det avtal systemet väljer. Justera efteråt på
+                          kundkortet vid behov.
+                        </span>
+                      </div>
+                    )}
                     {!loadingPreview && expectedForHorizon !== null && resolvedEndDate && (
                       <div className={`flex items-start gap-2 px-3 py-2 rounded-lg border text-xs ${
                         Math.abs((isBatch ? batchIncludedDays : includedCount) - expectedForHorizon) <= 1

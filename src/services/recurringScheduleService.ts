@@ -79,7 +79,9 @@ export async function resolveContractEndDate(
  */
 export async function resolveScheduleHorizon(
   customerId: string,
-  ownEndDate?: string | null
+  ownEndDate?: string | null,
+  /** Valt avtal när kunden täcks av flera — horisonten ska följa det avtalet. */
+  preferredContractId?: string | null
 ): Promise<{ endDate: string | null; rolled: boolean }> {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -97,7 +99,7 @@ export async function resolveScheduleHorizon(
   //    prioritet som resten av systemet (contractResolver). Kundradens datum
   //    kan tillhöra ett ANNAT avtal för kunder med flera avtal över tid.
   try {
-    const contractId = await resolveContractForCustomer(customerId)
+    const contractId = preferredContractId ?? (await resolveContractForCustomer(customerId))
     if (contractId) {
       const { data: contract } = await supabase
         .from('contracts')
@@ -349,7 +351,21 @@ export async function cancelRecurringSchedule(id: string): Promise<boolean> {
   // Mark linked cases as 'Borttaget' so they disappear from coordinator/technician schedules
   const caseIds = (sessions || []).map(s => s.case_id).filter(Boolean) as string[]
   if (caseIds.length > 0) {
-    await supabase.from('cases').update({ status: 'Borttaget' }).in('id', caseIds)
+    const { data: updatedCases, error: caseError } = await supabase
+      .from('cases')
+      .update({ status: 'Borttaget' })
+      .in('id', caseIds)
+      .select('id')
+    if (caseError) {
+      console.error('Error marking linked cases as Borttaget:', caseError)
+      return false
+    }
+    if (!updatedCases || updatedCases.length < caseIds.length) {
+      console.error(
+        `cancelRecurringSchedule: bara ${updatedCases?.length ?? 0} av ${caseIds.length} länkade ärenden kunde markeras som Borttaget (behörighet kan saknas)`
+      )
+      return false
+    }
   }
 
   // Cancel the sessions themselves
@@ -1209,22 +1225,34 @@ export async function executeTechnicianSwap(
   const caseIds = targets.map(s => s.case_id).filter(Boolean) as string[]
 
   if (sessionIds.length > 0) {
-    const { error } = await supabase
+    const { data: updatedSessions, error } = await supabase
       .from('station_inspection_sessions')
       .update({ technician_id: newTechnicianId, updated_at: nowISO })
       .in('id', sessionIds)
+      .select('id')
     if (error) {
       console.error('executeTechnicianSwap: kunde inte uppdatera sessions:', error)
+      return false
+    }
+    if (!updatedSessions || updatedSessions.length < sessionIds.length) {
+      console.error(
+        `executeTechnicianSwap: bara ${updatedSessions?.length ?? 0} av ${sessionIds.length} sessions uppdaterades (behörighet kan saknas)`
+      )
       return false
     }
   }
 
   // 3. Länkade cases — byt rollen där gamla teknikern står
+  const failedCaseIds: string[] = []
   if (caseIds.length > 0) {
-    const { data: caseRows } = await supabase
+    const { data: caseRows, error: caseFetchError } = await supabase
       .from('cases')
       .select('id, primary_technician_id, secondary_technician_id, tertiary_technician_id')
       .in('id', caseIds)
+    if (caseFetchError) {
+      console.error('executeTechnicianSwap: kunde inte hämta länkade cases:', caseFetchError)
+      return false
+    }
 
     for (const c of caseRows ?? []) {
       const patch: Record<string, unknown> = { updated_at: nowISO }
@@ -1244,11 +1272,24 @@ export async function executeTechnicianSwap(
         // Ärendet har flyttats manuellt till annan tekniker — rör det inte
         continue
       }
-      const { error } = await supabase.from('cases').update(patch).eq('id', c.id)
-      if (error) {
-        console.error('executeTechnicianSwap: kunde inte uppdatera case', c.id, error)
+      const { data: updatedCase, error } = await supabase
+        .from('cases')
+        .update(patch)
+        .eq('id', c.id)
+        .select('id')
+      if (error || !updatedCase || updatedCase.length === 0) {
+        console.error('executeTechnicianSwap: kunde inte uppdatera case', c.id, error ?? '0 rader uppdaterades (behörighet kan saknas)')
+        failedCaseIds.push(c.id)
       }
     }
+  }
+
+  if (failedCaseIds.length > 0) {
+    console.error(
+      `executeTechnicianSwap: ${failedCaseIds.length} länkade ärenden kunde inte uppdateras:`,
+      failedCaseIds
+    )
+    return false
   }
 
   return true

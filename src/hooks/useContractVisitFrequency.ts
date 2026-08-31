@@ -21,7 +21,11 @@ export interface ContractVisitFrequency {
 
 const EMPTY: ContractVisitFrequency = { frequency: null, visitsPerYear: null, contractId: null }
 
-export function useContractVisitFrequency(customerId: string | null | undefined) {
+export function useContractVisitFrequency(
+  customerId: string | null | undefined,
+  /** Valt avtal när kunden täcks av flera — annars slås det upp automatiskt. */
+  preferredContractId?: string | null
+) {
   const [data, setData] = useState<ContractVisitFrequency>(EMPTY)
 
   useEffect(() => {
@@ -32,7 +36,8 @@ export function useContractVisitFrequency(customerId: string | null | undefined)
     let cancelled = false
     ;(async () => {
       try {
-        const contractId = await resolveContractForCustomer(customerId)
+        const contractId =
+          preferredContractId ?? (await resolveContractForCustomer(customerId))
         if (cancelled || !contractId) {
           if (!cancelled) setData(EMPTY)
           return
@@ -57,7 +62,7 @@ export function useContractVisitFrequency(customerId: string | null | undefined)
     return () => {
       cancelled = true
     }
-  }, [customerId])
+  }, [customerId, preferredContractId])
 
   return data
 }

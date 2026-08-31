@@ -341,8 +341,33 @@ export class PriceListService {
    *   3. Avtal på huvudkontoret med covers_all_sites (täcker alla enheter)
    * Nyaste avtalet med prislista vinner inom varje steg. Null = inget avtal styr.
    */
-  static async resolveContractPriceListId(customerId: string): Promise<string | null> {
+  static async resolveContractPriceListId(
+    customerId: string,
+    contractId?: string | null
+  ): Promise<string | null> {
     const today = todayKey()
+
+    // Vet ärendet redan vilket avtal det hör till är prislistan en följd av
+    // det avtalet — inte en egen gissning. Utan detta kunde ett ärende bokas
+    // mot ett avtal men prissättas från ett annat när kunden har flera.
+    if (contractId) {
+      const { data: chosen } = await supabase
+        .from('contracts')
+        .select(
+          'price_list_id, created_at, status, terminated_at, effective_end_date, contract_end_date'
+        )
+        .eq('id', contractId)
+        .maybeSingle()
+      const row = chosen as {
+        price_list_id: string | null
+        status?: string | null
+        terminated_at?: string | null
+        effective_end_date?: string | null
+        contract_end_date?: string | null
+      } | null
+      if (row?.price_list_id && isLiveContract(row, today)) return row.price_list_id
+      return null
+    }
 
     // Avslutade avtal får aldrig styra priset på ett nytt ärende. Statusfiltret
     // ensamt räcker inte — ett uppsagt avtal ligger kvar på 'signed' fram till

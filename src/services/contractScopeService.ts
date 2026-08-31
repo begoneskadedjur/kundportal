@@ -6,7 +6,7 @@
 import { supabase } from '../lib/supabase'
 import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
 import { isLiveContract, type ContractLifecycleFields } from '../utils/contractLifecycle'
-import { resolveContractsForCustomers } from './contractResolver'
+import { customersCoveredByContract, resolveContractCandidates } from './contractResolver'
 import { ContractInvoiceGenerator } from './contractInvoiceGenerator'
 
 export interface ScopeRow {
@@ -768,25 +768,42 @@ export class ContractScopeService {
       const orphanRows = (orphans ?? []) as { id: string; customer_id: string }[]
       if (orphanRows.length === 0) return paused
 
-      const resolved = await resolveContractsForCustomers(
+      // Frågan är "omfattas schemat av DET HÄR avtalet?", inte "vilket avtal
+      // hör kunden till?". En kund med flera avtal har inget entydigt svar på
+      // den andra frågan, och då pausades bara det nyaste avtalets scheman.
+      const covered = await customersCoveredByContract(
+        contractId,
         orphanRows.map((r) => r.customer_id)
       )
-      const toPause = orphanRows.filter((r) => resolved[r.customer_id] === contractId)
+      const toPause = orphanRows.filter((r) => covered.has(r.customer_id))
       if (toPause.length === 0) return paused
 
-      const { data: pausedOrphans, error: orphanErr } = await supabase
-        .from('recurring_schedules')
-        .update({
-          status: 'paused',
-          // Knyt raden till avtalet nu när vi vet vilket det är, så nästa
-          // uppsägning inte behöver gissa om igen.
-          contract_id: contractId,
-          updated_at: new Date().toISOString(),
-        })
-        .in('id', toPause.map((r) => r.id))
-        .select('id')
-      if (orphanErr) console.error('Kunde inte pausa okopplade scheman:', orphanErr.message)
-      paused += (pausedOrphans ?? []).length
+      // Binder bara raden till avtalet när det är kundens enda. Täcks kunden av
+      // flera avtal vore kopplingen en gissning som överlever uppsägningen.
+      const candidateCounts = await Promise.all(
+        [...new Set(toPause.map((r) => r.customer_id))].map(async (id) => ({
+          id,
+          antal: (await resolveContractCandidates(id)).length,
+        }))
+      )
+      const unambiguous = new Set(candidateCounts.filter((c) => c.antal === 1).map((c) => c.id))
+
+      const bindIds = toPause.filter((r) => unambiguous.has(r.customer_id)).map((r) => r.id)
+      const pauseOnlyIds = toPause.filter((r) => !unambiguous.has(r.customer_id)).map((r) => r.id)
+
+      for (const [ids, extra] of [
+        [bindIds, { contract_id: contractId }],
+        [pauseOnlyIds, {}],
+      ] as const) {
+        if (ids.length === 0) continue
+        const { data: pausedOrphans, error: orphanErr } = await supabase
+          .from('recurring_schedules')
+          .update({ status: 'paused', ...extra, updated_at: new Date().toISOString() })
+          .in('id', ids)
+          .select('id')
+        if (orphanErr) console.error('Kunde inte pausa okopplade scheman:', orphanErr.message)
+        paused += (pausedOrphans ?? []).length
+      }
     } catch (err) {
       console.error('Kunde inte pausa scheman:', err)
     }

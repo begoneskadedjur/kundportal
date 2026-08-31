@@ -17,10 +17,10 @@ import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../sh
 import { CaseImageService, CaseImageWithUrl } from '../../../services/caseImageService';
 import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSuggestionCard';
 import { CaseNumberService } from '../../../services/caseNumberService';
-import { ContractService } from '../../../services/contractService';
-import { resolveContractForCustomer } from '../../../services/contractResolver';
+import { resolveContractCandidates } from '../../../services/contractResolver';
+import type { ContractCandidateInfo } from '../../../services/contractResolver';
+import ContractCandidateSelector from '../../shared/ContractCandidateSelector';
 import { resolveSiteContact } from '../../../utils/multisiteHelpers';
-import type { ContractWithBilling } from '../../../types/database';
 
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
@@ -94,7 +94,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   // Multi-kontrakt-refaktor (Fas 8c): aktiva avtal för vald kund + valt avtal.
   // Visas i UI bara när >1, annars auto-väljs det enda. Synth-rader (id 'synth-*')
   // får aldrig sparas till cases.contract_id — vi filtrerar bort dem vid insert.
-  const [customerContracts, setCustomerContracts] = useState<ContractWithBilling[]>([]);
+  const [contractCandidates, setContractCandidates] = useState<ContractCandidateInfo[]>([]);
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [multisiteRoles, setMultisiteRoles] = useState<any[]>([]);
   const [timeSlotDuration, setTimeSlotDuration] = useState(60);
@@ -133,6 +133,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   // kund eller enhet byts: en adress som kommer från en väntande kundförfrågan
   // (initialCaseData) eller som koordinatorn skrivit för hand ska stå kvar.
   const autofilledAddressRef = useRef<string | null>(null);
+  // Samma sak för fakturamärkningen, som ärvs enhet → huvudkontor. Utan detta
+  // skulle ett enhetsbyte skriva över en märkning koordinatorn skrivit själv.
+  const autofilledMarkingRef = useRef<string | null>(null);
   // Sant när adressen i fältet kommer från huvudkontoret för att enheten
   // saknar egen. Styr hjälptexten under fältet.
   const [addressFromParent, setAddressFromParent] = useState(false);
@@ -151,6 +154,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setCustomerSearchTerm('');
     setCustomerDropdownOpen(false);
     autofilledAddressRef.current = null;
+    autofilledMarkingRef.current = null;
     setAddressFromParent(false);
     // Städa upp bildförhandsvisningar
     setSelectedImages(prev => {
@@ -282,12 +286,23 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       // För contract cases, sätt bara grundläggande ärendedata
       // Låt nästa useEffect hantera kund-identifiering
       if (type === 'contract' && initialCaseData.customer_id) {
+        const src = initialCaseData as any;
         setFormData({
           status: 'Bokat',
           skadedjur: initialCaseData.pest_type || initialCaseData.skadedjur,
           priority: initialCaseData.priority,
           description: initialCaseData.description,
           adress: formattedAddress || '',
+          // Kundens egna uppgifter från förfrågan — koordinatorn ska slippa
+          // skriva om det kunden redan fyllt i. Nästa useEffect fyller bara
+          // luckor från kundkortet, den skriver inte över dessa.
+          kontaktperson: src.kontaktperson || '',
+          telefon_kontaktperson: src.telefon || '',
+          e_post_kontaktperson: src.email || '',
+          work_order_number: src.work_order_number || '',
+          work_object: src.work_object || '',
+          room_number: src.room_number || '',
+          markning_faktura: src.markning_faktura || '',
         });
         // Vänta med att sätta customer tills vi vet om det är multisite
       } else {
@@ -515,6 +530,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           contact_email: siteManager?.user_email || resolved.contact_email,
           billing_email: resolved.billing_email,
           billing_address: resolved.billing_address,
+          billing_reference: resolved.billing_reference,
           // Sitens egna uppgifter, fallback till huvudkund (HK)
           company_name: site.company_name,
           organization_number: site.organization_number || customer?.organization_number || parentCustomer?.organization_number,
@@ -538,15 +554,34 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           const adress = addressIsOurs ? (nextAddress || prev.adress || '') : prev.adress;
           if (addressIsOurs && nextAddress) autofilledAddressRef.current = nextAddress;
 
+          // Fakturamärkningen följer samma regel som adressen: enhetens värde
+          // (eller huvudkontorets, om enheten saknar eget) fylls i åt
+          // koordinatorn, men det som skrivits för hand står kvar.
+          const nextMarking = (dataSource.billing_reference || '').trim();
+          const markingIsOurs =
+            !prev.markning_faktura ||
+            prev.markning_faktura === autofilledMarkingRef.current;
+          const markning_faktura = markingIsOurs
+            ? (nextMarking || prev.markning_faktura || '')
+            : prev.markning_faktura;
+          if (markingIsOurs && nextMarking) autofilledMarkingRef.current = nextMarking;
+
+          // Kontaktuppgifterna följer samma regel som adressen: kunden kan ha
+          // angett en egen kontaktperson i sin förfrågan, och den får inte
+          // skrivas över av enhetens standarduppgifter.
+          const keepOwn = (current: string | null | undefined, next: string | null | undefined) =>
+            current?.trim() ? current : (next || '');
+
           return {
           ...prev,
-          kontaktperson: dataSource.contact_person || '',
-          telefon_kontaktperson: dataSource.contact_phone || '',
-          e_post_kontaktperson: dataSource.contact_email || '',
+          kontaktperson: keepOwn(prev.kontaktperson, dataSource.contact_person),
+          telefon_kontaktperson: keepOwn(prev.telefon_kontaktperson, dataSource.contact_phone),
+          e_post_kontaktperson: keepOwn(prev.e_post_kontaktperson, dataSource.contact_email),
           org_nr: dataSource.organization_number || parentCustomer?.organization_number || '',
           bestallare: dataSource.company_name || '',
           company_name: dataSource.company_name || customer?.company_name || parentCustomer?.company_name || '',
           adress,
+          markning_faktura,
           // Lägg även till faktura-fält om de finns
           e_post_faktura: dataSource.billing_email || dataSource.contact_email || '',
           faktura_adress: dataSource.billing_address || dataSource.contact_address || '',
@@ -559,31 +594,32 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     }
   }, [selectedContractCustomer, selectedSiteId, contractCustomers, multisiteRoles, caseType]);
 
-  // Multi-kontrakt-refaktor (Fas 8c): hämta aktiva avtal för vald avtalskund.
-  // Använder sitens customer_id för multisite (kontrakt hänger på siten).
+  // Hämtar de avtal som täcker vald kund eller enhet. Enheten går först —
+  // avtalet hänger normalt på siten för multisite-kunder.
   useEffect(() => {
     const targetCustomerId = selectedSiteId || selectedContractCustomer;
     if (!targetCustomerId) {
-      setCustomerContracts([]);
+      setContractCandidates([]);
       setSelectedContractId(null);
       return;
     }
     let cancelled = false;
-    ContractService.getActiveContracts(targetCustomerId)
-      .then(contracts => {
+    // Kandidatuppslaget ser även avtal som täcker enheten via avtalsomfattning
+    // eller huvudkontoret — getActiveContracts ser bara dem som bor på raden,
+    // så enheter under ett omfattande avtal fick inget val alls.
+    resolveContractCandidates(targetCustomerId)
+      .then(candidates => {
         if (cancelled) return;
-        setCustomerContracts(contracts);
-        // Auto-välj första (eller enda) — ändrar bara om inget redan valts eller
-        // om kunden bytts.
-        const first = contracts[0]?.id ?? null;
+        setContractCandidates(candidates);
         setSelectedContractId(prev => {
-          if (prev && contracts.some(c => c.id === prev)) return prev;
-          return first;
+          if (prev && candidates.some(c => c.id === prev)) return prev;
+          // Flera jämbördiga avtal: koordinatorn får välja. Ett avtal: ta det.
+          return candidates.length === 1 ? candidates[0].id : null;
         });
       })
       .catch(() => {
         if (!cancelled) {
-          setCustomerContracts([]);
+          setContractCandidates([]);
           setSelectedContractId(null);
         }
       });
@@ -678,6 +714,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    // Koordinatorn har tagit över märkningen: autofyllet får inte skriva över
+    // den när enhet byts.
+    if (name === 'markning_faktura') autofilledMarkingRef.current = null;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -866,7 +905,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   // på Servicebesök (contract) och Inspektion stationer (inspection).
   // Enheter ärver flaggorna från huvudkontoret (parent_customer_id).
   const requiresWorkOrderFlag = (flag: 'work_order_number_enabled' | 'work_object_enabled' | 'room_number_enabled') => {
-    if (caseType !== 'contract' && caseType !== 'inspection') return false
+    if (caseType !== 'contract' && caseType !== 'inspection' && caseType !== 'establishment') return false
     const cust = contractCustomers.find(c => c.id === selectedContractCustomer)
     if (!cust) return false
     if (cust[flag]) return true
@@ -897,6 +936,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
     if (!formData.start_date || !formData.due_date || !formData.primary_assignee_id) {
       return toast.error("Alla fält med * under 'Bokning & Detaljer' måste vara ifyllda.");
+    }
+
+    // Täcks kunden av flera gällande avtal måste ett väljas — annars hamnar
+    // ärendet på det avtal systemet råkar plocka, med fel premie och historik.
+    if (contractCandidates.length > 1 && !selectedContractId) {
+      return toast.error('Kunden har flera gällande avtal — välj vilket ärendet hör till.');
     }
 
     if ((caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering' || caseType === 'egenkontroll') && !selectedContractCustomer) {
@@ -1031,13 +1076,13 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         const outdoorCount = outdoorResult.count || 0;
         const indoorCount = indoorResult.count || 0;
 
-        // Skapa inspektionssession kopplad till ärendet + kundens gällande avtal
-        const sessionContractId = await resolveContractForCustomer(actualCustomerId!);
-
+        // Sessionen ska bära SAMMA avtal som ärendet. Tidigare slog den upp
+        // avtalet på nytt, vilket kunde ge ett annat än det valda när kunden
+        // har flera gällande avtal.
         const sessionData = {
           case_id: createdCase?.id,
           customer_id: actualCustomerId!,
-          contract_id: sessionContractId,
+          contract_id: persistedContractId ?? null,
           technician_id: formData.primary_assignee_id,
           scheduled_at: formData.start_date,
           status: 'scheduled' as const,
@@ -1089,6 +1134,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           case_number: caseNumber,
           service_id: serviceId || null,
           send_booking_confirmation: formData.skicka_bokningsbekraftelse === 'Ja',
+          invoice_marking: formData.markning_faktura?.trim() || null,
+          // Ärendemärkning — etableringar omfattas nu av samma krav som avtalsärenden
+          work_order_number: (formData as any).work_order_number?.trim() || null,
+          work_object: (formData as any).work_object?.trim() || null,
+          room_number: (formData as any).room_number?.trim() || null,
         }]).select('id').single();
         if (error) throw error;
 
@@ -1203,7 +1253,10 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           description: formData.description || '',
           status: 'Bokad', // Korrekt svensk status som används i systemet
           priority: formData.priority || 'normal',
-          service_type: 'routine' as const,
+          // Bokar vi in en befintlig kundförfrågan ska kundens egen ärendetyp
+          // stå kvar — annars byter ärendet typ mitt i flödet och etablerings-
+          // respektive inspektionsärenden tappar sin klassificering.
+          service_type: ((initialCaseData as any)?.service_type || 'routine') as any,
           pest_type: selectedService?.name || formData.skadedjur || null,
           service_id: serviceId || null,
           scheduled_start: formData.start_date,
@@ -1674,33 +1727,16 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 })()
               )}
 
-              {/* Multi-kontrakt-väljare: visas bara när vald avtalskund har > 1
-                  aktivt avtal. Synth-rader (kunder utan riktiga contracts-rader)
-                  räknas inte. För 99% av kunderna med 1 avtal är UI:t oförändrat. */}
-              {(caseType === 'contract' || caseType === 'inspection') &&
-               selectedContractCustomer &&
-               customerContracts.filter(c => !c.id.startsWith('synth-')).length > 1 && (
-                <div className="p-3 bg-[#20c58f]/10 border border-[#20c58f]/30 rounded-xl">
-                  <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
-                    <FileText className="w-4 h-4 text-[#20c58f]" />
-                    Välj avtal *
-                  </label>
-                  <Select
-                    value={selectedContractId ?? ''}
-                    onChange={v => setSelectedContractId(v || null)}
-                    options={customerContracts
-                      .filter(c => !c.id.startsWith('synth-'))
-                      .map(c => ({
-                        value: c.id,
-                        label: c.address_label || c.contact_address || `Avtal ${c.oneflow_contract_id}`,
-                      }))}
-                    placeholder="Välj vilket avtal ärendet ska bokas mot..."
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Kunden har flera avtal. Välj rätt avtal så att rapporter och historik
-                    kopplas korrekt.
-                  </p>
-                </div>
+              {/* Avtalsväljare: visas bara när kunden täcks av flera gällande
+                  avtal. För de allra flesta kunder med ett avtal är UI:t
+                  oförändrat — komponenten renderar ingenting då. */}
+              {(caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment') &&
+               selectedContractCustomer && (
+                <ContractCandidateSelector
+                  candidates={contractCandidates}
+                  value={selectedContractId}
+                  onChange={setSelectedContractId}
+                />
               )}
 
               {/* Offertinnehåll (visas om ärendet har Oneflow-koppling) */}
