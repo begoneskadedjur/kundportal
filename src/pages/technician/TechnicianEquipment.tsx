@@ -583,6 +583,32 @@ export default function TechnicianEquipment() {
       return
     }
 
+    // AVSLUTSSPÄRR (lärdom från BE-0008655): stäng ALDRIG etableringsärendet
+    // tyst när inga stationer placerats sedan det öppnades. X-knappen på
+    // placeringsformuläret går via denna väg — utan spärren stängdes ärendet
+    // innan teknikern hunnit placera, och senare placeringar tappade tyst
+    // både preparat- och faktureringskoppling.
+    try {
+      const placedTotal = await AddonStationBillingService.countStationsPlacedSince(
+        customerId,
+        openCase.created_at,
+        false
+      )
+      if (placedTotal === 0) {
+        const closeAnyway = window.confirm(
+          'Inga stationer har placerats i denna etablering ännu.\n\nOK = avsluta etableringsärendet ändå.\nAvbryt = ärendet förblir öppet så du kan placera stationer senare.'
+        )
+        if (!closeAnyway) {
+          toast('Etableringsärendet är fortfarande öppet — placera stationer och avsluta sedan', { icon: 'ℹ️' })
+          refreshData()
+          return
+        }
+      }
+    } catch (err) {
+      // Spärrkollen får inte blockera flödet — vid fel fortsätter vi som vanligt
+      console.error('Kunde inte räkna placerade stationer för avslutsspärren:', err)
+    }
+
     let serviceItems: EstablishmentSummaryState['serviceItems'] = []
     let etableringsItemId: string | null = null
     let addonCount = 0

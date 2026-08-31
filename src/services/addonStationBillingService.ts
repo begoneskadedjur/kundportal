@@ -175,6 +175,36 @@ export class AddonStationBillingService {
   }
 
   /**
+   * Stationer placerade hos en kund sedan ett givet datum.
+   * onlyAddon=true → bara tilläggsstationer (förifyllnad av etableringsraden);
+   * onlyAddon=false → alla stationer (avslutsspärr: har etableringen ens börjat?).
+   */
+  static async countStationsPlacedSince(
+    customerId: string,
+    sinceIso: string,
+    onlyAddon: boolean
+  ): Promise<number> {
+    let outdoorQuery = supabase
+      .from('equipment_placements')
+      .select('id', { count: 'exact', head: true })
+      .eq('customer_id', customerId)
+      .gte('placed_at', sinceIso)
+    let indoorQuery = supabase
+      .from('indoor_stations')
+      .select('id, floor_plan:floor_plans!inner(customer_id)', { count: 'exact', head: true })
+      .eq('floor_plan.customer_id', customerId)
+      .gte('placed_at', sinceIso)
+
+    if (onlyAddon) {
+      outdoorQuery = outdoorQuery.eq('is_addon', true)
+      indoorQuery = indoorQuery.eq('is_addon', true)
+    }
+
+    const [outdoorRes, indoorRes] = await Promise.all([outdoorQuery, indoorQuery])
+    return (outdoorRes.count || 0) + (indoorRes.count || 0)
+  }
+
+  /**
    * Tilläggsstationer placerade hos en kund sedan ett givet datum
    * (används för att förifylla antal på etableringsraden).
    */
@@ -182,22 +212,7 @@ export class AddonStationBillingService {
     customerId: string,
     sinceIso: string
   ): Promise<number> {
-    const [outdoorRes, indoorRes] = await Promise.all([
-      supabase
-        .from('equipment_placements')
-        .select('id', { count: 'exact', head: true })
-        .eq('customer_id', customerId)
-        .eq('is_addon', true)
-        .gte('placed_at', sinceIso),
-      supabase
-        .from('indoor_stations')
-        .select('id, floor_plan:floor_plans!inner(customer_id)', { count: 'exact', head: true })
-        .eq('floor_plan.customer_id', customerId)
-        .eq('is_addon', true)
-        .gte('placed_at', sinceIso)
-    ])
-
-    return (outdoorRes.count || 0) + (indoorRes.count || 0)
+    return this.countStationsPlacedSince(customerId, sinceIso, true)
   }
 
   /**
