@@ -345,6 +345,78 @@ export class PriceListService {
     customerId: string,
     contractId?: string | null
   ): Promise<string | null> {
+    // Primär väg: SECURITY DEFINER-RPC som levererar avtalskandidaterna förbi
+    // RLS — tekniker/kund saknar läsrätt på contracts och fick annars tyst 0
+    // kandidater (avtalsprislistan hoppades → fel pris i tekniker-flöden).
+    // Urvalslogiken (isLiveContract, nyast-vinner, täckningsdatum) bor HÄR,
+    // RPC:n är bara en dataleverantör. Fallback till direktläsning om RPC:n
+    // saknas (äldre miljö).
+    const viaRpc = await this.resolveContractPriceListIdViaRpc(customerId, contractId)
+    if (viaRpc !== undefined) return viaRpc
+    return this.resolveContractPriceListIdLegacy(customerId, contractId)
+  }
+
+  /** undefined = RPC otillgänglig (fall tillbaka), null/string = avgjort svar */
+  private static async resolveContractPriceListIdViaRpc(
+    customerId: string,
+    contractId?: string | null
+  ): Promise<string | null | undefined> {
+    const today = todayKey()
+
+    const { data, error } = await supabase.rpc('get_price_list_contract_candidates', {
+      p_customer_id: customerId,
+      p_contract_id: contractId ?? null
+    })
+    if (error) {
+      console.warn('[PriceListService] RPC get_price_list_contract_candidates otillgänglig, faller tillbaka:', error.message)
+      return undefined
+    }
+
+    type RpcRow = {
+      source: 'chosen' | 'owned' | 'covering' | 'parent'
+      contract_id: string
+      price_list_id: string | null
+      created_at: string
+      status: string | null
+      terminated_at: string | null
+      effective_end_date: string | null
+      contract_end_date: string | null
+      active_from: string | null
+      active_to: string | null
+    }
+    const rows = (data ?? []) as RpcRow[]
+
+    const newestLive = (candidates: RpcRow[]): string | null =>
+      candidates
+        .filter((c) => !!c.price_list_id && isLiveContract(c, today))
+        .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))[0]?.price_list_id ??
+      null
+
+    if (contractId) {
+      const chosen = rows.find((r) => r.source === 'chosen')
+      if (chosen?.price_list_id && isLiveContract(chosen, today)) return chosen.price_list_id
+      return null
+    }
+
+    const ownedListId = newestLive(rows.filter((r) => r.source === 'owned'))
+    if (ownedListId) return ownedListId
+
+    const coveringCandidates = rows.filter(
+      (r) =>
+        r.source === 'covering' &&
+        (!r.active_to || r.active_to >= today) &&
+        (!r.active_from || r.active_from <= today)
+    )
+    const coveredListId = newestLive(coveringCandidates)
+    if (coveredListId) return coveredListId
+
+    return newestLive(rows.filter((r) => r.source === 'parent'))
+  }
+
+  private static async resolveContractPriceListIdLegacy(
+    customerId: string,
+    contractId?: string | null
+  ): Promise<string | null> {
     const today = todayKey()
 
     // Vet ärendet redan vilket avtal det hör till är prislistan en följd av
