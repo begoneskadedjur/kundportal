@@ -40,6 +40,7 @@ import { CasePreparationService } from '../../services/casePreparationService'
 import type { PreparationUnit } from '../../types/casePreparations'
 import { CaseBillingService } from '../../services/caseBillingService'
 import { AddonStationBillingService } from '../../services/addonStationBillingService'
+import { PriceListService } from '../../services/priceListService'
 import { toLocalISOStringWithOffset } from '../../utils/dateHelpers'
 
 // Faktureringssammanfattning vid "Färdig med etablering"
@@ -51,6 +52,9 @@ interface EstablishmentSummaryState {
   etableringsItemId: string | null
   addonCount: number
   quantityDraft: number
+  // Redigerbart pris (kr/st) på etableringsraden — förifylls från radens pris,
+  // eller från avtals-/kundprislistan när raden står på 0
+  priceDraft: number
 }
 
 interface Customer {
@@ -382,12 +386,12 @@ export default function TechnicianEquipment() {
           }
         }
 
-        // Spara preparat till aktivt etableringsärende om valt
-        if (formData.preparation_id && formData.preparation_quantity) {
+        // Spara preparat + bakgrundssynka etableringsradens antal mot öppet etableringsärende
+        if ((formData.preparation_id && formData.preparation_quantity) || formData.is_addon) {
           try {
             const { data: establishmentCase, error: caseError } = await supabase
               .from('cases')
-              .select('id')
+              .select('id, created_at')
               .eq('customer_id', customerId)
               .eq('service_type', 'establishment')
               .not('status', 'ilike', '%avslutat%')
@@ -398,21 +402,32 @@ export default function TechnicianEquipment() {
             if (caseError) throw caseError
 
             if (establishmentCase) {
-              await CasePreparationService.addPreparation({
-                case_id: establishmentCase.id,
-                case_type: 'contract',
-                preparation_id: formData.preparation_id,
-                quantity: formData.preparation_quantity,
-                unit: formData.preparation_unit || 'g',
-                applied_by_technician_id: profile?.technician_id || undefined,
-                applied_by_technician_name: profile?.full_name || profile?.email || undefined
-              })
-            } else {
+              if (formData.preparation_id && formData.preparation_quantity) {
+                await CasePreparationService.addPreparation({
+                  case_id: establishmentCase.id,
+                  case_type: 'contract',
+                  preparation_id: formData.preparation_id,
+                  quantity: formData.preparation_quantity,
+                  unit: formData.preparation_unit || 'g',
+                  applied_by_technician_id: profile?.technician_id || undefined,
+                  applied_by_technician_name: profile?.full_name || profile?.email || undefined
+                })
+              }
+              // Ärendet uppdateras löpande i bakgrunden — "Färdig med
+              // etablering" blir en bekräftelse, inte en beräkning
+              if (formData.is_addon) {
+                await AddonStationBillingService.syncEstablishmentLineQuantity(
+                  establishmentCase.id,
+                  customerId,
+                  establishmentCase.created_at
+                )
+              }
+            } else if (formData.preparation_id && formData.preparation_quantity) {
               toast.error('Inget öppet etableringsärende hittades — preparatet sparades inte på ärendet')
             }
           } catch (prepError) {
-            console.error('Kunde inte spara preparat till etableringsärende:', prepError)
-            toast.error('Preparatet kunde inte sparas till etableringsärendet')
+            console.error('Kunde inte uppdatera etableringsärendet vid placering:', prepError)
+            toast.error('Placeringen sparades men etableringsärendet kunde inte uppdateras')
           }
         }
 
@@ -612,21 +627,35 @@ export default function TechnicianEquipment() {
     let serviceItems: EstablishmentSummaryState['serviceItems'] = []
     let etableringsItemId: string | null = null
     let addonCount = 0
+    let priceDraft = 0
     try {
       const items = await CaseBillingService.getCaseBillingItems(openCase.id, 'contract')
-      serviceItems = items
-        .filter(i => i.item_type === 'service')
-        .map(i => ({
-          id: i.id,
-          name: i.service_name || i.article_name || 'Tjänst',
-          quantity: i.quantity,
-          unitPrice: i.discounted_price ?? i.unit_price
-        }))
-      etableringsItemId = serviceItems.find(i => i.name.toLowerCase().includes('etablering'))?.id || null
+      const serviceRows = items.filter(i => i.item_type === 'service')
+      serviceItems = serviceRows.map(i => ({
+        id: i.id,
+        name: i.service_name || i.article_name || 'Tjänst',
+        quantity: i.quantity,
+        unitPrice: i.discounted_price ?? i.unit_price
+      }))
+      const etableringsRow = serviceRows.find(i =>
+        (i.service_name || i.article_name || '').toLowerCase().includes('etablering'))
+      etableringsItemId = etableringsRow?.id || null
       addonCount = await AddonStationBillingService.countAddonStationsPlacedSince(
         customerId,
         openCase.created_at
       )
+
+      // Prisförslag på etableringsraden: radens eget pris, eller — när raden
+      // står på 0 och tilläggsstationer placerats — uppslag i avtals-/kund-
+      // prislistan (samma kedja som rundfaktureringen). Redigerbart i dialogen.
+      priceDraft = etableringsRow ? (etableringsRow.discounted_price ?? etableringsRow.unit_price) : 0
+      if (etableringsRow?.service_id && priceDraft === 0 && addonCount > 0) {
+        const effective = await PriceListService.getEffectiveServicePrice(
+          etableringsRow.service_id,
+          customerId
+        )
+        if (effective?.price) priceDraft = effective.price
+      }
     } catch (err) {
       // Sväljs INTE: utan underlag skulle ärendet stängas utan fakturering och
       // pending-raderna stranda osynligt i case_billing_items
@@ -640,7 +669,7 @@ export default function TechnicianEquipment() {
       : serviceItems.find(i => i.id === etableringsItemId)?.quantity ?? 1
 
     const total = serviceItems.reduce((sum, i) =>
-      sum + i.unitPrice * (i.id === etableringsItemId ? quantityDraft : i.quantity), 0)
+      sum + (i.id === etableringsItemId ? priceDraft * quantityDraft : i.unitPrice * i.quantity), 0)
 
     if (total <= 0 && addonCount === 0) {
       // Vanlig avtalsetablering utan tillägg: stäng som tidigare, ingen faktureringsinfo
@@ -657,7 +686,8 @@ export default function TechnicianEquipment() {
       serviceItems,
       etableringsItemId,
       addonCount,
-      quantityDraft
+      quantityDraft,
+      priceDraft
     })
   }
 
@@ -668,19 +698,22 @@ export default function TechnicianEquipment() {
     const s = establishmentSummary
     setFinishingEstablishment(true)
     try {
-      // Uppdatera etableringsradens antal om det ändrats
+      // Uppdatera etableringsradens antal och pris om något ändrats
       const originalRow = s.serviceItems.find(i => i.id === s.etableringsItemId)
-      if (s.etableringsItemId && originalRow && originalRow.quantity !== s.quantityDraft) {
+      if (s.etableringsItemId && originalRow &&
+          (originalRow.quantity !== s.quantityDraft || originalRow.unitPrice !== s.priceDraft)) {
         const { error } = await supabase
           .from('case_billing_items')
           .update({
             quantity: s.quantityDraft,
-            total_price: originalRow.unitPrice * s.quantityDraft
+            unit_price: s.priceDraft,
+            discounted_price: s.priceDraft,
+            total_price: s.priceDraft * s.quantityDraft
           })
           .eq('id', s.etableringsItemId)
         if (error) {
-          console.error('Kunde inte uppdatera etableringsradens antal:', error)
-          toast.error('Antalet kunde inte uppdateras — kontrollera raden i ärendet')
+          console.error('Kunde inte uppdatera etableringsraden:', error)
+          toast.error('Etableringsraden kunde inte uppdateras — kontrollera raden i ärendet')
         }
       }
 
@@ -1054,7 +1087,7 @@ export default function TechnicianEquipment() {
           {establishmentSummary && (() => {
             const s = establishmentSummary
             const total = s.serviceItems.reduce((sum, i) =>
-              sum + i.unitPrice * (i.id === s.etableringsItemId ? s.quantityDraft : i.quantity), 0)
+              sum + (i.id === s.etableringsItemId ? s.priceDraft * s.quantityDraft : i.unitPrice * i.quantity), 0)
             return (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -1085,11 +1118,30 @@ export default function TechnicianEquipment() {
                     {s.serviceItems.map(item => {
                       const isEtablering = item.id === s.etableringsItemId
                       const qty = isEtablering ? s.quantityDraft : item.quantity
+                      const price = isEtablering ? s.priceDraft : item.unitPrice
                       return (
                         <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-800/30 border border-slate-700 rounded-xl">
                           <div className="min-w-0 flex-1">
                             <p className="text-sm text-slate-200 truncate">{item.name}</p>
-                            <p className="text-xs text-slate-400">{item.unitPrice.toLocaleString('sv-SE')} kr/st</p>
+                            {isEtablering ? (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={s.priceDraft}
+                                  onChange={(e) => {
+                                    const v = parseFloat(e.target.value)
+                                    setEstablishmentSummary(prev => prev
+                                      ? { ...prev, priceDraft: Number.isFinite(v) && v >= 0 ? v : 0 }
+                                      : prev)
+                                  }}
+                                  className="w-20 px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs text-right focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                                />
+                                <span className="text-xs text-slate-400">kr/st</span>
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-400">{item.unitPrice.toLocaleString('sv-SE')} kr/st</p>
+                            )}
                           </div>
                           {isEtablering ? (
                             <input
@@ -1108,7 +1160,7 @@ export default function TechnicianEquipment() {
                             <span className="text-sm text-slate-300 tabular-nums">{qty} st</span>
                           )}
                           <span className="text-sm text-slate-200 tabular-nums w-20 text-right">
-                            {(item.unitPrice * qty).toLocaleString('sv-SE')} kr
+                            {(price * qty).toLocaleString('sv-SE')} kr
                           </span>
                         </div>
                       )
@@ -1126,7 +1178,7 @@ export default function TechnicianEquipment() {
                   {total <= 0 && (
                     <p className="text-xs text-amber-400 mb-3">
                       Totalen är 0 kr — ärendet stängs utan att någon faktura skapas.
-                      {s.addonCount > 0 ? ' Pris saknas på etableringsraden, meddela kontoret om etableringen ska debiteras.' : ''}
+                      {s.addonCount > 0 ? ' Ange pris per station ovan om etableringen ska debiteras (eller lägg Etableringskostnad i kundens avtalsprislista för automatiskt pris).' : ''}
                     </p>
                   )}
 

@@ -320,6 +320,40 @@ export class AddonStationBillingService {
   }
 
   /**
+   * Bakgrundssynk av etableringsradens antal medan etableringen pågår:
+   * anropas efter varje placerad tilläggsstation så ärendets Ekonomi-flik
+   * alltid speglar verkligheten — "Färdig med etablering" blir en ren
+   * bekräftelse. Idempotent (sätter antal = aktuell räkning, ökar inte).
+   */
+  static async syncEstablishmentLineQuantity(
+    caseId: string,
+    customerId: string,
+    caseCreatedAt: string
+  ): Promise<void> {
+    try {
+      const count = await this.countStationsPlacedSince(customerId, caseCreatedAt, true)
+      if (count === 0) return
+
+      const items = await CaseBillingService.getCaseBillingItems(caseId, 'contract')
+      const row = items.find(i =>
+        i.item_type === 'service' &&
+        (i.service_name || i.article_name || '').toLowerCase().includes('etablering')
+      )
+      if (!row || row.quantity === count) return
+
+      const price = row.discounted_price ?? row.unit_price
+      const { error } = await supabase
+        .from('case_billing_items')
+        .update({ quantity: count, total_price: price * count })
+        .eq('id', row.id)
+      if (error) console.warn('[AddonStationBilling] Kunde inte synka etableringsradens antal:', error)
+    } catch (err) {
+      // Bakgrundssynk får aldrig störa placeringsflödet
+      console.warn('[AddonStationBilling] Bakgrundssynk av etableringsrad misslyckades:', err)
+    }
+  }
+
+  /**
    * Vikarie-skydd: tekniker-RLS kräver att teknikern är tilldelad ärendet för
    * att kunna LÄSA tillbaka contract_billing_items (technician_owns_case).
    * Sätter teknikern som sekundär/tertiär om hen inte redan är tilldelad.
