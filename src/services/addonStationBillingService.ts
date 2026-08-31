@@ -184,15 +184,19 @@ export class AddonStationBillingService {
     sinceIso: string,
     onlyAddon: boolean
   ): Promise<number> {
+    // Endast aktiva stationer räknas — placerad-och-borttagen ska inte
+    // blåsa upp antal (specialistkrav: faktureringsrisk annars)
     let outdoorQuery = supabase
       .from('equipment_placements')
       .select('id', { count: 'exact', head: true })
       .eq('customer_id', customerId)
+      .eq('status', 'active')
       .gte('placed_at', sinceIso)
     let indoorQuery = supabase
       .from('indoor_stations')
       .select('id, floor_plan:floor_plans!inner(customer_id)', { count: 'exact', head: true })
       .eq('floor_plan.customer_id', customerId)
+      .eq('status', 'active')
       .gte('placed_at', sinceIso)
 
     if (onlyAddon) {
@@ -249,8 +253,11 @@ export class AddonStationBillingService {
     // rader → dubbelfaktura vid återöppnad session)
     const existingItems: CaseBillingItemWithRelations[] =
       await CaseBillingService.getCaseBillingItems(caseId, 'contract', 'all')
+    // Markören är primär identifiering; service_id som fallback för rader
+    // skapade innan markörkolumnen fanns
     const existing = existingItems.find(
-      i => i.item_type === 'service' && i.service_id === service.id
+      i => i.is_addon_station_line === true ||
+        (i.item_type === 'service' && i.service_id === service.id)
     )
 
     if (existing && existing.status !== 'pending') {
@@ -281,19 +288,30 @@ export class AddonStationBillingService {
       return { outcome: 'updated', quantity, unitPrice, priceMissing: unitPrice === 0 }
     }
 
-    await CaseBillingService.addServiceToCase({
+    // Radtext särskiljer rundan från etableringen på kundens faktura
+    // (specialistkrav: annars läser det som dubbeldebitering). Idempotens-
+    // vakterna matchar på service_id/markör, aldrig namn — suffixet är säkert.
+    const rundDatum = new Date().toLocaleDateString('sv-SE')
+    const created = await CaseBillingService.addServiceToCase({
       case_id: caseId,
       case_type: 'contract',
       customer_id: customerId,
       service_id: service.id,
       service_code: service.code,
-      service_name: service.name,
+      service_name: `${service.name} – kontrollrunda ${rundDatum}`,
       quantity,
       unit_price: unitPrice,
       added_by_technician_id: technicianId || undefined,
       added_by_technician_name: technicianName || undefined,
       notes: 'Tilläggsstationer kontrollerade i rundan'
     })
+    // Markera raden som ärendets tilläggsstationsrad (partiellt unikt index
+    // i DB stoppar dubbletter om två avslut skulle racea)
+    const { error: markError } = await supabase
+      .from('case_billing_items')
+      .update({ is_addon_station_line: true })
+      .eq('id', created.id)
+    if (markError) console.warn('[AddonStationBilling] Kunde inte sätta tilläggsradsmarkör:', markError)
 
     // Automatiska interna kostnader (artikelrader) — bara vid nyskapande
     const defaultArticles = await this.getDefaultArticles(service.id)
@@ -320,36 +338,43 @@ export class AddonStationBillingService {
   }
 
   /**
-   * Bakgrundssynk av etableringsradens antal medan etableringen pågår:
-   * anropas efter varje placerad tilläggsstation så ärendets Ekonomi-flik
-   * alltid speglar verkligheten — "Färdig med etablering" blir en ren
-   * bekräftelse. Idempotent (sätter antal = aktuell räkning, ökar inte).
+   * Bakgrundssynk av tilläggsstationsraden på öppet etableringsärende.
+   * Hela synken (ärendeuppslag + räkning + upsert) körs i SECURITY DEFINER-
+   * RPC:n sync_addon_station_line:
+   * - fungerar även för vikarier som inte kan läsa ärendet (cases-RLS)
+   * - kan inte skapa dubbelrader (partiellt unikt index + ON CONFLICT)
+   * - synkar antal även NER (0-total ⇒ ingen faktura)
+   * - rör ALDRIG Etableringskostnad-raden (egen rad med markörkolumn)
+   * Klienten bidrar bara med prisuppslaget (fungerar för alla roller via
+   * prislist-RPC:n). Får aldrig störa placeringsflödet — sväljer fel.
    */
-  static async syncEstablishmentLineQuantity(
-    caseId: string,
+  static async syncAddonEstablishmentLine(
     customerId: string,
-    caseCreatedAt: string
-  ): Promise<void> {
+    technicianId?: string | null,
+    technicianName?: string | null
+  ): Promise<{ found: boolean; count?: number; row_id?: string | null; open_count?: number; already_billed?: boolean } | null> {
     try {
-      const count = await this.countStationsPlacedSince(customerId, caseCreatedAt, true)
-      if (count === 0) return
+      const service = await this.getAddonStationService()
+      let unitPrice: number | null = null
+      if (service) {
+        const effective = await PriceListService.getEffectiveServicePrice(service.id, customerId)
+        unitPrice = effective?.price ?? service.base_price ?? null
+      }
 
-      const items = await CaseBillingService.getCaseBillingItems(caseId, 'contract')
-      const row = items.find(i =>
-        i.item_type === 'service' &&
-        (i.service_name || i.article_name || '').toLowerCase().includes('etablering')
-      )
-      if (!row || row.quantity === count) return
-
-      const price = row.discounted_price ?? row.unit_price
-      const { error } = await supabase
-        .from('case_billing_items')
-        .update({ quantity: count, total_price: price * count })
-        .eq('id', row.id)
-      if (error) console.warn('[AddonStationBilling] Kunde inte synka etableringsradens antal:', error)
+      const { data, error } = await supabase.rpc('sync_addon_station_line', {
+        p_customer_id: customerId,
+        p_unit_price: unitPrice,
+        p_technician_id: technicianId ?? null,
+        p_technician_name: technicianName ?? null
+      })
+      if (error) {
+        console.warn('[AddonStationBilling] sync_addon_station_line fel:', error)
+        return null
+      }
+      return data as { found: boolean; count?: number; row_id?: string | null; open_count?: number; already_billed?: boolean }
     } catch (err) {
-      // Bakgrundssynk får aldrig störa placeringsflödet
-      console.warn('[AddonStationBilling] Bakgrundssynk av etableringsrad misslyckades:', err)
+      console.warn('[AddonStationBilling] Bakgrundssynk av tilläggsrad misslyckades:', err)
+      return null
     }
   }
 

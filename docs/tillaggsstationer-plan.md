@@ -9,6 +9,19 @@ Kvar för go-live (affärsdata som inte kunde läggas in autonomt):
 2. FEV-datastäd: dubblettkundraden "Återvinningscentralen", stationer på rätt enhetsrad.
 3. Lägg gärna arbetstid/stationsartikel som automatiska interna kostnader på tjänsten (Tjänsteutbud → Redigera tjänst → Används för tilläggsstationer).
 
+Uppdatering 2026-08-31 (kväll, efter Christians test mot Demo AB):
+- FIXAT (882547e6): avslutsspärr — etableringsärende stängs inte längre tyst när 0 stationer placerats (X-knappen på placeringsformuläret gick via Färdig med etablering-vägen och stängde ärendet i förtid; senare placeringar tappade preparat + fakturering).
+- FIXAT (ff3cba95): avtalsprislistan resolvas nu för ALLA roller via SECURITY DEFINER-RPC `get_price_list_contract_candidates` (applicerad i live-DB). Tidigare hoppade avtalsprisliste-steget tyst för tekniker (RLS på contracts) → 0 kr trots korrekt koppling i avtalskartan. Prislistor kopplas numera via avtalskartan — kundens price_list_id är sekundär. Planens tidigare rekommendation "använd kundprislista, aldrig avtalsprislista" är därmed OBSOLET.
+
+Uppdatering 2026-08-31 (sen kväll, efter Christians klargörande + dubbel specialistvalidering):
+- OMBYGGT: tilläggsstationerna i etableringsärenden får en EGEN tjänsterad med den flaggade tjänsten (used_for_addon_stations) — Etableringskostnad-raden (ärendets primärtjänst, 0 kr-norm, "annan funktion") rörs ALDRIG av tilläggslogiken.
+- Ny markörkolumn case_billing_items.is_addon_station_line + partiellt unikt index (max en tilläggsrad per ärende) + SECURITY DEFINER-RPC sync_addon_station_line som gör hela synken atomärt (ärendeuppslag förbi cases-RLS → vikarie-säker, räkning av AKTIVA tilläggsstationer, upsert via ON CONFLICT, synkar även NER till 0). Anropas vid varje placering, vid borttag och när Färdig-dialogen öppnas.
+- All radidentifiering via markören — ALDRIG namnmatchning (kolliderar med "Avetablering avtal"/"Avetablering punktinsats").
+- Radtext särskiljer flödena på fakturan: "– etablering" resp. "– kontrollrunda ÅÅÅÅ-MM-DD" (idempotensvakter matchar service_id/markör, aldrig namn).
+- Redigerbart pris i Färdig-dialogen med rabattspärr: pris under aktuellt listpris bokförs som discount_percent + requires_approval → rabattgodkännande-flödet kan inte kringgås. Listpriset re-resolvas vid varje dialogöppning.
+- Varning när kunden har flera öppna etableringsärenden.
+- Beslut: inga automatiska interna artikelrader i etableringsflödet (endast rundflödet) — annars måste artikelantal räknas om vid varje synk.
+
 Kända avvikelser/restpunkter efter granskning (medvetna, ej blockerande):
 - EditContractCaseModal kör INTE prefill av tilläggsstationsraden — kontrollrundor ska avslutas via kontrollmodulen. Avslutas de i modalen får raden läggas manuellt. (Delad service finns; modalintegration = v2.)
 - Vikarie-skyddet (ensureTechnicianOnCase) blockeras av cases-RLS för otilldelade tekniker — fakturafel ger då tydlig toast och raderna ligger kvar (inget tyst tapp). Riktig lösning kräver SECURITY DEFINER-RPC.

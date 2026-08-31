@@ -80,6 +80,13 @@ export interface CaseBillingItem {
    * rabattansvarig vid godkännande.
    */
   discount_motivation?: string | null
+  /**
+   * Markör: raden är ärendets (enda) tilläggsstationsrad — skapad/synkad av
+   * sync_addon_station_line (etablering) eller prefillAddonStationLine (runda).
+   * Partiellt unikt index i DB garanterar max en per ärende. Identifiera
+   * ALLTID tilläggsraden via denna, aldrig via namn eller service_id.
+   */
+  is_addon_station_line?: boolean
   created_at: string
   updated_at: string
 }

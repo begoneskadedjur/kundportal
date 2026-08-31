@@ -43,18 +43,24 @@ import { AddonStationBillingService } from '../../services/addonStationBillingSe
 import { PriceListService } from '../../services/priceListService'
 import { toLocalISOStringWithOffset } from '../../utils/dateHelpers'
 
-// Faktureringssammanfattning vid "Färdig med etablering"
+// Faktureringssammanfattning vid "Färdig med etablering".
+// Tilläggsstationerna har en EGEN rad (markör is_addon_station_line, synkad
+// via RPC) med den flaggade tjänsten — Etableringskostnad-raden (ärendets
+// primärtjänst, 0 kr-norm) visas men rörs aldrig av denna logik.
 interface EstablishmentSummaryState {
   caseId: string
   customerId: string
   customerName: string
   serviceItems: { id: string; name: string; quantity: number; unitPrice: number }[]
-  etableringsItemId: string | null
+  addonItemId: string | null
   addonCount: number
   quantityDraft: number
-  // Redigerbart pris (kr/st) på etableringsraden — förifylls från radens pris,
-  // eller från avtals-/kundprislistan när raden står på 0
+  // Redigerbart pris (kr/st) på tilläggsraden — förifylls från radens pris
+  // eller aktuellt listpris
   priceDraft: number
+  // Aktuellt listpris (avtals-/kundprislista): pris under detta räknas som
+  // rabatt och går genom rabattgodkännande-flödet
+  listPrice: number
 }
 
 interface Customer {
@@ -413,15 +419,6 @@ export default function TechnicianEquipment() {
                   applied_by_technician_name: profile?.full_name || profile?.email || undefined
                 })
               }
-              // Ärendet uppdateras löpande i bakgrunden — "Färdig med
-              // etablering" blir en bekräftelse, inte en beräkning
-              if (formData.is_addon) {
-                await AddonStationBillingService.syncEstablishmentLineQuantity(
-                  establishmentCase.id,
-                  customerId,
-                  establishmentCase.created_at
-                )
-              }
             } else if (formData.preparation_id && formData.preparation_quantity) {
               toast.error('Inget öppet etableringsärende hittades — preparatet sparades inte på ärendet')
             }
@@ -429,6 +426,18 @@ export default function TechnicianEquipment() {
             console.error('Kunde inte uppdatera etableringsärendet vid placering:', prepError)
             toast.error('Placeringen sparades men etableringsärendet kunde inte uppdateras')
           }
+        }
+
+        // Bakgrundssynka tilläggsraden på öppet etableringsärende (RPC —
+        // vikarie-säker, atomär, hittar ärendet själv). Ekonomi-fliken
+        // speglar alltid verkligheten; "Färdig" blir en ren bekräftelse.
+        if (formData.is_addon) {
+          await AddonStationBillingService.syncAddonEstablishmentLine(
+            customerId,
+            technicianId || null,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (profile as any)?.full_name || profile?.email || null
+          )
         }
 
         toast.success('Utrustning placerad!')
@@ -506,6 +515,17 @@ export default function TechnicianEquipment() {
           throw new Error(result.error)
         }
         toast.success(`Utrustning markerad som ${statusLabels[deleteType]}`)
+      }
+
+      // Synka NER tilläggsraden på öppet etableringsärende när en
+      // tilläggsstation tas bort under pågående etablering
+      if (deleteConfirm.equipment.is_addon) {
+        await AddonStationBillingService.syncAddonEstablishmentLine(
+          deleteConfirm.equipment.customer_id,
+          technicianId || null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (profile as any)?.full_name || profile?.email || null
+        )
       }
 
       setDeleteConfirm(null)
@@ -625,10 +645,32 @@ export default function TechnicianEquipment() {
     }
 
     let serviceItems: EstablishmentSummaryState['serviceItems'] = []
-    let etableringsItemId: string | null = null
+    let addonItemId: string | null = null
     let addonCount = 0
     let priceDraft = 0
+    let listPrice = 0
+    let quantityDraft = 0
     try {
+      // Synka tilläggsraden atomärt (RPC skapar/uppdaterar med färsk räkning)
+      // så dialogen alltid visar verkligheten — även om bakgrundssynk missats
+      const sync = await AddonStationBillingService.syncAddonEstablishmentLine(
+        customerId,
+        technicianId || null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (profile as any)?.full_name || profile?.email || null
+      )
+      if (sync?.open_count && sync.open_count > 1) {
+        toast('Obs: kunden har flera öppna etableringsärenden — kontrollera att rätt ärende stängs', { icon: '⚠️', duration: 8000 })
+      }
+
+      // Aktuellt listpris för den flaggade tjänsten (re-resolvas vid varje
+      // dialogöppning — prislistan kan ha ändrats under en flerdagarsetablering)
+      const service = await AddonStationBillingService.getAddonStationService()
+      if (service) {
+        const effective = await PriceListService.getEffectiveServicePrice(service.id, customerId)
+        listPrice = effective?.price ?? service.base_price ?? 0
+      }
+
       const items = await CaseBillingService.getCaseBillingItems(openCase.id, 'contract')
       const serviceRows = items.filter(i => i.item_type === 'service')
       serviceItems = serviceRows.map(i => ({
@@ -637,25 +679,14 @@ export default function TechnicianEquipment() {
         quantity: i.quantity,
         unitPrice: i.discounted_price ?? i.unit_price
       }))
-      const etableringsRow = serviceRows.find(i =>
-        (i.service_name || i.article_name || '').toLowerCase().includes('etablering'))
-      etableringsItemId = etableringsRow?.id || null
-      addonCount = await AddonStationBillingService.countAddonStationsPlacedSince(
-        customerId,
-        openCase.created_at
-      )
-
-      // Prisförslag på etableringsraden: radens eget pris, eller — när raden
-      // står på 0 och tilläggsstationer placerats — uppslag i avtals-/kund-
-      // prislistan (samma kedja som rundfaktureringen). Redigerbart i dialogen.
-      priceDraft = etableringsRow ? (etableringsRow.discounted_price ?? etableringsRow.unit_price) : 0
-      if (etableringsRow?.service_id && priceDraft === 0 && addonCount > 0) {
-        const effective = await PriceListService.getEffectiveServicePrice(
-          etableringsRow.service_id,
-          customerId
-        )
-        if (effective?.price) priceDraft = effective.price
-      }
+      // Tilläggsraden identifieras via markören — ALDRIG via namn
+      // (namnmatchning träffar t.ex. "Avetablering avtal")
+      const addonRow = serviceRows.find(i => i.is_addon_station_line === true)
+      addonItemId = addonRow?.id || null
+      addonCount = sync?.count ?? addonRow?.quantity ?? 0
+      quantityDraft = addonRow?.quantity ?? 0
+      const rowPrice = addonRow ? (addonRow.discounted_price ?? addonRow.unit_price) : 0
+      priceDraft = rowPrice > 0 ? rowPrice : listPrice
     } catch (err) {
       // Sväljs INTE: utan underlag skulle ärendet stängas utan fakturering och
       // pending-raderna stranda osynligt i case_billing_items
@@ -664,12 +695,8 @@ export default function TechnicianEquipment() {
       return
     }
 
-    const quantityDraft = etableringsItemId && addonCount > 0
-      ? addonCount
-      : serviceItems.find(i => i.id === etableringsItemId)?.quantity ?? 1
-
     const total = serviceItems.reduce((sum, i) =>
-      sum + (i.id === etableringsItemId ? priceDraft * quantityDraft : i.unitPrice * i.quantity), 0)
+      sum + (i.id === addonItemId ? priceDraft * quantityDraft : i.unitPrice * i.quantity), 0)
 
     if (total <= 0 && addonCount === 0) {
       // Vanlig avtalsetablering utan tillägg: stäng som tidigare, ingen faktureringsinfo
@@ -684,10 +711,11 @@ export default function TechnicianEquipment() {
       customerId,
       customerName,
       serviceItems,
-      etableringsItemId,
+      addonItemId,
       addonCount,
       quantityDraft,
-      priceDraft
+      priceDraft,
+      listPrice
     })
   }
 
@@ -698,22 +726,47 @@ export default function TechnicianEquipment() {
     const s = establishmentSummary
     setFinishingEstablishment(true)
     try {
-      // Uppdatera etableringsradens antal och pris om något ändrats
-      const originalRow = s.serviceItems.find(i => i.id === s.etableringsItemId)
-      if (s.etableringsItemId && originalRow &&
-          (originalRow.quantity !== s.quantityDraft || originalRow.unitPrice !== s.priceDraft)) {
+      // Säkerställ att tilläggsraden finns (bakgrundssynk kan ha fallerat i fält)
+      let addonItemId = s.addonItemId
+      if (!addonItemId && s.quantityDraft > 0) {
+        const sync = await AddonStationBillingService.syncAddonEstablishmentLine(
+          s.customerId,
+          technicianId || null,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (profile as any)?.full_name || profile?.email || null
+        )
+        addonItemId = sync?.row_id ?? null
+      }
+
+      // Uppdatera tilläggsradens antal och pris om något ändrats. Pris UNDER
+      // listpris bokförs som rabatt (discount_percent + requires_approval) så
+      // rabattgodkännande-flödet inte kan kringgås; pris uppåt är fritt.
+      const originalRow = s.serviceItems.find(i => i.id === addonItemId)
+      const priceChanged = !originalRow || originalRow.unitPrice !== s.priceDraft
+      const qtyChanged = !originalRow || originalRow.quantity !== s.quantityDraft
+      if (addonItemId && (priceChanged || qtyChanged)) {
+        let unitPrice = s.priceDraft
+        let discountPercent = 0
+        if (s.listPrice > 0 && s.priceDraft < s.listPrice) {
+          unitPrice = s.listPrice
+          discountPercent = Math.round((1 - s.priceDraft / s.listPrice) * 10000) / 100
+        }
         const { error } = await supabase
           .from('case_billing_items')
           .update({
             quantity: s.quantityDraft,
-            unit_price: s.priceDraft,
+            unit_price: unitPrice,
+            discount_percent: discountPercent,
             discounted_price: s.priceDraft,
-            total_price: s.priceDraft * s.quantityDraft
+            total_price: s.priceDraft * s.quantityDraft,
+            requires_approval: discountPercent > 0
           })
-          .eq('id', s.etableringsItemId)
+          .eq('id', addonItemId)
         if (error) {
-          console.error('Kunde inte uppdatera etableringsraden:', error)
-          toast.error('Etableringsraden kunde inte uppdateras — kontrollera raden i ärendet')
+          console.error('Kunde inte uppdatera tilläggsraden:', error)
+          toast.error('Tilläggsraden kunde inte uppdateras — kontrollera raden i ärendet')
+        } else if (discountPercent > 0) {
+          toast(`Priset ${s.priceDraft} kr är under listpriset ${s.listPrice} kr — raden går till rabattgodkännande`, { icon: 'ℹ️', duration: 8000 })
         }
       }
 
@@ -1087,7 +1140,7 @@ export default function TechnicianEquipment() {
           {establishmentSummary && (() => {
             const s = establishmentSummary
             const total = s.serviceItems.reduce((sum, i) =>
-              sum + (i.id === s.etableringsItemId ? s.priceDraft * s.quantityDraft : i.unitPrice * i.quantity), 0)
+              sum + (i.id === s.addonItemId ? s.priceDraft * s.quantityDraft : i.unitPrice * i.quantity), 0)
             return (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -1116,7 +1169,7 @@ export default function TechnicianEquipment() {
 
                   <div className="space-y-2 mb-3">
                     {s.serviceItems.map(item => {
-                      const isEtablering = item.id === s.etableringsItemId
+                      const isEtablering = item.id === s.addonItemId
                       const qty = isEtablering ? s.quantityDraft : item.quantity
                       const price = isEtablering ? s.priceDraft : item.unitPrice
                       return (
@@ -1178,7 +1231,12 @@ export default function TechnicianEquipment() {
                   {total <= 0 && (
                     <p className="text-xs text-amber-400 mb-3">
                       Totalen är 0 kr — ärendet stängs utan att någon faktura skapas.
-                      {s.addonCount > 0 ? ' Ange pris per station ovan om etableringen ska debiteras (eller lägg Etableringskostnad i kundens avtalsprislista för automatiskt pris).' : ''}
+                      {s.addonCount > 0 ? ' Ange pris per station ovan, eller lägg tilläggsstations-tjänsten i kundens avtalsprislista för automatiskt pris.' : ''}
+                    </p>
+                  )}
+                  {s.listPrice > 0 && s.addonItemId && s.priceDraft < s.listPrice && (
+                    <p className="text-xs text-amber-400 mb-3">
+                      Priset är under listpriset ({s.listPrice.toLocaleString('sv-SE')} kr/st) — raden går till rabattgodkännande.
                     </p>
                   )}
 

@@ -368,21 +368,23 @@ export function AddStationWizard({
                 applied_by_technician_name: profile?.full_name || profile?.email || undefined
               })
             }
-            // Ärendet uppdateras löpande i bakgrunden — "Färdig med
-            // etablering" blir en bekräftelse, inte en beräkning
-            if (input.is_addon) {
-              await AddonStationBillingService.syncEstablishmentLineQuantity(
-                establishmentCase.id,
-                selectedCustomerId,
-                establishmentCase.created_at
-              )
-            }
           } else if (input.preparation_id && input.preparation_quantity) {
             toast.error('Inget öppet etableringsärende hittades — preparatet sparades inte på ärendet')
           }
         } catch (prepError) {
           console.error('Kunde inte uppdatera etableringsärendet vid placering:', prepError)
           toast.error('Placeringen sparades men etableringsärendet kunde inte uppdateras')
+        }
+
+        // Bakgrundssynka tilläggsraden (RPC — vikarie-säker, atomär,
+        // hittar öppet etableringsärende själv)
+        if (input.is_addon) {
+          await AddonStationBillingService.syncAddonEstablishmentLine(
+            selectedCustomerId,
+            technicianId || profile?.technician_id || null,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (profile as any)?.full_name || profile?.email || null
+          )
         }
       }
 
