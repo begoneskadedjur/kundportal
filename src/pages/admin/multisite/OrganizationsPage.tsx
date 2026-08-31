@@ -817,7 +817,7 @@ export default function OrganizationsPage() {
     try {
       const { data: sites, error } = await supabase
         .from('customers')
-        .select('id, site_name, site_code, region, contact_person, contact_email, contact_phone, contact_address, billing_address, billing_email, is_active')
+        .select('id, site_name, site_code, region, organization_number, contact_person, contact_email, contact_phone, contact_address, billing_address, billing_email, billing_reference, is_active')
         .eq('organization_id', organizationId)
         .eq('site_type', 'enhet')
         .eq('is_multisite', true)

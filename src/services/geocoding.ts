@@ -10,6 +10,14 @@ export interface GeocodeResult {
   }
   formatted_address: string
   place_id: string
+  /**
+   * Strukturerade delar av adressen. Optional eftersom bara /api/geocode-search
+   * fyller i dem — clientside-geokodningen längre ner i filen gör det inte, och
+   * fri text som användaren skriver för hand har inga komponenter alls.
+   */
+  city?: string | null
+  municipality?: string | null
+  postal_code?: string | null
 }
 
 export interface GeocodingError {

@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import AddressAutocomplete from '../../ui/AddressAutocomplete'
+import type { GeocodeResult } from '../../../services/geocoding'
 import { X, Building2, Mail, Phone, MapPin, Copy, Loader2, User } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -24,12 +26,15 @@ interface SiteModalProps {
     contact_address?: string
     billing_email?: string
     billing_address?: string
+    billing_reference?: string
   } | null
 }
 
 interface ParentData {
   billing_email?: string
   billing_address?: string
+  billing_reference?: string
+  is_regional?: boolean
   contract_type?: string
   assigned_account_manager?: string
   account_manager_email?: string
@@ -64,7 +69,13 @@ export default function SiteModal({
   // Faktureringsuppgifter
   const [billingEmail, setBillingEmail] = useState('')
   const [billingAddress, setBillingAddress] = useState('')
+  const [billingReference, setBillingReference] = useState('')
   const [useSameBilling, setUseSameBilling] = useState(false)
+
+  // Senaste ort som adressvalet självt skrev in i Region. Låter oss skilja
+  // "regionen står kvar från ett tidigare autofyll" från "någon har skrivit
+  // något eget här" — bara det förra får skrivas över. Se handleAddressChange.
+  const autofilledRegionRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (isOpen) {
@@ -82,6 +93,9 @@ export default function SiteModal({
         setContactAddress(existingSite.contact_address || '')
         setBillingEmail(existingSite.billing_email || '')
         setBillingAddress(existingSite.billing_address || '')
+        setBillingReference(existingSite.billing_reference || '')
+        // Sparad region räknas som användarens egen — aldrig som autofyll.
+        autofilledRegionRef.current = null
       } else {
         // Återställ för ny enhet
         resetForm()
@@ -93,7 +107,7 @@ export default function SiteModal({
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('billing_email, billing_address, contract_type, assigned_account_manager, account_manager_email, sales_person, sales_person_email')
+        .select('billing_email, billing_address, billing_reference, is_regional, contract_type, assigned_account_manager, account_manager_email, sales_person, sales_person_email')
         .eq('id', parentCustomerId)
         .single()
 
@@ -115,16 +129,52 @@ export default function SiteModal({
     setContactAddress('')
     setBillingEmail('')
     setBillingAddress('')
+    setBillingReference('')
     setUseSameBilling(false)
+    autofilledRegionRef.current = null
   }
 
   const handleCopyBilling = () => {
     if (parentData) {
       setBillingEmail(parentData.billing_email || '')
       setBillingAddress(parentData.billing_address || '')
+      setBillingReference(parentData.billing_reference || '')
       setUseSameBilling(true)
       toast.success('Faktureringsuppgifter kopierade från huvudkontor')
     }
+  }
+
+  /**
+   * Regionalkunder (Stockholms Kommun m.fl.) använder region som en kod
+   * — "Södermalm Väst", inte en ort. Koden genererar e-postadresser och
+   * matchar enheter mot kartpolygoner, så den får aldrig fyllas i med orten.
+   *
+   * Kräver att huvudkontoret hämtats: så länge parentData är null vet vi inte
+   * vilken sorts kund det är, och då är det säkrare att låta bli att fylla i
+   * än att gissa fel på en regionalkund.
+   */
+  const regionFollowsCity = parentData !== null && !parentData.is_regional
+
+  const handleAddressChange = (val: string | GeocodeResult) => {
+    // Fri text: användaren skriver själv, ingen ort att hämta.
+    if (typeof val === 'string') {
+      setContactAddress(val)
+      return
+    }
+
+    setContactAddress(val.formatted_address)
+
+    const city = val.city?.trim()
+    if (!city || !regionFollowsCity) return
+
+    // Fyll bara i tomt fält eller en ort vi själva satt. Har någon skrivit
+    // "Borlänge 2" eller "Ludvika kommun" för hand står det kvar.
+    setRegion(prev => {
+      const ours = !prev.trim() || prev === autofilledRegionRef.current
+      if (!ours) return prev
+      autofilledRegionRef.current = city
+      return city
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,18 +188,12 @@ export default function SiteModal({
     setLoading(true)
 
     try {
-      // Hämta organization_id från huvudkontoret
-      const { data: parentOrg, error: parentError } = await supabase
-        .from('customers')
-        .select('organization_id, contract_type, contract_start_date, contract_end_date')
-        .eq('id', parentCustomerId)
-        .single()
-
-      if (parentError || !parentOrg) {
-        throw new Error('Kunde inte hämta organisationsinformation')
-      }
-
-      const siteData = {
+      // Fälten användaren faktiskt redigerar här. Bara dessa får skrivas vid
+      // UPDATE: avtalsdata, status, härkomst och ägarskap har inga kontroller i
+      // modalen, och en osynlig skrivning är alltid fel. En enhet kan tillkomma
+      // mitt i avtalsperioden eller teckna eget avtal — dess datum ska bevaras,
+      // aldrig harmoniseras mot huvudkontoret.
+      const formValues = {
         company_name: `${organizationName} - ${siteName}`,
         site_name: siteName,
         site_code: siteCode.trim() ? siteCode.trim().toUpperCase() : null,
@@ -161,46 +205,66 @@ export default function SiteModal({
         contact_address: contactAddress || null,
         billing_email: billingEmail || null,
         billing_address: billingAddress || null,
-        organization_id: parentOrg.organization_id,
-        parent_customer_id: parentCustomerId,
-        is_multisite: true,
-        site_type: 'enhet',
-        contract_type: parentOrg.contract_type,
-        contract_start_date: parentOrg.contract_start_date || null,
-        contract_end_date: parentOrg.contract_end_date || null,
-        contract_status: 'signed',
-        is_active: true,
-        source_type: 'oneflow' as const,
-        // Kopiera account manager info från parent om det finns
-        ...(parentData && {
-          assigned_account_manager: parentData.assigned_account_manager,
-          account_manager_email: parentData.account_manager_email,
-          sales_person: parentData.sales_person,
-          sales_person_email: parentData.sales_person_email
-        })
+        billing_reference: billingReference.trim() || null,
+      }
+
+      // Enhetskoden är unik i databasen; felet ser olika ut beroende på om
+      // constraintet slår eller Postgres hinner formulera meddelandet.
+      const describeError = (error: { code?: string; message?: string }) => {
+        if (error.code === '23505' || error.message?.includes('site_code')) {
+          return new Error('Enhetskoden används redan')
+        }
+        return error
       }
 
       if (existingSite) {
-        // Uppdatera befintlig enhet
         const { error } = await supabase
           .from('customers')
-          .update(siteData)
+          .update(formValues)
           .eq('id', existingSite.id)
 
-        if (error) throw error
+        if (error) throw describeError(error)
         toast.success('Enhet uppdaterad')
       } else {
-        // Skapa ny enhet
+        // Huvudkontorets uppgifter behövs bara när enheten skapas.
+        const { data: parentOrg, error: parentError } = await supabase
+          .from('customers')
+          .select('organization_id, contract_type, contract_start_date, contract_end_date')
+          .eq('id', parentCustomerId)
+          .single()
+
+        if (parentError || !parentOrg) {
+          throw new Error('Kunde inte hämta organisationsinformation')
+        }
+
+        // Startvärden för en ny enhet. Huvudkontoret är en rimlig gissning vid
+        // skapandet — därefter äger enheten sina egna värden.
+        const insertData = {
+          ...formValues,
+          organization_id: parentOrg.organization_id,
+          parent_customer_id: parentCustomerId,
+          is_multisite: true,
+          site_type: 'enhet',
+          contract_type: parentOrg.contract_type,
+          contract_start_date: parentOrg.contract_start_date || null,
+          contract_end_date: parentOrg.contract_end_date || null,
+          contract_status: 'signed',
+          is_active: true,
+          source_type: 'oneflow' as const,
+          // Kopiera account manager info från parent om det finns
+          ...(parentData && {
+            assigned_account_manager: parentData.assigned_account_manager,
+            account_manager_email: parentData.account_manager_email,
+            sales_person: parentData.sales_person,
+            sales_person_email: parentData.sales_person_email
+          })
+        }
+
         const { error } = await supabase
           .from('customers')
-          .insert(siteData)
+          .insert(insertData)
 
-        if (error) {
-          if (error.message?.includes('site_code')) {
-            throw new Error('Enhetskoden används redan')
-          }
-          throw error
-        }
+        if (error) throw describeError(error)
         toast.success('Ny enhet skapad')
       }
 
@@ -288,10 +352,19 @@ export default function SiteModal({
                 <Input
                   type="text"
                   value={region}
-                  onChange={(e) => setRegion(e.target.value)}
+                  onChange={(e) => {
+                    // Egen redigering — sluta betrakta värdet som autofyllt.
+                    autofilledRegionRef.current = null
+                    setRegion(e.target.value)
+                  }}
                   placeholder="t.ex. Stockholm"
                   required
                 />
+                {regionFollowsCity && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Fylls i automatiskt från adressen. Kan ändras.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-2">
@@ -352,11 +425,10 @@ export default function SiteModal({
                 <label className="block text-sm font-medium text-slate-400 mb-2">
                   Adress
                 </label>
-                <Input
-                  type="text"
+                <AddressAutocomplete
                   value={contactAddress}
-                  onChange={(e) => setContactAddress(e.target.value)}
-                  placeholder="Gatuadress, Postnr Ort"
+                  onChange={handleAddressChange}
+                  placeholder="Sök adress..."
                 />
               </div>
             </div>
@@ -404,6 +476,20 @@ export default function SiteModal({
                   onChange={(e) => setBillingAddress(e.target.value)}
                   placeholder="Fakturaadress eller referens"
                 />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-400 mb-2">
+                  Märkning faktura
+                </label>
+                <Input
+                  type="text"
+                  value={billingReference}
+                  onChange={(e) => setBillingReference(e.target.value)}
+                  placeholder="t.ex. PO-nummer eller kostnadsställe"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Blir Er referens på fakturan och fylls i automatiskt när ärenden skapas mot enheten.
+                </p>
               </div>
             </div>
             {useSameBilling && (

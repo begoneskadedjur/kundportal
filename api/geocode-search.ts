@@ -33,10 +33,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ results: [] })
     }
 
+    // Plockar ut en namngiven del ur Googles address_components.
+    type AddressComponent = { long_name?: string; types?: string[] }
+    const part = (components: AddressComponent[] | undefined, type: string): string | null =>
+      components?.find((c) => c.types?.includes(type))?.long_name ?? null
+
     const results = (data.results ?? []).slice(0, 5).map((item: any) => ({
       location: { lat: item.geometry.location.lat, lng: item.geometry.location.lng },
       formatted_address: item.formatted_address,
       place_id: item.place_id,
+      // postal_town före locality: för svenska adresser ger postal_town orten man
+      // skriver på brevet ("Falun"), medan locality ofta saknas helt eller pekar
+      // på en mindre ort som inte stämmer med postadressen.
+      city: part(item.address_components, 'postal_town') ?? part(item.address_components, 'locality'),
+      municipality: part(item.address_components, 'administrative_area_level_2'),
+      postal_code: part(item.address_components, 'postal_code'),
     }))
 
     return res.status(200).json({ results })

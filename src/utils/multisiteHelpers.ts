@@ -203,6 +203,9 @@ export interface SiteContactFields {
   contact_address?: string | null
   billing_email?: string | null
   billing_address?: string | null
+  /** Fakturamärkning ("Er referens"). Ärvs så att enheter under samma avtal
+   *  slipper upprepa huvudkontorets PO-nummer på varje enhet. */
+  billing_reference?: string | null
 }
 
 export interface ResolvedSiteContact extends SiteContactFields {
@@ -233,6 +236,7 @@ export function resolveSiteContact(
     'contact_address',
     'billing_email',
     'billing_address',
+    'billing_reference',
   ]
 
   const out: ResolvedSiteContact = { inheritedFields: [] }
