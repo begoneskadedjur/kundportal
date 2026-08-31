@@ -190,6 +190,8 @@ export class ServiceCatalogService {
         rut_eligible: input.rut_eligible ?? false,
         rot_rate_percent: input.rot_rate_percent ?? null,
         rut_rate_percent: input.rut_rate_percent ?? null,
+        is_contract_service: input.is_contract_service ?? false,
+        used_for_addon_stations: input.used_for_addon_stations ?? false,
       })
       .select().single()
     if (error) {

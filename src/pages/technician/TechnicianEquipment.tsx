@@ -37,6 +37,21 @@ import { getRecurringSchedulesByCustomer } from '../../services/recurringSchedul
 import type { BatchScheduleUnit } from '../../types/recurringSchedule'
 import type { OutdoorInspectionWithRelations } from '../../types/inspectionSession'
 import { CasePreparationService } from '../../services/casePreparationService'
+import type { PreparationUnit } from '../../types/casePreparations'
+import { CaseBillingService } from '../../services/caseBillingService'
+import { AddonStationBillingService } from '../../services/addonStationBillingService'
+import { toLocalISOStringWithOffset } from '../../utils/dateHelpers'
+
+// Faktureringssammanfattning vid "Färdig med etablering"
+interface EstablishmentSummaryState {
+  caseId: string
+  customerId: string
+  customerName: string
+  serviceItems: { id: string; name: string; quantity: number; unitPrice: number }[]
+  etableringsItemId: string | null
+  addonCount: number
+  quantityDraft: number
+}
 
 interface Customer {
   id: string
@@ -96,6 +111,9 @@ export default function TechnicianEquipment() {
   const [formResetKey, setFormResetKey] = useState(0)
   const [lastEquipmentType, setLastEquipmentType] = useState<EquipmentType | null>(null)
   const [lastUsedMap, setLastUsedMap] = useState(false)
+  // Kopiera från föregående station: preparat + mängd + märkning följer med i batchen
+  const [lastPreparation, setLastPreparation] = useState<{ id: string; quantity: number | null; unit: PreparationUnit } | null>(null)
+  const [lastIsAddon, setLastIsAddon] = useState(false)
 
   // Recurring schedule prompt
   const [showSchedulePrompt, setShowSchedulePrompt] = useState(false)
@@ -115,6 +133,10 @@ export default function TechnicianEquipment() {
 
   // Schema-redigering
   const [editScheduleId, setEditScheduleId] = useState<string | null>(null)
+
+  // Faktureringssammanfattning vid "Färdig med etablering"
+  const [establishmentSummary, setEstablishmentSummary] = useState<EstablishmentSummaryState | null>(null)
+  const [finishingEstablishment, setFinishingEstablishment] = useState(false)
 
   // Borttagningsdialog
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -262,6 +284,8 @@ export default function TechnicianEquipment() {
     setFormResetKey(0)
     setLastEquipmentType(null)
     setLastUsedMap(false)
+    setLastPreparation(null)
+    setLastIsAddon(false)
     setIsFormOpen(true)
     // För inomhus hanteras det i modalen via IndoorEquipmentView
   }
@@ -289,7 +313,8 @@ export default function TechnicianEquipment() {
           latitude: formData.latitude,
           longitude: formData.longitude,
           comment: formData.comment || null,
-          status: formData.status
+          status: formData.status,
+          is_addon: formData.is_addon
         })
 
         if (!result.success) {
@@ -338,7 +363,8 @@ export default function TechnicianEquipment() {
           latitude: formData.latitude,
           longitude: formData.longitude,
           comment: formData.comment || null,
-          status: 'active'
+          status: 'active',
+          is_addon: formData.is_addon
         })
 
         if (!result.success || !result.equipment) {
@@ -411,6 +437,12 @@ export default function TechnicianEquipment() {
         setBatchCount(prev => prev + 1)
         setLastEquipmentType(formData.equipment_type)
         setLastUsedMap(true)
+        setLastPreparation(
+          formData.preparation_id
+            ? { id: formData.preparation_id, quantity: formData.preparation_quantity ?? null, unit: formData.preparation_unit || 'g' }
+            : null
+        )
+        setLastIsAddon(formData.is_addon)
         setShowSuccessState(true)
         setEditingEquipment(null)
         setPreviewPosition(null)
@@ -425,10 +457,13 @@ export default function TechnicianEquipment() {
     }
   }
 
-  // Hantera borttagning
+  // Hantera borttagning. Borttagsregler: avtalsstationer (is_addon=false) kan
+  // tekniker bara flytta eller markera försvunnen/skadad — "Borttagen" och
+  // permanent radering är förbehållet tilläggsstationer (admin har full rätt
+  // via sina egna vyer). Kontakta kontoret vid avtalsförändringar.
   const handleDeleteEquipment = (equipment: EquipmentPlacementWithRelations) => {
     setDeleteConfirm({ id: equipment.id, equipment })
-    setDeleteType('removed')
+    setDeleteType(equipment.is_addon ? 'removed' : 'missing')
   }
 
   const confirmDelete = async () => {
@@ -504,18 +539,32 @@ export default function TechnicianEquipment() {
     setIsFormOpen(true)
   }
 
-  // Avsluta etablering från inomhusflödet (markerar ärende som Avslutat)
-  const handleFinishEstablishmentFromIndoor = async (customerId: string) => {
-    setIsWizardOpen(false)
-    setWizardAutoIndoor(false)
-    setWizardCustomerId(null)
-    const name = customers.find(c => c.id === customerId)?.company_name
-      || allCustomers.find(c => c.customer_id === customerId)?.customer_name
-      || ''
+  // Stäng etableringsärendet (RLS-verifierat: 0 uppdaterade rader = behörighet saknas)
+  const closeEstablishmentCase = async (caseId: string): Promise<boolean> => {
+    const { data: updatedRows, error: updateError } = await supabase
+      .from('cases')
+      .update({ status: 'Avslutat', completed_date: toLocalISOStringWithOffset() })
+      .eq('id', caseId)
+      .select('id')
 
+    if (updateError || !updatedRows || updatedRows.length === 0) {
+      console.error('Kunde inte avsluta etableringsärende:', updateError)
+      toast.error('Etableringsärendet kunde inte avslutas — det kan vara tilldelat en annan tekniker')
+      return false
+    }
+    return true
+  }
+
+  // Färdig med etablering (delad väg för utomhus- och inomhusflödet):
+  // hämtar öppet etableringsärende, förifyller antal på etableringsraden från
+  // tilläggsstationer placerade sedan ärendet öppnades (server-side räkning,
+  // klarar flerdagarsetableringar) och visar faktureringssammanfattning när
+  // det finns något att fakturera. Vid 0 kr och inga tilläggsstationer stängs
+  // ärendet som tidigare utan faktureringsinfo.
+  const finishEstablishment = async (customerId: string, customerName: string) => {
     const { data: openCase, error: openCaseError } = await supabase
       .from('cases')
-      .select('id')
+      .select('id, created_at')
       .eq('customer_id', customerId)
       .eq('service_type', 'establishment')
       .not('status', 'ilike', '%avslutat%')
@@ -528,21 +577,132 @@ export default function TechnicianEquipment() {
       toast.error('Kunde inte hämta etableringsärendet — status uppdaterades inte')
     }
 
-    if (openCase?.id) {
-      const { data: updatedRows, error: updateError } = await supabase
-        .from('cases')
-        .update({ status: 'Avslutat' })
-        .eq('id', openCase.id)
-        .select('id')
-
-      if (updateError || !updatedRows || updatedRows.length === 0) {
-        console.error('Kunde inte avsluta etableringsärende:', updateError)
-        toast.error('Etableringsärendet kunde inte avslutas — det kan vara tilldelat en annan tekniker')
-      }
+    if (!openCase?.id) {
+      refreshData()
+      await checkAndPromptSchedule(customerId, customerName)
+      return
     }
 
-    refreshData()
-    await checkAndPromptSchedule(customerId, name)
+    let serviceItems: EstablishmentSummaryState['serviceItems'] = []
+    let etableringsItemId: string | null = null
+    let addonCount = 0
+    try {
+      const items = await CaseBillingService.getCaseBillingItems(openCase.id, 'contract')
+      serviceItems = items
+        .filter(i => i.item_type === 'service')
+        .map(i => ({
+          id: i.id,
+          name: i.service_name || i.article_name || 'Tjänst',
+          quantity: i.quantity,
+          unitPrice: i.discounted_price ?? i.unit_price
+        }))
+      etableringsItemId = serviceItems.find(i => i.name.toLowerCase().includes('etablering'))?.id || null
+      addonCount = await AddonStationBillingService.countAddonStationsPlacedSince(
+        customerId,
+        openCase.created_at
+      )
+    } catch (err) {
+      // Sväljs INTE: utan underlag skulle ärendet stängas utan fakturering och
+      // pending-raderna stranda osynligt i case_billing_items
+      console.error('Kunde inte hämta faktureringsunderlag för etableringen:', err)
+      toast.error('Kunde inte hämta faktureringsunderlaget — ärendet lämnas öppet. Försök igen eller kontakta kontoret.')
+      return
+    }
+
+    const quantityDraft = etableringsItemId && addonCount > 0
+      ? addonCount
+      : serviceItems.find(i => i.id === etableringsItemId)?.quantity ?? 1
+
+    const total = serviceItems.reduce((sum, i) =>
+      sum + i.unitPrice * (i.id === etableringsItemId ? quantityDraft : i.quantity), 0)
+
+    if (total <= 0 && addonCount === 0) {
+      // Vanlig avtalsetablering utan tillägg: stäng som tidigare, ingen faktureringsinfo
+      await closeEstablishmentCase(openCase.id)
+      refreshData()
+      await checkAndPromptSchedule(customerId, customerName)
+      return
+    }
+
+    setEstablishmentSummary({
+      caseId: openCase.id,
+      customerId,
+      customerName,
+      serviceItems,
+      etableringsItemId,
+      addonCount,
+      quantityDraft
+    })
+  }
+
+  // Bekräfta faktureringssammanfattningen: uppdatera antal, stäng ärendet och
+  // kör faktureringskedjan (hoppar över faktura vid 0 kr — beslutat beteende)
+  const confirmFinishEstablishment = async () => {
+    if (!establishmentSummary) return
+    const s = establishmentSummary
+    setFinishingEstablishment(true)
+    try {
+      // Uppdatera etableringsradens antal om det ändrats
+      const originalRow = s.serviceItems.find(i => i.id === s.etableringsItemId)
+      if (s.etableringsItemId && originalRow && originalRow.quantity !== s.quantityDraft) {
+        const { error } = await supabase
+          .from('case_billing_items')
+          .update({
+            quantity: s.quantityDraft,
+            total_price: originalRow.unitPrice * s.quantityDraft
+          })
+          .eq('id', s.etableringsItemId)
+        if (error) {
+          console.error('Kunde inte uppdatera etableringsradens antal:', error)
+          toast.error('Antalet kunde inte uppdateras — kontrollera raden i ärendet')
+        }
+      }
+
+      const closed = await closeEstablishmentCase(s.caseId)
+
+      if (closed) {
+        // Fakturering i egen try/catch — får aldrig blockera avslutet
+        try {
+          const billing = await AddonStationBillingService.completeContractCaseBilling({
+            caseId: s.caseId,
+            customerId: s.customerId,
+            technicianId: technicianId || null,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            technicianName: (profile as any)?.full_name || profile?.email || null,
+            workPerformed: 'Etablering av stationer'
+          })
+          if (billing.invoiceError) {
+            toast.error(`Fakturan kunde inte skapas: ${billing.invoiceError}. Raderna ligger kvar — kontoret fakturerar från Merförsäljning.`, { duration: 10000 })
+          } else if (billing.itemsCreated > 0) {
+            toast.success(`Etablering avslutad — ${billing.itemsCreated} rad(er) skickade till fakturering (${billing.totalAmount} kr)`)
+          } else if (billing.skippedZeroTotal) {
+            toast.success('Etablering avslutad. Raderna är 0 kr — ingen faktura skapades.')
+          } else {
+            toast.success('Etablering avslutad!')
+          }
+        } catch (billingErr) {
+          console.error('Fakturering vid etableringsavslut misslyckades:', billingErr)
+          toast.error('Faktureringen misslyckades — raderna ligger kvar, kontoret fakturerar från Merförsäljning.', { duration: 10000 })
+        }
+      }
+
+      setEstablishmentSummary(null)
+      refreshData()
+      await checkAndPromptSchedule(s.customerId, s.customerName)
+    } finally {
+      setFinishingEstablishment(false)
+    }
+  }
+
+  // Avsluta etablering från inomhusflödet
+  const handleFinishEstablishmentFromIndoor = async (customerId: string) => {
+    setIsWizardOpen(false)
+    setWizardAutoIndoor(false)
+    setWizardCustomerId(null)
+    const name = customers.find(c => c.id === customerId)?.company_name
+      || allCustomers.find(c => c.customer_id === customerId)?.customer_name
+      || ''
+    await finishEstablishment(customerId, name)
   }
 
   // Check om en kund saknar schema och visa prompt
@@ -575,38 +735,11 @@ export default function TechnicianEquipment() {
     setBatchCustomerName('')
     setLastEquipmentType(null)
     setLastUsedMap(false)
+    setLastPreparation(null)
+    setLastIsAddon(false)
 
     if (finishedCustomerId) {
-      // Markera öppet etableringsärende som avslutat
-      const { data: openCase, error: openCaseError } = await supabase
-        .from('cases')
-        .select('id')
-        .eq('customer_id', finishedCustomerId)
-        .eq('service_type', 'establishment')
-        .not('status', 'ilike', '%avslutat%')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
-      if (openCaseError) {
-        console.error('Kunde inte hämta etableringsärende:', openCaseError)
-        toast.error('Kunde inte hämta etableringsärendet — status uppdaterades inte')
-      }
-
-      if (openCase?.id) {
-        const { data: updatedRows, error: updateError } = await supabase
-          .from('cases')
-          .update({ status: 'Avslutat' })
-          .eq('id', openCase.id)
-          .select('id')
-
-        if (updateError || !updatedRows || updatedRows.length === 0) {
-          console.error('Kunde inte avsluta etableringsärende:', updateError)
-          toast.error('Etableringsärendet kunde inte avslutas — det kan vara tilldelat en annan tekniker')
-        }
-      }
-
-      await checkAndPromptSchedule(finishedCustomerId, finishedCustomerName)
+      await finishEstablishment(finishedCustomerId, finishedCustomerName)
     }
   }
 
@@ -870,6 +1003,8 @@ export default function TechnicianEquipment() {
                         existingEquipment={editingEquipment}
                         initialEquipmentType={lastEquipmentType || undefined}
                         autoShowMap={lastUsedMap}
+                        initialPreparation={lastPreparation}
+                        initialIsAddon={lastIsAddon}
                         existingStations={customerExistingStations}
                         inspections={editingEquipment ? outdoorInspections : []}
                         onSubmit={handleFormSubmit}
@@ -886,6 +1021,113 @@ export default function TechnicianEquipment() {
               </motion.div>
             </motion.div>
           )}
+        </AnimatePresence>
+
+        {/* Faktureringssammanfattning vid "Färdig med etablering" */}
+        <AnimatePresence>
+          {establishmentSummary && (() => {
+            const s = establishmentSummary
+            const total = s.serviceItems.reduce((sum, i) =>
+              sum + i.unitPrice * (i.id === s.etableringsItemId ? s.quantityDraft : i.quantity), 0)
+            return (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              >
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.95, opacity: 0 }}
+                  className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-md p-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 className="text-lg font-semibold text-white mb-1">
+                    Stäng ärende och skicka följande för fakturering
+                  </h3>
+                  <p className="text-sm text-slate-400 mb-3">{s.customerName}</p>
+
+                  {s.addonCount > 0 && (
+                    <p className="text-xs text-violet-400 mb-3 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-violet-500" />
+                      {s.addonCount} tilläggsstation{s.addonCount === 1 ? '' : 'er'} placerade i denna etablering
+                    </p>
+                  )}
+
+                  <div className="space-y-2 mb-3">
+                    {s.serviceItems.map(item => {
+                      const isEtablering = item.id === s.etableringsItemId
+                      const qty = isEtablering ? s.quantityDraft : item.quantity
+                      return (
+                        <div key={item.id} className="flex items-center justify-between gap-2 px-3 py-2 bg-slate-800/30 border border-slate-700 rounded-xl">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-slate-200 truncate">{item.name}</p>
+                            <p className="text-xs text-slate-400">{item.unitPrice.toLocaleString('sv-SE')} kr/st</p>
+                          </div>
+                          {isEtablering ? (
+                            <input
+                              type="number"
+                              min={1}
+                              value={s.quantityDraft}
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value)
+                                setEstablishmentSummary(prev => prev
+                                  ? { ...prev, quantityDraft: Number.isFinite(v) && v > 0 ? v : 1 }
+                                  : prev)
+                              }}
+                              className="w-16 px-2 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm text-center focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                            />
+                          ) : (
+                            <span className="text-sm text-slate-300 tabular-nums">{qty} st</span>
+                          )}
+                          <span className="text-sm text-slate-200 tabular-nums w-20 text-right">
+                            {(item.unitPrice * qty).toLocaleString('sv-SE')} kr
+                          </span>
+                        </div>
+                      )
+                    })}
+                    {s.serviceItems.length === 0 && (
+                      <p className="text-sm text-slate-400 px-1">Inga tjänsterader på ärendet.</p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between px-1 pb-3 border-b border-slate-700/50 mb-3">
+                    <span className="text-sm font-medium text-slate-300">Totalt (exkl. moms)</span>
+                    <span className="text-base font-semibold text-white tabular-nums">{total.toLocaleString('sv-SE')} kr</span>
+                  </div>
+
+                  {total <= 0 && (
+                    <p className="text-xs text-amber-400 mb-3">
+                      Totalen är 0 kr — ärendet stängs utan att någon faktura skapas.
+                      {s.addonCount > 0 ? ' Pris saknas på etableringsraden, meddela kontoret om etableringen ska debiteras.' : ''}
+                    </p>
+                  )}
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setEstablishmentSummary(null)
+                        toast('Etableringsärendet är fortfarande öppet', { icon: 'ℹ️' })
+                      }}
+                      disabled={finishingEstablishment}
+                      className="flex-1 px-4 py-3 border border-slate-700 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors disabled:opacity-60"
+                    >
+                      Avbryt
+                    </button>
+                    <button
+                      onClick={confirmFinishEstablishment}
+                      disabled={finishingEstablishment}
+                      className="flex-1 px-4 py-3 rounded-xl bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff] font-medium transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+                    >
+                      {finishingEstablishment && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {total > 0 ? 'Stäng & fakturera' : 'Stäng ärende'}
+                    </button>
+                  </div>
+                </motion.div>
+              </motion.div>
+            )
+          })()}
         </AnimatePresence>
 
         {/* Bekräftelse-dialog för borttagning */}
@@ -923,7 +1165,15 @@ export default function TechnicianEquipment() {
 
                 {/* Val mellan statusar */}
                 <div className="space-y-2 mb-6">
-                  {/* Borttagen */}
+                  {/* Avtalsstationer kan inte tas bort av tekniker */}
+                  {!deleteConfirm.equipment.is_addon && (
+                    <p className="text-xs text-slate-400 px-1 pb-1">
+                      Stationen ingår i avtalet och kan bara flyttas eller markeras
+                      försvunnen/skadad. Kontakta kontoret om den ska tas bort.
+                    </p>
+                  )}
+                  {/* Borttagen — endast tilläggsstationer */}
+                  {deleteConfirm.equipment.is_addon && (
                   <button
                     onClick={() => setDeleteType('removed')}
                     className={`w-full p-3 rounded-xl border text-left transition-all ${
@@ -946,6 +1196,7 @@ export default function TechnicianEquipment() {
                       </div>
                     </div>
                   </button>
+                  )}
 
                   {/* Försvunnen */}
                   <button
@@ -995,10 +1246,11 @@ export default function TechnicianEquipment() {
                     </div>
                   </button>
 
-                  {/* Separator */}
+                  {/* Separator + permanent radering — endast tilläggsstationer */}
+                  {deleteConfirm.equipment.is_addon && (
+                  <>
                   <div className="border-t border-slate-700 my-3" />
 
-                  {/* Permanent radering */}
                   <button
                     onClick={() => setDeleteType('permanent')}
                     className={`w-full p-3 rounded-xl border text-left transition-all ${
@@ -1021,6 +1273,8 @@ export default function TechnicianEquipment() {
                       </div>
                     </div>
                   </button>
+                  </>
+                  )}
                 </div>
 
                 <div className="flex gap-3">

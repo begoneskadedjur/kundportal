@@ -2,7 +2,7 @@
 // Formulär för att skapa/redigera inomhusstationer
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn, FlaskConical } from 'lucide-react'
+import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn, FlaskConical, Check } from 'lucide-react'
 import ImageLightbox from '../ImageLightbox'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -44,6 +44,9 @@ interface IndoorStationFormProps {
   existingStationNumbers?: string[]
   inspections?: IndoorStationInspectionWithRelations[]
   initialStationType?: IndoorStationType
+  // Kopiera från föregående station: preparat + mängd + märkning följer med
+  initialPreparation?: { id: string; quantity: number | null; unit: PreparationUnit } | null
+  initialIsAddon?: boolean
   onSubmit: (input: CreateIndoorStationInput | UpdateIndoorStationInput) => Promise<void>
   onCancel: () => void
   onDelete?: () => void
@@ -57,6 +60,8 @@ export function IndoorStationForm({
   existingStationNumbers = [],
   inspections = [],
   initialStationType,
+  initialPreparation = null,
+  initialIsAddon = false,
   onSubmit,
   onCancel,
   onDelete,
@@ -85,9 +90,23 @@ export function IndoorStationForm({
   const [availablePreparations, setAvailablePreparations] = useState<Preparation[]>([])
   const [stationHasPreparations, setStationHasPreparations] = useState(false)
   const [loadingPreparations, setLoadingPreparations] = useState(false)
-  const [preparationId, setPreparationId] = useState<string | null>(null)
-  const [preparationQuantity, setPreparationQuantity] = useState<number | null>(null)
-  const [preparationUnit, setPreparationUnit] = useState<PreparationUnit>('g')
+  const [preparationId, setPreparationId] = useState<string | null>(
+    !isEditing && initialPreparation ? initialPreparation.id : null
+  )
+  const [preparationQuantity, setPreparationQuantity] = useState<number | null>(
+    !isEditing && initialPreparation ? initialPreparation.quantity : null
+  )
+  const [preparationUnit, setPreparationUnit] = useState<PreparationUnit>(
+    (!isEditing && initialPreparation?.unit) || 'g'
+  )
+
+  // Tillägg utöver avtal + "kopierat"-hint
+  const [isAddon, setIsAddon] = useState(
+    isEditing ? (existingStation?.is_addon === true) : initialIsAddon
+  )
+  const [showCopiedHint, setShowCopiedHint] = useState(
+    !isEditing && (!!initialPreparation || initialIsAddon)
+  )
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -132,6 +151,14 @@ export function IndoorStationForm({
       if (hasPreps) {
         const preps = await CasePreparationService.getPreparationsForStationType(matchedType.id)
         setAvailablePreparations(preps)
+        // Kopierat/kvarvarande preparat som inte finns för typen rensas
+        setPreparationId(prev => {
+          if (prev && !preps.some(p => p.id === prev)) {
+            setPreparationQuantity(null)
+            return null
+          }
+          return prev
+        })
       } else {
         setAvailablePreparations([])
         setPreparationId(null)
@@ -179,6 +206,7 @@ export function IndoorStationForm({
     setStationType(type)
     setPreparationId(null)
     setPreparationQuantity(null)
+    setShowCopiedHint(false)
     if (!isEditing) {
       const config = getCurrentTypeConfig(type)
       const suggested = generateStationNumber(type, existingStationNumbers, config?.prefix)
@@ -241,6 +269,7 @@ export function IndoorStationForm({
           location_description: locationDescription.trim() || undefined,
           comment: comment.trim() || undefined,
           status,
+          is_addon: isAddon,
           photo: selectedPhoto || undefined
         }
         await onSubmit(updateInput)
@@ -253,6 +282,7 @@ export function IndoorStationForm({
           position_y_percent: position.y,
           location_description: locationDescription.trim() || undefined,
           comment: comment.trim() || undefined,
+          is_addon: isAddon,
           photo: selectedPhoto || undefined,
           preparation_id: preparationId || undefined,
           preparation_quantity: preparationQuantity || undefined,
@@ -351,6 +381,44 @@ export function IndoorStationForm({
             </div>
           )}
         </div>
+
+      {/* Kopierat från föregående station */}
+      {showCopiedHint && (
+        <div className="flex items-center justify-between px-3 py-2 bg-slate-800/40 border border-slate-700/60 rounded-lg">
+          <p className="text-xs text-slate-400 flex items-center gap-1.5">
+            <Check className="w-3.5 h-3.5 text-[#20c58f]" />
+            Kopierat från föregående station
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setPreparationId(null)
+              setPreparationQuantity(null)
+              setIsAddon(false)
+              setShowCopiedHint(false)
+            }}
+            className="text-xs text-slate-500 hover:text-slate-300 underline transition-colors"
+          >
+            Rensa
+          </button>
+        </div>
+      )}
+
+      {/* Tillägg utöver avtal */}
+      <label className="flex items-start gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl cursor-pointer">
+        <input
+          type="checkbox"
+          checked={isAddon}
+          onChange={(e) => setIsAddon(e.target.checked)}
+          className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f]"
+        />
+        <span>
+          <span className="block text-sm font-medium text-slate-200">Tillägg utöver avtal</span>
+          <span className="block text-xs text-slate-400 mt-0.5">
+            Tilläggsstationer debiteras etablering och per kontrollrunda, och ingår inte i avtalets årspremie
+          </span>
+        </span>
+      </label>
 
       {/* Serienummer */}
       <div>

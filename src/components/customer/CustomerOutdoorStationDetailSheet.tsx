@@ -167,6 +167,12 @@ export function CustomerOutdoorStationDetailSheet({
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} text-${statusConfig.color}`}>
                     {getEquipmentStatusLabel(station.status)}
                   </span>
+                  {station.is_addon === true && (
+                    <span className="flex items-center gap-1.5 text-xs text-violet-400">
+                      <span className="w-2 h-2 rounded-full bg-violet-500" />
+                      Tillägg utöver avtal
+                    </span>
+                  )}
                 </div>
               </div>
 

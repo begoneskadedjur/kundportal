@@ -1,13 +1,16 @@
 // src/components/admin/settings/ServiceCatalogEditModal.tsx
 
 import { useState, useEffect } from 'react'
-import { X, Save } from 'lucide-react'
+import { X, Save, Plus, Trash2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Select from '../../ui/Select'
 import { ServiceCatalogService } from '../../../services/servicesCatalogService'
+import { AddonStationBillingService } from '../../../services/addonStationBillingService'
+import { ArticleService } from '../../../services/articleService'
+import type { Article } from '../../../types/articles'
 import type { Service, ServiceWithGroup, ServiceGroup, CreateServiceInput, UpdateServiceInput } from '../../../types/services'
 import { SERVICE_UNITS } from '../../../types/services'
 import { DEFAULT_ROT_PERCENT, DEFAULT_RUT_PERCENT } from '../../../utils/rotRutConstants'
@@ -49,6 +52,12 @@ export default function ServiceCatalogEditModal({
   const [rutRatePercent, setRutRatePercent] = useState<string>('')
   // Avtalstyp-flagga — om true visas tjänsten som val i kundens Avtalstyp
   const [isContractService, setIsContractService] = useState(false)
+  // Tilläggsstationer: EN tjänst åt gången kan vara rundfaktureringstjänsten.
+  // OBS: skild från is_addon_service ("Tilläggstjänst" i prisguiden ovan).
+  const [usedForAddonStations, setUsedForAddonStations] = useState(false)
+  // Automatiska interna kostnader (artikelrader) per station
+  const [defaultArticles, setDefaultArticles] = useState<{ article_id: string; quantity_per_unit: number }[]>([])
+  const [allArticles, setAllArticles] = useState<Article[]>([])
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -71,6 +80,13 @@ export default function ServiceCatalogEditModal({
       setRotRatePercent(service.rot_rate_percent != null ? String(service.rot_rate_percent) : '')
       setRutRatePercent(service.rut_rate_percent != null ? String(service.rut_rate_percent) : '')
       setIsContractService(service.is_contract_service ?? false)
+      setUsedForAddonStations(service.used_for_addon_stations ?? false)
+      setDefaultArticles([])
+      if (service.used_for_addon_stations) {
+        AddonStationBillingService.getDefaultArticles(service.id)
+          .then(rows => setDefaultArticles(rows.map(r => ({ article_id: r.article_id, quantity_per_unit: r.quantity_per_unit }))))
+          .catch(() => {})
+      }
     } else {
       setCode('')
       setName('')
@@ -89,8 +105,18 @@ export default function ServiceCatalogEditModal({
       setRotRatePercent('')
       setRutRatePercent('')
       setIsContractService(false)
+      setUsedForAddonStations(false)
+      setDefaultArticles([])
     }
   }, [isOpen, service, groups])
+
+  // Ladda artikellistan när tilläggsstations-sektionen öppnas
+  useEffect(() => {
+    if (!isOpen || !usedForAddonStations || allArticles.length > 0) return
+    ArticleService.getAllArticles()
+      .then(setAllArticles)
+      .catch(() => toast.error('Kunde inte ladda artiklar'))
+  }, [isOpen, usedForAddonStations, allArticles.length])
 
   const handleSave = async () => {
     if (!name.trim()) { toast.error('Namn är obligatoriskt'); return }
@@ -119,6 +145,7 @@ export default function ServiceCatalogEditModal({
           rot_rate_percent: rotRateNum,
           rut_rate_percent: rutRateNum,
           is_contract_service: isContractService,
+          used_for_addon_stations: usedForAddonStations,
         }
         await ServiceCatalogService.createService(input)
         toast.success('Tjänst skapad')
@@ -140,8 +167,14 @@ export default function ServiceCatalogEditModal({
           rot_rate_percent: rotRateNum,
           rut_rate_percent: rutRateNum,
           is_contract_service: isContractService,
+          used_for_addon_stations: usedForAddonStations,
         }
         await ServiceCatalogService.updateService(service!.id, input)
+        // Spara automatiska interna kostnader (rensas när flaggan stängs av)
+        await AddonStationBillingService.setDefaultArticles(
+          service!.id,
+          usedForAddonStations ? defaultArticles.filter(r => r.article_id) : []
+        )
         toast.success('Tjänst uppdaterad')
       }
       onSaved()
@@ -183,7 +216,7 @@ export default function ServiceCatalogEditModal({
             </div>
 
             {/* Body */}
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-3 max-h-[75vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Art.nr *</label>
@@ -392,6 +425,78 @@ export default function ServiceCatalogEditModal({
                     )}
                   </div>
                 </div>
+              </div>
+              {/* Tilläggsstationer */}
+              <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={usedForAddonStations}
+                      onChange={(e) => setUsedForAddonStations(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#20c58f] focus:ring-[#20c58f] bg-slate-700 border-slate-600"
+                    />
+                    <span className="text-sm font-semibold text-slate-300">Används för tilläggsstationer</span>
+                  </label>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Tjänsten förifylls automatiskt vid kontrollrundeavslut med antal kontrollerade
+                    tilläggsstationer. Endast en tjänst åt gången kan ha denna inställning.
+                  </p>
+                </div>
+
+                {usedForAddonStations && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-slate-400">
+                      Automatiska interna kostnader per station (artikelrader, påverkar marginal — fakturaraden påverkas ej)
+                    </p>
+                    {isCreating ? (
+                      <p className="text-xs text-slate-500">Spara tjänsten först, öppna sedan igen för att koppla artiklar.</p>
+                    ) : (
+                      <>
+                        {defaultArticles.map((row, idx) => (
+                          <div key={idx} className="flex items-center gap-2">
+                            <select
+                              value={row.article_id}
+                              onChange={(e) => setDefaultArticles(prev =>
+                                prev.map((r, i) => i === idx ? { ...r, article_id: e.target.value } : r))}
+                              className={`${selectClass} flex-1`}
+                            >
+                              <option value="">Välj artikel...</option>
+                              {allArticles.map(a => (
+                                <option key={a.id} value={a.id}>{a.name}</option>
+                              ))}
+                            </select>
+                            <input
+                              type="number"
+                              min={0.1}
+                              step={0.1}
+                              value={row.quantity_per_unit}
+                              onChange={(e) => setDefaultArticles(prev =>
+                                prev.map((r, i) => i === idx ? { ...r, quantity_per_unit: parseFloat(e.target.value) || 1 } : r))}
+                              className={`${selectClass} w-20 text-center`}
+                              title="Antal per station"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setDefaultArticles(prev => prev.filter((_, i) => i !== idx))}
+                              className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setDefaultArticles(prev => [...prev, { article_id: '', quantity_per_unit: 1 }])}
+                          className="flex items-center gap-1.5 text-xs text-[#20c58f] hover:text-[#1ab07f] transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Lägg till artikel
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

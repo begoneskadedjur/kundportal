@@ -252,17 +252,33 @@ export class IndoorStationService {
         photoPath = await this.uploadStationPhoto(input.photo)
       }
 
+      // Sätt station_type_id via kodmatchning så nya rader inte förlitar sig
+      // på legacy-fallbacken i läsvägarna. Misslyckad matchning är inte fatal.
+      let stationTypeId: string | null = null
+      try {
+        const { data: typeRow } = await supabase
+          .from('station_types')
+          .select('id')
+          .eq('code', input.station_type)
+          .maybeSingle()
+        stationTypeId = typeRow?.id ?? null
+      } catch {
+        stationTypeId = null
+      }
+
       // Skapa databaspost
       const { data, error } = await supabase
         .from('indoor_stations')
         .insert({
           floor_plan_id: input.floor_plan_id,
           station_type: input.station_type,
+          station_type_id: stationTypeId,
           station_number: stationNumber,
           position_x_percent: input.position_x_percent,
           position_y_percent: input.position_y_percent,
           location_description: input.location_description || null,
           comment: input.comment || null,
+          is_addon: input.is_addon === true,
           photo_path: photoPath,
           placed_by_technician_id: technicianId || null,
           status: 'active'

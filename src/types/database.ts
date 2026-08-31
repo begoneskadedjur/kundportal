@@ -1850,6 +1850,8 @@ export interface EquipmentPlacement {
   status: EquipmentStatus
   status_updated_at: string
   status_updated_by: string | null
+  // Tillägg utöver avtal: styr rundfakturering och borttagsregler, inte livscykeln
+  is_addon?: boolean
   comment: string | null
   photo_path: string | null
   // Koppling till station_types — sätts vid skapande via kod-/namnmatchning

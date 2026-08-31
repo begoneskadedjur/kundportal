@@ -265,12 +265,17 @@ export default function CaseServiceSelector({
         // Auto-skapa fakturarad för primärtjänsten om den saknas.
         // Dubbel-läsning precis innan INSERT skyddar mot parallella komponentinstanser
         // som kan ha hunnit skapa raden medan vi väntade på andra fetches.
+        // OBS: existenskollen MÅSTE läsa 'all' — en redan fakturerad rad
+        // (status 'billed', t.ex. efter kontrollrunde-/etableringsavslut) syns
+        // inte i pending-läsningen och skulle annars auto-skapas igen →
+        // dubbelfaktura vid nästa avslut.
         let finalItems = itemsData
         if (caseId && svc && !itemsData.some(i => i.item_type === 'service' && i.service_id === primaryServiceId)) {
-          const freshItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
-          const stillMissing = !freshItems.some(
+          const allStatusItems = await CaseBillingService.getCaseBillingItems(caseId, caseType, 'all')
+          const stillMissing = !allStatusItems.some(
             i => i.item_type === 'service' && i.service_id === primaryServiceId
           )
+          const freshItems = allStatusItems.filter(i => i.status === 'pending')
           if (stillMissing) {
             const customerPrice = customerPricesData[svc.id]
             const priceToUse = customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)

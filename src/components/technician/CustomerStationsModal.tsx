@@ -1017,6 +1017,11 @@ export function CustomerStationsModal({
                             }}
                             onCancel={() => setEditingIndoorStation(false)}
                             onDelete={async () => {
+                              // Borttagsregler: avtalsstationer tas inte bort av tekniker
+                              if (!selectedIndoorStation.is_addon) {
+                                toast.error('Stationen ingår i avtalet och kan inte tas bort. Kontakta kontoret.')
+                                return
+                              }
                               if (!confirm('Är du säker på att du vill ta bort denna station?')) return
                               try {
                                 await IndoorStationService.deleteStation(selectedIndoorStation.id)
@@ -1040,6 +1045,11 @@ export function CustomerStationsModal({
                           onClose={closeIndoorDetail}
                           onEdit={() => setEditingIndoorStation(true)}
                           onDelete={async () => {
+                            // Borttagsregler: avtalsstationer tas inte bort av tekniker
+                            if (!selectedIndoorStation.is_addon) {
+                              toast.error('Stationen ingår i avtalet och kan inte tas bort. Kontakta kontoret.')
+                              return
+                            }
                             if (!confirm('Är du säker på att du vill ta bort denna station?')) return
                             try {
                               await IndoorStationService.deleteStation(selectedIndoorStation.id)
@@ -1096,7 +1106,8 @@ export function CustomerStationsModal({
                                   latitude: formData.latitude,
                                   longitude: formData.longitude,
                                   comment: formData.comment || null,
-                                  status: formData.status
+                                  status: formData.status,
+                                  is_addon: formData.is_addon
                                 })
                                 if (!result.success) throw new Error(result.error)
                                 if (formData.photo) {

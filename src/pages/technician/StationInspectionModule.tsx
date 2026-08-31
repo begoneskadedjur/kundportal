@@ -77,6 +77,9 @@ import {
 } from '../../services/inspectionSessionService'
 import { PreparationService } from '../../services/preparationService'
 import type { Preparation } from '../../types/preparations'
+import { AddonStationBillingService } from '../../services/addonStationBillingService'
+import { EquipmentService } from '../../services/equipmentService'
+import { IndoorStationService } from '../../services/indoorStationService'
 
 // Typer
 import type {
@@ -124,6 +127,7 @@ interface StationData {
   station_number?: string | null
   equipment_type?: string | null
   station_type?: string | null
+  is_addon?: boolean
   status: string
   latitude?: number
   longitude?: number
@@ -190,6 +194,13 @@ export default function StationInspectionModule() {
   const [selectedPreparationId, setSelectedPreparationId] = useState<string | null>(null)
   const [inspectedStationIds, setInspectedStationIds] = useState<Set<string>>(new Set())
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Kontrollera + hämta upp (endast tilläggsstationer): sparar kontrollen och
+  // markerar stationen Borttagen i ETT moment — rätt ordning kan inte bli fel
+  const [pickUpAfterSave, setPickUpAfterSave] = useState(false)
+  const selectedStationId = selectedStation?.id
+  useEffect(() => {
+    setPickUpAfterSave(false)
+  }, [selectedStationId])
 
   // Preparatdata
   const [preparations, setPreparations] = useState<Preparation[]>([])
@@ -1118,7 +1129,42 @@ export default function StationInspectionModule() {
         }
       }))
 
-      toast.success('Inspektion sparad!')
+      // Kontrollera + hämta upp: markera tilläggsstationen Borttagen EFTER att
+      // kontrollen sparats (ordningen garanterar att sista kontrollen finns i
+      // rapporten och faktureras en sista gång)
+      if (pickUpAfterSave && selectedStation.is_addon === true) {
+        try {
+          if (isOutdoor) {
+            const res = await EquipmentService.updateEquipmentStatus(
+              selectedStation.id,
+              'removed',
+              currentSession.technician_id || ''
+            )
+            if (!res.success) throw new Error(res.error)
+            setOutdoorStations(prev => prev.map(s =>
+              s.id === selectedStation.id ? { ...s, status: 'removed' } : s
+            ))
+          } else {
+            // OBS: indoor_stations.status_updated_by har FK mot profiles(id),
+            // INTE technicians — skicka aldrig technician_id här (FK-fel)
+            await IndoorStationService.updateStationStatus(
+              selectedStation.id,
+              'removed',
+              undefined
+            )
+            setIndoorStations(prev => prev.map(s =>
+              s.id === selectedStation.id ? { ...s, status: 'removed' } : s
+            ))
+          }
+          toast.success('Station kontrollerad och upphämtad — den slutar faktureras efter denna runda')
+        } catch (pickupErr) {
+          console.error('Kunde inte markera stationen som upphämtad:', pickupErr)
+          toast.error('Kontrollen sparades men stationen kunde inte markeras som upphämtad — gör det via utrustningsvyn')
+        }
+      } else {
+        toast.success('Inspektion sparad!')
+      }
+
       setSelectedStation(null)
       setSelectedStatus('ok')
       setInspectionNotes('')
@@ -1126,6 +1172,7 @@ export default function StationInspectionModule() {
       setPhotoFile(null)
       setPhotoPreview(null)
       setSelectedPreparationId(null)
+      setPickUpAfterSave(false)
 
     } catch (err) {
       console.error('Error saving inspection:', err)
@@ -1218,9 +1265,23 @@ export default function StationInspectionModule() {
     }
   }
 
-  // Avsluta inspektion
+  // Avsluta inspektion.
+  // Ordning (viktig): session → ärendestatus + completed_date → fakturering.
+  // Faktureringen körs i egen try/catch och får ALDRIG blockera avslutet —
+  // fältmiljö med dåligt nät är normalfallet, inte undantaget.
   const handleCompleteInspection = async () => {
     if (!session) return
+
+    // Avslutsvakt: aktiva tilläggsstationer som inte kontrollerats i rundan
+    const uninspectedAddons = [...outdoorStations, ...indoorStations].filter(
+      s => s.is_addon === true && s.status === 'active' && !inspectedStationIds.has(s.id)
+    )
+    if (uninspectedAddons.length > 0) {
+      const proceed = window.confirm(
+        `${uninspectedAddons.length} tilläggsstation${uninspectedAddons.length === 1 ? '' : 'er'} är inte kontrollerad${uninspectedAddons.length === 1 ? '' : 'e'} — de faktureras inte i denna runda. Kontrollera eller hämta upp dem innan avslut, eller fortsätt ändå.`
+      )
+      if (!proceed) return
+    }
 
     try {
       setIsSubmitting(true)
@@ -1231,6 +1292,42 @@ export default function StationInspectionModule() {
           const caseUpdated = await updateCaseStatusToCompleted(session.case_id)
           if (!caseUpdated) {
             toast.error('Inspektionen avslutades men ärendets status kunde inte sättas till Avslutat — kontrollera ärendet')
+          }
+
+          // Fakturering: förifyll tilläggsstationsrad + kör ad-hoc-kedjan.
+          // Fel här blockerar aldrig avslutet — raderna ligger kvar och
+          // kontoret fakturerar från Merförsäljning.
+          try {
+            const prefill = await AddonStationBillingService.prefillAddonStationLine({
+              caseId: session.case_id,
+              customerId: session.customer_id,
+              sessionId: session.id,
+              technicianId: session.technician_id,
+              technicianName: session.technician?.name || null
+            })
+
+            if (prefill.outcome === 'already_billed' && prefill.billedQuantityMismatch) {
+              toast(`Tilläggsstationer redan fakturerade för denna runda (${prefill.billedQuantityMismatch.billed} st). Antalet har ändrats till ${prefill.billedQuantityMismatch.current} — meddela kontoret.`, { duration: 10000, icon: '⚠️' })
+            }
+            if (prefill.priceMissing && (prefill.outcome === 'created' || prefill.outcome === 'updated')) {
+              toast(`Pris saknas i prislistan för tilläggsstationer — raden skapades med 0 kr och ingen faktura genereras. Meddela kontoret.`, { duration: 10000, icon: '⚠️' })
+            }
+
+            const billing = await AddonStationBillingService.completeContractCaseBilling({
+              caseId: session.case_id,
+              customerId: session.customer_id,
+              technicianId: session.technician_id,
+              technicianName: session.technician?.name || null,
+              workPerformed: sessionNotes || null
+            })
+            if (billing.invoiceError) {
+              toast.error(`Fakturan kunde inte skapas: ${billing.invoiceError}. Raderna ligger kvar — kontoret fakturerar från Merförsäljning.`, { duration: 10000 })
+            } else if (billing.itemsCreated > 0) {
+              toast.success(`${billing.itemsCreated} rad(er) skickade till fakturering (${billing.totalAmount} kr)`)
+            }
+          } catch (billingErr) {
+            console.error('Fakturering vid kontrollrundeavslut misslyckades:', billingErr)
+            toast.error('Faktureringen misslyckades — raderna ligger kvar, kontoret fakturerar från Merförsäljning.', { duration: 10000 })
           }
         }
         toast.success('Inspektion avslutad!')
@@ -2729,6 +2826,24 @@ export default function StationInspectionModule() {
                   className="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white placeholder-slate-500 focus:outline-none focus:border-green-500"
                 />
               </div>
+
+              {/* Kontrollera + hämta upp — endast tilläggsstationer */}
+              {selectedStation.is_addon === true && selectedStation.status === 'active' && session?.status !== 'completed' && (
+                <label className="mt-4 flex items-start gap-3 p-3 bg-violet-500/10 border border-violet-500/30 rounded-xl cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={pickUpAfterSave}
+                    onChange={(e) => setPickUpAfterSave(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f]"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-slate-200">Hämta upp stationen efter kontrollen</span>
+                    <span className="block text-xs text-slate-400 mt-0.5">
+                      Tilläggsstationen markeras Borttagen när kontrollen sparas. Den faktureras en sista gång i denna runda och slutar sedan räknas.
+                    </span>
+                  </span>
+                </label>
+              )}
 
               </div>{/* Slut på scrollbart innehåll */}
             </motion.div>

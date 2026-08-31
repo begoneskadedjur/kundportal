@@ -1,0 +1,426 @@
+// src/services/addonStationBillingService.ts
+// Tilläggsstationer (Tillägg utöver avtal): räkning, förifylld tjänsterad per
+// kontrollrunda och delad avslutskedja för fakturering av kontroll- och
+// etableringsärenden. Se docs/tillaggsstationer-plan.md.
+//
+// Viktiga regler (beslutade 2026-08-31):
+// - Antal på rundraden = tilläggsstationer som KONTROLLERADES i sessionen
+//   (inspektionsrader), inte aktiva-vid-avslut. Robust mot upphämtning mitt i rundan.
+// - Idempotensvakt läser ALLA statusar ('all') — default pending-filter missar
+//   billade rader och skulle dubbelfakturera vid återöppnad session.
+// - Vid 0-pris skapas raden som synligt underlag men INGEN faktura genereras
+//   (fakturering hoppar över när fakturerbar total är 0).
+// - Fakturering får ALDRIG blockera statusövergången — anroparen kör kedjan i
+//   try/catch efter att status satts.
+// - Provision skapas ALDRIG automatiskt här.
+
+import { supabase } from '../lib/supabase'
+import { CaseBillingService } from './caseBillingService'
+import { ContractBillingService } from './contractBillingService'
+import { PriceListService } from './priceListService'
+import { VisitService } from './visitService'
+import type { Service, ServiceDefaultArticle } from '../types/services'
+import type { CaseBillingItemWithRelations } from '../types/caseBilling'
+
+export interface PrefillResult {
+  outcome: 'created' | 'updated' | 'already_billed' | 'no_stations' | 'no_service'
+  quantity: number
+  unitPrice: number
+  priceMissing: boolean
+  /** Satt när raden redan är fakturerad men antalet har ändrats */
+  billedQuantityMismatch?: { billed: number; current: number }
+}
+
+export interface CompleteBillingResult {
+  itemsCreated: number
+  totalAmount: number
+  invoiceError?: string | null
+  skippedZeroTotal: boolean
+}
+
+export class AddonStationBillingService {
+  /**
+   * Tjänsten som används för rundfakturering av tilläggsstationer.
+   * Slås upp dynamiskt via services.used_for_addon_stations (max en åt gången).
+   */
+  static async getAddonStationService(): Promise<Service | null> {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*')
+      .eq('used_for_addon_stations', true)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[AddonStationBilling] Kunde inte hämta tilläggsstations-tjänst:', error)
+      return null
+    }
+    return data
+  }
+
+  /**
+   * Automatiska interna kostnader (artikelrader) per enhet av en tjänst.
+   */
+  static async getDefaultArticles(serviceId: string): Promise<ServiceDefaultArticle[]> {
+    const { data, error } = await supabase
+      .from('service_default_articles')
+      .select('*, article:articles(id, name, default_price, unit)')
+      .eq('service_id', serviceId)
+
+    if (error) {
+      console.error('[AddonStationBilling] Kunde inte hämta tjänsteartiklar:', error)
+      return []
+    }
+    return (data || []) as ServiceDefaultArticle[]
+  }
+
+  /**
+   * Ersätt tjänstens automatiska interna kostnader (admin-UI).
+   */
+  static async setDefaultArticles(
+    serviceId: string,
+    rows: { article_id: string; quantity_per_unit: number }[]
+  ): Promise<void> {
+    const { error: delError } = await supabase
+      .from('service_default_articles')
+      .delete()
+      .eq('service_id', serviceId)
+    if (delError) throw new Error(`Databasfel: ${delError.message}`)
+
+    if (rows.length > 0) {
+      const { error: insError } = await supabase
+        .from('service_default_articles')
+        .insert(rows.map(r => ({
+          service_id: serviceId,
+          article_id: r.article_id,
+          quantity_per_unit: r.quantity_per_unit
+        })))
+      if (insError) throw new Error(`Databasfel: ${insError.message}`)
+    }
+  }
+
+  /**
+   * Räkna tilläggsstationer som KONTROLLERADES i en session
+   * (inspektionsrader i sessionen, joinade mot is_addon).
+   * Fallback: aktiva tilläggsstationer per kund om sessionen saknar rader helt.
+   */
+  static async countInspectedAddonStations(
+    sessionId: string,
+    customerId: string
+  ): Promise<number> {
+    const [outdoorRes, indoorRes] = await Promise.all([
+      supabase
+        .from('outdoor_station_inspections')
+        .select('station_id, station:equipment_placements!station_id(is_addon)')
+        .eq('session_id', sessionId),
+      supabase
+        .from('indoor_station_inspections')
+        .select('station_id, station:indoor_stations!station_id(is_addon)')
+        .eq('session_id', sessionId)
+    ])
+
+    if (outdoorRes.error) console.error('[AddonStationBilling] Utomhusräkning fel:', outdoorRes.error)
+    if (indoorRes.error) console.error('[AddonStationBilling] Inomhusräkning fel:', indoorRes.error)
+    const queriesFailed = !!outdoorRes.error || !!indoorRes.error
+
+    const outdoorRows = outdoorRes.data || []
+    const indoorRows = indoorRes.data || []
+
+    // PostgREST kan returnera joinen som objekt eller en-elements-array
+    const rowIsAddon = (station: unknown): boolean => {
+      const s = Array.isArray(station) ? station[0] : station
+      return (s as { is_addon?: boolean } | null)?.is_addon === true
+    }
+
+    // Dubbletter kan förekomma (känd brist: ingen DB-unik på station+session) —
+    // räkna unika station_id så en dubbelsparad kontroll inte dubbelfakturerar
+    const addonIds = new Set<string>()
+    for (const row of outdoorRows) {
+      if (rowIsAddon(row.station)) addonIds.add(row.station_id)
+    }
+    for (const row of indoorRows) {
+      if (rowIsAddon(row.station)) addonIds.add(row.station_id)
+    }
+
+    if (outdoorRows.length === 0 && indoorRows.length === 0 && !queriesFailed) {
+      // Sessionen saknar inspektionsrader helt — fall tillbaka på aktiva
+      // tilläggsstationer. GÄLLER BARA när frågorna lyckades: vid fel (RLS/nät)
+      // ska vi hellre räkna 0 än fakturera stationer som aldrig kontrollerades.
+      return this.countActiveAddonStations(customerId)
+    }
+
+    return addonIds.size
+  }
+
+  /**
+   * Aktiva tilläggsstationer hos en kund (utomhus + inomhus via planritningar).
+   */
+  static async countActiveAddonStations(customerId: string): Promise<number> {
+    const [outdoorRes, indoorRes] = await Promise.all([
+      supabase
+        .from('equipment_placements')
+        .select('id', { count: 'exact', head: true })
+        .eq('customer_id', customerId)
+        .eq('status', 'active')
+        .eq('is_addon', true),
+      supabase
+        .from('indoor_stations')
+        .select('id, floor_plan:floor_plans!inner(customer_id)', { count: 'exact', head: true })
+        .eq('floor_plan.customer_id', customerId)
+        .eq('status', 'active')
+        .eq('is_addon', true)
+    ])
+
+    return (outdoorRes.count || 0) + (indoorRes.count || 0)
+  }
+
+  /**
+   * Tilläggsstationer placerade hos en kund sedan ett givet datum
+   * (används för att förifylla antal på etableringsraden).
+   */
+  static async countAddonStationsPlacedSince(
+    customerId: string,
+    sinceIso: string
+  ): Promise<number> {
+    const [outdoorRes, indoorRes] = await Promise.all([
+      supabase
+        .from('equipment_placements')
+        .select('id', { count: 'exact', head: true })
+        .eq('customer_id', customerId)
+        .eq('is_addon', true)
+        .gte('placed_at', sinceIso),
+      supabase
+        .from('indoor_stations')
+        .select('id, floor_plan:floor_plans!inner(customer_id)', { count: 'exact', head: true })
+        .eq('floor_plan.customer_id', customerId)
+        .eq('is_addon', true)
+        .gte('placed_at', sinceIso)
+    ])
+
+    return (outdoorRes.count || 0) + (indoorRes.count || 0)
+  }
+
+  /**
+   * Förifyll tjänsterad för tilläggsstationer på ett kontrollärende.
+   * Idempotent: uppdaterar pending-rad, hoppar över billed-rad (med varning
+   * om antalet ändrats). Skapar även tjänstens automatiska interna
+   * kostnader (artikelrader) vid nyskapande.
+   */
+  static async prefillAddonStationLine(params: {
+    caseId: string
+    customerId: string
+    sessionId: string
+    technicianId?: string | null
+    technicianName?: string | null
+  }): Promise<PrefillResult> {
+    const { caseId, customerId, sessionId, technicianId, technicianName } = params
+
+    const quantity = await this.countInspectedAddonStations(sessionId, customerId)
+    if (quantity === 0) {
+      return { outcome: 'no_stations', quantity: 0, unitPrice: 0, priceMissing: false }
+    }
+
+    const service = await this.getAddonStationService()
+    if (!service) {
+      console.warn('[AddonStationBilling] Ingen tjänst har flaggan "Används för tilläggsstationer" — ingen rad skapas')
+      return { outcome: 'no_service', quantity, unitPrice: 0, priceMissing: false }
+    }
+
+    // Pris: avtalets/kundens/standardprislistan → base_price → 0
+    const effectivePrice = await PriceListService.getEffectiveServicePrice(service.id, customerId)
+    const unitPrice = effectivePrice?.price ?? service.base_price ?? 0
+
+    // Idempotensvakt — läs ALLA statusar (default pending-filter missar billade
+    // rader → dubbelfaktura vid återöppnad session)
+    const existingItems: CaseBillingItemWithRelations[] =
+      await CaseBillingService.getCaseBillingItems(caseId, 'contract', 'all')
+    const existing = existingItems.find(
+      i => i.item_type === 'service' && i.service_id === service.id
+    )
+
+    if (existing && existing.status !== 'pending') {
+      // Redan fakturerad — skapa inget, men flagga om antalet ändrats
+      return {
+        outcome: 'already_billed',
+        quantity,
+        unitPrice,
+        priceMissing: unitPrice === 0,
+        billedQuantityMismatch: existing.quantity !== quantity
+          ? { billed: existing.quantity, current: quantity }
+          : undefined
+      }
+    }
+
+    if (existing) {
+      // Pending-rad finns (t.ex. återöppnad session) — uppdatera antal + pris
+      const { error } = await supabase
+        .from('case_billing_items')
+        .update({
+          quantity,
+          unit_price: unitPrice,
+          discounted_price: unitPrice,
+          total_price: unitPrice * quantity
+        })
+        .eq('id', existing.id)
+      if (error) throw new Error(`Databasfel: ${error.message}`)
+      return { outcome: 'updated', quantity, unitPrice, priceMissing: unitPrice === 0 }
+    }
+
+    await CaseBillingService.addServiceToCase({
+      case_id: caseId,
+      case_type: 'contract',
+      customer_id: customerId,
+      service_id: service.id,
+      service_code: service.code,
+      service_name: service.name,
+      quantity,
+      unit_price: unitPrice,
+      added_by_technician_id: technicianId || undefined,
+      added_by_technician_name: technicianName || undefined,
+      notes: 'Tilläggsstationer kontrollerade i rundan'
+    })
+
+    // Automatiska interna kostnader (artikelrader) — bara vid nyskapande
+    const defaultArticles = await this.getDefaultArticles(service.id)
+    for (const da of defaultArticles) {
+      try {
+        await CaseBillingService.addArticleToCase({
+          case_id: caseId,
+          case_type: 'contract',
+          customer_id: customerId,
+          article_id: da.article_id,
+          article_name: da.article?.name || 'Artikel',
+          quantity: quantity * da.quantity_per_unit,
+          unit_price: da.article?.default_price ?? 0,
+          added_by_technician_id: technicianId || undefined,
+          added_by_technician_name: technicianName || undefined,
+          notes: 'Automatisk intern kostnad (tilläggsstationer)'
+        })
+      } catch (err) {
+        console.error('[AddonStationBilling] Kunde inte skapa intern kostnadsrad:', err)
+      }
+    }
+
+    return { outcome: 'created', quantity, unitPrice, priceMissing: unitPrice === 0 }
+  }
+
+  /**
+   * Vikarie-skydd: tekniker-RLS kräver att teknikern är tilldelad ärendet för
+   * att kunna LÄSA tillbaka contract_billing_items (technician_owns_case).
+   * Sätter teknikern som sekundär/tertiär om hen inte redan är tilldelad.
+   */
+  static async ensureTechnicianOnCase(
+    caseId: string,
+    technicianId: string,
+    technicianName?: string | null
+  ): Promise<void> {
+    const { data: caseRow, error } = await supabase
+      .from('cases')
+      .select('id, primary_technician_id, secondary_technician_id, tertiary_technician_id')
+      .eq('id', caseId)
+      .maybeSingle()
+
+    if (error || !caseRow) return
+
+    const assigned = [
+      caseRow.primary_technician_id,
+      caseRow.secondary_technician_id,
+      caseRow.tertiary_technician_id
+    ].filter(Boolean)
+
+    if (assigned.includes(technicianId)) return
+
+    const update: Record<string, unknown> = {}
+    if (!caseRow.secondary_technician_id) {
+      update.secondary_technician_id = technicianId
+      if (technicianName) update.secondary_technician_name = technicianName
+    } else if (!caseRow.tertiary_technician_id) {
+      update.tertiary_technician_id = technicianId
+      if (technicianName) update.tertiary_technician_name = technicianName
+    } else {
+      return // Alla platser upptagna — läs-tillbakafallet fångas av felhanteringen
+    }
+
+    // OBS: cases-RLS (cases_update_scoped) kräver att teknikern redan är
+    // tilldelad för att få uppdatera — en otilldelad vikarie får tyst
+    // 0-radersvar här. Då felar fakturagenereringen senare med tydlig toast
+    // (raderna ligger kvar ofakturerade, inget tyst intäktstapp). Riktig
+    // lösning kräver SECURITY DEFINER-RPC — se docs/tillaggsstationer-plan.md.
+    const { data: updatedRows, error: updError } = await supabase
+      .from('cases')
+      .update(update)
+      .eq('id', caseId)
+      .select('id')
+    if (updError || !updatedRows || updatedRows.length === 0) {
+      console.warn('[AddonStationBilling] Kunde inte tilldela tekniker på ärendet (RLS eller fel):', updError)
+    }
+  }
+
+  /**
+   * Delad avslutskedja för avtalsärendens fakturering utanför EditContractCaseModal:
+   * besökssnapshot → ad-hoc-fakturarader → faktura. Används av kontrollrundeavslut
+   * (StationInspectionModule) och etableringsavslut (TechnicianEquipment).
+   *
+   * - Skapar INGEN provision (beslut: provision kryssas alltid i manuellt).
+   * - Hoppar över fakturagenerering när fakturerbar total är 0 (beslut:
+   *   0-rader är synligt underlag, inte faktura).
+   * - Anroparen ansvarar för att status/completed_date redan är satta och för
+   *   att köra denna i try/catch — fel här får aldrig blockera avslutet.
+   */
+  static async completeContractCaseBilling(params: {
+    caseId: string
+    customerId: string
+    technicianId?: string | null
+    technicianName?: string | null
+    workPerformed?: string | null
+  }): Promise<CompleteBillingResult> {
+    const { caseId, customerId, technicianId, technicianName, workPerformed } = params
+
+    // Vikarie-skydd före allt annat (påverkar RLS-läsbarhet i kedjan)
+    if (technicianId) {
+      await this.ensureTechnicianOnCase(caseId, technicianId, technicianName)
+    }
+
+    // Finns något att fakturera? Rader med total 0 räknas som underlag, inte faktura.
+    const pendingItems = await CaseBillingService.getCaseBillingItems(caseId, 'contract')
+    const serviceItems = pendingItems.filter(i => i.item_type === 'service')
+    const billableTotal = serviceItems.reduce((sum, i) => sum + (i.total_price || 0), 0)
+
+    if (serviceItems.length === 0 || billableTotal <= 0) {
+      return { itemsCreated: 0, totalAmount: 0, skippedZeroTotal: billableTotal <= 0 && serviceItems.length > 0 }
+    }
+
+    // Besökssnapshot måste finnas INNAN fakturering (stämplar visit_id på raderna).
+    // RPC:n är idempotent (ett slutbesök per ärende).
+    const visit = await VisitService.createVisitSnapshot({
+      caseId,
+      caseType: 'contract',
+      source: 'completion',
+      isFinal: true,
+      customerId,
+      visitDate: new Date().toISOString(),
+      technicianId: technicianId ?? null,
+      technicianName: technicianName ?? undefined,
+      technicians: technicianId || technicianName
+        ? [{ id: technicianId ?? null, name: technicianName || '', role: 'primary' as const }]
+        : undefined,
+      workPerformed: workPerformed ?? undefined
+    })
+    if (!visit) {
+      console.warn('[AddonStationBilling] Besökssnapshot kunde inte skapas — fakturering fortsätter utan besökskoppling')
+    }
+
+    const result = await ContractBillingService.createAdHocItemsFromCase(
+      caseId,
+      customerId,
+      new Date()
+    )
+
+    return {
+      itemsCreated: result.created,
+      totalAmount: result.totalAmount,
+      invoiceError: result.invoiceError ?? null,
+      skippedZeroTotal: false
+    }
+  }
+}

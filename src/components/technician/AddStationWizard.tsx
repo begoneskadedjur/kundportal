@@ -41,8 +41,17 @@ import type {
   CreateIndoorStationInput
 } from '../../types/indoor'
 import type { StationType } from '../../types/stationTypes'
+import type { PreparationUnit } from '../../types/casePreparations'
 import { useAuth } from '../../contexts/AuthContext'
 import toast from 'react-hot-toast'
+
+// Kopiera från föregående station: senaste placeringens värden i batchen
+interface LastPlacementValues {
+  type: IndoorStationType
+  typeData: StationType | null
+  preparation: { id: string; quantity: number | null; unit: PreparationUnit } | null
+  isAddon: boolean
+}
 
 type WizardStep = 1 | 2 | 3
 
@@ -100,6 +109,8 @@ export function AddStationWizard({
   const [placementMode, setPlacementMode] = useState<PlacementMode>('view')
   const [selectedStationType, setSelectedStationType] = useState<IndoorStationType | null>(null)
   const [selectedTypeData, setSelectedTypeData] = useState<StationType | null>(null)
+  const [lastPlacement, setLastPlacement] = useState<LastPlacementValues | null>(null)
+  const [copyFromLast, setCopyFromLast] = useState(false)
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showFloorPlanMenu, setShowFloorPlanMenu] = useState(false)
@@ -275,6 +286,18 @@ export function AddStationWizard({
     setSelectedTypeData(typeData || null)
     setPlacementMode('place')
     setShowTypeSelector(false)
+    setCopyFromLast(false)
+  }
+
+  // Kopiera från föregående station: hoppa över typväljaren och
+  // förifyll preparat/mängd/märkning från senaste placeringen
+  const startCopyPlacement = () => {
+    if (!lastPlacement) return
+    setSelectedStationType(lastPlacement.type)
+    setSelectedTypeData(lastPlacement.typeData)
+    setPlacementMode('place')
+    setShowTypeSelector(false)
+    setCopyFromLast(true)
   }
 
   // Återställ placeringsläge
@@ -283,6 +306,7 @@ export function AddStationWizard({
     setSelectedStationType(null)
     setSelectedTypeData(null)
     setPreviewPosition(null)
+    setCopyFromLast(false)
   }
 
   // Hantera planritningsuppladdning
@@ -351,6 +375,15 @@ export function AddStationWizard({
       }
 
       toast.success('Station placerad!')
+      // Spara senaste värden för "kopiera föregående"
+      setLastPlacement({
+        type: input.station_type,
+        typeData: selectedTypeData,
+        preparation: input.preparation_id
+          ? { id: input.preparation_id, quantity: input.preparation_quantity ?? null, unit: input.preparation_unit || 'g' }
+          : null,
+        isAddon: input.is_addon === true
+      })
       setShowStationForm(false)
       resetPlacementMode()
       // Ladda om stationer
@@ -457,6 +490,7 @@ export function AddStationWizard({
     setShowStationForm(false)
     setShowFloorPlanMenu(false)
     setMenuPosition(null)
+    setLastPlacement(null)
     resetPlacementMode()
     onClose()
   }
@@ -866,6 +900,18 @@ export function AddStationWizard({
                               <Plus className="w-3.5 h-3.5" />
                               Placera fler stationer
                             </button>
+                            {lastPlacement && (
+                              <button
+                                onClick={startCopyPlacement}
+                                className="w-full px-3 py-2 text-sm bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                Placera fler – kopiera föregående
+                                {lastPlacement.typeData?.name && (
+                                  <span className="text-slate-400">({lastPlacement.typeData.name})</span>
+                                )}
+                              </button>
+                            )}
                             {onSwitchToOutdoor && selectedCustomerId && (
                               <button
                                 onClick={() => {
@@ -967,6 +1013,8 @@ export function AddStationWizard({
                             position={previewPosition}
                             existingStationNumbers={stations.map(s => s.station_number).filter(Boolean) as string[]}
                             initialStationType={selectedStationType || undefined}
+                            initialPreparation={copyFromLast ? lastPlacement?.preparation ?? null : null}
+                            initialIsAddon={copyFromLast ? lastPlacement?.isAddon ?? false : false}
                             onSubmit={handleCreateStation}
                             onCancel={() => { setShowStationForm(false); resetPlacementMode() }}
                             isSubmitting={isSubmitting}

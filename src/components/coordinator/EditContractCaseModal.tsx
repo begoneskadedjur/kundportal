@@ -2617,7 +2617,6 @@ export default function EditContractCaseModal({
                 primaryServiceId={formData.service_id}
                 articleGroupId={articleGroupId}
                 onChange={handleBillingSummaryChange}
-                readOnly={isEstablishment}
               />
             </div>
           )}

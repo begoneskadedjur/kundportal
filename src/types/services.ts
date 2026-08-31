@@ -36,8 +36,24 @@ export interface Service {
   rut_rate_percent: number | null  // null = använd global default
   // Om true: tjänsten kan väljas som Avtalstyp på kund.
   is_contract_service: boolean
+  // Om true: tjänsten används för rundfakturering av tilläggsstationer
+  // (max EN tjänst åt gången, partiellt unikt index i DB).
+  // OBS: skild från is_addon_service ("Tilläggstjänst" i prisguiden).
+  used_for_addon_stations: boolean
   created_at: string
   updated_at: string
+}
+
+// Automatisk intern kostnad (artikelrad) per enhet av en tjänst,
+// t.ex. arbetstid/station vid rundfakturering av tilläggsstationer.
+export interface ServiceDefaultArticle {
+  id: string
+  service_id: string
+  article_id: string
+  quantity_per_unit: number
+  created_at: string
+  updated_at: string
+  article?: { id: string; name: string; default_price: number | null; unit?: string | null }
 }
 
 export interface ServiceWithGroup extends Service {
@@ -79,6 +95,7 @@ export interface CreateServiceInput {
   rot_rate_percent?: number | null
   rut_rate_percent?: number | null
   is_contract_service?: boolean
+  used_for_addon_stations?: boolean
 }
 
 export interface UpdateServiceInput {
@@ -98,6 +115,7 @@ export interface UpdateServiceInput {
   rot_rate_percent?: number | null
   rut_rate_percent?: number | null
   is_contract_service?: boolean
+  used_for_addon_stations?: boolean
 }
 
 export const SERVICE_UNITS = ['st', 'timme', 'dag', 'km', 'm2', 'fp'] as const

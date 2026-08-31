@@ -209,6 +209,8 @@ export interface IndoorStation {
   photo_path: string | null;
   status: IndoorStationStatus;
   calculated_status: 'ok' | 'warning' | 'critical'; // Status baserad på mätningar vs tröskelvärden
+  // Tillägg utöver avtal: styr rundfakturering och borttagsregler, inte livscykeln
+  is_addon?: boolean;
   status_updated_at: string | null;
   status_updated_by: string | null;
   placed_at: string;
@@ -336,6 +338,7 @@ export interface CreateIndoorStationInput {
   location_description?: string;
   comment?: string;
   photo?: File;
+  is_addon?: boolean;
   preparation_id?: string | null;
   preparation_quantity?: number | null;
   preparation_unit?: PreparationUnit;
@@ -350,6 +353,7 @@ export interface UpdateIndoorStationInput {
   location_description?: string;
   comment?: string;
   status?: IndoorStationStatus;
+  is_addon?: boolean;
   photo?: File;
 }
 

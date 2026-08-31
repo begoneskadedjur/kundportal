@@ -304,7 +304,7 @@ async function generateInspectionReportHTML(data: {
     return `
       <tr>
         <td><strong>${stationNumber}</strong></td>
-        <td>${insp.station?.station_type_data?.name || insp.station?.equipment_type || '-'}</td>
+        <td>${insp.station?.station_type_data?.name || insp.station?.equipment_type || '-'}${insp.station?.is_addon ? `<br/><span style="font-size:8px;color:#7c3aed;">Tillägg utöver avtal</span>` : ''}</td>
         <td><span class="status-badge" style="background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${getStatusLabel(insp.status, dynamicLabels)}</span></td>
         <td>${insp.station?.station_type_data?.measurement_label || '-'}</td>
         <td class="text-right">${insp.measurement_value !== null && insp.measurement_value !== undefined ? insp.measurement_value : '-'}</td>
@@ -376,7 +376,7 @@ async function generateInspectionReportHTML(data: {
       return `
         <tr>
           <td><strong>${stationNumber}</strong></td>
-          <td>${insp.station?.station_type_data?.name || insp.station?.station_type || '-'}</td>
+          <td>${insp.station?.station_type_data?.name || insp.station?.station_type || '-'}${insp.station?.is_addon ? `<br/><span style="font-size:8px;color:#7c3aed;">Tillägg utöver avtal</span>` : ''}</td>
           <td><span class="status-badge" style="background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${getStatusLabel(insp.status, dynamicLabels)}</span></td>
           <td>${insp.station?.station_type_data?.measurement_label || '-'}</td>
           <td class="text-right">${insp.measurement_value !== null && insp.measurement_value !== undefined ? insp.measurement_value : '-'}</td>

@@ -76,6 +76,9 @@ interface EquipmentPlacementFormProps {
   // Batch-placering: bevara val mellan stationer
   initialEquipmentType?: EquipmentType
   autoShowMap?: boolean
+  // Kopiera från föregående station: preparat + mängd + märkning följer med
+  initialPreparation?: { id: string; quantity: number | null; unit: PreparationUnit } | null
+  initialIsAddon?: boolean
   // Befintliga stationer att visa på kartan
   existingStations?: ExistingStation[]
   // Kontrollhistorik
@@ -89,6 +92,7 @@ export interface FormData {
   longitude: number
   comment: string
   status: EquipmentStatus
+  is_addon: boolean
   photo?: File | null
   preparation_id?: string | null
   preparation_quantity?: number | null
@@ -115,6 +119,8 @@ export function EquipmentPlacementForm({
   showCustomerPicker = false,
   initialEquipmentType,
   autoShowMap = false,
+  initialPreparation = null,
+  initialIsAddon = false,
   existingStations,
   inspections = []
 }: EquipmentPlacementFormProps) {
@@ -225,8 +231,34 @@ export function EquipmentPlacementForm({
     longitude: existingEquipment?.longitude || 0,
     comment: existingEquipment?.comment || '',
     status: existingEquipment?.status || 'active',
-    photo: null
+    is_addon: existingEquipment ? (existingEquipment.is_addon === true) : initialIsAddon,
+    photo: null,
+    // Kopierat från föregående station i batch-flödet (samma stationstyp per definition)
+    preparation_id: !existingEquipment && initialPreparation ? initialPreparation.id : null,
+    preparation_quantity: !existingEquipment && initialPreparation ? initialPreparation.quantity : null,
+    preparation_unit: !existingEquipment && initialPreparation ? initialPreparation.unit : undefined
   })
+
+  // Visar "Kopierat från föregående station"-raden tills teknikern rensar eller byter typ
+  const [showCopiedHint, setShowCopiedHint] = useState(
+    !existingEquipment && (!!initialPreparation || initialIsAddon)
+  )
+
+  // Typbyte nollställer alltid preparatet — dels bryter det kopieringen,
+  // dels låg gammalt preparation_id annars kvar i state vid byte mellan
+  // två preparatbärande typer (latent bugg, selecten visade tomt men värdet skickades)
+  const handleTypeSelect = (code: EquipmentType) => {
+    setFormData(prev => {
+      if (prev.equipment_type === code) return prev
+      return { ...prev, equipment_type: code, preparation_id: null, preparation_quantity: null }
+    })
+    setShowCopiedHint(false)
+  }
+
+  const clearCopiedValues = () => {
+    setFormData(prev => ({ ...prev, preparation_id: null, preparation_quantity: null, is_addon: false }))
+    setShowCopiedHint(false)
+  }
 
   // Uppdatera default typ till första dynamiska typen om vi skapar ny
   useEffect(() => {
@@ -258,6 +290,13 @@ export function EquipmentPlacementForm({
       if (hasPreps) {
         const preps = await CasePreparationService.getPreparationsForStationType(stationType.id)
         setAvailablePreparations(preps)
+        // Kopierat/kvarvarande preparat som inte finns för typen rensas
+        setFormData(prev => {
+          if (prev.preparation_id && !preps.some(p => p.id === prev.preparation_id)) {
+            return { ...prev, preparation_id: null, preparation_quantity: null }
+          }
+          return prev
+        })
       } else {
         setAvailablePreparations([])
         setFormData(prev => ({ ...prev, preparation_id: null, preparation_quantity: null }))
@@ -527,7 +566,7 @@ export function EquipmentPlacementForm({
                   type="button"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => setFormData(prev => ({ ...prev, equipment_type: stationType.code as EquipmentType }))}
+                  onClick={() => handleTypeSelect(stationType.code as EquipmentType)}
                   className={`p-4 rounded-xl border-2 transition-all ${
                     isSelected
                       ? 'border-[#20c58f] bg-[#20c58f]/10'
@@ -561,7 +600,7 @@ export function EquipmentPlacementForm({
                     type="button"
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setFormData(prev => ({ ...prev, equipment_type: type }))}
+                    onClick={() => handleTypeSelect(type)}
                     className={`p-4 rounded-xl border-2 transition-all ${
                       isSelected
                         ? 'border-[#20c58f] bg-[#20c58f]/10'
@@ -584,6 +623,39 @@ export function EquipmentPlacementForm({
           </div>
         )}
       </div>
+
+      {/* Kopierat från föregående station */}
+      {showCopiedHint && (
+        <div className="flex items-center justify-between px-3 py-2 bg-slate-800/40 border border-slate-700/60 rounded-lg">
+          <p className="text-xs text-slate-400 flex items-center gap-1.5">
+            <Check className="w-3.5 h-3.5 text-[#20c58f]" />
+            Kopierat från föregående station
+          </p>
+          <button
+            type="button"
+            onClick={clearCopiedValues}
+            className="text-xs text-slate-500 hover:text-slate-300 underline transition-colors"
+          >
+            Rensa
+          </button>
+        </div>
+      )}
+
+      {/* Tillägg utöver avtal */}
+      <label className="flex items-start gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl cursor-pointer">
+        <input
+          type="checkbox"
+          checked={formData.is_addon}
+          onChange={(e) => setFormData(prev => ({ ...prev, is_addon: e.target.checked }))}
+          className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f]"
+        />
+        <span>
+          <span className="block text-sm font-medium text-slate-200">Tillägg utöver avtal</span>
+          <span className="block text-xs text-slate-400 mt-0.5">
+            Tilläggsstationer debiteras etablering och per kontrollrunda, och ingår inte i avtalets årspremie
+          </span>
+        </span>
+      </label>
 
       {/* Serienummer */}
       <div>

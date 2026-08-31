@@ -344,9 +344,10 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
       const matVal = insp.measurement_value !== null && insp.measurement_value !== undefined
         ? Number(insp.measurement_value)
         : ''
+      const isAddonRow = (insp.station as any)?.is_addon === true
       const row = wsOut.addRow([
         index + 1,
-        insp.station?.station_type_data?.name || (insp.station as any)?.equipment_type || '-',
+        (insp.station?.station_type_data?.name || (insp.station as any)?.equipment_type || '-') + (isAddonRow ? ' (Tillägg utöver avtal)' : ''),
         statusLabel,
         insp.station?.station_type_data?.measurement_label || '-',
         matVal,
@@ -437,7 +438,7 @@ export async function generateInspectionExcel(sessionId: string): Promise<void> 
         : ''
       const row = wsIn.addRow([
         numberMap.get(insp.id) ?? '-',
-        station?.station_type_data?.name || station?.station_type || '-',
+        (station?.station_type_data?.name || station?.station_type || '-') + (station?.is_addon === true ? ' (Tillägg utöver avtal)' : ''),
         fp,
         station?.location_description || '',
         statusLabel,

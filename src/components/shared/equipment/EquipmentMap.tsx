@@ -357,6 +357,11 @@ export function EquipmentMap({
       } else if (isInspected) {
         strokeColor = '#16a34a'
         strokeWeight = 3
+      } else if (item.is_addon === true && item.status === 'active') {
+        // Tilläggsstation (utöver avtal): violett ring — krockar inte med
+        // status- (amber/röd/slate), inspekterad- (grön) eller highlight-färg (blå)
+        strokeColor = '#a855f7'
+        strokeWeight = 3
       }
 
       // Bestäm label-text

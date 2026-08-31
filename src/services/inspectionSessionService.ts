@@ -1413,14 +1413,16 @@ export async function updateSessionPhotoCaption(
 // ============================================
 
 /**
- * Uppdatera ärendestatus när inspektionen är klar
+ * Uppdatera ärendestatus när inspektionen är klar.
+ * Sätter även completed_date i samma update (krävs av faktureringskedjan
+ * och intäktsvyerna — tidigare lucka där kontrollärenden saknade avslutsdatum).
  */
 export async function updateCaseStatusToCompleted(
   caseId: string
 ): Promise<boolean> {
   const { data, error } = await supabase
     .from('cases')
-    .update({ status: 'Avslutat' })
+    .update({ status: 'Avslutat', completed_date: toLocalISOStringWithOffset() })
     .eq('id', caseId)
     .select('id')
 

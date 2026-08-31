@@ -394,7 +394,11 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
         const typeRgb = hexToRgb(typeDisplay.color)
         pdf.setFillColor(...typeRgb)
         pdf.circle(colX + 3, yPosition + 7, 2.5, 'F')
-        pdf.text(typeDisplay.label, colX + 8, yPosition + 9)
+        pdf.text(
+          typeDisplay.label + ((item as any).is_addon === true ? ' (Tillägg)' : ''),
+          colX + 8,
+          yPosition + 9
+        )
 
         colX += colWidths.type
         pdf.text(item.serial_number || '-', colX, yPosition + 9)

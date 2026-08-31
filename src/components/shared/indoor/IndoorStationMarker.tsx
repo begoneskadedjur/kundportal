@@ -199,6 +199,15 @@ export function IndoorStationMarker({
         )}
       </div>
 
+      {/* Tilläggsstation (utöver avtal): violett hörnmarkering uppe till vänster */}
+      {station.is_addon === true && (
+        <div
+          className="absolute -top-1 -left-1 w-3 h-3 rounded-full border border-white"
+          style={{ backgroundColor: '#a855f7' }}
+          title="Tilläggsstation (utöver avtal)"
+        />
+      )}
+
       {/* Status badge for non-active stations OR calculated status warning/critical */}
       {station.status !== 'active' ? (
         <div
@@ -228,6 +237,9 @@ export function IndoorStationMarker({
         <div className="bg-slate-800 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
           <p className="font-medium">{station.station_number || 'Utan nummer'}</p>
           <p className="text-slate-400">{typeConfig.label}</p>
+          {station.is_addon === true && (
+            <p className="text-violet-400">Tillägg utöver avtal</p>
+          )}
         </div>
       </div>
     </div>
@@ -294,6 +306,13 @@ export function StationLegend() {
           </div>
         )
       })}
+      <div className="flex items-center gap-1.5">
+        <div
+          className="w-4 h-4 rounded-full border border-white/50"
+          style={{ backgroundColor: '#a855f7' }}
+        />
+        <span className="text-xs text-slate-400">Tilläggsstation (utöver avtal)</span>
+      </div>
     </div>
   )
 }
