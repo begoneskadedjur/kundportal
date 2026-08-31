@@ -104,8 +104,8 @@ BEGIN
       status, requires_approval, notes, is_addon_station_line
     ) VALUES (
       v_case_id, 'contract', p_customer_id, 'service',
-      v_service_id, v_service_code, v_service_name || ' – etablering',
-      NULL, NULL, v_service_name || ' – etablering',
+      v_service_id, v_service_code, v_service_name || ' – Etablering',
+      NULL, NULL, v_service_name || ' – Etablering',
       v_count, v_price, 0, v_price, v_price * v_count,
       25, 'standard', p_technician_id, p_technician_name,
       'pending', false, 'Tilläggsstationer placerade i etableringen', true

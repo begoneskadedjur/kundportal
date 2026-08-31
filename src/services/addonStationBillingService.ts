@@ -298,7 +298,7 @@ export class AddonStationBillingService {
       customer_id: customerId,
       service_id: service.id,
       service_code: service.code,
-      service_name: `${service.name} – kontrollrunda ${rundDatum}`,
+      service_name: `${service.name} – Kontrollrunda ${rundDatum}`,
       quantity,
       unit_price: unitPrice,
       added_by_technician_id: technicianId || undefined,
