@@ -128,6 +128,8 @@ interface StationData {
   equipment_type?: string | null
   station_type?: string | null
   is_addon?: boolean
+  // Preparat satt vid utplacering — förvälj i kontrollformuläret
+  preparation_id?: string | null
   status: string
   latitude?: number
   longitude?: number
@@ -201,6 +203,10 @@ export default function StationInspectionModule() {
   useEffect(() => {
     setPickUpAfterSave(false)
   }, [selectedStationId])
+  // Upphämtade tilläggsstationer i denna runda (för auto-arbetsrapporten)
+  const [pickedUpCount, setPickedUpCount] = useState(0)
+  // Senast använda preparat i rundan — fallback-förval för nästa station
+  const lastUsedPreparationRef = useRef<string | null>(null)
 
   // Preparatdata
   const [preparations, setPreparations] = useState<Preparation[]>([])
@@ -680,6 +686,7 @@ export default function StationInspectionModule() {
           photo_path,
           measurement_value,
           measurement_unit,
+          preparation_id,
           technician:technicians(id, name)
         `)
         .eq('station_id', station.id)
@@ -688,6 +695,26 @@ export default function StationInspectionModule() {
         .limit(5)
 
       if (error) throw error
+
+      // Förvälj preparat när stationen inte redan kontrollerats i denna runda:
+      // 1) stationens senaste kontroll, 2) preparatet satt vid utplaceringen,
+      // 3) samma som föregående station i rundan. Endast preparat som är
+      // giltiga för stationstypen förväljs — teknikern kan alltid ändra.
+      if (!existing) {
+        const stationTypeId = station.station_type_data?.id
+        const validPrep = (prepId: string | null | undefined): string | null => {
+          if (!prepId) return null
+          const prep = preparations.find(p => p.id === prepId)
+          if (!prep) return null
+          if (stationTypeId && !(prep.station_type_ids?.includes(stationTypeId))) return null
+          return prepId
+        }
+        const suggested =
+          validPrep((data as { preparation_id?: string | null }[] | null)?.[0]?.preparation_id) ??
+          validPrep(station.preparation_id) ??
+          validPrep(lastUsedPreparationRef.current)
+        if (suggested) setSelectedPreparationId(suggested)
+      }
 
       // Hämta foto-URLs
       const historyWithPhotos = await Promise.all(
@@ -706,7 +733,7 @@ export default function StationInspectionModule() {
     } finally {
       setHistoryLoading(false)
     }
-  }, [session?.status, outdoorStations, inspectionResults])
+  }, [session?.status, outdoorStations, inspectionResults, preparations])
 
   // Hantera klick på outdoor station (från kartan)
   const handleOutdoorStationClick = useCallback((equipment: EquipmentPlacementWithRelations) => {
@@ -1112,6 +1139,8 @@ export default function StationInspectionModule() {
 
       // Markera som inspekterad
       setInspectedStationIds(prev => new Set(prev).add(selectedStation.id))
+      // Kom ihåg preparatet till nästa stations förval
+      if (selectedPreparationId) lastUsedPreparationRef.current = selectedPreparationId
 
       // Spara resultat till sammanställning
       setInspectionResults(prev => ({
@@ -1156,6 +1185,7 @@ export default function StationInspectionModule() {
               s.id === selectedStation.id ? { ...s, status: 'removed' } : s
             ))
           }
+          setPickedUpCount(prev => prev + 1)
           toast.success('Station kontrollerad och upphämtad — den slutar faktureras efter denna runda')
         } catch (pickupErr) {
           console.error('Kunde inte markera stationen som upphämtad:', pickupErr)
@@ -1285,11 +1315,29 @@ export default function StationInspectionModule() {
 
     try {
       setIsSubmitting(true)
+
+      // Systematisk arbetsrapport (fakturans "Utfört arbete") — kort och
+      // beskrivande, skrivs bara om ärendets fält är tomt
+      const inspectedCount = progress?.inspectedStations ?? inspectedStationIds.size
+      const totalCount = progress?.totalStations ?? inspectedCount
+      let autoReport = `Kontrollerat ${inspectedCount}/${totalCount} stationer.`
+      try {
+        const placedDuring = session.started_at
+          ? await AddonStationBillingService.countStationsPlacedSince(session.customer_id, session.started_at, true)
+          : 0
+        if (placedDuring > 0) {
+          autoReport += `\n${placedDuring} tilläggsstation${placedDuring === 1 ? '' : 'er'} utplacerad${placedDuring === 1 ? '' : 'e'} utöver avtal enligt överenskommelse med kund.`
+        }
+      } catch { /* rapporttext får aldrig blockera avslutet */ }
+      if (pickedUpCount > 0) {
+        autoReport += `\n${pickedUpCount} tilläggsstation${pickedUpCount === 1 ? '' : 'er'} upphämtad${pickedUpCount === 1 ? '' : 'e'} enligt överenskommelse med kund.`
+      }
+
       const updated = await completeInspectionSession(session.id)
       if (updated) {
         // Uppdatera även ärendets status till "Avslutat" om case_id finns
         if (session.case_id) {
-          const caseUpdated = await updateCaseStatusToCompleted(session.case_id)
+          const caseUpdated = await updateCaseStatusToCompleted(session.case_id, autoReport)
           if (!caseUpdated) {
             toast.error('Inspektionen avslutades men ärendets status kunde inte sättas till Avslutat — kontrollera ärendet')
           }
@@ -1318,7 +1366,7 @@ export default function StationInspectionModule() {
               customerId: session.customer_id,
               technicianId: session.technician_id,
               technicianName: session.technician?.name || null,
-              workPerformed: sessionNotes || null
+              workPerformed: sessionNotes ? `${autoReport}\n${sessionNotes}` : autoReport
             })
             if (billing.invoiceError) {
               toast.error(`Fakturan kunde inte skapas: ${billing.invoiceError}. Raderna ligger kvar — kontoret fakturerar från Merförsäljning.`, { duration: 10000 })

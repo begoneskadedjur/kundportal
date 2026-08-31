@@ -211,6 +211,10 @@ export interface IndoorStation {
   calculated_status: 'ok' | 'warning' | 'critical'; // Status baserad på mätningar vs tröskelvärden
   // Tillägg utöver avtal: styr rundfakturering och borttagsregler, inte livscykeln
   is_addon?: boolean;
+  // Preparat i stationen (satt vid utplacering) — kontrollflödet förväljer detta
+  preparation_id?: string | null;
+  preparation_quantity?: number | null;
+  preparation_unit?: string | null;
   status_updated_at: string | null;
   status_updated_by: string | null;
   placed_at: string;

@@ -1852,6 +1852,10 @@ export interface EquipmentPlacement {
   status_updated_by: string | null
   // Tillägg utöver avtal: styr rundfakturering och borttagsregler, inte livscykeln
   is_addon?: boolean
+  // Preparat i stationen (satt vid utplacering) — kontrollflödet förväljer detta
+  preparation_id?: string | null
+  preparation_quantity?: number | null
+  preparation_unit?: string | null
   comment: string | null
   photo_path: string | null
   // Koppling till station_types — sätts vid skapande via kod-/namnmatchning

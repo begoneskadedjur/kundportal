@@ -1416,15 +1416,18 @@ export async function updateSessionPhotoCaption(
  * Uppdatera ärendestatus när inspektionen är klar.
  * Sätter även completed_date i samma update (krävs av faktureringskedjan
  * och intäktsvyerna — tidigare lucka där kontrollärenden saknade avslutsdatum).
+ * workReport: systematisk avslutstext ("Kontrollerat 8/10 stationer." osv) —
+ * skrivs BARA när ärendets work_report är tomt, manuell text skrivs aldrig över.
  */
 export async function updateCaseStatusToCompleted(
-  caseId: string
+  caseId: string,
+  workReport?: string | null
 ): Promise<boolean> {
   const { data, error } = await supabase
     .from('cases')
     .update({ status: 'Avslutat', completed_date: toLocalISOStringWithOffset() })
     .eq('id', caseId)
-    .select('id')
+    .select('id, work_report')
 
   if (error) {
     console.error('Error updating case status:', error)
@@ -1434,6 +1437,14 @@ export async function updateCaseStatusToCompleted(
   if (!data || data.length === 0) {
     console.error('Error updating case status: 0 rader uppdaterades (behörighet kan saknas) för case', caseId)
     return false
+  }
+
+  if (workReport && !(data[0] as { work_report?: string | null }).work_report?.trim()) {
+    const { error: reportError } = await supabase
+      .from('cases')
+      .update({ work_report: workReport })
+      .eq('id', caseId)
+    if (reportError) console.warn('Kunde inte skriva auto-arbetsrapport:', reportError)
   }
 
   return true

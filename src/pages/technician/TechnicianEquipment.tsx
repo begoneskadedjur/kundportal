@@ -61,6 +61,8 @@ interface EstablishmentSummaryState {
   // Aktuellt listpris (avtals-/kundprislista): pris under detta räknas som
   // rabatt och går genom rabattgodkännande-flödet
   listPrice: number
+  // Systematisk avslutstext till ärendets work_report (fakturans Utfört arbete)
+  workReport: string
 }
 
 interface Customer {
@@ -374,7 +376,11 @@ export default function TechnicianEquipment() {
           longitude: formData.longitude,
           comment: formData.comment || null,
           status: 'active',
-          is_addon: formData.is_addon
+          is_addon: formData.is_addon,
+          // Preparat sparas även på stationen — kontrollflödet förväljer det
+          preparation_id: formData.preparation_id || null,
+          preparation_quantity: formData.preparation_quantity ?? null,
+          preparation_unit: formData.preparation_id ? (formData.preparation_unit || 'g') : null
         })
 
         if (!result.success || !result.equipment) {
@@ -574,18 +580,27 @@ export default function TechnicianEquipment() {
     setIsFormOpen(true)
   }
 
-  // Stäng etableringsärendet (RLS-verifierat: 0 uppdaterade rader = behörighet saknas)
-  const closeEstablishmentCase = async (caseId: string): Promise<boolean> => {
+  // Stäng etableringsärendet (RLS-verifierat: 0 uppdaterade rader = behörighet saknas).
+  // workReport: systematisk avslutstext — skrivs bara när fältet är tomt.
+  const closeEstablishmentCase = async (caseId: string, workReport?: string): Promise<boolean> => {
     const { data: updatedRows, error: updateError } = await supabase
       .from('cases')
       .update({ status: 'Avslutat', completed_date: toLocalISOStringWithOffset() })
       .eq('id', caseId)
-      .select('id')
+      .select('id, work_report')
 
     if (updateError || !updatedRows || updatedRows.length === 0) {
       console.error('Kunde inte avsluta etableringsärende:', updateError)
       toast.error('Etableringsärendet kunde inte avslutas — det kan vara tilldelat en annan tekniker')
       return false
+    }
+
+    if (workReport && !(updatedRows[0] as { work_report?: string | null }).work_report?.trim()) {
+      const { error: reportError } = await supabase
+        .from('cases')
+        .update({ work_report: workReport })
+        .eq('id', caseId)
+      if (reportError) console.warn('Kunde inte skriva auto-arbetsrapport:', reportError)
     }
     return true
   }
@@ -623,8 +638,9 @@ export default function TechnicianEquipment() {
     // placeringsformuläret går via denna väg — utan spärren stängdes ärendet
     // innan teknikern hunnit placera, och senare placeringar tappade tyst
     // både preparat- och faktureringskoppling.
+    let placedTotal = 0
     try {
-      const placedTotal = await AddonStationBillingService.countStationsPlacedSince(
+      placedTotal = await AddonStationBillingService.countStationsPlacedSince(
         customerId,
         openCase.created_at,
         false
@@ -698,9 +714,16 @@ export default function TechnicianEquipment() {
     const total = serviceItems.reduce((sum, i) =>
       sum + (i.id === addonItemId ? priceDraft * quantityDraft : i.unitPrice * i.quantity), 0)
 
+    // Systematisk arbetsrapport (fakturans "Utfört arbete")
+    const workReport =
+      `Etablering: ${placedTotal} station${placedTotal === 1 ? '' : 'er'} utplacerad${placedTotal === 1 ? '' : 'e'}` +
+      (addonCount > 0
+        ? `, varav ${addonCount} tilläggsstation${addonCount === 1 ? '' : 'er'} utöver avtal enligt överenskommelse med kund.`
+        : '.')
+
     if (total <= 0 && addonCount === 0) {
       // Vanlig avtalsetablering utan tillägg: stäng som tidigare, ingen faktureringsinfo
-      await closeEstablishmentCase(openCase.id)
+      await closeEstablishmentCase(openCase.id, workReport)
       refreshData()
       await checkAndPromptSchedule(customerId, customerName)
       return
@@ -715,7 +738,8 @@ export default function TechnicianEquipment() {
       addonCount,
       quantityDraft,
       priceDraft,
-      listPrice
+      listPrice,
+      workReport
     })
   }
 
@@ -770,7 +794,7 @@ export default function TechnicianEquipment() {
         }
       }
 
-      const closed = await closeEstablishmentCase(s.caseId)
+      const closed = await closeEstablishmentCase(s.caseId, s.workReport)
 
       if (closed) {
         // Fakturering i egen try/catch — får aldrig blockera avslutet
@@ -781,7 +805,7 @@ export default function TechnicianEquipment() {
             technicianId: technicianId || null,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             technicianName: (profile as any)?.full_name || profile?.email || null,
-            workPerformed: 'Etablering av stationer'
+            workPerformed: s.workReport
           })
           if (billing.invoiceError) {
             toast.error(`Fakturan kunde inte skapas: ${billing.invoiceError}. Raderna ligger kvar — kontoret fakturerar från Merförsäljning.`, { duration: 10000 })
