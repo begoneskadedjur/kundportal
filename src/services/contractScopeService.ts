@@ -189,8 +189,34 @@ export class ContractScopeService {
   }
 
   /**
+   * Spegla avtalsfält till kundraden avtalet bor på, så att avtalskartan och
+   * kundens inställningar (t.ex. BillingSettingsModal) visar samma sak.
+   * Bara levande avtal speglar — historiska avtal får inte skriva över
+   * kundens inställningar. Fel sväljs: speglingen får aldrig fälla
+   * avtalsändringen den hänger på.
+   */
+  private static async mirrorToCustomerRow(
+    contract: { customer_id: string | null; status: string | null },
+    patch: Record<string, string | null>
+  ): Promise<void> {
+    try {
+      if (!contract.customer_id) return
+      if (contract.status !== 'active' && contract.status !== 'signed') return
+      const { error } = await supabase
+        .from('customers')
+        .update(patch)
+        .eq('id', contract.customer_id)
+      if (error) console.error('Kunde inte spegla avtalsfält till kundraden:', error.message)
+    } catch (err) {
+      console.error('Kunde inte spegla avtalsfält till kundraden:', err)
+    }
+  }
+
+  /**
    * Sätt (eller rensa) avtalets prislista — styr avrops-/tilläggspriser per
    * ärende. Loggas i contract_events så bytet syns i avtalets tidslinje.
+   * Valet speglas till kundens price_list_id; borttagning speglas inte
+   * (då gäller kundens egen prislista, precis som förut).
    */
   static async setPriceList(
     contractId: string,
@@ -201,9 +227,11 @@ export class ContractScopeService {
       .from('contracts')
       .update({ price_list_id: priceListId })
       .eq('id', contractId)
-      .select('id')
+      .select('id, customer_id, status')
     if (error) throw new Error(`Kunde inte byta prislista: ${error.message}`)
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    if (priceListId) await this.mirrorToCustomerRow(data[0], { price_list_id: priceListId })
 
     const to = names?.to
     const from = names?.from
@@ -659,9 +687,11 @@ export class ContractScopeService {
       .from('contracts')
       .update({ begone_employee_name: clean })
       .eq('id', contractId)
-      .select('id')
+      .select('id, customer_id, status')
     if (error) throw new Error(`Kunde inte spara säljare: ${error.message}`)
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    if (clean) await this.mirrorToCustomerRow(data[0], { sales_person: clean })
 
     await this.logEvent(contractId, {
       event_type: 'other',
@@ -1019,9 +1049,11 @@ export class ContractScopeService {
       .from('contracts')
       .update({ label: typeName, contract_type: typeName })
       .eq('id', contractId)
-      .select('id')
+      .select('id, customer_id, status')
     if (error) throw new Error(`Kunde inte ändra avtalstyp: ${error.message}`)
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    await this.mirrorToCustomerRow(data[0], { contract_type: typeName })
 
     await this.logEvent(contractId, {
       event_type: 'other',
