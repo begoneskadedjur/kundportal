@@ -806,6 +806,32 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     setSiteModalOpen(true)
   }
 
+  /**
+   * Kundansvarig är verksamhetens relation, inte ett enskilt avtals — därför
+   * bor den i Verksamheten-panelen och inte på avtalspappren (säljaren på
+   * pappret är den som skrev under just det avtalet). Skrivs till HELA
+   * familjen: enheter får en kopia av HK:s värden när de skapas (SiteModal)
+   * och ärendeflödet läser enhetens värde före HK:s, så en kvarlämnad gammal
+   * kopia skulle annars vinna över det nya.
+   */
+  const saveAccountManager = async (name: string | null, email: string | null) => {
+    setBusy(true)
+    try {
+      const familyIds = [root.id, ...units.map((u) => u.id)]
+      const { error } = await supabase
+        .from('customers')
+        .update({ assigned_account_manager: name, account_manager_email: email })
+        .in('id', familyIds)
+      if (error) throw new Error(error.message)
+      toast.success(name ? `Kundansvarig satt till ${name}.` : 'Kundansvarig borttagen.')
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara kundansvarig')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Uppföljningsdata (§ 3)
   // -------------------------------------------------------------------------
@@ -1098,6 +1124,14 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             <Plus className="w-3.5 h-3.5" />
             Lägg till enhet
           </button>
+
+          <AccountManagerRow
+            name={root.assigned_account_manager ?? null}
+            email={root.account_manager_email ?? null}
+            staff={technicians}
+            disabled={busy}
+            onSave={saveAccountManager}
+          />
         </aside>
 
         {/* Höger: avtalsdokumenten */}
@@ -2343,6 +2377,104 @@ function SignatureLine({
           {isFallback && <span className="italic"> · från kundkortet</span>}
         </span>
       </button>
+    </div>
+  )
+}
+
+/**
+ * Kundansvarig-raden i Verksamheten-panelen. Väljs ur personalregistret,
+ * aldrig fritext (samma regel som säljaren på pappren) — e-posten följer
+ * med automatiskt från registret och visas i kundportalen.
+ */
+function AccountManagerRow({
+  name,
+  email,
+  staff,
+  disabled,
+  onSave,
+}: {
+  name: string | null
+  email: string | null
+  staff: { id: string; name: string; email?: string | null }[]
+  disabled: boolean
+  onSave: (name: string | null, email: string | null) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const commit = async (nextName: string) => {
+    const clean = nextName.trim() || null
+    if (clean === name) {
+      setEditing(false)
+      return
+    }
+    // Namn som står kvar men saknas i registret (någon som slutat) behåller
+    // sin sparade e-post; registervalda får registrets e-post.
+    const match = staff.find((s) => s.name === clean)
+    const nextEmail = clean === null ? null : match ? (match.email ?? null) : email
+    setSaving(true)
+    try {
+      await onSave(clean, nextEmail)
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="mt-4 pt-3 border-t border-slate-700/50">
+      <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">
+        Kundansvarig
+      </div>
+      {editing ? (
+        <div>
+          <select
+            defaultValue={name ?? ''}
+            onChange={(e) => void commit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setEditing(false)
+            }}
+            autoFocus
+            disabled={saving}
+            className="w-full px-3 py-1.5 text-sm rounded-lg bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#20c58f] cursor-pointer disabled:opacity-50"
+            aria-label="Kundansvarig"
+          >
+            <option value="">— ingen kundansvarig —</option>
+            {staff.map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
+              </option>
+            ))}
+            {name && !staff.some((s) => s.name === name) && (
+              <option value={name}>{name} (ej i personalregistret)</option>
+            )}
+          </select>
+          <div className="text-[10px] text-slate-500 mt-1">
+            {saving ? 'Sparar…' : 'Gäller hela verksamheten · Esc avbryter'}
+          </div>
+        </div>
+      ) : name ? (
+        <button
+          onClick={() => setEditing(true)}
+          disabled={disabled}
+          className="group block w-full text-left disabled:opacity-50"
+          title="Klicka för att byta kundansvarig"
+        >
+          <span className="flex items-center gap-1.5 text-sm font-medium text-slate-200 group-hover:text-[#20c58f] transition-colors">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#20c58f] shrink-0" />
+            {name}
+          </span>
+          {email && <span className="block text-[11px] text-slate-500 mt-0.5 pl-3">{email}</span>}
+        </button>
+      ) : (
+        <button
+          onClick={() => setEditing(true)}
+          disabled={disabled}
+          className="text-[11px] italic text-amber-300/90 hover:text-amber-200 underline decoration-dotted disabled:opacity-50"
+        >
+          Ange kundansvarig
+        </button>
+      )}
     </div>
   )
 }
