@@ -11,6 +11,7 @@ import {
 import { BugReportModal } from '../../shared/BugReportModal'
 import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
 import { IntranetLink } from '../../shared/IntranetLink'
+import { ChangelogLink } from '../../shared/ChangelogLink'
 import { ProfileLink } from '../../shared/ProfileLink'
 import { topLevelItems, navGroups } from './coordinatorNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
@@ -176,6 +177,9 @@ export function CoordinatorSidebar({
 
         {/* Intranät & Hjälpcenter */}
         <IntranetLink basePath="/koordinator" collapsed={collapsed} />
+
+        {/* Uppdateringar i systemet */}
+        <ChangelogLink collapsed={collapsed} />
 
         {/* Mitt konto (profil + byt lösenord) */}
         <ProfileLink basePath="/koordinator" collapsed={collapsed} />

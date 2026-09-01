@@ -12,6 +12,7 @@ import { useState } from 'react'
 import { BugReportModal } from '../../shared/BugReportModal'
 import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
 import { IntranetLink } from '../../shared/IntranetLink'
+import { ChangelogLink } from '../../shared/ChangelogLink'
 import { ProfileLink } from '../../shared/ProfileLink'
 import { topLevelItems, navGroups, favoriteItems } from './adminNavConfig'
 import { SidebarNavGroup } from './SidebarNavGroup'
@@ -225,6 +226,9 @@ export function AdminSidebar({
 
         {/* Intranät & Hjälpcenter */}
         <IntranetLink basePath="/admin" collapsed={collapsed} />
+
+        {/* Uppdateringar i systemet */}
+        <ChangelogLink collapsed={collapsed} />
 
         {/* Mitt konto (profil + byt lösenord) */}
         <ProfileLink basePath="/admin" collapsed={collapsed} />

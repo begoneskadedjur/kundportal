@@ -5,6 +5,7 @@ import { Menu, X, LogOut } from 'lucide-react'
 import { topLevelItems, navGroups, mobileBottomItems } from './saljareNavConfig'
 import { MobileNavGroup } from '../../admin/layout/MobileNavGroup'
 import { IntranetLink } from '../../shared/IntranetLink'
+import { ChangelogLink } from '../../shared/ChangelogLink'
 import { ProfileLink } from '../../shared/ProfileLink'
 
 interface SäljareMobileNavProps {
@@ -77,6 +78,7 @@ export function SäljareMobileNav({ currentPath, onSignOut }: SäljareMobileNavP
           ))}
           <div className="h-px bg-slate-700/50 my-3" />
           <IntranetLink basePath="/saljare" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
+          <ChangelogLink variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <ProfileLink basePath="/saljare" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <button
             onClick={onSignOut}

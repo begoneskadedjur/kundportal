@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { BugReportModal } from '../../shared/BugReportModal'
 import { IntranetLink } from '../../shared/IntranetLink'
+import { ChangelogLink } from '../../shared/ChangelogLink'
 import { ProfileLink } from '../../shared/ProfileLink'
 import { topLevelItems, navGroups } from './saljareNavConfig'
 import { SidebarNavGroup } from '../../admin/layout/SidebarNavGroup'
@@ -168,6 +169,9 @@ export function SäljareSidebar({
 
         {/* Intranät & Hjälpcenter */}
         <IntranetLink basePath="/saljare" collapsed={collapsed} />
+
+        {/* Uppdateringar i systemet */}
+        <ChangelogLink collapsed={collapsed} />
 
         {/* Mitt konto (profil + byt lösenord) */}
         <ProfileLink basePath="/saljare" collapsed={collapsed} />

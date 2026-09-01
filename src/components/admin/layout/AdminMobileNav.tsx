@@ -7,6 +7,7 @@ import { MobileNavGroup } from './MobileNavGroup'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
 import { IntranetLink } from '../../shared/IntranetLink'
+import { ChangelogLink } from '../../shared/ChangelogLink'
 import { ProfileLink } from '../../shared/ProfileLink'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { useAuth } from '../../../contexts/AuthContext'
@@ -103,6 +104,7 @@ export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) 
           <div className="h-px bg-slate-700/50 my-3" />
           <ReportIncidentButton role="admin" onNavigate={() => setMobileMenuOpen(false)} />
           <IntranetLink basePath="/admin" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
+          <ChangelogLink variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <ProfileLink basePath="/admin" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <button
             onClick={onSignOut}
