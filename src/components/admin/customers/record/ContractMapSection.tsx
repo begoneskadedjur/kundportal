@@ -807,23 +807,30 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   }
 
   /**
-   * Kundansvarig är verksamhetens relation, inte ett enskilt avtals — därför
-   * bor den i Verksamheten-panelen och inte på avtalspappren (säljaren på
-   * pappret är den som skrev under just det avtalet). Skrivs till HELA
-   * familjen: enheter får en kopia av HK:s värden när de skapas (SiteModal)
-   * och ärendeflödet läser enhetens värde före HK:s, så en kvarlämnad gammal
-   * kopia skulle annars vinna över det nya.
+   * Kundansvarig följer AVTALET och dess omfattning — kunden kan ha två avtal
+   * med olika ansvariga för olika enheter. Speglas därför bara till kundraden
+   * avtalet bor på + enheterna i § 1 Omfattning, aldrig hela familjen.
    */
-  const saveAccountManager = async (name: string | null, email: string | null) => {
+  const saveAccountManager = async (
+    contract: RecordContract,
+    name: string | null,
+    email: string | null
+  ) => {
     setBusy(true)
     try {
-      const familyIds = [root.id, ...units.map((u) => u.id)]
-      const { error } = await supabase
-        .from('customers')
-        .update({ assigned_account_manager: name, account_manager_email: email })
-        .in('id', familyIds)
-      if (error) throw new Error(error.message)
-      toast.success(name ? `Kundansvarig satt till ${name}.` : 'Kundansvarig borttagen.')
+      const covered = new Set<string>()
+      if (contract.customer_id) covered.add(contract.customer_id)
+      if (contract.covers_all_sites) {
+        locations.forEach((l) => covered.add(l.id))
+      } else {
+        for (const cs of activeScopeByContract.get(contract.id) ?? []) covered.add(cs.customer_id)
+      }
+      await ContractScopeService.setAccountManager(contract.id, name, email, [...covered])
+      toast.success(
+        name
+          ? `Kundansvarig för ${contractDisplayName(contract)} är nu ${name} — gäller enheterna i avtalets omfattning.`
+          : 'Kundansvarig borttagen från avtalet.'
+      )
       await onChanged()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Kunde inte spara kundansvarig')
@@ -1124,14 +1131,6 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             <Plus className="w-3.5 h-3.5" />
             Lägg till enhet
           </button>
-
-          <AccountManagerRow
-            name={root.assigned_account_manager ?? null}
-            email={root.account_manager_email ?? null}
-            staff={technicians}
-            disabled={busy}
-            onSave={saveAccountManager}
-          />
         </aside>
 
         {/* Höger: avtalsdokumenten */}
@@ -1202,6 +1201,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                   toast.error(err instanceof Error ? err.message : 'Kunde inte spara säljare')
                 }
               }}
+              onSaveAccountManager={(name, email) => saveAccountManager(c, name, email)}
               onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
               isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
               isSingleSite={isSingleSite}
@@ -2225,8 +2225,10 @@ interface PaperProps {
   onEditSignedAt?: () => void
   /** Spara avtalets säljare (den som skrivit under för BeGone) */
   onSaveSalesPerson?: (name: string | null) => Promise<void>
-  /** Aktiv personal att välja säljare bland — aldrig fritext */
-  staff: { id: string; name: string }[]
+  /** Spara avtalets kundansvarige — speglas till enheterna i § 1 Omfattning */
+  onSaveAccountManager?: (name: string | null, email: string | null) => Promise<void>
+  /** Aktiv personal att välja säljare/kundansvarig bland — aldrig fritext */
+  staff: { id: string; name: string; email?: string | null }[]
   /** Säg upp avtalet (saknas för redan avslutade) */
   onTerminate?: () => void
   /** Ångra uppsägning */
@@ -2382,34 +2384,46 @@ function SignatureLine({
 }
 
 /**
- * Kundansvarig-raden i Verksamheten-panelen. Väljs ur personalregistret,
- * aldrig fritext (samma regel som säljaren på pappren) — e-posten följer
- * med automatiskt från registret och visas i kundportalen.
+ * Kundansvarig-raden under säljarens signatur på avtalspappret. Följer
+ * AVTALET (kunden kan ha två avtal med olika ansvariga för olika enheter);
+ * kundkortets värde visas som dämpad fallback tills avtalet fått ett eget.
+ * Väljs ur personalregistret, aldrig fritext — e-posten följer med från
+ * registret och speglas till kundraderna som avtalet omfattar.
  */
-function AccountManagerRow({
-  name,
+function AccountManagerLine({
+  value,
   email,
+  fallback,
+  ink,
+  archived,
   staff,
-  disabled,
   onSave,
 }: {
-  name: string | null
+  value: string | null
   email: string | null
+  fallback: string | null
+  ink: (typeof PAPER_INK)['live' | 'archived']
+  archived: boolean
   staff: { id: string; name: string; email?: string | null }[]
-  disabled: boolean
-  onSave: (name: string | null, email: string | null) => Promise<void>
+  /** Utelämnas på arkiverade avtal */
+  onSave?: (name: string | null, email: string | null) => Promise<void>
 }) {
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  const shown = value ?? fallback
+  const isFallback = !value && !!fallback
+  const nameColor = archived ? '#3a424f' : '#2f3a46'
+
   const commit = async (nextName: string) => {
+    if (!onSave) return
     const clean = nextName.trim() || null
-    if (clean === name) {
+    if (clean === value) {
       setEditing(false)
       return
     }
-    // Namn som står kvar men saknas i registret (någon som slutat) behåller
-    // sin sparade e-post; registervalda får registrets e-post.
+    // Registerval ger registrets e-post; ett kvarstående namn utanför
+    // registret (någon som slutat) behåller sin sparade e-post.
     const match = staff.find((s) => s.name === clean)
     const nextEmail = clean === null ? null : match ? (match.email ?? null) : email
     setSaving(true)
@@ -2421,61 +2435,66 @@ function AccountManagerRow({
     }
   }
 
-  return (
-    <div className="mt-4 pt-3 border-t border-slate-700/50">
-      <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">
-        Kundansvarig
+  if (editing) {
+    return (
+      <div className="font-sans text-[10px]" style={{ color: ink.muted }}>
+        Kundansvarig ·{' '}
+        <select
+          defaultValue={value ?? ''}
+          onChange={(e) => void commit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          autoFocus
+          disabled={saving}
+          className="bg-transparent border-0 border-b border-dashed p-0 pr-4 text-[10px] focus:outline-none focus:ring-0 cursor-pointer appearance-none"
+          style={{ color: nameColor, borderBottomColor: ink.muted }}
+          aria-label="Kundansvarig"
+        >
+          <option value="">— ingen kundansvarig —</option>
+          {staff.map((s) => (
+            <option key={s.id} value={s.name}>
+              {s.name}
+            </option>
+          ))}
+          {value && !staff.some((s) => s.name === value) && (
+            <option value={value}>{value} (ej i personalregistret)</option>
+          )}
+        </select>
+        {saving && <span className="italic"> sparar…</span>}
       </div>
-      {editing ? (
-        <div>
-          <select
-            defaultValue={name ?? ''}
-            onChange={(e) => void commit(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setEditing(false)
-            }}
-            autoFocus
-            disabled={saving}
-            className="w-full px-3 py-1.5 text-sm rounded-lg bg-slate-800 border border-slate-700 text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#20c58f] cursor-pointer disabled:opacity-50"
-            aria-label="Kundansvarig"
-          >
-            <option value="">— ingen kundansvarig —</option>
-            {staff.map((s) => (
-              <option key={s.id} value={s.name}>
-                {s.name}
-              </option>
-            ))}
-            {name && !staff.some((s) => s.name === name) && (
-              <option value={name}>{name} (ej i personalregistret)</option>
-            )}
-          </select>
-          <div className="text-[10px] text-slate-500 mt-1">
-            {saving ? 'Sparar…' : 'Gäller hela verksamheten · Esc avbryter'}
-          </div>
-        </div>
-      ) : name ? (
-        <button
-          onClick={() => setEditing(true)}
-          disabled={disabled}
-          className="group block w-full text-left disabled:opacity-50"
-          title="Klicka för att byta kundansvarig"
-        >
-          <span className="flex items-center gap-1.5 text-sm font-medium text-slate-200 group-hover:text-[#20c58f] transition-colors">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#20c58f] shrink-0" />
-            {name}
-          </span>
-          {email && <span className="block text-[11px] text-slate-500 mt-0.5 pl-3">{email}</span>}
-        </button>
-      ) : (
-        <button
-          onClick={() => setEditing(true)}
-          disabled={disabled}
-          className="text-[11px] italic text-amber-300/90 hover:text-amber-200 underline decoration-dotted disabled:opacity-50"
-        >
-          Ange kundansvarig
-        </button>
-      )}
-    </div>
+    )
+  }
+
+  if (!shown) {
+    if (!onSave) return null
+    return (
+      <button
+        onClick={() => setEditing(true)}
+        className="block font-sans text-[10px] text-[#b45309] hover:text-[#262e38] underline decoration-dotted transition-colors"
+        title="Ange kundansvarig för avtalet — speglas till enheterna i § 1 Omfattning"
+      >
+        Ange kundansvarig
+      </button>
+    )
+  }
+
+  return (
+    <button
+      onClick={onSave ? () => setEditing(true) : undefined}
+      disabled={!onSave}
+      className={`block text-left font-sans text-[10px] transition-opacity ${
+        onSave ? 'hover:opacity-70' : 'cursor-default'
+      }`}
+      style={{ color: ink.muted }}
+      title={onSave ? 'Klicka för att byta kundansvarig' : undefined}
+    >
+      Kundansvarig ·{' '}
+      <span className="font-semibold" style={{ color: nameColor, opacity: isFallback ? 0.6 : 1 }}>
+        {shown}
+      </span>
+      {isFallback && <span className="italic"> · från kundkortet</span>}
+    </button>
   )
 }
 
@@ -2527,6 +2546,7 @@ function PaperContract({
   onSaveAgreementText,
   onEditSignedAt,
   onSaveSalesPerson,
+  onSaveAccountManager,
   staff,
   onTerminate,
   onReactivate,
@@ -3117,14 +3137,28 @@ function PaperContract({
             då faller signaturen tillbaka på kundkortets säljare, som kan vara
             fel person för just det avtalet. Klick redigerar direkt i
             skrivstilen; utseendet är identiskt före och efter. */}
-        <SignatureLine
-          value={contract.begone_employee_name ?? null}
-          fallback={root.sales_person ?? null}
-          ink={ink}
-          archived={archived}
-          staff={staff}
-          onSave={onSaveSalesPerson}
-        />
+        <div className="shrink-0 space-y-1.5">
+          <SignatureLine
+            value={contract.begone_employee_name ?? null}
+            fallback={root.sales_person ?? null}
+            ink={ink}
+            archived={archived}
+            staff={staff}
+            onSave={onSaveSalesPerson}
+          />
+          {/* Kundansvarig hör till avtalet och dess omfattning — kunden kan ha
+              två avtal med olika ansvariga. Kundkortets värde visas som dämpad
+              fallback tills avtalet fått ett eget. */}
+          <AccountManagerLine
+            value={contract.account_manager_name ?? null}
+            email={contract.account_manager_email ?? null}
+            fallback={root.assigned_account_manager ?? null}
+            ink={ink}
+            archived={archived}
+            staff={staff}
+            onSave={onSaveAccountManager}
+          />
+        </div>
         {/* Signeringsdatum och åtgärder flyttar in i avslutsnotisen på
             arkiverade avtal — inget att redigera där. */}
         {!archived && (

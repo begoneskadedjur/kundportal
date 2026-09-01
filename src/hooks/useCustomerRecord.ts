@@ -30,6 +30,9 @@ export type RecordContract = Contract & {
   visits_per_year?: number | null
   /** Datum då kunden faktiskt signerade (ej samma som created_at) */
   signed_at?: string | null
+  /** Kundansvarig för avtalet — speglas till kundraderna avtalet omfattar */
+  account_manager_name?: string | null
+  account_manager_email?: string | null
 }
 
 /** Besöksfrekvenser — samma värden som recurring_schedules använder */

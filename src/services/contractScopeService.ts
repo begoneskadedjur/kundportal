@@ -700,6 +700,47 @@ export class ContractScopeService {
     })
   }
 
+  /**
+   * Kundansvarig för AVTALET. Speglas till kundraderna avtalet OMFATTAR
+   * (raden det bor på + § 1-enheterna) — aldrig hela familjen: kunden kan ha
+   * två avtal med olika kundansvariga för olika enheter. Omfattningen
+   * beräknas av avtalskartan (covers_all_sites/contract_sites/enkelkundens
+   * egen rad) och skickas in som coveredCustomerIds. Borttagning speglas
+   * inte — ett annat avtal kan äga kundradens värde.
+   */
+  static async setAccountManager(
+    contractId: string,
+    name: string | null,
+    email: string | null,
+    coveredCustomerIds: string[]
+  ): Promise<void> {
+    const clean = name?.trim() || null
+    const cleanEmail = clean ? email?.trim() || null : null
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({ account_manager_name: clean, account_manager_email: cleanEmail })
+      .eq('id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte spara kundansvarig: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    if (clean && coveredCustomerIds.length > 0) {
+      const { error: mirrorError } = await supabase
+        .from('customers')
+        .update({ assigned_account_manager: clean, account_manager_email: cleanEmail })
+        .in('id', coveredCustomerIds)
+      if (mirrorError) {
+        console.error('Kunde inte spegla kundansvarig till kundraderna:', mirrorError.message)
+      }
+    }
+
+    await this.logEvent(contractId, {
+      event_type: 'other',
+      title: clean ? 'Kundansvarig satt' : 'Kundansvarig borttagen',
+      detail: clean ?? undefined,
+    })
+  }
+
   static async setSignedAt(contractId: string, signedAt: string | null): Promise<void> {
     const { data, error } = await supabase
       .from('contracts')
