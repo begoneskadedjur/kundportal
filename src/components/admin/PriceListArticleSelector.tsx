@@ -13,7 +13,7 @@ import { PriceListEditModal } from './settings/PriceListEditModal'
 import { PriceListService } from '../../services/priceListService'
 import { ArticleService } from '../../services/articleService'
 import { ARTICLE_CATEGORIES } from '../../types/articles'
-import type { PriceList, PriceListItemWithArticle, Article, ArticleCategory, ARTICLE_CATEGORY_CONFIG } from '../../types/articles'
+import type { PriceList, PriceListItemWithArticle, Article, ArticleCategory } from '../../types/articles'
 import type { SelectedArticleItem } from '../../types/products'
 import type { CustomerType } from '../../types/products'
 import { formatArticlePrice } from '../../utils/articlePricingCalculator'
@@ -35,6 +35,7 @@ const CATEGORY_CONFIG: Record<ArticleCategory, { label: string; icon: string; co
   Bekämpning: { label: 'Bekämpning', icon: '🐭', color: 'text-green-400', bgColor: 'bg-green-500/20' },
   Tillbehör: { label: 'Tillbehör', icon: '🛡️', color: 'text-purple-400', bgColor: 'bg-purple-500/20' },
   Arbetstid: { label: 'Arbetstid', icon: '⏱️', color: 'text-orange-400', bgColor: 'bg-orange-500/20' },
+  Underentreprenör: { label: 'Underentreprenör', icon: '🤝', color: 'text-amber-400', bgColor: 'bg-amber-500/20' },
   Övrigt: { label: 'Övrigt', icon: '📋', color: 'text-slate-400', bgColor: 'bg-slate-500/20' }
 }
 
@@ -217,7 +218,7 @@ export default function PriceListArticleSelector({
       setCopyName('')
       setCopySourceId(null)
       toast.success(`Prislista "${newPL.name}" skapad!`)
-    } catch (error) {
+    } catch {
       toast.error('Kunde inte kopiera prislista')
     } finally {
       setCopying(false)

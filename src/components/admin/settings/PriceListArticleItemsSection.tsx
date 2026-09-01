@@ -13,8 +13,9 @@ import type {
   PriceListItemWithArticle,
   QuantityTier,
   ArticleWithGroup,
+  ArticleCategory,
 } from '../../../types/articles'
-import { getArticleGroups } from '../../../types/articles'
+import { getArticleGroups, ARTICLE_CATEGORIES } from '../../../types/articles'
 import toast from 'react-hot-toast'
 
 interface Props {
@@ -63,7 +64,9 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [allArticles, setAllArticles] = useState<ArticleWithGroup[]>([])
   const [pickerSearch, setPickerSearch] = useState('')
+  const [pickerCategory, setPickerCategory] = useState<ArticleCategory | 'all'>('all')
   const [loadingArticles, setLoadingArticles] = useState(false)
+  const [bulkAdding, setBulkAdding] = useState(false)
 
   useEffect(() => {
     loadItems()
@@ -98,6 +101,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
 
   const openPicker = async () => {
     setPickerOpen(true)
+    setPickerCategory('all')
     if (allArticles.length === 0) {
       setLoadingArticles(true)
       try {
@@ -114,10 +118,25 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
 
   const addedArticleIds = useMemo(() => new Set(items.map(i => i.article_id!).filter(Boolean)), [items])
 
+  // Artiklar som inte redan ligger i prislistan
+  const availableArticles = useMemo(
+    () => allArticles.filter(a => !addedArticleIds.has(a.id)),
+    [allArticles, addedArticleIds]
+  )
+
+  // Kategorier med antal tillgängliga artiklar, i fast ordning
+  const pickerCategories = useMemo(() => {
+    const counts = new Map<ArticleCategory, number>()
+    availableArticles.forEach(a => counts.set(a.category, (counts.get(a.category) ?? 0) + 1))
+    return ARTICLE_CATEGORIES
+      .filter(c => counts.has(c))
+      .map(c => ({ category: c, count: counts.get(c)! }))
+  }, [availableArticles])
+
   const filteredPickerArticles = useMemo(() => {
     const q = pickerSearch.trim().toLowerCase()
-    return allArticles
-      .filter(a => !addedArticleIds.has(a.id))
+    return availableArticles
+      .filter(a => pickerCategory === 'all' || a.category === pickerCategory)
       .filter(a => {
         if (!q) return true
         return (
@@ -126,8 +145,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
           (a.description || '').toLowerCase().includes(q)
         )
       })
-      .slice(0, 50)
-  }, [allArticles, addedArticleIds, pickerSearch])
+  }, [availableArticles, pickerCategory, pickerSearch])
 
   const handleAddArticle = async (article: ArticleWithGroup) => {
     try {
@@ -138,13 +156,40 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
         quantity_tiers: null,
       })
       toast.success(`${article.name} tillagd`)
-      setPickerOpen(false)
-      setPickerSearch('')
       await loadItems()
       onUpdate()
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      toast.error(err?.message || 'Kunde inte lägga till artikel')
+      toast.error(err instanceof Error ? err.message : 'Kunde inte lägga till artikel')
+    }
+  }
+
+  // Lägg till alla artiklar som matchar aktuellt filter/sökning i ett svep
+  const handleAddAllFiltered = async () => {
+    if (filteredPickerArticles.length === 0 || bulkAdding) return
+    const scope = pickerCategory === 'all'
+      ? (pickerSearch.trim() ? 'alla matchande' : 'alla')
+      : `alla i ${pickerCategory}`
+    if (!confirm(`Lägg till ${scope} ${filteredPickerArticles.length} artiklar i prislistan? Grundpriset används som kundpris tills du ändrar det.`)) return
+    setBulkAdding(true)
+    try {
+      await PriceListService.bulkUpsertPriceListItems(
+        filteredPickerArticles.map(a => ({
+          price_list_id: priceListId,
+          article_id: a.id,
+          custom_price: Number(a.default_price) || 0,
+          quantity_tiers: null,
+        }))
+      )
+      toast.success(`${filteredPickerArticles.length} artiklar tillagda`)
+      setPickerCategory('all')
+      await loadItems()
+      onUpdate()
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : 'Kunde inte lägga till artiklarna')
+    } finally {
+      setBulkAdding(false)
     }
   }
 
@@ -155,9 +200,9 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
       toast.success('Artikel borttagen')
       await loadItems()
       onUpdate()
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      toast.error(err?.message || 'Kunde inte ta bort')
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ta bort')
     }
   }
 
@@ -237,9 +282,9 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
       toast.success('Sparad')
       await loadItems()
       onUpdate()
-    } catch (err: any) {
+    } catch (err) {
       console.error(err)
-      toast.error(err?.message || 'Kunde inte spara')
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara')
       setStates(prev => ({ ...prev, [articleId]: { ...prev[articleId], saving: false } }))
     }
   }
@@ -290,7 +335,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
                 const state = states[item.article_id!]
                 if (!state) return null
                 const article = item.article
-                const groups = getArticleGroups(article as any)
+                const groups = getArticleGroups(article as ArticleWithGroup)
                 const hasTiers = !!(state.tiers && state.tiers.length > 0)
                 return (
                   <>
@@ -465,7 +510,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
               </button>
             </div>
 
-            <div className="p-3 border-b border-slate-800">
+            <div className="p-3 border-b border-slate-800 space-y-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
@@ -477,6 +522,33 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
                   className="w-full pl-9 pr-3 py-2 text-sm rounded-lg bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
                 />
               </div>
+              {pickerCategories.length > 1 && (
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    onClick={() => setPickerCategory('all')}
+                    className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
+                      pickerCategory === 'all'
+                        ? 'bg-[#20c58f] text-[#fff] border-[#20c58f]'
+                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-slate-500'
+                    }`}
+                  >
+                    Alla ({availableArticles.length})
+                  </button>
+                  {pickerCategories.map(({ category, count }) => (
+                    <button
+                      key={category}
+                      onClick={() => setPickerCategory(category)}
+                      className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
+                        pickerCategory === category
+                          ? 'bg-[#20c58f] text-[#fff] border-[#20c58f]'
+                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-slate-500'
+                      }`}
+                    >
+                      {category} ({count})
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-2">
@@ -488,8 +560,8 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
                 <div className="text-center py-8 text-sm text-slate-500">
                   {allArticles.length === 0
                     ? 'Inga artiklar hittades'
-                    : pickerSearch
-                    ? 'Ingen artikel matchar sökningen'
+                    : pickerSearch || pickerCategory !== 'all'
+                    ? 'Ingen artikel matchar filtreringen'
                     : 'Alla artiklar är redan tillagda'}
                 </div>
               ) : (
@@ -527,13 +599,30 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
               )}
             </div>
 
-            <div className="px-4 py-2.5 border-t border-slate-800 flex justify-end">
-              <button
-                onClick={() => setPickerOpen(false)}
-                className="px-3 py-1.5 text-xs font-medium rounded bg-slate-800 text-slate-300 hover:bg-slate-700"
-              >
-                Stäng
-              </button>
+            <div className="px-4 py-2.5 border-t border-slate-800 flex items-center justify-between gap-3">
+              <div className="text-xs text-slate-500">
+                {loadingArticles
+                  ? ''
+                  : `Visar ${filteredPickerArticles.length} av ${availableArticles.length} tillgängliga artiklar`}
+              </div>
+              <div className="flex items-center gap-2">
+                {filteredPickerArticles.length > 1 && (
+                  <button
+                    onClick={handleAddAllFiltered}
+                    disabled={bulkAdding}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded bg-[#20c58f] text-[#fff] hover:bg-[#20c58f]/90 disabled:opacity-50"
+                  >
+                    {bulkAdding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    Lägg till alla ({filteredPickerArticles.length})
+                  </button>
+                )}
+                <button
+                  onClick={() => setPickerOpen(false)}
+                  className="px-3 py-1.5 text-xs font-medium rounded bg-slate-800 text-slate-300 hover:bg-slate-700"
+                >
+                  Stäng
+                </button>
+              </div>
             </div>
           </div>
         </div>
