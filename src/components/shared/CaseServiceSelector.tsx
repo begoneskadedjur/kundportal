@@ -27,6 +27,7 @@ import { supabase } from '../../lib/supabase'
 import { CaseBillingService } from '../../services/caseBillingService'
 import { ServiceCatalogService } from '../../services/servicesCatalogService'
 import { PriceListService } from '../../services/priceListService'
+import { ContractCoverageService, type ContractCoverage } from '../../services/contractCoverageService'
 import { PricingSettingsService } from '../../services/pricingSettingsService'
 import type { PricingSettings } from '../../types/pricingSettings'
 import { DEFAULT_PRICING_SETTINGS } from '../../types/pricingSettings'
@@ -133,6 +134,8 @@ export default function CaseServiceSelector({
   )
   const [articles, setArticles] = useState<ArticleWithEffectivePrice[]>([])
   const [addonServices, setAddonServices] = useState<ServiceWithGroup[]>([])
+  /** Tjänster som ingår i kundens avtal (§ 4): pris 0, faktureras aldrig */
+  const [coverage, setCoverage] = useState<ContractCoverage>({ contractId: null, coveredServiceIds: new Set(), contractLabel: null })
   const [resolvedServiceGroupId, setResolvedServiceGroupId] = useState<string | null>(null)
   const [ovrigtServiceGroupId, setOvrigtServiceGroupId] = useState<string | null>(null)
   const [pricingSettings, setPricingSettings] = useState<PricingSettings>({
@@ -252,6 +255,13 @@ export default function CaseServiceSelector({
             .maybeSingle()
           caseContractId = (caseRow as { contract_id?: string | null } | null)?.contract_id ?? null
         }
+        // "Ingår i avtalet": tjänster i avtalets § 4 skapas med pris 0 och
+        // faktureras aldrig som merförsäljning.
+        const coverageData =
+          customerId && caseType === 'contract'
+            ? await ContractCoverageService.forCase(customerId, caseId, caseType)
+            : { contractId: null, coveredServiceIds: new Set<string>(), contractLabel: null }
+        setCoverage(coverageData)
 
         const [articlesData, itemsData, allServicesData, settingsData, customerPricesData, customerArticlePricesData] = await Promise.all([
           CaseBillingService.getArticlesWithPrices(customerId, resolvedArticleGroupId),
@@ -259,7 +269,7 @@ export default function CaseServiceSelector({
           ServiceCatalogService.getAllActiveServices(),
           PricingSettingsService.get(),
           // Avtalssteget: avtalets prislista → kundens prislista (avtalet vinner per tjänst)
-          customerId ? PriceListService.getServicePricesForCase(customerId, caseContractId) : Promise.resolve({}),
+          customerId ? PriceListService.getServicePricesForCase(customerId, caseContractId) : Promise.resolve({} as Record<string, number>),
           customerId ? PriceListService.getCustomerArticlePrices(customerId) : Promise.resolve({}),
         ])
         setPricingSettings(settingsData)
@@ -290,7 +300,8 @@ export default function CaseServiceSelector({
           const freshItems = allStatusItems.filter(i => i.status === 'pending')
           if (stillMissing) {
             const customerPrice = customerPricesData[svc.id]
-            const priceToUse = customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
+            const coveredByContract = coverageData.coveredServiceIds.has(svc.id)
+            const priceToUse = coveredByContract ? 0 : customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
             await CaseBillingService.addServiceToCase({
               case_id: caseId,
               case_type: caseType,
@@ -303,6 +314,7 @@ export default function CaseServiceSelector({
               vat_rate: 25,
               added_by_technician_id: technicianId || undefined,
               added_by_technician_name: technicianName || undefined,
+              covered_by_contract: coveredByContract,
             })
             finalItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
           } else {
@@ -418,9 +430,11 @@ export default function CaseServiceSelector({
   // ──────────────────────────────────────────────────────────────
   const handleAddAddon = async (svc: ServiceWithGroup) => {
     if (saving) return
-    // Använd kundens fasta pris om det finns, annars base_price
+    // Ingår i avtalet (§ 4): pris 0 och aldrig merförsäljning. Annars kundens
+    // fasta pris om det finns, annars base_price.
+    const coveredByContract = coverage.coveredServiceIds.has(svc.id)
     const customerPrice = customerServicePrices[svc.id]
-    const priceToUse = customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
+    const priceToUse = coveredByContract ? 0 : customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
     if (draftMode && !caseId) {
       const price = priceToUse
       const discounted = calculateDiscountedPrice(price, 0)
@@ -479,6 +493,7 @@ export default function CaseServiceSelector({
         vat_rate: 25,
         added_by_technician_id: technicianId || undefined,
         added_by_technician_name: technicianName || undefined,
+        covered_by_contract: coveredByContract,
       })
       await reloadItems()
       setShowAddonPicker(false)
@@ -1242,6 +1257,15 @@ export default function CaseServiceSelector({
                         Fast pris
                       </span>
                     )}
+                    {item.covered_by_contract && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium"
+                        title={coverage.contractLabel ? `Ingår i ${coverage.contractLabel}, faktureras inte` : "Ingår i avtalet, faktureras inte"}
+                      >
+                        <CheckCircle className="w-3 h-3" />
+                        Ingår i avtalet
+                      </span>
+                    )}
                     {/* Avtalstillägg: endast avtalskundärenden med sparade rader */}
                     {caseType === 'contract' && customerId && caseId && !draftMode && (
                       item.contract_addition_annual != null ? (
@@ -1543,7 +1567,11 @@ export default function CaseServiceSelector({
                         <span className="text-xs text-slate-400 mr-1">{svc.code}</span>
                         <span className="text-sm text-white">{svc.name}</span>
                       </div>
-                      {svc.base_price != null && (
+                      {coverage.coveredServiceIds.has(svc.id) ? (
+                        <span className="text-xs text-[#20c58f] whitespace-nowrap ml-2" title={coverage.contractLabel ? `Ingår i ${coverage.contractLabel}` : "Ingår i avtalet"}>
+                          Ingår i avtalet
+                        </span>
+                      ) : svc.base_price != null && (
                         <span className="text-xs text-[#20c58f] whitespace-nowrap ml-2">
                           {formatPrice(svc.base_price)}
                         </span>

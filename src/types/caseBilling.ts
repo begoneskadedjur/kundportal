@@ -49,6 +49,8 @@ export interface CaseBillingItem {
   item_type: CaseBillingItemType
   /** Avtalsinnehåll (§ 6): premium = ingår i årspremien, per_year = egen rad på årsfakturan, per_round = tilläggsstation per kontrollrunda */
   billing_model?: 'premium' | 'per_year' | 'per_round' | null
+  /** Raden täcks av kundens avtal (§ 4) och faktureras inte som merförsäljning */
+  covered_by_contract?: boolean | null
   quantity: number
   unit_price: number
   discount_percent: number
@@ -142,6 +144,8 @@ export interface AddCaseServiceInput {
   added_by_technician_id?: string
   added_by_technician_name?: string
   notes?: string
+  /** Tjänsten ingår i kundens avtal (§ 4): pris 0, faktureras aldrig */
+  covered_by_contract?: boolean
 }
 
 /**

@@ -86,6 +86,22 @@ type DragPayload =
   | { type: 'unit'; unitId: string }
   | { type: 'org' }
   | { type: 'scoperow'; unitId: string; scopeRowId: string; fromContractId: string }
+  /** Ett papper: släpps på arkivet (uppsägning) eller på ett annat papper (byt ordning) */
+  | { type: 'paper'; contractId: string }
+  /** Katalogen: prislista → § 2, tjänst → § 4, utrustning → § 6 */
+  | {
+      type: 'catalog'
+      kind: 'pricelist' | 'service' | 'equipment' | 'station_type'
+      id: string
+      name: string
+      code?: string | null
+      basePrice?: number | null
+    }
+
+/** Enheten en dragning handlar om (null för verksamheten, papper och katalog) */
+function unitIdOf(payload: DragPayload): string | null {
+  return payload.type === 'unit' || payload.type === 'scoperow' ? payload.unitId : null
+}
 
 interface DragState {
   payload: DragPayload
@@ -96,14 +112,25 @@ interface DragState {
   invalidReason: string | null
   /** Musen är över det tomma avtalsbladet (nytt avtal) */
   overBlank: boolean
+  /** § 1-rad över Verksamhetspanelen (avsluta täckning) */
+  overAside: boolean
+  /** Papper över arkivet (uppsägning) */
+  overArchive: boolean
   /** Släppzon inuti pappret: 'scope' (§ 1, standard) eller 'refs' (§ 8) */
   overZone: DropZone
 }
 
-type DropZone = 'scope' | 'refs'
+type DropZone = 'scope' | 'refs' | 'content' | 'equipment' | 'pricelist'
 
 /** Vad som ligger under pekaren vid en dragning */
-type DropTarget = { kind: 'paper'; contract: RecordContract; zone: DropZone } | { kind: 'blank' } | null
+type DropTarget =
+  | { kind: 'paper'; contract: RecordContract; zone: DropZone }
+  | { kind: 'blank' }
+  /** Verksamhetspanelen: en § 1-rad släpps tillbaka = täckningen avslutas */
+  | { kind: 'aside' }
+  /** Arkivet: ett papper släpps = uppsägning */
+  | { kind: 'archive' }
+  | null
 
 /** Enhet som släppts på § 8 Referenser: sätt Er referens */
 interface RefPrompt {
@@ -211,6 +238,34 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [fortnoxTarget, setFortnoxTarget] = useState<LinkFortnoxTarget | null>(null)
   /** § 3: enhetens besöksplan redigeras */
   const [sitePlanPrompt, setSitePlanPrompt] = useState<SitePlanPrompt | null>(null)
+  /** Katalogen i Verksamhetspanelen */
+  const [catalogOpen, setCatalogOpen] = useState(false)
+  const [catalogTab, setCatalogTab] = useState<'pricelist' | 'service' | 'equipment'>('pricelist')
+  const [catalogSearch, setCatalogSearch] = useState('')
+  const [catalog, setCatalog] = useState<{
+    services: { id: string; code: string | null; name: string; base_price: number | null; is_contract_service: boolean | null; is_addon_service: boolean | null; used_for_addon_stations: boolean | null }[]
+    stationTypes: { id: string; code: string | null; name: string }[]
+  }>({ services: [], stationTypes: [] })
+
+  useEffect(() => {
+    if (!catalogOpen) return
+    let cancelled = false
+    ;(async () => {
+      const [{ data: services }, { data: types }] = await Promise.all([
+        supabase.from('services').select('id, code, name, base_price, is_contract_service, is_addon_service, used_for_addon_stations').eq('is_active', true).order('code'),
+        supabase.from('station_types').select('id, code, name').eq('is_active', true).order('sort_order'),
+      ])
+      if (cancelled) return
+      setCatalog({
+        services: (services ?? []) as typeof catalog.services,
+        stationTypes: (types ?? []) as typeof catalog.stationTypes,
+      })
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [catalogOpen])
   /** Avtal som ska raderas (bekräftelse) */
   const [deletePrompt, setDeletePrompt] = useState<RecordContract | null>(null)
   /** Avtal vars besöksfrekvens ska sättas */
@@ -248,7 +303,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 
     // Papper = riktiga aktiva avtal. Kundrads-/importrester visas i en egen
     // sektion nedanför — de kan inte ta emot omfattning (ingen riktig avtalsrad).
-    const papers = contracts.filter((c) => !c.fromCustomerRow && !isImportedContract(c) && !isEndedContract(c))
+    // Visningsordning: display_order (dra papper över papper), sedan skapandeordning
+    const papers = contracts
+      .filter((c) => !c.fromCustomerRow && !isImportedContract(c) && !isEndedContract(c))
+      .sort((a, b) => {
+        const d = Number(a.display_order ?? 0) - Number(b.display_order ?? 0)
+        return d !== 0 ? d : (a.created_at ?? '').localeCompare(b.created_at ?? '')
+      })
     const leftovers = contracts.filter((c) => (c.fromCustomerRow || isImportedContract(c)) && !isEndedContract(c))
     // Kundkortsavtal som kan materialiseras till riktiga avtalsrader
     const customerRowContracts = leftovers.filter((c) => c.fromCustomerRow)
@@ -452,6 +513,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       if (isImportedContract(contract)) return 'Importrest — konvertera till riktigt avtal först'
       if (contract.covers_all_sites) return 'Omfattar redan hela verksamheten'
       if (payload.type === 'org') return null
+      if (payload.type === 'paper' || payload.type === 'catalog') return null
       const unitId = payload.unitId
       // Enkelkund: avtalet bor på kundraden som ÄR lokalen. Då ska lokalen
       // ändå kunna skrivas in i omfattningen — det är hela poängen.
@@ -473,19 +535,44 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     const el = document.elementFromPoint(x, y)
     if (!el) return null
     if (el.closest('[data-blank-sheet]')) return { kind: 'blank' }
+    if (el.closest('[data-drop-zone="archive"]')) return { kind: 'archive' }
+    if (el.closest('[data-drop-zone="aside"]')) return { kind: 'aside' }
     const paperEl = el.closest<HTMLElement>('[data-paper-id]')
     if (!paperEl) return null
     const contract = papers.find((c) => c.id === paperEl.dataset.paperId)
     if (!contract) return null
     const zoneEl = el.closest<HTMLElement>('[data-drop-zone]')
-    const zone: DropZone = zoneEl?.dataset.dropZone === 'refs' ? 'refs' : 'scope'
+    const raw = zoneEl?.dataset.dropZone
+    const zone: DropZone =
+      raw === 'refs' || raw === 'content' || raw === 'equipment' || raw === 'pricelist' ? raw : 'scope'
     return { kind: 'paper', contract, zone }
+  }
+
+  /** Vad får släppas var? Katalog och papper har egna regler, enheter går via validateDrop. */
+  const validateAnyDrop = (payload: DragPayload, target: DropTarget): string | null => {
+    if (!target) return null
+    if (payload.type === 'paper') {
+      if (target.kind === 'archive') return null
+      if (target.kind === 'paper') return target.contract.id === payload.contractId ? 'Släpp på ett annat papper för att byta ordning' : null
+      return 'Dra pappret till arkivet (säg upp) eller över ett annat papper (byt ordning)'
+    }
+    if (payload.type === 'catalog') {
+      if (target.kind !== 'paper') return 'Släpp på ett avtal'
+      if (isTerminatedButRunning(target.contract)) return 'Avtalet är uppsagt'
+      return null
+    }
+    if (target.kind === 'aside') return payload.type === 'scoperow' ? null : 'Dra en rad ur § 1 hit för att avsluta täckningen'
+    if (target.kind === 'archive') return 'Bara papper kan arkiveras'
+    if (target.kind === 'blank') return payload.type === 'scoperow' ? 'Omfattningsrader flyttas mellan avtal' : null
+    if (target.zone === 'refs') return validateRefDrop(payload, target.contract)
+    return validateDrop(payload, target.contract)
   }
 
   /** Släpp på § 8: enheten måste redan stå i avtalets omfattning */
   const validateRefDrop = useCallback(
     (payload: DragPayload, contract: RecordContract): string | null => {
       if (payload.type === 'org') return 'Dra in en enskild enhet för att sätta dess referens'
+      if (payload.type === 'paper' || payload.type === 'catalog') return 'Bara enheter kan få en referenskod här'
       if (contract.covers_all_sites) return null
       if (contract.customer_id === payload.unitId) return null
       const scope = activeScopeByContract.get(contract.id) ?? []
@@ -507,8 +594,18 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       overContractId: null,
       invalidReason: null,
       overBlank: false,
+      overAside: false,
+      overArchive: false,
       overZone: 'scope',
     })
+  }
+
+  /** Vad dragningen heter i spöket och släppytorna */
+  const payloadLabel = (payload: DragPayload): string => {
+    if (payload.type === 'org') return 'Hela verksamheten'
+    if (payload.type === 'paper') return contractDisplayName(papers.find((c) => c.id === payload.contractId) ?? ({ label: 'Avtal' } as RecordContract))
+    if (payload.type === 'catalog') return payload.name
+    return customerRowName(customerById.get(payload.unitId) ?? ({ company_name: 'Enhet' } as RecordCustomer))
   }
 
   const dragRef = useRef<DragState | null>(null)
@@ -534,13 +631,11 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         x: e.clientX,
         y: e.clientY,
         overContractId: paper?.contract.id ?? null,
-        overBlank: target?.kind === 'blank' && prev.payload.type !== 'scoperow',
+        overBlank: target?.kind === 'blank' && (prev.payload.type === 'unit' || prev.payload.type === 'org'),
+        overAside: target?.kind === 'aside' && prev.payload.type === 'scoperow',
+        overArchive: target?.kind === 'archive' && prev.payload.type === 'paper',
         overZone: paper?.zone ?? 'scope',
-        invalidReason: paper
-          ? paper.zone === 'refs'
-            ? validateRefDrop(prev.payload, paper.contract)
-            : validateDrop(prev.payload, paper.contract)
-          : null,
+        invalidReason: target && (target.kind === 'paper' || target.kind === 'aside' || target.kind === 'archive') ? validateAnyDrop(prev.payload, target) : null,
       })
     }
     const onUp = (e: PointerEvent) => {
@@ -549,24 +644,43 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       if (!prev?.started) return
       const target = findDropTarget(e.clientX, e.clientY)
       if (!target) return
+      const err = validateAnyDrop(prev.payload, target)
+      if (err) {
+        if (target.kind === 'paper' || target.kind === 'aside' || target.kind === 'archive') toast.error(err)
+        return
+      }
+      const payload = prev.payload
       if (target.kind === 'blank') {
-        // Omfattningsrader flyttas mellan befintliga avtal, de skapar inga nya.
-        if (prev.payload.type === 'scoperow') return
-        setTypePrompt({ source: null, blankPayload: prev.payload })
+        if (payload.type === 'unit' || payload.type === 'org') setTypePrompt({ source: null, blankPayload: payload })
+        return
+      }
+      if (target.kind === 'aside') {
+        if (payload.type !== 'scoperow') return
+        const contract = papers.find((c) => c.id === payload.fromContractId)
+        const cs = (activeScopeByContract.get(payload.fromContractId) ?? []).find((r) => r.id === payload.scopeRowId)
+        if (contract && cs) endCoverage(contract, cs, e.clientX, e.clientY)
+        return
+      }
+      if (target.kind === 'archive') {
+        if (payload.type !== 'paper') return
+        const contract = papers.find((c) => c.id === payload.contractId)
+        if (contract) setTerminatePrompt(contract)
+        return
+      }
+      if (payload.type === 'paper') {
+        const from = papers.find((c) => c.id === payload.contractId)
+        if (from) void swapOrder(from, target.contract)
+        return
+      }
+      if (payload.type === 'catalog') {
+        void dropCatalog(payload, target.contract, target.zone)
         return
       }
       if (target.zone === 'refs') {
-        const err = validateRefDrop(prev.payload, target.contract)
-        if (err) toast.error(err)
-        else if (prev.payload.type !== 'org') setRefPrompt({ contract: target.contract, unitId: prev.payload.unitId })
+        if (payload.type !== 'org') setRefPrompt({ contract: target.contract, unitId: payload.unitId })
         return
       }
-      const err = validateDrop(prev.payload, target.contract)
-      if (err) {
-        toast.error(err)
-      } else {
-        openDatePromptForDrop(prev.payload, target.contract, e.clientX, e.clientY)
-      }
+      openDatePromptForDrop(payload, target.contract, e.clientX, e.clientY)
     }
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
@@ -575,7 +689,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       window.removeEventListener('pointerup', onUp)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!drag, validateDrop, validateRefDrop, papers])
+  }, [!!drag, validateDrop, validateRefDrop, papers, activeScopeByContract])
 
   const openDatePromptForDrop = (payload: DragPayload, contract: RecordContract, x: number, y: number) => {
     // "Hela verksamheten" → fråga först om det gäller även framtida enheter
@@ -583,6 +697,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       setScopeModePrompt({ x, y, contract })
       return
     }
+    // Papper och katalog har egna släppvägar (swapOrder, dropCatalog)
+    if (payload.type === 'paper' || payload.type === 'catalog') return
     const subject = customerRowName(customerById.get(payload.unitId) ?? ({ company_name: 'Enhet' } as RecordCustomer))
     setDatePrompt({
       x,
@@ -641,15 +757,148 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         toast.success(
           `${customerRowName(customerById.get(payload.unitId)!)} flyttad till ${contractDisplayName(contract)} — gamla täckningen avslutas ${formatDateSv(date)}.`
         )
-      } else {
+      } else if (payload.type === 'unit') {
         await ContractScopeService.addSite(contract.id, payload.unitId, date)
-        toast.success(
-          `${customerRowName(customerById.get(payload.unitId)!)} står nu i § 1 Omfattning för ${contractDisplayName(contract)} från ${formatDateSv(date)}.`
+        const unitName = customerRowName(customerById.get(payload.unitId)!)
+        // Ångra: raden raderas om den är färsk, annars avslutas täckningen
+        const { data: fresh } = await supabase
+          .from('contract_sites')
+          .select('id')
+          .eq('contract_id', contract.id)
+          .eq('customer_id', payload.unitId)
+          .is('active_to', null)
+          .maybeSingle()
+        undoToast(
+          `${unitName} står nu i § 1 Omfattning för ${contractDisplayName(contract)} från ${formatDateSv(date)}.`,
+          fresh
+            ? async () => {
+                await ContractScopeService.removeSiteIfFresh(fresh.id)
+                await onChanged()
+              }
+            : null
         )
       }
       await onChanged()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Kunde inte uppdatera omfattningen')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Toast med Ångra-knapp (fem sekunder). Ångra-fel visas som vanlig felrad. */
+  const undoToast = (message: string, undo: (() => Promise<void>) | null) => {
+    if (!undo) {
+      toast.success(message)
+      return
+    }
+    toast(
+      (t) => (
+        <span className="flex items-center gap-3">
+          <span>{message}</span>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id)
+              try {
+                await undo()
+                toast.success('Ångrat.')
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'Kunde inte ångra')
+              }
+            }}
+            className="shrink-0 text-xs font-bold text-[#20c58f] border border-[#20c58f]/40 rounded-lg px-2.5 py-1 hover:bg-[#20c58f]/10"
+          >
+            Ångra
+          </button>
+        </span>
+      ),
+      { duration: 6000, icon: '✓' }
+    )
+  }
+
+  /** Byt visningsordning: pappret som dras tar den andras plats */
+  const swapOrder = async (from: RecordContract, to: RecordContract) => {
+    setBusy(true)
+    try {
+      const fromOrder = Number(from.display_order ?? papers.indexOf(from) + 1)
+      const toOrder = Number(to.display_order ?? papers.indexOf(to) + 1)
+      await ContractScopeService.swapDisplayOrder({ id: from.id, order: fromOrder }, { id: to.id, order: toOrder })
+      undoToast(`${contractDisplayName(from)} ligger nu ${toOrder < fromOrder ? 'före' : 'efter'} ${contractDisplayName(to)}.`, async () => {
+        await ContractScopeService.swapDisplayOrder({ id: from.id, order: toOrder }, { id: to.id, order: fromOrder })
+        await onChanged()
+      })
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte byta ordning')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Katalogen: prislista → § 2, tjänst → § 4 (ingår i premien), utrustning →
+   * § 6 (per styck och år), stationstyp → § 6 (per kontrollrunda). Priset tas
+   * från avtalets prislista, annars kundens, annars tjänstens grundpris.
+   */
+  const dropCatalog = async (payload: Extract<DragPayload, { type: 'catalog' }>, contract: RecordContract, zone: DropZone) => {
+    if (payload.kind === 'pricelist') {
+      await changePriceList(contract, payload.id)
+      return
+    }
+    setBusy(true)
+    try {
+      const listId = contract.price_list_id ?? root.price_list_id ?? null
+      let unitPrice = payload.basePrice ?? 0
+      let serviceId = payload.id
+      let serviceCode = payload.code ?? null
+      let serviceName = payload.name
+      let stationTypeId: string | null = null
+      let billingModel: 'premium' | 'per_year' | 'per_round' =
+        payload.kind === 'service' ? (zone === 'equipment' ? 'per_year' : 'premium') : payload.kind === 'station_type' ? 'per_round' : zone === 'content' ? 'premium' : 'per_year'
+      if (payload.kind === 'station_type') {
+        // Tilläggsstation: raden bär tjänsten som är flaggad för tilläggsstationer
+        const addon = catalog.services.find((s) => s.used_for_addon_stations)
+        if (!addon) throw new Error('Ingen tjänst är flaggad för tilläggsstationer (tjänstekatalogen)')
+        serviceId = addon.id
+        serviceCode = addon.code
+        serviceName = `${payload.name} (tilläggsstation)`
+        stationTypeId = payload.id
+        unitPrice = addon.base_price ?? 0
+        billingModel = 'per_round'
+      }
+      if (listId) {
+        const { data: priced } = await supabase
+          .from('price_list_items')
+          .select('custom_price')
+          .eq('price_list_id', listId)
+          .eq('service_id', serviceId)
+          .maybeSingle()
+        if (priced?.custom_price != null) unitPrice = Number(priced.custom_price)
+      }
+      const rowId = await ContractScopeService.addContentServiceRow(contract.id, contract.customer_id ?? root.id, {
+        serviceId,
+        serviceCode,
+        serviceName,
+        unitPrice,
+        quantity: 1,
+        billingModel,
+        stationTypeId,
+        note: 'Tillagd från katalogen i avtalskartan',
+      })
+      setContentReloadKey((k) => k + 1)
+      setBillingPlansKey((k) => k + 1)
+      undoToast(
+        `${serviceName} tillagd i ${billingModel === 'premium' ? '§ 4 Tjänster i avtalet' : '§ 6 Utrustning'} för ${contractDisplayName(contract)}${
+          unitPrice ? ` (${formatKr(unitPrice)}${billingModel === 'per_round' ? '/runda' : '/år'})` : ' (pris saknas, sätt i redigeraren)'
+        }.`,
+        async () => {
+          await ContractScopeService.removeContentRow(contract.id, rowId)
+          setContentReloadKey((k) => k + 1)
+          setBillingPlansKey((k) => k + 1)
+        }
+      )
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte lägga till raden')
     } finally {
       setBusy(false)
     }
@@ -668,7 +917,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         setBusy(true)
         try {
           await ContractScopeService.endSite(cs.id, date)
-          toast.success(`Täckningen för ${unitName} avslutas ${formatDateSv(date)}.`)
+          undoToast(`Täckningen för ${unitName} avslutas ${formatDateSv(date)}.`, async () => {
+            await ContractScopeService.reopenSite(cs.id)
+            await onChanged()
+          })
           await onChanged()
         } catch (err) {
           toast.error(err instanceof Error ? err.message : 'Kunde inte avsluta täckningen')
@@ -731,7 +983,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
    * materialiserar bara kundradens första.
    */
   const createFromBlank = async (payload: DragPayload, typeName?: string) => {
-    if (payload.type === 'scoperow') return
+    if (payload.type !== 'unit' && payload.type !== 'org') return
     setBusy(true)
     try {
       const contractId = await ContractScopeService.createBlankContract(root.id, {
@@ -887,7 +1139,6 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     }
     // papers.length: planen läses om när avtal tillkommer eller försvinner;
     // billingPlansKey bumpas efter varje skrivning som påverkar fakturorna.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [root.id, papers.length, contentReloadKey, billingPlansKey, contracts])
 
   // § 6: aktiva stationer per kundrad, ur utplaceringarna (ute) och planritningarna (inne)
@@ -1262,14 +1513,19 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     if ((contract.price_list_id ?? null) === priceListId) return
     setBusy(true)
     try {
+      const previous = contract.price_list_id ?? null
       await ContractScopeService.setPriceList(contract.id, priceListId, {
         from: priceListName(contract.price_list_id),
         to: priceListName(priceListId),
       })
-      toast.success(
+      undoToast(
         priceListId
           ? `Prislistan för ${contractDisplayName(contract)} är nu ${priceListName(priceListId) ?? 'uppdaterad'} — gäller nya ärenden direkt.`
-          : `Prislistan togs bort från ${contractDisplayName(contract)} — kundens prislista gäller.`
+          : `Prislistan togs bort från ${contractDisplayName(contract)} — kundens prislista gäller.`,
+        async () => {
+          await ContractScopeService.setPriceList(contract.id, previous, { from: priceListName(priceListId), to: priceListName(previous) })
+          await onChanged()
+        }
       )
       await onChanged()
     } catch (err) {
@@ -1514,11 +1770,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     return match ? 'hot' : 'dim'
   }
 
-  const dragSourceUnitId = drag?.started
-    ? drag.payload.type === 'org'
-      ? null
-      : drag.payload.unitId
-    : null
+  const dragSourceUnitId = drag?.started ? unitIdOf(drag.payload) : null
 
   return (
     <div>
@@ -1625,8 +1877,22 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         </svg>
 
         {/* Vänster: verksamheten */}
-        <aside className="relative z-10 bg-slate-800/30 border border-slate-700 rounded-2xl p-4 lg:sticky lg:top-4">
-          <h3 className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-3">Verksamheten</h3>
+        <aside
+          data-drop-zone="aside"
+          className={`relative z-10 bg-slate-800/30 border rounded-2xl p-4 lg:sticky lg:top-4 transition-colors ${
+            drag?.started && drag.payload.type === 'scoperow'
+              ? drag.overAside
+                ? 'border-amber-400 bg-amber-400/10'
+                : 'border-amber-400/40'
+              : 'border-slate-700'
+          }`}
+        >
+          <h3 className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
+            Verksamheten
+            {drag?.started && drag.payload.type === 'scoperow' && (
+              <span className="ml-2 normal-case tracking-normal text-amber-300 font-medium">släpp här för att avsluta täckningen</span>
+            )}
+          </h3>
 
           {units.length > 0 && (
             <div
@@ -1735,6 +2001,100 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             <Plus className="w-3.5 h-3.5" />
             Lägg till enhet
           </button>
+
+          {/* Katalogen: systemets prislistor, tjänster och utrustning. Dras in
+              i § 2, § 4 och § 6 på ett papper. Systemkatalog, inte kundinnehåll,
+              så regeln "inget kundnivå-innehåll i Verksamhetspanelen" håller. */}
+          {papers.length > 0 && (
+            <details className="mt-3 border border-slate-700/60 rounded-xl" open={catalogOpen} onToggle={(e) => setCatalogOpen((e.target as HTMLDetailsElement).open)}>
+              <summary className="cursor-pointer px-3 py-2 text-[10px] uppercase tracking-wider text-slate-500 font-semibold select-none flex items-center gap-2">
+                Katalog
+                <span className="ml-auto normal-case tracking-normal font-medium text-slate-500">dra in på ett avtal</span>
+              </summary>
+              <div className="px-3 pb-3">
+                <div className="flex gap-1 mb-2">
+                  {(['pricelist', 'service', 'equipment'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setCatalogTab(tab)}
+                      className={`text-[11px] font-semibold rounded-lg px-2.5 py-1 transition-colors ${
+                        catalogTab === tab ? 'bg-[#20c58f] text-[#fff]' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                      }`}
+                    >
+                      {tab === 'pricelist' ? 'Prislistor' : tab === 'service' ? 'Tjänster' : 'Utrustning'}
+                    </button>
+                  ))}
+                </div>
+                {catalogTab !== 'pricelist' && (
+                  <input
+                    value={catalogSearch}
+                    onChange={(e) => setCatalogSearch(e.target.value)}
+                    placeholder="Sök…"
+                    className="w-full mb-2 px-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white focus:ring-1 focus:ring-[#20c58f] focus:outline-none"
+                  />
+                )}
+                <div className="space-y-1.5 max-h-72 overflow-y-auto pr-0.5">
+                  {catalogTab === 'pricelist' &&
+                    priceLists.map((pl) => (
+                      <div
+                        key={pl.id}
+                        onPointerDown={(e) => startDrag(e, { type: 'catalog', kind: 'pricelist', id: pl.id, name: pl.name })}
+                        className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-2.5 py-1.5 text-xs text-slate-200 cursor-grab select-none touch-none hover:border-[#20c58f]"
+                      >
+                        <span className="truncate">{pl.name}</span>
+                        {pl.is_default && <span className="ml-auto text-[10px] text-slate-500">standard</span>}
+                      </div>
+                    ))}
+                  {catalogTab === 'service' &&
+                    catalog.services
+                      .filter((s) => !s.is_contract_service && !s.is_addon_service && !s.used_for_addon_stations)
+                      .filter((s) => !catalogSearch || s.name.toLowerCase().includes(catalogSearch.toLowerCase()) || (s.code ?? '').includes(catalogSearch))
+                      .slice(0, 60)
+                      .map((s) => (
+                        <div
+                          key={s.id}
+                          onPointerDown={(e) => startDrag(e, { type: 'catalog', kind: 'service', id: s.id, name: s.name, code: s.code, basePrice: s.base_price })}
+                          className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-2.5 py-1.5 text-xs text-slate-200 cursor-grab select-none touch-none hover:border-[#20c58f]"
+                        >
+                          <span className="text-[10px] text-slate-500 tabular-nums w-7 shrink-0">{s.code}</span>
+                          <span className="truncate">{s.name}</span>
+                          {s.base_price != null && <span className="ml-auto text-[10px] text-slate-500 tabular-nums whitespace-nowrap">{formatKr(s.base_price)}</span>}
+                        </div>
+                      ))}
+                  {catalogTab === 'equipment' && (
+                    <>
+                      {catalog.services
+                        .filter((s) => s.is_addon_service || s.used_for_addon_stations)
+                        .filter((s) => !catalogSearch || s.name.toLowerCase().includes(catalogSearch.toLowerCase()))
+                        .map((s) => (
+                          <div
+                            key={s.id}
+                            onPointerDown={(e) => startDrag(e, { type: 'catalog', kind: 'equipment', id: s.id, name: s.name, code: s.code, basePrice: s.base_price })}
+                            className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-2.5 py-1.5 text-xs text-slate-200 cursor-grab select-none touch-none hover:border-[#20c58f]"
+                          >
+                            <span className="text-[10px] text-slate-500 tabular-nums w-7 shrink-0">{s.code}</span>
+                            <span className="truncate">{s.name}</span>
+                            <span className="ml-auto text-[10px] text-slate-500 whitespace-nowrap">per år</span>
+                          </div>
+                        ))}
+                      {catalog.stationTypes
+                        .filter((t) => !catalogSearch || t.name.toLowerCase().includes(catalogSearch.toLowerCase()))
+                        .map((t) => (
+                          <div
+                            key={t.id}
+                            onPointerDown={(e) => startDrag(e, { type: 'catalog', kind: 'station_type', id: t.id, name: t.name, code: t.code })}
+                            className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-2.5 py-1.5 text-xs text-slate-200 cursor-grab select-none touch-none hover:border-[#20c58f]"
+                          >
+                            <span className="truncate">{t.name}</span>
+                            <span className="ml-auto text-[10px] text-slate-500 whitespace-nowrap">tilläggsstation, per runda</span>
+                          </div>
+                        ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            </details>
+          )}
         </aside>
 
         {/* Höger: avtalsdokumenten */}
@@ -1819,13 +2179,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               isInvalidTarget={drag?.started ? drag.overContractId === c.id && !!drag.invalidReason : false}
               invalidReason={drag?.overContractId === c.id ? drag?.invalidReason ?? null : null}
               awaiting={!!drag?.started}
-              dragSubject={
-                drag?.started
-                  ? drag.payload.type === 'org'
-                    ? 'Hela verksamheten'
-                    : customerRowName(customerById.get(drag.payload.unitId) ?? ({ company_name: 'Enheten' } as RecordCustomer))
-                  : null
-              }
+              dragSubject={drag?.started ? payloadLabel(drag.payload) : null}
+              dragKind={drag?.started ? drag.payload.type : null}
+              onPaperDrag={(e) => startDrag(e, { type: 'paper', contractId: c.id })}
               registerRef={(el) => {
                 if (el) paperRefs.current.set(c.id, el)
                 else paperRefs.current.delete(c.id)
@@ -1901,7 +2257,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             className={`relative rounded-md rounded-tr-xl border-2 border-dashed px-6 py-6 text-center font-sans transition-all ${
               drag?.started && drag.overBlank
                 ? 'border-[#20c58f] bg-[#20c58f]/10 scale-[1.006]'
-                : drag?.started && drag.payload.type !== 'scoperow'
+                : drag?.started && (drag.payload.type === 'unit' || drag.payload.type === 'org')
                   ? 'border-[#20c58f]/50'
                   : 'border-slate-700'
             }`}
@@ -1914,11 +2270,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             </p>
             <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
               {drag?.started && drag.overBlank
-                ? `Släpp: ett nytt avtal skapas med ${
-                    drag.payload.type === 'org'
-                      ? 'alla enheter'
-                      : customerRowName(customerById.get(drag.payload.unitId) ?? ({ company_name: 'enheten' } as RecordCustomer))
-                  } i § 1`
+                ? `Släpp: ett nytt avtal skapas med ${drag.payload.type === 'org' ? 'alla enheter' : payloadLabel(drag.payload)} i § 1`
                 : 'Dra in en enhet eller Hela verksamheten hit. Du väljer avtalstyp, sedan fylls premie (§ 7) och löptid (§ 9) i på pappret.'}
             </p>
           </div>
@@ -1959,6 +2311,19 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Arkivytan: ett papper som dras hit sägs upp (uppsägningsdialogen öppnas) */}
+          {drag?.started && drag.payload.type === 'paper' && (
+            <div
+              data-drop-zone="archive"
+              className={`flex items-center justify-center gap-2 border-2 border-dashed rounded-2xl px-4 py-4 text-sm font-semibold transition-colors ${
+                drag.overArchive ? 'border-red-400 bg-red-400/10 text-red-300' : 'border-slate-600 text-slate-400'
+              }`}
+            >
+              <Archive className="w-4 h-4" />
+              {drag.overArchive ? 'Släpp: avtalet sägs upp' : 'Dra hit för att säga upp avtalet'}
             </div>
           )}
 
@@ -2098,22 +2463,40 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         >
           {drag.payload.type === 'org' ? (
             <Building2 className="w-4 h-4 text-[#20c58f]" />
+          ) : drag.payload.type === 'paper' ? (
+            <FileText className="w-4 h-4 text-slate-300" />
+          ) : drag.payload.type === 'catalog' ? (
+            <Plus className="w-4 h-4 text-slate-300" />
           ) : (
             <Home className="w-4 h-4 text-slate-300" />
           )}
           <span>
-            {drag.payload.type === 'org'
-              ? 'Hela verksamheten'
-              : customerRowName(customerById.get(drag.payload.unitId) ?? ({ company_name: 'Enhet' } as RecordCustomer))}
+            {payloadLabel(drag.payload)}
             <span className={`block text-[10px] font-normal ${drag.invalidReason ? 'text-red-400' : 'text-[#20c58f]'}`}>
               {drag.invalidReason ??
                 (drag.overBlank
                   ? 'Släpp för att skapa ett nytt avtal'
-                  : drag.overContractId
-                    ? drag.overZone === 'refs'
-                      ? 'Släpp för att sätta Er referens'
-                      : 'Släpp för att skriva in i avtalet'
-                    : 'Släpp på ett avtal eller det tomma bladet')}
+                  : drag.overAside
+                    ? 'Släpp för att avsluta täckningen'
+                    : drag.overArchive
+                      ? 'Släpp för att säga upp avtalet'
+                      : drag.overContractId
+                        ? drag.payload.type === 'paper'
+                          ? 'Släpp för att byta ordning'
+                          : drag.payload.type === 'catalog'
+                            ? drag.payload.kind === 'pricelist'
+                              ? 'Släpp för att byta prislista (§ 2)'
+                              : drag.overZone === 'equipment' || drag.payload.kind !== 'service'
+                                ? 'Släpp för att lägga till i § 6 Utrustning'
+                                : 'Släpp för att lägga till i § 4 Tjänster'
+                            : drag.overZone === 'refs'
+                              ? 'Släpp för att sätta Er referens'
+                              : 'Släpp för att skriva in i avtalet'
+                        : drag.payload.type === 'paper'
+                          ? 'Släpp på arkivet eller ett annat papper'
+                          : drag.payload.type === 'catalog'
+                            ? 'Släpp på ett avtal'
+                            : 'Släpp på ett avtal eller det tomma bladet')}
             </span>
           </span>
         </div>
@@ -3193,6 +3576,10 @@ interface PaperProps {
   invalidReason: string | null
   awaiting: boolean
   dragSubject: string | null
+  /** Vilken typ som dras (styr släpptexten) */
+  dragKind?: DragPayload['type'] | null
+  /** Greppet vid stämpeln: dra pappret till arkivet eller över ett annat papper */
+  onPaperDrag?: (e: React.PointerEvent) => void
   isUnitContract: boolean
   /** Kunden saknar enheter — kundraden ÄR lokalen */
   isSingleSite: boolean
@@ -3549,6 +3936,8 @@ function PaperContract({
   invalidReason,
   awaiting,
   dragSubject,
+  dragKind,
+  onPaperDrag,
   isUnitContract,
   isSingleSite,
   registerRef,
@@ -3678,9 +4067,19 @@ function PaperContract({
         >
           {isInvalidTarget
             ? invalidReason
-            : dropZone === 'refs'
-              ? `Släpp: sätt Er referens för ${dragSubject} i § 8`
-              : `Släpp: ${dragSubject} skrivs in i § 1 Omfattning`}
+            : dragKind === 'paper'
+              ? `Släpp: ${dragSubject} byter plats med det här pappret`
+              : dragKind === 'catalog'
+                ? dropZone === 'pricelist'
+                  ? `Släpp: ${dragSubject} blir avtalets prislista (§ 2)`
+                  : dropZone === 'equipment'
+                    ? `Släpp: ${dragSubject} läggs till i § 6 Utrustning`
+                    : dropZone === 'content'
+                      ? `Släpp: ${dragSubject} läggs till i § 4 Tjänster i avtalet`
+                      : `Släpp: ${dragSubject} läggs till på avtalet`
+                : dropZone === 'refs'
+                  ? `Släpp: sätt Er referens för ${dragSubject} i § 8`
+                  : `Släpp: ${dragSubject} skrivs in i § 1 Omfattning`}
         </div>
       )}
       {awaiting && !isDropTarget && !isInvalidTarget && (
@@ -3735,7 +4134,11 @@ function PaperContract({
             {orgnr ? ` (${orgnr})` : ''}
           </div>
         </div>
-        <div className="ml-auto shrink-0 text-center self-center">
+        <div
+          className={`ml-auto shrink-0 text-center self-center ${onPaperDrag ? 'cursor-grab select-none touch-none' : ''}`}
+          onPointerDown={onPaperDrag}
+          title={onPaperDrag ? 'Dra pappret till arkivet för att säga upp det, eller över ett annat papper för att byta ordning' : undefined}
+        >
           <ContractStamp
             variant={archived ? 'ended' : terminatedRunning ? 'terminated' : 'active'}
             color={state === 'active' ? accent : undefined}
@@ -3939,8 +4342,8 @@ function PaperContract({
         ink={ink}
       />
 
-      {/* § 2 Prislista */}
-      <div className="mt-3.5">
+      {/* § 2 Prislista — släppzon för prislistor från katalogen */}
+      <div className="mt-3.5" data-drop-zone="pricelist">
         <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
           <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 2 · Prislista för avrop</h4>
           {avropCatalog.catalog.priced.length > 0 && (
@@ -4125,26 +4528,32 @@ function PaperContract({
       </div>
 
       {/* § 4 Tjänster i avtalet + § 5 Marginal */}
-      <ContractContentSection
-        content={contentData.content}
-        loading={contentData.loading}
-        onEdit={onEditContent}
-        showAccumulated={isAvrop}
-        accumulated={accumulatedOutcome.summary}
-        accumulatedLoading={accumulatedOutcome.loading}
-      />
+      {/* § 4 + § 5 — släppzon för tjänster från katalogen */}
+      <div data-drop-zone="content">
+        <ContractContentSection
+          content={contentData.content}
+          loading={contentData.loading}
+          onEdit={onEditContent}
+          showAccumulated={isAvrop}
+          accumulated={accumulatedOutcome.summary}
+          accumulatedLoading={accumulatedOutcome.loading}
+        />
+      </div>
 
-      {/* § 6 Utrustning i avtalet — samma rader som § 4/§ 5, med faktureringsläge */}
-      <ContractEquipmentSection
-        services={contentData.content.services}
-        articles={contentData.content.articles}
-        loading={contentData.loading}
-        ink={ink}
-        archived={archived}
-        onEdit={onEditContent}
-        onChangeModel={onChangeLineModel}
-        stationCount={stationCount}
-      />
+      {/* § 6 Utrustning i avtalet — samma rader som § 4/§ 5, med faktureringsläge.
+          Släppzon för utrustning och stationstyper från katalogen. */}
+      <div data-drop-zone="equipment">
+        <ContractEquipmentSection
+          services={contentData.content.services}
+          articles={contentData.content.articles}
+          loading={contentData.loading}
+          ink={ink}
+          archived={archived}
+          onEdit={onEditContent}
+          onChangeModel={onChangeLineModel}
+          stationCount={stationCount}
+        />
+      </div>
 
       {/* § 7 Premie och fakturering — avtalet är källan till årspremiefakturan */}
       <ContractPremiumSection

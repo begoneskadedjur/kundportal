@@ -422,7 +422,8 @@ export class CaseBillingService {
         added_by_technician_name: input.added_by_technician_name || null,
         status: 'pending',
         requires_approval: itemRequiresApproval(discountPercent),
-        notes: input.notes || null
+        notes: input.notes || null,
+        covered_by_contract: input.covered_by_contract ?? false
       })
       .select()
       .single()

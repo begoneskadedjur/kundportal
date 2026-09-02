@@ -381,7 +381,8 @@ export class ContractBillingService {
     // marginalkalkyl) och ligger kvar i case_billing_items — de ska ALDRIG bli
     // fakturarader. Samma filtrering som privat/företag (invoiceService.createInvoiceFromCase).
     // Fallback: gamla ärenden utan tjänsterader faktureras på sina artikelrader (bakåtkompat).
-    const serviceItems = allCaseBillingItems.filter(i => i.item_type === 'service')
+    // Rader som täcks av avtalet (§ 4, covered_by_contract) faktureras aldrig som merförsäljning.
+    const serviceItems = allCaseBillingItems.filter(i => i.item_type === 'service' && !i.covered_by_contract)
     const caseBillingItems = serviceItems.length > 0
       ? serviceItems
       : allCaseBillingItems.filter(i => i.item_type === 'article' || !i.item_type)

@@ -93,7 +93,8 @@ export class InvoiceService {
     const allBillingItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
 
     // Filtrera: fakturarader = item_type='service', eller alla om inga tjänsterader finns (bakåtkompatibilitet)
-    const serviceItems = allBillingItems.filter(i => i.item_type === 'service')
+    // Rader som täcks av avtalet (§ 4, covered_by_contract) faktureras aldrig.
+    const serviceItems = allBillingItems.filter(i => i.item_type === 'service' && !i.covered_by_contract)
     const billingItems = serviceItems.length > 0 ? serviceItems : allBillingItems.filter(i => i.item_type === 'article' || !i.item_type)
 
     if (billingItems.length === 0) {

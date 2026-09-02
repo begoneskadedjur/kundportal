@@ -1629,6 +1629,131 @@ export class ContractScopeService {
     return newEnd
   }
 
+  /**
+   * Ångra "dra in i § 1": raden raderas bara om den är färsk (under tio
+   * minuter) och inget pekar på avtalet för enheten; annars avslutas
+   * täckningen med samma datum som den började (historiken bevaras).
+   */
+  static async removeSiteIfFresh(scopeRowId: string): Promise<'deleted' | 'ended'> {
+    const { data: row, error } = await supabase
+      .from('contract_sites')
+      .select('id, contract_id, customer_id, active_from, created_at')
+      .eq('id', scopeRowId)
+      .single()
+    if (error || !row) throw new Error('Omfattningsraden hittades inte')
+    const ageMs = Date.now() - new Date(row.created_at).getTime()
+    const [{ data: sessions }, { data: cases }] = await Promise.all([
+      supabase.from('station_inspection_sessions').select('id').eq('contract_id', row.contract_id).eq('customer_id', row.customer_id).limit(1),
+      supabase.from('cases').select('id').eq('contract_id', row.contract_id).eq('customer_id', row.customer_id).limit(1),
+    ])
+    const hasDeps = (sessions?.length ?? 0) > 0 || (cases?.length ?? 0) > 0
+    if (ageMs < 10 * 60 * 1000 && !hasDeps) {
+      const { error: delErr } = await supabase.from('contract_sites').delete().eq('id', scopeRowId)
+      if (delErr) throw new Error(`Kunde inte ångra: ${delErr.message}`)
+      await this.logEvent(row.contract_id, { event_type: 'note', title: 'Omfattning ångrad', detail: 'Enheten togs bort ur § 1 direkt efter att den dragits in' })
+      return 'deleted'
+    }
+    await this.endSite(scopeRowId, row.active_from ?? todayKey())
+    return 'ended'
+  }
+
+  /** Ångra "avsluta täckning": öppna raden igen. */
+  static async reopenSite(scopeRowId: string): Promise<void> {
+    const { data, error } = await supabase
+      .from('contract_sites')
+      .update({ active_to: null })
+      .eq('id', scopeRowId)
+      .select('contract_id')
+    if (error) throw new Error(`Kunde inte återöppna täckningen: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Omfattningsraden hittades inte')
+    await this.logEvent(data[0].contract_id, { event_type: 'note', title: 'Avslutad täckning ångrad', detail: 'Enheten står åter i § 1 Omfattning' })
+  }
+
+  /** Byt visningsordning mellan två papper (drag papper över papper). */
+  static async swapDisplayOrder(a: { id: string; order: number }, b: { id: string; order: number }): Promise<void> {
+    const orderA = a.order === b.order ? b.order + 1 : b.order
+    const orderB = a.order === b.order ? a.order : a.order
+    const [r1, r2] = await Promise.all([
+      supabase.from('contracts').update({ display_order: orderA }).eq('id', a.id),
+      supabase.from('contracts').update({ display_order: orderB }).eq('id', b.id),
+    ])
+    if (r1.error || r2.error) throw new Error(`Kunde inte byta ordning: ${r1.error?.message ?? r2.error?.message}`)
+  }
+
+  /**
+   * Katalogen: lägg en tjänst eller utrustning på avtalet som rad i
+   * avtalsinnehållet. premium = ingår i premien (§ 4), per_year = utöver
+   * premien (§ 6), per_round = tilläggsstation per kontrollrunda (§ 6).
+   */
+  static async addContentServiceRow(
+    contractId: string,
+    customerId: string,
+    input: {
+      serviceId: string
+      serviceCode: string | null
+      serviceName: string
+      unitPrice: number
+      quantity?: number
+      vatRate?: number
+      billingModel: 'premium' | 'per_year' | 'per_round'
+      stationTypeId?: string | null
+      note?: string | null
+    }
+  ): Promise<string> {
+    const qty = input.quantity ?? 1
+    const total = Math.round(input.unitPrice * qty * 100) / 100
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .insert({
+        case_id: contractId,
+        case_type: 'contract',
+        customer_id: customerId,
+        item_type: 'service',
+        service_id: input.serviceId,
+        service_code: input.serviceCode,
+        service_name: input.serviceName,
+        article_name: input.serviceName,
+        quantity: qty,
+        unit_price: input.unitPrice,
+        discount_percent: 0,
+        discounted_price: input.unitPrice,
+        total_price: total,
+        vat_rate: input.vatRate ?? 25,
+        price_source: 'standard',
+        status: 'pending',
+        requires_approval: false,
+        billing_model: input.billingModel,
+        station_type_id: input.stationTypeId ?? null,
+        notes: input.note ?? null,
+      })
+      .select('id')
+      .single()
+    if (error || !data) throw new Error(`Kunde inte lägga till raden: ${error?.message ?? 'okänt fel'}`)
+    await this.logEvent(contractId, {
+      event_type: input.billingModel === 'premium' ? 'other' : 'billing',
+      title: `${input.serviceName} tillagd i ${input.billingModel === 'premium' ? '§ 4' : '§ 6'}`,
+      detail:
+        input.billingModel === 'premium'
+          ? `Ingår i premien${input.unitPrice ? ` · ${input.unitPrice.toLocaleString('sv-SE')} kr/år` : ''}`
+          : input.billingModel === 'per_year'
+            ? `${qty} st à ${input.unitPrice.toLocaleString('sv-SE')} kr per år, utöver premien`
+            : 'Per kontrollrunda (tilläggsstation)',
+    })
+    return data.id
+  }
+
+  /** Ångra en katalograd: raderas bara om den inte hunnit faktureras. */
+  static async removeContentRow(contractId: string, itemId: string): Promise<void> {
+    const { error } = await supabase
+      .from('case_billing_items')
+      .delete()
+      .eq('id', itemId)
+      .eq('case_id', contractId)
+      .eq('case_type', 'contract')
+      .eq('status', 'pending')
+    if (error) throw new Error(`Kunde inte ångra: ${error.message}`)
+  }
+
   /** Räkna om kundradens speglade avtalsfält (summa av levande avtal). */
   static async resyncCustomerRow(customerId: string): Promise<void> {
     await this.mirrorSharedFields(customerId)
