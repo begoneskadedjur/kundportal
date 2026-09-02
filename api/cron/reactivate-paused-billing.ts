@@ -1,5 +1,7 @@
 // api/cron/reactivate-paused-billing.ts
-// Daglig cron: återaktivera kunder vars billing_paused_until har passerat.
+// Daglig cron: återaktivera kunder och avtal vars billing_paused_until har passerat.
+// Avtalskartan som motor (fas 5): pausen bor på avtalet när kunden har avtal,
+// kundraden bär den bara för synth-kunder utan contracts-rad.
 // Körs 04:00 UTC via Vercel Cron.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
@@ -38,29 +40,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (error) throw error
 
     const ids = (customers ?? []).map(c => c.id)
-    if (ids.length === 0) {
-      return {
-        status: 'success' as const,
-        summary: { reactivated: 0, details: [] },
-      }
+
+    if (ids.length > 0) {
+      const { error: updateErr } = await supabase
+        .from('customers')
+        .update({
+          billing_active: true,
+          billing_paused_until: null,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', ids)
+      if (updateErr) throw updateErr
     }
 
-    const { error: updateErr } = await supabase
-      .from('customers')
-      .update({
-        billing_active: true,
-        billing_paused_until: null,
-        updated_at: new Date().toISOString(),
-      })
-      .in('id', ids)
+    // Avtal med passerad paus
+    const { data: contracts, error: contractsErr } = await supabase
+      .from('contracts')
+      .select('id, customer_id, label, address_label, billing_paused_until')
+      .eq('billing_active', false)
+      .not('billing_paused_until', 'is', null)
+      .lte('billing_paused_until', today)
+    if (contractsErr) throw contractsErr
 
-    if (updateErr) throw updateErr
+    const contractIds = (contracts ?? []).map(c => c.id)
+    if (contractIds.length > 0) {
+      const { error: contractUpdateErr } = await supabase
+        .from('contracts')
+        .update({
+          billing_active: true,
+          billing_paused_until: null,
+          updated_at: new Date().toISOString(),
+        })
+        .in('id', contractIds)
+      if (contractUpdateErr) throw contractUpdateErr
+    }
 
     return {
       status: 'success' as const,
       summary: {
-        reactivated: customers?.length ?? 0,
-        details: (customers ?? []).map(c => ({ id: c.id, company_name: c.company_name })),
+        reactivated: ids.length,
+        reactivatedContracts: contractIds.length,
+        details: [
+          ...(customers ?? []).map(c => ({ id: c.id, company_name: c.company_name })),
+          ...(contracts ?? []).map(c => ({ id: c.id, contract: c.label ?? c.address_label ?? c.id, customer_id: c.customer_id })),
+        ],
       },
     }
   })

@@ -192,7 +192,6 @@
   "src/components/shared/BugReportModal.tsx|TS2339": 1,
   "src/components/shared/CaseHistoryPanel.tsx|TS2613": 1,
   "src/components/shared/CaseImageGallery.tsx|TS2339": 1,
-  "src/components/shared/CaseServiceSelector.tsx|TS7053": 1,
   "src/components/shared/DeleteCaseConfirmDialog.tsx|TS2339": 1,
   "src/components/shared/DuplicateCaseDialog.tsx|TS2613": 1,
   "src/components/shared/equipment/EquipmentList.tsx|TS7053": 1,

@@ -555,6 +555,7 @@ export type Database = {
           billing_frequency: 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'on_demand' | null
           billing_anchor_month: number | null
           billing_active: boolean | null
+          billing_paused_until: string | null
           contract_start_date: string | null
           contract_end_date: string | null
           terminated_at: string | null

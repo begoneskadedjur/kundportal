@@ -44,6 +44,8 @@ export type RecordContract = Contract & {
   option_until?: string | null
   option_decision_deadline?: string | null
   renewal_reminder_days?: number | null
+  /** Fakturapaus till datum (billing_active=false). Tomt = tills vidare. */
+  billing_paused_until?: string | null
 }
 
 /** Besöksfrekvenser — samma värden som recurring_schedules använder */

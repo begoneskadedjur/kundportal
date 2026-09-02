@@ -2,6 +2,7 @@
 // Faktureringsinställningar per kund – artiklar, antal, fast avtalsvärde, premiejustering
 
 import { useState, useEffect, useId } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Receipt, Save, Building2, Copy, TrendingUp, Plus,
   Trash2, Package, CalendarDays, FileSignature, AlertCircle, RefreshCw, X
@@ -244,6 +245,7 @@ export default function BillingSettingsModal({
         setContractEndDate(contract.contract_end_date ?? '')
         if (contract.billing_anchor_month != null) setBillingAnchorMonth(contract.billing_anchor_month)
         if (contract.billing_active != null) setBillingActive(contract.billing_active)
+        setBillingPausedUntil(contract.billing_paused_until ?? '')
         if (contract.annual_value != null && Number(contract.annual_value) > 0) {
           setFixedContractValue(String(contract.annual_value))
         }
@@ -371,9 +373,11 @@ export default function BillingSettingsModal({
     })()
   }, [isOpen, customerId, headquarterCustomerId])
 
-  // Ladda billing_paused_until från DB (saknas som prop)
+  // Ladda billing_paused_until från kundraden (saknas som prop). Med avtal
+  // i scope bor pausen på avtalet och laddas i avtalseffekten ovan.
   useEffect(() => {
     if (!isOpen || !customerId) { setBillingPausedUntil(''); return }
+    if (contractId) return
     ;(async () => {
       const { data } = await supabase
         .from('customers')
@@ -382,7 +386,7 @@ export default function BillingSettingsModal({
         .maybeSingle()
       setBillingPausedUntil((data?.billing_paused_until as string) ?? '')
     })()
-  }, [isOpen, customerId])
+  }, [isOpen, customerId, contractId])
 
   // Summering
   const adjustPct = priceAdjustmentPercent !== '' ? parseFloat(priceAdjustmentPercent) || 0 : 0
@@ -486,7 +490,6 @@ export default function BillingSettingsModal({
       cost_center: costCenter || null,
       billing_recipient: billingRecipient || null,
       price_adjustment_percent: priceAdjustmentPercent !== '' ? parseFloat(priceAdjustmentPercent) : null,
-      billing_paused_until: billingActive ? null : (billingPausedUntil || null),
       adhoc_invoice_grouping: adhocInvoiceGrouping,
       updated_at: new Date().toISOString(),
     }
@@ -497,6 +500,7 @@ export default function BillingSettingsModal({
     // värde rakt av: med flera avtal skrev det annars över summan.
     // Utan avtal (synth-kund) skrivs fälten till kundraden som förut.
     if (!contractId) {
+      customerUpdate.billing_paused_until = billingActive ? null : (billingPausedUntil || null)
       customerUpdate.billing_frequency = billingFrequency
       customerUpdate.annual_value = annualValue
       customerUpdate.monthly_value = monthlyValue
@@ -514,16 +518,14 @@ export default function BillingSettingsModal({
       .eq('id', saveId)
     if (error) throw error
 
-    // Skriv avtalsfälten till contracts-raden när scopad, och spegla summan
+    // Med avtal i scope skrivs bara faktureringsläget (på/paus) till avtalet.
+    // Premie, datum, frekvens och ankarmånad ägs av avtalskartan (§ 7, § 9)
+    // och visas här bara som läsning. Kundraden speglas som summa.
     if (contractId) {
       try {
         await ContractService.updateBilling(contractId, {
-          annual_value: annualValue,
-          billing_frequency: billingFrequency,
-          billing_anchor_month: billingAnchorMonth,
           billing_active: billingActive,
-          contract_start_date: contractStartDate || null,
-          contract_end_date: contractEndDate || null,
+          billing_paused_until: billingActive ? null : (billingPausedUntil || null),
         })
         await ContractScopeService.resyncCustomerRow(saveId)
       } catch (err) {
@@ -545,20 +547,9 @@ export default function BillingSettingsModal({
       if (adjError) throw adjError
     }
 
-    // Propagera avtalsdatum till barn-enheter bara för synth-kunder. Med
-    // riktiga avtal styr § 1 Omfattning täckningen, och datum på enhetsrader
-    // ger bara spökkort i avtalskartan.
-    if (!contractId && isMultisite && sites.length > 0) {
-      const siteIds = sites.map(s => s.id)
-      await supabase
-        .from('customers')
-        .update({
-          contract_start_date: contractStartDate || null,
-          contract_end_date: contractEndDate || null,
-          updated_at: new Date().toISOString()
-        })
-        .in('id', siteIds)
-    }
+    // Ingen datumpropagering till enheter: enheter ärver avtalsdatum från
+    // huvudkontoret (resolveContractEndDate) och riktiga avtal styr täckningen
+    // via § 1 Omfattning. Datum på enhetsrader gav bara spökkort i avtalskartan.
 
     if (isMultisite && billingType === 'per_site') {
       for (const site of siteBilling) {
@@ -656,6 +647,10 @@ export default function BillingSettingsModal({
   if (!isOpen || !customerId) return null
 
   const sel = 'w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none'
+  // Avtalskartan som motor: med avtal i scope är premie, datum, frekvens och
+  // ankarmånad läsbara här och ändras på avtalet (§ 7, § 9).
+  const contractScoped = !!contractId
+  const avtalskartaHref = `/admin/befintliga-kunder/${headquarterCustomerId ?? customerId}`
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[9999] p-4">
@@ -727,6 +722,29 @@ export default function BillingSettingsModal({
                 </div>
               </div>
             )}
+            {contractScoped ? (
+              <div className="p-2.5 bg-slate-800/40 border border-slate-700/50 rounded-lg text-xs space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-slate-300">Avtalsvillkoren styrs från avtalskartan</span>
+                  <Link to={avtalskartaHref} onClick={onClose} className="text-[#20c58f] hover:underline shrink-0">
+                    Öppna avtalskartan
+                  </Link>
+                </div>
+                <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-0.5 text-slate-400">
+                  <span>Startdatum</span>
+                  <span className="text-slate-200 tabular-nums text-right">{contractStartDate || '–'}</span>
+                  <span>Slutdatum</span>
+                  <span className="text-slate-200 tabular-nums text-right">{contractEndDate || 'tills vidare'}</span>
+                  <span>Fakturamånad</span>
+                  <span className="text-slate-200 text-right">{billingAnchorMonth ? MONTHS_SV[billingAnchorMonth - 1] : 'ej angiven'}</span>
+                  <span>Frekvens</span>
+                  <span className="text-slate-200 text-right">{BILLING_FREQUENCY_CONFIG[billingFrequency]?.label ?? '–'}</span>
+                  <span>Årspremie</span>
+                  <span className="text-slate-200 tabular-nums text-right">{fixedVal != null ? fmt(fixedVal) : '–'}</span>
+                </div>
+                <p className="text-slate-500">Premie, datum och fakturamånad ändras i § 7 och § 9 på avtalet. Fakturaplanen visas där.</p>
+              </div>
+            ) : (<>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-slate-400 mb-1">Avtalets startdatum</label>
@@ -758,9 +776,10 @@ export default function BillingSettingsModal({
               />
               <p className="text-xs text-slate-500 mt-1">Månaden avtalet ingicks – fakturor läggs i denna månad + intervall</p>
             </div>
+            </>)}
 
             {/* Live-diff banner: visar hur aktuella ändringar påverkar befintliga fakturor */}
-            {liveDiff && (liveDiff.create + liveDiff.update + liveDiff.delete) > 0 && (
+            {!contractScoped && liveDiff && (liveDiff.create + liveDiff.update + liveDiff.delete) > 0 && (
               <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-2 text-xs">
                 <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div className="flex-1">
@@ -781,7 +800,7 @@ export default function BillingSettingsModal({
             )}
 
             {/* Fakturaschema - hela avtalsperiodens planerade fakturor */}
-            {plannedSchedule.length > 0 && (
+            {!contractScoped && plannedSchedule.length > 0 && (
               <div className="p-2.5 bg-slate-800/40 border border-slate-700/50 rounded-lg">
                 <div className="flex items-center gap-1.5 mb-2">
                   <CalendarDays className="w-3.5 h-3.5 text-[#20c58f]" />
@@ -835,7 +854,7 @@ export default function BillingSettingsModal({
               </div>
             )}
 
-            {billingAnchorMonth != null && billingFrequency !== 'on_demand' && plannedSchedule.length === 0 && (
+            {!contractScoped && billingAnchorMonth != null && billingFrequency !== 'on_demand' && plannedSchedule.length === 0 && (
               <p className="text-xs text-slate-500">
                 Inga fakturor planeras — kontrollera avtalsstart, avtalsslut och årspremie.
               </p>
@@ -852,6 +871,7 @@ export default function BillingSettingsModal({
                 <label className="block text-xs font-medium text-slate-400 mb-1">Faktureringsfrekvens</label>
                 <Select
                   value={billingFrequency}
+                  disabled={contractScoped}
                   onChange={(v) => setBillingFrequency(v as BillingFrequency)}
                   options={Object.entries(BILLING_FREQUENCY_CONFIG).map(([k, c]) => ({
                     value: k,
@@ -975,13 +995,16 @@ export default function BillingSettingsModal({
               <input
                 type="number"
                 value={fixedContractValue}
+                disabled={contractScoped}
                 onChange={e => setFixedContractValue(e.target.value)}
                 placeholder={calculatedTotal > 0 ? String(calculatedTotal) : '0'}
                 min="0"
                 className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none placeholder-slate-500"
               />
               <p className="text-xs text-slate-500 mt-1">
-                {calculatedTotal > 0 ? (
+                {contractScoped ? (
+                  'Årspremien ägs av avtalets premietrappa (§ 7 i avtalskartan)'
+                ) : calculatedTotal > 0 ? (
                   <>
                     Beräknat från tjänsterader: <span className="text-slate-300 font-medium">{fmt(calculatedTotal)}</span>
                     {fixedVal == null && ' — används som årsbelopp'}

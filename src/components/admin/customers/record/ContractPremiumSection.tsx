@@ -163,6 +163,7 @@ export default function ContractPremiumSection({
   const anchor = contract.billing_anchor_month ?? null
   const nextStart = nextInvoicePeriodStart(contract, today)
   const paused = contract.billing_active === false
+  const pausedUntil = paused && contract.billing_paused_until ? formatDateSv(contract.billing_paused_until) : null
   const sortedEvents = [...premiumEvents].sort((a, b) => a.effective_from.localeCompare(b.effective_from))
   const canEdit = !archived && !!onSavePremium
   const canStep = !archived && !!onAddPremiumEvent
@@ -254,7 +255,7 @@ export default function ContractPremiumSection({
         </h4>
         <span className="ml-auto font-sans text-[10.5px] tabular-nums" style={{ color: ink.muted }}>
           {paused
-            ? 'fakturering pausad'
+            ? (pausedUntil ? `fakturering pausad till ${pausedUntil}` : 'fakturering pausad tills vidare')
             : frequencyLabel
               ? `faktureras ${frequencyLabel.toLowerCase()}${anchor ? ` · ${MONTHS[anchor - 1]}` : ''}`
               : 'faktureringsvillkor saknas'}
@@ -292,7 +293,7 @@ export default function ContractPremiumSection({
             <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
             <span className="font-sans text-[12px] tabular-nums" style={{ color: ink.secondary }}>
               {paused ? (
-                'pausad'
+                pausedUntil ? `pausad till ${pausedUntil}` : 'pausad tills vidare'
               ) : nextLabel ? (
                 <>
                   <b style={{ color: ink.primary }}>{formatDateSv(nextLabel.date)}</b> · {nextLabel.text}

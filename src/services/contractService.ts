@@ -16,7 +16,7 @@ const CONTRACT_BILLING_COLUMNS = `
   selected_products, billing_email, billing_address, customer_id,
   customer_group_id, created_at, updated_at,
   annual_value, total_contract_value, billing_frequency, billing_anchor_month,
-  billing_active, contract_start_date, contract_end_date, terminated_at,
+  billing_active, billing_paused_until, contract_start_date, contract_end_date, terminated_at,
   termination_reason, notice_period_months, effective_end_date, contract_type,
   address_label, display_order
 `
@@ -1935,6 +1935,7 @@ export class ContractService {
       | 'billing_frequency'
       | 'billing_anchor_month'
       | 'billing_active'
+      | 'billing_paused_until'
       | 'contract_start_date'
       | 'contract_end_date'
       | 'contract_length'
@@ -2003,7 +2004,7 @@ export class ContractService {
       .select(`
         id, oneflow_contract_id, annual_value, total_contract_value,
         contract_start_date, contract_end_date, contract_length, contract_type,
-        billing_frequency, billing_anchor_month, billing_active, terminated_at,
+        billing_frequency, billing_anchor_month, billing_active, billing_paused_until, terminated_at,
         termination_reason, notice_period_months, effective_end_date,
         agreement_text, contact_address, contact_person, contact_email,
         contact_phone, company_name, organization_number, billing_email,
@@ -2060,6 +2061,7 @@ export class ContractService {
       billing_frequency: cust.billing_frequency as ContractWithBilling['billing_frequency'],
       billing_anchor_month: cust.billing_anchor_month,
       billing_active: cust.billing_active ?? true,
+      billing_paused_until: cust.billing_paused_until ?? null,
       contract_start_date: cust.contract_start_date,
       contract_end_date: cust.contract_end_date,
       terminated_at: cust.terminated_at,
