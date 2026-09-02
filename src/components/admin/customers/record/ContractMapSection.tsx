@@ -1101,18 +1101,73 @@ export default function ContractMapSection({ data, onChanged }: Props) {
    * datumen på kundraden ger ett spökkort i avtalskartan fast enheten står i
    * ett avtals § 1. Nollning tar bort kortet; avtalet ovan bär reglerna.
    */
+  /** Raden står i något avtals § 1 eller bär ett eget papper */
+  const rowIsCovered = (rowId: string) =>
+    (coverage.get(rowId) ?? []).length > 0 || papers.some((p) => p.customer_id === rowId)
+
+  /**
+   * Kundkortsavtal kan nollas så fort kunden har minst ett riktigt papper:
+   * då är avtalskartan källan och kundkortsdatumen bara rester. Rader som
+   * ännu inte står i något avtal kräver en bekräftelse.
+   */
+  const canClearRow = (c: RecordContract) => c.fromCustomerRow && papers.length > 0
+
   const clearRowContractFields = async (customerRowContract: RecordContract) => {
     const rowId = customerRowContract.customer_id ?? ''
     const row = customerById.get(rowId)
+    const name = row ? customerRowName(row) : 'kundraden'
+    if (
+      !rowIsCovered(rowId) &&
+      !window.confirm(
+        `${name} står inte i något avtal ännu. Nolla kundkortets avtalsdatum ändå? Enheten blir "utan avtalstäckning" tills du drar in den i ett avtal.`
+      )
+    ) {
+      return
+    }
     setBusy(true)
     try {
       await ContractScopeService.clearCustomerRowContractFields(rowId)
-      toast.success(`Avtalsfälten på ${row ? customerRowName(row) : 'kundraden'} nollade. Avtalet i § 1 gäller.`)
+      toast.success(
+        rowIsCovered(rowId)
+          ? `Avtalsfälten på ${name} nollade. Avtalet i § 1 gäller.`
+          : `Avtalsfälten på ${name} nollade. Dra in enheten i ett avtal när den ska täckas.`
+      )
       await onChanged()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Kunde inte nolla avtalsfälten')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const clearAllRowContractFields = async (rows: RecordContract[]) => {
+    const ids = rows.map((c) => c.customer_id ?? '').filter(Boolean)
+    if (ids.length === 0) return
+    const uncovered = ids.filter((id) => !rowIsCovered(id)).length
+    if (
+      !window.confirm(
+        uncovered > 0
+          ? `Nolla kundkortets avtalsdatum på ${ids.length} rader? ${uncovered} av dem står inte i något avtal ännu och blir "utan avtalstäckning" tills de dras in.`
+          : `Nolla kundkortets avtalsdatum på ${ids.length} rader? Avtalen i § 1 gäller redan.`
+      )
+    ) {
+      return
+    }
+    setBusy(true)
+    let done = 0
+    try {
+      for (const id of ids) {
+        await ContractScopeService.clearCustomerRowContractFields(id)
+        done++
+      }
+      toast.success(`Avtalsfälten nollade på ${done} rader.`)
+    } catch (err) {
+      toast.error(
+        `${err instanceof Error ? err.message : 'Kunde inte nolla avtalsfälten'} (${done} av ${ids.length} klara)`
+      )
+    } finally {
+      setBusy(false)
+      await onChanged()
     }
   }
 
@@ -2410,18 +2465,20 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                         (står i § 1, eller bär ett eget papper) är rester: nolla
                         datumen så spökkortet försvinner, i stället för att skapa
                         ännu ett avtal av dem. */}
-                    {c.fromCustomerRow &&
-                      ((coverage.get(c.customer_id ?? '') ?? []).length > 0 ||
-                        papers.some((p) => p.customer_id === c.customer_id)) && (
-                        <button
-                          onClick={() => void clearRowContractFields(c)}
-                          disabled={busy}
-                          className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-300 border border-slate-600 rounded-lg px-2.5 py-1 hover:border-slate-400 hover:text-slate-100 transition-colors disabled:opacity-50"
-                          title="Raden täcks redan av ett avtal — nolla kundradens egna avtalsdatum så resten försvinner"
-                        >
-                          Nolla avtalsfält
-                        </button>
-                      )}
+                    {canClearRow(c) && (
+                      <button
+                        onClick={() => void clearRowContractFields(c)}
+                        disabled={busy}
+                        className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-300 border border-slate-600 rounded-lg px-2.5 py-1 hover:border-slate-400 hover:text-slate-100 transition-colors disabled:opacity-50"
+                        title={
+                          rowIsCovered(c.customer_id ?? '')
+                            ? 'Raden täcks redan av ett avtal — nolla kundradens egna avtalsdatum så resten försvinner'
+                            : 'Nolla kundradens egna avtalsdatum — avtalskartan är källan nu'
+                        }
+                      >
+                        Nolla avtalsfält
+                      </button>
+                    )}
                     <button
                       onClick={() =>
                         c.fromCustomerRow
@@ -2430,11 +2487,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                       }
                       disabled={busy}
                       className={`${
-                        c.fromCustomerRow &&
-                        ((coverage.get(c.customer_id ?? '') ?? []).length > 0 ||
-                          papers.some((p) => p.customer_id === c.customer_id))
-                          ? ''
-                          : 'ml-auto '
+                        canClearRow(c) ? '' : 'ml-auto '
                       }shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#20c58f] border border-[#20c58f]/40 rounded-lg px-2.5 py-1 hover:bg-[#20c58f]/10 transition-colors disabled:opacity-50`}
                       title={
                         c.fromCustomerRow
@@ -2448,6 +2501,21 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                   </li>
                 ))}
               </ul>
+              {leftovers.filter(canClearRow).length > 1 && (
+                <div className="px-4 pb-3 flex items-center justify-between gap-3 text-[11px] text-slate-500">
+                  <span>
+                    Kundkortsavtalen är rester när avtalskartan bär reglerna. Nollning rör bara kundradens
+                    egna avtalsdatum, aldrig ärenden, scheman eller avtalen ovan.
+                  </span>
+                  <button
+                    onClick={() => void clearAllRowContractFields(leftovers.filter(canClearRow))}
+                    disabled={busy}
+                    className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-300 border border-slate-600 rounded-lg px-2.5 py-1 hover:border-slate-400 hover:text-slate-100 transition-colors disabled:opacity-50"
+                  >
+                    Nolla alla kundkortsavtal ({leftovers.filter(canClearRow).length})
+                  </button>
+                </div>
+              )}
             </details>
           )}
         </main>
