@@ -42,16 +42,24 @@ export function useContractVisitFrequency(
           if (!cancelled) setData(EMPTY)
           return
         }
-        const { data: contract } = await supabase
-          .from('contracts')
-          .select('visit_frequency, visits_per_year')
-          .eq('id', contractId)
-          .maybeSingle()
+        // Enhetens egen takt i § 3 (contract_sites) vinner över avtalets förval:
+        // samma avtal kan omfatta enheter med olika frekvens.
+        const [{ data: contract }, { data: site }] = await Promise.all([
+          supabase.from('contracts').select('visit_frequency, visits_per_year').eq('id', contractId).maybeSingle(),
+          supabase
+            .from('contract_sites')
+            .select('visit_frequency, visits_per_year')
+            .eq('contract_id', contractId)
+            .eq('customer_id', customerId)
+            .is('active_to', null)
+            .maybeSingle(),
+        ])
         if (cancelled) return
         const row = contract as { visit_frequency?: string | null; visits_per_year?: number | null } | null
+        const unit = site as { visit_frequency?: string | null; visits_per_year?: number | null } | null
         setData({
-          frequency: (row?.visit_frequency as RecurringFrequency | undefined) ?? null,
-          visitsPerYear: row?.visits_per_year ?? null,
+          frequency: ((unit?.visit_frequency ?? row?.visit_frequency) as RecurringFrequency | undefined) ?? null,
+          visitsPerYear: unit?.visits_per_year ?? row?.visits_per_year ?? null,
           contractId,
         })
       } catch (err) {

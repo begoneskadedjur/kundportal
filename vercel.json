@@ -13,6 +13,10 @@
       "schedule": "30 1 * * *"
     },
     {
+      "path": "/api/cron/contract-renewal-watch",
+      "schedule": "45 1 * * *"
+    },
+    {
       "path": "/api/cron/sync-embeddings",
       "schedule": "0 2 * * *"
     },

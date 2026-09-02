@@ -232,6 +232,16 @@ async function backfillContractVisitFrequency(
     if (!contract) return
     if (contract.visit_frequency || contract.visits_per_year != null) return
 
+    // Avtal som omfattar flera enheter (FEV: åtta reningsverk, WBAB: 16
+    // enheter) får ALDRIG stämplas med första schemats frekvens: enheterna
+    // kan ha olika takt, och avtalets frekvens sätts i § 3 på avtalskartan.
+    const { count } = await supabase
+      .from('contract_sites')
+      .select('id', { count: 'exact', head: true })
+      .eq('contract_id', contractId)
+      .is('active_to', null)
+    if ((count ?? 0) > 1) return
+
     const visits = visitsPerYearFromSelection(frequency, customConfig)
     // setVisitFrequency loggar händelsen på avtalets tidslinje (contract_events)
     await ContractScopeService.setVisitFrequency(contractId, frequency, visits)

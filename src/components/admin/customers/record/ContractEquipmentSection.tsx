@@ -35,9 +35,11 @@ interface Props {
   archived: boolean
   onEdit?: () => void
   onChangeModel?: (item: CaseBillingItemWithRelations, model: BillingModel) => Promise<void>
+  /** Aktiva stationer (ute + inne) på avtalets enheter, ur utplaceringarna */
+  stationCount?: { outdoor: number; indoor: number; addon: number } | null
 }
 
-export default function ContractEquipmentSection({ services, articles, loading, ink, archived, onEdit, onChangeModel }: Props) {
+export default function ContractEquipmentSection({ services, articles, loading, ink, archived, onEdit, onChangeModel, stationCount }: Props) {
   const [busyId, setBusyId] = useState<string | null>(null)
   const extra = services.filter((s) => billingModelOf(s) !== 'premium')
   const canEdit = !archived && !!onChangeModel
@@ -148,6 +150,19 @@ export default function ContractEquipmentSection({ services, articles, loading, 
             )
           })}
         </>
+      )}
+      {stationCount && stationCount.outdoor + stationCount.indoor > 0 && (
+        <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
+          <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>
+            6.{articles.length + extra.length + 1}
+          </span>
+          <span className="font-semibold">Utplacerat på avtalets enheter</span>
+          <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
+          <span className="font-sans text-[12px] tabular-nums" style={{ color: ink.secondary }}>
+            {stationCount.outdoor} ute · {stationCount.indoor} inne
+            {stationCount.addon > 0 ? ` · varav ${stationCount.addon} tilläggsstation${stationCount.addon === 1 ? '' : 'er'}` : ''}
+          </span>
+        </div>
       )}
       <p className="font-sans text-[10.5px] leading-relaxed pt-1.5" style={{ color: ink.muted }}>
         Intern kostnad räknas i § 5. "Per styck och år" faktureras som egna rader på årspremiefakturan; tillägg som

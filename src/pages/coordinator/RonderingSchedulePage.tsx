@@ -62,6 +62,8 @@ interface UnitRow {
   contractEndDate: string | null
   address: string | null
   schedules: RecurringScheduleWithRelations[]
+  /** § 3 i avtalskartan: on_demand = avrop, schemalöshet är korrekt */
+  serviceMode: 'inspection' | 'on_demand'
 }
 
 interface OrgGroup {
@@ -684,7 +686,7 @@ function OrgBatchSelector({ group, onClose, onConfirm }: OrgBatchSelectorProps) 
   const [selectedTechnicianId, setSelectedTechnicianId] = useState('')
   const [selectedServiceType, setSelectedServiceType] = useState('rondering_trafikkontoret')
 
-  const unitsWithoutSchedule = group.units.filter(u => u.schedules.length === 0)
+  const unitsWithoutSchedule = group.units.filter(u => u.schedules.length === 0 && u.serviceMode !== 'on_demand')
   const targetCount = unitsWithoutSchedule.length > 0 ? unitsWithoutSchedule.length : group.units.length
 
   useEffect(() => {
@@ -789,7 +791,7 @@ function OrgGroupCard({
   const [expanded, setExpanded] = useState(true)
 
   const totalSchedules = group.units.reduce((sum, u) => sum + u.schedules.length, 0)
-  const unitsWithout = group.units.filter(u => u.schedules.length === 0).length
+  const unitsWithout = group.units.filter(u => u.schedules.length === 0 && u.serviceMode !== 'on_demand').length
   const unitLabel = group.isRegional ? 'regioner' : 'enheter'
   const allSchedules = group.units.flatMap(u => u.schedules)
   // Unika tekniker som driftar organisationens scheman (för avatarer i headern)
@@ -866,7 +868,7 @@ function OrgGroupCard({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">{unit.siteName}</p>
                     {unit.region && <p className="text-xs text-slate-500">{unit.region}</p>}
-                    <p className="text-xs text-slate-600 mt-0.5">Inget schema</p>
+                    <p className="text-xs text-slate-600 mt-0.5">{unit.serviceMode === 'on_demand' ? 'Avrop enligt avtalet, inget schema behövs' : 'Inget schema'}</p>
                   </div>
                   <button
                     onClick={() => onAddUnit(unit)}
@@ -932,14 +934,23 @@ export function RonderingSchedulePage() {
 
   const loadSchedules = useCallback(async () => {
     setLoading(true)
-    const [schedulesData, multisiteResult] = await Promise.all([
+    const [schedulesData, multisiteResult, scopeResult] = await Promise.all([
       getAllRecurringSchedules(),
       supabase
         .from('customers')
         .select('id, company_name, site_name, site_type, parent_customer_id, organization_id, is_multisite, is_regional, region, contact_address, contract_end_date')
-        .eq('is_multisite', true)
+        .eq('is_multisite', true),
+      // Driftläge per enhet från avtalskartan (§ 3): en enhet som bara står som
+      // avrop i sina avtal ska inte flaggas som "utan schema".
+      supabase.from('contract_sites').select('customer_id, service_mode').is('active_to', null),
     ])
     setSchedules(schedulesData)
+    const serviceModeByCustomer = new Map<string, 'inspection' | 'on_demand'>()
+    for (const row of (scopeResult.data ?? []) as Array<{ customer_id: string; service_mode: string | null }>) {
+      const prev = serviceModeByCustomer.get(row.customer_id)
+      const mode = row.service_mode === 'on_demand' ? 'on_demand' : 'inspection'
+      serviceModeByCustomer.set(row.customer_id, prev === 'inspection' ? 'inspection' : mode)
+    }
 
     const multisiteCustomers = (multisiteResult.data || []) as MultisiteCustomer[]
 
@@ -974,6 +985,7 @@ export function RonderingSchedulePage() {
         contractEndDate: u.contract_end_date ?? parent.contract_end_date,
         address: u.contact_address,
         schedules: schedulesData.filter(s => s.customer_id === u.id),
+        serviceMode: serviceModeByCustomer.get(u.id) ?? 'inspection',
       }))
 
       groups.push({
@@ -1056,7 +1068,7 @@ export function RonderingSchedulePage() {
     if (!orgBatchTarget) return
     const group = orgBatchTarget
     setOrgBatchTarget(null)
-    const unitsWithoutSchedule = group.units.filter(u => u.schedules.length === 0)
+    const unitsWithoutSchedule = group.units.filter(u => u.schedules.length === 0 && u.serviceMode !== 'on_demand')
     const targetUnits = unitsWithoutSchedule.length > 0 ? unitsWithoutSchedule : group.units
     const batchUnits: BatchScheduleUnit[] = targetUnits.map(u => ({
       customerId: u.customerId,

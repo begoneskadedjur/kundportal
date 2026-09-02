@@ -1502,6 +1502,133 @@ export class ContractScopeService {
     })
   }
 
+  /**
+   * § 3 per enhet: driftläge och besökstakt för en enhet i avtalets omfattning.
+   * inspection = schema förväntas, on_demand = avrop (schemalöshet är rätt).
+   * Frekvens null = avtalets förval gäller.
+   */
+  static async setSiteVisitPlan(
+    contractId: string,
+    contractSiteId: string,
+    input: { serviceMode: 'inspection' | 'on_demand'; frequency: string | null; visitsPerYear: number | null },
+    unitName?: string | null
+  ): Promise<void> {
+    const { data, error } = await supabase
+      .from('contract_sites')
+      .update({
+        service_mode: input.serviceMode,
+        visit_frequency: input.serviceMode === 'on_demand' ? null : input.frequency,
+        visits_per_year: input.serviceMode === 'on_demand' ? null : input.visitsPerYear,
+      })
+      .eq('id', contractSiteId)
+      .eq('contract_id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte spara enhetens besöksplan: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Omfattningsraden kunde inte uppdateras (0 rader)')
+    await this.logEvent(contractId, {
+      event_type: 'scope_mode',
+      title: `${unitName ?? 'Enhet'}: ${input.serviceMode === 'on_demand' ? 'avrop' : 'stationskontroll'}`,
+      detail:
+        input.serviceMode === 'on_demand'
+          ? 'Ärendestyrd, inget schema förväntas'
+          : input.visitsPerYear
+            ? `${input.visitsPerYear} besök per år${input.frequency ? ` (${input.frequency})` : ''}`
+            : 'Avtalets förval gäller',
+    })
+  }
+
+  /**
+   * § 9 Förlängning: läge och optionsfält. Styr bara bevakningen: inget
+   * avtal stoppas automatiskt (beslut 2026-09-02).
+   */
+  static async setRenewal(
+    contractId: string,
+    input: {
+      renewalMode: 'rolling' | 'fixed' | 'option'
+      optionUntil: string | null
+      optionDecisionDeadline: string | null
+      reminderDays: number | null
+    }
+  ): Promise<void> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({
+        renewal_mode: input.renewalMode,
+        option_until: input.renewalMode === 'option' ? input.optionUntil : null,
+        option_decision_deadline: input.renewalMode === 'option' ? input.optionDecisionDeadline : null,
+        renewal_reminder_days: input.reminderDays ?? 90,
+      })
+      .eq('id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte spara förlängningsläget: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+    const labels = { rolling: 'Löper vidare tills uppsägning', fixed: 'Fast slutdatum', option: 'Option på förlängning' }
+    await this.logEvent(contractId, {
+      event_type: 'renewal',
+      title: labels[input.renewalMode],
+      detail:
+        input.renewalMode === 'option'
+          ? `Längst till ${input.optionUntil ?? '?'} · beslut senast ${input.optionDecisionDeadline ?? '?'} · påminnelse ${input.reminderDays ?? 90} dagar före`
+          : input.renewalMode === 'fixed'
+            ? `Påminnelse ${input.reminderDays ?? 90} dagar före slutdatumet`
+            : 'Ingen bevakning utöver uppsägningstiden',
+    })
+  }
+
+  /**
+   * Nyttja option: flytta slutdatumet framåt (12 månader, aldrig förbi
+   * option_until) på SAMMA papper och logga händelsen. Nästa beslutsdatum
+   * sätts med samma uppsägningstid som avtalet har.
+   */
+  static async exerciseOption(contractId: string, input?: { newEndDate?: string | null; note?: string | null }): Promise<string> {
+    const { data: c, error: readError } = await supabase
+      .from('contracts')
+      .select('contract_end_date, option_until, option_decision_deadline, notice_period_months, customer_id')
+      .eq('id', contractId)
+      .single()
+    if (readError || !c) throw new Error(`Kunde inte läsa avtalet: ${readError?.message ?? 'okänt fel'}`)
+    if (!c.contract_end_date) throw new Error('Avtalet saknar slutdatum')
+
+    let newEnd: string
+    if (input?.newEndDate) {
+      newEnd = input.newEndDate
+    } else {
+      const d = new Date(`${c.contract_end_date}T12:00:00`)
+      d.setFullYear(d.getFullYear() + 1)
+      newEnd = d.toISOString().slice(0, 10)
+    }
+    if (c.option_until && newEnd > c.option_until) newEnd = c.option_until
+    if (newEnd <= c.contract_end_date) throw new Error('Optionen är redan fullt nyttjad')
+
+    // Nästa beslutsdatum: nya slutdatumet minus uppsägningstiden, om fler optioner finns
+    let nextDeadline: string | null = null
+    if (c.option_until && newEnd < c.option_until) {
+      const d = new Date(`${newEnd}T12:00:00`)
+      d.setMonth(d.getMonth() - (c.notice_period_months ?? 6))
+      nextDeadline = d.toISOString().slice(0, 10)
+    }
+
+    const { error } = await supabase
+      .from('contracts')
+      .update({ contract_end_date: newEnd, option_decision_deadline: nextDeadline })
+      .eq('id', contractId)
+    if (error) throw new Error(`Kunde inte nyttja optionen: ${error.message}`)
+
+    await this.logEvent(contractId, {
+      event_type: 'renewal',
+      title: `Option nyttjad, avtalet gäller till ${newEnd}`,
+      detail: [
+        `Tidigare slutdatum ${c.contract_end_date}`,
+        nextDeadline ? `Nästa beslut senast ${nextDeadline}` : 'Sista optionen nyttjad',
+        input?.note?.trim() || null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+    })
+    if (c.customer_id) await this.mirrorSharedFields(c.customer_id)
+    return newEnd
+  }
+
   /** Räkna om kundradens speglade avtalsfält (summa av levande avtal). */
   static async resyncCustomerRow(customerId: string): Promise<void> {
     await this.mirrorSharedFields(customerId)

@@ -39,6 +39,11 @@ export type RecordContract = Contract & {
   diary_number?: string | null
   /** Ankarmånad (1–12) för fakturaperioderna */
   billing_anchor_month?: number | null
+  /** § 9: rolling (löper vidare), fixed (fast slut), option (fast period med option). Styr bara bevakningen. */
+  renewal_mode?: 'rolling' | 'fixed' | 'option' | null
+  option_until?: string | null
+  option_decision_deadline?: string | null
+  renewal_reminder_days?: number | null
 }
 
 /** Besöksfrekvenser — samma värden som recurring_schedules använder */
@@ -112,6 +117,11 @@ export interface RecordContractSite {
   active_from: string | null
   active_to: string | null
   note: string | null
+  /** § 3 per enhet: 'inspection' (schema förväntas) eller 'on_demand' (avrop) */
+  service_mode?: 'inspection' | 'on_demand' | null
+  /** Frekvens per enhet; saknas den gäller avtalets */
+  visit_frequency?: string | null
+  visits_per_year?: number | null
 }
 
 // Avtalskartan: avtalshändelser utan egen tabell (prislistbyten, omfattningsläge)
@@ -469,7 +479,7 @@ export function useCustomerRecord(customerId: string | undefined) {
         .order('effective_from', { ascending: true }),
       supabase
         .from('contract_sites')
-        .select('id, contract_id, customer_id, active_from, active_to, note, contract:contracts!inner(customer_id)')
+        .select('id, contract_id, customer_id, active_from, active_to, note, service_mode, visit_frequency, visits_per_year, contract:contracts!inner(customer_id)')
         .in('contract.customer_id', familyIds)
         .order('active_from', { ascending: true }),
       supabase

@@ -111,6 +111,29 @@ interface RefPrompt {
   unitId: string
 }
 
+/** § 3 per enhet: driftläge, takt och utfall i avtalsåret */
+export interface UnitFollowup {
+  unitId: string
+  /** contract_sites-raden (null när enheten är avtalets egen kundrad eller täcks via covers_all_sites) */
+  scopeRowId: string | null
+  serviceMode: 'inspection' | 'on_demand'
+  frequency: string | null
+  visitsPerYear: number | null
+  /** Takten kommer från avtalets förval, inte enhetens egen rad */
+  inherited: boolean
+  /** Förväntat antal utförda besök hittills i avtalsåret (pro rata) */
+  expectedSoFar: number | null
+  doneThisYear: number
+  nextVisitAt: string | null
+  casesThisYear: number
+}
+
+/** Redigering av en enhets besöksplan i § 3 */
+interface SitePlanPrompt {
+  contract: RecordContract
+  unit: UnitFollowup
+}
+
 interface DatePrompt {
   x: number
   y: number
@@ -186,6 +209,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [indexAllOpen, setIndexAllOpen] = useState(false)
   /** Koppla Fortnox-faktura till en passerad period (§ 7) */
   const [fortnoxTarget, setFortnoxTarget] = useState<LinkFortnoxTarget | null>(null)
+  /** § 3: enhetens besöksplan redigeras */
+  const [sitePlanPrompt, setSitePlanPrompt] = useState<SitePlanPrompt | null>(null)
   /** Avtal som ska raderas (bekräftelse) */
   const [deletePrompt, setDeletePrompt] = useState<RecordContract | null>(null)
   /** Avtal vars besöksfrekvens ska sättas */
@@ -865,6 +890,62 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [root.id, papers.length, contentReloadKey, billingPlansKey, contracts])
 
+  // § 6: aktiva stationer per kundrad, ur utplaceringarna (ute) och planritningarna (inne)
+  const [stationsByCustomer, setStationsByCustomer] = useState<Map<string, { outdoor: number; indoor: number; addon: number }>>(new Map())
+  useEffect(() => {
+    let cancelled = false
+    const ids = [root.id, ...units.map((u) => u.id)]
+    if (ids.length === 0) return
+    ;(async () => {
+      try {
+        const [{ data: outdoor }, { data: indoor }] = await Promise.all([
+          supabase.from('equipment_placements').select('customer_id, is_addon').in('customer_id', ids).eq('status', 'active'),
+          supabase
+            .from('indoor_stations')
+            .select('is_addon, floor_plan:floor_plans!inner(customer_id)')
+            .eq('status', 'active')
+            .in('floor_plan.customer_id', ids),
+        ])
+        if (cancelled) return
+        const map = new Map<string, { outdoor: number; indoor: number; addon: number }>()
+        const bump = (customerId: string, kind: 'outdoor' | 'indoor', addon: boolean) => {
+          const cur = map.get(customerId) ?? { outdoor: 0, indoor: 0, addon: 0 }
+          cur[kind] += 1
+          if (addon) cur.addon += 1
+          map.set(customerId, cur)
+        }
+        for (const r of (outdoor ?? []) as { customer_id: string; is_addon: boolean | null }[]) bump(r.customer_id, 'outdoor', !!r.is_addon)
+        for (const r of (indoor ?? []) as unknown as { is_addon: boolean | null; floor_plan: { customer_id: string } | null }[]) {
+          if (r.floor_plan?.customer_id) bump(r.floor_plan.customer_id, 'indoor', !!r.is_addon)
+        }
+        setStationsByCustomer(map)
+      } catch (err) {
+        console.error('Kunde inte räkna stationer för avtalskartan:', err)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [root.id, units])
+
+  const stationCountFor = useCallback(
+    (contract: RecordContract) => {
+      const ids = contract.covers_all_sites
+        ? locations.map((l) => l.id)
+        : [contract.customer_id ?? '', ...(activeScopeByContract.get(contract.id) ?? []).map((cs) => cs.customer_id)]
+      const sum = { outdoor: 0, indoor: 0, addon: 0 }
+      for (const id of new Set(ids)) {
+        const s = stationsByCustomer.get(id)
+        if (!s) continue
+        sum.outdoor += s.outdoor
+        sum.indoor += s.indoor
+        sum.addon += s.addon
+      }
+      return sum
+    },
+    [activeScopeByContract, locations, stationsByCustomer]
+  )
+
   const invoiceMode: 'per_contract' | 'consolidated' =
     (root as unknown as { contract_invoice_mode?: string | null }).contract_invoice_mode === 'consolidated'
       ? 'consolidated'
@@ -1270,6 +1351,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       casesTotal: number
       covered: string[]
       caseIds: string[]
+      units: UnitFollowup[]
     } => {
       // Täckta kundrader: avtalets egen rad + omfattningen (eller alla enheter
       // när avtalet täcker hela verksamheten)
@@ -1301,6 +1383,54 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       const list = cases.filter((c) => c.contract_id === contract.id || (c.customer_id && coveredSet.has(c.customer_id)))
       const casesDone = list.filter((c) => c.completed_date || isCompletedStatus(c.status as ClickUpStatus)).length
 
+      // § 3 per enhet: driftläge, takt, utfall i avtalsåret och nästa besök.
+      // Avtalsåret räknas från senaste årsdagen av avtalsstarten (annars 1 jan).
+      const start = contract.contract_start_date ?? contract.start_date ?? null
+      let yearStart = `${key.slice(0, 4)}-01-01`
+      if (start) {
+        const anniversary = `${key.slice(0, 4)}${start.slice(4)}`
+        yearStart = anniversary <= key ? anniversary : `${Number(key.slice(0, 4)) - 1}${start.slice(4)}`
+      }
+      const daysIntoYear = Math.max(
+        1,
+        Math.round((new Date(`${key}T12:00:00`).getTime() - new Date(`${yearStart}T12:00:00`).getTime()) / 86400000)
+      )
+      const scopeRows = activeScopeByContract.get(contract.id) ?? []
+      const unitIdsForRows = contract.covers_all_sites
+        ? locations.map((l) => l.id)
+        : [
+            ...(locationIds.has(contract.customer_id ?? '') ? [contract.customer_id as string] : []),
+            ...scopeRows.map((cs) => cs.customer_id),
+          ].filter((id, i, arr) => arr.indexOf(id) === i)
+      const units: UnitFollowup[] = unitIdsForRows.map((unitId) => {
+        const scope = scopeRows.find((cs) => cs.customer_id === unitId) ?? null
+        const serviceMode: 'inspection' | 'on_demand' = scope?.service_mode === 'on_demand' ? 'on_demand' : 'inspection'
+        const frequency = scope?.visit_frequency ?? contract.visit_frequency ?? null
+        const plan =
+          scope?.visits_per_year ??
+          contract.visits_per_year ??
+          (frequency ? (VISITS_PER_YEAR_BY_FREQUENCY[frequency] ?? null) : null)
+        const unitVisits = visits.filter((s) => s.customer_id === unitId)
+        const doneThisYear = unitVisits.filter((s) => s.completed_at && (s.completed_at as string).slice(0, 10) >= yearStart).length
+        const nextUnit =
+          unitVisits
+            .filter((s) => !s.completed_at && s.scheduled_at && (s.scheduled_at as string).slice(0, 10) >= key)
+            .sort((a, b) => (a.scheduled_at as string).localeCompare(b.scheduled_at as string))[0] ?? null
+        const unitCases = list.filter((c) => c.customer_id === unitId)
+        return {
+          unitId,
+          scopeRowId: scope?.id ?? null,
+          serviceMode,
+          frequency,
+          visitsPerYear: plan,
+          inherited: !scope?.visit_frequency && !scope?.visits_per_year,
+          expectedSoFar: plan ? Math.min(plan, Math.round((plan * daysIntoYear) / 365)) : null,
+          doneThisYear,
+          nextVisitAt: nextUnit?.scheduled_at ?? null,
+          casesThisYear: unitCases.filter((c) => (c.completed_date ?? c.created_at).slice(0, 10) >= yearStart).length,
+        }
+      })
+
       return {
         nextVisit,
         visitsDone,
@@ -1310,10 +1440,69 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         casesTotal: list.length,
         covered,
         caseIds: list.map((c) => c.id),
+        units,
       }
     },
-    [activeScopeByContract, cases, inspections, locations]
+    [activeScopeByContract, cases, inspections, locations, locationIds]
   )
+
+  const saveSitePlan = async (
+    contract: RecordContract,
+    unit: UnitFollowup,
+    input: { serviceMode: 'inspection' | 'on_demand'; frequency: string | null; visitsPerYear: number | null }
+  ) => {
+    if (!unit.scopeRowId) {
+      toast.error('Enheten står inte i § 1 Omfattning på det här avtalet. Besökstakten sätts på avtalet i § 3.')
+      return
+    }
+    setBusy(true)
+    try {
+      await ContractScopeService.setSiteVisitPlan(contract.id, unit.scopeRowId, input, customerRowName(customerById.get(unit.unitId) ?? root))
+      toast.success(
+        input.serviceMode === 'on_demand'
+          ? `${customerRowName(customerById.get(unit.unitId) ?? root)} arbetar på avrop. Inget schema förväntas.`
+          : `Besökstakt sparad för ${customerRowName(customerById.get(unit.unitId) ?? root)}.`
+      )
+      setSitePlanPrompt(null)
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara enhetens besöksplan')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const saveRenewal = async (
+    contract: RecordContract,
+    input: { renewalMode: 'rolling' | 'fixed' | 'option'; optionUntil: string | null; optionDecisionDeadline: string | null; reminderDays: number | null }
+  ) => {
+    try {
+      await ContractScopeService.setRenewal(contract.id, input)
+      toast.success(
+        input.renewalMode === 'option'
+          ? 'Option registrerad. Kundansvarig påminns före beslutsdatumet.'
+          : input.renewalMode === 'fixed'
+            ? 'Fast slutdatum med påminnelse registrerat.'
+            : 'Avtalet löper vidare tills det sägs upp.'
+      )
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara förlängningsläget')
+      throw err
+    }
+  }
+
+  const exerciseOption = async (contract: RecordContract) => {
+    try {
+      const newEnd = await ContractScopeService.exerciseOption(contract.id)
+      toast.success(`Option nyttjad: ${contractDisplayName(contract)} gäller nu till ${formatDateSv(newEnd)}. Planera fakturorna för nästa period.`)
+      await onChanged()
+      setBillingPlansKey((k) => k + 1)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte nyttja optionen')
+      throw err
+    }
+  }
 
   // -------------------------------------------------------------------------
   // Render
@@ -1666,6 +1855,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               planEntries={planEntriesByContract.get(c.id) ?? []}
               onLinkFortnox={(period) => openLinkFortnox(c, period)}
               onChangeLineModel={(item, model) => changeLineBillingModel(c, item, model)}
+              onEditSitePlan={(unit) => setSitePlanPrompt({ contract: c, unit })}
+              onSaveRenewal={(input) => saveRenewal(c, input)}
+              onExerciseOption={() => exerciseOption(c)}
+              stationCount={stationCountFor(c)}
               // Uppsagt-men-löpande avtal ligger kvar bland de aktiva (de
               // fungerar till slutdatumet) och ska kunna ångras direkt — inte
               // först när uppsägningstiden hunnit löpa ut.
@@ -1821,6 +2014,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                     onRenew={() => renewContract(c)}
                     onReactivate={() => reactivate(c)}
                     locations={locations}
+                    stationCount={stationCountFor(c)}
                   />
                 ))}
               </div>
@@ -1951,6 +2145,19 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           setBillingPlansKey((k) => k + 1)
         }}
       />
+
+      {/* § 3 per enhet: driftläge och besökstakt */}
+      {sitePlanPrompt && (
+        <SitePlanModal
+          unitName={customerRowName(customerById.get(sitePlanPrompt.unit.unitId) ?? root)}
+          unit={sitePlanPrompt.unit}
+          contractFrequency={sitePlanPrompt.contract.visit_frequency ?? null}
+          contractVisits={sitePlanPrompt.contract.visits_per_year ?? null}
+          busy={busy}
+          onClose={() => setSitePlanPrompt(null)}
+          onSave={(input) => void saveSitePlan(sitePlanPrompt.contract, sitePlanPrompt.unit, input)}
+        />
+      )}
 
       {/* Indexera alla avtal (gemet) */}
       {indexAllOpen && (
@@ -2736,6 +2943,104 @@ function IndexAllModal({
   )
 }
 
+/**
+ * § 3 per enhet: driftläge (stationskontroll eller avrop) och besökstakt.
+ * Tom takt = avtalets förval. Avrop har ingen takt.
+ */
+function SitePlanModal({
+  unitName,
+  unit,
+  contractFrequency,
+  contractVisits,
+  busy,
+  onClose,
+  onSave,
+}: {
+  unitName: string
+  unit: UnitFollowup
+  contractFrequency: string | null
+  contractVisits: number | null
+  busy: boolean
+  onClose: () => void
+  onSave: (input: { serviceMode: 'inspection' | 'on_demand'; frequency: string | null; visitsPerYear: number | null }) => void
+}) {
+  const [mode, setMode] = useState<'inspection' | 'on_demand'>(unit.serviceMode)
+  const [frequency, setFrequency] = useState<string>(unit.inherited ? '' : (unit.frequency ?? ''))
+  const [visits, setVisits] = useState<string>(unit.inherited ? '' : unit.visitsPerYear != null ? String(unit.visitsPerYear) : '')
+  const inputCls = 'mt-1 w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none'
+
+  return (
+    <Modal isOpen onClose={onClose} title={`Besöksplan · ${unitName}`} size="sm">
+      <div className="p-4 space-y-3">
+        <label className="text-xs text-slate-400 block">
+          Driftläge
+          <select value={mode} onChange={(e) => setMode(e.target.value as 'inspection' | 'on_demand')} className={inputCls} autoFocus>
+            <option value="inspection">Stationskontroll (återkommande schema)</option>
+            <option value="on_demand">Avrop (ärendestyrd, inget schema)</option>
+          </select>
+        </label>
+        {mode === 'inspection' && (
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-xs text-slate-400">
+              Frekvens
+              <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className={inputCls}>
+                <option value="">
+                  Avtalets förval{contractFrequency ? ` (${(VISIT_FREQUENCY_LABEL[contractFrequency] ?? contractFrequency).toLowerCase()})` : ''}
+                </option>
+                {Object.entries(VISIT_FREQUENCY_LABEL).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs text-slate-400">
+              Besök per år
+              <input
+                value={visits}
+                onChange={(e) => setVisits(e.target.value)}
+                inputMode="numeric"
+                placeholder={contractVisits != null ? `förval ${contractVisits}` : frequency ? String(VISITS_PER_YEAR_BY_FREQUENCY[frequency] ?? '') : ''}
+                className={inputCls}
+              />
+            </label>
+          </div>
+        )}
+        <p className="text-[11px] text-slate-500">
+          {mode === 'on_demand'
+            ? 'Enheten flaggas inte som "utan schema" i ronderingsöversikten. Extra besök bokas som vanliga ärenden.'
+            : 'Takten visas vid schemaläggning och används för utfallet i § 3. Tom takt = avtalets förval.'}
+        </p>
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-700/50">
+          <button onClick={onClose} disabled={busy} className="text-xs text-slate-400 hover:text-slate-200">
+            Avbryt
+          </button>
+          <button
+            onClick={() =>
+              onSave({
+                serviceMode: mode,
+                frequency: mode === 'inspection' && frequency ? frequency : null,
+                visitsPerYear:
+                  mode === 'inspection'
+                    ? visits
+                      ? Number(visits)
+                      : frequency
+                        ? (VISITS_PER_YEAR_BY_FREQUENCY[frequency] ?? null)
+                        : null
+                    : null,
+              })
+            }
+            disabled={busy}
+            className="bg-[#20c58f] text-[#fff] text-sm font-semibold rounded-xl px-4 py-2 hover:brightness-110 disabled:opacity-50"
+          >
+            Spara
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 function DatePromptPopover({ prompt, onClose }: { prompt: DatePrompt; onClose: () => void }) {
   const [customDate, setCustomDate] = useState('')
   const confirm = (date: string) => {
@@ -2863,7 +3168,13 @@ interface PaperProps {
     casesTotal: number
     covered: string[]
     caseIds: string[]
+    units: UnitFollowup[]
   }
+  /** § 3 per enhet: öppna redigering av enhetens besöksplan */
+  onEditSitePlan?: (unit: UnitFollowup) => void
+  /** § 9: förlängningsläge, option och nyttjande */
+  onSaveRenewal?: (input: { renewalMode: 'rolling' | 'fixed' | 'option'; optionUntil: string | null; optionDecisionDeadline: string | null; reminderDays: number | null }) => Promise<void>
+  onExerciseOption?: () => Promise<void>
   priceListLabel: string | null
   /**
    * Papprets livscykel. Styr både utseende och vilka åtgärder som finns:
@@ -2926,6 +3237,8 @@ interface PaperProps {
   onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null }) => void
   /** § 6: byt faktureringsläge på en tjänsterad */
   onChangeLineModel?: (item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_round') => Promise<void>
+  /** § 6: aktiva stationer på avtalets enheter */
+  stationCount?: { outdoor: number; indoor: number; addon: number } | null
   /** Öppna väljaren för signeringsdatum */
   onEditSignedAt?: () => void
   /** Spara avtalets säljare (den som skrivit under för BeGone) */
@@ -3271,6 +3584,10 @@ function PaperContract({
   planEntries,
   onLinkFortnox,
   onChangeLineModel,
+  onEditSitePlan,
+  onSaveRenewal,
+  onExerciseOption,
+  stationCount,
 }: PaperProps) {
   const key = todayKey()
   const archived = state === 'archived'
@@ -3702,6 +4019,60 @@ function PaperContract({
             )}
           </span>
         </div>
+        {/* Per enhet: driftläge, takt och utfall i avtalsåret. Takten ärvs från
+            avtalets förval tills enheten får en egen (contract_sites). */}
+        {followup.units.length > 0 && (
+          <div className="pt-1">
+            {followup.units.map((u, i) => {
+              const unit = customerById.get(u.unitId)
+              const behind = u.serviceMode === 'inspection' && u.expectedSoFar != null && u.doneThisYear < u.expectedSoFar
+              const noSchedule = u.serviceMode === 'inspection' && !u.nextVisitAt
+              return (
+                <div
+                  key={u.unitId}
+                  className="flex items-center gap-2.5 py-1.5 text-[13px]"
+                  style={{ borderBottom: `1px dotted ${ink.rule}` }}
+                >
+                  <span className="font-sans text-[10.5px] w-6 tabular-nums" style={{ color: ink.muted }}>
+                    3.{i + 1}
+                  </span>
+                  <span className="font-semibold">{unit ? customerRowName(unit) : 'Enhet'}</span>
+                  <span className="flex-1 border-b border-dotted mx-1 translate-y-1 min-w-3" style={{ borderColor: ink.rule }} />
+                  {onEditSitePlan && !archived ? (
+                    <button
+                      onClick={() => onEditSitePlan(u)}
+                      className="font-sans text-[11px] underline decoration-dotted hover:text-[#262e38]"
+                      style={{ color: u.inherited ? ink.muted : ink.secondary }}
+                      title={u.scopeRowId ? 'Ändra driftläge och besökstakt för enheten' : 'Enheten täcks via avtalets förval, ändra i avtalets frekvens'}
+                    >
+                      {u.serviceMode === 'on_demand'
+                        ? 'avrop'
+                        : `stationskontroll${u.frequency ? ` · ${(VISIT_FREQUENCY_LABEL[u.frequency] ?? u.frequency).toLowerCase()}` : ''}`}
+                    </button>
+                  ) : (
+                    <span className="font-sans text-[11px]" style={{ color: ink.secondary }}>
+                      {u.serviceMode === 'on_demand'
+                        ? 'avrop'
+                        : `stationskontroll${u.frequency ? ` · ${(VISIT_FREQUENCY_LABEL[u.frequency] ?? u.frequency).toLowerCase()}` : ''}`}
+                    </span>
+                  )}
+                  {u.serviceMode === 'inspection' && u.visitsPerYear != null && (
+                    <span className="font-sans text-[11.5px] tabular-nums" style={{ color: behind ? ink.warn : ink.positive }}>
+                      {u.doneThisYear} av {u.visitsPerYear} i år
+                    </span>
+                  )}
+                  <span className="font-sans text-[11.5px] tabular-nums whitespace-nowrap" style={{ color: noSchedule ? ink.warn : ink.secondary }}>
+                    {u.serviceMode === 'on_demand'
+                      ? `${u.casesThisYear} ärende${u.casesThisYear === 1 ? '' : 'n'} i år`
+                      : u.nextVisitAt
+                        ? `nästa ${formatDateSv(u.nextVisitAt)}`
+                        : 'inget schema'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
         <div className="flex flex-wrap gap-2.5 pt-2.5 font-sans">
           <button
             onClick={() => onOpenHistory('besok')}
@@ -3772,6 +4143,7 @@ function PaperContract({
         archived={archived}
         onEdit={onEditContent}
         onChangeModel={onChangeLineModel}
+        stationCount={stationCount}
       />
 
       {/* § 7 Premie och fakturering — avtalet är källan till årspremiefakturan */}
@@ -3809,8 +4181,16 @@ function PaperContract({
         />
       </div>
 
-      {/* § 9 Löptid */}
-      <ContractTermSection contract={contract} ink={ink} archived={archived} onSaveTerm={onSaveTerm} />
+      {/* § 9 Löptid och option */}
+      <ContractTermSection
+        contract={contract}
+        ink={ink}
+        archived={archived}
+        onSaveTerm={onSaveTerm}
+        onSaveRenewal={onSaveRenewal}
+        onExerciseOption={onExerciseOption}
+        onTerminate={onTerminate}
+      />
 
       {/* Avslutsnotis — bara på arkiverade avtal. Sammanfattar vad som hände
           och hur länge relationen varade, plus den enda framåtriktade
