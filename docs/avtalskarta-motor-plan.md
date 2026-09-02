@@ -50,7 +50,7 @@ När kunden har fler än ett levande papper visas ett band överst i papperskolu
 
 `SAMLINGSFAKTURA · en faktura per period, en rad per avtal · 4 avtal, 35 114 kr/år · ändra`
 
-Alternativ: `ENSKILDA FAKTUROR · varje avtal faktureras för sig`. Lagras på HK-raden som `customers.contract_invoice_mode`. Varje papper speglar valet i § 7. Samlad faktura kräver att avtalen delar frekvens, ankarmånad och Fortnox-kundnummer; avvikande avtal faller ut som egna fakturor och gemet visar varning.
+Alternativ: `ENSKILDA FAKTUROR · varje avtal faktureras för sig`. Lagras på HK-raden som `customers.contract_invoice_mode`. Varje papper speglar valet i § 7. Samlad faktura kräver att avtalen delar frekvens, ankarmånad och Fortnox-kundnummer; avvikande avtal faller ut som egna fakturor och gemet visar varning. Beslut 2026-09-02: på samlad faktura står huvudkundens referens (HK:s Märkning faktura) i fakturahuvudet och avtalen listas som rader; inget undantag per avtal i första versionen. Gemet får också "Indexera alla avtal". Fortnox-faktura 643 (FEV år 1) är redan byggd exakt så: fyra rader, en per prispost, en mottagare.
 
 ### Tomt avtalsblad
 
@@ -181,7 +181,7 @@ RPC:n får `p_contract_id`, låser `contracts` (inte `customers`), skriver `cont
 ```sql
 alter table contract_sites
   add column service_mode text not null default 'inspection'
-    check (service_mode in ('inspection','follow_up','on_demand')),
+    check (service_mode in ('inspection','on_demand')),
   add column visit_frequency text,
   add column visits_per_year smallint;
 
@@ -240,13 +240,16 @@ Oförändrad mekanik. Kedjan enhet → ärende → faktura finns: `billing_refer
 ### Cron
 
 - `generate-continuing-contracts` skrivs om till avtalsnivå med samma planerare som frontend och fakturanummer via max-sekvens (dagens `count` kolliderar efter radering). Dagens version läser kundraden, nycklar bara på period per kund och skulle med två avtal på samma huvudkontor hoppa över det andra som "finns redan". Hårt krav: cronen är omskriven innan något andra papper på en kund får `billing_active`.
-- `expire-contracts` stänger även avtal med `renewal_mode` `fixed` eller `option` när `contract_end_date` passerat (option: bara om ingen `renewal`-händelse flyttat slutet). `isEndedContract` i `contractLifecycle` får samma regel, annars räknar vyerna avtalet som levande medan backend stängt det. Utan detta rullar ett `fixed`-avtal vidare för alltid.
+- Beslut 2026-09-02: avtal med option eller fast slutdatum stoppas INTE automatiskt. De löper vidare tills någon aktivt säger upp dem, precis som rullande avtal idag. `renewal_mode` och optionsfälten styr därför bara bevakningen (påminnelse 90 dagar före beslutsdatum, händelse i tidslinjen, samma papper vid förlängning), inte livscykeln. `expire-contracts` och `isEndedContract` lämnas som de är.
+- "Indexera alla avtal" finns på gemet: ett klick indexerar kundens alla levande avtal med samma procent och datum (FEV: fyra avtal). Fakturaansvarig indexerar utan annan godkännare. Utrustning per år indexeras i samma steg om det kan göras enkelt, annars skjuts det.
 - Ny `contract-renewal-watch` (dagligen): för `option` 90 dagar före beslutsdatum, för `fixed` 90 dagar före slut, för `rolling` 30 dagar före uppsägningsfönstret. Skriver `contract_events` och mejlar kundansvarig. Avtalskartan visar "Avtal som kräver beslut" och bevakningsraden i § 9 visar dagar kvar. Schemahorisonten (`resolveScheduleHorizon`, `extend-recurring-schedules`) rullar bara `rolling`-avtal.
 - `reactivate-paused-billing` läser även `contracts.billing_paused_until`.
 
 ### Redan fakturerade perioder (FEV år 1, WBAB år 1)
 
 Fortnox-import (`F-`) är enda vägen att markera en period som fakturerad utanför portalen. Den automatiska "betalda historiken" (`insertHistoricalPaidInvoice`) stängs av för riktiga avtal och ersätts av planposten `uncovered` som visas i förhandsgranskningen ("Perioden saknar faktura i portalen, importera från Fortnox") och aldrig appliceras. Täckningsfiltret godtar `F-`-faktura med samma avtal eller med tomt avtal och samma kund. Importmodalen får avtalsval och en manuell "Registrera Fortnox-faktura"-form. Ingen ny status `externally_invoiced`: den skulle ge intäkt utan verifikat.
+
+Fortnox 2026-09-02, kund 5004 (FEV): år 1 är fakturerad som **Fortnox 643** (2026-07-06, 35 114 kr exkl. moms, betald) med fyra rader på tjänst 129, en per prispost, radtext "Skadedjursavtal generell, avser årsavtal GNU 2026/60, {anläggning}". Den ska importeras som avtalsfaktura för perioden 2026-07-01 till 2027-06-30 och täcka alla fyra avtalen (samlad). Dessutom är tilläggsutrustning per år redan fakturerad med "avtalstid följer huvudavtal GNU 2026/60": 648 (8 Aurocon à 2 348 + 2 ljusfällor à 1 686, ref 4019), 744 (12 Aurocon + 11 ljusfällor, Märkning 3099, obetald), 745 (3 Aurocon, Märkning 5037, obetald), 862 (3 mekaniska fällor à 2 348 vid huvudkontoret, ref 8315, "faktureras med huvudavtalet från 2027-07-01", obetald). Sammanlagt cirka 83 000 kr/år i utrustning utöver premien, på tjänsteraderna 37, 79 och 39. Det bekräftar § 6-modellen (per år på tjänsteraden med antal per enhet) och per-enhet-referenserna i § 8. Ingen av dessa fem fakturor finns i portalen, och de 23 Aurocon-enheterna och 13 ljusfällorna finns inte som stationer i portalen. Krav från Christian: radtexten på årspremiefakturor ska innehålla ordet "Årspremie" (eller "Avtalspremie") så de går att känna igen.
 
 Latent fel att stänga först: WBAB:s år 1 (F-642, 74 591 kr) är importerad som `adhoc` med period juli 2026 och `contract_id` null, och WBAB saknar helt `contracts`-rad (kundraden bär 74 591 kr, årsvis, ankar 7). Täckningsfiltret ser bara `contract`-typ, så varje omplanering av WBAB:s HK skapar idag en falsk betald faktura på 93 239 kr inkl. moms. Omplanering triggas från fem ställen: de två importmodalerna, rabattgodkännande, avtalstillägg vid teknikeravslut (`contractAdditionService`) och cronen efter 2028-06-30. F-642 kan typas om till avtalsfaktura först när fas 1 skapat WBAB:s avtal. Fram till fas 2: rör inte WBAB via någon av vägarna, och lägg avtalstillägg för WBAB på is.
 
@@ -306,18 +309,23 @@ Fas 1 räcker för att lägga upp FEV helt från UI: fyra papper på HK 5004, å
 16. Schemahorisonten och `extend-recurring-schedules` rullar slutdatumet ett år i taget så länge avtalet inte är uppsagt; 16 aktiva scheman saknar avtalskoppling och faller till kundraden. Fas 3 måste ge båda vägarna `renewal_mode`, och tekniker måste kunna läsa det via RPC:n.
 17. Avtal som bor på enhetsrader (Pelican, Heimstaden) syns inte i huvudkontorets papperskolumn. Gemet visas bara på HK och grupperar på Fortnox-kundnummer, så de samfaktureras aldrig av misstag, men planen bör säga var de pappren visas (förslag: på enhetens egen kundsida, som idag).
 
-## 9. Öppna frågor till Christian
+## 9. Beslut och öppna frågor
 
-1. Diarienummer på fakturan: i radtexten och `ExternalInvoiceReference1`, med "Er referens" reserverat för referenskoden? (Förslag: ja.)
-2. Samlad faktura där avtalen har olika referenser: HK:s kod i huvudet och avtalets i radtexten, eller enskilda fakturor i det läget?
-3. Ska ett enskilt avtal kunna dras ur samlingsfakturan (undantag per avtal), eller räcker kundnivåvalet först?
-4. Utrustning per år: fakturera avtalat antal eller faktiskt utplacerat, och helt år i förskott eller pro rata när en station placeras mitt i året? Provision på per-år-rader?
-5. Option: räcker 90 dagars förvarning, och ska avtalet förlängas automatiskt vid tystnad eller alltid kräva aktivt beslut? Samma papper eller nytt papper vid förlängning? (Förslag: samma papper, händelse i tidslinjen.)
-6. Indexering: får fakturaansvarig indexera utan andra godkännare? Ska "indexera alla avtal" finnas på gemet (ett klick för FEV:s fyra) och ska AKI även gälla per-år-utrustning?
-7. Besökstyp: ska `service_mode` styra vilken ärendetyp schemat skapar (stationskontroll respektive uppföljning), och behövs en egen ärendetyp för uppföljning?
-8. Får WBAB:s F-642 typas om till avtalsfaktura och knytas till WBAB-avtalet, och vilket Fortnox-nummer har FEV:s år 1-faktura?
+Besvarat av Christian 2026-09-02:
+
+1. Diarienummer: ja, i radtexten och `ExternalInvoiceReference1`, "Er referens" reserveras för referenskoden. Fältet (`contracts.diary_number`) är generellt och redigerbart per avtal för alla kunder, inte något FEV-specifikt.
+2. Samlad faktura med olika referenser: huvudkundens referens i huvudet, avtalen som rader.
+3. Inget undantag per avtal från samlingsfakturan i första versionen.
+5. Option: 90 dagars förvarning räcker. Avtalet löper vidare om ingen aktivt säger upp det. Samma papper, händelse i tidslinjen.
+6. Indexering: fakturaansvarig indexerar utan annan godkännare. "Indexera alla avtal" på gemet. Utrustning indexeras om det blir enkelt och tydligt, annars senare.
+7. Besökstyp: ingen egen uppföljningstyp. Stationskontroller används; extra besök är vanliga engångsärenden ("extrabesök avtalskund"). `service_mode` blir `inspection` eller `on_demand`.
+8. FEV år 1 = Fortnox 643, WBAB år 1 = Fortnox 642 (se avsnitt 5). Årspremiefakturor ska ha "Årspremie" i radtexten.
+10. Synth-kunderna materialiseras inte i batch. Först ska motorn fungera överallt, sedan går Christian igenom alla avtal ett och ett.
+
+Kvar att besvara:
+
+4. Utrustning per år: fakturera avtalat antal eller faktiskt utplacerat, och helt år i förskott eller pro rata när en station placeras mitt i året? Provision på per-år-rader? (FEV:s fakturor 648, 744, 745 och 862 fakturerar avtalat antal helt år i förskott, vilket talar för den modellen.)
 9. Hur långt före periodstart ska årspremieutkastet skapas i Fortnox?
-10. Ska de 80 kunderna som faktureras via synth-avtal materialiseras till riktiga avtal i en batch?
 
 ## 10. Rättelser mot tidigare underlag
 
