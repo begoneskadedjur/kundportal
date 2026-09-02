@@ -13,6 +13,7 @@
 
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import DateField from '../../../ui/DateField'
 import {
   BILLING_FREQUENCY_LABEL,
   formatDateSv,
@@ -444,7 +445,7 @@ export default function ContractPremiumSection({
               {stepForm.eventType === 'indexation' ? 'Indexjustering' : 'Nytt steg i premietrappan'}
             </span>
             <label htmlFor={`step-date-${contract.id}`}>Gäller från</label>
-            <input id={`step-date-${contract.id}`} type="date" lang="sv-SE" className={PAPER_INPUT_CLASS} value={stepDate} onChange={(e) => setStepDate(e.target.value)} />
+            <DateField id={`step-date-${contract.id}`} className={`${PAPER_INPUT_CLASS} pl-7 w-full`} value={stepDate} onChange={setStepDate} />
             {stepForm.eventType === 'indexation' && (
               <>
                 <label htmlFor={`step-pct-${contract.id}`}>Procent</label>

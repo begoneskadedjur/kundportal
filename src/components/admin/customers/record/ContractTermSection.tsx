@@ -10,6 +10,7 @@
 
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import DateField from '../../../ui/DateField'
 import { formatDateSv, type RecordContract } from '../../../../hooks/useCustomerRecord'
 import { todayKey } from '../../../../utils/contractLifecycle'
 import { PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk } from './paperInk'
@@ -190,9 +191,9 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
       ) : (
         <div className="font-sans py-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center text-[12px]" style={{ color: ink.secondary }}>
           <label htmlFor={`term-start-${contract.id}`}>Startdatum</label>
-          <input id={`term-start-${contract.id}`} type="date" lang="sv-SE" className={PAPER_INPUT_CLASS} value={startInput} onChange={(e) => setStartInput(e.target.value)} autoFocus />
+          <DateField id={`term-start-${contract.id}`} className={`${PAPER_INPUT_CLASS} pl-7 w-full`} value={startInput} onChange={setStartInput} autoFocus />
           <label htmlFor={`term-end-${contract.id}`}>Slutdatum</label>
-          <input id={`term-end-${contract.id}`} type="date" lang="sv-SE" className={PAPER_INPUT_CLASS} value={endInput} onChange={(e) => setEndInput(e.target.value)} />
+          <DateField id={`term-end-${contract.id}`} className={`${PAPER_INPUT_CLASS} pl-7 w-full`} value={endInput} onChange={setEndInput} clearable />
           <label htmlFor={`term-notice-${contract.id}`}>Uppsägningstid (mån)</label>
           <input id={`term-notice-${contract.id}`} className={PAPER_INPUT_CLASS} inputMode="numeric" value={noticeInput} onChange={(e) => setNoticeInput(e.target.value)} placeholder="t.ex. 6" />
           <div className="col-span-2 flex items-center gap-3 pt-1">
@@ -236,9 +237,9 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
           {modeInput === 'option' && (
             <>
               <label htmlFor={`renew-until-${contract.id}`}>Längst till</label>
-              <input id={`renew-until-${contract.id}`} type="date" lang="sv-SE" className={PAPER_INPUT_CLASS} value={optionUntilInput} onChange={(e) => setOptionUntilInput(e.target.value)} />
+              <DateField id={`renew-until-${contract.id}`} className={`${PAPER_INPUT_CLASS} pl-7 w-full`} value={optionUntilInput} onChange={setOptionUntilInput} clearable />
               <label htmlFor={`renew-deadline-${contract.id}`}>Beslut senast</label>
-              <input id={`renew-deadline-${contract.id}`} type="date" lang="sv-SE" className={PAPER_INPUT_CLASS} value={deadlineInput} onChange={(e) => setDeadlineInput(e.target.value)} />
+              <DateField id={`renew-deadline-${contract.id}`} className={`${PAPER_INPUT_CLASS} pl-7 w-full`} value={deadlineInput} onChange={setDeadlineInput} clearable />
             </>
           )}
           {modeInput !== 'rolling' && (

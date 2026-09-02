@@ -3339,12 +3339,11 @@ function IndexAllModal({
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs text-slate-400">
             Gäller från
-            <input
-              type="date"
-              lang="sv-SE"
+            <DateField
               value={effectiveFrom}
-              onChange={(e) => setEffectiveFrom(e.target.value)}
-              className="mt-1 w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
+              onChange={setEffectiveFrom}
+              aria-label="Gäller från"
+              className="mt-1 w-full pl-9 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
             />
           </label>
           <label className="text-xs text-slate-400">
