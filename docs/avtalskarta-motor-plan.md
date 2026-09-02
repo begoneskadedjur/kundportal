@@ -227,7 +227,12 @@ Dagens `planForContract` med tre ändringar: belopp från trappan, `invoice_mark
 
 ### Utrustning per år
 
-`per_year`-rader ger `equipment_annual`-rader: "{tjänst}, tillägg utöver avtal, {antal} st à {pris} kr/år, {period}". Med `equipment_billing = separate` blir det en egen faktura med `contract_invoice_kind = equipment`. Antalet låses på raden vid fakturering. Per-runda-flödet (tjänst 43) är oförändrat.
+Beslut 2026-09-02: båda modellerna ska stödjas, och de utgår från dagens etableringsflöde. Koordinatorn skapar ett etableringsärende, teknikern placerar ut stationer och markerar varje station som Tillägg (utöver avtalet) eller inte (inne i avtalet).
+
+- **Tilläggsstation utanför avtalet** (`billing_model = per_round`): debiteras per etablering och per kontrollrunda enligt prislistan. Dagens tilläggsstationsflöde (tjänst 43), oförändrat.
+- **Tilläggsutrustning som läggs in i avtalet** (`billing_model = per_year`): från ärendemodalen används den befintliga funktionen "Lägg till i avtalet" på fakturarader och interna kostnader (avtalstillägg, `apply_contract_addition`). Då adderas utrustningen till avtalet som § 6-rad, syns i kundens tidslinje, kunden betalar pro rata fram till nästa årspremie (merförsäljningsfakturan, som idag), och nästa årspremiefaktura får utrustningen som `equipment_annual`-rad för hela det kommande året. Avtalat antal, helt år i förskott. Premietrappan får ett `addition`-steg (M6 flyttar tillägget från kundraden till avtalet).
+
+`equipment_annual`-radens text: "{tjänst}, tillägg utöver avtal, {antal} st à {pris} kr/år, {period}". Med `equipment_billing = separate` blir det en egen faktura med `contract_invoice_kind = equipment`. Antalet låses på raden vid fakturering. FEV:s fakturor 648, 744, 745 och 862 är exakt sådana tillägg (Aurocon, ljusfällor, mekaniska fällor) och ska importeras och kopplas till respektive § 6-rad, med "faktureras med huvudavtalet från 2027-07-01" som täckning för första perioden.
 
 ### Avrop per ärende
 
@@ -322,10 +327,10 @@ Besvarat av Christian 2026-09-02:
 8. FEV år 1 = Fortnox 643, WBAB år 1 = Fortnox 642 (se avsnitt 5). Årspremiefakturor ska ha "Årspremie" i radtexten.
 10. Synth-kunderna materialiseras inte i batch. Först ska motorn fungera överallt, sedan går Christian igenom alla avtal ett och ett.
 
-Kvar att besvara:
+4. Utrustning per år: båda modellerna, se avsnitt 5 "Utrustning per år". Tillägg utanför avtalet per runda; tillägg i avtalet via "Lägg till i avtalet" med pro rata nu och helt år i nästa premie. Provision på per-år-rader är inte beslutad (per-rundaflödet ger provision via ärendet som idag).
+9. Årspremiefakturan skapas så tidigt att den är betald innan kundens nya avtalsår börjar: fakturadatum = periodstart minus betalningsvillkor (30 dagar) minus marginal. Förslag: 40 dagar före periodstart, som inställning (`invoice_lead_days`) med 40 som standard. Dagens beteende (skapas vid planering med förfallodag idag + 30) ersätts.
 
-4. Utrustning per år: fakturera avtalat antal eller faktiskt utplacerat, och helt år i förskott eller pro rata när en station placeras mitt i året? Provision på per-år-rader? (FEV:s fakturor 648, 744, 745 och 862 fakturerar avtalat antal helt år i förskott, vilket talar för den modellen.)
-9. Hur långt före periodstart ska årspremieutkastet skapas i Fortnox?
+Kvar att besvara: inget som blockerar fas 2.
 
 ## 10. Rättelser mot tidigare underlag
 
