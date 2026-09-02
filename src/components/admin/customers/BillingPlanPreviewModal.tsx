@@ -6,7 +6,7 @@ import React from 'react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import LoadingSpinner from '../../shared/LoadingSpinner'
-import type { BillingPlan, BillingPlanEntry, BillingPlanAction } from '../../../services/contractInvoiceGenerator'
+import type { BillingPlan, BillingPlanAction } from '../../../services/contractInvoiceGenerator'
 
 interface Props {
   isOpen: boolean
@@ -34,6 +34,10 @@ const actionMeta: Partial<Record<BillingPlanAction, { label: string; className: 
   delete: { label: 'RADERAS', className: 'bg-red-500/20 text-red-300 border-red-500/40' },
   locked: { label: 'LÅST', className: 'bg-slate-600/40 text-slate-300 border-slate-500/40' },
   keep: { label: 'OFÖRÄNDRAD', className: 'bg-slate-700/40 text-slate-400 border-slate-600/40' },
+  // Passerad period utan faktura på ett riktigt avtal: skapas aldrig här,
+  // importeras från Fortnox (avtalskartan § 7).
+  uncovered: { label: 'SAKNAR FAKTURA', className: 'bg-amber-500/15 text-amber-300 border-amber-500/40' },
+  consolidated: { label: 'SAMLINGSFAKTURA', className: 'bg-slate-700/40 text-slate-400 border-slate-600/40' },
 }
 
 // Actions som inte visas i listan (historiska skapas/backfillas silent)

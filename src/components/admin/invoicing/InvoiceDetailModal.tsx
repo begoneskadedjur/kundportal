@@ -1027,6 +1027,28 @@ export default function InvoiceDetailModal({
       if (effectiveMarking) fortnoxPayload.YourReference = effectiveMarking
       if (invoice.notes) fortnoxPayload.Remarks = invoice.notes
 
+      // Årspremiefakturor (inget ärende): avtalets diarienummer som extern
+      // referens och kundansvarig som Vår referens. Samlad faktura (flera
+      // avtal): diarienummer från raderna, gemensam kundansvarig om alla delar.
+      if (!invoice.case_id && invoice.invoice_type === 'contract') {
+        const contractIds = new Set<string>()
+        if ((invoice as any).contract_id) contractIds.add((invoice as any).contract_id)
+        for (const it of invoice.items as Array<{ contract_id?: string | null }>) {
+          if (it.contract_id) contractIds.add(it.contract_id)
+        }
+        if (contractIds.size > 0) {
+          const { data: contractRows } = await supabase
+            .from('contracts')
+            .select('id, diary_number, account_manager_name')
+            .in('id', [...contractIds])
+          const rows = (contractRows ?? []) as Array<{ diary_number: string | null; account_manager_name: string | null }>
+          const diaries = [...new Set(rows.map((r) => r.diary_number?.trim()).filter((d): d is string => !!d))]
+          if (diaries.length > 0) fortnoxPayload.ExternalInvoiceReference1 = diaries.join(' / ').slice(0, 80)
+          const managers = [...new Set(rows.map((r) => r.account_manager_name?.trim()).filter((m): m is string => !!m))]
+          if (managers.length === 1 && !fortnoxPayload.OurReference) fortnoxPayload.OurReference = managers[0]
+        }
+      }
+
       // ROT/RUT: fakturanivån bär bara typen ('rot'/'rut'); raderna är
       // flaggade i steg 3, och fastighetsbeteckning + avdragsbelopp
       // registreras via taxreductions-resursen efter att fakturan skapats.

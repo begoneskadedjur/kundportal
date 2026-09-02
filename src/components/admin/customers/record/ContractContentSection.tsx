@@ -146,7 +146,13 @@ export default function ContractContentSection({
   accumulatedLoading,
   showAccumulated,
 }: Props) {
-  const { services, articles, summary, settings } = content
+  const { services: allServices, articles, summary, settings } = content
+  // § 4 visar det som ingår i premien. Rader med annat faktureringsläge
+  // (per styck och år, per kontrollrunda) bor i § 6 Utrustning.
+  const services = allServices.filter((s) => {
+    const m = (s as unknown as { billing_model?: string | null }).billing_model
+    return !m || m === 'premium'
+  })
 
   // Artiklar grupperade per tjänsterad (mapped_service_id → tjänstens item-id)
   const articlesByService = new Map<string, CaseBillingItemWithRelations[]>()

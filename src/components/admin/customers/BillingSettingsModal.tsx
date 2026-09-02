@@ -18,6 +18,7 @@ import { type BillingFrequency, BILLING_FREQUENCY_CONFIG, type AdhocInvoiceGroup
 import toast from 'react-hot-toast'
 import { ContractInvoiceGenerator, computePlannedInvoicesPure, type BillingPlan } from '../../../services/contractInvoiceGenerator'
 import { ContractService } from '../../../services/contractService'
+import { ContractScopeService } from '../../../services/contractScopeService'
 import { PaymentTermsService } from '../../../services/paymentTermsService'
 import BillingPlanPreviewModal from './BillingPlanPreviewModal'
 
@@ -490,15 +491,20 @@ export default function BillingSettingsModal({
       updated_at: new Date().toISOString(),
     }
 
-    // Avtalsfält: skriv alltid till customers (synth-fallback + dashboards).
-    // När contractId finns skrivs samma data även till contracts (sanningen).
-    customerUpdate.billing_frequency = billingFrequency
-    customerUpdate.annual_value = annualValue
-    customerUpdate.monthly_value = monthlyValue
-    customerUpdate.contract_start_date = contractStartDate || null
-    customerUpdate.contract_end_date = contractEndDate || null
-    customerUpdate.billing_anchor_month = billingAnchorMonth
-    customerUpdate.billing_active = billingActive
+    // Avtalsfält: när modalen är scopad till ett avtal är AVTALET källan
+    // (avtalskartan som motor). Kundraden speglas då som summa av kundens
+    // levande avtal via ContractScopeService, aldrig med det här avtalets
+    // värde rakt av: med flera avtal skrev det annars över summan.
+    // Utan avtal (synth-kund) skrivs fälten till kundraden som förut.
+    if (!contractId) {
+      customerUpdate.billing_frequency = billingFrequency
+      customerUpdate.annual_value = annualValue
+      customerUpdate.monthly_value = monthlyValue
+      customerUpdate.contract_start_date = contractStartDate || null
+      customerUpdate.contract_end_date = contractEndDate || null
+      customerUpdate.billing_anchor_month = billingAnchorMonth
+      customerUpdate.billing_active = billingActive
+    }
 
     // För multisite: spara billing-inställningar på hauptkontoret, inte barn-enheten
     const saveId = headquarterCustomerId ?? customerId
@@ -508,7 +514,7 @@ export default function BillingSettingsModal({
       .eq('id', saveId)
     if (error) throw error
 
-    // Skriv avtalsfälten även till contracts-raden när scopad
+    // Skriv avtalsfälten till contracts-raden när scopad, och spegla summan
     if (contractId) {
       try {
         await ContractService.updateBilling(contractId, {
@@ -519,6 +525,7 @@ export default function BillingSettingsModal({
           contract_start_date: contractStartDate || null,
           contract_end_date: contractEndDate || null,
         })
+        await ContractScopeService.resyncCustomerRow(saveId)
       } catch (err) {
         console.error('[BillingSettingsModal] kunde inte uppdatera contracts-raden:', err)
         throw err
@@ -538,8 +545,10 @@ export default function BillingSettingsModal({
       if (adjError) throw adjError
     }
 
-    // Propagera bara avtalsdatum till barn-enheter — rör inte annual_value
-    if (isMultisite && sites.length > 0) {
+    // Propagera avtalsdatum till barn-enheter bara för synth-kunder. Med
+    // riktiga avtal styr § 1 Omfattning täckningen, och datum på enhetsrader
+    // ger bara spökkort i avtalskartan.
+    if (!contractId && isMultisite && sites.length > 0) {
       const siteIds = sites.map(s => s.id)
       await supabase
         .from('customers')
@@ -594,13 +603,21 @@ export default function BillingSettingsModal({
       if (!ok) return
       setPlanLoading(true)
       setPlanOpen(true)
-      const newPlan = await ContractInvoiceGenerator.planForCustomer(customerId)
+      // Alla kundens avtal enligt faktureringsläget (gemet): samlad faktura
+      // eller en plan per avtal. Tidigare planerades bara första avtalet.
+      const planCustomerId = headquarterCustomerId ?? customerId
+      const plans = await ContractInvoiceGenerator.planCombinedForCustomer(planCustomerId)
+      const newPlan = ContractInvoiceGenerator.mergePlans(planCustomerId, plans)
       setPlan(newPlan)
       const hasChanges = (newPlan.summary.create + newPlan.summary.update + newPlan.summary.delete + newPlan.summary.historical) > 0
       if (!hasChanges) {
         setPlanOpen(false)
         setPlan(null)
-        toast.success('Inga fakturaändringar behövs')
+        toast.success(
+          newPlan.summary.uncovered > 0
+            ? `Inga fakturaändringar behövs. ${newPlan.summary.uncovered} passerad period saknar faktura i portalen: importera från Fortnox.`
+            : 'Inga fakturaändringar behövs'
+        )
         onSave()
         onClose()
       }

@@ -96,6 +96,20 @@ function periodAmount(annual: number, frequency: string | null): number {
   return Math.round(annual / divisor)
 }
 
+/** Rad ur fakturaplanen som rör det här avtalet (från ContractInvoiceGenerator). */
+export interface PremiumPlanEntry {
+  action: string
+  periodStart: string
+  periodEnd: string
+  /** Fakturans belopp exkl. moms (hela fakturan vid samlad) */
+  subtotal: number
+  invoiceDate: string
+  dueDate: string
+  existingStatus?: string | null
+  consolidated?: boolean
+  reason?: string
+}
+
 interface Props {
   contract: RecordContract
   premiumEvents: PremiumEvent[]
@@ -103,6 +117,12 @@ interface Props {
   annualInForce: number | null
   ink: PaperInk
   archived: boolean
+  /** Kundens faktureringsläge (gemet) */
+  invoiceMode?: 'per_contract' | 'consolidated'
+  /** Fakturaplanens rader för avtalet, i periodordning */
+  planEntries?: PremiumPlanEntry[]
+  /** Koppla en Fortnox-faktura till en passerad period utan faktura */
+  onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null }) => void
   onSavePremium?: (input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }) => Promise<void>
   onAddPremiumEvent?: (input: {
     eventType: 'step_up' | 'indexation' | 'adjustment'
@@ -120,6 +140,9 @@ export default function ContractPremiumSection({
   archived,
   onSavePremium,
   onAddPremiumEvent,
+  invoiceMode,
+  planEntries,
+  onLinkFortnox,
 }: Props) {
   const [editing, setEditing] = useState(false)
   const [stepForm, setStepForm] = useState<null | { eventType: 'step_up' | 'indexation' }>(null)
@@ -143,6 +166,24 @@ export default function ContractPremiumSection({
   const sortedEvents = [...premiumEvents].sort((a, b) => a.effective_from.localeCompare(b.effective_from))
   const canEdit = !archived && !!onSavePremium
   const canStep = !archived && !!onAddPremiumEvent
+  // Fakturaplanen vinner över den lokala periodberäkningen när den finns:
+  // den känner till trappan, utrustningen, Fortnox-importer och samlingsfakturor.
+  const entries = planEntries ?? []
+  const uncovered = entries.filter((e) => e.action === 'uncovered')
+  const nextEntry = entries.find((e) => e.periodStart > today && e.action !== 'uncovered' && e.action !== 'delete')
+  const nextLabel: { date: string; text: string } | null = nextEntry
+    ? {
+        date: nextEntry.periodStart,
+        text:
+          nextEntry.existingStatus && ['booked', 'sent', 'paid'].includes(nextEntry.existingStatus)
+            ? `${formatKr(nextEntry.subtotal)} · ${nextEntry.existingStatus === 'paid' ? 'betald' : 'skickad'}`
+            : nextEntry.existingStatus
+              ? `${formatKr(nextEntry.subtotal)} · utkast${nextEntry.consolidated ? ', samlad' : ''}`
+              : `${formatKr(nextEntry.subtotal)} · skapas ${formatDateSv(nextEntry.invoiceDate)}${nextEntry.consolidated ? ', samlad' : ''}`,
+      }
+    : nextStart
+      ? { date: nextStart, text: annualInForce ? formatKr(periodAmount(annualInForce, frequency)) : 'belopp saknas' }
+      : null
 
   const openEdit = () => {
     setAnnualInput(annualInForce != null ? String(annualInForce) : '')
@@ -252,13 +293,9 @@ export default function ContractPremiumSection({
             <span className="font-sans text-[12px] tabular-nums" style={{ color: ink.secondary }}>
               {paused ? (
                 'pausad'
-              ) : nextStart && annualInForce ? (
+              ) : nextLabel ? (
                 <>
-                  <b style={{ color: ink.primary }}>{formatDateSv(nextStart)}</b> · {formatKr(periodAmount(annualInForce, frequency))}
-                </>
-              ) : nextStart ? (
-                <>
-                  <b style={{ color: ink.primary }}>{formatDateSv(nextStart)}</b> · belopp saknas
+                  <b style={{ color: ink.primary }}>{formatDateSv(nextLabel.date)}</b> · {nextLabel.text}
                 </>
               ) : (
                 'ingen planerad'
@@ -270,9 +307,30 @@ export default function ContractPremiumSection({
             <span className="font-semibold">Faktureras</span>
             <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
             <span className="font-sans text-[12px]" style={{ color: ink.secondary }}>
-              på egen faktura
+              {invoiceMode === 'consolidated' ? 'på kundens samlingsfaktura, som egen rad' : 'på egen faktura'}
             </span>
           </div>
+          {uncovered.map((u) => (
+            <div
+              key={u.periodStart}
+              className="flex items-center gap-2 mt-1.5 px-2.5 py-1.5 rounded-md font-sans text-[11px] leading-relaxed"
+              style={{ border: '1px dashed rgba(180,83,9,.5)', color: '#7a3c07' }}
+            >
+              <span>
+                Perioden <b>{formatDateSv(u.periodStart)} t.o.m. {formatDateSv(u.periodEnd)}</b> saknar faktura i portalen
+                {u.subtotal > 0 ? ` (${formatKr(u.subtotal)} exkl. moms)` : ''}. Fakturerad utanför portalen? Koppla Fortnox-fakturan.
+              </span>
+              {onLinkFortnox && !archived && (
+                <button
+                  onClick={() => onLinkFortnox({ periodStart: u.periodStart, periodEnd: u.periodEnd, expectedSubtotal: u.subtotal || null })}
+                  className={`${PAPER_LINK_CLASS} ml-auto shrink-0`}
+                  style={{ color: ink.warn }}
+                >
+                  koppla Fortnox-faktura
+                </button>
+              )}
+            </div>
+          ))}
         </>
       ) : (
         <div className="font-sans py-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center text-[12px]" style={{ color: ink.secondary }}>

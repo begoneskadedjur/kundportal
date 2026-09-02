@@ -86,6 +86,30 @@ export interface FortnoxInvoice {
   FinalPayDate: string | null
 }
 
+export interface FortnoxInvoiceRow {
+  ArticleNumber: string | null
+  Description: string
+  DeliveredQuantity: number | string
+  Price: number | string
+  Total: number | string
+  VAT: number | string
+  Discount?: number | string
+}
+
+/** Fakturan som GET /invoices/{nr} ger: huvud + rader. */
+export interface FortnoxInvoiceDetail extends FortnoxInvoice {
+  Net: number | string
+  TotalVAT: number | string
+  Booked: boolean
+  Cancelled: boolean
+  YourReference: string | null
+  OurReference: string | null
+  ExternalInvoiceReference1: string | null
+  Remarks: string | null
+  OrganisationNumber?: string | null
+  InvoiceRows: FortnoxInvoiceRow[]
+}
+
 /**
  * Delar upp en svensk enradsadress ("Gatan 1, 123 45 Ort, Sverige") i
  * Fortnox-fälten Address1 / ZipCode / City. Returnerar hela strängen som
@@ -176,6 +200,15 @@ export const FortnoxService = {
       : 'invoices'
     const data = await fortnoxRequest<{ Invoices: FortnoxInvoice[] }>(path)
     return data.Invoices ?? []
+  },
+
+  /**
+   * En faktura med rader, för import av redan fakturerade avtalsperioder
+   * (avtalskartan § 7: "koppla Fortnox-faktura").
+   */
+  async getInvoice(documentNumber: string | number): Promise<FortnoxInvoiceDetail> {
+    const data = await fortnoxRequest<{ Invoice: FortnoxInvoiceDetail }>(`invoices/${documentNumber}`)
+    return data.Invoice
   },
 
   async createInvoice(invoice: Record<string, unknown>): Promise<FortnoxInvoice> {

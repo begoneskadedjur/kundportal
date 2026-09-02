@@ -1468,6 +1468,117 @@ export class ContractScopeService {
   }
 
   /**
+   * § 6 Utrustning: faktureringsläge på en tjänsterad i avtalsinnehållet.
+   *   premium   = ingår i årspremien (§ 4)
+   *   per_year  = debiteras utöver premien, antal x pris per år, rad på årsfakturan
+   *   per_round = tilläggsstation per kontrollrunda (tjänst 43), aldrig från avtalet
+   */
+  static async setLineBillingModel(
+    contractId: string,
+    itemId: string,
+    model: 'premium' | 'per_year' | 'per_round',
+    label?: string | null
+  ): Promise<void> {
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .update({ billing_model: model })
+      .eq('id', itemId)
+      .eq('case_id', contractId)
+      .eq('case_type', 'contract')
+      .eq('item_type', 'service')
+      .select('id')
+    if (error) throw new Error(`Kunde inte ändra faktureringsläge: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Raden kunde inte uppdateras (0 rader)')
+    const labels = { premium: 'ingår i premien', per_year: 'per styck och år', per_round: 'per kontrollrunda' }
+    await this.logEvent(contractId, {
+      event_type: 'billing',
+      title: `${label ?? 'Rad'}: ${labels[model]}`,
+      detail:
+        model === 'per_year'
+          ? 'Egen rad på årspremiefakturan'
+          : model === 'per_round'
+            ? 'Debiteras när kontrollrundan avslutas'
+            : 'Ingår i årspremien',
+    })
+  }
+
+  /** Räkna om kundradens speglade avtalsfält (summa av levande avtal). */
+  static async resyncCustomerRow(customerId: string): Promise<void> {
+    await this.mirrorSharedFields(customerId)
+  }
+
+  /**
+   * Gemet: hur kundens årspremier faktureras. 'consolidated' = en faktura
+   * per period med en rad per avtal, 'per_contract' = en faktura per avtal.
+   * Läses på huvudkontorsraden. Loggas på varje levande avtal.
+   */
+  static async setContractInvoiceMode(customerId: string, mode: 'per_contract' | 'consolidated'): Promise<void> {
+    const { data, error } = await supabase
+      .from('customers')
+      .update({ contract_invoice_mode: mode })
+      .eq('id', customerId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte ändra faktureringsläge: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Kundraden kunde inte uppdateras (0 rader)')
+    const live = await this.liveContractsOnCustomer(customerId)
+    for (const c of live) {
+      await this.logEvent(c.id, {
+        event_type: 'billing',
+        title: mode === 'consolidated' ? 'Faktureras på kundens samlingsfaktura' : 'Faktureras på egen faktura',
+        detail: mode === 'consolidated' ? 'En faktura per period, en rad per avtal' : 'Varje avtal faktureras för sig',
+      })
+    }
+  }
+
+  /**
+   * Indexera alla levande avtal på en kund i ett steg (gemet). Samma
+   * procent och datum på alla; utrustningsrader "per styck och år" räknas
+   * upp med samma procent när includeEquipment är satt.
+   */
+  static async indexAllContracts(
+    customerId: string,
+    input: { effectiveFrom: string; percent: number; note?: string | null; includeEquipment?: boolean }
+  ): Promise<{ indexed: number; skipped: number }> {
+    if (!Number.isFinite(input.percent) || input.percent === 0) throw new Error('Ange en procentsats')
+    const live = await this.liveContractsOnCustomer(customerId)
+    let indexed = 0
+    let skipped = 0
+    for (const c of live) {
+      const current = Number(c.annual_value ?? 0)
+      if (!(current > 0)) {
+        skipped += 1
+        continue
+      }
+      const next = Math.round(current * (1 + input.percent / 100))
+      await this.addPremiumEvent(c.id, {
+        eventType: 'indexation',
+        effectiveFrom: input.effectiveFrom,
+        annualValue: next,
+        note: `${input.note?.trim() ? `${input.note.trim()} ` : ''}${input.percent.toLocaleString('sv-SE')} %`.trim(),
+      })
+      if (input.includeEquipment) {
+        const { data: rows } = await supabase
+          .from('case_billing_items')
+          .select('id, unit_price, quantity')
+          .eq('case_id', c.id)
+          .eq('case_type', 'contract')
+          .eq('item_type', 'service')
+          .eq('billing_model', 'per_year')
+          .neq('status', 'cancelled')
+        for (const r of (rows ?? []) as { id: string; unit_price: number; quantity: number }[]) {
+          const unit = Math.round(Number(r.unit_price) * (1 + input.percent / 100) * 100) / 100
+          await supabase
+            .from('case_billing_items')
+            .update({ unit_price: unit, total_price: Math.round(unit * Number(r.quantity) * 100) / 100 })
+            .eq('id', r.id)
+        }
+      }
+      indexed += 1
+    }
+    return { indexed, skipped }
+  }
+
+  /**
    * Nolla kundradens egna avtalsfält när raden täcks av ett riktigt avtal.
    * Avtalsdatum på en kundrad utan egen contracts-rad ger ett "kundkortsavtal"
    * i avtalskartan; när enheten i stället står i ett avtals § 1 är datumen

@@ -47,6 +47,8 @@ export interface CaseBillingItem {
   service_name: string | null
   // Gemensamma fält
   item_type: CaseBillingItemType
+  /** Avtalsinnehåll (§ 6): premium = ingår i årspremien, per_year = egen rad på årsfakturan, per_round = tilläggsstation per kontrollrunda */
+  billing_model?: 'premium' | 'per_year' | 'per_round' | null
   quantity: number
   unit_price: number
   discount_percent: number

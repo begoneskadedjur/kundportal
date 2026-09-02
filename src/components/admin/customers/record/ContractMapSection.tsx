@@ -60,9 +60,14 @@ import { isCompletedStatus, type ClickUpStatus } from '../../../../types/databas
 import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
 import ContractContentSection, { useContractContent, useAccumulatedCaseOutcome } from './ContractContentSection'
 import ContractPriceListSection, { useAvropCatalog } from './ContractPriceListSection'
-import ContractPremiumSection from './ContractPremiumSection'
+import ContractPremiumSection, { type PremiumPlanEntry } from './ContractPremiumSection'
 import ContractReferencesSection from './ContractReferencesSection'
 import ContractTermSection from './ContractTermSection'
+import ContractEquipmentSection from './ContractEquipmentSection'
+import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
+import BillingPlanPreviewModal from '../BillingPlanPreviewModal'
+import { ContractInvoiceGenerator, type BillingPlan } from '../../../../services/contractInvoiceGenerator'
+import type { CaseBillingItemWithRelations } from '../../../../types/caseBilling'
 import ContractCaseServiceSelector from '../ContractCaseServiceSelector'
 import Modal from '../../../ui/Modal'
 import SiteModal from '../../multisite/SiteModal'
@@ -170,6 +175,17 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [typePrompt, setTypePrompt] = useState<{ source: RecordContract | null; blankPayload?: DragPayload } | null>(null)
   /** Enhet släppt på § 8 — raden öppnas för inmatning av Er referens */
   const [refPrompt, setRefPrompt] = useState<RefPrompt | null>(null)
+  /** Fakturaplanen för kundens avtal (gemet, § 7). Läses om efter varje skrivning. */
+  const [billingPlans, setBillingPlans] = useState<BillingPlan[]>([])
+  const [billingPlansKey, setBillingPlansKey] = useState(0)
+  /** Förhandsgranskning innan fakturaplanen appliceras */
+  const [planPreview, setPlanPreview] = useState<BillingPlan | null>(null)
+  const [planPreviewOpen, setPlanPreviewOpen] = useState(false)
+  const [planLoading, setPlanLoading] = useState(false)
+  /** "Indexera alla avtal" på gemet */
+  const [indexAllOpen, setIndexAllOpen] = useState(false)
+  /** Koppla Fortnox-faktura till en passerad period (§ 7) */
+  const [fortnoxTarget, setFortnoxTarget] = useState<LinkFortnoxTarget | null>(null)
   /** Avtal som ska raderas (bekräftelse) */
   const [deletePrompt, setDeletePrompt] = useState<RecordContract | null>(null)
   /** Avtal vars besöksfrekvens ska sättas */
@@ -823,6 +839,188 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Fakturaplan (gemet + § 7): avtalen är källan till årspremiefakturan
+  // -------------------------------------------------------------------------
+
+  useEffect(() => {
+    let cancelled = false
+    if (papers.length === 0) {
+      setBillingPlans([])
+      return
+    }
+    ContractInvoiceGenerator.planCombinedForCustomer(root.id)
+      .then((plans) => {
+        if (!cancelled) setBillingPlans(plans)
+      })
+      .catch((err) => {
+        console.error('Kunde inte planera fakturor för avtalskartan:', err)
+        if (!cancelled) setBillingPlans([])
+      })
+    return () => {
+      cancelled = true
+    }
+    // papers.length: planen läses om när avtal tillkommer eller försvinner;
+    // billingPlansKey bumpas efter varje skrivning som påverkar fakturorna.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [root.id, papers.length, contentReloadKey, billingPlansKey, contracts])
+
+  const invoiceMode: 'per_contract' | 'consolidated' =
+    (root as unknown as { contract_invoice_mode?: string | null }).contract_invoice_mode === 'consolidated'
+      ? 'consolidated'
+      : 'per_contract'
+
+  /** Planens rader per avtal, för § 7 (samlade rader räknas till varje avtal de bär) */
+  const planEntriesByContract = useMemo(() => {
+    const map = new Map<string, PremiumPlanEntry[]>()
+    for (const plan of billingPlans) {
+      for (const e of plan.entries) {
+        if (!e.planned) continue
+        const ids = new Set<string>()
+        if (e.contractId) ids.add(e.contractId)
+        else if (plan.contractId) ids.add(plan.contractId)
+        for (const r of e.rows ?? []) if (r.contract_id) ids.add(r.contract_id)
+        const entry: PremiumPlanEntry = {
+          action: e.action,
+          periodStart: e.planned.periodStart,
+          periodEnd: e.planned.periodEnd,
+          subtotal: e.planned.subtotal,
+          invoiceDate: e.planned.invoiceDate,
+          dueDate: e.planned.dueDate,
+          existingStatus: e.existingStatus ?? null,
+          consolidated: e.consolidated ?? plan.consolidated ?? false,
+          reason: e.reason,
+        }
+        for (const id of ids) map.set(id, [...(map.get(id) ?? []), entry])
+      }
+    }
+    for (const list of map.values()) list.sort((a, b) => a.periodStart.localeCompare(b.periodStart))
+    return map
+  }, [billingPlans])
+
+  const planTotals = useMemo(() => {
+    const merged = billingPlans.length ? ContractInvoiceGenerator.mergePlans(root.id, billingPlans) : null
+    const today = todayKey()
+    const next = merged?.entries
+      .filter((e) => e.planned && e.planned.periodStart > today && e.action !== 'uncovered' && e.action !== 'delete')
+      .sort((a, b) => a.planned!.periodStart.localeCompare(b.planned!.periodStart))[0]
+    return {
+      changes: merged ? merged.summary.create + merged.summary.update + merged.summary.delete : 0,
+      uncovered: merged?.summary.uncovered ?? 0,
+      next: next?.planned ?? null,
+    }
+  }, [billingPlans, root.id])
+
+  const annualSum = useMemo(
+    () => papers.reduce((s, c) => s + (contractEffectiveAnnualValue(c, premiumByContract.get(c.id) ?? []) ?? 0), 0),
+    [papers, premiumByContract]
+  )
+
+  const setInvoiceMode = async (mode: 'per_contract' | 'consolidated') => {
+    if (mode === invoiceMode) return
+    setBusy(true)
+    try {
+      await ContractScopeService.setContractInvoiceMode(root.id, mode)
+      toast.success(
+        mode === 'consolidated'
+          ? 'Årspremierna faktureras nu på en samlad faktura, en rad per avtal. Planera fakturorna för att byta ut befintliga utkast.'
+          : 'Varje avtal faktureras nu för sig. Planera fakturorna för att byta ut befintliga utkast.'
+      )
+      await onChanged()
+      setBillingPlansKey((k) => k + 1)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ändra faktureringsläge')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const openPlanPreview = async () => {
+    setPlanLoading(true)
+    setPlanPreviewOpen(true)
+    try {
+      const plans = await ContractInvoiceGenerator.planCombinedForCustomer(root.id)
+      setBillingPlans(plans)
+      const merged = ContractInvoiceGenerator.mergePlans(root.id, plans)
+      setPlanPreview(merged)
+      if (merged.summary.create + merged.summary.update + merged.summary.delete + merged.summary.historical === 0) {
+        setPlanPreviewOpen(false)
+        setPlanPreview(null)
+        toast.success(
+          merged.summary.uncovered > 0
+            ? `Fakturorna stämmer redan. ${merged.summary.uncovered} passerad period saknar faktura i portalen, koppla den från § 7.`
+            : 'Fakturorna stämmer redan med avtalen.'
+        )
+      }
+    } catch (err) {
+      setPlanPreviewOpen(false)
+      toast.error(err instanceof Error ? err.message : 'Kunde inte beräkna fakturaplanen')
+    } finally {
+      setPlanLoading(false)
+    }
+  }
+
+  const applyPlanPreview = async () => {
+    if (!planPreview) return
+    setBusy(true)
+    try {
+      const r = await ContractInvoiceGenerator.apply(planPreview)
+      toast.success(`Fakturor: ${r.createdIds.length} nya, ${r.updatedIds.length} uppdaterade, ${r.deletedIds.length} borttagna.`)
+      setPlanPreviewOpen(false)
+      setPlanPreview(null)
+      await onChanged()
+      setBillingPlansKey((k) => k + 1)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte applicera fakturaplanen')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const indexAll = async (input: { effectiveFrom: string; percent: number; note: string | null; includeEquipment: boolean }) => {
+    setBusy(true)
+    try {
+      const r = await ContractScopeService.indexAllContracts(root.id, input)
+      toast.success(
+        `${r.indexed} avtal indexerade med ${input.percent.toLocaleString('sv-SE')} % från ${formatDateSv(input.effectiveFrom)}${
+          r.skipped ? ` (${r.skipped} utan premie hoppades över)` : ''
+        }. Planera fakturorna för att räkna om beloppen.`
+      )
+      setIndexAllOpen(false)
+      await onChanged()
+      setBillingPlansKey((k) => k + 1)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte indexera avtalen')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const changeLineBillingModel = async (contract: RecordContract, item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_round') => {
+    try {
+      await ContractScopeService.setLineBillingModel(contract.id, item.id, model, item.service_name ?? item.article_name)
+      toast.success(`${item.service_name ?? item.article_name}: ${model === 'per_year' ? 'per styck och år' : model === 'per_round' ? 'per kontrollrunda' : 'ingår i premien'}.`)
+      setContentReloadKey((k) => k + 1)
+      setBillingPlansKey((k) => k + 1)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ändra faktureringsläge')
+      throw err
+    }
+  }
+
+  const openLinkFortnox = (contract: RecordContract, period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null }) => {
+    setFortnoxTarget({
+      customerId: root.id,
+      customerName: customerRowName(root),
+      contractId: invoiceMode === 'consolidated' && papers.length > 1 ? null : contract.id,
+      contractLabel: invoiceMode === 'consolidated' && papers.length > 1 ? null : contractDisplayName(contract),
+      coveredContractIds: invoiceMode === 'consolidated' ? papers.map((p) => p.id) : undefined,
+      periodStart: period.periodStart,
+      periodEnd: period.periodEnd,
+      expectedSubtotal: period.expectedSubtotal,
+    })
+  }
+
   const deleteContract = async (contract: RecordContract) => {
     setDeletePrompt(null)
     setBusy(true)
@@ -1352,6 +1550,68 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 
         {/* Höger: avtalsdokumenten */}
         <main className="relative z-10 space-y-6 min-w-0">
+          {/* Gemet: hur kundens årspremier faktureras. Kundnivåval som rör hur
+              pappren binds ihop, därför här ovanför pappren och aldrig i
+              Verksamhetspanelen. Bär även "Planera fakturor" och "Indexera alla". */}
+          {papers.length > 0 && (
+            <div className="flex items-center gap-3 flex-wrap bg-slate-800/40 border border-slate-700 rounded-xl px-4 py-2.5 text-[12.5px] font-sans">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={invoiceMode === 'consolidated' ? '#20c58f' : '#94a3b8'} strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M21 11.5l-8.5 8.5a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8" />
+              </svg>
+              <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-100">
+                {papers.length > 1 ? (invoiceMode === 'consolidated' ? 'Samlingsfaktura' : 'Enskilda fakturor') : 'Årspremie'}
+              </span>
+              <span className="text-slate-400">
+                {papers.length > 1
+                  ? invoiceMode === 'consolidated'
+                    ? 'en faktura per period, en Fortnox-rad per avtal'
+                    : 'varje avtal faktureras för sig'
+                  : 'avtalet faktureras för sig'}
+              </span>
+              <span className="flex-1 border-b border-dotted border-slate-700 translate-y-1 min-w-4" />
+              <span className="text-slate-200 font-semibold tabular-nums whitespace-nowrap">
+                {papers.length} avtal · {formatKr(annualSum)}/år
+                {planTotals.next ? ` · nästa ${formatDateSv(planTotals.next.periodStart)}` : ''}
+              </span>
+              {papers.length > 1 && (
+                <button
+                  onClick={() => void setInvoiceMode(invoiceMode === 'consolidated' ? 'per_contract' : 'consolidated')}
+                  disabled={busy}
+                  className="text-[12px] font-semibold text-[#20c58f] underline decoration-dotted hover:brightness-110 disabled:opacity-50"
+                  title={invoiceMode === 'consolidated' ? 'Byt till en faktura per avtal' : 'Byt till en samlad faktura med en rad per avtal'}
+                >
+                  {invoiceMode === 'consolidated' ? 'dela upp' : 'slå ihop'}
+                </button>
+              )}
+              <button
+                onClick={() => setIndexAllOpen(true)}
+                disabled={busy}
+                className="text-[12px] font-semibold text-slate-300 underline decoration-dotted hover:text-slate-100 disabled:opacity-50"
+                title="Indexera alla kundens avtal med samma procent och datum"
+              >
+                indexera alla
+              </button>
+              <button
+                onClick={() => void openPlanPreview()}
+                disabled={busy || planLoading}
+                className={`inline-flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 ${
+                  planTotals.changes > 0
+                    ? 'bg-[#20c58f] text-[#fff] hover:brightness-110'
+                    : 'border border-slate-600 text-slate-200 hover:border-[#20c58f]'
+                }`}
+                title="Jämför avtalen med fakturorna och skapa, uppdatera eller ta bort utkast"
+              >
+                Planera fakturor
+                {planTotals.changes > 0 && <span className="tabular-nums opacity-90">· {planTotals.changes}</span>}
+              </button>
+              {planTotals.uncovered > 0 && (
+                <span className="text-[11px] text-amber-300 whitespace-nowrap">
+                  {planTotals.uncovered} period{planTotals.uncovered === 1 ? '' : 'er'} saknar faktura, se § 7
+                </span>
+              )}
+            </div>
+          )}
+
           {papers.map((c) => (
             <PaperContract
               key={c.id}
@@ -1402,6 +1662,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onSaveUnitReference={(unit, code) => saveUnitReference(c, unit, code)}
               refFocusUnitId={refPrompt?.contract.id === c.id ? refPrompt.unitId : null}
               onRefFocusHandled={() => setRefPrompt(null)}
+              invoiceMode={papers.length > 1 ? invoiceMode : 'per_contract'}
+              planEntries={planEntriesByContract.get(c.id) ?? []}
+              onLinkFortnox={(period) => openLinkFortnox(c, period)}
+              onChangeLineModel={(item, model) => changeLineBillingModel(c, item, model)}
               // Uppsagt-men-löpande avtal ligger kvar bland de aktiva (de
               // fungerar till slutdatumet) och ska kunna ångras direkt — inte
               // först när uppsägningstiden hunnit löpa ut.
@@ -1664,6 +1928,39 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       {/* Datum-popover */}
       {datePrompt && (
         <DatePromptPopover prompt={datePrompt} onClose={() => setDatePrompt(null)} />
+      )}
+
+      {/* Fakturaplan: förhandsgranska diff mot fakturorna innan apply (gemet) */}
+      <BillingPlanPreviewModal
+        isOpen={planPreviewOpen}
+        plan={planPreview}
+        loading={planLoading}
+        onConfirm={() => void applyPlanPreview()}
+        onCancel={() => {
+          setPlanPreviewOpen(false)
+          setPlanPreview(null)
+        }}
+      />
+
+      {/* Koppla Fortnox-faktura till en passerad period (§ 7) */}
+      <LinkFortnoxInvoiceModal
+        target={fortnoxTarget}
+        onClose={() => setFortnoxTarget(null)}
+        onLinked={async () => {
+          await onChanged()
+          setBillingPlansKey((k) => k + 1)
+        }}
+      />
+
+      {/* Indexera alla avtal (gemet) */}
+      {indexAllOpen && (
+        <IndexAllModal
+          count={papers.length}
+          annualSum={annualSum}
+          busy={busy}
+          onClose={() => setIndexAllOpen(false)}
+          onConfirm={(input) => void indexAll(input)}
+        />
       )}
 
       {/* Avtalstyp innan nytt avtal skapas — samma typer som Oneflow-wizarden */}
@@ -2346,6 +2643,99 @@ function VisitFrequencyModal({
 // Datum-popover: Idag / Avtalsstart / valfritt datum
 // ---------------------------------------------------------------------------
 
+/**
+ * Indexera alla kundens levande avtal i ett steg (gemet). Samma procent och
+ * datum på alla; fakturaansvarig indexerar utan annan godkännare (beslut
+ * 2026-09-02). Utrustning per styck och år räknas upp om rutan är ikryssad.
+ */
+function IndexAllModal({
+  count,
+  annualSum,
+  busy,
+  onClose,
+  onConfirm,
+}: {
+  count: number
+  annualSum: number
+  busy: boolean
+  onClose: () => void
+  onConfirm: (input: { effectiveFrom: string; percent: number; note: string | null; includeEquipment: boolean }) => void
+}) {
+  const nextYear = new Date()
+  nextYear.setFullYear(nextYear.getFullYear() + 1)
+  const [effectiveFrom, setEffectiveFrom] = useState(`${nextYear.getFullYear()}-01-01`)
+  const [percent, setPercent] = useState('')
+  const [note, setNote] = useState('AKI')
+  const [includeEquipment, setIncludeEquipment] = useState(true)
+  const pct = Number(percent.replace(',', '.'))
+  const valid = Number.isFinite(pct) && pct !== 0 && !!effectiveFrom
+  const preview = valid ? Math.round(annualSum * (1 + pct / 100)) : null
+
+  return (
+    <Modal isOpen onClose={onClose} title={`Indexera ${count} avtal`} size="sm">
+      <div className="p-4 space-y-3">
+        <p className="text-xs text-slate-400">
+          Ett steg i varje avtals premietrappa med samma procent och datum. Nuvarande summa {formatKr(annualSum)}/år
+          {preview != null ? `, blir ${formatKr(preview)}/år` : ''}. Beloppen når fakturorna när du planerar om dem.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-xs text-slate-400">
+            Gäller från
+            <input
+              type="date"
+              lang="sv-SE"
+              value={effectiveFrom}
+              onChange={(e) => setEffectiveFrom(e.target.value)}
+              className="mt-1 w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
+            />
+          </label>
+          <label className="text-xs text-slate-400">
+            Procent
+            <input
+              value={percent}
+              onChange={(e) => setPercent(e.target.value)}
+              inputMode="decimal"
+              placeholder="t.ex. 3,1"
+              autoFocus
+              className="mt-1 w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
+            />
+          </label>
+        </div>
+        <label className="block text-xs text-slate-400">
+          Notering
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="t.ex. AKI näringsgren N, dec 2026"
+            className="mt-1 w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
+          />
+        </label>
+        <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={includeEquipment}
+            onChange={(e) => setIncludeEquipment(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
+          />
+          Räkna även upp utrustning per styck och år (§ 6)
+        </label>
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-700/50">
+          <button onClick={onClose} disabled={busy} className="text-xs text-slate-400 hover:text-slate-200">
+            Avbryt
+          </button>
+          <button
+            onClick={() => valid && onConfirm({ effectiveFrom, percent: pct, note: note.trim() || null, includeEquipment })}
+            disabled={!valid || busy}
+            className="bg-[#20c58f] text-[#fff] text-sm font-semibold rounded-xl px-4 py-2 hover:brightness-110 disabled:opacity-50"
+          >
+            Indexera
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 function DatePromptPopover({ prompt, onClose }: { prompt: DatePrompt; onClose: () => void }) {
   const [customDate, setCustomDate] = useState('')
   const confirm = (date: string) => {
@@ -2530,6 +2920,12 @@ interface PaperProps {
   /** Enhet som just släppts på § 8 — dess rad öppnas för inmatning */
   refFocusUnitId?: string | null
   onRefFocusHandled?: () => void
+  /** § 7: kundens faktureringsläge och fakturaplanens rader för avtalet */
+  invoiceMode?: 'per_contract' | 'consolidated'
+  planEntries?: PremiumPlanEntry[]
+  onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null }) => void
+  /** § 6: byt faktureringsläge på en tjänsterad */
+  onChangeLineModel?: (item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_round') => Promise<void>
   /** Öppna väljaren för signeringsdatum */
   onEditSignedAt?: () => void
   /** Spara avtalets säljare (den som skrivit under för BeGone) */
@@ -2871,6 +3267,10 @@ function PaperContract({
   onSaveUnitReference,
   refFocusUnitId,
   onRefFocusHandled,
+  invoiceMode,
+  planEntries,
+  onLinkFortnox,
+  onChangeLineModel,
 }: PaperProps) {
   const key = todayKey()
   const archived = state === 'archived'
@@ -3363,6 +3763,17 @@ function PaperContract({
         accumulatedLoading={accumulatedOutcome.loading}
       />
 
+      {/* § 6 Utrustning i avtalet — samma rader som § 4/§ 5, med faktureringsläge */}
+      <ContractEquipmentSection
+        services={contentData.content.services}
+        articles={contentData.content.articles}
+        loading={contentData.loading}
+        ink={ink}
+        archived={archived}
+        onEdit={onEditContent}
+        onChangeModel={onChangeLineModel}
+      />
+
       {/* § 7 Premie och fakturering — avtalet är källan till årspremiefakturan */}
       <ContractPremiumSection
         contract={contract}
@@ -3372,6 +3783,9 @@ function PaperContract({
         archived={archived}
         onSavePremium={onSavePremium}
         onAddPremiumEvent={onAddPremiumEvent}
+        invoiceMode={invoiceMode}
+        planEntries={planEntries}
+        onLinkFortnox={onLinkFortnox}
       />
 
       {/* § 8 Referenser — avtalets referens + Er referens per enhet i omfattningen.

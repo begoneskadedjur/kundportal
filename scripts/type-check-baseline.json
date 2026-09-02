@@ -297,7 +297,6 @@
   "src/services/commissionExportService.ts|TS7006": 1,
   "src/services/communicationService.ts|TS2352": 1,
   "src/services/contractBillingService.ts|TS2339": 1,
-  "src/services/contractInvoiceGenerator.ts|TS2367": 2,
   "src/services/contractService.ts|TS2430": 1,
   "src/services/contractService.ts|TS7053": 2,
   "src/services/coordinatorAnalyticsService.ts|TS2300": 2,
