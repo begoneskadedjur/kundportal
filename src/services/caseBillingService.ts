@@ -185,8 +185,8 @@ export class CaseBillingService {
    * (contracts.price_list_id via ägarskap eller contract_sites) vinner per
    * tjänst, kundens prislista fyller ut. Används av ärendeflödet.
    */
-  static async getServicePricesForCase(customerId: string): Promise<Record<string, number>> {
-    return PriceListService.getServicePricesForCase(customerId)
+  static async getServicePricesForCase(customerId: string, contractId?: string | null): Promise<Record<string, number>> {
+    return PriceListService.getServicePricesForCase(customerId, contractId)
   }
 
   /**

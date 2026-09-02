@@ -60,6 +60,9 @@ import { isCompletedStatus, type ClickUpStatus } from '../../../../types/databas
 import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
 import ContractContentSection, { useContractContent, useAccumulatedCaseOutcome } from './ContractContentSection'
 import ContractPriceListSection, { useAvropCatalog } from './ContractPriceListSection'
+import ContractPremiumSection from './ContractPremiumSection'
+import ContractReferencesSection from './ContractReferencesSection'
+import ContractTermSection from './ContractTermSection'
 import ContractCaseServiceSelector from '../ContractCaseServiceSelector'
 import Modal from '../../../ui/Modal'
 import SiteModal from '../../multisite/SiteModal'
@@ -86,6 +89,21 @@ interface DragState {
   y: number
   overContractId: string | null
   invalidReason: string | null
+  /** Musen är över det tomma avtalsbladet (nytt avtal) */
+  overBlank: boolean
+  /** Släppzon inuti pappret: 'scope' (§ 1, standard) eller 'refs' (§ 8) */
+  overZone: DropZone
+}
+
+type DropZone = 'scope' | 'refs'
+
+/** Vad som ligger under pekaren vid en dragning */
+type DropTarget = { kind: 'paper'; contract: RecordContract; zone: DropZone } | { kind: 'blank' } | null
+
+/** Enhet som släppts på § 8 Referenser: sätt Er referens */
+interface RefPrompt {
+  contract: RecordContract
+  unitId: string
 }
 
 interface DatePrompt {
@@ -144,8 +162,14 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [contentEditor, setContentEditor] = useState<RecordContract | null>(null)
   /** Bumpas när innehållet sparats så pappren hämtar om tjänster + marginal */
   const [contentReloadKey, setContentReloadKey] = useState(0)
-  /** Val av avtalstyp innan ett nytt avtal skapas */
-  const [typePrompt, setTypePrompt] = useState<{ source: RecordContract | null } | null>(null)
+  /**
+   * Val av avtalstyp innan ett nytt avtal skapas. `blankPayload` = enheten
+   * (eller Hela verksamheten) som släpptes på det tomma avtalsbladet; då
+   * skapas ett tomt avtal på kundraden och enheten skrivs in i § 1 direkt.
+   */
+  const [typePrompt, setTypePrompt] = useState<{ source: RecordContract | null; blankPayload?: DragPayload } | null>(null)
+  /** Enhet släppt på § 8 — raden öppnas för inmatning av Er referens */
+  const [refPrompt, setRefPrompt] = useState<RefPrompt | null>(null)
   /** Avtal som ska raderas (bekräftelse) */
   const [deletePrompt, setDeletePrompt] = useState<RecordContract | null>(null)
   /** Avtal vars besöksfrekvens ska sättas */
@@ -399,18 +423,51 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     [activeScopeByContract, isSingleSite]
   )
 
-  const findPaperAt = (x: number, y: number): RecordContract | null => {
+  /**
+   * Vad ligger under pekaren: ett papper (med släppzon), det tomma
+   * avtalsbladet eller inget. Zonen läses ur närmaste [data-drop-zone]
+   * inuti pappret; utan zon gäller § 1 Omfattning som förut.
+   */
+  const findDropTarget = (x: number, y: number): DropTarget => {
     const el = document.elementFromPoint(x, y)
-    const paperEl = el?.closest<HTMLElement>('[data-paper-id]')
+    if (!el) return null
+    if (el.closest('[data-blank-sheet]')) return { kind: 'blank' }
+    const paperEl = el.closest<HTMLElement>('[data-paper-id]')
     if (!paperEl) return null
-    return papers.find((c) => c.id === paperEl.dataset.paperId) ?? null
+    const contract = papers.find((c) => c.id === paperEl.dataset.paperId)
+    if (!contract) return null
+    const zoneEl = el.closest<HTMLElement>('[data-drop-zone]')
+    const zone: DropZone = zoneEl?.dataset.dropZone === 'refs' ? 'refs' : 'scope'
+    return { kind: 'paper', contract, zone }
   }
+
+  /** Släpp på § 8: enheten måste redan stå i avtalets omfattning */
+  const validateRefDrop = useCallback(
+    (payload: DragPayload, contract: RecordContract): string | null => {
+      if (payload.type === 'org') return 'Dra in en enskild enhet för att sätta dess referens'
+      if (contract.covers_all_sites) return null
+      if (contract.customer_id === payload.unitId) return null
+      const scope = activeScopeByContract.get(contract.id) ?? []
+      if (scope.some((cs) => cs.customer_id === payload.unitId)) return null
+      return 'Skriv in enheten i § 1 Omfattning först'
+    },
+    [activeScopeByContract]
+  )
 
   const startDrag = (e: React.PointerEvent, payload: DragPayload) => {
     if (busy || e.button !== 0) return
     if ((e.target as HTMLElement).closest('button')) return
     e.preventDefault()
-    setDrag({ payload, started: false, x: e.clientX, y: e.clientY, overContractId: null, invalidReason: null })
+    setDrag({
+      payload,
+      started: false,
+      x: e.clientX,
+      y: e.clientY,
+      overContractId: null,
+      invalidReason: null,
+      overBlank: false,
+      overZone: 'scope',
+    })
   }
 
   const dragRef = useRef<DragState | null>(null)
@@ -428,27 +485,46 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         setDrag({ ...prev, x: e.clientX, y: e.clientY })
         return
       }
-      const over = findPaperAt(e.clientX, e.clientY)
+      const target = findDropTarget(e.clientX, e.clientY)
+      const paper = target?.kind === 'paper' ? target : null
       setDrag({
         ...prev,
         started: true,
         x: e.clientX,
         y: e.clientY,
-        overContractId: over?.id ?? null,
-        invalidReason: over ? validateDrop(prev.payload, over) : null,
+        overContractId: paper?.contract.id ?? null,
+        overBlank: target?.kind === 'blank' && prev.payload.type !== 'scoperow',
+        overZone: paper?.zone ?? 'scope',
+        invalidReason: paper
+          ? paper.zone === 'refs'
+            ? validateRefDrop(prev.payload, paper.contract)
+            : validateDrop(prev.payload, paper.contract)
+          : null,
       })
     }
     const onUp = (e: PointerEvent) => {
       const prev = dragRef.current
       setDrag(null)
       if (!prev?.started) return
-      const over = findPaperAt(e.clientX, e.clientY)
-      if (!over) return
-      const err = validateDrop(prev.payload, over)
+      const target = findDropTarget(e.clientX, e.clientY)
+      if (!target) return
+      if (target.kind === 'blank') {
+        // Omfattningsrader flyttas mellan befintliga avtal, de skapar inga nya.
+        if (prev.payload.type === 'scoperow') return
+        setTypePrompt({ source: null, blankPayload: prev.payload })
+        return
+      }
+      if (target.zone === 'refs') {
+        const err = validateRefDrop(prev.payload, target.contract)
+        if (err) toast.error(err)
+        else if (prev.payload.type !== 'org') setRefPrompt({ contract: target.contract, unitId: prev.payload.unitId })
+        return
+      }
+      const err = validateDrop(prev.payload, target.contract)
       if (err) {
         toast.error(err)
       } else {
-        openDatePromptForDrop(prev.payload, over, e.clientX, e.clientY)
+        openDatePromptForDrop(prev.payload, target.contract, e.clientX, e.clientY)
       }
     }
     window.addEventListener('pointermove', onMove)
@@ -458,7 +534,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       window.removeEventListener('pointerup', onUp)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!drag, validateDrop, papers])
+  }, [!!drag, validateDrop, validateRefDrop, papers])
 
   const openDatePromptForDrop = (payload: DragPayload, contract: RecordContract, x: number, y: number) => {
     // "Hela verksamheten" → fråga först om det gäller även framtida enheter
@@ -601,6 +677,147 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       await onChanged()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Kunde inte skapa avtalet')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * Tomt avtalsblad: en enhet (eller Hela verksamheten) släpptes på det
+   * streckade pappret. Skapar ett tomt avtal på kundraden och skriver in
+   * enheten i § 1 från idag. Premie och löptid fylls i på pappret (§ 7, § 9).
+   * Detta är vägen till FLERA avtal på samma kund — "Skapa avtal" ovan
+   * materialiserar bara kundradens första.
+   */
+  const createFromBlank = async (payload: DragPayload, typeName?: string) => {
+    if (payload.type === 'scoperow') return
+    setBusy(true)
+    try {
+      const contractId = await ContractScopeService.createBlankContract(root.id, {
+        label: typeName ?? null,
+        contractType: typeName ?? null,
+      })
+      const today = todayKey()
+      if (payload.type === 'org') {
+        await ContractScopeService.coverAll(
+          contractId,
+          locations.map((l) => l.id),
+          today
+        )
+        toast.success(
+          `Nytt avtal${typeName ? ` (${typeName})` : ''} skapat med alla ${locations.length} enheter i § 1. Fyll i årspremie i § 7 och löptid i § 9.`
+        )
+      } else {
+        const unit = customerById.get(payload.unitId)
+        await ContractScopeService.addSite(contractId, payload.unitId, today)
+        toast.success(
+          `Nytt avtal${typeName ? ` (${typeName})` : ''} skapat med ${unit ? customerRowName(unit) : 'enheten'} i § 1 från idag. Fyll i årspremie i § 7 och löptid i § 9.`
+        )
+      }
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte skapa avtalet')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const savePremium = async (
+    contract: RecordContract,
+    input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }
+  ) => {
+    try {
+      await ContractScopeService.setPremium(contract.id, input)
+      toast.success(
+        input.annualValue
+          ? `Årspremie ${formatKr(input.annualValue)} sparad för ${contractDisplayName(contract)}.`
+          : `Premien borttagen från ${contractDisplayName(contract)}.`
+      )
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara premien')
+      throw err
+    }
+  }
+
+  const addPremiumEvent = async (
+    contract: RecordContract,
+    input: { eventType: 'step_up' | 'indexation' | 'adjustment'; effectiveFrom: string; annualValue: number; note: string | null }
+  ) => {
+    try {
+      await ContractScopeService.addPremiumEvent(contract.id, input)
+      toast.success(
+        `${input.eventType === 'indexation' ? 'Indexjustering' : 'Nytt steg'} från ${formatDateSv(input.effectiveFrom)}: ${formatKr(input.annualValue)}/år.`
+      )
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara steget')
+      throw err
+    }
+  }
+
+  const saveTerm = async (
+    contract: RecordContract,
+    input: { startDate: string | null; endDate: string | null; noticePeriodMonths: number | null }
+  ) => {
+    try {
+      await ContractScopeService.setTerm(contract.id, input)
+      toast.success(`Löptid sparad för ${contractDisplayName(contract)}.`)
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara löptiden')
+      throw err
+    }
+  }
+
+  const saveInvoiceReference = async (
+    contract: RecordContract,
+    input: { invoiceReference: string | null; diaryNumber: string | null }
+  ) => {
+    try {
+      await ContractScopeService.setInvoiceReference(contract.id, input)
+      toast.success('Avtalets referens sparad. Skrivs på årspremiefakturan.')
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara referensen')
+      throw err
+    }
+  }
+
+  const saveUnitReference = async (contract: RecordContract, unit: RecordCustomer, code: string | null) => {
+    try {
+      await ContractScopeService.setUnitBillingReference(unit.id, code, {
+        contractId: contract.id,
+        unitName: customerRowName(unit),
+      })
+      toast.success(
+        code
+          ? `Er referens ${code} sparad på ${customerRowName(unit)} (Märkning faktura). Förifylls på enhetens ärenden.`
+          : `Er referens borttagen från ${customerRowName(unit)}.`
+      )
+      setRefPrompt(null)
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara referenskoden')
+      throw err
+    }
+  }
+
+  /**
+   * Kundkortsavtal på en rad som redan täcks av ett riktigt avtal är rester:
+   * datumen på kundraden ger ett spökkort i avtalskartan fast enheten står i
+   * ett avtals § 1. Nollning tar bort kortet; avtalet ovan bär reglerna.
+   */
+  const clearRowContractFields = async (customerRowContract: RecordContract) => {
+    const rowId = customerRowContract.customer_id ?? ''
+    const row = customerById.get(rowId)
+    setBusy(true)
+    try {
+      await ContractScopeService.clearCustomerRowContractFields(rowId)
+      toast.success(`Avtalsfälten på ${row ? customerRowName(row) : 'kundraden'} nollade. Avtalet i § 1 gäller.`)
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte nolla avtalsfälten')
     } finally {
       setBusy(false)
     }
@@ -1176,6 +1393,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
               onEditFrequency={() => setFrequencyPrompt(c)}
               onEditSignedAt={() => setSignedAtPrompt(c)}
+              locations={locations}
+              dropZone={drag?.overContractId === c.id ? drag.overZone : undefined}
+              onSavePremium={(input) => savePremium(c, input)}
+              onAddPremiumEvent={(input) => addPremiumEvent(c, input)}
+              onSaveTerm={(input) => saveTerm(c, input)}
+              onSaveInvoiceReference={(input) => saveInvoiceReference(c, input)}
+              onSaveUnitReference={(unit, code) => saveUnitReference(c, unit, code)}
+              refFocusUnitId={refPrompt?.contract.id === c.id ? refPrompt.unitId : null}
+              onRefFocusHandled={() => setRefPrompt(null)}
               // Uppsagt-men-löpande avtal ligger kvar bland de aktiva (de
               // fungerar till slutdatumet) och ska kunna ångras direkt — inte
               // först när uppsägningstiden hunnit löpa ut.
@@ -1207,6 +1433,38 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               isSingleSite={isSingleSite}
             />
           ))}
+
+          {/* Tomt avtalsblad: alltid sist, även när avtal redan finns. Dra in en
+              enhet (eller Hela verksamheten) så skapas ett NYTT avtal på
+              kundraden — vägen till flera avtal på samma kund (FEV: fyra
+              prisposter). "Skapa avtal" nedan materialiserar bara kundradens
+              första avtal och räcker inte för det. */}
+          <div
+            data-blank-sheet
+            className={`relative rounded-md rounded-tr-xl border-2 border-dashed px-6 py-6 text-center font-sans transition-all ${
+              drag?.started && drag.overBlank
+                ? 'border-[#20c58f] bg-[#20c58f]/10 scale-[1.006]'
+                : drag?.started && drag.payload.type !== 'scoperow'
+                  ? 'border-[#20c58f]/50'
+                  : 'border-slate-700'
+            }`}
+          >
+            <div className="text-[9.5px] font-bold uppercase tracking-[0.2em] text-[#20c58f] mb-1.5">
+              Tomt avtalsblad
+            </div>
+            <p className="text-sm font-semibold text-slate-200">
+              Nytt avtal på {customerRowName(root)}
+            </p>
+            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+              {drag?.started && drag.overBlank
+                ? `Släpp: ett nytt avtal skapas med ${
+                    drag.payload.type === 'org'
+                      ? 'alla enheter'
+                      : customerRowName(customerById.get(drag.payload.unitId) ?? ({ company_name: 'enheten' } as RecordCustomer))
+                  } i § 1`
+                : 'Dra in en enhet eller Hela verksamheten hit. Du väljer avtalstyp, sedan fylls premie (§ 7) och löptid (§ 9) i på pappret.'}
+            </p>
+          </div>
 
           {papers.length === 0 && (
             <div className="border border-dashed border-slate-700 rounded-2xl p-6 text-center">
@@ -1298,6 +1556,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                     terminatedBy={terminatedByFor(c.id)}
                     onRenew={() => renewContract(c)}
                     onReactivate={() => reactivate(c)}
+                    locations={locations}
                   />
                 ))}
               </div>
@@ -1324,6 +1583,22 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                           c.contract_end_date ? ` – ${formatDateSv(c.contract_end_date)}` : ''
                         }`}
                     </span>
+                    {/* Kundkortsavtal på en rad som redan täcks av ett riktigt avtal
+                        (står i § 1, eller bär ett eget papper) är rester: nolla
+                        datumen så spökkortet försvinner, i stället för att skapa
+                        ännu ett avtal av dem. */}
+                    {c.fromCustomerRow &&
+                      ((coverage.get(c.customer_id ?? '') ?? []).length > 0 ||
+                        papers.some((p) => p.customer_id === c.customer_id)) && (
+                        <button
+                          onClick={() => void clearRowContractFields(c)}
+                          disabled={busy}
+                          className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-300 border border-slate-600 rounded-lg px-2.5 py-1 hover:border-slate-400 hover:text-slate-100 transition-colors disabled:opacity-50"
+                          title="Raden täcks redan av ett avtal — nolla kundradens egna avtalsdatum så resten försvinner"
+                        >
+                          Nolla avtalsfält
+                        </button>
+                      )}
                     <button
                       onClick={() =>
                         c.fromCustomerRow
@@ -1331,7 +1606,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                           : void promoteImported(c)
                       }
                       disabled={busy}
-                      className="ml-auto shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#20c58f] border border-[#20c58f]/40 rounded-lg px-2.5 py-1 hover:bg-[#20c58f]/10 transition-colors disabled:opacity-50"
+                      className={`${
+                        c.fromCustomerRow &&
+                        ((coverage.get(c.customer_id ?? '') ?? []).length > 0 ||
+                          papers.some((p) => p.customer_id === c.customer_id))
+                          ? ''
+                          : 'ml-auto '
+                      }shrink-0 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#20c58f] border border-[#20c58f]/40 rounded-lg px-2.5 py-1 hover:bg-[#20c58f]/10 transition-colors disabled:opacity-50`}
                       title={
                         c.fromCustomerRow
                           ? 'Skapa ett riktigt avtal av kundkortets data'
@@ -1368,7 +1649,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               : customerRowName(customerById.get(drag.payload.unitId) ?? ({ company_name: 'Enhet' } as RecordCustomer))}
             <span className={`block text-[10px] font-normal ${drag.invalidReason ? 'text-red-400' : 'text-[#20c58f]'}`}>
               {drag.invalidReason ??
-                (drag.overContractId ? 'Släpp för att skriva in i avtalet' : 'Släpp på ett avtal')}
+                (drag.overBlank
+                  ? 'Släpp för att skapa ett nytt avtal'
+                  : drag.overContractId
+                    ? drag.overZone === 'refs'
+                      ? 'Släpp för att sätta Er referens'
+                      : 'Släpp för att skriva in i avtalet'
+                    : 'Släpp på ett avtal eller det tomma bladet')}
             </span>
           </span>
         </div>
@@ -1398,9 +1685,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                 <button
                   key={t.serviceId}
                   onClick={() => {
-                    const source = typePrompt.source
+                    const { source, blankPayload } = typePrompt
                     setTypePrompt(null)
-                    void materializeContract(source, t.value)
+                    if (blankPayload) void createFromBlank(blankPayload, t.value)
+                    else void materializeContract(source, t.value)
                   }}
                   disabled={busy}
                   className="w-full flex items-center gap-2 text-left text-sm rounded-xl border border-slate-700/60 px-3 py-2.5 text-slate-200 hover:border-[#20c58f] hover:bg-[#20c58f]/5 transition-colors disabled:opacity-50"
@@ -1418,9 +1706,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-700/50">
               <button
                 onClick={() => {
-                  const source = typePrompt.source
+                  const { source, blankPayload } = typePrompt
                   setTypePrompt(null)
-                  void materializeContract(source)
+                  if (blankPayload) void createFromBlank(blankPayload)
+                  else void materializeContract(source)
                 }}
                 disabled={busy}
                 className="text-xs text-slate-400 hover:text-slate-200"
@@ -2221,6 +2510,26 @@ interface PaperProps {
   onEditFrequency?: () => void
   /** Spara avtalsobjektets text */
   onSaveAgreementText?: (text: string | null) => Promise<void>
+  /** Alla lokaler (enheter, eller kundraden själv) — § 8 listar dem avtalet omfattar */
+  locations: RecordCustomer[]
+  /** Släppzon under pekaren just nu ('refs' = § 8 Referenser) */
+  dropZone?: DropZone
+  /** § 7 Premie och fakturering */
+  onSavePremium?: (input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }) => Promise<void>
+  onAddPremiumEvent?: (input: {
+    eventType: 'step_up' | 'indexation' | 'adjustment'
+    effectiveFrom: string
+    annualValue: number
+    note: string | null
+  }) => Promise<void>
+  /** § 9 Löptid */
+  onSaveTerm?: (input: { startDate: string | null; endDate: string | null; noticePeriodMonths: number | null }) => Promise<void>
+  /** § 8 Referenser */
+  onSaveInvoiceReference?: (input: { invoiceReference: string | null; diaryNumber: string | null }) => Promise<void>
+  onSaveUnitReference?: (unit: RecordCustomer, code: string | null) => Promise<void>
+  /** Enhet som just släppts på § 8 — dess rad öppnas för inmatning */
+  refFocusUnitId?: string | null
+  onRefFocusHandled?: () => void
   /** Öppna väljaren för signeringsdatum */
   onEditSignedAt?: () => void
   /** Spara avtalets säljare (den som skrivit under för BeGone) */
@@ -2553,6 +2862,15 @@ function PaperContract({
   onRenew,
   state,
   terminatedBy,
+  locations,
+  dropZone,
+  onSavePremium,
+  onAddPremiumEvent,
+  onSaveTerm,
+  onSaveInvoiceReference,
+  onSaveUnitReference,
+  refFocusUnitId,
+  onRefFocusHandled,
 }: PaperProps) {
   const key = todayKey()
   const archived = state === 'archived'
@@ -2573,6 +2891,16 @@ function PaperContract({
   const nextStep = nextPremiumEvent(premiumEvents)
   const orgnr = contract.organization_number ?? root.organization_number
   const owner = customerById.get(contract.customer_id ?? '')
+  // Lokalerna avtalet omfattar, i § 1:s ordning: täcker-alla → alla lokaler;
+  // annars raden avtalet bor på (om den är en lokal) + § 1-enheterna.
+  const coveredLocations: RecordCustomer[] = contract.covers_all_sites
+    ? locations
+    : [
+        ...(owner && locations.some((l) => l.id === owner.id) ? [owner] : []),
+        ...scope
+          .map((cs) => customerById.get(cs.customer_id))
+          .filter((c): c is RecordCustomer => !!c && c.id !== owner?.id),
+      ]
   const frequency = contract.billing_frequency ? BILLING_FREQUENCY_LABEL[contract.billing_frequency] : null
   // Kräver ett numeriskt Oneflow-id. Den gamla kollen (bara !isImportedContract)
   // släppte igenom portalskapade avtal, vars syntetiska 'local-<uuid>' gav en
@@ -2631,7 +2959,11 @@ function PaperContract({
             color: isInvalidTarget ? '#9b3535' : '#262e38',
           }}
         >
-          {isInvalidTarget ? invalidReason : `Släpp: ${dragSubject} skrivs in i § 1 Omfattning`}
+          {isInvalidTarget
+            ? invalidReason
+            : dropZone === 'refs'
+              ? `Släpp: sätt Er referens för ${dragSubject} i § 8`
+              : `Släpp: ${dragSubject} skrivs in i § 1 Omfattning`}
         </div>
       )}
       {awaiting && !isDropTarget && !isInvalidTarget && (
@@ -3030,6 +3362,41 @@ function PaperContract({
         accumulated={accumulatedOutcome.summary}
         accumulatedLoading={accumulatedOutcome.loading}
       />
+
+      {/* § 7 Premie och fakturering — avtalet är källan till årspremiefakturan */}
+      <ContractPremiumSection
+        contract={contract}
+        premiumEvents={premiumEvents}
+        annualInForce={annual}
+        ink={ink}
+        archived={archived}
+        onSavePremium={onSavePremium}
+        onAddPremiumEvent={onAddPremiumEvent}
+      />
+
+      {/* § 8 Referenser — avtalets referens + Er referens per enhet i omfattningen.
+          Släppzon: dra in en enhet från vänster för att sätta dess kod. */}
+      <div
+        data-drop-zone="refs"
+        className={`rounded transition-shadow ${
+          dropZone === 'refs' && (isDropTarget || isInvalidTarget) ? 'ring-2 ring-offset-2 ring-[#20c58f]' : ''
+        }`}
+        style={dropZone === 'refs' && (isDropTarget || isInvalidTarget) ? { ['--tw-ring-offset-color' as string]: ink.sheet } : undefined}
+      >
+        <ContractReferencesSection
+          contract={contract}
+          coveredLocations={coveredLocations}
+          ink={ink}
+          archived={archived}
+          onSaveInvoiceReference={onSaveInvoiceReference}
+          onSaveUnitReference={onSaveUnitReference}
+          focusUnitId={refFocusUnitId}
+          onFocusHandled={onRefFocusHandled}
+        />
+      </div>
+
+      {/* § 9 Löptid */}
+      <ContractTermSection contract={contract} ink={ink} archived={archived} onSaveTerm={onSaveTerm} />
 
       {/* Avslutsnotis — bara på arkiverade avtal. Sammanfattar vad som hände
           och hur länge relationen varade, plus den enda framåtriktade

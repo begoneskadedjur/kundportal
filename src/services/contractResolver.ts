@@ -144,6 +144,14 @@ export async function resolveContractCandidates(
   const today = todayKey()
   const found: ContractCandidateInfo[] = []
 
+  // Primär väg: SECURITY DEFINER-RPC som levererar kandidaterna förbi RLS.
+  // Tekniker läser contracts bara där begone_employee_email matchar, så
+  // scheman och sessioner de skapade fick contract_id = null. Urvalet
+  // (levande, ej importrest, datumtäckning, nyast vinner) görs fortfarande
+  // här. Saknas RPC:n (äldre miljö) faller vi tillbaka på direktläsning.
+  const viaRpc = await resolveCandidatesViaRpc(customerId, today, client)
+  if (viaRpc) return finalizeCandidates(viaRpc)
+
   // 1. Avtal som bor på kundraden. Importrester (template_id='imported' eller
   //    oneflow_contract_id 'imported-…') räknas inte som riktiga avtal.
   const { data: owned } = await client
@@ -198,7 +206,11 @@ export async function resolveContractCandidates(
     )
   }
 
-  // Samma avtal kan träffa via flera mekanismer — behåll den starkaste.
+  return finalizeCandidates(found)
+}
+
+/** Samma avtal kan träffa via flera mekanismer — behåll den starkaste, sortera deterministiskt. */
+function finalizeCandidates(found: ContractCandidateInfo[]): ContractCandidateInfo[] {
   const byId = new Map<string, ContractCandidateInfo>()
   for (const c of found) {
     const prev = byId.get(c.id)
@@ -210,6 +222,47 @@ export async function resolveContractCandidates(
     if (m !== 0) return m
     return (a.created_at ?? '').localeCompare(b.created_at ?? '')
   })
+}
+
+let rpcWarned = false
+
+type RpcCandidateRow = RawCandidate & {
+  mechanism: ContractMatchMechanism
+  active_from?: string | null
+  active_to?: string | null
+}
+
+/**
+ * Kandidater via RPC:n get_contract_candidates (migration 20260902).
+ * Returnerar null när RPC:n saknas eller felar, så anroparen kan falla
+ * tillbaka. Filtren är identiska med direktläsningen ovan.
+ */
+async function resolveCandidatesViaRpc(
+  customerId: string,
+  today: string,
+  client: AnyClient
+): Promise<ContractCandidateInfo[] | null> {
+  const { data, error } = await client.rpc('get_contract_candidates', { p_customer_id: customerId })
+  if (error) {
+    // Migrationen 20260902_contract_candidates_rpc är inte applicerad överallt
+    // ännu — varna en gång per session, inte vid varje uppslag.
+    if (!rpcWarned) {
+      rpcWarned = true
+      console.warn('[contractResolver] RPC get_contract_candidates otillgänglig, faller tillbaka på direktläsning:', error.message)
+    }
+    return null
+  }
+  const rows = ((data ?? []) as unknown as RpcCandidateRow[]).filter((r) => {
+    if (!ACTIVE_STATUSES.includes((r.status ?? '') as (typeof ACTIVE_STATUSES)[number])) return false
+    if (!isLiveContract(r, today)) return false
+    if (r.mechanism === 'owned' && isImportedContractRow(r)) return false
+    if (r.mechanism === 'site_scope') {
+      if (r.active_from && r.active_from > today) return false
+      if (r.active_to && r.active_to < today) return false
+    }
+    return true
+  })
+  return rows.map((r) => toCandidate(r, r.mechanism))
 }
 
 /**

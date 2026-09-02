@@ -525,9 +525,18 @@ export class PriceListService {
    * kundens rader fyller ut för tjänster avtalslistan saknar.
    * Tom map → anroparen faller vidare till prisguiden.
    */
-  static async getServicePricesForCase(customerId: string): Promise<Record<string, number>> {
+  static async getServicePricesForCase(
+    customerId: string,
+    /**
+     * Ärendets avtal (cases.contract_id) när det är känt. Utan det väljs
+     * avtalet via omfattningen, vilket är entydigt så länge enheten bara
+     * står i ett avtal — men fel när kunden har flera avtal med olika
+     * prislistor på samma enhet.
+     */
+    contractId?: string | null
+  ): Promise<Record<string, number>> {
     const [contractListId, customerPrices] = await Promise.all([
-      this.resolveContractPriceListId(customerId),
+      this.resolveContractPriceListId(customerId, contractId ?? null),
       this.getCustomerServicePrices(customerId),
     ])
     if (!contractListId) return customerPrices

@@ -5,7 +5,7 @@
 
 import { supabase } from '../lib/supabase'
 import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
-import { isLiveContract, type ContractLifecycleFields } from '../utils/contractLifecycle'
+import { isLiveContract, isImportedContractRow, type ContractLifecycleFields } from '../utils/contractLifecycle'
 import { customersCoveredByContract, resolveContractCandidates } from './contractResolver'
 import { ContractInvoiceGenerator } from './contractInvoiceGenerator'
 
@@ -18,7 +18,28 @@ export interface ScopeRow {
   note: string | null
 }
 
-export type ContractEventType = 'price_list' | 'scope_mode' | 'note' | 'billing' | 'other'
+/** Avtalsrad med de fält speglingen till kundraden behöver. */
+type LiveContractRow = ContractLifecycleFields & {
+  id: string
+  annual_value: number | string | null
+  billing_frequency: string | null
+  billing_anchor_month: number | null
+  contract_start_date: string | null
+  contract_end_date: string | null
+  notice_period_months: number | null
+  template_id: string | null
+  oneflow_contract_id: string | null
+  display_order: number | null
+}
+
+export type ContractEventType =
+  | 'price_list'
+  | 'scope_mode'
+  | 'note'
+  | 'billing'
+  | 'indexation'
+  | 'renewal'
+  | 'other'
 
 export interface ContractEventRow {
   id: string
@@ -307,6 +328,7 @@ export class ContractScopeService {
       contract_end_date: string | null
       contract_length: string | null
       billing_frequency: string | null
+      billing_anchor_month: number | null
       notice_period_months: number | null
       agreement_text: string | null
       price_list_id: string | null
@@ -319,7 +341,7 @@ export class ContractScopeService {
       .select(
         'company_name, organization_number, contact_email, contact_person, contact_address, ' +
           'annual_value, contract_type, contract_start_date, contract_end_date, contract_length, ' +
-          'billing_frequency, notice_period_months, agreement_text, price_list_id, billing_email, billing_address'
+          'billing_frequency, billing_anchor_month, notice_period_months, agreement_text, price_list_id, billing_email, billing_address'
       )
       .eq('id', customerId)
       .single()
@@ -328,7 +350,13 @@ export class ContractScopeService {
     }
     const customer = data as unknown as CustomerRow
 
-    const annual = Number(customer.annual_value ?? 0)
+    // Kundradens avtalsfält beskriver kundens FÖRSTA avtal. Har kunden redan
+    // levande avtal är raden en spegling av dem (annual_value = summan), och
+    // ett andra avtal ska då börja tomt i stället för att ärva fel belopp,
+    // fel slutdatum och fel uppsägningstid.
+    const hasOtherLive = (await this.liveContractsOnCustomer(customerId)).length > 0
+    const annual = hasOtherLive ? 0 : Number(customer.annual_value ?? 0)
+    const nextOrder = await this.nextDisplayOrder(customerId)
     const { data: created, error } = await supabase
       .from('contracts')
       .insert({
@@ -354,14 +382,16 @@ export class ContractScopeService {
         billing_address: customer.billing_address ?? null,
         annual_value: annual > 0 ? annual : null,
         total_value: annual > 0 ? annual : null,
-        billing_frequency: customer.billing_frequency ?? null,
-        contract_start_date: customer.contract_start_date ?? null,
-        contract_end_date: customer.contract_end_date ?? null,
-        start_date: customer.contract_start_date ?? null,
-        contract_length: customer.contract_length ?? null,
-        notice_period_months: customer.notice_period_months ?? null,
-        agreement_text: customer.agreement_text ?? null,
+        billing_frequency: hasOtherLive ? null : (customer.billing_frequency ?? null),
+        billing_anchor_month: hasOtherLive ? null : (customer.billing_anchor_month ?? null),
+        contract_start_date: hasOtherLive ? null : (customer.contract_start_date ?? null),
+        contract_end_date: hasOtherLive ? null : (customer.contract_end_date ?? null),
+        start_date: hasOtherLive ? null : (customer.contract_start_date ?? null),
+        contract_length: hasOtherLive ? null : (customer.contract_length ?? null),
+        notice_period_months: hasOtherLive ? null : (customer.notice_period_months ?? null),
+        agreement_text: hasOtherLive ? null : (customer.agreement_text ?? null),
         price_list_id: customer.price_list_id ?? null,
+        display_order: nextOrder,
       })
       .select('id')
       .single()
@@ -616,9 +646,13 @@ export class ContractScopeService {
     await supabase.from('contract_premium_events').delete().eq('contract_id', contractId)
     await supabase.from('recurring_schedules').update({ contract_id: null }).eq('contract_id', contractId)
 
-    const { data, error } = await supabase.from('contracts').delete().eq('id', contractId).select('id')
+    const { data, error } = await supabase.from('contracts').delete().eq('id', contractId).select('id, customer_id')
     if (error) throw new Error(`Kunde inte radera avtalet: ${error.message}`)
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte raderas (0 rader)')
+
+    // Kundradens årsvärde = summan av levande avtal; räkna om utan det raderade
+    const customerId = (data[0] as { customer_id?: string | null }).customer_id
+    if (customerId) await this.mirrorSharedFields(customerId)
   }
 
   /**
@@ -990,6 +1024,10 @@ export class ContractScopeService {
         .filter(Boolean)
         .join(' · '),
     })
+
+    // Kundradens årsvärde är summan av levande avtal — räkna om när ett
+    // avtal lämnar (annars ligger beloppet kvar tills nästa spegling).
+    if (customerId && alreadyPassed) await this.mirrorSharedFields(customerId)
   }
 
   /**
@@ -1082,6 +1120,9 @@ export class ContractScopeService {
       title: 'Uppsägning ångrad',
       detail: 'Scheman återupptagna och avbokade besök återställda. Kör om fakturagenereringen vid behov.',
     })
+
+    // Avtalet räknas som levande igen — kundradens summa ska ha med det
+    if (customerId) await this.mirrorSharedFields(customerId)
   }
 
   /** Sätt avtalstyp: namnet blir både label (visningsnamn) och contract_type */
@@ -1101,6 +1142,345 @@ export class ContractScopeService {
       title: 'Avtalstyp ändrad',
       detail: typeName,
     })
+  }
+
+  // ---------------------------------------------------------------------------
+  // Avtalskartan som motor (fas 1): tomt avtalsblad, § 7 Premie, § 8 Referenser,
+  // § 9 Löptid. Se docs/avtalskarta-motor-plan.md.
+  // ---------------------------------------------------------------------------
+
+  /** Levande, riktiga avtal (ej importrester) på en kundrad. */
+  private static async liveContractsOnCustomer(customerId: string): Promise<LiveContractRow[]> {
+    const { data } = await supabase
+      .from('contracts')
+      .select(
+        'id, annual_value, billing_frequency, billing_anchor_month, contract_start_date, contract_end_date, ' +
+          'notice_period_months, status, terminated_at, effective_end_date, template_id, oneflow_contract_id, display_order'
+      )
+      .eq('customer_id', customerId)
+      .in('status', ['signed', 'active'])
+    const today = todayKey()
+    return ((data ?? []) as unknown as LiveContractRow[]).filter(
+      (c) => isLiveContract(c, today) && !isImportedContractRow(c)
+    )
+  }
+
+  /** Nästa visningsordning på kundraden (papprens ordning i avtalskartan). */
+  private static async nextDisplayOrder(customerId: string): Promise<number> {
+    const { data } = await supabase
+      .from('contracts')
+      .select('display_order')
+      .eq('customer_id', customerId)
+    const max = ((data ?? []) as { display_order: number | null }[]).reduce(
+      (m, r) => Math.max(m, Number(r.display_order ?? 0)),
+      0
+    )
+    return max + 1
+  }
+
+  /**
+   * Spegla avtalens fält till kundraden när avtalen är källan.
+   *
+   * annual_value på kundraden = SUMMAN av kundens levande avtal, så att
+   * synth-fallbacken, dashboards och gamla listor visar rätt tal även för
+   * kunder med flera avtal (FEV: fyra prisposter). Frekvens, ankarmånad,
+   * datum och uppsägningstid speglas bara när ALLA levande avtal delar
+   * värdet — annars finns inget entydigt kundvärde och raden lämnas orörd.
+   * Fel sväljs: speglingen får aldrig fälla avtalsändringen.
+   */
+  private static async mirrorSharedFields(customerId: string): Promise<void> {
+    try {
+      const live = await this.liveContractsOnCustomer(customerId)
+      if (live.length === 0) return
+      const sum = live.reduce((s, c) => s + Number(c.annual_value ?? 0), 0)
+      const patch: Record<string, unknown> = { annual_value: sum > 0 ? sum : null }
+      const shared = <T>(pick: (c: LiveContractRow) => T): T | undefined => {
+        const first = pick(live[0])
+        return live.every((c) => pick(c) === first) ? first : undefined
+      }
+      const freq = shared((c) => c.billing_frequency ?? null)
+      if (freq) patch.billing_frequency = freq
+      const anchor = shared((c) => c.billing_anchor_month ?? null)
+      if (anchor) patch.billing_anchor_month = anchor
+      const start = shared((c) => c.contract_start_date ?? null)
+      if (start) patch.contract_start_date = start
+      const end = shared((c) => c.contract_end_date ?? null)
+      if (end !== undefined) patch.contract_end_date = end
+      const notice = shared((c) => c.notice_period_months ?? null)
+      if (notice) patch.notice_period_months = notice
+      const { error } = await supabase.from('customers').update(patch).eq('id', customerId)
+      if (error) console.error('Kunde inte spegla avtalsfält till kundraden:', error.message)
+    } catch (err) {
+      console.error('Kunde inte spegla avtalsfält till kundraden:', err)
+    }
+  }
+
+  /**
+   * Tomt avtal på en kundrad (tomt avtalsblad i avtalskartan). Bär bara
+   * parter och typ; premie, löptid och omfattning fylls i på pappret.
+   * Till skillnad från createFromCustomerRow ärvs INGET från kundradens
+   * avtalsfält — det här är ett nytt avtal, inte en materialisering.
+   */
+  static async createBlankContract(
+    customerId: string,
+    input: { label?: string | null; contractType?: string | null }
+  ): Promise<string> {
+    const { data: customer, error: readError } = await supabase
+      .from('customers')
+      .select('company_name, organization_number, contact_email, contact_person, contact_address, billing_email, billing_address, price_list_id')
+      .eq('id', customerId)
+      .single()
+    if (readError || !customer) throw new Error(`Kunde inte läsa kunden: ${readError?.message ?? 'okänt fel'}`)
+
+    const nextOrder = await this.nextDisplayOrder(customerId)
+    const typeName = input.contractType ?? input.label ?? null
+    const { data: created, error } = await supabase
+      .from('contracts')
+      .insert({
+        customer_id: customerId,
+        oneflow_contract_id: `local-${crypto.randomUUID()}`,
+        template_id: 'local',
+        source_type: 'manual',
+        type: 'contract',
+        status: 'active',
+        label: input.label ?? typeName ?? 'Avtal',
+        contract_type: typeName,
+        company_name: customer.company_name ?? null,
+        organization_number: customer.organization_number ?? null,
+        contact_email: customer.contact_email ?? null,
+        contact_person: customer.contact_person ?? null,
+        contact_address: customer.contact_address ?? null,
+        billing_email: customer.billing_email ?? null,
+        billing_address: customer.billing_address ?? null,
+        price_list_id: customer.price_list_id ?? null,
+        billing_active: true,
+        display_order: nextOrder,
+      })
+      .select('id')
+      .single()
+    if (error || !created) throw new Error(`Kunde inte skapa avtalet: ${error?.message ?? 'okänt fel'}`)
+
+    await this.logEvent(created.id, {
+      event_type: 'other',
+      title: 'Avtalet skapat',
+      detail: 'Skapat i avtalskartan (tomt avtalsblad)',
+    })
+    return created.id
+  }
+
+  /**
+   * § 7 Premie och fakturering: årspremie, frekvens och ankarmånad.
+   * Premietrappan får en startpunkt om den saknas (annars uppdateras det
+   * enda steget); har trappan flera steg lämnas den åt användaren.
+   */
+  static async setPremium(
+    contractId: string,
+    input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }
+  ): Promise<void> {
+    const { data: current, error: readError } = await supabase
+      .from('contracts')
+      .select('customer_id, annual_value, billing_frequency, billing_anchor_month, contract_start_date')
+      .eq('id', contractId)
+      .single()
+    if (readError || !current) throw new Error(`Kunde inte läsa avtalet: ${readError?.message ?? 'okänt fel'}`)
+
+    const annual = input.annualValue && input.annualValue > 0 ? Math.round(input.annualValue) : null
+    const { error } = await supabase
+      .from('contracts')
+      .update({
+        annual_value: annual,
+        total_value: annual,
+        billing_frequency: input.billingFrequency ?? null,
+        billing_anchor_month: input.billingAnchorMonth ?? null,
+        billing_active: true,
+      })
+      .eq('id', contractId)
+    if (error) throw new Error(`Kunde inte spara premien: ${error.message}`)
+
+    if (annual) {
+      const { data: events } = await supabase
+        .from('contract_premium_events')
+        .select('id, event_type, effective_from')
+        .eq('contract_id', contractId)
+        .order('effective_from', { ascending: true })
+      const list = (events ?? []) as { id: string; event_type: string; effective_from: string }[]
+      if (list.length === 0) {
+        await supabase.from('contract_premium_events').insert({
+          contract_id: contractId,
+          effective_from: current.contract_start_date ?? todayKey(),
+          annual_value: annual,
+          event_type: 'start',
+          note: 'Satt i avtalskartan',
+        })
+      } else if (list.length === 1) {
+        await supabase.from('contract_premium_events').update({ annual_value: annual }).eq('id', list[0].id)
+      }
+    }
+
+    const prevAnnual = current.annual_value == null ? null : Number(current.annual_value)
+    await this.logEvent(contractId, {
+      event_type: 'billing',
+      title: 'Premie och fakturering ändrad',
+      detail: [
+        annual !== prevAnnual
+          ? `Årspremie ${prevAnnual != null ? `${prevAnnual.toLocaleString('sv-SE')} → ` : ''}${annual != null ? `${annual.toLocaleString('sv-SE')} kr` : 'borttagen'}`
+          : null,
+        input.billingFrequency && input.billingFrequency !== current.billing_frequency
+          ? `Frekvens ${input.billingFrequency}`
+          : null,
+        input.billingAnchorMonth && input.billingAnchorMonth !== current.billing_anchor_month
+          ? `Ankarmånad ${input.billingAnchorMonth}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') || 'Inga ändrade värden',
+    })
+    if (current.customer_id) await this.mirrorSharedFields(current.customer_id)
+  }
+
+  /**
+   * Nytt steg i premietrappan (upptrappning, indexjustering, justering).
+   * Träder steget i kraft idag eller tidigare uppdateras avtalets årsvärde
+   * direkt; framtida steg ligger kvar i trappan tills datumet passerar.
+   */
+  static async addPremiumEvent(
+    contractId: string,
+    input: {
+      eventType: 'step_up' | 'indexation' | 'adjustment'
+      effectiveFrom: string
+      annualValue: number
+      note?: string | null
+    }
+  ): Promise<void> {
+    const annual = Math.round(input.annualValue)
+    if (!(annual > 0)) throw new Error('Årspremien måste vara större än noll')
+    const { data: current, error: readError } = await supabase
+      .from('contracts')
+      .select('customer_id, annual_value')
+      .eq('id', contractId)
+      .single()
+    if (readError || !current) throw new Error(`Kunde inte läsa avtalet: ${readError?.message ?? 'okänt fel'}`)
+
+    const { error } = await supabase.from('contract_premium_events').insert({
+      contract_id: contractId,
+      effective_from: input.effectiveFrom,
+      annual_value: annual,
+      event_type: input.eventType,
+      note: input.note ?? null,
+    })
+    if (error) throw new Error(`Kunde inte spara steget: ${error.message}`)
+
+    const inForce = input.effectiveFrom <= todayKey()
+    if (inForce) {
+      await supabase.from('contracts').update({ annual_value: annual, total_value: annual }).eq('id', contractId)
+    }
+    const labels: Record<typeof input.eventType, string> = {
+      step_up: 'Upptrappning',
+      indexation: 'Indexjustering',
+      adjustment: 'Justering',
+    }
+    const prev = current.annual_value == null ? null : Number(current.annual_value)
+    await this.logEvent(contractId, {
+      event_type: input.eventType === 'indexation' ? 'indexation' : 'billing',
+      title: `${labels[input.eventType]} ${inForce ? 'gäller' : 'planerad'} från ${input.effectiveFrom}`,
+      detail: `${prev != null ? `${prev.toLocaleString('sv-SE')} → ` : ''}${annual.toLocaleString('sv-SE')} kr/år${input.note ? ` · ${input.note}` : ''}`,
+    })
+    if (inForce && current.customer_id) await this.mirrorSharedFields(current.customer_id)
+  }
+
+  /** § 9 Löptid: start, slut och uppsägningstid. */
+  static async setTerm(
+    contractId: string,
+    input: { startDate: string | null; endDate: string | null; noticePeriodMonths: number | null }
+  ): Promise<void> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({
+        contract_start_date: input.startDate,
+        start_date: input.startDate,
+        contract_end_date: input.endDate,
+        notice_period_months: input.noticePeriodMonths,
+      })
+      .eq('id', contractId)
+      .select('id, customer_id')
+    if (error) throw new Error(`Kunde inte spara löptiden: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+
+    await this.logEvent(contractId, {
+      event_type: 'other',
+      title: 'Löptid ändrad',
+      detail: `${input.startDate ?? '?'} till ${input.endDate ?? 'tills vidare'}${
+        input.noticePeriodMonths ? ` · uppsägningstid ${input.noticePeriodMonths} mån` : ''
+      }`,
+    })
+    if (data[0].customer_id) await this.mirrorSharedFields(data[0].customer_id)
+  }
+
+  /** § 8 Referenser: avtalets Er referens och diarienummer (skrivs på årspremiefakturan). */
+  static async setInvoiceReference(
+    contractId: string,
+    input: { invoiceReference: string | null; diaryNumber: string | null }
+  ): Promise<void> {
+    const ref = input.invoiceReference?.trim() || null
+    const diary = input.diaryNumber?.trim() || null
+    const { data, error } = await supabase
+      .from('contracts')
+      .update({ invoice_reference: ref, diary_number: diary })
+      .eq('id', contractId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte spara referensen: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
+    await this.logEvent(contractId, {
+      event_type: 'billing',
+      title: 'Avtalets referens ändrad',
+      detail: [ref ? `Er referens ${ref}` : 'Ingen Er referens', diary ? `diarienummer ${diary}` : null]
+        .filter(Boolean)
+        .join(' · '),
+    })
+  }
+
+  /**
+   * § 8 Referenser per enhet: skriver enhetens fält "Märkning faktura"
+   * (customers.billing_reference), samma fält som Redigera enhet. Koden
+   * förifylls sedan som Er referens på alla ärenden och fakturor för enheten,
+   * oavsett avtal. Loggas på avtalet den sattes ifrån.
+   */
+  static async setUnitBillingReference(
+    customerId: string,
+    code: string | null,
+    context?: { contractId: string; unitName: string }
+  ): Promise<void> {
+    const value = code?.trim() || null
+    const { data, error } = await supabase
+      .from('customers')
+      .update({ billing_reference: value })
+      .eq('id', customerId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte spara referenskoden: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Enheten kunde inte uppdateras (0 rader)')
+    if (context) {
+      await this.logEvent(context.contractId, {
+        event_type: 'billing',
+        title: value ? `Er referens satt för ${context.unitName}` : `Er referens borttagen för ${context.unitName}`,
+        detail: value ? `${value} · skrivs på enhetens ärenden och fakturor` : 'Beställaren anger kod på ärendet',
+      })
+    }
+  }
+
+  /**
+   * Nolla kundradens egna avtalsfält när raden täcks av ett riktigt avtal.
+   * Avtalsdatum på en kundrad utan egen contracts-rad ger ett "kundkortsavtal"
+   * i avtalskartan; när enheten i stället står i ett avtals § 1 är datumen
+   * bara rester som ska bort. contract_status lämnas (kundportalen läser den).
+   */
+  static async clearCustomerRowContractFields(customerId: string): Promise<void> {
+    const { data, error } = await supabase
+      .from('customers')
+      .update({ contract_start_date: null, contract_end_date: null })
+      .eq('id', customerId)
+      .select('id')
+    if (error) throw new Error(`Kunde inte nolla kundradens avtalsfält: ${error.message}`)
+    if (!data || data.length === 0) throw new Error('Kundraden kunde inte uppdateras (0 rader)')
   }
 
   /** Skriv en händelse i avtalets logg (tidslinjen). Fel sväljs — loggen får aldrig fälla mutationen. */

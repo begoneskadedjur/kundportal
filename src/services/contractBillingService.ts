@@ -27,6 +27,7 @@ import {
 } from '../types/contractBilling'
 import { CaseBillingService } from './caseBillingService'
 import { CustomerContractArticleService } from './customerContractArticleService'
+import { resolveContractForCustomer } from './contractResolver'
 
 export class ContractBillingService {
   /**
@@ -113,17 +114,16 @@ export class ContractBillingService {
     const adjustmentPercent = customer?.price_adjustment_percent ?? 0
     const hasAdjustment = adjustmentPercent !== 0
 
-    // Etapp 5: koppla raderna till kundradens avtal när det är entydigt.
-    // Exakt ett avtal (signed/active eller importerat trashed) => contract_id,
-    // vid 0 eller >1 => null. Fel här får inte stoppa genereringen.
+    // Etapp 5: koppla raderna till avtalet som gäller för kundraden. Samma
+    // resolver som schemaläggning, kontroller och prissättning (eget avtal →
+    // contract_sites → covers_all_sites), så att raderna hamnar på rätt avtal
+    // även när enheten täcks av huvudkontorets avtal. Fel här får inte stoppa
+    // genereringen.
     let resolvedContractId: string | null = null
-    const { data: contractRows } = await supabase
-      .from('contracts')
-      .select('id')
-      .eq('customer_id', customerId)
-      .or("status.in.(signed,active),and(status.eq.trashed,template_id.eq.imported)")
-    if (contractRows?.length === 1) {
-      resolvedContractId = contractRows[0].id
+    try {
+      resolvedContractId = await resolveContractForCustomer(customerId)
+    } catch (err) {
+      console.warn('[contractBillingService] Kunde inte lösa avtal för kundraden:', err)
     }
 
     // Artiklar lagras med årsbelopp — skala till rätt period

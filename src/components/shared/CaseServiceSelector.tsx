@@ -241,13 +241,25 @@ export default function CaseServiceSelector({
           .from('service_groups').select('id').eq('name', 'Övrigt').maybeSingle()
         setOvrigtServiceGroupId(ovrigtSgRow?.id ?? null)
 
+        // Ärendets avtal styr prislistan när kunden har flera avtal på samma
+        // enhet. Bara avtalskundernas ärenden (tabellen cases) bär contract_id.
+        let caseContractId: string | null = null
+        if (caseId && caseType === 'contract') {
+          const { data: caseRow } = await supabase
+            .from('cases')
+            .select('contract_id')
+            .eq('id', caseId)
+            .maybeSingle()
+          caseContractId = (caseRow as { contract_id?: string | null } | null)?.contract_id ?? null
+        }
+
         const [articlesData, itemsData, allServicesData, settingsData, customerPricesData, customerArticlePricesData] = await Promise.all([
           CaseBillingService.getArticlesWithPrices(customerId, resolvedArticleGroupId),
           caseId ? CaseBillingService.getCaseBillingItems(caseId, caseType) : Promise.resolve([]),
           ServiceCatalogService.getAllActiveServices(),
           PricingSettingsService.get(),
           // Avtalssteget: avtalets prislista → kundens prislista (avtalet vinner per tjänst)
-          customerId ? PriceListService.getServicePricesForCase(customerId) : Promise.resolve({}),
+          customerId ? PriceListService.getServicePricesForCase(customerId, caseContractId) : Promise.resolve({}),
           customerId ? PriceListService.getCustomerArticlePrices(customerId) : Promise.resolve({}),
         ])
         setPricingSettings(settingsData)

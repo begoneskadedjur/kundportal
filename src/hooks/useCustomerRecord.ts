@@ -33,6 +33,12 @@ export type RecordContract = Contract & {
   /** Kundansvarig för avtalet — speglas till kundraderna avtalet omfattar */
   account_manager_name?: string | null
   account_manager_email?: string | null
+  /** Er referens på avtalets fakturor (årspremie). Enhetens kod bor på kundraden. */
+  invoice_reference?: string | null
+  /** Diarie-/upphandlingsnummer, t.ex. GNU 2026/60 */
+  diary_number?: string | null
+  /** Ankarmånad (1–12) för fakturaperioderna */
+  billing_anchor_month?: number | null
 }
 
 /** Besöksfrekvenser — samma värden som recurring_schedules använder */
