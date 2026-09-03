@@ -23,6 +23,8 @@ export interface LinkFortnoxTarget {
   periodEnd: string
   /** Förväntat belopp exkl. moms (för jämförelse i förhandsvisningen) */
   expectedSubtotal?: number | null
+  /** premium (årspremie) eller equipment (tillägg utöver avtal per år) */
+  kind?: 'premium' | 'equipment'
 }
 
 interface Props {
@@ -63,6 +65,7 @@ export default function LinkFortnoxInvoiceModal({ target, onClose, onLinked }: P
         coveredContractIds: target.coveredContractIds,
         periodStart: target.periodStart,
         periodEnd: target.periodEnd,
+        kind: target.kind ?? 'premium',
       })
       toast.success(
         `${result.invoiceNumber} täcker nu perioden ${formatDateSv(target.periodStart)} t.o.m. ${formatDateSv(target.periodEnd)} (${formatKr(result.subtotal)} exkl. moms).`

@@ -42,6 +42,7 @@ import { InvoiceService } from '../../../services/invoiceService'
 import { ProvisionService } from '../../../services/provisionService'
 import type { CommissionPost } from '../../../types/provision'
 import { FortnoxService } from '../../../services/fortnoxService'
+import { ContractInvoiceGenerator } from '../../../services/contractInvoiceGenerator'
 import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerResolver'
 import { isPersonnummer } from '../../../services/fortnoxService'
 import { FortnoxMirrorService } from '../../../services/fortnoxMirrorService'
@@ -1049,11 +1050,23 @@ export default function InvoiceDetailModal({
         verify_organization_number: isOneOffInvoice,
       })
 
+      // 2a2. Debiteringstillfället är sändningen: en avtalsfaktura planeras om
+      // så att tilläggsstationer och utrustningsrader speglar antalet just nu.
+      // Rör bara redigerbara fakturor och bara den här fakturan.
+      let itemsForSend = invoice.items
+      if (invoice.invoice_type === 'contract') {
+        const refreshed = await ContractInvoiceGenerator.refreshContractInvoiceBeforeSend(invoice.id)
+        if (refreshed.changed) {
+          itemsForSend = refreshed.items as unknown as typeof invoice.items
+          toast('Fakturan uppdaterades med dagens antal tilläggsstationer innan sändning', { icon: 'ℹ️' })
+        }
+      }
+
       // 2b. Säkerställ att alla artiklar/tjänster finns i Fortnox innan fakturan skickas.
       // Vi använder våra interna service-/artikelkoder som ArticleNumber.
       // Saknas artikeln i Fortnox skapas den (Type: SERVICE, med unit + VAT).
       await FortnoxService.ensureArticlesExistForInvoiceItems(
-        invoice.items.map(i => ({
+        itemsForSend.map(i => ({
           article_code: i.article_code,
           article_name: i.article_name,
           vat_rate: i.vat_rate,
@@ -1077,9 +1090,13 @@ export default function InvoiceDetailModal({
       // 1 000 kr inkl. moms (utkast 890, 2026-09-03). Privatpersoner får
       // därför inkl-priser + VATIncluded=true, företag exkl-priser + false.
       const vatIncluded = isPrivatePerson
-      const invoiceRows = invoice.items.map(item => ({
+      // Textrader (line_kind index_note, 0 kr) skickas som ren textrad: bara
+      // Description, så Fortnox inte bokför en 0-rad med artikel och moms.
+      const invoiceRows = itemsForSend.map(item => (item as { line_kind?: string | null }).line_kind === 'index_note'
+        ? { Description: item.article_name.slice(0, 200) }
+        : ({
         ArticleNumber: item.article_code || undefined,
-        Description: item.article_name,
+        Description: item.article_name.slice(0, 200),
         DeliveredQuantity: item.quantity,
         Price: vatIncluded ? toVatInclusivePrice(item.unit_price, item.vat_rate) : item.unit_price,
         VAT: item.vat_rate,

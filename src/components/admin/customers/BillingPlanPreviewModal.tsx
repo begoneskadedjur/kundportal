@@ -108,6 +108,11 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
                         {meta.label}
                       </span>
                       <span className="text-slate-200 w-24">{formatPeriod(entry.planned?.periodStart)}</span>
+                      {entry.kind && entry.kind !== 'premium' && (
+                        <span className="text-[10px] uppercase tracking-wide text-slate-400">
+                          {entry.kind === 'equipment_monthly' ? 'tillägg per månad' : 'tillägg per år'}
+                        </span>
+                      )}
                       <span className="text-slate-400 font-mono w-28">
                         {entry.action === 'update' && entry.existingAmount != null && entry.planned
                           ? `${formatAmount(entry.existingAmount)} → ${formatAmount(entry.planned.totalAmount)}`

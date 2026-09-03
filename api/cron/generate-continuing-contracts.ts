@@ -17,7 +17,10 @@ import { createClient } from '@supabase/supabase-js'
 import { requireCronSecret } from '../_lib/cronAuth'
 import { withCronLog } from '../_lib/cronLogger'
 import {
+  computePlannedEquipmentPeriods,
+  computePlannedMonthlyEquipmentPeriods,
   computePlannedPeriods,
+  type EquipmentInvoiceMode,
   parseLocalDate,
   periodDivisor,
   rollingHorizonEnd,
@@ -90,6 +93,10 @@ type RowSpec = {
 
 type Sources = {
   steps: PremiumStep[]
+  /** Tilläggssteg i trappan med text: textrad på periodens premiefaktura */
+  additionNotes: Array<{ effective_from: string; note: string }>
+  /** Var § 6 per år-rader hamnar: premiefakturan eller egna fakturor */
+  equipmentInvoiceMode: EquipmentInvoiceMode
   premium: Array<{ id: string; code: string | null; name: string; quantity: number; unit_price: number; total_price: number; vat_rate: number; discount_percent: number }>
   equipment: EquipmentLine[]
 }
@@ -113,11 +120,19 @@ function isImported(c: ContractRow): boolean {
 }
 
 async function loadSources(contractId: string): Promise<Sources> {
-  const [{ data: steps }, { data: items }] = await Promise.all([
-    supabase.from('contract_premium_events').select('effective_from, annual_value').eq('contract_id', contractId),
+  // Antal tilläggsstationer vid debiteringstillfället: synka § 6-raderna
+  // från utplacerade stationer innan planen räknas (service role)
+  try {
+    await supabase.rpc('sync_addon_period_lines', { p_customer_id: null, p_contract_id: contractId, p_annual_price: null })
+  } catch (err) {
+    console.warn('Antalssynk av tilläggsstationer misslyckades:', err)
+  }
+  const [{ data: contractRow }, { data: steps }, { data: items }] = await Promise.all([
+    supabase.from('contracts').select('equipment_invoice_mode').eq('id', contractId).maybeSingle(),
+    supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
     supabase
       .from('case_billing_items')
-      .select('id, article_code, article_name, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, billing_model')
+      .select('id, article_code, article_name, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, billing_model, billing_start_date')
       .eq('case_id', contractId)
       .eq('case_type', 'contract')
       .eq('item_type', 'service')
@@ -135,10 +150,16 @@ async function loadSources(contractId: string): Promise<Sources> {
     vat_rate: number
     discount_percent: number | null
     billing_model: string | null
+    billing_start_date?: string | null
   }
+  type StepRow = { effective_from: string; annual_value: number | string; event_type?: string | null; note?: string | null }
   const rows = (items ?? []) as Item[]
   return {
-    steps: ((steps ?? []) as PremiumStep[]).map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value) })),
+    equipmentInvoiceMode: (contractRow as { equipment_invoice_mode?: string | null } | null)?.equipment_invoice_mode === 'separate' ? 'separate' : 'with_premium',
+    additionNotes: ((steps ?? []) as StepRow[])
+      .filter((s) => s.event_type === 'addition' && !!s.note)
+      .map((s) => ({ effective_from: s.effective_from, note: s.note as string })),
+    steps: ((steps ?? []) as StepRow[]).map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value) })),
     premium: rows
       .filter((r) => (r.billing_model ?? 'premium') === 'premium')
       .map((r) => ({
@@ -152,15 +173,18 @@ async function loadSources(contractId: string): Promise<Sources> {
         discount_percent: Number(r.discount_percent ?? 0),
       })),
     equipment: rows
-      .filter((r) => r.billing_model === 'per_year')
+      .filter((r) => r.billing_model === 'per_year' || r.billing_model === 'per_month')
       .map((r) => ({
         id: r.id,
         contract_id: contractId,
         name: r.service_name ?? r.article_name ?? 'Utrustning',
         code: r.service_code ?? r.article_code ?? null,
         quantity: Number(r.quantity),
-        unit_price_annual: Number(r.unit_price),
+        unit_price_annual: r.billing_model === 'per_month' ? Number(r.unit_price) * 12 : Number(r.unit_price),
+        unit_price_month: r.billing_model === 'per_month' ? Number(r.unit_price) : Number(r.unit_price) / 12,
         vat_rate: Number(r.vat_rate),
+        billing_model: r.billing_model === 'per_month' ? ('per_month' as const) : ('per_year' as const),
+        billing_start_date: r.billing_start_date ?? null,
       })),
   }
 }
@@ -170,6 +194,24 @@ function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): R
   const diary = contract.diary_number ? ` (${contract.diary_number})` : ''
   const label = contract.label ?? contract.contract_type ?? 'avtal'
   const rows: RowSpec[] = []
+  // Egna tilläggsfakturor: bara utrustningsraderna
+  if (p.kind === 'equipment' || p.kind === 'equipment_monthly') {
+    for (const eq of p.equipmentRows) {
+      rows.push({
+        contract_id: contract.id,
+        line_kind: p.kind === 'equipment_monthly' ? 'equipment_monthly' : 'equipment_annual',
+        case_billing_item_id: eq.source_id,
+        article_code: eq.code,
+        article_name: `${eq.name}, tillägg utöver avtal ${label}, ${period}, ${eq.quantity} st`,
+        quantity: eq.quantity,
+        unit_price: eq.unit_price,
+        total_price: eq.total_price,
+        vat_rate: eq.vat_rate,
+        discount_percent: 0,
+      })
+    }
+    return rows
+  }
   if (sources.premium.length > 0) {
     const divisor = periodDivisor(contract.billing_frequency ?? null)
     const scaled = sources.premium.map((it) => ({ it, total: Math.round((it.total_price * 100) / divisor) / 100 }))
@@ -217,18 +259,38 @@ function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): R
       discount_percent: 0,
     })
   }
+  // Inbakade tillägg: textrad (0 kr) på perioden där steget träder i kraft
+  for (const step of sources.additionNotes) {
+    if (step.effective_from < p.periodStart || step.effective_from > p.periodEnd) continue
+    rows.push({
+      contract_id: contract.id,
+      line_kind: 'index_note',
+      article_code: null,
+      article_name: step.note.slice(0, 200),
+      quantity: 0,
+      unit_price: 0,
+      total_price: 0,
+      vat_rate: 25,
+      discount_percent: 0,
+    })
+  }
   return rows
 }
 
-/** Perioder som redan har faktura (per avtal, samlat eller Fortnox-import) på kunden. */
+/** Täckningsnyckel: fakturatyp + periodstart. Diffen är alltid per typ. */
+function periodKey(kind: string | null | undefined, periodStart: string): string {
+  return `${kind ?? 'premium'}|${periodStart}`
+}
+
+/** Perioder som redan har faktura (per avtal, samlat eller Fortnox-import) på kunden, per fakturatyp. */
 async function loadCoveredPeriods(customerId: string): Promise<{
   perContract: Map<string, Set<string>>
   consolidated: Set<string>
-  fortnoxRanges: Array<{ start: string; end: string }>
+  fortnoxRanges: Array<{ kind: string; start: string; end: string }>
 }> {
   const { data } = await supabase
     .from('invoices')
-    .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, billing_period_start, billing_period_end, invoice_items(contract_id)')
+    .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, contract_invoice_kind, billing_period_start, billing_period_end, invoice_items(contract_id)')
     .eq('customer_id', customerId)
     .in('invoice_type', ['contract', 'adhoc'])
   type Inv = {
@@ -237,40 +299,43 @@ async function loadCoveredPeriods(customerId: string): Promise<{
     is_historical: boolean | null
     is_consolidated: boolean | null
     contract_id: string | null
+    contract_invoice_kind: string | null
     billing_period_start: string | null
     billing_period_end: string | null
     invoice_items: Array<{ contract_id: string | null }> | null
   }
   const perContract = new Map<string, Set<string>>()
   const consolidated = new Set<string>()
-  const fortnoxRanges: Array<{ start: string; end: string }> = []
+  const fortnoxRanges: Array<{ kind: string; start: string; end: string }> = []
   for (const inv of (data ?? []) as Inv[]) {
     if (!inv.billing_period_start) continue
+    const kind = inv.contract_invoice_kind ?? 'premium'
     if (inv.is_historical && (inv.invoice_number ?? '').startsWith('F-') && inv.billing_period_end) {
-      fortnoxRanges.push({ start: inv.billing_period_start, end: inv.billing_period_end })
+      fortnoxRanges.push({ kind, start: inv.billing_period_start, end: inv.billing_period_end })
       continue
     }
     if (inv.invoice_type !== 'contract') continue
+    const key = periodKey(kind, inv.billing_period_start)
     if (inv.is_consolidated) {
-      consolidated.add(inv.billing_period_start)
+      consolidated.add(key)
       for (const it of inv.invoice_items ?? []) {
         if (!it.contract_id) continue
         const set = perContract.get(it.contract_id) ?? new Set<string>()
-        set.add(inv.billing_period_start)
+        set.add(key)
         perContract.set(it.contract_id, set)
       }
       continue
     }
-    const key = inv.contract_id ?? '__none__'
-    const set = perContract.get(key) ?? new Set<string>()
-    set.add(inv.billing_period_start)
-    perContract.set(key, set)
+    const cKey = inv.contract_id ?? '__none__'
+    const set = perContract.get(cKey) ?? new Set<string>()
+    set.add(key)
+    perContract.set(cKey, set)
   }
   return { perContract, consolidated, fortnoxRanges }
 }
 
-function coveredByFortnox(p: PlannedPeriod, ranges: Array<{ start: string; end: string }>): boolean {
-  return ranges.some((r) => p.periodStart <= r.end && p.periodEnd >= r.start)
+function coveredByFortnox(p: PlannedPeriod, ranges: Array<{ kind: string; start: string; end: string }>): boolean {
+  return ranges.some((r) => r.kind === (p.kind ?? 'premium') && p.periodStart <= r.end && p.periodEnd >= r.start)
 }
 
 async function generateInvoiceNumber(): Promise<string> {
@@ -309,7 +374,7 @@ async function insertInvoice(
       customer_id: customer.id,
       contract_id: opts.contractId,
       is_consolidated: opts.consolidated,
-      contract_invoice_kind: 'premium',
+      contract_invoice_kind: p.kind ?? 'premium',
       case_id: null,
       case_type: null,
       customer_name: customer.company_name,
@@ -362,24 +427,39 @@ async function generateForCustomerContracts(customer: CustomerRow, contracts: Co
   const covered = await loadCoveredPeriods(customer.id)
   const consolidatedMode = customer.contract_invoice_mode === 'consolidated' && contracts.length > 1
 
-  type Planned = { contract: ContractRow; sources: Sources; periods: PlannedPeriod[] }
+  type Planned = { contract: ContractRow; sources: Sources; periods: PlannedPeriod[]; equipmentPeriods: PlannedPeriod[] }
   const planned: Planned[] = []
   for (const contract of contracts) {
     const sources = await loadSources(contract.id)
-    // Rullande avtal: planera bortom slutdatumet tills avtalet sägs upp
-    const periods = computePlannedPeriods(contract, {
+    const planOpts = {
       steps: sources.steps,
       equipment: sources.equipment,
       leadDays: DEFAULT_INVOICE_LEAD_DAYS,
       horizonEnd: contract.terminated_at ? undefined : horizonEnd,
       today,
-    })
+    }
+    // Rullande avtal: planera bortom slutdatumet tills avtalet sägs upp
+    const periods = computePlannedPeriods(contract, { ...planOpts, equipmentMode: sources.equipmentInvoiceMode })
       // Aldrig passerade perioder från cronen: de importeras från Fortnox
       .filter((p) => !p.isHistorical && !coveredByFortnox(p, covered.fortnoxRanges))
-    planned.push({ contract, sources, periods })
+    // Egna tilläggsfakturor: per år när avtalet fakturerar utrustning separat, per månad alltid
+    const equipmentPeriods = [
+      ...(sources.equipmentInvoiceMode === 'separate' ? computePlannedEquipmentPeriods(contract, planOpts) : []),
+      ...computePlannedMonthlyEquipmentPeriods(contract, planOpts),
+    ].filter((p) => !p.isHistorical && !coveredByFortnox(p, covered.fortnoxRanges))
+    planned.push({ contract, sources, periods, equipmentPeriods })
   }
 
   let created = 0
+  // Tilläggsfakturor samlas aldrig: alltid per avtal
+  for (const pl of planned) {
+    created += await createPerContract(customer, orgNr, { contract: pl.contract, sources: pl.sources, periods: pl.equipmentPeriods }, covered.perContract, today)
+  }
+  // Redigerbara fakturor vars utrustningsrader avviker från dagens antal
+  for (const pl of planned) {
+    created += 0
+    await refreshEditableEquipmentInvoices(customer, orgNr, pl)
+  }
 
   if (consolidatedMode) {
     // Grupp = alla avtal med samma frekvens och ankarmånad
@@ -406,9 +486,10 @@ async function generateForCustomerContracts(customer: CustomerRow, contracts: Co
         }
       }
       for (const [periodStart, slot] of byPeriod) {
-        if (covered.consolidated.has(periodStart)) continue
+        const key = periodKey('premium', periodStart)
+        if (covered.consolidated.has(key)) continue
         // Perioden redan fakturerad per avtal (t.ex. innan gemet slogs på): hoppa över
-        if (group.some((pl) => covered.perContract.get(pl.contract.id)?.has(periodStart))) continue
+        if (group.some((pl) => covered.perContract.get(pl.contract.id)?.has(key))) continue
         // Skapa bara när fakturadatumet är inne (ledtiden), annars nästa körning
         if (slot.p.invoiceDate > today) continue
         const ok = await insertInvoice(customer, orgNr, slot.p, slot.rows, {
@@ -438,19 +519,100 @@ async function createPerContract(
   const own = perContract.get(pl.contract.id) ?? new Set<string>()
   const legacy = perContract.get('__none__') ?? new Set<string>()
   for (const p of pl.periods) {
-    if (own.has(p.periodStart) || legacy.has(p.periodStart)) continue
+    const key = periodKey(p.kind, p.periodStart)
+    if (own.has(key) || legacy.has(key)) continue
     if (p.invoiceDate > today) continue
+    const isEquipment = p.kind === 'equipment' || p.kind === 'equipment_monthly'
     const ok = await insertInvoice(customer, orgNr, p, buildRows(pl.contract, pl.sources, p), {
       contractId: pl.contract.id,
       consolidated: false,
       marking: pl.contract.invoice_reference ?? customer.billing_reference,
-      notes: `Årspremie ${pl.contract.label ?? ''} · Betalning ${p.sequenceNumber}/${p.totalSequenceCount} · Period ${p.periodStart} t.o.m. ${p.periodEnd}${
-        pl.contract.diary_number ? ` · ${pl.contract.diary_number}` : ''
-      }`.replace('  ', ' '),
+      notes: isEquipment
+        ? `Tilläggsstationer utöver avtal ${pl.contract.label ?? ''} · Period ${p.periodStart} t.o.m. ${p.periodEnd}${
+            pl.contract.diary_number ? ` · ${pl.contract.diary_number}` : ''
+          }`.replace('  ', ' ')
+        : `Årspremie ${pl.contract.label ?? ''} · Betalning ${p.sequenceNumber}/${p.totalSequenceCount} · Period ${p.periodStart} t.o.m. ${p.periodEnd}${
+            pl.contract.diary_number ? ` · ${pl.contract.diary_number}` : ''
+          }`.replace('  ', ' '),
     })
     if (ok) created++
   }
   return created
+}
+
+/**
+ * Debitering mot antal vid debiteringstillfället: redigerbara avtalsfakturor
+ * (draft, pending_approval, ready) vars utrustningsrader avviker från dagens
+ * antal får raderna utbytta och summorna omräknade. Skickade fakturor rörs
+ * aldrig. Rader som inte är utrustning måste vara oförändrade, annars lämnas
+ * fakturan (manuellt justerad).
+ */
+async function refreshEditableEquipmentInvoices(
+  customer: CustomerRow,
+  orgNr: string | null,
+  pl: { contract: ContractRow; sources: Sources; periods: PlannedPeriod[]; equipmentPeriods: PlannedPeriod[] }
+): Promise<number> {
+  void orgNr
+  const { data: invoices } = await supabase
+    .from('invoices')
+    .select('id, status, contract_invoice_kind, billing_period_start, is_consolidated, invoice_items(id, line_kind, contract_id, total_price, quantity)')
+    .eq('contract_id', pl.contract.id)
+    .eq('invoice_type', 'contract')
+    .in('status', ['draft', 'pending_approval', 'ready'])
+  type Inv = {
+    id: string
+    status: string | null
+    contract_invoice_kind: string | null
+    billing_period_start: string | null
+    is_consolidated: boolean | null
+    invoice_items: Array<{ id: string; line_kind: string | null; contract_id: string | null; total_price: number | null; quantity: number | null }> | null
+  }
+  const isEq = (k: string | null | undefined) => k === 'equipment_annual' || k === 'equipment_monthly'
+  const sig = (rows: Array<{ line_kind?: string | null; total_price?: number | null; quantity?: number | null }>) =>
+    rows.map((r) => `${r.line_kind ?? ''}|${Math.round(Number(r.total_price ?? 0) * 100)}|${r.quantity ?? ''}`).sort().join(';')
+  let updated = 0
+  for (const inv of (invoices ?? []) as Inv[]) {
+    if (inv.is_consolidated || !inv.billing_period_start) continue
+    const kind = inv.contract_invoice_kind ?? 'premium'
+    const plannedPeriod = [...pl.periods, ...pl.equipmentPeriods].find((p) => (p.kind ?? 'premium') === kind && p.periodStart === inv.billing_period_start)
+    if (!plannedPeriod) continue
+    const rows = buildRows(pl.contract, pl.sources, plannedPeriod)
+    const existingRows = inv.invoice_items ?? []
+    if (sig(rows) === sig(existingRows)) continue
+    // Andra rader än utrustning måste vara oförändrade (annars manuellt justerad faktura)
+    if (sig(rows.filter((r) => !isEq(r.line_kind))) !== sig(existingRows.filter((r) => !isEq(r.line_kind)))) continue
+    const subtotal = Math.round(rows.reduce((s, r) => s + r.total_price, 0) * 100) / 100
+    const vat = Math.round(rows.reduce((s, r) => s + (r.total_price * r.vat_rate) / 100, 0) * 100) / 100
+    await supabase.from('invoice_items').delete().eq('invoice_id', inv.id)
+    await supabase.from('invoice_items').insert(
+      rows.map((r) => ({
+        invoice_id: inv.id,
+        contract_id: r.contract_id,
+        line_kind: r.line_kind,
+        case_billing_item_id: r.case_billing_item_id ?? null,
+        article_id: null,
+        article_code: r.article_code,
+        article_name: r.article_name,
+        quantity: r.quantity,
+        unit_price: r.unit_price,
+        total_price: r.total_price,
+        vat_rate: r.vat_rate,
+        discount_percent: r.discount_percent,
+      }))
+    )
+    await supabase
+      .from('invoices')
+      .update({
+        subtotal,
+        vat_amount: vat,
+        total_amount: Math.round((subtotal + vat) * 100) / 100,
+        // Godkänd faktura vars rader ändrats ska granskas igen
+        ...(inv.status === 'ready' ? { status: 'pending_approval' } : {}),
+      })
+      .eq('id', inv.id)
+    updated++
+  }
+  return updated
 }
 
 /** Kund utan avtalsrad: kundradens fält som förut, men aldrig passerade perioder. */

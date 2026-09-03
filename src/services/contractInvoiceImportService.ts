@@ -22,6 +22,8 @@ export interface ImportContractInvoiceInput {
   customerId: string
   /** Avtalet perioden gäller, eller null för samlad faktura över flera avtal */
   contractId: string | null
+  /** Fakturatyp: premium (årspremie) eller equipment (tillägg utöver avtal per år) */
+  kind?: 'premium' | 'equipment'
   periodStart: string
   periodEnd: string
   /** Avtal som fakturan täcker när den är samlad (för radkoppling och logg) */
@@ -91,7 +93,7 @@ export class ContractInvoiceImportService {
       customer_id: input.customerId,
       contract_id: input.contractId,
       is_consolidated: consolidated,
-      contract_invoice_kind: 'premium',
+      contract_invoice_kind: input.kind ?? 'premium',
       case_id: null,
       case_type: null,
       customer_name: customer.company_name,
@@ -113,7 +115,7 @@ export class ContractInvoiceImportService {
       is_historical: true,
       fortnox_document_number: nr,
       invoice_marking: detail.YourReference || null,
-      notes: `Importerad från Fortnox ${nr}. Årspremie, period ${input.periodStart} t.o.m. ${input.periodEnd}${
+      notes: `Importerad från Fortnox ${nr}. ${input.kind === 'equipment' ? 'Tilläggsstationer utöver avtal' : 'Årspremie'}, period ${input.periodStart} t.o.m. ${input.periodEnd}${
         detail.Remarks ? ` · ${detail.Remarks.replace(/\s+/g, ' ').trim().slice(0, 200)}` : ''
       }`,
       created_at: detail.InvoiceDate ? `${detail.InvoiceDate}T12:00:00+02:00` : new Date().toISOString(),
@@ -138,7 +140,7 @@ export class ContractInvoiceImportService {
       .map((r) => ({
         invoice_id: invoiceId,
         contract_id: input.contractId,
-        line_kind: 'premium',
+        line_kind: input.kind === 'equipment' ? 'equipment_annual' : 'premium',
         article_code: r.ArticleNumber || null,
         article_name: (r.Description || 'Årspremie').trim(),
         quantity: num(r.DeliveredQuantity) || 1,

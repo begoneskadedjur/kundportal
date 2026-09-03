@@ -1269,6 +1269,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         for (const r of e.rows ?? []) if (r.contract_id) ids.add(r.contract_id)
         const entry: PremiumPlanEntry = {
           action: e.action,
+          kind: e.kind ?? 'premium',
           periodStart: e.planned.periodStart,
           periodEnd: e.planned.periodEnd,
           subtotal: e.planned.subtotal,
@@ -1395,16 +1396,23 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     }
   }
 
-  const openLinkFortnox = (contract: RecordContract, period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null }) => {
+  const openLinkFortnox = (
+    contract: RecordContract,
+    period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null; kind?: string }
+  ) => {
+    // Tilläggsfakturor (kind equipment) är alltid per avtal, aldrig samlade
+    const isEquipment = period.kind === 'equipment' || period.kind === 'equipment_monthly'
+    const consolidated = !isEquipment && invoiceMode === 'consolidated' && papers.length > 1
     setFortnoxTarget({
       customerId: root.id,
       customerName: customerRowName(root),
-      contractId: invoiceMode === 'consolidated' && papers.length > 1 ? null : contract.id,
-      contractLabel: invoiceMode === 'consolidated' && papers.length > 1 ? null : contractDisplayName(contract),
-      coveredContractIds: invoiceMode === 'consolidated' ? papers.map((p) => p.id) : undefined,
+      contractId: consolidated ? null : contract.id,
+      contractLabel: consolidated ? null : contractDisplayName(contract),
+      coveredContractIds: consolidated ? papers.map((p) => p.id) : undefined,
       periodStart: period.periodStart,
       periodEnd: period.periodEnd,
       expectedSubtotal: period.expectedSubtotal,
+      kind: isEquipment ? 'equipment' : 'premium',
     })
   }
 
@@ -3688,7 +3696,7 @@ interface PaperProps {
   /** § 7: kundens faktureringsläge och fakturaplanens rader för avtalet */
   invoiceMode?: 'per_contract' | 'consolidated'
   planEntries?: PremiumPlanEntry[]
-  onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null }) => void
+  onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null; kind?: string }) => void
   /** § 6: byt faktureringsläge på en tjänsterad */
   onChangeLineModel?: (item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_month' | 'per_round') => Promise<void>
   /** § 6: aktiva stationer på avtalets enheter */

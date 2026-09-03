@@ -100,6 +100,8 @@ function periodAmount(annual: number, frequency: string | null): number {
 /** Rad ur fakturaplanen som rör det här avtalet (från ContractInvoiceGenerator). */
 export interface PremiumPlanEntry {
   action: string
+  /** Fakturatyp: premium, equipment (tillägg per år), equipment_monthly (tillägg per månad) */
+  kind?: string
   periodStart: string
   periodEnd: string
   /** Fakturans belopp exkl. moms (hela fakturan vid samlad) */
@@ -123,7 +125,7 @@ interface Props {
   /** Fakturaplanens rader för avtalet, i periodordning */
   planEntries?: PremiumPlanEntry[]
   /** Koppla en Fortnox-faktura till en passerad period utan faktura */
-  onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null }) => void
+  onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null; kind?: string }) => void
   onSavePremium?: (input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }) => Promise<void>
   onAddPremiumEvent?: (input: {
     eventType: 'step_up' | 'indexation' | 'adjustment'
@@ -170,9 +172,13 @@ export default function ContractPremiumSection({
   const canStep = !archived && !!onAddPremiumEvent
   // Fakturaplanen vinner över den lokala periodberäkningen när den finns:
   // den känner till trappan, utrustningen, Fortnox-importer och samlingsfakturor.
-  const entries = planEntries ?? []
-  const uncovered = entries.filter((e) => e.action === 'uncovered')
+  const allEntries = planEntries ?? []
+  // § 7 handlar om premien; tillägg på egna fakturor får rad 7.5
+  const entries = allEntries.filter((e) => !e.kind || e.kind === 'premium')
+  const equipmentEntries = allEntries.filter((e) => e.kind === 'equipment' || e.kind === 'equipment_monthly')
+  const uncovered = allEntries.filter((e) => e.action === 'uncovered')
   const nextEntry = entries.find((e) => e.periodStart > today && e.action !== 'uncovered' && e.action !== 'delete')
+  const nextEquipment = equipmentEntries.find((e) => e.periodStart >= today.slice(0, 7) + '-01' && e.action !== 'uncovered' && e.action !== 'delete')
   const nextLabel: { date: string; text: string } | null = nextEntry
     ? {
         date: nextEntry.periodStart,
@@ -312,6 +318,24 @@ export default function ContractPremiumSection({
               {invoiceMode === 'consolidated' ? 'på kundens samlingsfaktura, som egen rad' : 'på egen faktura'}
             </span>
           </div>
+          {equipmentEntries.length > 0 && (
+            <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
+              <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.5</span>
+              <span className="font-semibold">Tillägg faktureras separat</span>
+              <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
+              <span className="font-sans text-[12px] tabular-nums" style={{ color: ink.secondary }}>
+                {nextEquipment ? (
+                  <>
+                    <b style={{ color: ink.primary }}>{formatDateSv(nextEquipment.periodStart)}</b> · {formatKr(nextEquipment.subtotal)}
+                    {nextEquipment.kind === 'equipment_monthly' ? ' per månad' : ' per år'}
+                    {nextEquipment.existingStatus ? (['booked', 'sent', 'paid'].includes(nextEquipment.existingStatus) ? ' · skickad' : ' · utkast') : ` · skapas ${formatDateSv(nextEquipment.invoiceDate)}`}
+                  </>
+                ) : (
+                  'ingen planerad'
+                )}
+              </span>
+            </div>
+          )}
           {uncovered.map((u) => (
             <div
               key={u.periodStart}
@@ -319,12 +343,12 @@ export default function ContractPremiumSection({
               style={{ border: '1px dashed rgba(180,83,9,.5)', color: '#7a3c07' }}
             >
               <span>
-                Perioden <b>{formatDateSv(u.periodStart)} t.o.m. {formatDateSv(u.periodEnd)}</b> saknar faktura i portalen
+                {u.kind === 'equipment' || u.kind === 'equipment_monthly' ? 'Tilläggsperioden' : 'Perioden'} <b>{formatDateSv(u.periodStart)} t.o.m. {formatDateSv(u.periodEnd)}</b> saknar faktura i portalen
                 {u.subtotal > 0 ? ` (${formatKr(u.subtotal)} exkl. moms)` : ''}. Fakturerad utanför portalen? Koppla Fortnox-fakturan.
               </span>
               {onLinkFortnox && !archived && (
                 <button
-                  onClick={() => onLinkFortnox({ periodStart: u.periodStart, periodEnd: u.periodEnd, expectedSubtotal: u.subtotal || null })}
+                  onClick={() => onLinkFortnox({ periodStart: u.periodStart, periodEnd: u.periodEnd, expectedSubtotal: u.subtotal || null, kind: u.kind })}
                   className={`${PAPER_LINK_CLASS} ml-auto shrink-0`}
                   style={{ color: ink.warn }}
                 >
