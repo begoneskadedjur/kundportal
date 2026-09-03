@@ -65,6 +65,8 @@ import ContractReferencesSection from './ContractReferencesSection'
 import ContractTermSection from './ContractTermSection'
 import ContractEquipmentSection from './ContractEquipmentSection'
 import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
+import AddonDropPrompt, { type AddonDropPromptState } from './AddonDropPrompt'
+import type { AddonBrick } from '../../../../types/addonStations'
 import BillingPlanPreviewModal from '../BillingPlanPreviewModal'
 import { ContractInvoiceGenerator, type BillingPlan } from '../../../../services/contractInvoiceGenerator'
 import type { CaseBillingItemWithRelations } from '../../../../types/caseBilling'
@@ -97,10 +99,12 @@ type DragPayload =
       code?: string | null
       basePrice?: number | null
     }
+  /** Bricka med tilläggsstationer (per enhet och typ): § 7 = inbakat, § 6 = tillägg */
+  | ({ type: 'addon_stations' } & AddonBrick)
 
 /** Enheten en dragning handlar om (null för verksamheten, papper och katalog) */
 function unitIdOf(payload: DragPayload): string | null {
-  return payload.type === 'unit' || payload.type === 'scoperow' ? payload.unitId : null
+  return payload.type === 'unit' || payload.type === 'scoperow' || payload.type === 'addon_stations' ? payload.unitId : null
 }
 
 interface DragState {
@@ -120,7 +124,7 @@ interface DragState {
   overZone: DropZone
 }
 
-type DropZone = 'scope' | 'refs' | 'content' | 'equipment' | 'pricelist'
+type DropZone = 'scope' | 'refs' | 'content' | 'equipment' | 'pricelist' | 'premium'
 
 /** Vad som ligger under pekaren vid en dragning */
 type DropTarget =
@@ -544,9 +548,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     const zoneEl = el.closest<HTMLElement>('[data-drop-zone]')
     const raw = zoneEl?.dataset.dropZone
     const zone: DropZone =
-      raw === 'refs' || raw === 'content' || raw === 'equipment' || raw === 'pricelist' ? raw : 'scope'
+      raw === 'refs' || raw === 'content' || raw === 'equipment' || raw === 'pricelist' || raw === 'premium' ? raw : 'scope'
     return { kind: 'paper', contract, zone }
   }
+
+  /** Täcker avtalet enheten (eget avtal, § 1-rad eller hela verksamheten)? */
+  const contractCoversUnit = (contract: RecordContract, unitId: string): boolean =>
+    !!contract.covers_all_sites ||
+    contract.customer_id === unitId ||
+    (activeScopeByContract.get(contract.id) ?? []).some((cs) => cs.customer_id === unitId)
 
   /** Vad får släppas var? Katalog och papper har egna regler, enheter går via validateDrop. */
   const validateAnyDrop = (payload: DragPayload, target: DropTarget): string | null => {
@@ -559,6 +569,14 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     if (payload.type === 'catalog') {
       if (target.kind !== 'paper') return 'Släpp på ett avtal'
       if (isTerminatedButRunning(target.contract)) return 'Avtalet är uppsagt'
+      if (target.zone === 'premium') return 'Katalogen släpps på § 2, § 4 eller § 6'
+      return null
+    }
+    if (payload.type === 'addon_stations') {
+      if (target.kind !== 'paper') return 'Släpp på § 7 (baka in i premien) eller § 6 (tillägg utöver avtalet)'
+      if (isTerminatedButRunning(target.contract)) return 'Avtalet är uppsagt'
+      if (target.zone !== 'premium' && target.zone !== 'equipment') return 'Släpp på § 7 för att baka in i premien, eller på § 6 för tillägg utöver avtalet'
+      if (!contractCoversUnit(target.contract, payload.unitId)) return 'Enheten står inte i avtalets omfattning'
       return null
     }
     if (target.kind === 'aside') return payload.type === 'scoperow' ? null : 'Dra en rad ur § 1 hit för att avsluta täckningen'
@@ -605,6 +623,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     if (payload.type === 'org') return 'Hela verksamheten'
     if (payload.type === 'paper') return contractDisplayName(papers.find((c) => c.id === payload.contractId) ?? ({ label: 'Avtal' } as RecordContract))
     if (payload.type === 'catalog') return payload.name
+    if (payload.type === 'addon_stations') {
+      return `${payload.count} st ${payload.stationTypeName} · ${customerRowName(customerById.get(payload.unitId) ?? ({ company_name: 'Enhet' } as RecordCustomer))}`
+    }
     return customerRowName(customerById.get(payload.unitId) ?? ({ company_name: 'Enhet' } as RecordCustomer))
   }
 
@@ -674,6 +695,25 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       }
       if (payload.type === 'catalog') {
         void dropCatalog(payload, target.contract, target.zone)
+        return
+      }
+      if (payload.type === 'addon_stations') {
+        if (target.zone !== 'premium' && target.zone !== 'equipment') return
+        const unit = customerById.get(payload.unitId)
+        setAddonPrompt({
+          x: e.clientX,
+          y: e.clientY,
+          contract: target.contract,
+          state: {
+            x: e.clientX,
+            y: e.clientY,
+            contractLabel: contractDisplayName(target.contract),
+            unitName: unit ? customerRowName(unit) : 'enhet',
+            brick: payload,
+            zone: target.zone,
+            annualInForce: target.contract.annual_value != null ? Number(target.contract.annual_value) : null,
+          },
+        })
         return
       }
       if (target.zone === 'refs') {
@@ -1198,6 +1238,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 
   // § 6: aktiva stationer per kundrad, ur utplaceringarna (ute) och planritningarna (inne)
   const [stationsByCustomer, setStationsByCustomer] = useState<Map<string, { outdoor: number; indoor: number; addon: number }>>(new Map())
+  /** Tilläggsstationer per år/månad utan beslutat läge, per enhet och stationstyp */
+  const [addonBricksByCustomer, setAddonBricksByCustomer] = useState<Map<string, AddonBrick[]>>(new Map())
+  const [stationsKey, setStationsKey] = useState(0)
+  const [addonPrompt, setAddonPrompt] = useState<{ x: number; y: number; contract: RecordContract; state: AddonDropPromptState } | null>(null)
   useEffect(() => {
     let cancelled = false
     const ids = [root.id, ...units.map((u) => u.id)]
@@ -1205,26 +1249,65 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     ;(async () => {
       try {
         const [{ data: outdoor }, { data: indoor }] = await Promise.all([
-          supabase.from('equipment_placements').select('customer_id, is_addon').in('customer_id', ids).eq('status', 'active'),
+          supabase
+            .from('equipment_placements')
+            .select('id, customer_id, is_addon, station_type_id, addon_billing_model, addon_contract_mode, station_type:station_types(name)')
+            .in('customer_id', ids)
+            .eq('status', 'active'),
           supabase
             .from('indoor_stations')
-            .select('is_addon, floor_plan:floor_plans!inner(customer_id)')
+            .select('id, is_addon, station_type_id, addon_billing_model, addon_contract_mode, station_type:station_types(name), floor_plan:floor_plans!inner(customer_id)')
             .eq('status', 'active')
             .in('floor_plan.customer_id', ids),
         ])
         if (cancelled) return
         const map = new Map<string, { outdoor: number; indoor: number; addon: number }>()
-        const bump = (customerId: string, kind: 'outdoor' | 'indoor', addon: boolean) => {
-          const cur = map.get(customerId) ?? { outdoor: 0, indoor: 0, addon: 0 }
+        const bricks = new Map<string, AddonBrick>()
+        type Row = {
+          id: string
+          customer_id: string
+          is_addon: boolean | null
+          station_type_id: string | null
+          addon_billing_model: string | null
+          addon_contract_mode: string | null
+          station_type: { name: string } | { name: string }[] | null
+        }
+        const typeName = (st: Row['station_type']): string => {
+          const s = Array.isArray(st) ? st[0] : st
+          return s?.name ?? 'Station'
+        }
+        const bump = (r: Row, kind: 'outdoor' | 'indoor') => {
+          const cur = map.get(r.customer_id) ?? { outdoor: 0, indoor: 0, addon: 0 }
           cur[kind] += 1
-          if (addon) cur.addon += 1
-          map.set(customerId, cur)
+          if (r.is_addon) cur.addon += 1
+          map.set(r.customer_id, cur)
+          // Bricka: per år/månad utan beslutat läge
+          if (r.is_addon && (r.addon_billing_model === 'per_year' || r.addon_billing_model === 'per_month') && !r.addon_contract_mode) {
+            const key = `${r.customer_id}|${r.station_type_id ?? ''}|${r.addon_billing_model}`
+            const b = bricks.get(key) ?? {
+              unitId: r.customer_id,
+              stationTypeId: r.station_type_id,
+              stationTypeName: typeName(r.station_type),
+              model: r.addon_billing_model,
+              count: 0,
+              outdoorIds: [],
+              indoorIds: [],
+            }
+            b.count += 1
+            if (kind === 'outdoor') b.outdoorIds.push(r.id)
+            else b.indoorIds.push(r.id)
+            bricks.set(key, b)
+          }
         }
-        for (const r of (outdoor ?? []) as { customer_id: string; is_addon: boolean | null }[]) bump(r.customer_id, 'outdoor', !!r.is_addon)
-        for (const r of (indoor ?? []) as unknown as { is_addon: boolean | null; floor_plan: { customer_id: string } | null }[]) {
-          if (r.floor_plan?.customer_id) bump(r.floor_plan.customer_id, 'indoor', !!r.is_addon)
+        for (const r of (outdoor ?? []) as unknown as Row[]) bump(r, 'outdoor')
+        for (const r of (indoor ?? []) as unknown as Array<Omit<Row, 'customer_id'> & { floor_plan: { customer_id: string } | { customer_id: string }[] | null }>) {
+          const fp = Array.isArray(r.floor_plan) ? r.floor_plan[0] : r.floor_plan
+          if (fp?.customer_id) bump({ ...r, customer_id: fp.customer_id }, 'indoor')
         }
+        const byCustomer = new Map<string, AddonBrick[]>()
+        for (const b of bricks.values()) byCustomer.set(b.unitId, [...(byCustomer.get(b.unitId) ?? []), b])
         setStationsByCustomer(map)
+        setAddonBricksByCustomer(byCustomer)
       } catch (err) {
         console.error('Kunde inte räkna stationer för avtalskartan:', err)
       }
@@ -1232,7 +1315,80 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     return () => {
       cancelled = true
     }
-  }, [root.id, units])
+  }, [root.id, units, stationsKey])
+
+  /** Brickor för de enheter avtalet täcker */
+  const bricksFor = useCallback(
+    (contract: RecordContract): AddonBrick[] => {
+      const ids = contract.covers_all_sites
+        ? locations.map((l) => l.id)
+        : [contract.customer_id ?? '', ...(activeScopeByContract.get(contract.id) ?? []).map((cs) => cs.customer_id)]
+      const out: AddonBrick[] = []
+      for (const id of new Set(ids)) out.push(...(addonBricksByCustomer.get(id) ?? []))
+      return out
+    },
+    [activeScopeByContract, locations, addonBricksByCustomer]
+  )
+
+  /** Släpp av brickan bekräftat i popovern: baka in (§ 7) eller tillägg (§ 6) */
+  const confirmAddonDrop = async (input: { effectiveFrom: string; unitPriceAnnual: number }) => {
+    if (!addonPrompt) return
+    const { contract, state } = addonPrompt
+    const b = state.brick
+    setBusy(true)
+    try {
+      if (state.zone === 'premium') {
+        const res = await ContractScopeService.addAddonStationsToPremium(contract.id, {
+          unitId: b.unitId,
+          unitName: state.unitName,
+          stationTypeId: b.stationTypeId,
+          stationTypeName: b.stationTypeName,
+          model: b.model,
+          count: b.count,
+          outdoorIds: b.outdoorIds,
+          indoorIds: b.indoorIds,
+          unitPriceAnnual: input.unitPriceAnnual,
+          effectiveFrom: input.effectiveFrom,
+        })
+        toast.success(`${b.count} st ${b.stationTypeName} inbakade i ${contractDisplayName(contract)}: premien blir ${formatKr(res.newAnnual)}/år från ${formatDateSv(input.effectiveFrom)}.`)
+      } else {
+        await ContractScopeService.addAddonStationsSeparate(contract.id, {
+          unitId: b.unitId,
+          unitName: state.unitName,
+          stationTypeName: b.stationTypeName,
+          model: b.model,
+          count: b.count,
+          outdoorIds: b.outdoorIds,
+          indoorIds: b.indoorIds,
+          unitPriceAnnual: input.unitPriceAnnual,
+        })
+        toast.success(`${b.count} st ${b.stationTypeName} ligger nu som tillägg utöver ${contractDisplayName(contract)} (§ 6), ${b.model === 'per_month' ? 'per månad' : 'per år'}.`)
+      }
+      setStationsKey((k) => k + 1)
+      setContentReloadKey((k) => k + 1)
+      setBillingPlansKey((k) => k + 1)
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara tilläggsstationerna')
+      throw err
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const changeEquipmentInvoiceMode = async (contract: RecordContract, mode: 'with_premium' | 'separate') => {
+    setBusy(true)
+    try {
+      await ContractScopeService.setEquipmentInvoiceMode(contract.id, mode)
+      toast.success(mode === 'separate' ? 'Utrustning i § 6 faktureras nu på egna fakturor.' : 'Utrustning i § 6 ligger nu på premiefakturan.')
+      setBillingPlansKey((k) => k + 1)
+      await onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ändra faktureringsläge')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const stationCountFor = useCallback(
     (contract: RecordContract) => {
@@ -2278,6 +2434,10 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onSaveRenewal={(input) => saveRenewal(c, input)}
               onExerciseOption={() => exerciseOption(c)}
               stationCount={stationCountFor(c)}
+              addonBricks={bricksFor(c)}
+              onBrickDrag={(e, brick) => startDrag(e, { type: 'addon_stations', ...brick })}
+              unitNameOf={(id) => customerRowName(customerById.get(id) ?? ({ company_name: 'Enhet' } as RecordCustomer))}
+              onChangeEquipmentInvoiceMode={(mode) => changeEquipmentInvoiceMode(c, mode)}
               // Uppsagt-men-löpande avtal ligger kvar bland de aktiva (de
               // fungerar till slutdatumet) och ska kunna ångras direkt — inte
               // först när uppsägningstiden hunnit löpa ut.
@@ -2557,7 +2717,11 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                     : drag.overArchive
                       ? 'Släpp för att säga upp avtalet'
                       : drag.overContractId
-                        ? drag.payload.type === 'paper'
+                        ? drag.payload.type === 'addon_stations'
+                          ? drag.overZone === 'premium'
+                            ? 'Släpp för att baka in i årspremien (§ 7)'
+                            : 'Släpp för att lägga som tillägg utöver avtalet (§ 6)'
+                          : drag.payload.type === 'paper'
                           ? 'Släpp för att byta ordning'
                           : drag.payload.type === 'catalog'
                             ? drag.payload.kind === 'pricelist'
@@ -2579,6 +2743,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       )}
 
       {/* Datum-popover */}
+      {addonPrompt && (
+        <AddonDropPrompt prompt={addonPrompt.state} onClose={() => setAddonPrompt(null)} onConfirm={confirmAddonDrop} />
+      )}
       {datePrompt && (
         <DatePromptPopover prompt={datePrompt} onClose={() => setDatePrompt(null)} />
       )}
@@ -3701,6 +3868,11 @@ interface PaperProps {
   onChangeLineModel?: (item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_month' | 'per_round') => Promise<void>
   /** § 6: aktiva stationer på avtalets enheter */
   stationCount?: { outdoor: number; indoor: number; addon: number } | null
+  /** § 6: brickor med tilläggsstationer att besluta om, och drag av dem */
+  addonBricks?: AddonBrick[]
+  onBrickDrag?: (e: React.PointerEvent, brick: AddonBrick) => void
+  unitNameOf?: (unitId: string) => string
+  onChangeEquipmentInvoiceMode?: (mode: 'with_premium' | 'separate') => Promise<void>
   /** Öppna väljaren för signeringsdatum */
   onEditSignedAt?: () => void
   /** Spara avtalets säljare (den som skrivit under för BeGone) */
@@ -4052,6 +4224,10 @@ function PaperContract({
   onSaveRenewal,
   onExerciseOption,
   stationCount,
+  addonBricks,
+  onBrickDrag,
+  unitNameOf,
+  onChangeEquipmentInvoiceMode,
 }: PaperProps) {
   const key = todayKey()
   const archived = state === 'archived'
@@ -4142,6 +4318,10 @@ function PaperContract({
         >
           {isInvalidTarget
             ? invalidReason
+            : dragKind === 'addon_stations'
+              ? dropZone === 'premium'
+                ? `Släpp: ${dragSubject} bakas in i årspremien (§ 7)`
+                : `Släpp: ${dragSubject} läggs som tillägg utöver avtalet (§ 6)`
             : dragKind === 'paper'
               ? `Släpp: ${dragSubject} byter plats med det här pappret`
               : dragKind === 'catalog'
@@ -4627,22 +4807,36 @@ function PaperContract({
           onEdit={onEditContent}
           onChangeModel={onChangeLineModel}
           stationCount={stationCount}
+          bricks={addonBricks}
+          onBrickPointerDown={onBrickDrag}
+          unitNameOf={unitNameOf}
+          equipmentInvoiceMode={contract.equipment_invoice_mode ?? 'with_premium'}
+          onChangeEquipmentInvoiceMode={archived ? undefined : onChangeEquipmentInvoiceMode}
         />
       </div>
 
-      {/* § 7 Premie och fakturering — avtalet är källan till årspremiefakturan */}
-      <ContractPremiumSection
-        contract={contract}
-        premiumEvents={premiumEvents}
-        annualInForce={annual}
-        ink={ink}
-        archived={archived}
-        onSavePremium={onSavePremium}
-        onAddPremiumEvent={onAddPremiumEvent}
-        invoiceMode={invoiceMode}
-        planEntries={planEntries}
-        onLinkFortnox={onLinkFortnox}
-      />
+      {/* § 7 Premie och fakturering — avtalet är källan till årspremiefakturan.
+          Släppzon: dra en bricka med tilläggsstationer hit för att baka in dem i premien. */}
+      <div
+        data-drop-zone="premium"
+        className={`rounded transition-shadow ${
+          dropZone === 'premium' && (isDropTarget || isInvalidTarget) ? 'ring-2 ring-offset-2 ring-[#20c58f]' : ''
+        }`}
+        style={dropZone === 'premium' && (isDropTarget || isInvalidTarget) ? { ['--tw-ring-offset-color' as string]: ink.sheet } : undefined}
+      >
+        <ContractPremiumSection
+          contract={contract}
+          premiumEvents={premiumEvents}
+          annualInForce={annual}
+          ink={ink}
+          archived={archived}
+          onSavePremium={onSavePremium}
+          onAddPremiumEvent={onAddPremiumEvent}
+          invoiceMode={invoiceMode}
+          planEntries={planEntries}
+          onLinkFortnox={onLinkFortnox}
+        />
+      </div>
 
       {/* § 8 Referenser — avtalets referens + Er referens per enhet i omfattningen.
           Släppzon: dra in en enhet från vänster för att sätta dess kod. */}

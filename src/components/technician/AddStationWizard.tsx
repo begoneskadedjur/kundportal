@@ -124,7 +124,6 @@ export function AddStationWizard({
       .catch(() => { if (!cancelled) setAddonPrices(null) })
       .finally(() => { if (!cancelled) setAddonPricesLoading(false) })
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomerId])
   const [copyFromLast, setCopyFromLast] = useState(false)
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)

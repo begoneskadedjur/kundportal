@@ -1346,7 +1346,7 @@ export class ContractScopeService {
   static async addPremiumEvent(
     contractId: string,
     input: {
-      eventType: 'step_up' | 'indexation' | 'adjustment'
+      eventType: 'step_up' | 'indexation' | 'adjustment' | 'addition'
       effectiveFrom: string
       annualValue: number
       note?: string | null
@@ -1378,6 +1378,7 @@ export class ContractScopeService {
       step_up: 'Upptrappning',
       indexation: 'Indexjustering',
       adjustment: 'Justering',
+      addition: 'Tillägg',
     }
     const prev = current.annual_value == null ? null : Number(current.annual_value)
     await this.logEvent(contractId, {
@@ -1386,6 +1387,157 @@ export class ContractScopeService {
       detail: `${prev != null ? `${prev.toLocaleString('sv-SE')} → ` : ''}${annual.toLocaleString('sv-SE')} kr/år${input.note ? ` · ${input.note}` : ''}`,
     })
     if (inForce && current.customer_id) await this.mirrorSharedFields(current.customer_id)
+  }
+
+  /**
+   * Tilläggsstationer inbakade i årspremien (släpp av brickan på § 7):
+   * ett steg i premietrappan från valt datum med text om antal och datum,
+   * stationerna märks included, eventuell § 6-rad för dem avslutas.
+   * Samma dag och typ: steget summeras och texten byggs på (unik nyckel).
+   */
+  static async addAddonStationsToPremium(
+    contractId: string,
+    input: {
+      unitId: string
+      unitName: string
+      stationTypeId: string | null
+      stationTypeName: string
+      model: 'per_year' | 'per_month'
+      count: number
+      outdoorIds: string[]
+      indoorIds: string[]
+      unitPriceAnnual: number
+      effectiveFrom: string
+    }
+  ): Promise<{ newAnnual: number; note: string }> {
+    const add = Math.round(input.unitPriceAnnual * input.count * 100) / 100
+    if (!(add > 0)) throw new Error('Årspriset måste vara större än noll')
+    const { data: contract, error: cErr } = await supabase
+      .from('contracts')
+      .select('customer_id, annual_value')
+      .eq('id', contractId)
+      .single()
+    if (cErr || !contract) throw new Error(`Kunde inte läsa avtalet: ${cErr?.message ?? 'okänt fel'}`)
+    const { data: steps } = await supabase
+      .from('contract_premium_events')
+      .select('id, effective_from, annual_value, event_type, note')
+      .eq('contract_id', contractId)
+    type Step = { id: string; effective_from: string; annual_value: number | string; event_type: string; note: string | null }
+    const all = ((steps ?? []) as Step[]).sort((a, b) => a.effective_from.localeCompare(b.effective_from))
+    // Årsvärdet som gäller vid datumet (trappan, annars avtalets annual_value)
+    const applicable = all.filter((s) => s.effective_from <= input.effectiveFrom)
+    const inForce = applicable.length > 0
+      ? Number(applicable[applicable.length - 1].annual_value)
+      : all.length > 0
+        ? Number(all[0].annual_value)
+        : Number(contract.annual_value ?? 0)
+    const note = `Tilläggsstationer adderade till avtalet, ${input.count} st ${input.stationTypeName} på ${input.unitName}, ${input.effectiveFrom}`
+
+    const same = all.find((s) => s.effective_from === input.effectiveFrom && s.event_type === 'addition')
+    let newAnnual: number
+    if (same) {
+      newAnnual = Math.round((Number(same.annual_value) + add) * 100) / 100
+      const { error } = await supabase
+        .from('contract_premium_events')
+        .update({ annual_value: newAnnual, note: `${same.note ?? ''}${same.note ? ' · ' : ''}${note}` })
+        .eq('id', same.id)
+      if (error) throw new Error(`Kunde inte uppdatera steget: ${error.message}`)
+    } else {
+      newAnnual = Math.round((inForce + add) * 100) / 100
+      const { error } = await supabase.from('contract_premium_events').insert({
+        contract_id: contractId,
+        effective_from: input.effectiveFrom,
+        annual_value: newAnnual,
+        event_type: 'addition',
+        note,
+      })
+      if (error) throw new Error(`Kunde inte spara steget: ${error.message}`)
+    }
+    // Senare steg i trappan bär vidare höjningen
+    for (const later of all.filter((s) => s.effective_from > input.effectiveFrom)) {
+      await supabase
+        .from('contract_premium_events')
+        .update({ annual_value: Math.round((Number(later.annual_value) + add) * 100) / 100 })
+        .eq('id', later.id)
+    }
+    if (input.effectiveFrom <= todayKey()) {
+      const latestInForce = Math.max(newAnnual, ...all.filter((s) => s.effective_from <= todayKey() && s.effective_from > input.effectiveFrom).map((s) => Number(s.annual_value) + add))
+      await supabase.from('contracts').update({ annual_value: latestInForce, total_value: latestInForce }).eq('id', contractId)
+    }
+
+    // Stationerna: inbakade, kopplade till avtalet
+    if (input.outdoorIds.length > 0) {
+      await supabase.from('equipment_placements').update({ addon_contract_mode: 'included', addon_contract_id: contractId }).in('id', input.outdoorIds)
+    }
+    if (input.indoorIds.length > 0) {
+      await supabase.from('indoor_stations').update({ addon_contract_mode: 'included', addon_contract_id: contractId }).in('id', input.indoorIds)
+    }
+    // Eventuell § 6-rad för samma enhet/typ/modell avslutas (historiken kvar)
+    let q = supabase
+      .from('case_billing_items')
+      .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+      .eq('case_id', contractId)
+      .eq('site_customer_id', input.unitId)
+      .eq('billing_model', input.model)
+      .eq('status', 'pending')
+    q = input.stationTypeId ? q.eq('station_type_id', input.stationTypeId) : q.is('station_type_id', null)
+    await q
+
+    await this.logEvent(contractId, {
+      event_type: 'billing',
+      title: `Tilläggsstationer inbakade i premien från ${input.effectiveFrom}`,
+      detail: `${note} · +${add.toLocaleString('sv-SE')} kr/år → ${newAnnual.toLocaleString('sv-SE')} kr/år`,
+    })
+    if (contract.customer_id) await this.mirrorSharedFields(contract.customer_id)
+    return { newAnnual, note }
+  }
+
+  /**
+   * Tilläggsstationer som tillägg utöver avtalet (släpp av brickan på § 6):
+   * stationerna märks separate och kopplas till avtalet, § 6-raden synkas
+   * via RPC (antal, pris, startdatum = nästa periodstart).
+   */
+  static async addAddonStationsSeparate(
+    contractId: string,
+    input: {
+      unitId: string
+      unitName: string
+      stationTypeName: string
+      model: 'per_year' | 'per_month'
+      count: number
+      outdoorIds: string[]
+      indoorIds: string[]
+      unitPriceAnnual: number
+    }
+  ): Promise<void> {
+    if (input.outdoorIds.length > 0) {
+      await supabase.from('equipment_placements').update({ addon_contract_mode: 'separate', addon_contract_id: contractId }).in('id', input.outdoorIds)
+    }
+    if (input.indoorIds.length > 0) {
+      await supabase.from('indoor_stations').update({ addon_contract_mode: 'separate', addon_contract_id: contractId }).in('id', input.indoorIds)
+    }
+    const { error } = await supabase.rpc('sync_addon_period_lines', {
+      p_customer_id: input.unitId,
+      p_contract_id: contractId,
+      p_annual_price: input.unitPriceAnnual,
+    })
+    if (error) throw new Error(`Kunde inte synka § 6-raden: ${error.message}`)
+    await this.logEvent(contractId, {
+      event_type: 'billing',
+      title: `Tilläggsstationer utöver avtalet: ${input.count} st ${input.stationTypeName} på ${input.unitName}`,
+      detail: `${input.model === 'per_month' ? 'Per månad' : 'Per år'} · ${input.unitPriceAnnual.toLocaleString('sv-SE')} kr/år per station · egna fakturor, antal vid varje debitering`,
+    })
+  }
+
+  /** § 6: var per år-rader faktureras, på premiefakturan eller på egna fakturor. */
+  static async setEquipmentInvoiceMode(contractId: string, mode: 'with_premium' | 'separate'): Promise<void> {
+    const { error } = await supabase.from('contracts').update({ equipment_invoice_mode: mode }).eq('id', contractId)
+    if (error) throw new Error(`Kunde inte ändra faktureringsläge: ${error.message}`)
+    await this.logEvent(contractId, {
+      event_type: 'billing',
+      title: mode === 'separate' ? 'Utrustning faktureras på egna fakturor' : 'Utrustning faktureras på premiefakturan',
+      detail: mode === 'separate' ? 'Per år-rader i § 6 får egna fakturor parallellt med årspremien' : 'Per år-rader i § 6 ligger som rader på årspremiefakturan',
+    })
   }
 
   /** § 9 Löptid: start, slut och uppsägningstid. */

@@ -45,3 +45,17 @@ export function defaultAddonBillingModel(prices: AddonPrices | null | undefined)
   if (prices && prices.hasContract && prices.perYear != null && prices.perYear > 0) return 'per_year'
   return 'per_round'
 }
+
+/**
+ * Bricka i avtalskartan: tilläggsstationer per enhet och stationstyp som
+ * ännu inte fått ett avtalsläge (dras till § 7 = inbakat, § 6 = tillägg).
+ */
+export interface AddonBrick {
+  unitId: string
+  stationTypeId: string | null
+  stationTypeName: string
+  model: 'per_year' | 'per_month'
+  count: number
+  outdoorIds: string[]
+  indoorIds: string[]
+}

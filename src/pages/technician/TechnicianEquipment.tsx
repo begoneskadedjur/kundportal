@@ -140,7 +140,6 @@ export default function TechnicianEquipment() {
       .catch(() => { if (!cancelled) setAddonPrices(null) })
       .finally(() => { if (!cancelled) setAddonPricesLoading(false) })
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wizardCustomerId])
 
   // Recurring schedule prompt

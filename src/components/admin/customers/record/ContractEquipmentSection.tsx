@@ -13,6 +13,7 @@ import { useState } from 'react'
 import type { CaseBillingItemWithRelations } from '../../../../types/caseBilling'
 import { formatKr } from '../../../../hooks/useCustomerRecord'
 import { PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk } from './paperInk'
+import type { AddonBrick } from '../../../../types/addonStations'
 
 type BillingModel = 'premium' | 'per_year' | 'per_month' | 'per_round'
 
@@ -38,11 +39,52 @@ interface Props {
   onChangeModel?: (item: CaseBillingItemWithRelations, model: BillingModel) => Promise<void>
   /** Aktiva stationer (ute + inne) på avtalets enheter, ur utplaceringarna */
   stationCount?: { outdoor: number; indoor: number; addon: number } | null
+  /** Tilläggsstationer per år/månad utan beslutat läge: brickor att dra till § 7 eller § 6 */
+  bricks?: AddonBrick[]
+  onBrickPointerDown?: (e: React.PointerEvent, brick: AddonBrick) => void
+  /** Enhetens namn för § 6-rader som avser en enhet */
+  unitNameOf?: (unitId: string) => string
+  /** Var per år-rader faktureras */
+  equipmentInvoiceMode?: 'with_premium' | 'separate' | null
+  onChangeEquipmentInvoiceMode?: (mode: 'with_premium' | 'separate') => Promise<void>
 }
 
-export default function ContractEquipmentSection({ services, articles, loading, ink, archived, onEdit, onChangeModel, stationCount }: Props) {
+export default function ContractEquipmentSection({
+  services,
+  articles,
+  loading,
+  ink,
+  archived,
+  onEdit,
+  onChangeModel,
+  stationCount,
+  bricks,
+  onBrickPointerDown,
+  unitNameOf,
+  equipmentInvoiceMode,
+  onChangeEquipmentInvoiceMode,
+}: Props) {
   const [busyId, setBusyId] = useState<string | null>(null)
-  const extra = services.filter((s) => billingModelOf(s) !== 'premium')
+  const [modeBusy, setModeBusy] = useState(false)
+  // Synkade stationsrader med 0 st göms (stationerna är borttagna eller inbakade)
+  const extra = services.filter((s) => {
+    if (billingModelOf(s) === 'premium') return false
+    const site = (s as unknown as { site_customer_id?: string | null }).site_customer_id
+    return !(site && Number(s.quantity) === 0)
+  })
+  const rowUnitName = (s: CaseBillingItemWithRelations): string | null => {
+    const site = (s as unknown as { site_customer_id?: string | null }).site_customer_id
+    return site && unitNameOf ? unitNameOf(site) : null
+  }
+  const toggleMode = async () => {
+    if (!onChangeEquipmentInvoiceMode) return
+    setModeBusy(true)
+    try {
+      await onChangeEquipmentInvoiceMode(equipmentInvoiceMode === 'separate' ? 'with_premium' : 'separate')
+    } finally {
+      setModeBusy(false)
+    }
+  }
   const canEdit = !archived && !!onChangeModel
   const rowStyle = { borderColor: ink.rule }
   const numStyle = { color: ink.muted }
@@ -74,10 +116,23 @@ export default function ContractEquipmentSection({ services, articles, loading, 
               redigera
             </button>
           )}
+          {onChangeEquipmentInvoiceMode ? (
+            <button
+              onClick={() => void toggleMode()}
+              disabled={archived || modeBusy}
+              className={PAPER_LINK_CLASS}
+              style={{ color: ink.muted }}
+              title="Klicka för att byta: per år-rader på premiefakturan eller på egna fakturor parallellt med avtalet"
+            >
+              {equipmentInvoiceMode === 'separate' ? 'egna fakturor' : 'på premiefakturan'}
+            </button>
+          ) : equipmentInvoiceMode === 'separate' ? (
+            <span>egna fakturor</span>
+          ) : null}
         </span>
       </div>
 
-      {!loading && articles.length === 0 && extra.length === 0 ? (
+      {!loading && articles.length === 0 && extra.length === 0 && !(bricks && bricks.length > 0) ? (
         <p className="font-sans text-[11px] italic py-2" style={{ color: ink.muted }}>
           Ingen utrustning registrerad. Lägg in stationer, fällor och materiel som intern kostnad, eller
           tilläggsutrustning som debiteras per styck och år.
@@ -120,6 +175,11 @@ export default function ContractEquipmentSection({ services, articles, loading, 
                 <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>6.{articles.length + i + 1}</span>
                 <span className="font-semibold">
                   {s.service_name ?? s.article_name}
+                  {rowUnitName(s) && (
+                    <span className="font-normal text-[11.5px] ml-1.5" style={{ color: ink.secondary }}>
+                      · {rowUnitName(s)}
+                    </span>
+                  )}
                   <span className="font-normal text-[11.5px] ml-1.5 tabular-nums" style={{ color: ink.secondary }}>
                     {Number(s.quantity).toLocaleString('sv-SE')} st
                   </span>
@@ -156,6 +216,29 @@ export default function ContractEquipmentSection({ services, articles, loading, 
           })}
         </>
       )}
+      {/* Brickor: tilläggsstationer som väntar på beslut. Dras till § 7 (inbakat) eller § 6 (tillägg). */}
+      {bricks && bricks.length > 0 && (
+        <div className="mt-2 space-y-1.5">
+          {bricks.map((b) => (
+            <div
+              key={`${b.unitId}|${b.stationTypeId ?? ''}|${b.model}`}
+              onPointerDown={onBrickPointerDown && !archived ? (e) => onBrickPointerDown(e, b) : undefined}
+              className={`px-2.5 py-1.5 rounded border border-dashed font-sans text-[10.5px] select-none ${
+                onBrickPointerDown && !archived ? 'cursor-grab active:cursor-grabbing' : ''
+              }`}
+              style={{ borderColor: ink.rule, color: ink.secondary, touchAction: 'none' }}
+              title="Dra till § 7 för att baka in i årspremien, eller till § 6 för tillägg utöver avtalet"
+            >
+              <span className="font-semibold" style={{ color: ink.primary }}>Tilläggsstationer</span>
+              {' · '}
+              {unitNameOf ? unitNameOf(b.unitId) : 'enhet'} · {b.stationTypeName} · {b.count} st · {b.model === 'per_month' ? 'per månad' : 'per år'}
+              <span className="block italic" style={{ color: ink.muted }}>
+                att besluta: dra till § 7 för att baka in i premien, eller till § 6 för tillägg utöver avtalet
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       {stationCount && stationCount.outdoor + stationCount.indoor > 0 && (
         <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
           <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>
@@ -170,8 +253,9 @@ export default function ContractEquipmentSection({ services, articles, loading, 
         </div>
       )}
       <p className="font-sans text-[10.5px] leading-relaxed pt-1.5" style={{ color: ink.muted }}>
-        Intern kostnad räknas i § 5. "Per styck och år" faktureras som egna rader på årspremiefakturan; tillägg som
-        läggs till avtalet från ett ärende hamnar här automatiskt. "Per kontrollrunda" debiteras när rundan avslutas.
+        Intern kostnad räknas i § 5. "Per styck och år" faktureras {equipmentInvoiceMode === 'separate' ? 'på egna fakturor parallellt med premien' : 'som egna rader på årspremiefakturan'};
+        "per styck och månad" alltid på egna månadsfakturor. Tilläggsstationer per år eller månad synkas hit från utplaceringarna, antal vid varje debitering.
+        "Per kontrollrunda" debiteras när rundan avslutas.
       </p>
     </div>
   )

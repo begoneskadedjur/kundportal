@@ -46,6 +46,8 @@ export type RecordContract = Contract & {
   renewal_reminder_days?: number | null
   /** Fakturapaus till datum (billing_active=false). Tomt = tills vidare. */
   billing_paused_until?: string | null
+  /** § 6 per år-rader: på premiefakturan (with_premium) eller egna fakturor (separate) */
+  equipment_invoice_mode?: 'with_premium' | 'separate' | null
 }
 
 /** Besöksfrekvenser — samma värden som recurring_schedules använder */
