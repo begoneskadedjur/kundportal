@@ -602,6 +602,16 @@ export default function RonderingCaseModal({
           )
           return
         }
+        // Avtalat material (artiklar med kundpris) måste vara mappat mot en tjänst,
+        // annars faktureras det aldrig utan försvinner som intern kostnad.
+        const unmappedPriced = await CaseBillingService.getUnmappedCustomerPricedArticles(caseData.id)
+        if (unmappedPriced.length > 0) {
+          toast.error(
+            `${unmappedPriced.map(u => `${u.quantity} st ${u.name}`).join(', ')} har kundpris men ingen tjänst att faktureras på. Mappa dem mot en tjänst i prisguiden först.`,
+            { duration: 8000 }
+          )
+          return
+        }
       } catch (guardError: any) {
         toast.error(`Kunde inte kontrollera rabattmotiveringar: ${guardError.message}`)
         return

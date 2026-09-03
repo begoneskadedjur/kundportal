@@ -395,6 +395,19 @@ export default function CaseServiceSelector({
   const marginPercent = serviceCost > 0 ? calculateMarginPercent(serviceCost, purchaseCost) : null
   const marginOk = marginPercent === null || marginPercent >= pricingSettings.min_margin_percent
 
+  // Tjänsterader vars pris härleds ur mappade artiklar med kundpris (avtalat
+  // pris, t.ex. LOU-prisbilaga). Priset är låst: prisguiden räknar
+  // kundpris × antal och påslag bara på övriga artiklar. Fast tjänstepris i
+  // prislistan har företräde och hanteras av hasFixedPrice.
+  const derivedLockedServiceIds = new Set(
+    serviceItems
+      .filter(si => !(si.service_id && customerServicePrices[si.service_id] !== undefined))
+      .filter(si => articleItems.some(a =>
+        a.customer_unit_price != null && (a.mapped_service_id || priceAssignments[a.id] || null) === si.id
+      ))
+      .map(si => si.id)
+  )
+
   const getMarginColor = () => {
     if (marginPercent === null) return 'text-slate-400'
     if (marginPercent >= pricingSettings.target_margin_percent) return 'text-emerald-400'
@@ -520,6 +533,19 @@ export default function CaseServiceSelector({
     const defaultQty = isDosage && item.article.dosage_unit
       ? getDosageDisplayUnit(item.article.dosage_unit).factor
       : 1
+    // Kundpris från prislistan (avtalat, låst) som ögonblicksbild på raden.
+    // Inköpspriset ovan rörs inte: det är intern kostnad och marginalbas.
+    // Dosering: kundpriset gäller per förpackning precis som inköpet, räkna om per dosenhet.
+    const rawCustomerPrice = item.customer_price == null
+      ? null
+      : (!isDosage && item.quantity_tiers && item.quantity_tiers.length > 0)
+        ? resolveTieredPrice(defaultQty, item.quantity_tiers)
+        : item.customer_price
+    const customerUnitPrice = rawCustomerPrice == null
+      ? null
+      : isDosage
+        ? Math.round(calculatePricePerDosageUnit(rawCustomerPrice, item.article.total_content!) * 100) / 100
+        : rawCustomerPrice
 
     if (draftMode && !caseId) {
       const discounted = calculateDiscountedPrice(unitPrice, 0)
@@ -543,6 +569,7 @@ export default function CaseServiceSelector({
         total_price: total,
         vat_rate: item.article.vat_rate,
         price_source: item.price_source,
+        customer_unit_price: customerUnitPrice,
         added_by_technician_id: technicianId ?? null,
         added_by_technician_name: technicianName ?? null,
         status: 'pending',
@@ -575,6 +602,7 @@ export default function CaseServiceSelector({
         unit_price: unitPrice,
         vat_rate: item.article.vat_rate,
         price_source: item.price_source,
+        customer_unit_price: customerUnitPrice,
         added_by_technician_id: technicianId || undefined,
         added_by_technician_name: technicianName || undefined,
       })
@@ -590,11 +618,12 @@ export default function CaseServiceSelector({
   // Uppdatera antal
   // ──────────────────────────────────────────────────────────────
   /**
-   * Om artikeln har mängdrabatt i kundens prislista: räkna fram korrekt unit_price
-   * för ny kvantitet och skicka med i update-anropet.
+   * Om artikeln har mängdrabatt i kundens prislista: räkna fram korrekt KUNDPRIS
+   * (customer_unit_price) för ny kvantitet. Inköpspriset (unit_price) rörs aldrig.
+   * Doseringsprodukter har inga stafflar per gram - hoppa över dem.
    */
-  const tierPriceForQty = (articleId: string | null | undefined, qty: number): number | null => {
-    if (!articleId) return null
+  const tierPriceForQty = (articleId: string | null | undefined, qty: number, isDosage = false): number | null => {
+    if (!articleId || isDosage) return null
     const cp = customerArticlePrices[articleId]
     if (!cp || !cp.quantity_tiers || cp.quantity_tiers.length === 0) return null
     return resolveTieredPrice(qty, cp.quantity_tiers)
@@ -607,23 +636,20 @@ export default function CaseServiceSelector({
     const isDosage = item.article?.is_dosage_product && item.article?.dosage_unit
     const minQty = isDosage ? 0.1 : 1
     const newQty = Math.max(minQty, item.quantity + delta)
-    const tierPrice = tierPriceForQty(item.article_id, newQty)
+    const tierPrice = tierPriceForQty(item.article_id, newQty, !!isDosage)
     if (draftMode && !caseId) {
       const patch: Partial<CaseBillingItemWithRelations> = { quantity: newQty }
-      if (tierPrice != null) patch.unit_price = tierPrice
+      if (tierPrice != null) patch.customer_unit_price = tierPrice
       updateDraftItem(id, patch)
       return
     }
     if (!caseId) return
     setSaving(true)
     try {
-      await CaseBillingService.updateCaseArticle(id, { quantity: newQty })
-      if (tierPrice != null && tierPrice !== item.unit_price) {
-        await supabase
-          .from('case_billing_items')
-          .update({ unit_price: tierPrice, updated_at: new Date().toISOString() })
-          .eq('id', id)
-      }
+      await CaseBillingService.updateCaseArticle(id, {
+        quantity: newQty,
+        ...(tierPrice != null && tierPrice !== item.customer_unit_price ? { customer_unit_price: tierPrice } : {}),
+      })
       await reloadItems()
     } catch (err: any) {
       toast.error(err.message)
@@ -640,23 +666,20 @@ export default function CaseServiceSelector({
     const minQty = isDosage ? 0.1 : 1
     const newQty = Math.max(minQty, absoluteQty)
     if (newQty === item.quantity) return
-    const tierPrice = tierPriceForQty(item.article_id, newQty)
+    const tierPrice = tierPriceForQty(item.article_id, newQty, !!isDosage)
     if (draftMode && !caseId) {
       const patch: Partial<CaseBillingItemWithRelations> = { quantity: newQty }
-      if (tierPrice != null) patch.unit_price = tierPrice
+      if (tierPrice != null) patch.customer_unit_price = tierPrice
       updateDraftItem(id, patch)
       return
     }
     if (!caseId) return
     setSaving(true)
     try {
-      await CaseBillingService.updateCaseArticle(id, { quantity: newQty })
-      if (tierPrice != null && tierPrice !== item.unit_price) {
-        await supabase
-          .from('case_billing_items')
-          .update({ unit_price: tierPrice, updated_at: new Date().toISOString() })
-          .eq('id', id)
-      }
+      await CaseBillingService.updateCaseArticle(id, {
+        quantity: newQty,
+        ...(tierPrice != null && tierPrice !== item.customer_unit_price ? { customer_unit_price: tierPrice } : {}),
+      })
       await reloadItems()
     } catch (err: any) {
       toast.error(err.message)
@@ -681,8 +704,8 @@ export default function CaseServiceSelector({
     const newPrice = isPrivate ? parsed / (1 + VAT_RATE) : parsed
     const item = allItems.find(i => i.id === id)
     if (!item) return
-    // Skydd: kundprislista-låsta tjänster får inte ändras här
-    if (item.service_id && customerServicePrices[item.service_id] !== undefined) {
+    // Skydd: kundprislista-låsta och härlett låsta tjänster får inte ändras här
+    if ((item.service_id && customerServicePrices[item.service_id] !== undefined) || derivedLockedServiceIds.has(id)) {
       setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
       return
     }
@@ -1235,9 +1258,11 @@ export default function CaseServiceSelector({
                 && item.service_id !== laborService.id
                 && item.total_price > 0
                 && !(item.service_id && customerServicePrices[item.service_id] !== undefined)
+                && !derivedLockedServiceIds.has(item.id)
               const rotPct = getEffectiveRotPercent(svc)
               const rutPct = getEffectiveRutPercent(svc)
               const hasFixedPrice = !!item.service_id && customerServicePrices[item.service_id] !== undefined
+              const isDerivedLocked = !hasFixedPrice && derivedLockedServiceIds.has(item.id)
               return (
                 <div key={item.id} className="p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg">
                   {/* Namn – alltid full bredd */}
@@ -1257,6 +1282,15 @@ export default function CaseServiceSelector({
                         Fast pris
                       </span>
                     )}
+                    {isDerivedLocked && (
+                      <span
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium"
+                        title="Priset härleds ur kundens avtalade artikelpriser (kundpris × antal) och kan inte ändras här"
+                      >
+                        <CheckCircle className="w-3 h-3" />
+                        Låst av avtal
+                      </span>
+                    )}
                     {item.covered_by_contract && (
                       <span
                         className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium"
@@ -1267,7 +1301,7 @@ export default function CaseServiceSelector({
                       </span>
                     )}
                     {/* Avtalstillägg: endast avtalskundärenden med sparade rader */}
-                    {caseType === 'contract' && customerId && caseId && !draftMode && (
+                    {caseType === 'contract' && customerId && caseId && !draftMode && !isDerivedLocked && (
                       item.contract_addition_annual != null ? (
                         <button
                           type="button"
@@ -1310,11 +1344,13 @@ export default function CaseServiceSelector({
                       <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-auto">
                         {formatPrice(item.total_price * priceMultiplier)}
                       </span>
-                    ) : hasFixedPrice ? (
+                    ) : hasFixedPrice || isDerivedLocked ? (
                       <div className="flex items-center gap-1 ml-auto">
                         <span
                           className="w-24 px-2 py-0.5 text-sm text-right bg-[#20c58f]/10 border border-[#20c58f]/30 rounded text-[#20c58f] font-medium cursor-not-allowed"
-                          title="Fast pris från kundens prislista – kan inte ändras här"
+                          title={hasFixedPrice
+                            ? 'Fast pris från kundens prislista – kan inte ändras här'
+                            : 'Låst av avtal: kundpris × antal på mappade artiklar – ändra antal eller mappning i stället'}
                         >
                           {displayUnitPrice}
                         </span>
@@ -1669,6 +1705,7 @@ export default function CaseServiceSelector({
           <div className="mt-3 space-y-3">
             <p className="text-xs text-slate-500">
               Interna kostnader visas <strong>inte</strong> på fakturan – de används bara för att beräkna inköpskostnad och marginal.
+              Artiklar med kundpris i kundens prislista är undantaget: de låser priset på tjänsten de mappas mot och skrivs ut som specifikation på fakturaraden.
             </p>
 
             {/* Befintliga artikelrader */}
@@ -1696,9 +1733,20 @@ export default function CaseServiceSelector({
                           ({item.article.total_content}{dosageUnit} / fp)
                         </span>
                       )}
-                      {hasContract && (
-                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-[#20c58f]/20 text-[#20c58f] border border-[#20c58f]/30">
-                          Avtalspris
+                      {item.customer_unit_price != null && (
+                        <span
+                          className="text-[10px] font-medium text-[#20c58f]"
+                          title="Avtalat kundpris från prislistan: låser priset på den tjänst artikeln mappas mot och skrivs som specifikation på fakturaraden"
+                        >
+                          kundpris {formatPrice(item.customer_unit_price)}/{isDosage ? dosageUnit : 'st'}
+                        </span>
+                      )}
+                      {item.customer_unit_price != null && !item.mapped_service_id && !priceAssignments[item.id] && (
+                        <span
+                          className="text-[10px] font-medium text-amber-400"
+                          title="Mappa artikeln mot en tjänst i prisguiden, annars faktureras inte det avtalade priset"
+                        >
+                          ej mappad mot tjänst
                         </span>
                       )}
                       {hasTiers && (
@@ -1717,7 +1765,7 @@ export default function CaseServiceSelector({
                     )}
                     {/* Kontroller på rad 2 */}
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-500">{item.unit_price} kr/{isDosage ? dosageUnit : 'st'}</span>
+                      <span className="text-xs text-slate-500">{item.customer_unit_price != null ? 'inköp ' : ''}{item.unit_price} kr/{isDosage ? dosageUnit : 'st'}</span>
                       {!readOnly && (
                         <div className="flex items-center gap-1 ml-auto">
                           <button
@@ -1841,7 +1889,10 @@ export default function CaseServiceSelector({
                                 )}
                               </div>
                               <span className="text-xs text-[#20c58f] font-semibold whitespace-nowrap ml-2">
-                                {hasTiers ? `fr. ${formatPrice(item.effective_price)}` : formatPrice(item.effective_price)}
+                                {hasTiers
+                                  ? `fr. ${formatPrice(item.customer_price ?? item.effective_price)}`
+                                  : formatPrice(item.customer_price ?? item.effective_price)}
+                                <span className="text-slate-500 font-normal ml-1">inköp {formatPrice(item.effective_price)}</span>
                               </span>
                             </button>
                           )
@@ -1923,6 +1974,7 @@ export default function CaseServiceSelector({
           quantity: i.quantity,
           unit_price: i.unit_price,
           total_price: i.total_price,
+          customer_unit_price: i.customer_unit_price ?? null,
           default_price: i.article?.default_price ?? null,
           rot_eligible: !!i.article?.rot_eligible,
           rut_eligible: !!i.article?.rut_eligible,

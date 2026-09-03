@@ -51,6 +51,8 @@ export interface CaseBillingItem {
   billing_model?: 'premium' | 'per_year' | 'per_round' | null
   /** Raden täcks av kundens avtal (§ 4) och faktureras inte som merförsäljning */
   covered_by_contract?: boolean | null
+  /** Kundens avtalade pris per enhet från prislistan (ögonblicksbild). unit_price är alltid inköpspris. Null = inget kundpris. */
+  customer_unit_price?: number | null
   quantity: number
   unit_price: number
   discount_percent: number
@@ -125,6 +127,8 @@ export interface AddCaseArticleInput {
   added_by_technician_id?: string
   added_by_technician_name?: string
   notes?: string
+  /** Kundpris från prislistan (avtalat, låst). Skrivs bara när kunden har artikeln i sin prislista. */
+  customer_unit_price?: number | null
 }
 
 /**
@@ -159,17 +163,23 @@ export interface UpdateCaseArticleInput {
   fastighetsbeteckning?: string | null
   min_quantity?: number | null
   mapped_service_id?: string | null
+  /** Kundpris per enhet (t.ex. omräknat efter mängdrabatt vid nytt antal) */
+  customer_unit_price?: number | null
 }
 
 /**
  * Artikel med effektivt pris (för UI).
- * Om artikeln finns i kundens prislista sätts `price_source = 'customer_list'`
- * och `quantity_tiers` kan innehålla mängdrabatt-stafflar.
+ * `effective_price` är ALLTID inköpspriset (articles.default_price).
+ * Om artikeln finns i kundens prislista sätts `price_source = 'customer_list'`,
+ * `customer_price` bär kundpriset (custom_price eller lägsta tier) och
+ * `quantity_tiers` kan innehålla mängdrabatt-stafflar.
  */
 export interface ArticleWithEffectivePrice {
   article: Article
   effective_price: number
   price_source: PriceSource
+  /** Kundens avtalade pris per enhet (null/undefined = inget kundpris) */
+  customer_price?: number | null
   customer_discount_percent?: number
   quantity_tiers?: import('./articles').QuantityTier[] | null
 }
@@ -392,4 +402,53 @@ export interface AccumulatedCaseSummary {
   revenue: number
   cost: number
   margin_percent: number | null
+}
+
+// ─────────────────────────────────────────────────────────────
+// Kundpris på artiklar (avtalade priser, t.ex. LOU-prisbilaga)
+// ─────────────────────────────────────────────────────────────
+
+/** Artikelrad med kundpris från prislistan: låser priset på tjänsten den mappas mot */
+export function hasCustomerPrice(
+  item: Pick<CaseBillingItem, 'item_type' | 'customer_unit_price'>
+): boolean {
+  return item.item_type === 'article' && item.customer_unit_price != null
+}
+
+type SpecItem = Pick<CaseBillingItem, 'id' | 'item_type' | 'customer_unit_price' | 'mapped_service_id' | 'quantity' | 'article_name'> & {
+  status?: string | null
+  article?: { is_dosage_product?: boolean | null; dosage_unit?: string | null } | null
+}
+
+const specNumber = (n: number) =>
+  new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 2 }).format(n)
+
+/**
+ * Specifikation för fakturaraden: "20 st Myrdosa à 18 kr" av de artiklar med
+ * kundpris som är mappade mot tjänsteraden. Artiklar UTAN kundpris nämns
+ * aldrig (interna produkter är inte kundens sak). Tom sträng = ingen spec.
+ */
+export function buildCustomerArticleSpec(serviceItemId: string, items: SpecItem[]): string {
+  const parts: string[] = []
+  for (const a of items) {
+    if (a.item_type !== 'article' || a.customer_unit_price == null) continue
+    if (a.mapped_service_id !== serviceItemId) continue
+    if (a.status === 'cancelled') continue
+    const unit = a.article?.is_dosage_product && a.article?.dosage_unit ? a.article.dosage_unit : null
+    if (unit) {
+      // Dosering lagras i grundenhet (g/ml/m); visa i kg/l/m när det blir läsbart
+      const big = unit === 'g' ? { u: 'kg', f: 1000 } : unit === 'ml' ? { u: 'l', f: 1000 } : { u: unit, f: 1 }
+      const qty = a.quantity / big.f
+      const price = a.customer_unit_price * big.f
+      parts.push(`${specNumber(qty)} ${big.u} ${a.article_name} à ${specNumber(price)} kr/${big.u}`)
+    } else {
+      parts.push(`${a.quantity} st ${a.article_name} à ${specNumber(a.customer_unit_price)} kr`)
+    }
+  }
+  return parts.join(', ')
+}
+
+/** Radtext med specifikation: "Myrbekämpning, 20 st Myrdosa à 18 kr" */
+export function appendCustomerArticleSpec(name: string, spec: string): string {
+  return spec ? `${name}, ${spec}` : name
 }

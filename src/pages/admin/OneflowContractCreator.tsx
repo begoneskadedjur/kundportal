@@ -724,6 +724,7 @@ export default function OneflowContractCreator() {
                 total_price: i.total_price,
                 vat_rate: i.vat_rate,
                 price_source: i.price_source,
+                customer_unit_price: i.customer_unit_price ?? null,
                 notes: i.notes,
                 rot_rut_type: i.rot_rut_type,
                 fastighetsbeteckning: i.fastighetsbeteckning ?? null,

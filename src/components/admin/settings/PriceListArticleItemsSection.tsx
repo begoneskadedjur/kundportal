@@ -170,7 +170,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
     const scope = pickerCategory === 'all'
       ? (pickerSearch.trim() ? 'alla matchande' : 'alla')
       : `alla i ${pickerCategory}`
-    if (!confirm(`Lägg till ${scope} ${filteredPickerArticles.length} artiklar i prislistan? Grundpriset används som kundpris tills du ändrar det.`)) return
+    if (!confirm(`Lägg till ${scope} ${filteredPickerArticles.length} artiklar i prislistan? Inköpspriset används som kundpris tills du ändrar det.`)) return
     setBulkAdding(true)
     try {
       await PriceListService.bulkUpsertPriceListItems(
@@ -324,7 +324,7 @@ export function PriceListArticleItemsSection({ priceListId, onUpdate }: Props) {
                 <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400 w-20">Kod</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Artikel</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Grupp</th>
-                <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Grundpris</th>
+                <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-400" title="Vad artikeln kostar oss (articles.default_price)">Inköpspris</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wide text-slate-400">Kundpris</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-400">Mängdrabatter</th>
                 <th className="px-3 py-2 w-20" />

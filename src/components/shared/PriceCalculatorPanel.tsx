@@ -21,8 +21,10 @@ interface ArticleItem {
   article_name: string
   article_code?: string | null
   quantity: number
-  /** Priset som visas på raden i UI — lika med kundpris för avtalsartiklar, annars default_price */
+  /** Inköpspris per enhet på raden (articles.default_price, ev. per doseringsenhet) */
   unit_price: number
+  /** Kundens avtalade pris per enhet, ögonblicksbild från prislistan (null = inget kundpris) */
+  customer_unit_price?: number | null
   total_price: number
   /** Artikelns grunddata-pris (articles.default_price) — den verkliga inköpskostnaden. */
   default_price?: number | null
@@ -145,6 +147,9 @@ export default function PriceCalculatorPanel({
    * Returnerar null om kunden inte har ett avtalspris för artikeln.
    */
   const customerUnitPrice = (a: ArticleItem): number | null => {
+    // Radens ögonblicksbild vinner: det är det pris som sparades när artikeln
+    // lades till (inkl. mängdrabatt för antalet). Live-uppslag bara för gamla rader.
+    if (a.customer_unit_price != null) return a.customer_unit_price
     if (!a.article_id || !customerArticlePrices) return null
     const cp = customerArticlePrices[a.article_id]
     if (!cp) return null

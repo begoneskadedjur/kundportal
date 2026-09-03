@@ -1,6 +1,7 @@
 // src/services/invoiceService.ts
 // Service för hantering av fakturor (privat/företag direktfakturering)
 
+import { buildCustomerArticleSpec, appendCustomerArticleSpec } from '../types/caseBilling'
 import { supabase } from '../lib/supabase'
 import type {
   Invoice,
@@ -245,9 +246,14 @@ export class InvoiceService {
     } else {
       // Utan anpassat pris: standard — bara service-rader (eller artikel-rader för gamla ärenden)
       for (const item of billingItems) {
-        // Välj rätt namn/kod beroende på om det är en tjänstrad eller artikelrad
+        // Välj rätt namn/kod beroende på om det är en tjänstrad eller artikelrad.
+        // Tjänsterader får specifikation av mappade artiklar med kundpris
+        // ("Myrbekämpning, 20 st Myrdosa à 18 kr"); artiklar utan kundpris nämns aldrig.
         const displayName = item.item_type === 'service'
-          ? (item.service_name || item.article_name)
+          ? appendCustomerArticleSpec(
+              item.service_name || item.article_name,
+              buildCustomerArticleSpec(item.id, allBillingItems)
+            )
           : item.article_name
         const displayCode = item.item_type === 'service'
           ? (item.service_code || item.article_code)
@@ -768,6 +774,19 @@ export class InvoiceService {
     const billingItems = billingItemsData || []
     if (billingItems.length === 0) throw new Error('Inga fakturerbara tjänster på ärendet')
 
+    // Artiklar med kundpris på ärendet: ger specifikation på tjänsteraderna
+    // (samma text som vid första faktureringen, byggd från aktuella rader).
+    let specArticles: Parameters<typeof buildCustomerArticleSpec>[1] = []
+    if (invoice.case_id) {
+      const { data: specData } = await supabase
+        .from('case_billing_items')
+        .select('id, item_type, customer_unit_price, mapped_service_id, quantity, article_name, status, article:articles(is_dosage_product, dosage_unit)')
+        .eq('case_id', invoice.case_id)
+        .eq('item_type', 'article')
+        .not('customer_unit_price', 'is', null)
+      specArticles = (specData as unknown as typeof specArticles) || []
+    }
+
     const priceCaseType = deriveInvoiceCaseType(invoice)
     // Anpassat totalpris är en manuell överskrivning per ärende — hoppa över
     // uppslaget helt när ärendekopplingen saknas i stället för att gissa typ.
@@ -840,7 +859,9 @@ export class InvoiceService {
             case_billing_item_id: item.id,
             article_id: item.article_id,
             article_code: item.article_code,
-            article_name: item.article_name,
+            article_name: item.item_type === 'service'
+              ? appendCustomerArticleSpec(item.service_name || item.article_name, buildCustomerArticleSpec(item.id, specArticles))
+              : item.article_name,
             quantity: item.quantity,
             unit_price: item.unit_price,
             discount_percent: item.discount_percent,

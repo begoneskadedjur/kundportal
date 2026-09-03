@@ -10,6 +10,8 @@ import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, Ale
 import CaseServiceSelector from '../../shared/CaseServiceSelector';
 import ServiceArticleSelector from '../../shared/ServiceArticleSelector';
 import { CaseBillingService } from '../../../services/caseBillingService';
+import { PriceListService } from '../../../services/priceListService';
+import { resolveTieredPrice, calculatePricePerDosageUnit } from '../../../types/articles';
 import type { CaseBillingItemWithRelations } from '../../../types/caseBilling';
 import type { Service } from '../../../types/services';
 import SiteSelector from '../../shared/SiteSelector';
@@ -923,6 +925,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     e.preventDefault();
     let finalCaseId: string | null = null;
     let finalCaseType: 'private' | 'business' | 'contract' = (caseType as any) || 'private';
+    // Kundraden ärendet skrivs på (multisite: enheten). Funktionsscope, så att
+    // utkastraderna längre ner kan läsa den - tidigare block-scopad let → ReferenceError.
+    let actualCustomerId: string | null = null;
 
     // För inspection-ärenden krävs inte title från användaren
     if (!caseType) {
@@ -999,7 +1004,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       if (caseType === 'inspection') {
         // Hantera stationskontroll-ärenden
         // Om multisite, använd sitens customer_id istället för huvudkundens
-        let actualCustomerId = selectedContractCustomer;
+        actualCustomerId = selectedContractCustomer;
         if (customer?.is_multisite && selectedSiteId) {
           actualCustomerId = selectedSiteId;
         }
@@ -1103,7 +1108,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         toast.success(`Stationskontroll inbokad för ${customerName}!`);
 
       } else if (caseType === 'establishment') {
-        let actualCustomerId = selectedContractCustomer;
+        actualCustomerId = selectedContractCustomer;
         if (customer?.is_multisite && selectedSiteId) {
           actualCustomerId = selectedSiteId;
         }
@@ -1233,7 +1238,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       } else if (caseType === 'contract') {
         // Hantera avtalskundärenden
         // Om multisite, använd sitens customer_id istället för huvudkundens
-        let actualCustomerId = selectedContractCustomer;
+        actualCustomerId = selectedContractCustomer;
         if (customer?.is_multisite && selectedSiteId) {
           // selectedSiteId är faktiskt customer_id för siten från SiteSelector
           actualCustomerId = selectedSiteId;
@@ -1362,6 +1367,24 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       // Spara draft-items för nya ärenden (ej befintliga ärenden – deras items är redan sparade live)
       if (draftBillingItems.length > 0 && finalCaseId && !initialCaseData?.id) {
         try {
+          // Utkastet skapades innan kunden var vald, så artiklarna saknar kundpris.
+          // Slå upp kundens prislista nu så avtalade artikelpriser följer med in.
+          const draftArticlePrices = actualCustomerId
+            ? await PriceListService.getCustomerArticlePrices(actualCustomerId).catch(() => ({} as Awaited<ReturnType<typeof PriceListService.getCustomerArticlePrices>>))
+            : ({} as Awaited<ReturnType<typeof PriceListService.getCustomerArticlePrices>>)
+          const customerUnitPriceFor = (it: CaseBillingItemWithRelations): number | null => {
+            if (it.customer_unit_price != null) return it.customer_unit_price
+            if (!it.article_id) return null
+            const cp = draftArticlePrices[it.article_id]
+            if (!cp) return null
+            const isDosage = !!(it.article?.is_dosage_product && it.article?.total_content && it.article?.dosage_unit)
+            const base = !isDosage && cp.quantity_tiers && cp.quantity_tiers.length > 0
+              ? resolveTieredPrice(it.quantity, cp.quantity_tiers)
+              : cp.custom_price
+            return isDosage
+              ? Math.round(calculatePricePerDosageUnit(base, it.article!.total_content!) * 100) / 100
+              : base
+          }
           for (const item of draftBillingItems) {
             let createdItem: { id: string } | null = null
             if (item.item_type === 'service' && item.service_id) {
@@ -1390,6 +1413,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 discount_percent: item.discount_percent || 0,
                 vat_rate: item.vat_rate || 25,
                 price_source: item.price_source,
+                customer_unit_price: customerUnitPriceFor(item),
               })
             }
             // Rabattmotivering från draft-läget följer med raden in i DB

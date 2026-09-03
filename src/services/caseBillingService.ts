@@ -35,13 +35,12 @@ export class CaseBillingService {
   /**
    * Hämta alla aktiva artiklar med effektivt pris.
    *
-   * Artiklar är interna kostnader/inköp, inte kundpriser — de faktureras
-   * aldrig direkt till kund. Därför används alltid articles.default_price.
-   * Kundspecifik prissättning sker på TJÄNSTE-nivå via prislistor (se
-   * PriceListService.getEffectiveServicePrice).
-   *
-   * customerId-parametern accepteras för bakåtkompatibilitet men används inte
-   * längre för artikelpriser.
+   * effective_price är ALLTID inköpspriset (articles.default_price) - det som
+   * räknas som intern kostnad i marginalen. Har kunden artikeln i sin prislista
+   * (custom_price eller mängdrabatt) läggs det som customer_price bredvid:
+   * ett avtalat pris som låser tjänsten artikeln mappas mot och skrivs som
+   * specifikation på fakturaraden. Tidigare skrev kundpriset ÖVER inköpspriset
+   * här, vilket gjorde att marginalen räknades mot fel siffra.
    */
   static async getArticlesWithPrices(customerId?: string | null, articleGroupId?: string | null): Promise<ArticleWithEffectivePrice[]> {
     // Om articleGroupId anges: hämta artiklar från den gruppen + alltid Arbetstid och Övrigt
@@ -103,7 +102,8 @@ export class CaseBillingService {
           : cp.custom_price
         return {
           article,
-          effective_price: basePrice,
+          effective_price: article.default_price,
+          customer_price: basePrice,
           price_source: 'customer_list' as PriceSource,
           quantity_tiers: hasTiers ? cp.quantity_tiers : null,
         }
@@ -221,7 +221,8 @@ export class CaseBillingService {
         added_by_technician_name: input.added_by_technician_name || null,
         status: 'pending',
         requires_approval: itemRequiresApproval(discountPercent),
-        notes: input.notes || null
+        notes: input.notes || null,
+        customer_unit_price: input.customer_unit_price ?? null
       })
       .select()
       .single()
@@ -281,6 +282,26 @@ export class CaseBillingService {
    * Rabattrader som saknar motivering för ett ärende - används som spärr
    * vid ärendeavslut. Avtalstilläggsrader räknas inte som rabatt.
    */
+  /**
+   * Artikelrader med kundpris (avtalat pris) som inte är mappade mot någon
+   * tjänsterad. Spärr vid avslut och fakturering: annars försvinner det
+   * avtalade materialet tyst som intern kostnad i stället för att faktureras.
+   */
+  static async getUnmappedCustomerPricedArticles(caseId: string): Promise<
+    { id: string; name: string; quantity: number }[]
+  > {
+    const { data, error } = await supabase
+      .from('case_billing_items')
+      .select('id, article_name, quantity')
+      .eq('case_id', caseId)
+      .eq('status', 'pending')
+      .eq('item_type', 'article')
+      .not('customer_unit_price', 'is', null)
+      .is('mapped_service_id', null)
+    if (error) throw error
+    return (data || []).map(r => ({ id: r.id, name: r.article_name, quantity: Number(r.quantity) }))
+  }
+
   static async getUnmotivatedDiscountItems(caseId: string): Promise<
     { id: string; name: string; discount_percent: number }[]
   > {
@@ -337,6 +358,7 @@ export class CaseBillingService {
         rot_rut_type: input.rot_rut_type !== undefined ? input.rot_rut_type : existing.rot_rut_type,
         fastighetsbeteckning: input.fastighetsbeteckning !== undefined ? input.fastighetsbeteckning : existing.fastighetsbeteckning,
         mapped_service_id: input.mapped_service_id !== undefined ? input.mapped_service_id : existing.mapped_service_id,
+        customer_unit_price: input.customer_unit_price !== undefined ? input.customer_unit_price : existing.customer_unit_price,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)

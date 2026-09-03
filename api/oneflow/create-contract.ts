@@ -72,6 +72,8 @@ interface ContractRequestBody {
     total_price: number
     vat_rate?: number
     price_source?: string
+    /** Kundpris per enhet från prislistan (bara artikelrader) */
+    customer_unit_price?: number | null
     notes?: string | null
     rot_rut_type?: 'ROT' | 'RUT' | null
     fastighetsbeteckning?: string | null
@@ -665,6 +667,7 @@ export default async function handler(
           total_price: item.total_price,
           vat_rate: item.vat_rate ?? 25,
           price_source: item.price_source || 'standard',
+          customer_unit_price: item.item_type === 'article' ? (item.customer_unit_price ?? null) : null,
           status: 'pending',
           requires_approval: false,
           notes: item.notes || null,

@@ -1,6 +1,7 @@
 // src/services/contractBillingService.ts
 // Service för avtalsfakturering
 
+import { buildCustomerArticleSpec, appendCustomerArticleSpec } from '../types/caseBilling'
 import { supabase } from '../lib/supabase'
 import {
   ContractBillingItem,
@@ -417,7 +418,11 @@ export class ContractBillingService {
         // samma fallback som invoiceService, annars tappas artikelnumret
         // på Fortnox-fakturan för merförsäljning mot avtal
         article_code: item.service_code || item.article_code,
-        article_name: item.service_name || item.article_name,
+        // Specifikation av mappade artiklar med kundpris ("20 st Myrdosa à 18 kr");
+        // artiklar utan kundpris nämns aldrig
+        article_name: item.item_type === 'service'
+          ? appendCustomerArticleSpec(item.service_name || item.article_name, buildCustomerArticleSpec(item.id, allCaseBillingItems))
+          : (item.service_name || item.article_name),
         quantity: item.quantity,
         unit_price: item.unit_price,
         total_price: item.total_price,
