@@ -14,6 +14,8 @@ Kvar för go-live:
 
 Verifierat mot live-Fortnox 2026-09-03 (lokal full synk, 1,5 s, 3 anrop): 918 aktiva kunder, 0 inaktiva, alla kundnummer numeriska, `filter=inactive` och `lastmodified` accepteras. Fortnox högsta privatnummer är 10497 medan portalens räknare stod på 10467, och portalens 10465 (Annica Anderbrant) är Sonja Johnsen i Fortnox. Därför släpper "Till Fortnox" ett portalnummer som spegeln visar tillhör någon annan och hämtar ett nytt (steg 1c-pre i InvoiceDetailModal).
 
+Browser-test 2026-09-03 (Peter, Ann Löfling INV-202609-0316): kunden lades upp rätt som 10498 (portalnumret 10467 släpptes, det tillhörde Mariella Issa). Men fakturautkastet fick 1 000 kr inkl. moms i stället för 1 250 kr: portalen skickade exkl-pris utan VATIncluded, och privatkundkortets "priser inkl. moms" fick Fortnox att tolka radens Price som inkl. Felet fanns sedan 2026-07-17 (33cd6d82) för alla privatkunder portalen skapat. RÄTTAT samma dag: privatpersoner får `VATIncluded: true` + radpris × (1 + moms) (`toVatInclusivePrice`), företag `VATIncluded: false` uttryckligen. Utkast 890 rättades manuellt av Peter.
+
 Avvikelser från planen (medvetna):
 - Ingen advisory lock i allocate-customer (PostgREST har inga transaktioner). Race hanteras av Fortnox unika kundnummer + retry på 2000637 och portalens unika constraint, vilket planen redan pekade ut som sanningen.
 - Portalens räknare (`current_counter`) visas nedtonad som "räknare" på kundgruppssidan och heter "Oneflow-räknare" i redigeringsmodalen, gömdes inte.

@@ -46,7 +46,7 @@ import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerReso
 import { isPersonnummer } from '../../../services/fortnoxService'
 import { FortnoxMirrorService } from '../../../services/fortnoxMirrorService'
 import { CaseCustomerService } from '../../../services/caseCustomerService'
-import { orgDigits, type FortnoxMirrorHit } from '../../../shared/fortnoxCustomerNumbers'
+import { orgDigits, toVatInclusivePrice, type FortnoxMirrorHit } from '../../../shared/fortnoxCustomerNumbers'
 import { PaymentTermsService, type BillingCategory } from '../../../services/paymentTermsService'
 import type { InvoiceWithItems, InvoiceStatus, InvoiceItem } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
@@ -1071,11 +1071,17 @@ export default function InvoiceDetailModal({
         rotRut?.toUpperCase() === 'ROT' ? 'CONSTRUCTION'
         : rotRut?.toUpperCase() === 'RUT' ? 'CLEANING'
         : undefined
+      // Momsläge sätts ALLTID uttryckligen. Utelämnas VATIncluded tar Fortnox
+      // kundkortets standard, och privatkundkort har "priser inkl. moms":
+      // då tolkas radens Price som inklusive moms och en 1 000 kr-rad blir
+      // 1 000 kr inkl. moms (utkast 890, 2026-09-03). Privatpersoner får
+      // därför inkl-priser + VATIncluded=true, företag exkl-priser + false.
+      const vatIncluded = isPrivatePerson
       const invoiceRows = invoice.items.map(item => ({
         ArticleNumber: item.article_code || undefined,
         Description: item.article_name,
         DeliveredQuantity: item.quantity,
-        Price: item.unit_price,
+        Price: vatIncluded ? toVatInclusivePrice(item.unit_price, item.vat_rate) : item.unit_price,
         VAT: item.vat_rate,
         ...(item.discount_percent > 0 ? { Discount: item.discount_percent, DiscountType: 'PERCENT' } : {}),
         ...((item as any).rot_rut_type && invoice.fastighetsbeteckning
@@ -1113,6 +1119,7 @@ export default function InvoiceDetailModal({
         CustomerNumber: fortnoxCustomerNumber,
         InvoiceDate: today,
         DueDate: dueDate,
+        VATIncluded: vatIncluded,
         InvoiceRows: invoiceRows,
       }
 

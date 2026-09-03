@@ -11,6 +11,7 @@ import {
   orgDigits,
   parseFortnoxCustomerNumber,
   parseSwedishAddress,
+  toVatInclusivePrice,
   type FortnoxMirrorHit,
 } from './fortnoxCustomerNumbers'
 
@@ -114,6 +115,17 @@ describe('decideCandidate', () => {
   })
   it('inactive-only när bara inaktiva finns', () => {
     expect(decideCandidate([hit('3561', false), hit('3562', false)]).kind).toBe('inactive-only')
+  })
+})
+
+describe('toVatInclusivePrice', () => {
+  it('räknar upp exkl-pris till inkl-pris med öresavrundning', () => {
+    expect(toVatInclusivePrice(1000, 25)).toBe(1250)
+    expect(toVatInclusivePrice(2396, 25)).toBe(2995)
+    expect(toVatInclusivePrice(3997.6, 25)).toBe(4997)
+    expect(toVatInclusivePrice(333.33, 12)).toBe(373.33)
+    expect(toVatInclusivePrice(100, 0)).toBe(100)
+    expect(toVatInclusivePrice(100, null)).toBe(100)
   })
 })
 

@@ -117,6 +117,17 @@ export function buildFortnoxCustomerCard(input: FortnoxCustomerCardInput): {
   return { card, type, orgNrSkipped: !!input.organization_number && !orgOk }
 }
 
+/**
+ * Radpris inklusive moms, avrundat till öre. Fortnox tolkar radens Price som
+ * inklusive moms när fakturan har VATIncluded=true (kundkortets "priser inkl.
+ * moms" är standard för privatpersoner), så portalens exkl-pris måste räknas
+ * upp innan det skickas. Annars blir en 1 000 kr-rad 1 000 kr inkl. moms.
+ */
+export function toVatInclusivePrice(unitPriceExclVat: number, vatRatePercent: number | null | undefined): number {
+  const rate = Number(vatRatePercent ?? 0)
+  return Math.round(unitPriceExclVat * (1 + rate / 100) * 100) / 100
+}
+
 /** Luhn-kontroll (mod 10) för svenska org-/personnummer med 10 siffror. */
 export function luhnValid(digits10: string): boolean {
   if (!/^\d{10}$/.test(digits10)) return false
