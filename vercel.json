@@ -51,6 +51,10 @@
     {
       "path": "/api/cron/sync-fortnox-customers",
       "schedule": "15 2 * * *"
+    },
+    {
+      "path": "/api/cron/sync-fortnox-customers-incremental",
+      "schedule": "*/10 * * * *"
     }
   ],
   "rewrites": [

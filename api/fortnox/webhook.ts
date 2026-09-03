@@ -34,9 +34,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Saknar EntityId' })
   }
 
-  // Kundhändelser (topic customers, create/update) håller Fortnox-spegeln
-  // färsk inom sekunder. Payloaden litas aldrig på: kundkortet hämtas från
-  // API:t. 404 = raderad kund, numret förblir upptaget (missing_since).
+  // Kundhändelser: uppdaterar Fortnox-spegeln. OBS: Fortnox har ingen
+  // HTTP-webhook för kunder (händelser går via websocket
+  // wss://ws.fortnox.se/topics-v1), så grenen är VILANDE tills en
+  // websocket-brygga postar hit. Spegeln hålls i stället färsk av
+  // api/cron/sync-fortnox-customers-incremental (var 10:e min).
+  // Payloaden litas aldrig på: kundkortet hämtas från API:t.
+  // 404 = raderad kund, numret förblir upptaget (missing_since).
   if (typeof Type === 'string' && Type.toUpperCase().startsWith('CUSTOMER')) {
     try {
       const accessToken = await getValidAccessToken()

@@ -4,10 +4,13 @@
 
 Migrationerna är applicerade i live-DB (fortnox_customer_numbers, fortnox_customer_mirror_state, customer_group_fortnox_stats, business_cases.customer_group_id, ny allocate_customer_number, RLS-täppning på customer_groups). Kod pushad till main.
 
+RÄTTELSE 2026-09-03 (eftermiddag): Fortnox har INGEN HTTP-webhook för kunder. Entitetshändelser (topics customers, invoices, articles m.fl., typer som `customer-created-v1`/`customer-updated-v2`/`customer-deleted-v1`) levereras via websocket `wss://ws.fortnox.se/topics-v1` (add-tenants-v1 med client secret + access token, add-topics-v1, replay via offset upp till 14 dagar). Det kräver en ständigt uppkopplad process, vilket Vercel serverless inte ger. Portalens `api/fortnox/webhook.ts` matas inte heller av Fortnox idag: fakturastatus pollas av Edge Function `fortnox-sync` (pg_cron var 5:e min). Tabellen `fortnox_sync_state` (topic, tenant_id, last_offset) var förberedd för en websocket-konsument men är tom.
+
+Webhook-lagret ersätts därför av `api/cron/sync-fortnox-customers-incremental` var 10:e minut (2 anrop per körning, ca 290 anrop/dygn, ingen cron_runs-logg). Kundgrenen i webhook.ts ligger kvar vilande för en framtida websocket-brygga. Inget behöver sättas upp hos Fortnox.
+
 Kvar för go-live:
-1. Registrera Fortnox-webhook för topic customers (create + update) mot `https://kundportal.vercel.app/api/fortnox/webhook?secret=<FORTNOX_WEBHOOK_SECRET>` i Fortnox developer-portal, samma URL som fakturawebhooken. Tills dess håller inkrementell synk (vid allokering och på kundgruppssidan) och den nattliga cronen (02:15) spegeln färsk.
-2. Browser-test enligt "Testkriterier" nedan. Särskilt: skapa engångsjobb företag (gruppval krävs nu), avsluta, Till Fortnox.
-3. Första gången kundgruppssidan öppnas efter deploy görs en full synk automatiskt om den lokala synken nedan inte redan fyllt spegeln.
+1. Browser-test enligt "Testkriterier" nedan. Särskilt: skapa engångsjobb företag (gruppval krävs nu), avsluta, Till Fortnox.
+2. Kontrollera efter första deployen att `fortnox_customer_mirror_state.last_incremental_at` tickar var 10:e minut (kräver CRON_SECRET i Vercel, fail-closed).
 
 Verifierat mot live-Fortnox 2026-09-03 (lokal full synk, 1,5 s, 3 anrop): 918 aktiva kunder, 0 inaktiva, alla kundnummer numeriska, `filter=inactive` och `lastmodified` accepteras. Fortnox högsta privatnummer är 10497 medan portalens räknare stod på 10467, och portalens 10465 (Annica Anderbrant) är Sonja Johnsen i Fortnox. Därför släpper "Till Fortnox" ett portalnummer som spegeln visar tillhör någon annan och hämtar ett nytt (steg 1c-pre i InvoiceDetailModal).
 
@@ -72,7 +75,7 @@ Kod:
 - `api/fortnox/sync-customers.ts`: `requireAuth(['admin'])`, inkrementell synk för knappen "Uppdatera nu". Kundgruppssidan anropar den själv vid inläsning om watermark är äldre än 10 min.
 
 Färskhet i tre lager, så "ofas" inte kan uppstå där det spelar roll:
-1. Webhook: spegeln uppdateras inom sekunder när ekonomi lägger upp eller ändrar en kund i Fortnox.
+1. Inkrementell cron var 10:e minut (ersatte webhooken, se RÄTTELSE överst): spegeln ligger högst tio minuter efter Fortnox.
 2. Allokering (fas 4) kör ALLTID en inkrementell synk först och POST:en är sanningen (2000637 vid krock). Även en gammal spegel kostar bara ett retry, aldrig fel nummer.
 3. Nattlig full synk fångar allt annat.
 - `src/components/admin/settings/CustomerGroupsSettings.tsx` + `customerGroupService.ts`: "Senaste" = `max(numeric_value)` i intervallet från spegeln, med "synkad ÅÅÅÅ-MM-DD HH:MM" under; null = "ej synkad" och `current_counter` nedtonat. Kapacitetsstapeln (rad 146) räknar på spegelns max. Kolumnen "Kunder" behålls som portalens antal, lägg gärna Fortnox antal bredvid.
