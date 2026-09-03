@@ -1,6 +1,6 @@
 # Plan: tilläggsstationer med tre betalningsmodeller och två avtalslägen
 
-Status: skriven 2026-09-03, validerad av expertagenter samma dag, implementeras direkt därefter.
+Status: skriven 2026-09-03, validerad av två expertagenter (ekonomi/fakturering respektive fältflöde/RLS/avtalskarta) samma dag, fas 0 till 4 implementerade och pushade till main 2026-09-03. Inget browser-testat.
 
 ## 1. Affärsregler (Christian 2026-09-03)
 
@@ -93,3 +93,20 @@ RPC `apply_contract_addition` v2 höjer årspremien och lägger samtidigt en § 
 - Vikarie-RLS: all synk via SECURITY DEFINER-RPC med rollkontroll.
 - Multisite: stationer ligger på enhetsrader, fakturerande kund är avtalskunden. Räkning via contract_sites.
 - Synth-kunder utan avtalsrad kan inte få per år eller per månad. Formuläret visar bara per kontroll då.
+
+
+## 7. Validering och avvikelser från planen (2026-09-03)
+
+Granskningarna gav 33 fynd. De som ändrade bygget:
+
+- Diffen, cronens täckningsnyckel, samlingsfakturan och Fortnox-täckningen är typmedvetna: nyckel = fakturatyp + periodstart. Ny fakturatyp `equipment_monthly` för per månad, eftersom per år och per månad annars kolliderar på samma periodstart.
+- § 6-raderna fick `billing_start_date` (nästa periodstart vid skapande). Pro rata-raden täcker fram dit, raden tas med i perioder från och med datumet. Ingen dubbeldebitering mellan pro rata och första helårsrad. Pro rata skapas inte alls när periodens faktura fortfarande är redigerbar: då tar den fakturan upp stationerna.
+- Pro rata-raden görs av en SECURITY DEFINER-RPC (`sync_addon_prorata_line`) med egen markör `is_addon_prorata_line`, eftersom vikarier inte kan läsa ärendet. Periodstart räknas i SQL (`contract_next_period_start`).
+- Stationerna fick `addon_contract_id` (sätts av avtalskartan). RPC:n löser annars avtal per enhet i samma ordning som get_contract_candidates. Trigger `addon_station_normalize` håller kolumnerna konsekventa så äldre skrivvägar utan modell inte spricker.
+- Godkänd faktura (ready) vars rader ändras går tillbaka till pending_approval. Cronen byter bara utrustningsrader när övriga rader är oförändrade.
+- Fakturamodalen planerar om bara den aktuella fakturan före sändning och skickar textrader som ren Description. Radtext kapas vid 200 tecken.
+- Befintliga RPC:n `sync_addon_station_line` fick behörighetsvakt. Stationspolicyerna på equipment_placements går på profiles.user_id (7 av 26 profiler hade id skilt från user_id).
+- Inbakat-läget upsertar trappsteget per dag och typ (unik nyckel) och lyfter senare steg med samma belopp.
+- Månadspris avrundas till öre, inte hela kronor (2 348 / 12 = 195,67).
+
+Kvar efter bygget: klicktest av hela kedjan, golvpris på tjänst 144 i standardprislistan (affärsdata), Pulse Rat iQ för larmet på Nytäppan (ej skapad), FEV:s Fortnox 648/744/745/862 importeras som typ equipment i § 7.

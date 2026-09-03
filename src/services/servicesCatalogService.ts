@@ -192,6 +192,7 @@ export class ServiceCatalogService {
         rut_rate_percent: input.rut_rate_percent ?? null,
         is_contract_service: input.is_contract_service ?? false,
         used_for_addon_stations: input.used_for_addon_stations ?? false,
+        used_for_addon_stations_annual: input.used_for_addon_stations_annual ?? false,
       })
       .select().single()
     if (error) {

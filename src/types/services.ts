@@ -40,6 +40,8 @@ export interface Service {
   // (max EN tjänst åt gången, partiellt unikt index i DB).
   // OBS: skild från is_addon_service ("Tilläggstjänst" i prisguiden).
   used_for_addon_stations: boolean
+  /** Bär årspriset för tilläggsstationer (per år, per månad = /12). Max EN tjänst. */
+  used_for_addon_stations_annual?: boolean
   created_at: string
   updated_at: string
 }
@@ -96,6 +98,7 @@ export interface CreateServiceInput {
   rut_rate_percent?: number | null
   is_contract_service?: boolean
   used_for_addon_stations?: boolean
+  used_for_addon_stations_annual?: boolean
 }
 
 export interface UpdateServiceInput {
@@ -116,6 +119,7 @@ export interface UpdateServiceInput {
   rut_rate_percent?: number | null
   is_contract_service?: boolean
   used_for_addon_stations?: boolean
+  used_for_addon_stations_annual?: boolean
 }
 
 export const SERVICE_UNITS = ['st', 'timme', 'dag', 'km', 'm2', 'fp'] as const

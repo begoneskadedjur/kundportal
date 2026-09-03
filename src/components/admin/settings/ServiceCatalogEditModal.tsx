@@ -55,6 +55,7 @@ export default function ServiceCatalogEditModal({
   // Tilläggsstationer: EN tjänst åt gången kan vara rundfaktureringstjänsten.
   // OBS: skild från is_addon_service ("Tilläggstjänst" i prisguiden ovan).
   const [usedForAddonStations, setUsedForAddonStations] = useState(false)
+  const [usedForAddonStationsAnnual, setUsedForAddonStationsAnnual] = useState(false)
   // Automatiska interna kostnader (artikelrader) per station
   const [defaultArticles, setDefaultArticles] = useState<{ article_id: string; quantity_per_unit: number }[]>([])
   const [allArticles, setAllArticles] = useState<Article[]>([])
@@ -81,6 +82,7 @@ export default function ServiceCatalogEditModal({
       setRutRatePercent(service.rut_rate_percent != null ? String(service.rut_rate_percent) : '')
       setIsContractService(service.is_contract_service ?? false)
       setUsedForAddonStations(service.used_for_addon_stations ?? false)
+      setUsedForAddonStationsAnnual(service.used_for_addon_stations_annual ?? false)
       setDefaultArticles([])
       if (service.used_for_addon_stations) {
         AddonStationBillingService.getDefaultArticles(service.id)
@@ -146,6 +148,7 @@ export default function ServiceCatalogEditModal({
           rut_rate_percent: rutRateNum,
           is_contract_service: isContractService,
           used_for_addon_stations: usedForAddonStations,
+          used_for_addon_stations_annual: usedForAddonStationsAnnual,
         }
         await ServiceCatalogService.createService(input)
         toast.success('Tjänst skapad')
@@ -168,6 +171,7 @@ export default function ServiceCatalogEditModal({
           rut_rate_percent: rutRateNum,
           is_contract_service: isContractService,
           used_for_addon_stations: usedForAddonStations,
+          used_for_addon_stations_annual: usedForAddonStationsAnnual,
         }
         await ServiceCatalogService.updateService(service!.id, input)
         // Spara automatiska interna kostnader (rensas när flaggan stängs av)
@@ -439,8 +443,23 @@ export default function ServiceCatalogEditModal({
                     <span className="text-sm font-semibold text-slate-300">Används för tilläggsstationer</span>
                   </label>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Tjänsten förifylls automatiskt vid kontrollrundeavslut med antal kontrollerade
-                    tilläggsstationer. Endast en tjänst åt gången kan ha denna inställning.
+                    Per kontroll: tjänsten förifylls vid kontrollrundeavslut med antal kontrollerade
+                    tilläggsstationer och bär priset per kontroll. Endast en tjänst åt gången kan ha denna inställning.
+                  </p>
+                </div>
+                <div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={usedForAddonStationsAnnual}
+                      onChange={(e) => setUsedForAddonStationsAnnual(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#20c58f] focus:ring-[#20c58f] bg-slate-700 border-slate-600"
+                    />
+                    <span className="text-sm font-semibold text-slate-300">Bär årspriset för tilläggsstationer</span>
+                  </label>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Per år och per månad (årspriset delat med tolv): priset i kundens prislista på denna tjänst
+                    styr § 6-raderna och pro rata vid utsättning. Endast en tjänst åt gången kan ha denna inställning.
                   </p>
                 </div>
 
