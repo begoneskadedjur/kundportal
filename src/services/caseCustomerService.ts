@@ -1,10 +1,14 @@
 // src/services/caseCustomerService.ts
 // Skapar eller återanvänder en customers-rad för privat- eller företagsärenden
-// när ärendet avslutas och ska faktureras. Tilldelar kundnummer via
-// CustomerGroupService.allocateNumber (atomisk RPC).
+// när ärendet avslutas och ska faktureras.
+//
+// Sedan 2026-09-03 (docs/kundnummer-fortnox-plan.md) tilldelas INGET kundnummer
+// här: engångskunder får sitt nummer från Fortnox när fakturan skickas
+// ("Till Fortnox" → api/fortnox/allocate-customer). Raden skapas utan nummer så
+// att tekniker kan avsluta ärenden utan Fortnox-åtkomst. Portalens räknare
+// (allocate_customer_number) används bara av Oneflow-webhooken för avtalskunder.
 
 import { supabase } from '../lib/supabase'
-import { CustomerGroupService } from './customerGroupService'
 
 export interface GetOrCreateCaseCustomerParams {
   caseType: 'private' | 'business'
@@ -19,7 +23,8 @@ export interface GetOrCreateCaseCustomerParams {
 
 export interface CaseCustomerResult {
   customerId: string
-  customerNumber: number
+  /** null tills Fortnox-numret allokerats vid "Till Fortnox" */
+  customerNumber: number | null
   created: boolean
 }
 
@@ -31,14 +36,16 @@ export class CaseCustomerService {
       ? params.personnummer
       : params.organization_number
 
-    // 1. Matcha på befintlig customer via organization_number-kolumnen
-    //    (samma kolumn används för både org_nr och personnummer).
+    // 1. Matcha på befintlig customer via organization_number-kolumnen (samma
+    //    kolumn för org.nr och personnummer). Rad MED nummer föredras, sedan
+    //    äldst. Multisite-enheter (parent_customer_id) blir aldrig engångskund.
     if (lookupKey) {
       const { data: existing, error: lookupError } = await supabase
         .from('customers')
-        .select('id, customer_number')
+        .select('id, customer_number, customer_group_id')
         .eq('organization_number', lookupKey)
-        .not('customer_number', 'is', null)
+        .is('parent_customer_id', null)
+        .order('customer_number', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true })
         .limit(1)
         .maybeSingle()
@@ -47,16 +54,23 @@ export class CaseCustomerService {
         throw new Error(`Kunde inte slå upp befintlig kund: ${lookupError.message}`)
       }
 
-      if (existing?.customer_number) {
+      if (existing) {
+        // Grupp från ärendet fyller på en rad som saknar grupp
+        if (!existing.customer_group_id && params.customerGroupId) {
+          await supabase
+            .from('customers')
+            .update({ customer_group_id: params.customerGroupId })
+            .eq('id', existing.id)
+        }
         return {
           customerId: existing.id,
-          customerNumber: existing.customer_number,
+          customerNumber: existing.customer_number ?? null,
           created: false,
         }
       }
     }
 
-    // 2. Bestäm kundgrupp
+    // 2. Bestäm kundgrupp (styr Fortnox-nummerintervallet vid Till Fortnox)
     let groupId: string | undefined = params.customerGroupId
 
     if (params.caseType === 'private') {
@@ -77,13 +91,11 @@ export class CaseCustomerService {
     }
 
     if (!groupId) {
-      throw new Error('Välj kundgrupp innan ärendet kan avslutas.')
+      throw new Error('Välj kundgrupp för företagskunden (på ärendet) innan kunden kan läggas upp.')
     }
 
-    // 3. Allokera kundnummer atomiskt via RPC
-    const customerNumber = await CustomerGroupService.allocateNumber(groupId)
-
-    // 4. Skapa customer-rad. company_name och contact_email är NOT NULL i schemat.
+    // 3. Skapa customer-rad UTAN kundnummer. company_name och contact_email är
+    //    NOT NULL i schemat.
     const companyName = params.name || 'Okänd kund'
     const contactEmail = params.email || ''
 
@@ -99,7 +111,7 @@ export class CaseCustomerService {
         billing_address: params.address || null,
         organization_number: lookupKey || null,
         customer_group_id: groupId,
-        customer_number: customerNumber,
+        customer_number: null,
         is_active: true,
         billing_active: false,
         source_type: 'manual',
@@ -113,7 +125,7 @@ export class CaseCustomerService {
 
     return {
       customerId: inserted.id,
-      customerNumber,
+      customerNumber: null,
       created: true,
     }
   }

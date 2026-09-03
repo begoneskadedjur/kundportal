@@ -2,6 +2,7 @@
 // Alla anrop går till /api/fortnox/proxy?path=...
 
 import { supabase, getAuthHeaders } from '../lib/supabase'
+import { buildFortnoxCustomerCard, orgDigits } from '../shared/fortnoxCustomerNumbers'
 
 async function fortnoxRequest<T>(
   path: string,
@@ -110,39 +111,9 @@ export interface FortnoxInvoiceDetail extends FortnoxInvoice {
   InvoiceRows: FortnoxInvoiceRow[]
 }
 
-/**
- * Delar upp en svensk enradsadress ("Gatan 1, 123 45 Ort, Sverige") i
- * Fortnox-fälten Address1 / ZipCode / City. Returnerar hela strängen som
- * Address1 om postnummer inte kan hittas.
- */
-export function parseSwedishAddress(address: string | null | undefined): {
-  address1: string | null
-  zipCode: string | null
-  city: string | null
-} {
-  if (!address) return { address1: null, zipCode: null, city: null }
-  const cleaned = address.replace(/,?\s*Sverige\s*$/i, '').trim()
-  const m = cleaned.match(/^(.*?),?\s*(\d{3}\s?\d{2})\s+(.+)$/)
-  if (!m) return { address1: cleaned || null, zipCode: null, city: null }
-  return {
-    address1: m[1].replace(/,\s*$/, '').trim() || null,
-    zipCode: m[2].replace(/\s+/, ' ').trim(),
-    city: m[3].replace(/,\s*$/, '').trim() || null,
-  }
-}
-
-/**
- * Skiljer personnummer från organisationsnummer: i personnummer är
- * månadssiffrorna (position 3-4) 01-12, i org.nr är mittparet alltid >= 20.
- */
-export function isPersonnummer(nr: string | null | undefined): boolean {
-  if (!nr) return false
-  const digits = nr.replace(/\D/g, '')
-  const core = digits.length === 12 ? digits.slice(2) : digits
-  if (core.length !== 10) return false
-  const month = parseInt(core.slice(2, 4), 10)
-  return month >= 1 && month <= 12
-}
+// Adress- och personnummerhjälparna bor i src/shared så servern
+// (allocate-customer) bygger kundkortet exakt som frontend.
+export { parseSwedishAddress, isPersonnummer } from '../shared/fortnoxCustomerNumbers'
 
 export const FortnoxService = {
   // Anslutningsstatus
@@ -240,44 +211,51 @@ export const FortnoxService = {
     show_price_vat_included?: boolean
     // Vår referens — teknikerns namn
     our_reference?: string | null
+    // Opt-in: kräv att befintlig Fortnox-kund på numret har SAMMA org-/personnummer.
+    // Utan flaggan används numret så fort det finns (avtalsflödet, oförändrat).
+    verify_organization_number?: boolean
   }): Promise<string> {
     const customerNumberStr = String(customer.customer_number)
 
     // Försök hämta befintlig kund
+    let existing: FortnoxCustomer | null = null
     try {
-      const existing = await fortnoxRequest<{ Customer: FortnoxCustomer }>(
-        `customers/${customerNumberStr}`
-      )
-      if (existing?.Customer?.CustomerNumber) {
-        return existing.Customer.CustomerNumber
-      }
+      const res = await fortnoxRequest<{ Customer: FortnoxCustomer }>(`customers/${customerNumberStr}`)
+      existing = res?.Customer ?? null
     } catch {
-      // Kund finns inte — skapa ny
+      existing = null // Kund finns inte — skapa ny
     }
 
-    // Härled kundtyp om den inte skickats in
-    const type = customer.customer_type
-      ?? (isPersonnummer(customer.organization_number) ? 'PRIVATE' : 'COMPANY')
+    if (existing?.CustomerNumber) {
+      if (customer.verify_organization_number) {
+        const ours = orgDigits(customer.organization_number)
+        const theirs = orgDigits(existing.OrganisationNumber)
+        if (ours && theirs && ours !== theirs) {
+          throw new Error(
+            `Kundnummer ${customerNumberStr} tillhör "${existing.Name}" (${existing.OrganisationNumber}) i Fortnox, ` +
+            `inte ${customer.company_name}. Rätta kundnumret på kundkortet innan fakturan skickas.`
+          )
+        }
+      }
+      return existing.CustomerNumber
+    }
 
-    // Dela upp fakturaadressen i gata/postnr/ort så Fortnox-kortet blir komplett
-    const addr = parseSwedishAddress(customer.billing_address)
-
-    // Skapa ny kund i Fortnox med vårt kundnummer
+    // Skapa ny kund i Fortnox med vårt kundnummer. Kortet byggs av samma
+    // funktion som serverns allocate-customer (org.nr-format, adressdelning,
+    // betalningsvillkor).
+    const { card } = buildFortnoxCustomerCard({
+      name: customer.company_name,
+      organization_number: customer.organization_number,
+      billing_email: customer.billing_email,
+      billing_address: customer.billing_address,
+      phone: customer.phone,
+      customer_type: customer.customer_type,
+      terms_of_payment: customer.terms_of_payment,
+      show_price_vat_included: customer.show_price_vat_included,
+      our_reference: customer.our_reference,
+    })
     const newCustomer = await fortnoxRequest<{ Customer: FortnoxCustomer }>('customers', 'POST', {
-      Customer: {
-        CustomerNumber: customerNumberStr,
-        Name: customer.company_name,
-        Type: type,
-        ...(customer.organization_number ? { OrganisationNumber: customer.organization_number } : {}),
-        ...(customer.billing_email ? { EmailInvoice: customer.billing_email, Email: customer.billing_email } : {}),
-        ...(addr.address1 ? { Address1: addr.address1 } : {}),
-        ...(addr.zipCode ? { ZipCode: addr.zipCode } : {}),
-        ...(addr.city ? { City: addr.city } : {}),
-        ...(customer.phone ? { Phone1: customer.phone } : {}),
-        ...(customer.terms_of_payment ? { TermsOfPayment: customer.terms_of_payment } : {}),
-        ...(customer.show_price_vat_included != null ? { ShowPriceVATIncluded: customer.show_price_vat_included } : {}),
-        ...(customer.our_reference ? { OurReference: customer.our_reference } : {}),
-      },
+      Customer: { CustomerNumber: customerNumberStr, ...card },
     })
     return newCustomer.Customer.CustomerNumber
   },

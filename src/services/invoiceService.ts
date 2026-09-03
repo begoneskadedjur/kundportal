@@ -87,6 +87,8 @@ export class InvoiceService {
       address?: string
       organization_number?: string
       invoice_marking?: string
+      /** Portalens kundrad (customers.id). Sätts för engångsfakturor sedan 2026-09-03. */
+      customer_id?: string | null
     },
     invoiceType: string = 'case'
   ): Promise<InvoiceWithItems> {
@@ -175,6 +177,7 @@ export class InvoiceService {
         customer_phone: customerInfo.phone || null,
         customer_address: customerInfo.address || null,
         organization_number: customerInfo.organization_number || null,
+        customer_id: customerInfo.customer_id || null,
         subtotal,
         vat_amount,
         total_amount,
@@ -313,6 +316,8 @@ export class InvoiceService {
       address?: string
       organization_number?: string
       invoice_marking?: string
+      /** Portalens kundrad (customers.id). Sätts för engångsfakturor sedan 2026-09-03. */
+      customer_id?: string | null
     }
   ): Promise<InvoiceWithItems> {
     const { data: existing, error: fetchError } = await supabase

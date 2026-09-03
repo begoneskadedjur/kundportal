@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   X,
+  AlertTriangle,
   FileText,
   User,
   Mail,
@@ -43,6 +44,9 @@ import type { CommissionPost } from '../../../types/provision'
 import { FortnoxService } from '../../../services/fortnoxService'
 import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerResolver'
 import { isPersonnummer } from '../../../services/fortnoxService'
+import { FortnoxMirrorService } from '../../../services/fortnoxMirrorService'
+import { CaseCustomerService } from '../../../services/caseCustomerService'
+import { orgDigits, type FortnoxMirrorHit } from '../../../shared/fortnoxCustomerNumbers'
 import { PaymentTermsService, type BillingCategory } from '../../../services/paymentTermsService'
 import type { InvoiceWithItems, InvoiceStatus, InvoiceItem } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
@@ -383,6 +387,12 @@ export default function InvoiceDetailModal({
   const [updating, setUpdating] = useState(false)
   const [approving, setApproving] = useState(false)
   const [sendingToFortnox, setSendingToFortnox] = useState(false)
+  // Flera Fortnox-kunder på samma org.nr (eller bara inaktiva): koordinatorn
+  // väljer i modalen innan utkastet skapas (docs/kundnummer-fortnox-plan.md)
+  const [fortnoxCandidates, setFortnoxCandidates] = useState<{
+    kind: 'multiple' | 'inactive-only'
+    candidates: FortnoxMirrorHit[]
+  } | null>(null)
   const [syncing, setSyncing] = useState(false)
   const [editingDueDate, setEditingDueDate] = useState(false)
   const [dueDateDraft, setDueDateDraft] = useState('')
@@ -841,31 +851,42 @@ export default function InvoiceDetailModal({
     }
   }
 
-  const handleSendToFortnox = async () => {
+  const handleSendToFortnox = async (opts: {
+    chosenCustomerNumber?: string
+    reactivate?: boolean
+    forceNew?: boolean
+  } = {}) => {
     if (!invoice) return
     setSendingToFortnox(true)
     try {
-      // 1. Hämta kundnummer — primärt via fakturans customer_id (exakt rad,
-      // klarar multisite-enheter som delar org.nr), fallback via org.nr för
-      // äldre fakturor utan customer_id. Org.nr-uppslaget är deterministiskt
-      // (äldsta raden med kundnummer) eftersom org.nr inte längre är unikt.
+      // 1. Hitta kundraden och dess Fortnox-nummer. Primärt via fakturans
+      // customer_id (exakt rad, klarar multisite-enheter som delar org.nr),
+      // fallback via org.nr för fakturor utan customer_id. Engångskunder får
+      // sitt nummer först här (allokeras mot Fortnox i steg 1c), så raden
+      // hämtas UTAN krav på nummer: rad med nummer föredras, sedan äldst.
       let customerNumber: number | null = null
+      let customerRowId: string | null = invoice.customer_id ?? null
       if (invoice.customer_id) {
         customerNumber = await resolveFortnoxCustomerNumber(invoice.customer_id)
       }
       if (!customerNumber && invoice.organization_number) {
-        const { data: customerData } = await supabase
+        const { data: customerRow } = await supabase
           .from('customers')
-          .select('customer_number')
+          .select('id, customer_number')
           .eq('organization_number', invoice.organization_number)
-          .not('customer_number', 'is', null)
+          .is('parent_customer_id', null)
+          .order('customer_number', { ascending: true, nullsFirst: false })
           .order('created_at', { ascending: true })
           .limit(1)
           .maybeSingle()
-        customerNumber = (customerData as any)?.customer_number ?? null
+        if (customerRow) {
+          customerRowId = (customerRow as any).id
+          customerNumber = (customerRow as any).customer_number ?? null
+        }
       }
 
-      if (!customerNumber) {
+      const isOneOffInvoice = invoice.case_type === 'private' || invoice.case_type === 'business'
+      if (!customerNumber && !isOneOffInvoice) {
         toast.error('Kunden saknar kundnummer — lägg till det på kundkortet innan du skickar till Fortnox')
         return
       }
@@ -878,6 +899,7 @@ export default function InvoiceDetailModal({
         start_date?: string | null
         primary_assignee_name?: string | null
         invoice_marking?: string | null
+        customer_group_id?: string | null
       } | null = null
       if (invoice.case_id) {
         if (effectiveCaseType === 'contract') {
@@ -899,7 +921,7 @@ export default function InvoiceDetailModal({
         } else if (invoice.case_type === 'business') {
           const { data } = await supabase
             .from('business_cases')
-            .select('case_number, completed_date, start_date, primary_assignee_name, markning_faktura')
+            .select('case_number, completed_date, start_date, primary_assignee_name, markning_faktura, customer_group_id')
             .eq('id', invoice.case_id)
             .maybeSingle()
           if (data) {
@@ -916,6 +938,87 @@ export default function InvoiceDetailModal({
         }
       }
       const technicianName = caseMetaEarly?.primary_assignee_name ?? null
+
+      // 1c-pre. Engångskund MED portalnummer: kontrollera mot Fortnox-spegeln
+      // att numret inte tillhör någon annan (portalens gamla räknare och
+      // Fortnox gled isär, t.ex. portal 10465 = annan person i Fortnox).
+      // Ett bevisat fel nummer släpps så att Fortnox får ge ett nytt.
+      if (customerNumber && isOneOffInvoice && customerRowId) {
+        const ours = orgDigits(invoice.organization_number)
+        if (ours) {
+          const { data: mirrorRow } = await supabase
+            .from('fortnox_customer_numbers')
+            .select('customer_number, name, org_digits')
+            .eq('customer_number', String(customerNumber))
+            .maybeSingle()
+          const theirs = (mirrorRow as any)?.org_digits as string | null | undefined
+          if (mirrorRow && theirs && theirs !== ours) {
+            await supabase.from('customers').update({ customer_number: null }).eq('id', customerRowId)
+            toast(
+              `Kundnummer ${customerNumber} tillhör "${(mirrorRow as any).name}" i Fortnox. Kunden får ett nytt nummer.`,
+              { icon: '⚠️', duration: 8000 }
+            )
+            customerNumber = null
+          }
+        }
+      }
+
+      // 1c. Engångskund utan Fortnox-nummer: se till att kundraden finns och
+      // låt servern hitta/adoptera/skapa Fortnox-kunden med nästa lediga
+      // nummer i kundgruppens intervall (api/fortnox/allocate-customer).
+      // Flera Fortnox-träffar på samma org.nr → koordinatorn väljer i modalen.
+      if (!customerNumber && isOneOffInvoice) {
+        const oneOffType = invoice.case_type as 'private' | 'business'
+        if (!customerRowId) {
+          const created = await CaseCustomerService.getOrCreateCaseCustomer({
+            caseType: oneOffType,
+            name: invoice.customer_name,
+            personnummer: oneOffType === 'private' ? invoice.organization_number : null,
+            organization_number: oneOffType === 'business' ? invoice.organization_number : null,
+            email: invoice.customer_email,
+            phone: invoice.customer_phone,
+            address: invoice.customer_address,
+            customerGroupId: caseMetaEarly?.customer_group_id ?? undefined,
+          })
+          customerRowId = created.customerId
+          customerNumber = created.customerNumber
+        }
+        if (!customerNumber && customerRowId) {
+          const result = await FortnoxMirrorService.allocateCustomer({
+            customerId: customerRowId,
+            invoiceId: invoice.id,
+            groupId: caseMetaEarly?.customer_group_id ?? null,
+            chosenCustomerNumber: opts.chosenCustomerNumber,
+            reactivate: opts.reactivate,
+            forceNew: opts.forceNew,
+            ourReference: technicianName,
+          })
+          if (result.status === 'candidates') {
+            setFortnoxCandidates({ kind: result.kind, candidates: result.candidates })
+            toast(
+              result.kind === 'multiple'
+                ? 'Flera Fortnox-kunder har samma org.nr. Välj vilken fakturan ska gå till.'
+                : 'Kunden finns i Fortnox men är inaktiv. Välj återaktivering eller nytt nummer.',
+              { icon: 'ℹ️', duration: 6000 }
+            )
+            return
+          }
+          setFortnoxCandidates(null)
+          customerNumber = Number(result.customerNumber)
+          for (const w of result.warnings ?? []) toast(w, { icon: '⚠️', duration: 8000 })
+          if (result.status === 'created') {
+            toast.success(`Ny Fortnox-kund ${result.customerNumber}${result.groupName ? ` (${result.groupName})` : ''}`)
+          } else if (result.status === 'reused') {
+            toast.success(`Befintlig Fortnox-kund ${result.customerNumber} används${result.outsideGroup ? ' (utanför vald kundgrupp)' : ''}`)
+          } else if (result.status === 'conflict-adopted') {
+            toast(`Kundnummer ${result.customerNumber} bärs redan av en annan kundrad i portalen. Fakturan kopplades dit.`, { icon: '⚠️', duration: 8000 })
+          }
+        }
+      }
+      if (!customerNumber) {
+        toast.error('Kunden saknar kundnummer — lägg till det på kundkortet innan du skickar till Fortnox')
+        return
+      }
 
       // Fakturamärkningen kan ha lagts till i ärendet EFTER att fakturan
       // skapades - ärendets aktuella värde vinner över fakturans snapshot,
@@ -942,6 +1045,8 @@ export default function InvoiceDetailModal({
         terms_of_payment: isPrivatePerson ? '10' : null,
         show_price_vat_included: isPrivatePerson ? true : undefined,
         our_reference: technicianName,
+        // Engångskunder: numret får aldrig peka på en annan kund i Fortnox
+        verify_organization_number: isOneOffInvoice,
       })
 
       // 2b. Säkerställ att alla artiklar/tjänster finns i Fortnox innan fakturan skickas.
@@ -1294,6 +1399,69 @@ export default function InvoiceDetailModal({
             caseContext={caseContext}
             priceCheck={priceCheck}
           />
+        )}
+
+        {/* Fortnox-kandidater: samma org.nr finns på flera (eller bara inaktiva)
+            Fortnox-kunder. Koordinatorn väljer, aldrig auto-val. */}
+        {invoice && fortnoxCandidates && (
+          <div className="mx-4 mt-3 p-3 bg-slate-800/30 border border-amber-500/40 rounded-xl">
+            <div className="flex items-center gap-1.5 mb-1">
+              <AlertTriangle className="w-4 h-4 text-amber-400" />
+              <span className="text-sm font-semibold text-white">
+                {fortnoxCandidates.kind === 'multiple'
+                  ? 'Flera Fortnox-kunder har detta org.nr'
+                  : 'Kunden finns i Fortnox men är inaktiv'}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 mb-2">
+              {fortnoxCandidates.kind === 'multiple'
+                ? 'Välj vilken Fortnox-kund fakturautkastet ska skapas på. Kundnumret sparas på kundkortet i portalen.'
+                : 'Återaktivera kunden i Fortnox och använd dess nummer, eller skapa en ny kund med nästa lediga nummer i kundgruppen.'}
+            </p>
+            <div className="space-y-2">
+              {fortnoxCandidates.candidates.map(c => (
+                <button
+                  key={c.customer_number}
+                  type="button"
+                  disabled={sendingToFortnox}
+                  onClick={() => handleSendToFortnox({ chosenCustomerNumber: c.customer_number, reactivate: !c.active })}
+                  className="w-full text-left px-3 py-2 rounded-lg border border-slate-700/50 bg-slate-800/20 hover:border-[#20c58f] transition-colors disabled:opacity-50"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <span className="font-mono text-sm text-white">{c.customer_number}</span>
+                      <span className="text-sm text-slate-300 ml-2 truncate">{c.name ?? 'Namn saknas'}</span>
+                    </div>
+                    <span className={`text-xs ${c.active ? 'text-[#20c58f]' : 'text-amber-400'}`}>
+                      {c.active ? 'aktiv' : 'inaktiv, återaktiveras'}
+                    </span>
+                  </div>
+                  {c.organisation_number && (
+                    <div className="text-xs text-slate-500 font-mono">{c.organisation_number}</div>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-2 mt-2 border-t border-slate-700/50">
+              {fortnoxCandidates.kind === 'inactive-only' && (
+                <button
+                  type="button"
+                  disabled={sendingToFortnox}
+                  onClick={() => handleSendToFortnox({ forceNew: true })}
+                  className="text-xs text-[#20c58f] hover:underline disabled:opacity-50"
+                >
+                  Skapa ny Fortnox-kund med nytt nummer
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setFortnoxCandidates(null)}
+                className="text-xs text-slate-400 hover:text-white ml-auto"
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Content — split-view desktop, stacked mobile */}
@@ -2090,7 +2258,7 @@ export default function InvoiceDetailModal({
               )}
               {(invoice.status === 'pending_approval' || invoice.status === 'ready') && (
                 <button
-                  onClick={handleSendToFortnox}
+                  onClick={() => handleSendToFortnox()}
                   disabled={sendingToFortnox || invoice.status === 'pending_approval'}
                   title={invoice.status === 'pending_approval'
                     ? 'Låst tills fakturan godkänts av faktureringsansvarig'

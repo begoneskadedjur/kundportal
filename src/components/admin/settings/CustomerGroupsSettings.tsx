@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus,
@@ -11,27 +11,74 @@ import {
   ToggleRight,
   Hash,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { CustomerGroupService } from '../../../services/customerGroupService'
 import { CustomerGroup } from '../../../types/customerGroups'
+import {
+  FortnoxMirrorService,
+  type CustomerGroupFortnoxStats,
+  type FortnoxMirrorState,
+} from '../../../services/fortnoxMirrorService'
+import { formatSwedishDateTime } from '../../../types/database'
 import { CustomerGroupEditModal } from './CustomerGroupEditModal'
 import Button from '../../ui/Button'
 import toast from 'react-hot-toast'
 
+// Kundgruppssidan speglar Fortnox (docs/kundnummer-fortnox-plan.md, fas 1):
+// "Senaste" = högsta använda kundnummer i Fortnox inom gruppens intervall,
+// hämtat ur spegeln fortnox_customer_numbers. Spegeln hålls färsk av
+// Fortnox-webhooken, en inkrementell synk när sidan öppnas med gammal
+// vattenstämpel, och en nattlig full synk. Portalens egen räknare
+// (current_counter) används bara av Oneflow-avtalskunder och visas nedtonad.
 export function CustomerGroupsSettings() {
   const navigate = useNavigate()
   const [groups, setGroups] = useState<CustomerGroup[]>([])
   const [customerCounts, setCustomerCounts] = useState<Record<string, number>>({})
+  const [fortnoxStats, setFortnoxStats] = useState<Record<string, CustomerGroupFortnoxStats>>({})
+  const [mirrorState, setMirrorState] = useState<FortnoxMirrorState | null>(null)
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [editingGroup, setEditingGroup] = useState<CustomerGroup | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
-  useEffect(() => {
-    loadData()
+  const loadFortnox = useCallback(async () => {
+    try {
+      const [stats, state] = await Promise.all([
+        FortnoxMirrorService.getGroupStats(),
+        FortnoxMirrorService.getState(),
+      ])
+      setFortnoxStats(stats)
+      setMirrorState(state)
+      return state
+    } catch (error) {
+      console.error('Fel vid läsning av Fortnox-spegeln:', error)
+      return null
+    }
   }, [])
 
-  const loadData = async () => {
+  const runSync = useCallback(async (mode: 'incremental' | 'full', silent: boolean) => {
+    setSyncing(true)
+    try {
+      const result = await FortnoxMirrorService.sync(mode)
+      await loadFortnox()
+      if (!silent) {
+        toast.success(
+          mode === 'full'
+            ? `Fortnox-spegeln uppdaterad: ${result.active} aktiva, ${result.inactive} inaktiva, ${result.missing} raderade`
+            : `Fortnox-spegeln uppdaterad (${result.upserted} ändrade kunder)`
+        )
+      }
+    } catch (error) {
+      console.error('Fortnox-synk misslyckades:', error)
+      if (!silent) toast.error(error instanceof Error ? error.message : 'Kunde inte synka mot Fortnox')
+    } finally {
+      setSyncing(false)
+    }
+  }, [loadFortnox])
+
+  const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const allGroups = await CustomerGroupService.getAllGroups()
@@ -45,20 +92,30 @@ export function CustomerGroupsSettings() {
         })
       )
       setCustomerCounts(counts)
+
+      // Fortnox-spegeln: synka tyst om vattenstämpeln är äldre än 10 min
+      const state = await loadFortnox()
+      if (FortnoxMirrorService.isStale(state)) {
+        void runSync(state?.watermark ? 'incremental' : 'full', true)
+      }
     } catch (error) {
       console.error('Fel vid laddning:', error)
       toast.error('Kunde inte ladda kundgrupper')
     } finally {
       setLoading(false)
     }
-  }
+  }, [loadFortnox, runSync])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleToggleActive = async (group: CustomerGroup) => {
     try {
       await CustomerGroupService.updateGroup(group.id, { is_active: !group.is_active })
       toast.success(group.is_active ? 'Kundgrupp inaktiverad' : 'Kundgrupp aktiverad')
       loadData()
-    } catch (error) {
+    } catch {
       toast.error('Kunde inte ändra status')
     }
   }
@@ -87,9 +144,11 @@ export function CustomerGroupsSettings() {
   }
 
   const activeCount = groups.filter(g => g.is_active).length
+  const synced = mirrorState?.watermark ? formatSwedishDateTime(mirrorState.watermark) : null
+  const fortnoxTotal = (mirrorState?.total_active ?? 0) + (mirrorState?.total_inactive ?? 0)
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl mx-auto">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-4 mb-4">
@@ -102,16 +161,48 @@ export function CustomerGroupsSettings() {
           <div>
             <h1 className="text-2xl font-bold text-white">Kundgrupper</h1>
             <p className="text-sm text-slate-400">
-              Hantera kundgrupper och deras nummerserier. {activeCount} aktiva grupper.
+              Nummerserier speglade från Fortnox. {activeCount} aktiva grupper.
             </p>
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>
-            <Plus className="w-4 h-4 mr-1" />
-            Skapa kundgrupp
-          </Button>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-xs text-slate-400 flex items-center gap-2">
+            {syncing ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#20c58f]" />
+                <span>Synkar mot Fortnox...</span>
+              </>
+            ) : synced ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#20c58f]" />
+                <span>
+                  Fortnox synkad {synced}
+                  {fortnoxTotal > 0 && (
+                    <span className="text-slate-500"> · {mirrorState?.total_active ?? 0} aktiva, {mirrorState?.total_inactive ?? 0} inaktiva kunder</span>
+                  )}
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <span>Fortnox-spegeln är inte synkad ännu</span>
+              </>
+            )}
+            {mirrorState?.last_error && !syncing && (
+              <span className="text-amber-400" title={mirrorState.last_error}>· senaste synk misslyckades</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => runSync('incremental', false)} disabled={syncing}>
+              <RefreshCw className={`w-4 h-4 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+              Uppdatera nu
+            </Button>
+            <Button variant="primary" onClick={() => setIsCreateModalOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" />
+              Skapa kundgrupp
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -133,8 +224,8 @@ export function CustomerGroupsSettings() {
               <tr className="border-b border-slate-700/50">
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Kundgrupp</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Serie</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Senaste</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Kunder</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider" title="Högsta använda kundnummer i Fortnox inom serien">Senaste i Fortnox</th>
+                <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider" title="Kunder i Fortnox inom serien / kunder i portalen med gruppen">Kunder</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Kapacitet</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-slate-400 uppercase tracking-wider">Åtgärder</th>
               </tr>
@@ -142,10 +233,16 @@ export function CustomerGroupsSettings() {
             <tbody>
               <AnimatePresence>
                 {groups.map((group) => {
+                  const stats = fortnoxStats[group.id]
+                  const fortnoxMax = stats?.fortnox_max ?? null
+                  // Kapaciteten räknas på det högsta kända numret: Fortnox först,
+                  // portalens räknare som reserv tills spegeln är synkad
+                  const highest = Math.max(fortnoxMax ?? group.series_start - 1, group.current_counter)
                   const capacity = group.series_end - group.series_start + 1
-                  const used = Math.max(0, group.current_counter - group.series_start + 1)
+                  const used = Math.max(0, highest - group.series_start + 1)
                   const percent = capacity > 0 ? (used / capacity) * 100 : 0
                   const isNearFull = percent > 90
+                  const counterAhead = fortnoxMax != null && group.current_counter > fortnoxMax
 
                   return (
                     <motion.tr
@@ -163,8 +260,8 @@ export function CustomerGroupsSettings() {
                           <span className="text-sm font-medium text-white">{group.name}</span>
                           {group.is_private_default && (
                             <span
-                              className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#20c58f]/15 text-[#20c58f] border border-[#20c58f]/30"
-                              title="Privatärenden tilldelas automatiskt nummer från denna grupp"
+                              className="text-[10px] font-semibold uppercase tracking-wider text-[#20c58f]"
+                              title="Privatärenden hamnar automatiskt i denna grupp"
                             >
                               Privat standard
                             </span>
@@ -180,10 +277,23 @@ export function CustomerGroupsSettings() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-sm font-mono text-white">{group.current_counter}</span>
+                        {fortnoxMax != null ? (
+                          <span className="text-sm font-mono text-white">{fortnoxMax}</span>
+                        ) : (
+                          <span className="text-sm font-mono text-slate-500" title="Inga Fortnox-kunder i serien ännu">–</span>
+                        )}
+                        <div
+                          className={`text-[11px] font-mono ${counterAhead ? 'text-amber-400' : 'text-slate-500'}`}
+                          title={counterAhead
+                            ? 'Portalens Oneflow-räknare ligger före Fortnox. Nästa avtalskund får räknarens nummer + 1.'
+                            : 'Portalens Oneflow-räknare (används bara av avtalskunder)'}
+                        >
+                          räknare {group.current_counter}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-sm text-slate-300">{customerCounts[group.id] || 0}</span>
+                        <span className="text-sm text-slate-300">{stats?.fortnox_count ?? 0}</span>
+                        <span className="text-xs text-slate-500"> / {customerCounts[group.id] || 0}</span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">

@@ -29,7 +29,10 @@
     "src/utils/swedishHolidays.ts",
 
     // Delad periodmatematik för årspremiefakturor (generate-continuing-contracts)
-    "src/shared/contractPlanner.ts"
+    "src/shared/contractPlanner.ts",
+
+    // Delade kundnummerregler för Fortnox-spegeln och allokeringen
+    "src/shared/fortnoxCustomerNumbers.ts"
 
     // OBS: vite.config.ts kan inte typkollas här — Vite är ESM-only och detta
     // projekt använder NodeNext utan "type": "module" i package.json.

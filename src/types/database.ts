@@ -378,6 +378,8 @@ export type Database = {
           skadedjur: string | null
           skicka_bokningsbekraftelse: string | null
           org_nr: string | null
+          // Kundgrupp vald vid skapande: styr Fortnox-nummerintervall vid Till Fortnox
+          customer_group_id: string | null
           reklamation: string | null
           e_post_kontaktperson: string | null
           telefon_kontaktperson: string | null

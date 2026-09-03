@@ -47,6 +47,10 @@
     {
       "path": "/api/cron/send-booking-notifications",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-fortnox-customers",
+      "schedule": "15 2 * * *"
     }
   ],
   "rewrites": [

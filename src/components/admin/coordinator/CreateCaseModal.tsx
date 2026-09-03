@@ -19,6 +19,8 @@ import CaseImageSelector, { SelectedImage, uploadSelectedImages } from '../../sh
 import { CaseImageService, CaseImageWithUrl } from '../../../services/caseImageService';
 import { BookingSuggestionList, SingleSuggestion } from '../../shared/BookingSuggestionCard';
 import { CaseNumberService } from '../../../services/caseNumberService';
+import { CustomerGroupService } from '../../../services/customerGroupService';
+import type { CustomerGroup } from '../../../types/customerGroups';
 import { resolveContractCandidates } from '../../../services/contractResolver';
 import type { ContractCandidateInfo } from '../../../services/contractResolver';
 import ContractCandidateSelector from '../../shared/ContractCandidateSelector';
@@ -141,6 +143,16 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   // Sant när adressen i fältet kommer från huvudkontoret för att enheten
   // saknar egen. Styr hjälptexten under fältet.
   const [addressFromParent, setAddressFromParent] = useState(false);
+  // Kundgrupper för engångsjobb företag: gruppen styr vilket Fortnox-
+  // nummerintervall kunden får när fakturan skickas (docs/kundnummer-fortnox-plan.md)
+  const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    CustomerGroupService.getActiveGroups()
+      .then(setCustomerGroups)
+      .catch(() => setCustomerGroups([]));
+  }, [isOpen]);
 
   const handleReset = useCallback(() => {
     setStep('selectType'); setCaseType(null); setFormData({});
@@ -937,6 +949,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     // Företagsnamn krävs för business-ärenden
     if (caseType === 'business' && !formData.company_name?.trim()) {
       return toast.error("Företagsnamn måste vara ifyllt.");
+    }
+
+    // Kundgruppen avgör Fortnox-nummerserien när kunden läggs upp vid fakturering
+    if (caseType === 'business' && !(formData as any).customer_group_id) {
+      return toast.error("Välj kundgrupp för företagskunden.");
     }
 
     if (!formData.start_date || !formData.due_date || !formData.primary_assignee_id) {
@@ -2411,6 +2428,16 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />
                               <Input label="Beställare" name="bestallare" value={formData.bestallare || ''} onChange={handleChange} />
                             </div>
+                            <Select
+                              label="Kundgrupp *"
+                              value={(formData as any).customer_group_id || ''}
+                              onChange={(v) => setFormData(prev => ({ ...prev, customer_group_id: v || null } as any))}
+                              options={customerGroups
+                                .filter(g => !g.is_private_default)
+                                .map(g => ({ value: g.id, label: `${g.name} (${g.series_start}–${g.series_end})` }))}
+                              placeholder="Välj kundgrupp (Fortnox-nummerserie)"
+                              required
+                            />
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />
                               <Input type="email" label="E-post Faktura" name="e_post_faktura" value={formData.e_post_faktura || ''} onChange={handleChange} />

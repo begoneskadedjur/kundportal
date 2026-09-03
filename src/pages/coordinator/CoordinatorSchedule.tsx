@@ -211,7 +211,7 @@ export default function CoordinatorSchedule() {
           id, title, status, priority, start_date, due_date, created_at, updated_at,
           adress, kontaktperson, skadedjur, annat_skadedjur, bestallare, company_name,
           e_post_kontaktperson, telefon_kontaktperson, org_nr, pris,
-          e_post_faktura, markning_faktura,
+          e_post_faktura, markning_faktura, customer_group_id,
           primary_assignee_id, primary_assignee_name, primary_assignee_email,
           secondary_assignee_id, secondary_assignee_name, secondary_assignee_email,
           tertiary_assignee_id, tertiary_assignee_name, tertiary_assignee_email,

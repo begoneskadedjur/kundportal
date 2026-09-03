@@ -183,7 +183,7 @@ export function CustomerGroupEditModal({ isOpen, onClose, onSave, group, existin
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Senaste nummer</label>
+                <label className="block text-xs font-medium text-slate-400 mb-1" title="Portalens egen räknare, används bara av Oneflow-avtalskunder. Engångskunder får numret från Fortnox.">Oneflow-räknare</label>
                 <input
                   type="number"
                   value={currentCounter || ''}

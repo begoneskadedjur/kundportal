@@ -5,6 +5,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { getValidAccessToken } from './refresh'
+import { markMirrorMissing, upsertMirrorFromFortnoxCustomer } from '../_lib/fortnoxCustomerMirror'
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL!,
@@ -29,13 +30,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { Type, EntityId } = req.body || {}
 
-  // Vi bryr oss bara om faktura-händelser
-  if (Type !== 'INVOICE') {
-    return res.status(200).json({ ok: true, skipped: true })
-  }
-
   if (!EntityId) {
     return res.status(400).json({ error: 'Saknar EntityId' })
+  }
+
+  // Kundhändelser (topic customers, create/update) håller Fortnox-spegeln
+  // färsk inom sekunder. Payloaden litas aldrig på: kundkortet hämtas från
+  // API:t. 404 = raderad kund, numret förblir upptaget (missing_since).
+  if (typeof Type === 'string' && Type.toUpperCase().startsWith('CUSTOMER')) {
+    try {
+      const accessToken = await getValidAccessToken()
+      const customerRes = await fetch(`${FORTNOX_API}/customers/${encodeURIComponent(String(EntityId))}`, {
+        headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+      })
+      if (customerRes.status === 404) {
+        await markMirrorMissing(String(EntityId))
+        return res.status(200).json({ ok: true, mirror: 'missing' })
+      }
+      if (!customerRes.ok) {
+        console.error(`Kunde inte hämta Fortnox-kund ${EntityId}: ${customerRes.status}`)
+        return res.status(200).json({ ok: true, skipped: true })
+      }
+      const data = await customerRes.json()
+      if (data?.Customer?.CustomerNumber) {
+        await upsertMirrorFromFortnoxCustomer(data.Customer)
+      }
+      return res.status(200).json({ ok: true, mirror: 'upserted' })
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Okänt fel'
+      console.error('Fortnox kund-webhook fel:', message)
+      return res.status(200).json({ ok: false, error: message })
+    }
+  }
+
+  // Övriga händelser: bara fakturor synkas
+  if (Type !== 'INVOICE') {
+    return res.status(200).json({ ok: true, skipped: true })
   }
 
   try {

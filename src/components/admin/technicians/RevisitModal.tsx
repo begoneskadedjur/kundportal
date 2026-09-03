@@ -285,8 +285,8 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
             ? (caseData.company_name || caseData.kontaktperson || 'Okänd kund')
             : (caseData.kontaktperson || 'Okänd kund')
 
-          // Säkerställ kundnummer (krävs för Fortnox-export)
-          await CaseCustomerService.getOrCreateCaseCustomer({
+          // Säkerställ kundrad (Fortnox-numret allokeras vid Till Fortnox)
+          const caseCustomer = await CaseCustomerService.getOrCreateCaseCustomer({
             caseType: billingCaseType,
             name: customerName,
             personnummer: billingCaseType === 'private' ? caseData.personnummer : null,
@@ -294,6 +294,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
             email: caseData.e_post_kontaktperson,
             phone: caseData.telefon_kontaktperson,
             address: formatAddress(caseData.adress),
+            customerGroupId: billingCaseType === 'business' ? ((caseData as any).customer_group_id ?? undefined) : undefined,
           })
 
           const invoice = await InvoiceService.createInvoiceFromCase(
@@ -306,6 +307,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
               address: formatAddress(caseData.adress),
               organization_number: billingCaseType === 'business' ? caseData.org_nr : caseData.personnummer,
               invoice_marking: caseData.markning_faktura,
+              customer_id: caseCustomer.customerId,
             },
             'partial'
           )

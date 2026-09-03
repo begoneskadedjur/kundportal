@@ -101,6 +101,8 @@ interface TechnicianCase {
   skadedjur?: string;
   org_nr?: string;
   personnummer?: string;
+  // Kundgrupp vald vid skapande (business_cases): styr Fortnox-nummerserien
+  customer_group_id?: string | null;
   material_cost?: number;
   time_spent_minutes?: number;
   work_started_at?: string | null;
@@ -503,6 +505,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [existingCustomerNumber, setExistingCustomerNumber] = useState<number | null>(null)
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
   const [selectedCustomerGroupId, setSelectedCustomerGroupId] = useState<string | null>(null)
+  // Befintlig kundrad för person-/org.nr (kan sakna nummer: Fortnox-numret
+  // tilldelas först när fakturan skickas, docs/kundnummer-fortnox-plan.md)
+  const [existingCustomerId, setExistingCustomerId] = useState<string | null>(null)
   const [hasBillableAmount, setHasBillableAmount] = useState(false)
 
   // Besöksräknare + återbesökshistorik
@@ -828,6 +833,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         newCaseData.personnummer = currentCase.personnummer;
       } else if (currentCase.case_type === 'business') {
         newCaseData.org_nr = currentCase.org_nr;
+        newCaseData.customer_group_id = currentCase.customer_group_id ?? null;
       }
 
       const { data: newCase, error: insertError } = await supabase
@@ -948,8 +954,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             setCommissionPostsLocked(false);
           });
 
+        // Kundgruppen väljs normalt redan när ärendet skapas (CreateCaseModal);
+        // väljaren vid avslut är fallback för äldre ärenden utan grupp
+        setSelectedCustomerGroupId(caseData.customer_group_id ?? null)
+
         // Slå upp befintlig customer för att visa kundnummer + avgöra om
-        // kundgruppsval behöver visas för nya business-kunder
+        // kundgruppsval behöver visas för nya business-kunder. Raden kan
+        // finnas UTAN nummer (numret sätts vid Till Fortnox).
         const lookupKey = caseData.case_type === 'private'
           ? caseData.personnummer
           : caseData.case_type === 'business'
@@ -958,16 +969,19 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         if (lookupKey) {
           supabase
             .from('customers')
-            .select('customer_number')
+            .select('id, customer_number')
             .eq('organization_number', lookupKey)
-            .not('customer_number', 'is', null)
+            .is('parent_customer_id', null)
+            .order('customer_number', { ascending: true, nullsFirst: false })
             .order('created_at', { ascending: true })
             .limit(1)
             .maybeSingle()
             .then(({ data }) => {
+              setExistingCustomerId((data as any)?.id ?? null)
               setExistingCustomerNumber((data as any)?.customer_number ?? null)
             })
         } else {
+          setExistingCustomerId(null)
           setExistingCustomerNumber(null)
         }
       }
@@ -1238,9 +1252,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 billingCaseType
               );
 
+              // Kundraden fakturan ska kopplas till (customers.id). Kundnumret
+              // tilldelas från Fortnox när fakturan skickas.
+              let caseCustomerId: string | null = null;
+
               if (hasBillableAmt) {
-                // Se till att en customers-rad finns med customer_number innan
-                // fakturan skapas — annars kan Fortnox-exporten inte hitta kunden.
+                // Se till att en customers-rad finns innan fakturan skapas.
                 const customerName = billingCaseType === 'business'
                   ? (formData.company_name || currentCase.company_name || formData.bestallare || currentCase.bestallare || formData.kontaktperson || currentCase.kontaktperson || 'Okänd kund')
                   : (formData.kontaktperson || currentCase.kontaktperson || 'Okänd kund');
@@ -1259,8 +1276,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                     email: customerEmail,
                     phone: customerPhone,
                     address: customerAddress,
-                    customerGroupId: billingCaseType === 'business' ? (selectedCustomerGroupId || undefined) : undefined,
+                    customerGroupId: billingCaseType === 'business'
+                      ? (selectedCustomerGroupId || currentCase.customer_group_id || undefined)
+                      : undefined,
                   });
+                  caseCustomerId = result.customerId;
+                  setExistingCustomerId(result.customerId);
                   if (result.customerNumber) {
                     setExistingCustomerNumber(result.customerNumber);
                   }
@@ -1289,7 +1310,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                     : (formData.personnummer || currentCase.personnummer),
                   invoice_marking: billingCaseType === 'business'
                     ? (formData.markning_faktura || currentCase.markning_faktura)
-                    : undefined
+                    : undefined,
+                  customer_id: caseCustomerId,
                 }
               );
               if (wasAlreadyClosed) {
@@ -1514,7 +1536,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     currentCase.case_type === 'business' &&
     formData.status === 'Avslutat' &&
     hasBillableAmount &&
-    existingCustomerNumber === null &&
+    existingCustomerId === null &&
     !selectedCustomerGroupId
 
   const saveDisabled = loading || timeTrackingLoading || needsCustomerGroup
@@ -2190,17 +2212,26 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 </div>
               </CaseModalSection>
             )}
+            {currentCase && existingCustomerId !== null && existingCustomerNumber === null && (
+              <CaseModalSection subtle>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <CheckCircle className="w-4 h-4 text-[#20c58f]" />
+                  <span>Kundrad finns. Kundnumret tilldelas från Fortnox när fakturan skickas.</span>
+                </div>
+              </CaseModalSection>
+            )}
 
-            {/* Kundgruppsval för nya företagskunder (engångskunder) */}
+            {/* Kundgruppsval för företagskunder utan kundrad och utan grupp på ärendet
+                (fallback för äldre ärenden: nya ärenden får gruppen i CreateCaseModal) */}
             {currentCase &&
               currentCase.case_type === 'business' &&
               formData.status === 'Avslutat' &&
               hasBillableAmount &&
-              existingCustomerNumber === null && (
+              existingCustomerId === null && (
               <CaseModalSection icon={Receipt} iconClassName="text-[#20c58f]" title="Kundgrupp (för fakturering)">
                 <div className="space-y-2">
                   <p className="text-xs text-slate-400">
-                    Välj kundgrupp så tilldelas ett kundnummer när ärendet sparas. Krävs för Fortnox-export.
+                    Kundgruppen avgör vilken nummerserie kunden får i Fortnox. Numret tilldelas när fakturan skickas till Fortnox.
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {customerGroups
@@ -2221,8 +2252,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="text-sm font-medium text-white truncate">{group.name}</div>
-                                <div className="text-xs text-slate-500">
-                                  Nästa nr: {group.current_counter} ({group.series_start}–{group.series_end})
+                                <div className="text-xs text-slate-500 font-mono">
+                                  {group.series_start}–{group.series_end}
                                 </div>
                               </div>
                               {isSelected && (
