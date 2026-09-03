@@ -853,7 +853,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       let serviceCode = payload.code ?? null
       let serviceName = payload.name
       let stationTypeId: string | null = null
-      let billingModel: 'premium' | 'per_year' | 'per_round' =
+      let billingModel: 'premium' | 'per_year' | 'per_month' | 'per_round' =
         payload.kind === 'service' ? (zone === 'equipment' ? 'per_year' : 'premium') : payload.kind === 'station_type' ? 'per_round' : zone === 'content' ? 'premium' : 'per_year'
       if (payload.kind === 'station_type') {
         // Tilläggsstation: raden bär tjänsten som är flaggad för tilläggsstationer
@@ -1383,7 +1383,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     }
   }
 
-  const changeLineBillingModel = async (contract: RecordContract, item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_round') => {
+  const changeLineBillingModel = async (contract: RecordContract, item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_month' | 'per_round') => {
     try {
       await ContractScopeService.setLineBillingModel(contract.id, item.id, model, item.service_name ?? item.article_name)
       toast.success(`${item.service_name ?? item.article_name}: ${model === 'per_year' ? 'per styck och år' : model === 'per_round' ? 'per kontrollrunda' : 'ingår i premien'}.`)
@@ -3690,7 +3690,7 @@ interface PaperProps {
   planEntries?: PremiumPlanEntry[]
   onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null }) => void
   /** § 6: byt faktureringsläge på en tjänsterad */
-  onChangeLineModel?: (item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_round') => Promise<void>
+  onChangeLineModel?: (item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_month' | 'per_round') => Promise<void>
   /** § 6: aktiva stationer på avtalets enheter */
   stationCount?: { outdoor: number; indoor: number; addon: number } | null
   /** Öppna väljaren för signeringsdatum */

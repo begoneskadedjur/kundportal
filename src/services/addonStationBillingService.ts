@@ -21,6 +21,7 @@ import { PriceListService } from './priceListService'
 import { VisitService } from './visitService'
 import type { Service, ServiceDefaultArticle } from '../types/services'
 import type { CaseBillingItemWithRelations } from '../types/caseBilling'
+import type { AddonBillingModel, AddonPrices } from '../types/addonStations'
 
 export interface PrefillResult {
   outcome: 'created' | 'updated' | 'already_billed' | 'no_stations' | 'no_service'
@@ -39,6 +40,128 @@ export interface CompleteBillingResult {
 }
 
 export class AddonStationBillingService {
+  /**
+   * Tjänsten som bär ÅRSPRISET för tilläggsstationer (per år, per månad = /12).
+   * Tjänst 43 (used_for_addon_stations) fortsätter betyda pris per kontroll.
+   */
+  static async getAddonAnnualService(): Promise<Service | null> {
+    const { data, error } = await supabase
+      .from('services')
+      .select('*')
+      .eq('used_for_addon_stations_annual', true)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle()
+    if (error) {
+      console.error('[AddonStationBilling] Kunde inte läsa årstjänsten:', error)
+      return null
+    }
+    return (data as Service | null) ?? null
+  }
+
+  /**
+   * Priser för tilläggsstationer hos en kund: per år (årstjänsten), per månad
+   * (årspris/12) och per kontroll (tjänst 43), ur avtalets/kundens prislista.
+   * hasContract via RPC (tekniker kan inte läsa contracts direkt).
+   */
+  static async getAddonPrices(customerId: string): Promise<AddonPrices> {
+    const [annualService, roundService, candidates] = await Promise.all([
+      this.getAddonAnnualService(),
+      this.getAddonStationService(),
+      supabase.rpc('get_contract_candidates', { p_customer_id: customerId }),
+    ])
+    const [annual, round] = await Promise.all([
+      annualService ? PriceListService.getEffectiveServicePrice(annualService.id, customerId) : Promise.resolve(null),
+      roundService ? PriceListService.getEffectiveServicePrice(roundService.id, customerId) : Promise.resolve(null),
+    ])
+    const perYear = annual?.price ?? annualService?.base_price ?? null
+    const perRound = round?.price ?? roundService?.base_price ?? null
+    const hasContract = !candidates.error && Array.isArray(candidates.data) && candidates.data.length > 0
+    return {
+      perYear: perYear != null && perYear > 0 ? Number(perYear) : null,
+      perMonth: perYear != null && perYear > 0 ? Math.round((Number(perYear) / 12) * 100) / 100 : null,
+      perRound: perRound != null && perRound > 0 ? Number(perRound) : null,
+      hasContract,
+    }
+  }
+
+  /**
+   * § 6-rader för per år/per månad-stationer: antal synkas från enhetens
+   * aktiva stationer (SECURITY DEFINER-RPC, vikarie-säker). Sväljer fel.
+   */
+  static async syncAddonPeriodLines(customerId: string): Promise<{ ok: boolean; contractId?: string | null; reason?: string } | null> {
+    try {
+      const annual = await this.getAddonAnnualService()
+      let annualPrice: number | null = null
+      if (annual) {
+        const eff = await PriceListService.getEffectiveServicePrice(annual.id, customerId)
+        annualPrice = eff?.price ?? annual.base_price ?? null
+      }
+      const { data, error } = await supabase.rpc('sync_addon_period_lines', {
+        p_customer_id: customerId,
+        p_contract_id: null,
+        p_annual_price: annualPrice,
+      })
+      if (error) {
+        console.warn('[AddonStationBilling] sync_addon_period_lines fel:', error)
+        return null
+      }
+      const d = data as { ok?: boolean; contract_id?: string | null; reason?: string } | null
+      return { ok: !!d?.ok, contractId: d?.contract_id ?? null, reason: d?.reason }
+    } catch (err) {
+      console.warn('[AddonStationBilling] Periodsynk misslyckades:', err)
+      return null
+    }
+  }
+
+  /**
+   * Pro rata-rad på öppet etableringsärende för per år/per månad-stationer:
+   * årspris × dagar till nästa periodstart / 365 per station. Sväljer fel.
+   */
+  static async syncAddonProrataLine(
+    customerId: string,
+    technicianId?: string | null,
+    technicianName?: string | null
+  ): Promise<{ found: boolean; count?: number; total?: number; row_id?: string | null; covered_by_open_invoice?: string | null; no_contract?: boolean } | null> {
+    try {
+      const annual = await this.getAddonAnnualService()
+      let annualPrice: number | null = null
+      if (annual) {
+        const eff = await PriceListService.getEffectiveServicePrice(annual.id, customerId)
+        annualPrice = eff?.price ?? annual.base_price ?? null
+      }
+      const { data, error } = await supabase.rpc('sync_addon_prorata_line', {
+        p_customer_id: customerId,
+        p_annual_price: annualPrice,
+        p_technician_id: technicianId ?? null,
+        p_technician_name: technicianName ?? null,
+      })
+      if (error) {
+        console.warn('[AddonStationBilling] sync_addon_prorata_line fel:', error)
+        return null
+      }
+      return data as { found: boolean; count?: number; total?: number; row_id?: string | null; covered_by_open_invoice?: string | null; no_contract?: boolean }
+    } catch (err) {
+      console.warn('[AddonStationBilling] Pro rata-synk misslyckades:', err)
+      return null
+    }
+  }
+
+  /** Synk efter utsättning/borttag beroende på stationens modell. */
+  static async syncAfterStationChange(
+    customerId: string,
+    model: AddonBillingModel | null | undefined,
+    technicianId?: string | null,
+    technicianName?: string | null
+  ): Promise<void> {
+    if (!model || model === 'per_round') {
+      await this.syncAddonEstablishmentLine(customerId, technicianId ?? null, technicianName ?? null)
+      return
+    }
+    await this.syncAddonPeriodLines(customerId)
+    await this.syncAddonProrataLine(customerId, technicianId ?? null, technicianName ?? null)
+  }
+
   /**
    * Tjänsten som används för rundfakturering av tilläggsstationer.
    * Slås upp dynamiskt via services.used_for_addon_stations (max en åt gången).
@@ -111,11 +234,11 @@ export class AddonStationBillingService {
     const [outdoorRes, indoorRes] = await Promise.all([
       supabase
         .from('outdoor_station_inspections')
-        .select('station_id, station:equipment_placements!station_id(is_addon)')
+        .select('station_id, station:equipment_placements!station_id(is_addon, addon_billing_model)')
         .eq('session_id', sessionId),
       supabase
         .from('indoor_station_inspections')
-        .select('station_id, station:indoor_stations!station_id(is_addon)')
+        .select('station_id, station:indoor_stations!station_id(is_addon, addon_billing_model)')
         .eq('session_id', sessionId)
     ])
 
@@ -126,10 +249,12 @@ export class AddonStationBillingService {
     const outdoorRows = outdoorRes.data || []
     const indoorRows = indoorRes.data || []
 
-    // PostgREST kan returnera joinen som objekt eller en-elements-array
+    // PostgREST kan returnera joinen som objekt eller en-elements-array.
+    // Bara per kontroll-stationer debiteras i rundan; per år/månad har egna flöden.
     const rowIsAddon = (station: unknown): boolean => {
       const s = Array.isArray(station) ? station[0] : station
-      return (s as { is_addon?: boolean } | null)?.is_addon === true
+      const st = s as { is_addon?: boolean; addon_billing_model?: string | null } | null
+      return st?.is_addon === true && (st.addon_billing_model ?? 'per_round') === 'per_round'
     }
 
     // Dubbletter kan förekomma (känd brist: ingen DB-unik på station+session) —
@@ -153,7 +278,8 @@ export class AddonStationBillingService {
   }
 
   /**
-   * Aktiva tilläggsstationer hos en kund (utomhus + inomhus via planritningar).
+   * Aktiva tilläggsstationer PER KONTROLL hos en kund (utomhus + inomhus via
+   * planritningar). Per år/månad räknas aldrig här.
    */
   static async countActiveAddonStations(customerId: string): Promise<number> {
     const [outdoorRes, indoorRes] = await Promise.all([
@@ -162,13 +288,15 @@ export class AddonStationBillingService {
         .select('id', { count: 'exact', head: true })
         .eq('customer_id', customerId)
         .eq('status', 'active')
-        .eq('is_addon', true),
+        .eq('is_addon', true)
+        .eq('addon_billing_model', 'per_round'),
       supabase
         .from('indoor_stations')
         .select('id, floor_plan:floor_plans!inner(customer_id)', { count: 'exact', head: true })
         .eq('floor_plan.customer_id', customerId)
         .eq('status', 'active')
         .eq('is_addon', true)
+        .eq('addon_billing_model', 'per_round')
     ])
 
     return (outdoorRes.count || 0) + (indoorRes.count || 0)

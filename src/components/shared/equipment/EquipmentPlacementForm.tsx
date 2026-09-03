@@ -1,4 +1,6 @@
 // src/components/shared/equipment/EquipmentPlacementForm.tsx - Formulär för att skapa/redigera utrustning
+import { AddonModelPicker } from './AddonModelPicker'
+import { defaultAddonBillingModel, type AddonBillingModel, type AddonPrices } from '../../../types/addonStations'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -79,6 +81,11 @@ interface EquipmentPlacementFormProps {
   // Kopiera från föregående station: preparat + mängd + märkning följer med
   initialPreparation?: { id: string; quantity: number | null; unit: PreparationUnit } | null
   initialIsAddon?: boolean
+  /** Kopierad modell från föregående station i batchen */
+  initialAddonBillingModel?: AddonBillingModel | null
+  /** Priser ur kundens prislista (laddas av föräldern) */
+  addonPrices?: AddonPrices | null
+  addonPricesLoading?: boolean
   // Befintliga stationer att visa på kartan
   existingStations?: ExistingStation[]
   // Kontrollhistorik
@@ -93,6 +100,8 @@ export interface FormData {
   comment: string
   status: EquipmentStatus
   is_addon: boolean
+  /** Betalningsmodell för tilläggsstation (null när is_addon är false) */
+  addon_billing_model: AddonBillingModel | null
   photo?: File | null
   preparation_id?: string | null
   preparation_quantity?: number | null
@@ -121,6 +130,9 @@ export function EquipmentPlacementForm({
   autoShowMap = false,
   initialPreparation = null,
   initialIsAddon = false,
+  initialAddonBillingModel = null,
+  addonPrices = null,
+  addonPricesLoading = false,
   existingStations,
   inspections = []
 }: EquipmentPlacementFormProps) {
@@ -232,6 +244,11 @@ export function EquipmentPlacementForm({
     comment: existingEquipment?.comment || '',
     status: existingEquipment?.status || 'active',
     is_addon: existingEquipment ? (existingEquipment.is_addon === true) : initialIsAddon,
+    addon_billing_model: existingEquipment
+      ? (existingEquipment.is_addon === true ? (existingEquipment.addon_billing_model ?? 'per_round') : null)
+      : initialIsAddon
+        ? (initialAddonBillingModel ?? defaultAddonBillingModel(addonPrices))
+        : null,
     photo: null,
     // Kopierat från föregående station i batch-flödet (samma stationstyp per definition)
     preparation_id: !existingEquipment && initialPreparation ? initialPreparation.id : null,
@@ -256,7 +273,7 @@ export function EquipmentPlacementForm({
   }
 
   const clearCopiedValues = () => {
-    setFormData(prev => ({ ...prev, preparation_id: null, preparation_quantity: null, is_addon: false }))
+    setFormData(prev => ({ ...prev, preparation_id: null, preparation_quantity: null, is_addon: false, addon_billing_model: null }))
     setShowCopiedHint(false)
   }
 
@@ -646,14 +663,28 @@ export function EquipmentPlacementForm({
         <input
           type="checkbox"
           checked={formData.is_addon}
-          onChange={(e) => setFormData(prev => ({ ...prev, is_addon: e.target.checked }))}
+          onChange={(e) =>
+            setFormData(prev => ({
+              ...prev,
+              is_addon: e.target.checked,
+              addon_billing_model: e.target.checked ? (prev.addon_billing_model ?? defaultAddonBillingModel(addonPrices)) : null,
+            }))
+          }
           className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f]"
         />
-        <span>
+        <span className="flex-1 min-w-0">
           <span className="block text-sm font-medium text-slate-200">Tillägg utöver avtal</span>
           <span className="block text-xs text-slate-400 mt-0.5">
-            Tilläggsstationer debiteras etablering och per kontrollrunda, och ingår inte i avtalets årspremie
+            Stationen ingår inte i avtalets årspremie. Välj hur den betalas: priserna kommer från kundens prislista.
           </span>
+          {formData.is_addon && (
+            <AddonModelPicker
+              value={formData.addon_billing_model}
+              onChange={(m) => setFormData(prev => ({ ...prev, addon_billing_model: m }))}
+              prices={addonPrices}
+              loading={addonPricesLoading}
+            />
+          )}
         </span>
       </label>
 

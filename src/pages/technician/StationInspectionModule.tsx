@@ -128,6 +128,7 @@ interface StationData {
   equipment_type?: string | null
   station_type?: string | null
   is_addon?: boolean
+  addon_billing_model?: 'per_year' | 'per_month' | 'per_round' | null
   // Preparat satt vid utplacering — förvälj i kontrollformuläret
   preparation_id?: string | null
   status: string
@@ -1303,8 +1304,9 @@ export default function StationInspectionModule() {
     if (!session) return
 
     // Avslutsvakt: aktiva tilläggsstationer som inte kontrollerats i rundan
+    // Bara per kontroll-stationer påverkar rundans fakturering
     const uninspectedAddons = [...outdoorStations, ...indoorStations].filter(
-      s => s.is_addon === true && s.status === 'active' && !inspectedStationIds.has(s.id)
+      s => s.is_addon === true && (s.addon_billing_model ?? 'per_round') === 'per_round' && s.status === 'active' && !inspectedStationIds.has(s.id)
     )
     if (uninspectedAddons.length > 0) {
       const proceed = window.confirm(
@@ -2887,7 +2889,7 @@ export default function StationInspectionModule() {
                   <span>
                     <span className="block text-sm font-medium text-slate-200">Hämta upp stationen efter kontrollen</span>
                     <span className="block text-xs text-slate-400 mt-0.5">
-                      Tilläggsstationen markeras Borttagen när kontrollen sparas. Den faktureras en sista gång i denna runda och slutar sedan räknas.
+                      Tilläggsstationen markeras Borttagen när kontrollen sparas. Per kontroll faktureras den en sista gång i denna runda; per år eller månad slutar den räknas vid nästa debitering.
                     </span>
                   </span>
                 </label>

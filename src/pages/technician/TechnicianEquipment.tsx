@@ -40,6 +40,7 @@ import { CasePreparationService } from '../../services/casePreparationService'
 import type { PreparationUnit } from '../../types/casePreparations'
 import { CaseBillingService } from '../../services/caseBillingService'
 import { AddonStationBillingService } from '../../services/addonStationBillingService'
+import type { AddonBillingModel, AddonPrices } from '../../types/addonStations'
 import { PriceListService } from '../../services/priceListService'
 import { toLocalISOStringWithOffset } from '../../utils/dateHelpers'
 
@@ -126,6 +127,21 @@ export default function TechnicianEquipment() {
   // Kopiera från föregående station: preparat + mängd + märkning följer med i batchen
   const [lastPreparation, setLastPreparation] = useState<{ id: string; quantity: number | null; unit: PreparationUnit } | null>(null)
   const [lastIsAddon, setLastIsAddon] = useState(false)
+  const [lastAddonModel, setLastAddonModel] = useState<AddonBillingModel | null>(null)
+  // Priser för tilläggsstationer ur kundens prislista (laddas per kund i batchen)
+  const [addonPrices, setAddonPrices] = useState<AddonPrices | null>(null)
+  const [addonPricesLoading, setAddonPricesLoading] = useState(false)
+  useEffect(() => {
+    if (!wizardCustomerId) { setAddonPrices(null); return }
+    let cancelled = false
+    setAddonPricesLoading(true)
+    AddonStationBillingService.getAddonPrices(wizardCustomerId)
+      .then((p) => { if (!cancelled) setAddonPrices(p) })
+      .catch(() => { if (!cancelled) setAddonPrices(null) })
+      .finally(() => { if (!cancelled) setAddonPricesLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizardCustomerId])
 
   // Recurring schedule prompt
   const [showSchedulePrompt, setShowSchedulePrompt] = useState(false)
@@ -326,7 +342,8 @@ export default function TechnicianEquipment() {
           longitude: formData.longitude,
           comment: formData.comment || null,
           status: formData.status,
-          is_addon: formData.is_addon
+          is_addon: formData.is_addon,
+          addon_billing_model: formData.is_addon ? (formData.addon_billing_model ?? 'per_round') : null
         })
 
         if (!result.success) {
@@ -377,6 +394,7 @@ export default function TechnicianEquipment() {
           comment: formData.comment || null,
           status: 'active',
           is_addon: formData.is_addon,
+          addon_billing_model: formData.is_addon ? (formData.addon_billing_model ?? 'per_round') : null,
           // Preparat sparas även på stationen — kontrollflödet förväljer det
           preparation_id: formData.preparation_id || null,
           preparation_quantity: formData.preparation_quantity ?? null,
@@ -438,8 +456,9 @@ export default function TechnicianEquipment() {
         // vikarie-säker, atomär, hittar ärendet själv). Ekonomi-fliken
         // speglar alltid verkligheten; "Färdig" blir en ren bekräftelse.
         if (formData.is_addon) {
-          await AddonStationBillingService.syncAddonEstablishmentLine(
+          await AddonStationBillingService.syncAfterStationChange(
             customerId,
+            formData.addon_billing_model,
             technicianId || null,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (profile as any)?.full_name || profile?.email || null
@@ -473,6 +492,7 @@ export default function TechnicianEquipment() {
             : null
         )
         setLastIsAddon(formData.is_addon)
+        setLastAddonModel(formData.is_addon ? formData.addon_billing_model : null)
         setShowSuccessState(true)
         setEditingEquipment(null)
         setPreviewPosition(null)
@@ -526,8 +546,9 @@ export default function TechnicianEquipment() {
       // Synka NER tilläggsraden på öppet etableringsärende när en
       // tilläggsstation tas bort under pågående etablering
       if (deleteConfirm.equipment.is_addon) {
-        await AddonStationBillingService.syncAddonEstablishmentLine(
+        await AddonStationBillingService.syncAfterStationChange(
           deleteConfirm.equipment.customer_id,
+          deleteConfirm.equipment.addon_billing_model ?? 'per_round',
           technicianId || null,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (profile as any)?.full_name || profile?.email || null
@@ -675,6 +696,14 @@ export default function TechnicianEquipment() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (profile as any)?.full_name || profile?.email || null
       )
+      // Per år/månad: § 6-rader på avtalet + pro rata-rad på ärendet
+      await AddonStationBillingService.syncAddonPeriodLines(customerId)
+      await AddonStationBillingService.syncAddonProrataLine(
+        customerId,
+        technicianId || null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (profile as any)?.full_name || profile?.email || null
+      )
       if (sync?.open_count && sync.open_count > 1) {
         toast('Obs: kunden har flera öppna etableringsärenden — kontrollera att rätt ärende stängs', { icon: '⚠️', duration: 8000 })
       }
@@ -699,7 +728,7 @@ export default function TechnicianEquipment() {
       // (namnmatchning träffar t.ex. "Avetablering avtal")
       const addonRow = serviceRows.find(i => i.is_addon_station_line === true)
       addonItemId = addonRow?.id || null
-      addonCount = sync?.count ?? addonRow?.quantity ?? 0
+      addonCount = await AddonStationBillingService.countStationsPlacedSince(customerId, openCase.created_at, true)
       quantityDraft = addonRow?.quantity ?? 0
       const rowPrice = addonRow ? (addonRow.discounted_price ?? addonRow.unit_price) : 0
       priceDraft = rowPrice > 0 ? rowPrice : listPrice
@@ -1141,6 +1170,9 @@ export default function TechnicianEquipment() {
                         autoShowMap={lastUsedMap}
                         initialPreparation={lastPreparation}
                         initialIsAddon={lastIsAddon}
+                        initialAddonBillingModel={lastAddonModel}
+                        addonPrices={addonPrices}
+                        addonPricesLoading={addonPricesLoading}
                         existingStations={customerExistingStations}
                         inspections={editingEquipment ? outdoorInspections : []}
                         onSubmit={handleFormSubmit}

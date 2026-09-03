@@ -28,6 +28,7 @@ import { FloorPlanService, ALLOWED_FLOOR_PLAN_TYPES } from '../../services/floor
 import { IndoorStationService } from '../../services/indoorStationService'
 import { CasePreparationService } from '../../services/casePreparationService'
 import { AddonStationBillingService } from '../../services/addonStationBillingService'
+import type { AddonBillingModel, AddonPrices } from '../../types/addonStations'
 import { supabase } from '../../lib/supabase'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
@@ -52,6 +53,7 @@ interface LastPlacementValues {
   typeData: StationType | null
   preparation: { id: string; quantity: number | null; unit: PreparationUnit } | null
   isAddon: boolean
+  addonBillingModel: AddonBillingModel | null
 }
 
 type WizardStep = 1 | 2 | 3
@@ -111,6 +113,19 @@ export function AddStationWizard({
   const [selectedStationType, setSelectedStationType] = useState<IndoorStationType | null>(null)
   const [selectedTypeData, setSelectedTypeData] = useState<StationType | null>(null)
   const [lastPlacement, setLastPlacement] = useState<LastPlacementValues | null>(null)
+  const [addonPrices, setAddonPrices] = useState<AddonPrices | null>(null)
+  const [addonPricesLoading, setAddonPricesLoading] = useState(false)
+  useEffect(() => {
+    if (!selectedCustomerId) { setAddonPrices(null); return }
+    let cancelled = false
+    setAddonPricesLoading(true)
+    AddonStationBillingService.getAddonPrices(selectedCustomerId)
+      .then((p) => { if (!cancelled) setAddonPrices(p) })
+      .catch(() => { if (!cancelled) setAddonPrices(null) })
+      .finally(() => { if (!cancelled) setAddonPricesLoading(false) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCustomerId])
   const [copyFromLast, setCopyFromLast] = useState(false)
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -379,8 +394,9 @@ export function AddStationWizard({
         // Bakgrundssynka tilläggsraden (RPC — vikarie-säker, atomär,
         // hittar öppet etableringsärende själv)
         if (input.is_addon) {
-          await AddonStationBillingService.syncAddonEstablishmentLine(
+          await AddonStationBillingService.syncAfterStationChange(
             selectedCustomerId,
+            input.addon_billing_model ?? 'per_round',
             technicianId || profile?.technician_id || null,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (profile as any)?.full_name || profile?.email || null
@@ -396,7 +412,8 @@ export function AddStationWizard({
         preparation: input.preparation_id
           ? { id: input.preparation_id, quantity: input.preparation_quantity ?? null, unit: input.preparation_unit || 'g' }
           : null,
-        isAddon: input.is_addon === true
+        isAddon: input.is_addon === true,
+        addonBillingModel: input.is_addon === true ? (input.addon_billing_model ?? 'per_round') : null
       })
       setShowStationForm(false)
       resetPlacementMode()
@@ -1029,6 +1046,9 @@ export function AddStationWizard({
                             initialStationType={selectedStationType || undefined}
                             initialPreparation={copyFromLast ? lastPlacement?.preparation ?? null : null}
                             initialIsAddon={copyFromLast ? lastPlacement?.isAddon ?? false : false}
+                            initialAddonBillingModel={copyFromLast ? lastPlacement?.addonBillingModel ?? null : null}
+                            addonPrices={addonPrices}
+                            addonPricesLoading={addonPricesLoading}
                             onSubmit={handleCreateStation}
                             onCancel={() => { setShowStationForm(false); resetPlacementMode() }}
                             isSubmitting={isSubmitting}

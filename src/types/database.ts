@@ -1855,6 +1855,12 @@ export interface EquipmentPlacement {
   status_updated_by: string | null
   // Tillägg utöver avtal: styr rundfakturering och borttagsregler, inte livscykeln
   is_addon?: boolean
+  /** Tilläggsstation: per_year | per_month | per_round (valt vid utsättning) */
+  addon_billing_model?: 'per_year' | 'per_month' | 'per_round' | null
+  /** Per år/månad: included (i premien, § 7) eller separate (egna fakturor, § 6); null = ej beslutat */
+  addon_contract_mode?: 'included' | 'separate' | null
+  /** Avtalet stationen kopplats till från avtalskartan */
+  addon_contract_id?: string | null
   // Preparat i stationen (satt vid utplacering) — kontrollflödet förväljer detta
   preparation_id?: string | null
   preparation_quantity?: number | null

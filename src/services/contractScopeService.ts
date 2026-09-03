@@ -1476,7 +1476,7 @@ export class ContractScopeService {
   static async setLineBillingModel(
     contractId: string,
     itemId: string,
-    model: 'premium' | 'per_year' | 'per_round',
+    model: 'premium' | 'per_year' | 'per_month' | 'per_round',
     label?: string | null
   ): Promise<void> {
     const { data, error } = await supabase
@@ -1489,13 +1489,15 @@ export class ContractScopeService {
       .select('id')
     if (error) throw new Error(`Kunde inte ändra faktureringsläge: ${error.message}`)
     if (!data || data.length === 0) throw new Error('Raden kunde inte uppdateras (0 rader)')
-    const labels = { premium: 'ingår i premien', per_year: 'per styck och år', per_round: 'per kontrollrunda' }
+    const labels = { premium: 'ingår i premien', per_year: 'per styck och år', per_month: 'per styck och månad', per_round: 'per kontrollrunda' }
     await this.logEvent(contractId, {
       event_type: 'billing',
       title: `${label ?? 'Rad'}: ${labels[model]}`,
       detail:
         model === 'per_year'
           ? 'Egen rad på årspremiefakturan'
+          : model === 'per_month'
+            ? 'Egen månadsfaktura'
           : model === 'per_round'
             ? 'Debiteras när kontrollrundan avslutas'
             : 'Ingår i årspremien',
@@ -1695,7 +1697,7 @@ export class ContractScopeService {
       unitPrice: number
       quantity?: number
       vatRate?: number
-      billingModel: 'premium' | 'per_year' | 'per_round'
+      billingModel: 'premium' | 'per_year' | 'per_month' | 'per_round'
       stationTypeId?: string | null
       note?: string | null
     }

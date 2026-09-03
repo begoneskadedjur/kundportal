@@ -211,6 +211,9 @@ export interface IndoorStation {
   calculated_status: 'ok' | 'warning' | 'critical'; // Status baserad på mätningar vs tröskelvärden
   // Tillägg utöver avtal: styr rundfakturering och borttagsregler, inte livscykeln
   is_addon?: boolean;
+  addon_billing_model?: 'per_year' | 'per_month' | 'per_round' | null;
+  addon_contract_mode?: 'included' | 'separate' | null;
+  addon_contract_id?: string | null;
   // Preparat i stationen (satt vid utplacering) — kontrollflödet förväljer detta
   preparation_id?: string | null;
   preparation_quantity?: number | null;
@@ -343,6 +346,7 @@ export interface CreateIndoorStationInput {
   comment?: string;
   photo?: File;
   is_addon?: boolean;
+  addon_billing_model?: 'per_year' | 'per_month' | 'per_round' | null;
   preparation_id?: string | null;
   preparation_quantity?: number | null;
   preparation_unit?: PreparationUnit;
@@ -358,6 +362,9 @@ export interface UpdateIndoorStationInput {
   comment?: string;
   status?: IndoorStationStatus;
   is_addon?: boolean;
+  addon_billing_model?: 'per_year' | 'per_month' | 'per_round' | null;
+  addon_contract_mode?: 'included' | 'separate' | null;
+  addon_contract_id?: string | null;
   photo?: File;
 }
 

@@ -1,6 +1,8 @@
 // src/components/shared/indoor/IndoorStationForm.tsx
 // Formulär för att skapa/redigera inomhusstationer
 
+import { AddonModelPicker } from '../equipment/AddonModelPicker'
+import { defaultAddonBillingModel, type AddonBillingModel, type AddonPrices } from '../../../types/addonStations'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn, FlaskConical, Check } from 'lucide-react'
 import ImageLightbox from '../ImageLightbox'
@@ -47,6 +49,9 @@ interface IndoorStationFormProps {
   // Kopiera från föregående station: preparat + mängd + märkning följer med
   initialPreparation?: { id: string; quantity: number | null; unit: PreparationUnit } | null
   initialIsAddon?: boolean
+  initialAddonBillingModel?: AddonBillingModel | null
+  addonPrices?: AddonPrices | null
+  addonPricesLoading?: boolean
   onSubmit: (input: CreateIndoorStationInput | UpdateIndoorStationInput) => Promise<void>
   onCancel: () => void
   onDelete?: () => void
@@ -62,6 +67,9 @@ export function IndoorStationForm({
   initialStationType,
   initialPreparation = null,
   initialIsAddon = false,
+  initialAddonBillingModel = null,
+  addonPrices = null,
+  addonPricesLoading = false,
   onSubmit,
   onCancel,
   onDelete,
@@ -103,6 +111,13 @@ export function IndoorStationForm({
   // Tillägg utöver avtal + "kopierat"-hint
   const [isAddon, setIsAddon] = useState(
     isEditing ? (existingStation?.is_addon === true) : initialIsAddon
+  )
+  const [addonBillingModel, setAddonBillingModel] = useState<AddonBillingModel | null>(
+    isEditing
+      ? (existingStation?.is_addon === true ? (existingStation?.addon_billing_model ?? 'per_round') : null)
+      : initialIsAddon
+        ? (initialAddonBillingModel ?? defaultAddonBillingModel(addonPrices))
+        : null
   )
   const [showCopiedHint, setShowCopiedHint] = useState(
     !isEditing && (!!initialPreparation || initialIsAddon)
@@ -270,6 +285,7 @@ export function IndoorStationForm({
           comment: comment.trim() || undefined,
           status,
           is_addon: isAddon,
+          addon_billing_model: isAddon ? (addonBillingModel ?? 'per_round') : null,
           photo: selectedPhoto || undefined
         }
         await onSubmit(updateInput)
@@ -283,6 +299,7 @@ export function IndoorStationForm({
           location_description: locationDescription.trim() || undefined,
           comment: comment.trim() || undefined,
           is_addon: isAddon,
+          addon_billing_model: isAddon ? (addonBillingModel ?? 'per_round') : null,
           photo: selectedPhoto || undefined,
           preparation_id: preparationId || undefined,
           preparation_quantity: preparationQuantity || undefined,
@@ -409,14 +426,25 @@ export function IndoorStationForm({
         <input
           type="checkbox"
           checked={isAddon}
-          onChange={(e) => setIsAddon(e.target.checked)}
+          onChange={(e) => {
+            setIsAddon(e.target.checked)
+            setAddonBillingModel(e.target.checked ? (addonBillingModel ?? defaultAddonBillingModel(addonPrices)) : null)
+          }}
           className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f]"
         />
-        <span>
+        <span className="flex-1 min-w-0">
           <span className="block text-sm font-medium text-slate-200">Tillägg utöver avtal</span>
           <span className="block text-xs text-slate-400 mt-0.5">
-            Tilläggsstationer debiteras etablering och per kontrollrunda, och ingår inte i avtalets årspremie
+            Stationen ingår inte i avtalets årspremie. Välj hur den betalas: priserna kommer från kundens prislista.
           </span>
+          {isAddon && (
+            <AddonModelPicker
+              value={addonBillingModel}
+              onChange={setAddonBillingModel}
+              prices={addonPrices}
+              loading={addonPricesLoading}
+            />
+          )}
         </span>
       </label>
 

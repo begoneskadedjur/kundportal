@@ -14,17 +14,18 @@ import type { CaseBillingItemWithRelations } from '../../../../types/caseBilling
 import { formatKr } from '../../../../hooks/useCustomerRecord'
 import { PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk } from './paperInk'
 
-type BillingModel = 'premium' | 'per_year' | 'per_round'
+type BillingModel = 'premium' | 'per_year' | 'per_month' | 'per_round'
 
 const MODEL_LABEL: Record<BillingModel, string> = {
   premium: 'ingår i premien',
   per_year: 'per styck och år',
+  per_month: 'per styck och månad',
   per_round: 'per kontrollrunda',
 }
 
 export function billingModelOf(item: CaseBillingItemWithRelations): BillingModel {
   const m = (item as unknown as { billing_model?: string | null }).billing_model
-  return m === 'per_year' || m === 'per_round' ? m : 'premium'
+  return m === 'per_year' || m === 'per_month' || m === 'per_round' ? m : 'premium'
 }
 
 interface Props {
@@ -144,7 +145,11 @@ export default function ContractEquipmentSection({ services, articles, loading, 
                   </span>
                 )}
                 <span className="font-bold tabular-nums" style={{ color: ink.primary }}>
-                  {model === 'per_year' ? `${formatKr(Number(s.unit_price))} · ${formatKr(Number(s.total_price))}/år` : formatKr(Number(s.unit_price))}
+                  {model === 'per_year'
+                    ? `${formatKr(Number(s.unit_price))} · ${formatKr(Number(s.total_price))}/år`
+                    : model === 'per_month'
+                      ? `${formatKr(Number(s.unit_price))} · ${formatKr(Number(s.total_price))}/mån`
+                      : formatKr(Number(s.unit_price))}
                 </span>
               </div>
             )
