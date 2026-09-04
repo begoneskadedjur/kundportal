@@ -1135,7 +1135,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           : customer;
         const customerName = customerForTitle?.company_name || 'Okänd kund';
 
-        const { data: createdEstCase, error } = await supabase.from('cases').insert([{
+        const { error } = await supabase.from('cases').insert([{
           customer_id: actualCustomerId!,
           contract_id: persistedContractId ?? null,
           site_id: customer?.is_multisite ? selectedSiteId : null,
@@ -1161,36 +1161,16 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           work_order_number: (formData as any).work_order_number?.trim() || null,
           work_object: (formData as any).work_object?.trim() || null,
           room_number: (formData as any).room_number?.trim() || null,
-        }]).select('id').single();
+        }]);
         if (error) throw error;
 
-        // Auto-populera billing-items från kontraktets billing-items (case_id = contract_id)
-        if (createdEstCase?.id && persistedContractId) {
-          const { data: contractItems } = await supabase
-            .from('case_billing_items')
-            .select('item_type, service_id, article_id, service_name, article_name, quantity, unit_price, discounted_price, total_price, mapped_service_id')
-            .eq('case_id', persistedContractId);
-
-          if (contractItems && contractItems.length > 0) {
-            await supabase.from('case_billing_items').insert(
-              contractItems.map((ci: any) => ({
-                case_id: createdEstCase.id,
-                case_type: 'contract',
-                item_type: ci.item_type,
-                service_id: ci.service_id,
-                article_id: ci.article_id,
-                service_name: ci.service_name,
-                article_name: ci.article_name,
-                quantity: ci.quantity,
-                unit_price: ci.unit_price,
-                discounted_price: ci.discounted_price,
-                total_price: ci.total_price,
-                mapped_service_id: ci.mapped_service_id,
-                status: 'pending',
-              }))
-            );
-          }
-        }
+        // Inga fakturarader kopieras från avtalet (beslut 2026-09-04). En
+        // etablering är en del av avtalet och premien styrs av avtalskartan;
+        // avtalets § 4-rader på ärendet fakturerades som merförsäljning vid
+        // "Färdig med etablering" (HSB Tallen INV-202609-0317, Kiab Fortnox 889).
+        // Vad som ska etableras skrivs i beskrivningen till teknikern.
+        // Etableringskostnad 0 kr auto-skapas av tjänsteväljaren, tilläggs-
+        // stationer får sin egen rad från utplaceringsflödet.
 
         toast.success(`Etablering inbokad för ${customerName}!`);
 

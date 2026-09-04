@@ -716,7 +716,9 @@ export default function TechnicianEquipment() {
       }
 
       const items = await CaseBillingService.getCaseBillingItems(openCase.id, 'contract')
-      const serviceRows = items.filter(i => i.item_type === 'service')
+      // Rader som ingår i avtalet (§ 4, covered_by_contract) faktureras aldrig
+      // av avslutskedjan — de ska inte heller visas eller räknas i sammanfattningen
+      const serviceRows = items.filter(i => i.item_type === 'service' && !i.covered_by_contract)
       serviceItems = serviceRows.map(i => ({
         id: i.id,
         name: i.service_name || i.article_name || 'Tjänst',
