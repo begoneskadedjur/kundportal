@@ -1528,7 +1528,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       toast.success(
         `${r.indexed} avtal indexerade med ${input.percent.toLocaleString('sv-SE')} % från ${formatDateSv(input.effectiveFrom)}${
           r.skipped ? ` (${r.skipped} utan premie hoppades över)` : ''
-        }. Planera fakturorna för att räkna om beloppen.`
+        }. Klicka "Planera fakturor" och uppdatera de planerade fakturorna, annars träder indexeringen inte i kraft på dem.`
       )
       setIndexAllOpen(false)
       await onChanged()
@@ -3509,7 +3509,7 @@ function IndexAllModal({
       <div className="p-4 space-y-3">
         <p className="text-xs text-slate-400">
           Ett steg i varje avtals premietrappa med samma procent och datum. Nuvarande summa {formatKr(annualSum)}/år
-          {preview != null ? `, blir ${formatKr(preview)}/år` : ''}. Beloppen når fakturorna när du planerar om dem.
+          {preview != null ? `, blir ${formatKr(preview)}/år` : ''}. Indexeringen träder i kraft på fakturorna först när du sedan klickar "Planera fakturor" och uppdaterar de planerade fakturorna. Skickade fakturor rörs aldrig.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <label className="text-xs text-slate-400">
