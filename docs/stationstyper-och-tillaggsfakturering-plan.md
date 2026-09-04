@@ -156,13 +156,17 @@ Ordning, via systemet:
 
 **Tjänst 43 saknas i GNU-prislistan.** Får någon FEV-station `per_round` blir priset 0 kr. Lägg in tjänst 43 eller blockera per_round för FEV.
 
-## 11. Golvpriser
+## 11. När tjänstepriset saknas
 
-**Ingen tjänst i katalogen har `base_price`** — inte bara 144 och 79, utan även 43, 135, 36 och 9. Kunder utan prislisterad får därför 0 kr överallt, inte bara på tilläggsstationer.
+Detta gäller **tjänster**, inte artiklar. Artiklarnas inköpspris (`articles.default_price`) är ifyllt på de flesta artiklar och sköts på /admin/artiklar. Kundpriserna sätts per prislista på /admin/prislistor. Båda flödena fungerar och ska inte ändras.
 
-Två åtgärder, båda behövs:
-- **Affärsdata:** lägg 144, 79 och 43 i standardprislistan med golvpriser (Christian sätter beloppen).
-- **Kod:** åtgärden i 3.1, så att ett misslyckat prisuppslag blir ett blockerande fel i stället för en tyst nolla.
+Tjänstepriset för en tilläggsstation kommer från kundens prislista: GNU 2026/60 har tjänst 144 på 2 348 kr och 79 på 1 686 kr. Det gäller bara den kund som har listan.
+
+Problemet uppstår för en kund **utan** prislisterad för tjänsten. Ingen tjänst i katalogen har `base_price` ifylld (144, 79, 43, 135, 36 och 9 är alla null), så uppslaget returnerar ingenting. I dag skriver `sync_addon_period_lines` då `unit_price = 0`, och `contractPlanner.ts:287` filtrerar bort nollraden tyst. Stationen faktureras aldrig och felet syns ingenstans.
+
+**Åtgärden är i koden, inte i affärsdatan.** Se 3.1: RPC:n ska vägra skapa raden och returnera `price_missing` med stationstypens namn, så att avtalskartan och utsättningsformuläret visar "pris saknas för Mekanisk fälla" som blockerande fel. Då upptäcks luckan direkt och priset sätts i kundens prislista på vanligt sätt.
+
+Golvpriser i standardprislistan är alltså **inte nödvändiga** för att det här ska bli rätt. De kan läggas till senare som bekvämlighet, men de är inte en förutsättning för leveransen och ingen behöver fylla i något innan bygget startar.
 
 ## 12. Vad som ströks ur den ursprungliga planen
 
