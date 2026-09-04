@@ -173,6 +173,15 @@ export interface ContractBillingAggregate {
   external_total: number
   internal_cost: number
   margin_pct: number | null
+  /**
+   * Kostnaden delad: arbetstid förbrukas vid utförandet, utrustning står
+   * kvar hos kunden och används år efter år. Att summera dem och jämföra
+   * med ETT års intäkt ger missvisande minus på avtal med dyra stationer.
+   */
+  labour_cost: number
+  equipment_cost: number
+  /** År tills utrustningen är återbetald av årsintäkten. Null när utrustning saknas. */
+  payback_years: number | null
 }
 
 // ========== Tidsserier för strategisk pipeline-analys ==========
@@ -268,6 +277,17 @@ export interface PipelineTimeSeries {
   available_service_groups: string[]
 }
 
+/**
+ * Arbetstid är förbrukad i samma stund den utförs och ska alltid belasta
+ * året den utfördes. Utrustning (fällor, stationer) står kvar hos kunden
+ * och tjänas in över flera år — avtalen är rullande, så intäkten fortsätter
+ * tills kunden säger upp. Att summera de två och jämföra med ETT års intäkt
+ * är det som får avtal med dyra stationer att visa minus i onödan.
+ */
+function isLabourArticle(name: string): boolean {
+  return /arbetstid|restid|timpris/i.test(name || '')
+}
+
 // Service-klass för contract-hantering
 export class ContractService {
 
@@ -281,7 +301,7 @@ export class ContractService {
     const { data, error } = await supabase
       .from('case_billing_items')
       .select(
-        'id, case_id, item_type, service_name, article_name, quantity, unit_price, total_price, mapped_service_id'
+        'id, case_id, item_type, service_name, article_name, article_id, quantity, unit_price, total_price, mapped_service_id'
       )
       .in('case_id', contractIds)
       .eq('case_type', 'contract')
@@ -321,6 +341,20 @@ export class ContractService {
           ? Math.round(((external_total - internal_cost) / external_total) * 100)
           : null
 
+      // Arbetstid är förbrukad när den utförts; utrustningen står kvar och
+      // tjänas in över flera år. Avtalen är rullande (renewal_mode rolling),
+      // så intäkten fortsätter tills kunden säger upp.
+      const labour_cost = articles
+        .filter((x) => isLabourArticle(x.name))
+        .reduce((s, x) => s + x.total_price, 0)
+      const equipment_cost = articles
+        .filter((x) => !isLabourArticle(x.name))
+        .reduce((s, x) => s + x.total_price, 0)
+      const payback_years =
+        equipment_cost > 0 && external_total > 0
+          ? Math.round((equipment_cost / external_total) * 100) / 100
+          : null
+
       result.set(contractId, {
         contractId,
         services,
@@ -328,6 +362,9 @@ export class ContractService {
         external_total,
         internal_cost,
         margin_pct,
+        labour_cost,
+        equipment_cost,
+        payback_years,
       })
     })
 

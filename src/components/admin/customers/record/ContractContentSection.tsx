@@ -171,6 +171,16 @@ export default function ContractContentSection({
   const revenue = summary?.services.subtotal ?? 0
   const cost = summary?.articles.total_purchase_cost ?? 0
 
+  // Utrustning står kvar hos kunden och tjänas in över flera år, medan
+  // avtalsvärdet är ett ÅRSbelopp. Att dra hela inköpet från ett års intäkt
+  // ger minus på avtal med dyra stationer trots att affären är bra. Arbetstid
+  // hör till året den utfördes och räknas därför inte som utrustning.
+  const isLabour = (n: string | null | undefined) => /arbetstid|restid|timpris/i.test(n || '')
+  const equipmentCost = articles
+    .filter((a) => !isLabour(a.article_name))
+    .reduce((s, a) => s + (Number(a.total_price) || 0), 0)
+  const paybackYears = equipmentCost > 0 && revenue > 0 ? equipmentCost / revenue : null
+
   return (
     <>
       {/* § 4 Tjänster i avtalet */}
@@ -434,7 +444,36 @@ export default function ContractContentSection({
               <span className="text-[10.5px] font-normal text-[#8a9099]"> marginal</span>
             </span>
           </div>
-          {margin !== null && settings && margin < settings.min_margin_percent && (
+          {/* Utrustningen är en engångsutgift mot en återkommande intäkt.
+              Utan den här raden ser ett bra avtal ut som en förlust år 1. */}
+          {paybackYears !== null && (
+            <div className="mt-2 pt-2 border-t border-dashed border-[#c9cdd3] font-sans">
+              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
+                <span className="text-[11.5px] text-[#5d6672]">
+                  Utrustning{' '}
+                  <b className="text-[12px] text-[#262e38] tabular-nums">{formatKr(equipmentCost)}</b>
+                  <span className="text-[10.5px] text-[#8a9099]"> engångs</span>
+                </span>
+                <span className="text-[11.5px] text-[#5d6672]">
+                  Återbetald efter{' '}
+                  <b className="text-[12px] text-[#262e38] tabular-nums">
+                    {paybackYears.toLocaleString('sv-SE', { maximumFractionDigits: 1 })} år
+                  </b>
+                </span>
+                <span className="text-[11.5px] text-[#5d6672]">
+                  Därefter{' '}
+                  <b className="text-[12px] tabular-nums" style={{ color: '#2f7d5f' }}>
+                    {formatKr(revenue)}/år
+                  </b>
+                </span>
+              </div>
+              <p className="mt-1 text-[10.5px] italic text-[#8a9099]">
+                Utrustningen står kvar hos kunden. Marginalen ovan drar hela inköpet från ett års
+                avtalsvärde och blir därför låg första året.
+              </p>
+            </div>
+          )}
+          {margin !== null && settings && margin < settings.min_margin_percent && paybackYears === null && (
             <div
               className="mt-1.5 font-sans text-[11px] px-2.5 py-1.5 rounded"
               style={{ background: 'rgba(155,53,53,.08)', color: '#9b3535' }}
