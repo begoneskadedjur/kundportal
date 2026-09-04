@@ -280,6 +280,7 @@ export class IndoorStationService {
           comment: input.comment || null,
           is_addon: input.is_addon === true,
           addon_billing_model: input.is_addon === true ? (input.addon_billing_model ?? 'per_round') : null,
+          article_id: input.article_id ?? null,
           // Preparat sparas även på stationen — kontrollflödet förväljer det
           preparation_id: input.preparation_id || null,
           preparation_quantity: input.preparation_quantity ?? null,

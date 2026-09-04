@@ -2,7 +2,13 @@
 // Formulär för att skapa/redigera inomhusstationer
 
 import { AddonModelPicker } from '../equipment/AddonModelPicker'
-import { defaultAddonBillingModel, type AddonBillingModel, type AddonPrices } from '../../../types/addonStations'
+import {
+  defaultAddonBillingModel,
+  type AddonBillingModel,
+  type AddonPrices,
+  type StationTypeArticle,
+} from '../../../types/addonStations'
+import { AddonStationBillingService } from '../../../services/addonStationBillingService'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn, FlaskConical, Check } from 'lucide-react'
 import ImageLightbox from '../ImageLightbox'
@@ -52,6 +58,8 @@ interface IndoorStationFormProps {
   initialAddonBillingModel?: AddonBillingModel | null
   addonPrices?: AddonPrices | null
   addonPricesLoading?: boolean
+  /** Produkt från föregående station i batch-flödet */
+  initialArticleId?: string | null
   onSubmit: (input: CreateIndoorStationInput | UpdateIndoorStationInput) => Promise<void>
   onCancel: () => void
   onDelete?: () => void
@@ -70,6 +78,7 @@ export function IndoorStationForm({
   initialAddonBillingModel = null,
   addonPrices = null,
   addonPricesLoading = false,
+  initialArticleId = null,
   onSubmit,
   onCancel,
   onDelete,
@@ -122,6 +131,11 @@ export function IndoorStationForm({
   const [showCopiedHint, setShowCopiedHint] = useState(
     !isEditing && (!!initialPreparation || initialIsAddon)
   )
+  // Produkten som placeras ut: intern kostnad, syns aldrig för kund
+  const [articleId, setArticleId] = useState<string | null>(
+    existingStation?.article_id ?? initialArticleId ?? null
+  )
+  const [typeArticles, setTypeArticles] = useState<StationTypeArticle[]>([])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -286,6 +300,7 @@ export function IndoorStationForm({
           status,
           is_addon: isAddon,
           addon_billing_model: isAddon ? (addonBillingModel ?? 'per_round') : null,
+          article_id: articleId,
           photo: selectedPhoto || undefined
         }
         await onSubmit(updateInput)
@@ -300,6 +315,7 @@ export function IndoorStationForm({
           comment: comment.trim() || undefined,
           is_addon: isAddon,
           addon_billing_model: isAddon ? (addonBillingModel ?? 'per_round') : null,
+          article_id: articleId,
           photo: selectedPhoto || undefined,
           preparation_id: preparationId || undefined,
           preparation_quantity: preparationQuantity || undefined,
@@ -311,6 +327,26 @@ export function IndoorStationForm({
       setError(err instanceof Error ? err.message : 'Ett fel uppstod')
     }
   }
+
+  // Produkterna för vald stationstyp. Förvalet fylls i så teknikern
+  // slipper välja när typen bara har en produkt.
+  useEffect(() => {
+    const matched = dynamicStationTypes.find(t => t.code === stationType)
+    if (!matched?.id) { setTypeArticles([]); return }
+    let cancelled = false
+    AddonStationBillingService.getStationTypeArticles(matched.id)
+      .then(list => {
+        if (cancelled) return
+        setTypeArticles(list)
+        setArticleId(prev => {
+          if (prev && list.some(a => a.articleId === prev)) return prev
+          const fallback = list.find(a => a.isDefault) ?? (list.length === 1 ? list[0] : null)
+          return fallback ? fallback.articleId : null
+        })
+      })
+      .catch(() => { if (!cancelled) setTypeArticles([]) })
+    return () => { cancelled = true }
+  }, [stationType, dynamicStationTypes])
 
   // Aktuell typ-config för formulärvalidering
   const currentTypeConfig = getCurrentTypeConfig(stationType)
@@ -418,6 +454,28 @@ export function IndoorStationForm({
           >
             Rensa
           </button>
+        </div>
+      )}
+
+      {/* Produkt: intern kostnad, kunden ser bara stationstypen */}
+      {typeArticles.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Produkt {typeArticles.length > 1 && <span className="text-slate-500 font-normal">(intern)</span>}
+          </label>
+          <select
+            value={articleId ?? ''}
+            onChange={(e) => setArticleId(e.target.value || null)}
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+          >
+            <option value="">Ingen produkt vald</option>
+            {typeArticles.map(a => (
+              <option key={a.articleId} value={a.articleId}>{a.name}</option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-500 mt-1">
+            Används för intern kostnad och marginal. Kunden ser bara stationstypen.
+          </p>
         </div>
       )}
 

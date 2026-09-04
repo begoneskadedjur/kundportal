@@ -124,11 +124,12 @@ async function loadSources(contractId: string): Promise<Sources> {
   // från utplacerade stationer innan planen räknas (service role)
   try {
     await supabase.rpc('sync_addon_period_lines', { p_customer_id: null, p_contract_id: contractId, p_annual_price: null })
+    await supabase.rpc('sync_addon_article_lines', { p_contract_id: contractId })
   } catch (err) {
     console.warn('Antalssynk av tilläggsstationer misslyckades:', err)
   }
   const [{ data: contractRow }, { data: steps }, { data: items }] = await Promise.all([
-    supabase.from('contracts').select('equipment_invoice_mode').eq('id', contractId).maybeSingle(),
+    supabase.from('contracts').select('customer_id, customers!contracts_customer_id_fkey(addon_invoice_mode)').eq('id', contractId).maybeSingle(),
     supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
     supabase
       .from('case_billing_items')
@@ -155,7 +156,13 @@ async function loadSources(contractId: string): Promise<Sources> {
   type StepRow = { effective_from: string; annual_value: number | string; event_type?: string | null; note?: string | null }
   const rows = (items ?? []) as Item[]
   return {
-    equipmentInvoiceMode: (contractRow as { equipment_invoice_mode?: string | null } | null)?.equipment_invoice_mode === 'separate' ? 'separate' : 'with_premium',
+    // Läget bor på kunden sedan 2026-09-04 (contracts.equipment_invoice_mode
+    // är deprecated och läses inte längre).
+    equipmentInvoiceMode:
+      (contractRow as { customers?: { addon_invoice_mode?: string | null } | null } | null)?.customers
+        ?.addon_invoice_mode === 'separate_per_contract'
+        ? 'separate'
+        : 'with_premium',
     additionNotes: ((steps ?? []) as StepRow[])
       .filter((s) => s.event_type === 'addition' && !!s.note)
       .map((s) => ({ effective_from: s.effective_from, note: s.note as string })),

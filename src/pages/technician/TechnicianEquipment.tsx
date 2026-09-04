@@ -128,6 +128,8 @@ export default function TechnicianEquipment() {
   const [lastPreparation, setLastPreparation] = useState<{ id: string; quantity: number | null; unit: PreparationUnit } | null>(null)
   const [lastIsAddon, setLastIsAddon] = useState(false)
   const [lastAddonModel, setLastAddonModel] = useState<AddonBillingModel | null>(null)
+  // Produkten följer med i batchen (samma stationstyp per definition)
+  const [lastArticleId, setLastArticleId] = useState<string | null>(null)
   // Priser för tilläggsstationer ur kundens prislista (laddas per kund i batchen)
   const [addonPrices, setAddonPrices] = useState<AddonPrices | null>(null)
   const [addonPricesLoading, setAddonPricesLoading] = useState(false)
@@ -135,12 +137,24 @@ export default function TechnicianEquipment() {
     if (!wizardCustomerId) { setAddonPrices(null); return }
     let cancelled = false
     setAddonPricesLoading(true)
-    AddonStationBillingService.getAddonPrices(wizardCustomerId)
-      .then((p) => { if (!cancelled) setAddonPrices(p) })
+    const run = async () => {
+      let typeId: string | null = null
+      if (lastEquipmentType) {
+        const { data } = await supabase
+          .from('station_types')
+          .select('id')
+          .eq('code', lastEquipmentType)
+          .maybeSingle()
+        typeId = data?.id ?? null
+      }
+      const p = await AddonStationBillingService.getAddonPrices(wizardCustomerId, typeId)
+      if (!cancelled) setAddonPrices(p)
+    }
+    run()
       .catch(() => { if (!cancelled) setAddonPrices(null) })
       .finally(() => { if (!cancelled) setAddonPricesLoading(false) })
     return () => { cancelled = true }
-  }, [wizardCustomerId])
+  }, [wizardCustomerId, lastEquipmentType])
 
   // Recurring schedule prompt
   const [showSchedulePrompt, setShowSchedulePrompt] = useState(false)
@@ -313,6 +327,7 @@ export default function TechnicianEquipment() {
     setLastUsedMap(false)
     setLastPreparation(null)
     setLastIsAddon(false)
+    setLastArticleId(null)
     setIsFormOpen(true)
     // För inomhus hanteras det i modalen via IndoorEquipmentView
   }
@@ -342,7 +357,8 @@ export default function TechnicianEquipment() {
           comment: formData.comment || null,
           status: formData.status,
           is_addon: formData.is_addon,
-          addon_billing_model: formData.is_addon ? (formData.addon_billing_model ?? 'per_round') : null
+          addon_billing_model: formData.is_addon ? (formData.addon_billing_model ?? 'per_round') : null,
+          article_id: formData.article_id ?? null
         })
 
         if (!result.success) {
@@ -358,6 +374,21 @@ export default function TechnicianEquipment() {
           if (!photoResult.success) {
             console.error('Foto kunde inte laddas upp:', photoResult.error)
           }
+        }
+
+        // Redigering ändrar tilläggsläget lika ofta som utsättningen gör:
+        // markeras en befintlig station som tillägg i efterhand måste § 6
+        // och pro rata följa med, annars ligger den osynlig till nästa synk.
+        if (formData.is_addon || editingEquipment.is_addon) {
+          const missing = await AddonStationBillingService.syncAfterStationChange(
+            customerId,
+            formData.is_addon ? formData.addon_billing_model : editingEquipment.addon_billing_model,
+            technicianId || null,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (profile as any)?.full_name || profile?.email || null
+          )
+          const warning = AddonStationBillingService.priceMissingMessage(missing)
+          if (warning) toast.error(warning, { duration: 8000 })
         }
 
         toast.success('Utrustning uppdaterad')
@@ -394,6 +425,7 @@ export default function TechnicianEquipment() {
           status: 'active',
           is_addon: formData.is_addon,
           addon_billing_model: formData.is_addon ? (formData.addon_billing_model ?? 'per_round') : null,
+          article_id: formData.article_id ?? null,
           // Preparat sparas även på stationen — kontrollflödet förväljer det
           preparation_id: formData.preparation_id || null,
           preparation_quantity: formData.preparation_quantity ?? null,
@@ -455,13 +487,15 @@ export default function TechnicianEquipment() {
         // vikarie-säker, atomär, hittar ärendet själv). Ekonomi-fliken
         // speglar alltid verkligheten; "Färdig" blir en ren bekräftelse.
         if (formData.is_addon) {
-          await AddonStationBillingService.syncAfterStationChange(
+          const missing = await AddonStationBillingService.syncAfterStationChange(
             customerId,
             formData.addon_billing_model,
             technicianId || null,
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (profile as any)?.full_name || profile?.email || null
           )
+          const warning = AddonStationBillingService.priceMissingMessage(missing)
+          if (warning) toast.error(warning, { duration: 8000 })
         }
 
         toast.success('Utrustning placerad!')
@@ -492,6 +526,7 @@ export default function TechnicianEquipment() {
         )
         setLastIsAddon(formData.is_addon)
         setLastAddonModel(formData.is_addon ? formData.addon_billing_model : null)
+        setLastArticleId(formData.article_id ?? null)
         setShowSuccessState(true)
         setEditingEquipment(null)
         setPreviewPosition(null)
@@ -903,6 +938,7 @@ export default function TechnicianEquipment() {
     setLastUsedMap(false)
     setLastPreparation(null)
     setLastIsAddon(false)
+    setLastArticleId(null)
 
     if (finishedCustomerId) {
       await finishEstablishment(finishedCustomerId, finishedCustomerName)
@@ -1172,6 +1208,7 @@ export default function TechnicianEquipment() {
                         initialPreparation={lastPreparation}
                         initialIsAddon={lastIsAddon}
                         initialAddonBillingModel={lastAddonModel}
+                        initialArticleId={lastArticleId}
                         addonPrices={addonPrices}
                         addonPricesLoading={addonPricesLoading}
                         existingStations={customerExistingStations}

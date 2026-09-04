@@ -1534,9 +1534,27 @@ export class ContractScopeService {
     })
   }
 
-  /** § 6: var per år-rader faktureras, på premiefakturan eller på egna fakturor. */
+  /**
+   * § 6: var per år-rader faktureras, på premiefakturan eller på egna fakturor.
+   *
+   * Läget bor på KUNDEN sedan 2026-09-04: en kund med flera avtal ska inte
+   * kunna hamna i ett läge där hälften av tilläggen ligger på premien och
+   * hälften på egna fakturor. `contracts.equipment_invoice_mode` är
+   * deprecated och skrivs inte längre.
+   */
   static async setEquipmentInvoiceMode(contractId: string, mode: 'with_premium' | 'separate'): Promise<void> {
-    const { error } = await supabase.from('contracts').update({ equipment_invoice_mode: mode }).eq('id', contractId)
+    const { data: contract, error: readError } = await supabase
+      .from('contracts')
+      .select('customer_id')
+      .eq('id', contractId)
+      .maybeSingle()
+    if (readError || !contract?.customer_id) {
+      throw new Error(`Kunde inte hitta avtalets kund: ${readError?.message ?? 'okänt fel'}`)
+    }
+    const { error } = await supabase
+      .from('customers')
+      .update({ addon_invoice_mode: mode === 'separate' ? 'separate_per_contract' : 'with_contract' })
+      .eq('id', contract.customer_id)
     if (error) throw new Error(`Kunde inte ändra faktureringsläge: ${error.message}`)
     await this.logEvent(contractId, {
       event_type: 'billing',

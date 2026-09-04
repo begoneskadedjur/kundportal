@@ -15,6 +15,8 @@ import { useGpsLocation } from '../../../hooks/useGpsLocation'
 import { MapLocationPicker, type ExistingStation } from './MapLocationPicker'
 import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
+import { AddonStationBillingService } from '../../../services/addonStationBillingService'
+import type { StationTypeArticle } from '../../../types/addonStations'
 import { CasePreparationService } from '../../../services/casePreparationService'
 import type { Preparation } from '../../../types/preparations'
 import type { PreparationUnit } from '../../../types/casePreparations'
@@ -86,6 +88,8 @@ interface EquipmentPlacementFormProps {
   /** Priser ur kundens prislista (laddas av föräldern) */
   addonPrices?: AddonPrices | null
   addonPricesLoading?: boolean
+  /** Produkt från föregående station i batch-flödet */
+  initialArticleId?: string | null
   // Befintliga stationer att visa på kartan
   existingStations?: ExistingStation[]
   // Kontrollhistorik
@@ -102,6 +106,8 @@ export interface FormData {
   is_addon: boolean
   /** Betalningsmodell för tilläggsstation (null när is_addon är false) */
   addon_billing_model: AddonBillingModel | null
+  /** Produkten som placeras ut. Intern kostnad, visas aldrig för kund. */
+  article_id?: string | null
   photo?: File | null
   preparation_id?: string | null
   preparation_quantity?: number | null
@@ -133,6 +139,7 @@ export function EquipmentPlacementForm({
   initialAddonBillingModel = null,
   addonPrices = null,
   addonPricesLoading = false,
+  initialArticleId = null,
   existingStations,
   inspections = []
 }: EquipmentPlacementFormProps) {
@@ -145,6 +152,9 @@ export function EquipmentPlacementForm({
 
   // Preparat-state
   const [availablePreparations, setAvailablePreparations] = useState<Preparation[]>([])
+  // Produkterna teknikern kan välja mellan för vald stationstyp (intern kostnad)
+  const [typeArticles, setTypeArticles] = useState<StationTypeArticle[]>([])
+  const [typeArticlesLoading, setTypeArticlesLoading] = useState(false)
   const [stationHasPreparations, setStationHasPreparations] = useState(false)
   const [loadingPreparations, setLoadingPreparations] = useState(false)
 
@@ -250,6 +260,7 @@ export function EquipmentPlacementForm({
         ? (initialAddonBillingModel ?? defaultAddonBillingModel(addonPrices))
         : null,
     photo: null,
+    article_id: existingEquipment?.article_id ?? (!existingEquipment ? initialArticleId ?? null : null),
     // Kopierat från föregående station i batch-flödet (samma stationstyp per definition)
     preparation_id: !existingEquipment && initialPreparation ? initialPreparation.id : null,
     preparation_quantity: !existingEquipment && initialPreparation ? initialPreparation.quantity : null,
@@ -267,13 +278,13 @@ export function EquipmentPlacementForm({
   const handleTypeSelect = (code: EquipmentType) => {
     setFormData(prev => {
       if (prev.equipment_type === code) return prev
-      return { ...prev, equipment_type: code, preparation_id: null, preparation_quantity: null }
+      return { ...prev, equipment_type: code, preparation_id: null, preparation_quantity: null, article_id: null }
     })
     setShowCopiedHint(false)
   }
 
   const clearCopiedValues = () => {
-    setFormData(prev => ({ ...prev, preparation_id: null, preparation_quantity: null, is_addon: false, addon_billing_model: null }))
+    setFormData(prev => ({ ...prev, preparation_id: null, preparation_quantity: null, is_addon: false, addon_billing_model: null, article_id: null }))
     setShowCopiedHint(false)
   }
 
@@ -290,6 +301,28 @@ export function EquipmentPlacementForm({
       }
     }
   }, [isEditing, loadingTypes, dynamicStationTypes])
+
+  // Produkterna för vald stationstyp. Förvalet fylls i automatiskt så
+  // teknikern slipper välja när typen bara har en produkt.
+  useEffect(() => {
+    const type = dynamicStationTypes.find(t => t.code === formData.equipment_type)
+    if (!type?.id) { setTypeArticles([]); return }
+    let cancelled = false
+    setTypeArticlesLoading(true)
+    AddonStationBillingService.getStationTypeArticles(type.id)
+      .then(list => {
+        if (cancelled) return
+        setTypeArticles(list)
+        setFormData(prev => {
+          if (prev.article_id && list.some(a => a.articleId === prev.article_id)) return prev
+          const fallback = list.find(a => a.isDefault) ?? (list.length === 1 ? list[0] : null)
+          return { ...prev, article_id: fallback ? fallback.articleId : null }
+        })
+      })
+      .catch(() => { if (!cancelled) setTypeArticles([]) })
+      .finally(() => { if (!cancelled) setTypeArticlesLoading(false) })
+    return () => { cancelled = true }
+  }, [formData.equipment_type, dynamicStationTypes])
 
   // Ladda preparat när stationstyp ändras
   const loadPreparationsForType = useCallback(async (equipmentType: EquipmentType) => {
@@ -655,6 +688,30 @@ export function EquipmentPlacementForm({
           >
             Rensa
           </button>
+        </div>
+      )}
+
+      {/* Produkt: vilken artikel som faktiskt placeras ut. Intern kostnad,
+          syns aldrig för kunden (kunden ser bara stationstypen). */}
+      {typeArticles.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Produkt {typeArticles.length > 1 && <span className="text-slate-500 font-normal">(intern)</span>}
+          </label>
+          <select
+            value={formData.article_id ?? ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, article_id: e.target.value || null }))}
+            disabled={typeArticlesLoading}
+            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+          >
+            <option value="">Ingen produkt vald</option>
+            {typeArticles.map(a => (
+              <option key={a.articleId} value={a.articleId}>{a.name}</option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-500 mt-1">
+            Används för intern kostnad och marginal. Kunden ser bara stationstypen.
+          </p>
         </div>
       )}
 

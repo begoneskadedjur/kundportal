@@ -26,7 +26,7 @@ export const ADDON_BILLING_MODEL_HELP: Record<AddonBillingModel, string> = {
 
 /** Priser för tilläggsstationer hos en kund, ur kundens prislista. */
 export interface AddonPrices {
-  /** Årspris per station (tjänsten med used_for_addon_stations_annual) */
+  /** Årspris per station för den valda stationstypen (typens annual_service_id) */
   perYear: number | null
   /** Årspris / 12, avrundat till öre */
   perMonth: number | null
@@ -34,6 +34,34 @@ export interface AddonPrices {
   perRound: number | null
   /** Kunden har ett riktigt avtal (per år/månad kräver det) */
   hasContract: boolean
+  /**
+   * Stationstypen priset gäller. Null = generella årstjänsten användes,
+   * alltså innan teknikern valt typ.
+   */
+  stationTypeId?: string | null
+}
+
+/**
+ * Stationstyp som saknar pris i kundens prislista. Raden skapas då aldrig
+ * (en 0-krona hade filtrerats bort tyst av planeraren och stationen
+ * aldrig fakturerats), utan rapporteras hit så UI kan säga ifrån.
+ */
+export interface AddonPriceMissing {
+  station_type_id: string | null
+  station_type: string
+  site_customer_id?: string | null
+  model?: string
+  quantity?: number
+}
+
+/** Produkt som kan placeras ut för en stationstyp. Intern kostnad. */
+export interface StationTypeArticle {
+  articleId: string
+  code: string | null
+  name: string
+  /** Inköpspris, visas bara internt */
+  cost: number | null
+  isDefault: boolean
 }
 
 export function addonBillingModelLabel(model: AddonBillingModel | null | undefined): string {

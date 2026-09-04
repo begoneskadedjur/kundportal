@@ -61,6 +61,8 @@ import { EquipmentDetailSheet } from '../shared/equipment/EquipmentDetailSheet'
 import { RecurringScheduleManagement } from './RecurringScheduleManagement'
 import { RecurringScheduleWizardWithContract as RecurringScheduleWizard } from './RecurringScheduleWizardWithContract'
 import toast from 'react-hot-toast'
+import { AddonStationBillingService } from '../../services/addonStationBillingService'
+import type { AddonPrices } from '../../types/addonStations'
 
 interface CustomerStationsModalProps {
   customer: CustomerStationSummary | null
@@ -152,6 +154,21 @@ export function CustomerStationsModal({
   const [showTypeSelector, setShowTypeSelector] = useState(false)
   const [showStationForm, setShowStationForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Tilläggspriser ur kundens prislista: utan dem visar modellväljaren
+  // "pris saknas" och per år/per månad går inte att välja.
+  const [addonPrices, setAddonPrices] = useState<AddonPrices | null>(null)
+  const [addonPricesLoading, setAddonPricesLoading] = useState(false)
+  useEffect(() => {
+    const cid = customer?.customer_id
+    if (!isOpen || !cid) { setAddonPrices(null); return }
+    let cancelled = false
+    setAddonPricesLoading(true)
+    AddonStationBillingService.getAddonPrices(cid)
+      .then((p) => { if (!cancelled) setAddonPrices(p) })
+      .catch(() => { if (!cancelled) setAddonPrices(null) })
+      .finally(() => { if (!cancelled) setAddonPricesLoading(false) })
+    return () => { cancelled = true }
+  }, [isOpen, customer?.customer_id])
   const [isAddingIndoor, setIsAddingIndoor] = useState(false)
   const [menuOpenForPlan, setMenuOpenForPlan] = useState<string | null>(null)
   const [menuPosition, setMenuPosition] = useState<{ top: number; right: number } | null>(null)
@@ -1107,11 +1124,27 @@ export function CustomerStationsModal({
                                   longitude: formData.longitude,
                                   comment: formData.comment || null,
                                   status: formData.status,
-                                  is_addon: formData.is_addon
+                                  is_addon: formData.is_addon,
+                                  addon_billing_model: formData.is_addon
+                                    ? (formData.addon_billing_model ?? 'per_round')
+                                    : null,
+                                  article_id: formData.article_id ?? null
                                 })
                                 if (!result.success) throw new Error(result.error)
                                 if (formData.photo) {
                                   await EquipmentService.uploadEquipmentPhoto(selectedOutdoorStation.id, formData.photo)
+                                }
+                                if (formData.is_addon || selectedOutdoorStation.is_addon) {
+                                  const missing = await AddonStationBillingService.syncAfterStationChange(
+                                    selectedOutdoorStation.customer_id,
+                                    formData.is_addon
+                                      ? formData.addon_billing_model
+                                      : selectedOutdoorStation.addon_billing_model,
+                                    null,
+                                    null
+                                  )
+                                  const warning = AddonStationBillingService.priceMissingMessage(missing)
+                                  if (warning) toast.error(warning, { duration: 8000 })
                                 }
                                 toast.success('Utrustning uppdaterad')
                                 closeOutdoorDetail()
@@ -1127,6 +1160,8 @@ export function CustomerStationsModal({
                             }}
                             onCancel={() => setEditingOutdoorStation(false)}
                             isSubmitting={isSubmitting}
+                            addonPrices={addonPrices}
+                            addonPricesLoading={addonPricesLoading}
                             showCustomerPicker={false}
                           />
                         </div>

@@ -628,11 +628,12 @@ export class ContractInvoiceGenerator {
     // från utplacerade stationer innan planen räknas (SECURITY DEFINER-RPC).
     try {
       await supabase.rpc('sync_addon_period_lines', { p_customer_id: null, p_contract_id: contractId, p_annual_price: null })
+      await supabase.rpc('sync_addon_article_lines', { p_contract_id: contractId })
     } catch (err) {
       console.warn('[ContractInvoiceGenerator] Antalssynk av tilläggsstationer misslyckades:', err)
     }
     const [{ data: contract }, { data: steps }, { data: items }] = await Promise.all([
-      supabase.from('contracts').select('label, contract_type, invoice_reference, diary_number, equipment_invoice_mode').eq('id', contractId).maybeSingle(),
+      supabase.from('contracts').select('label, contract_type, invoice_reference, diary_number, customer_id, customers!contracts_customer_id_fkey(addon_invoice_mode)').eq('id', contractId).maybeSingle(),
       supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
       supabase
         .from('case_billing_items')
@@ -693,7 +694,13 @@ export class ContractInvoiceGenerator {
         billing_model: s.billing_model === 'per_month' ? ('per_month' as const) : ('per_year' as const),
         billing_start_date: s.billing_start_date ?? null,
       }))
-    const c = contract as { label?: string | null; contract_type?: string | null; invoice_reference?: string | null; diary_number?: string | null; equipment_invoice_mode?: string | null } | null
+    const c = contract as {
+      label?: string | null
+      contract_type?: string | null
+      invoice_reference?: string | null
+      diary_number?: string | null
+      customers?: { addon_invoice_mode?: string | null } | null
+    } | null
     type StepRow = { effective_from: string; annual_value: number | string; event_type?: string | null; note?: string | null }
     return {
       steps: ((steps ?? []) as StepRow[]).map((s) => ({ effective_from: s.effective_from, annual_value: Number(s.annual_value) })),
@@ -702,7 +709,10 @@ export class ContractInvoiceGenerator {
         .map((s) => ({ effective_from: s.effective_from, note: s.note as string })),
       premiumItems,
       equipment,
-      equipmentInvoiceMode: c?.equipment_invoice_mode === 'separate' ? 'separate' : 'with_premium',
+      // Faktureringsläget för tilläggsstationer bor på KUNDEN sedan 2026-09-04
+      // (contracts.equipment_invoice_mode är deprecated och läses inte).
+      equipmentInvoiceMode:
+        c?.customers?.addon_invoice_mode === 'separate_per_contract' ? 'separate' : 'with_premium',
       label: c?.label ?? c?.contract_type ?? null,
       invoiceReference: c?.invoice_reference ?? null,
       diaryNumber: c?.diary_number ?? null,

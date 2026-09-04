@@ -1330,6 +1330,24 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     [activeScopeByContract, locations, addonBricksByCustomer]
   )
 
+  /**
+   * Brickor vars enhet inte täcks av NÅGOT avtal. De renderas annars
+   * ingenstans, så tilläggsstationerna blir osynliga och obetalda.
+   */
+  const orphanBricks = useMemo(() => {
+    const covered = new Set<string>()
+    for (const p of papers) {
+      if (p.covers_all_sites) { locations.forEach((l) => covered.add(l.id)); continue }
+      covered.add(p.customer_id ?? '')
+      for (const cs of activeScopeByContract.get(p.id) ?? []) covered.add(cs.customer_id)
+    }
+    const out: AddonBrick[] = []
+    for (const [unitId, bricks] of addonBricksByCustomer) {
+      if (!covered.has(unitId)) out.push(...bricks)
+    }
+    return out
+  }, [papers, locations, activeScopeByContract, addonBricksByCustomer])
+
   /** Släpp av brickan bekräftat i popovern: baka in (§ 7) eller tillägg (§ 6) */
   const confirmAddonDrop = async (input: { effectiveFrom: string; unitPriceAnnual: number }) => {
     if (!addonPrompt) return
@@ -2380,6 +2398,26 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             </div>
           )}
 
+          {/* Tilläggsstationer på enheter som inget avtal täcker syns annars
+              ingenstans: brickan renderas bara på avtal vars omfattning
+              innehåller enheten. Utan den här raden ligger de obetalda. */}
+          {orphanBricks.length > 0 && (
+            <div className="mb-3 px-3 py-2 rounded-xl border border-amber-500/40 bg-amber-500/10">
+              <div className="text-[12px] font-semibold text-amber-200">
+                {orphanBricks.reduce((sum, b) => sum + b.count, 0)} tilläggsstationer utanför avtalen
+              </div>
+              <div className="text-[11px] text-amber-200/80 mt-0.5">
+                {Array.from(
+                  new Set(
+                    orphanBricks.map((b) =>
+                      customerRowName(customerById.get(b.unitId) ?? ({ company_name: 'Enhet' } as RecordCustomer))
+                    )
+                  )
+                ).join(', ')}
+                {' '}saknar avtal som täcker enheten. Lägg enheten i ett avtals § 1 så går stationerna att fakturera.
+              </div>
+            </div>
+          )}
           {papers.map((c) => (
             <PaperContract
               key={c.id}
@@ -2438,6 +2476,11 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onBrickDrag={(e, brick) => startDrag(e, { type: 'addon_stations', ...brick })}
               unitNameOf={(id) => customerRowName(customerById.get(id) ?? ({ company_name: 'Enhet' } as RecordCustomer))}
               onChangeEquipmentInvoiceMode={(mode) => changeEquipmentInvoiceMode(c, mode)}
+              equipmentInvoiceMode={
+                customerById.get(c.customer_id ?? '')?.addon_invoice_mode === 'separate_per_contract'
+                  ? 'separate'
+                  : 'with_premium'
+              }
               // Uppsagt-men-löpande avtal ligger kvar bland de aktiva (de
               // fungerar till slutdatumet) och ska kunna ångras direkt — inte
               // först när uppsägningstiden hunnit löpa ut.
@@ -3873,6 +3916,8 @@ interface PaperProps {
   onBrickDrag?: (e: React.PointerEvent, brick: AddonBrick) => void
   unitNameOf?: (unitId: string) => string
   onChangeEquipmentInvoiceMode?: (mode: 'with_premium' | 'separate') => Promise<void>
+  /** Kundens läge för § 6 (bor på kunden, inte avtalet) */
+  equipmentInvoiceMode?: 'with_premium' | 'separate'
   /** Öppna väljaren för signeringsdatum */
   onEditSignedAt?: () => void
   /** Spara avtalets säljare (den som skrivit under för BeGone) */
@@ -4228,6 +4273,7 @@ function PaperContract({
   onBrickDrag,
   unitNameOf,
   onChangeEquipmentInvoiceMode,
+  equipmentInvoiceMode = 'with_premium',
 }: PaperProps) {
   const key = todayKey()
   const archived = state === 'archived'
@@ -4810,7 +4856,7 @@ function PaperContract({
           bricks={addonBricks}
           onBrickPointerDown={onBrickDrag}
           unitNameOf={unitNameOf}
-          equipmentInvoiceMode={contract.equipment_invoice_mode ?? 'with_premium'}
+          equipmentInvoiceMode={equipmentInvoiceMode}
           onChangeEquipmentInvoiceMode={archived ? undefined : onChangeEquipmentInvoiceMode}
         />
       </div>

@@ -214,6 +214,10 @@ export interface IndoorStation {
   addon_billing_model?: 'per_year' | 'per_month' | 'per_round' | null;
   addon_contract_mode?: 'included' | 'separate' | null;
   addon_contract_id?: string | null;
+  /** När stationen markerades som tillägg (pro rata räknas härifrån) */
+  addon_marked_at?: string | null;
+  /** Produkten som placerades ut. Intern kostnad, aldrig synlig för kund. */
+  article_id?: string | null;
   // Preparat i stationen (satt vid utplacering) — kontrollflödet förväljer detta
   preparation_id?: string | null;
   preparation_quantity?: number | null;
@@ -347,6 +351,8 @@ export interface CreateIndoorStationInput {
   photo?: File;
   is_addon?: boolean;
   addon_billing_model?: 'per_year' | 'per_month' | 'per_round' | null;
+  /** Produkten som placeras ut. Intern kostnad. */
+  article_id?: string | null;
   preparation_id?: string | null;
   preparation_quantity?: number | null;
   preparation_unit?: PreparationUnit;
@@ -365,6 +371,8 @@ export interface UpdateIndoorStationInput {
   addon_billing_model?: 'per_year' | 'per_month' | 'per_round' | null;
   addon_contract_mode?: 'included' | 'separate' | null;
   addon_contract_id?: string | null;
+  /** Produkten som placerades ut. Intern kostnad. */
+  article_id?: string | null;
   photo?: File;
 }
 

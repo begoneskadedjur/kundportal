@@ -9,6 +9,8 @@ import { FloorPlanViewer } from './FloorPlanViewer'
 import { FloorPlanSelector, FloorPlanChipSelector } from './FloorPlanSelector'
 import { FloorPlanUploadForm } from './FloorPlanUploadForm'
 import { IndoorStationForm, StationTypeSelector } from './IndoorStationForm'
+import { AddonStationBillingService } from '../../../services/addonStationBillingService'
+import type { AddonPrices } from '../../../types/addonStations'
 import { IndoorStationDetailSheet, IndoorStationCard } from './IndoorStationDetailSheet'
 import { StationLegend } from './IndoorStationMarker'
 
@@ -54,6 +56,20 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
   const [selectedTypeData, setSelectedTypeData] = useState<StationType | null>(null)
   const [previewPosition, setPreviewPosition] = useState<{ x: number; y: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Tilläggspriser ur kundens prislista: utan dem kan teknikern inte välja
+  // per år eller per månad i modellväljaren.
+  const [addonPrices, setAddonPrices] = useState<AddonPrices | null>(null)
+  const [addonPricesLoading, setAddonPricesLoading] = useState(false)
+  useEffect(() => {
+    if (!customerId) { setAddonPrices(null); return }
+    let cancelled = false
+    setAddonPricesLoading(true)
+    AddonStationBillingService.getAddonPrices(customerId, selectedTypeData?.id ?? null)
+      .then((p) => { if (!cancelled) setAddonPrices(p) })
+      .catch(() => { if (!cancelled) setAddonPrices(null) })
+      .finally(() => { if (!cancelled) setAddonPricesLoading(false) })
+    return () => { cancelled = true }
+  }, [customerId, selectedTypeData?.id])
   const [showFloorPlanMenu, setShowFloorPlanMenu] = useState(false)
   const [replacingImage, setReplacingImage] = useState(false)
   const replaceImageInputRef = useRef<HTMLInputElement>(null)
@@ -164,10 +180,21 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
   const handleCreateStation = async (input: CreateIndoorStationInput) => {
     setIsSubmitting(true)
     try {
+      const technicianId = profile?.technicians?.id
       await IndoorStationService.createStation(
         input,
-        profile?.technicians?.id
+        technicianId
       )
+      if (input.is_addon && customerId) {
+        const missing = await AddonStationBillingService.syncAfterStationChange(
+          customerId,
+          input.addon_billing_model ?? 'per_round',
+          technicianId ?? null,
+          null
+        )
+        const warning = AddonStationBillingService.priceMissingMessage(missing)
+        if (warning) toast.error(warning, { duration: 8000 })
+      }
       toast.success('Station placerad!')
       setModalType('none')
       resetPlacementMode()
@@ -506,6 +533,8 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
               onSubmit={handleCreateStation}
               onCancel={() => { setModalType('none'); resetPlacementMode() }}
               isSubmitting={isSubmitting}
+              addonPrices={addonPrices}
+              addonPricesLoading={addonPricesLoading}
             />
           </div>
         </BottomSheet>

@@ -12,6 +12,8 @@ import type { Contract, Customer } from '../types/database'
 // customers har kolumner som ännu inte finns i database.ts-typen
 // (fortnox_verified_at är ny, notice_period_months finns i DB men saknas i typen)
 export type RecordCustomer = Customer & {
+  /** Faktureringsläge för tilläggsstationer (§ 6). Ersätter contracts.equipment_invoice_mode. */
+  addon_invoice_mode?: 'with_contract' | 'separate_per_contract' | null
   fortnox_verified_at?: string | null
   notice_period_months?: number | null
 }

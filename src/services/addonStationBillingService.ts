@@ -21,7 +21,12 @@ import { PriceListService } from './priceListService'
 import { VisitService } from './visitService'
 import type { Service, ServiceDefaultArticle } from '../types/services'
 import type { CaseBillingItemWithRelations } from '../types/caseBilling'
-import type { AddonBillingModel, AddonPrices } from '../types/addonStations'
+import type {
+  AddonBillingModel,
+  AddonPriceMissing,
+  AddonPrices,
+  StationTypeArticle,
+} from '../types/addonStations'
 
 export interface PrefillResult {
   outcome: 'created' | 'updated' | 'already_billed' | 'no_stations' | 'no_service'
@@ -64,53 +69,118 @@ export class AddonStationBillingService {
    * (årspris/12) och per kontroll (tjänst 43), ur avtalets/kundens prislista.
    * hasContract via RPC (tekniker kan inte läsa contracts direkt).
    */
-  static async getAddonPrices(customerId: string): Promise<AddonPrices> {
-    const [annualService, roundService, candidates] = await Promise.all([
-      this.getAddonAnnualService(),
+  static async getAddonPrices(customerId: string, stationTypeId?: string | null): Promise<AddonPrices> {
+    const [roundService, candidates] = await Promise.all([
       this.getAddonStationService(),
       supabase.rpc('get_contract_candidates', { p_customer_id: customerId }),
     ])
-    const [annual, round] = await Promise.all([
-      annualService ? PriceListService.getEffectiveServicePrice(annualService.id, customerId) : Promise.resolve(null),
-      roundService ? PriceListService.getEffectiveServicePrice(roundService.id, customerId) : Promise.resolve(null),
-    ])
-    const perYear = annual?.price ?? annualService?.base_price ?? null
+
+    // Årspriset per stationstyp: ljusfällan har egen tjänst (79), övriga
+    // delar 144. Samma trappa som prislistan, men uppslaget görs i SQL så
+    // att cronen och RPC:erna räknar likadant.
+    let perYear: number | null = null
+    if (stationTypeId) {
+      const { data, error } = await supabase.rpc('addon_annual_price_for_type', {
+        p_station_type_id: stationTypeId,
+        p_customer_id: customerId,
+        p_contract_id: null,
+      })
+      if (!error && data != null) perYear = Number(data)
+    } else {
+      const annualService = await this.getAddonAnnualService()
+      const annual = annualService
+        ? await PriceListService.getEffectiveServicePrice(annualService.id, customerId)
+        : null
+      const raw = annual?.price ?? annualService?.base_price ?? null
+      perYear = raw != null ? Number(raw) : null
+    }
+
+    const round = roundService
+      ? await PriceListService.getEffectiveServicePrice(roundService.id, customerId)
+      : null
     const perRound = round?.price ?? roundService?.base_price ?? null
     const hasContract = !candidates.error && Array.isArray(candidates.data) && candidates.data.length > 0
     return {
-      perYear: perYear != null && perYear > 0 ? Number(perYear) : null,
-      perMonth: perYear != null && perYear > 0 ? Math.round((Number(perYear) / 12) * 100) / 100 : null,
+      perYear: perYear != null && perYear > 0 ? perYear : null,
+      perMonth: perYear != null && perYear > 0 ? Math.round((perYear / 12) * 100) / 100 : null,
       perRound: perRound != null && perRound > 0 ? Number(perRound) : null,
       hasContract,
+      stationTypeId: stationTypeId ?? null,
     }
+  }
+
+  /** Produkterna teknikern kan välja mellan för en stationstyp. */
+  static async getStationTypeArticles(stationTypeId: string): Promise<StationTypeArticle[]> {
+    const { data, error } = await supabase
+      .from('station_type_articles')
+      .select('article_id, is_default, sort_order, article:articles(id, code, name, default_price)')
+      .eq('station_type_id', stationTypeId)
+      .order('sort_order')
+    if (error) {
+      console.error('[AddonStationBilling] Kunde inte hämta stationstypens artiklar:', error)
+      return []
+    }
+    type Row = {
+      article_id: string
+      is_default: boolean
+      article: { code: string | null; name: string; default_price: number | null } | null
+    }
+    return ((data ?? []) as unknown as Row[])
+      .filter((r) => r.article)
+      .map((r) => ({
+        articleId: r.article_id,
+        code: r.article?.code ?? null,
+        name: r.article?.name ?? 'Produkt',
+        cost: r.article?.default_price != null ? Number(r.article.default_price) : null,
+        isDefault: r.is_default === true,
+      }))
   }
 
   /**
    * § 6-rader för per år/per månad-stationer: antal synkas från enhetens
    * aktiva stationer (SECURITY DEFINER-RPC, vikarie-säker). Sväljer fel.
    */
-  static async syncAddonPeriodLines(customerId: string): Promise<{ ok: boolean; contractId?: string | null; reason?: string } | null> {
+  static async syncAddonPeriodLines(
+    customerId: string
+  ): Promise<{ ok: boolean; contractId?: string | null; reason?: string; priceMissing: AddonPriceMissing[] } | null> {
     try {
-      const annual = await this.getAddonAnnualService()
-      let annualPrice: number | null = null
-      if (annual) {
-        const eff = await PriceListService.getEffectiveServicePrice(annual.id, customerId)
-        annualPrice = eff?.price ?? annual.base_price ?? null
-      }
+      // p_annual_price lämnas null: RPC:n slår upp priset per stationstyp,
+      // så ljusfällan får sin egen tjänst i stället för den generella.
       const { data, error } = await supabase.rpc('sync_addon_period_lines', {
         p_customer_id: customerId,
         p_contract_id: null,
-        p_annual_price: annualPrice,
+        p_annual_price: null,
       })
       if (error) {
         console.warn('[AddonStationBilling] sync_addon_period_lines fel:', error)
         return null
       }
-      const d = data as { ok?: boolean; contract_id?: string | null; reason?: string } | null
-      return { ok: !!d?.ok, contractId: d?.contract_id ?? null, reason: d?.reason }
+      const d = data as {
+        ok?: boolean
+        contract_id?: string | null
+        reason?: string
+        price_missing?: AddonPriceMissing[]
+      } | null
+      const priceMissing = Array.isArray(d?.price_missing) ? d!.price_missing! : []
+      if (d?.contract_id) await this.syncAddonArticleLines(d.contract_id)
+      return { ok: !!d?.ok, contractId: d?.contract_id ?? null, reason: d?.reason, priceMissing }
     } catch (err) {
       console.warn('[AddonStationBilling] Periodsynk misslyckades:', err)
       return null
+    }
+  }
+
+  /**
+   * Speglar utplacerade produkter som interna kostnadsrader bredvid
+   * kundpriset. Raderna når aldrig fakturan (item_type article filtreras
+   * bort i både generatorn och cronen).
+   */
+  static async syncAddonArticleLines(contractId: string): Promise<void> {
+    try {
+      const { error } = await supabase.rpc('sync_addon_article_lines', { p_contract_id: contractId })
+      if (error) console.warn('[AddonStationBilling] sync_addon_article_lines fel:', error)
+    } catch (err) {
+      console.warn('[AddonStationBilling] Artikelsynk misslyckades:', err)
     }
   }
 
@@ -153,13 +223,24 @@ export class AddonStationBillingService {
     model: AddonBillingModel | null | undefined,
     technicianId?: string | null,
     technicianName?: string | null
-  ): Promise<void> {
+  ): Promise<AddonPriceMissing[]> {
     if (!model || model === 'per_round') {
       await this.syncAddonEstablishmentLine(customerId, technicianId ?? null, technicianName ?? null)
-      return
+      return []
     }
-    await this.syncAddonPeriodLines(customerId)
+    const period = await this.syncAddonPeriodLines(customerId)
     await this.syncAddonProrataLine(customerId, technicianId ?? null, technicianName ?? null)
+    return period?.priceMissing ?? []
+  }
+
+  /**
+   * Text för de stationstyper som saknar pris, att visa som varning efter
+   * utsättning. Tom sträng när allt fick pris.
+   */
+  static priceMissingMessage(missing: AddonPriceMissing[]): string {
+    if (!missing.length) return ''
+    const names = Array.from(new Set(missing.map((m) => m.station_type))).join(', ')
+    return `Pris saknas för ${names}. Stationen är utsatt men kommer inte att faktureras förrän priset lagts in i kundens prislista.`
   }
 
   /**
