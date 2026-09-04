@@ -18,7 +18,7 @@ import { type PriceList } from '../../../types/articles'
 import { type BillingFrequency, BILLING_FREQUENCY_CONFIG, type AdhocInvoiceGrouping } from '../../../types/contractBilling'
 import toast from 'react-hot-toast'
 import { ContractInvoiceGenerator, computePlannedInvoicesPure, type BillingPlan } from '../../../services/contractInvoiceGenerator'
-import { ContractService } from '../../../services/contractService'
+import { ContractService, isSyntheticContract } from '../../../services/contractService'
 import { ContractScopeService } from '../../../services/contractScopeService'
 import { PaymentTermsService } from '../../../services/paymentTermsService'
 import BillingPlanPreviewModal from './BillingPlanPreviewModal'
@@ -165,6 +165,17 @@ export default function BillingSettingsModal({
   // Billing form state
   const [billingFrequency, setBillingFrequency] = useState<BillingFrequency>('monthly')
   const [priceListId, setPriceListId] = useState<string | null>(null)
+  // Prislistan styrs av avtalskartan (§ 2) så snart kunden har ett riktigt avtal: läsning här
+  const [priceListLocked, setPriceListLocked] = useState(false)
+  useEffect(() => {
+    if (!isOpen || !customerId) { setPriceListLocked(false); return }
+    let cancelled = false
+    const readId = headquarterCustomerId ?? customerId
+    ContractService.getActiveContracts(readId)
+      .then((cs) => { if (!cancelled) setPriceListLocked(cs.some((c) => !isSyntheticContract(c))) })
+      .catch(() => { if (!cancelled) setPriceListLocked(false) })
+    return () => { cancelled = true }
+  }, [isOpen, customerId, headquarterCustomerId])
   const [billingEmail, setBillingEmail] = useState('')
   const [billingAddress, setBillingAddress] = useState('')
   const [billingType, setBillingType] = useState<'consolidated' | 'per_site'>('consolidated')
@@ -482,7 +493,8 @@ export default function BillingSettingsModal({
     // fälten behålls för bakåtkompat (synth-fallback i ContractService) men är
     // inte längre sanningskällan för avtalsdata på den här raden.
     const customerUpdate: Record<string, any> = {
-      price_list_id: priceListId,
+      // Prislistan skrivs bara för kunder utan riktigt avtal (annars speglas den från avtalskartan)
+      ...(priceListLocked || contractId ? {} : { price_list_id: priceListId }),
       billing_email: billingEmail || null,
       billing_address: billingAddress || null,
       billing_type: isMultisite ? billingType : null,
@@ -883,6 +895,7 @@ export default function BillingSettingsModal({
                 <label className="block text-xs font-medium text-slate-400 mb-1">Artikelkatalog (prislista)</label>
                 <Select
                   value={priceListId || ''}
+                  disabled={priceListLocked || contractScoped}
                   onChange={(v) => setPriceListId(v || null)}
                   placeholder="Ingen prislista"
                   options={[
@@ -893,6 +906,12 @@ export default function BillingSettingsModal({
                     })),
                   ]}
                 />
+                {(priceListLocked || contractScoped) && (
+                  <p className="text-xs text-slate-500 mt-1">
+                    Styrs av avtalskartan (§ 2 på avtalet).{' '}
+                    <Link to={avtalskartaHref} onClick={onClose} className="text-[#20c58f] hover:underline">Öppna avtalskartan</Link>
+                  </p>
+                )}
               </div>
             </div>
             <div>

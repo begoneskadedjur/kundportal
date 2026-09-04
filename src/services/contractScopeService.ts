@@ -30,6 +30,7 @@ type LiveContractRow = ContractLifecycleFields & {
   template_id: string | null
   oneflow_contract_id: string | null
   display_order: number | null
+  price_list_id?: string | null
 }
 
 export type ContractEventType =
@@ -236,8 +237,8 @@ export class ContractScopeService {
   /**
    * Sätt (eller rensa) avtalets prislista — styr avrops-/tilläggspriser per
    * ärende. Loggas i contract_events så bytet syns i avtalets tidslinje.
-   * Valet speglas till kundens price_list_id; borttagning speglas inte
-   * (då gäller kundens egen prislista, precis som förut).
+   * Kundradens price_list_id speglas från avtalen (mirrorSharedFields), även
+   * vid borttagning: avtalskartan är enda vägen att sätta kundens prislista.
    */
   static async setPriceList(
     contractId: string,
@@ -252,7 +253,7 @@ export class ContractScopeService {
     if (error) throw new Error(`Kunde inte byta prislista: ${error.message}`)
     if (!data || data.length === 0) throw new Error('Avtalet kunde inte uppdateras (0 rader)')
 
-    if (priceListId) await this.mirrorToCustomerRow(data[0], { price_list_id: priceListId })
+    if (data[0].customer_id) await this.mirrorSharedFields(data[0].customer_id)
 
     const to = names?.to
     const from = names?.from
@@ -1155,7 +1156,7 @@ export class ContractScopeService {
       .from('contracts')
       .select(
         'id, annual_value, billing_frequency, billing_anchor_month, contract_start_date, contract_end_date, ' +
-          'notice_period_months, status, terminated_at, effective_end_date, template_id, oneflow_contract_id, display_order'
+          'notice_period_months, status, terminated_at, effective_end_date, template_id, oneflow_contract_id, display_order, price_list_id'
       )
       .eq('customer_id', customerId)
       .in('status', ['signed', 'active'])
@@ -1208,6 +1209,10 @@ export class ContractScopeService {
       if (end !== undefined) patch.contract_end_date = end
       const notice = shared((c) => c.notice_period_months ?? null)
       if (notice) patch.notice_period_months = notice
+      // Kundradens prislista styrs av avtalskartan: delad lista, annars första pappret i ordningen
+      const sharedList = shared((c) => c.price_list_id ?? null)
+      const primary = [...live].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))[0]
+      patch.price_list_id = sharedList !== undefined ? sharedList : (primary.price_list_id ?? null)
       const { error } = await supabase.from('customers').update(patch).eq('id', customerId)
       if (error) console.error('Kunde inte spegla avtalsfält till kundraden:', error.message)
     } catch (err) {
