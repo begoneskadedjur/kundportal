@@ -270,7 +270,7 @@ export default function CaseServiceSelector({
           PricingSettingsService.get(),
           // Avtalssteget: avtalets prislista → kundens prislista (avtalet vinner per tjänst)
           customerId ? PriceListService.getServicePricesForCase(customerId, caseContractId) : Promise.resolve({} as Record<string, number>),
-          customerId ? PriceListService.getCustomerArticlePrices(customerId) : Promise.resolve({}),
+          customerId ? PriceListService.getCustomerArticlePrices(customerId, caseContractId) : Promise.resolve({}),
         ])
         setPricingSettings(settingsData)
         setArticles(articlesData)

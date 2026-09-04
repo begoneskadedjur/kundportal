@@ -705,19 +705,32 @@ export class PriceListService {
    * Returnerar en map {article_id: {custom_price, quantity_tiers}}.
    * Tom map om kunden saknar prislista.
    */
-  static async getCustomerArticlePrices(customerId: string): Promise<Record<string, { custom_price: number; quantity_tiers: QuantityTier[] | null }>> {
-    const { data: customer } = await supabase
-      .from('customers')
-      .select('price_list_id')
-      .eq('id', customerId)
-      .single()
-
-    if (!customer?.price_list_id) return {}
+  static async getCustomerArticlePrices(
+    customerId: string,
+    contractId?: string | null
+  ): Promise<Record<string, { custom_price: number; quantity_tiers: QuantityTier[] | null }>> {
+    // Avtalskartan styr: avtalets prislista (ärendets avtal, annars kundens
+    // avtal via täckningen) vinner över kundradens spegling.
+    let listId: string | null = null
+    try {
+      listId = await this.resolveContractPriceListId(customerId, contractId ?? null)
+    } catch {
+      listId = null
+    }
+    if (!listId) {
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('price_list_id')
+        .eq('id', customerId)
+        .single()
+      listId = customer?.price_list_id ?? null
+    }
+    if (!listId) return {}
 
     const { data: items, error } = await supabase
       .from('price_list_items')
       .select('article_id, custom_price, quantity_tiers')
-      .eq('price_list_id', customer.price_list_id)
+      .eq('price_list_id', listId)
       .not('article_id', 'is', null)
 
     if (error) throw new Error(`Databasfel: ${error.message}`)

@@ -14,11 +14,10 @@ import LoadingSpinner from '../../shared/LoadingSpinner'
 import { supabase } from '../../../lib/supabase'
 import { PriceListService } from '../../../services/priceListService'
 import ContractCaseServiceSelector from './ContractCaseServiceSelector'
-import { type PriceList } from '../../../types/articles'
 import { type BillingFrequency, BILLING_FREQUENCY_CONFIG, type AdhocInvoiceGrouping } from '../../../types/contractBilling'
 import toast from 'react-hot-toast'
 import { ContractInvoiceGenerator, computePlannedInvoicesPure, type BillingPlan } from '../../../services/contractInvoiceGenerator'
-import { ContractService, isSyntheticContract } from '../../../services/contractService'
+import { ContractService } from '../../../services/contractService'
 import { ContractScopeService } from '../../../services/contractScopeService'
 import { PaymentTermsService } from '../../../services/paymentTermsService'
 import BillingPlanPreviewModal from './BillingPlanPreviewModal'
@@ -106,7 +105,6 @@ export default function BillingSettingsModal({
   const [plan, setPlan] = useState<BillingPlan | null>(null)
   const [planLoading, setPlanLoading] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
-  const [priceLists, setPriceLists] = useState<PriceList[]>([])
   // Cache befintliga contract-invoices för live-diff (hämtas en gång vid öppning)
   const [existingInvoices, setExistingInvoices] = useState<Array<{
     id: string
@@ -164,18 +162,6 @@ export default function BillingSettingsModal({
 
   // Billing form state
   const [billingFrequency, setBillingFrequency] = useState<BillingFrequency>('monthly')
-  const [priceListId, setPriceListId] = useState<string | null>(null)
-  // Prislistan styrs av avtalskartan (§ 2) så snart kunden har ett riktigt avtal: läsning här
-  const [priceListLocked, setPriceListLocked] = useState(false)
-  useEffect(() => {
-    if (!isOpen || !customerId) { setPriceListLocked(false); return }
-    let cancelled = false
-    const readId = headquarterCustomerId ?? customerId
-    ContractService.getActiveContracts(readId)
-      .then((cs) => { if (!cancelled) setPriceListLocked(cs.some((c) => !isSyntheticContract(c))) })
-      .catch(() => { if (!cancelled) setPriceListLocked(false) })
-    return () => { cancelled = true }
-  }, [isOpen, customerId, headquarterCustomerId])
   const [billingEmail, setBillingEmail] = useState('')
   const [billingAddress, setBillingAddress] = useState('')
   const [billingType, setBillingType] = useState<'consolidated' | 'per_site'>('consolidated')
@@ -190,7 +176,6 @@ export default function BillingSettingsModal({
   useEffect(() => {
     if (!isOpen || !customerId) return
     setBillingFrequency(currentBillingFrequency || 'annual')
-    setPriceListId(currentPriceListId || null)
     setBillingEmail(currentBillingEmail || '')
     setBillingAddress(currentBillingAddress || '')
     setBillingType(currentBillingType || 'consolidated')
@@ -224,19 +209,9 @@ export default function BillingSettingsModal({
       currentBillingAddress, currentBillingType, currentBillingReference, currentCostCenter,
       currentBillingRecipient, currentPriceAdjustmentPercent, currentAdhocInvoiceGrouping, sites])
 
-  // Load price lists
-  useEffect(() => {
-    PriceListService.getActivePriceLists().then(setPriceLists).catch(console.error)
-  }, [])
-
-  // Default till standardprislistan om kunden saknar sparad prislista
-  useEffect(() => {
-    if (!isOpen || !customerId) return
-    if (currentPriceListId) return // Kunden har egen prislista → rör inte
-    PriceListService.getDefaultPriceList()
-      .then(pl => { if (pl) setPriceListId(pl.id) })
-      .catch(console.error)
-  }, [isOpen, customerId, currentPriceListId])
+  // Prislistan sätts bara i avtalskartan (§ 2 på avtalet) och speglas till
+  // kundraden därifrån. En kund kan ha flera prislistor, en per avtal, så
+  // modalen har inget prislistefält.
 
   // Multi-kontrakt-refaktor (Fas 6): när modalen scopas till ett specifikt kontrakt,
   // override:a avtalsfält med contracts-radens värden. Faktureringsfält som tillhör
@@ -493,8 +468,6 @@ export default function BillingSettingsModal({
     // fälten behålls för bakåtkompat (synth-fallback i ContractService) men är
     // inte längre sanningskällan för avtalsdata på den här raden.
     const customerUpdate: Record<string, any> = {
-      // Prislistan skrivs bara för kunder utan riktigt avtal (annars speglas den från avtalskartan)
-      ...(priceListLocked || contractId ? {} : { price_list_id: priceListId }),
       billing_email: billingEmail || null,
       billing_address: billingAddress || null,
       billing_type: isMultisite ? billingType : null,
@@ -892,26 +865,11 @@ export default function BillingSettingsModal({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1">Artikelkatalog (prislista)</label>
-                <Select
-                  value={priceListId || ''}
-                  disabled={priceListLocked || contractScoped}
-                  onChange={(v) => setPriceListId(v || null)}
-                  placeholder="Ingen prislista"
-                  options={[
-                    { value: '', label: 'Ingen prislista' },
-                    ...priceLists.map(pl => ({
-                      value: pl.id,
-                      label: `${pl.name}${pl.is_default ? ' (Standard)' : ''}`,
-                    })),
-                  ]}
-                />
-                {(priceListLocked || contractScoped) && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    Styrs av avtalskartan (§ 2 på avtalet).{' '}
-                    <Link to={avtalskartaHref} onClick={onClose} className="text-[#20c58f] hover:underline">Öppna avtalskartan</Link>
-                  </p>
-                )}
+                <label className="block text-xs font-medium text-slate-400 mb-1">Prislista</label>
+                <p className="text-xs text-slate-400 py-1.5">
+                  Sätts per avtal i avtalskartan (§ 2). En kund kan ha olika prislistor på olika avtal.{' '}
+                  <Link to={avtalskartaHref} onClick={onClose} className="text-[#20c58f] hover:underline">Öppna avtalskartan</Link>
+                </p>
               </div>
             </div>
             <div>
