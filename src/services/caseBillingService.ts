@@ -753,6 +753,53 @@ export class CaseBillingService {
   /**
    * Uppdatera status för alla items i ett ärende
    */
+  /**
+   * Rader som står som 'billed' utan att ligga på någon levande faktura
+   * släpps tillbaka till 'pending'.
+   *
+   * Bakgrund: createInvoiceFromCase markerar ALLA ärendets rader som billed,
+   * och upsertInvoiceFromCase raderar ett oskickat utkast (cascade tar
+   * fakturaraderna) utan att återställa dem. Nästa faktura byggdes då bara
+   * av rader som tillkommit efteråt: INV-202608-0026 blev 0 kr medan ärendet
+   * hade 976 kr i tjänster. Samma sak när en faktura makuleras.
+   *
+   * Bara privat och företag: avtalsärenden faktureras via
+   * contract_billing_items utan länk till raden och ska inte röras här.
+   */
+  static async releaseOrphanedBilledItems(
+    caseId: string,
+    caseType: BillableCaseType
+  ): Promise<number> {
+    if (caseType !== 'private' && caseType !== 'business') return 0
+
+    const { data: billed, error: billedError } = await supabase
+      .from('case_billing_items')
+      .select('id')
+      .eq('case_id', caseId)
+      .eq('case_type', caseType)
+      .eq('status', 'billed')
+    if (billedError) throw new Error(`Databasfel: ${billedError.message}`)
+    const ids = (billed ?? []).map((r) => r.id as string)
+    if (ids.length === 0) return 0
+
+    const { data: live, error: liveError } = await supabase
+      .from('invoice_items')
+      .select('case_billing_item_id, invoice:invoices!inner(status)')
+      .in('case_billing_item_id', ids)
+      .neq('invoice.status', 'cancelled')
+    if (liveError) throw new Error(`Databasfel: ${liveError.message}`)
+    const stillInvoiced = new Set((live ?? []).map((r) => r.case_billing_item_id as string))
+    const orphaned = ids.filter((id) => !stillInvoiced.has(id))
+    if (orphaned.length === 0) return 0
+
+    const { error } = await supabase
+      .from('case_billing_items')
+      .update({ status: 'pending', updated_at: new Date().toISOString() })
+      .in('id', orphaned)
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    return orphaned.length
+  }
+
   static async updateCaseItemsStatus(
     caseId: string,
     caseType: BillableCaseType,

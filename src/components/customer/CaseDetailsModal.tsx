@@ -517,11 +517,11 @@ export default function CaseDetailsModal({
           .eq('item_type', 'service')
           .eq('status', 'pending')
           .is('visit_number', null),
+        // Artikelrader utan prisfält: kundrollen läser inte artikelrader på
+        // basetabellen längre (inköpspriset är internt), utan via en RPC som
+        // bara lämnar ut namn och antal.
         supabase
-          .from('case_billing_items')
-          .select('id, article_name, article_code, quantity, mapped_service_id')
-          .eq('case_id', caseId)
-          .eq('item_type', 'article')
+          .rpc('customer_case_article_lines', { p_case_id: caseId })
           .eq('status', 'pending')
           .is('visit_number', null)
       ])

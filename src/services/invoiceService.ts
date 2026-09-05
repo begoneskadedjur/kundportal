@@ -354,6 +354,11 @@ export class InvoiceService {
       if (deleteError) throw new Error(`Databasfel: ${deleteError.message}`)
     }
 
+    // Raderna som låg på det raderade utkastet (och andra som fastnat som
+    // 'billed' utan levande faktura) måste tillbaka till 'pending', annars
+    // byggs den nya fakturan bara av rader som tillkommit efter förra avslutet.
+    await CaseBillingService.releaseOrphanedBilledItems(caseId, caseType)
+
     // Dubbelfaktureringsspärr: uppslaget ovan hoppar över delfakturor
     // (invoice_type='partial'), så en delfaktura raderas aldrig här. Om ärendets
     // kvarvarande fakturerbara rader redan ligger på en levande delfaktura skulle
@@ -535,6 +540,16 @@ export class InvoiceService {
       .single()
 
     if (error) throw new Error(`Databasfel: ${error.message}`)
+
+    // Makulerad faktura: ärendets rader ska kunna faktureras igen. Annars
+    // står de kvar som 'billed' och nästa faktura saknar dem.
+    if (status === 'cancelled' && data?.case_id && (data.case_type === 'private' || data.case_type === 'business')) {
+      try {
+        await CaseBillingService.releaseOrphanedBilledItems(data.case_id, data.case_type)
+      } catch (releaseError) {
+        console.warn('[InvoiceService] Kunde inte släppa ärendets rader efter makulering:', releaseError)
+      }
+    }
     return data
   }
 
