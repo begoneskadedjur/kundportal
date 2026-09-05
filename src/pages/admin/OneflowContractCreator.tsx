@@ -1749,15 +1749,6 @@ export default function OneflowContractCreator() {
                       <p className="text-xs text-slate-600 mt-2 italic">
                         Marginalen visas bara internt och skickas inte till kund.
                       </p>
-                      {/* Stationer och fällor står kvar hos kunden och tjänas in
-                          över flera år, medan priset ovan är ett årsbelopp. Utan
-                          den här noten ser ett bra avtal rött ut i förslaget. */}
-                      {marginPercent < 20 && (
-                        <p className="text-xs text-slate-500 mt-1.5">
-                          Innehåller förslaget utrustning som står kvar hos kunden är kostnaden en
-                          engångsutgift mot en återkommande intäkt. Marginalen gäller år 1.
-                        </p>
-                      )}
                     </>
                   )}
                 </Card>
