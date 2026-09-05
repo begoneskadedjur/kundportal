@@ -1,6 +1,6 @@
 # Plan: varaktig utrustning och marginal genom hela systemet
 
-Status: skriven 2026-09-05 efter två expertgranskningar (ekonomi respektive CRM/arkitektur), alla siffror verifierade mot produktionsdatabasen. EJ byggd. Ett tidigare försök (commit e4cf43b4) reverterades i 8f2552a6: det byggde på en regex på artikelnamn, konsumerades ingenstans och bröt avtalskartans layout.
+Status: skriven 2026-09-05 efter två expertgranskningar (ekonomi respektive CRM/arkitektur), alla siffror verifierade mot produktionsdatabasen. BYGGD och pushad 2026-09-05, EJ browser-testad. Avvikelser från planen: fångstbur duvor flaggas inte (verktyg, aldrig obevakad längre än ett dygn); max_payback_years bor i prisinställningarna bredvid min/mål, inte i artikelregistret; treårsmarginalen är med i § 5 och avtalsförslaget; RPC dokumentsignering_statistik lämnad (år 1); HeroMetrics visar marginal efter all kostnad med tydligare etikett i stället för löpande. Ett tidigare försök (commit e4cf43b4) reverterades i 8f2552a6: det byggde på en regex på artikelnamn, konsumerades ingenstans och bröt avtalskartans layout.
 
 ## 1. Problemet
 

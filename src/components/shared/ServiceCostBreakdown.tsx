@@ -18,6 +18,7 @@ import { useState } from 'react'
 import { ChevronUp, ChevronDown } from 'lucide-react'
 import { calculateMarginPercent } from '../../types/caseBilling'
 import type { CaseBillingItem } from '../../types/caseBilling'
+import { marginTone, summarizeBillingLines, toneTextClass, type MarginLine } from '../../shared/marginEngine'
 
 export interface CostBreakdownServiceRow {
   /** Unik nyckel för React + expand-state (t.ex. invoice_item.id eller case_billing_item.id) */
@@ -45,8 +46,8 @@ interface ServiceCostBreakdownProps {
   neutralMargin?: boolean
 }
 
-const marginColor = (m: number) =>
-  m >= 50 ? 'text-emerald-400' : m >= 30 ? 'text-amber-400' : 'text-red-400'
+// Samma trösklar som resten av systemet (var 50/30 hårdkodat här)
+const marginColor = (m: number) => toneTextClass(marginTone(m))
 
 export default function ServiceCostBreakdown({
   serviceRows,
@@ -84,6 +85,12 @@ export default function ServiceCostBreakdown({
   // Ingen artikel är kopplad till en tjänst → marginalen är okänd, inte 100 %.
   const marginUnknown = assignedArticles.length === 0
   const totalMargin = calculateMarginPercent(totalRevenue, totalCost)
+  // Fakturor är engångs, år 1 är rätt tal. Varaktig utrustning (fällor,
+  // stationer) visas bara som information så att en låg marginal går att förstå.
+  const durableCost = summarizeBillingLines(assignedArticles as unknown as MarginLine[], {
+    context: 'case',
+    revenueOverride: totalRevenue,
+  }).cost_durable
 
   const totalMarginNode = neutralMargin ? (
     <span className="text-slate-400">Pro rata - marginal ej tillämplig</span>
@@ -92,8 +99,13 @@ export default function ServiceCostBreakdown({
       – marginal
     </span>
   ) : (
-    <span className={`font-semibold tabular-nums ${marginColor(totalMargin)}`}>
-      {totalMargin.toFixed(1)}% marginal
+    <span className="tabular-nums">
+      <span className={`font-semibold ${marginColor(totalMargin)}`}>{totalMargin.toFixed(1)}% marginal</span>
+      {durableCost > 0 && (
+        <span className="text-slate-500 font-normal ml-2" title="Står kvar hos kunden i flera år; betalas tillbaka av avtalet, inte av den här fakturan">
+          varav varaktig utrustning {formatAmount(durableCost)}
+        </span>
+      )}
     </span>
   )
 

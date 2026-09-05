@@ -72,6 +72,24 @@ export default function ContractEquipmentSection({
     const site = (s as unknown as { site_customer_id?: string | null }).site_customer_id
     return !(site && Number(s.quantity) === 0)
   })
+  // Artikelrader faktureras aldrig, så deras eget billing_model säger inget.
+  // Vad de hör till avgörs av vad de är mappade mot: produkter för
+  // tilläggsstationer (site_customer_id, eller mappade mot en per år/månad-
+  // tjänsterad) ligger utöver premien och ska inte etiketteras "ingår i premien".
+  const isAddonArticle = (a: CaseBillingItemWithRelations): boolean => {
+    const site = (a as unknown as { site_customer_id?: string | null }).site_customer_id
+    if (site) return true
+    const mapped = a.mapped_service_id ? services.find((sv) => sv.id === a.mapped_service_id) : null
+    return !!mapped && billingModelOf(mapped) !== 'premium'
+  }
+  const premiumArticles = articles.filter((a) => !isAddonArticle(a))
+  const addonArticles = articles.filter(isAddonArticle)
+  const durableTag = (a: CaseBillingItemWithRelations) =>
+    a.article?.is_durable ? (
+      <span className="font-sans text-[10px] uppercase tracking-[0.08em]" style={{ color: ink.muted }} title="Står kvar hos kunden i flera år: engångskostnad i marginalen, inte löpande">
+        varaktig
+      </span>
+    ) : null
   const rowUnitName = (s: CaseBillingItemWithRelations): string | null => {
     const site = (s as unknown as { site_customer_id?: string | null }).site_customer_id
     return site && unitNameOf ? unitNameOf(site) : null
@@ -139,12 +157,12 @@ export default function ContractEquipmentSection({
         </p>
       ) : (
         <>
-          {articles.length > 0 && (
+          {premiumArticles.length > 0 && (
             <div className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] pt-2 pb-0.5" style={{ color: ink.muted }}>
               Ingår i premien · intern kostnad
             </div>
           )}
-          {articles.map((a, i) => (
+          {premiumArticles.map((a, i) => (
             <div key={a.id} className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
               <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>6.{i + 1}</span>
               <span className="font-semibold">
@@ -154,6 +172,7 @@ export default function ContractEquipmentSection({
                 </span>
               </span>
               <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
+              {durableTag(a)}
               <span className="font-sans text-[10px] uppercase tracking-[0.08em]" style={{ color: ink.positive }}>
                 ingår i premien
               </span>
@@ -172,7 +191,7 @@ export default function ContractEquipmentSection({
             const model = billingModelOf(s)
             return (
               <div key={s.id} className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-                <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>6.{articles.length + i + 1}</span>
+                <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>6.{premiumArticles.length + i + 1}</span>
                 <span className="font-semibold">
                   {s.service_name ?? s.article_name}
                   {rowUnitName(s) && (
@@ -214,6 +233,38 @@ export default function ContractEquipmentSection({
               </div>
             )
           })}
+
+          {addonArticles.length > 0 && (
+            <div className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] pt-2.5 pb-0.5" style={{ color: ink.muted }}>
+              Tilläggsstationer · intern kostnad
+            </div>
+          )}
+          {addonArticles.map((a, i) => (
+            <div key={a.id} className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
+              <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>
+                6.{premiumArticles.length + extra.length + i + 1}
+              </span>
+              <span className="font-semibold">
+                {a.article_name}
+                {rowUnitName(a) && (
+                  <span className="font-normal text-[11.5px] ml-1.5" style={{ color: ink.secondary }}>
+                    · {rowUnitName(a)}
+                  </span>
+                )}
+                <span className="font-normal text-[11.5px] ml-1.5 tabular-nums" style={{ color: ink.secondary }}>
+                  {Number(a.quantity).toLocaleString('sv-SE')} st
+                </span>
+              </span>
+              <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
+              {durableTag(a)}
+              <span className="font-sans text-[10px] uppercase tracking-[0.08em]" style={{ color: ink.secondary }}>
+                tilläggsstation
+              </span>
+              <span className="font-sans text-[12px] tabular-nums" style={{ color: ink.secondary }}>
+                kostnad {formatKr(Number(a.total_price))}
+              </span>
+            </div>
+          ))}
         </>
       )}
       {/* Brickor: tilläggsstationer som väntar på beslut. Dras till § 7 (inbakat) eller § 6 (tillägg). */}

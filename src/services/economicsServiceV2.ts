@@ -18,9 +18,14 @@ export interface RevenuePulsePoint {
 export interface MarginPoint {
   month: string
   revenue: number      // försäljning (service-rader + contract + ad_hoc)
-  cost: number         // summan av artikelkostnader (quantity × articles.default_price)
+  cost: number         // summan av artikelradernas total_price
+  /** Varaktig utrustning placerad under månaden (fällor, stationer): engångs, inte löpande */
+  cost_durable: number
   gross_profit: number
+  /** Efter all kostnad, alltså den verkliga kassaeffekten */
   margin_percent: number
+  /** Utan varaktig utrustning */
+  margin_percent_ongoing: number
 }
 
 export interface ServiceMarginRow {
@@ -30,8 +35,10 @@ export interface ServiceMarginRow {
   min_margin_percent: number | null
   revenue: number
   cost: number
+  cost_durable: number
   gross_profit: number
   margin_percent: number
+  margin_percent_ongoing: number
   cases_count: number
 }
 
@@ -65,7 +72,10 @@ export interface CustomerPortfolioRow {
   display_name: string
   address_label: string | null
   annual_value: number
-  margin_percent: number // genomsnittlig marginal från kundens ärenden senaste 12 mån
+  margin_percent: number // marginal från kundens ärenden senaste 12 mån, efter all kostnad
+  /** Utan varaktig utrustning: det avtalet ger löpande */
+  margin_percent_ongoing: number
+  cost_durable: number
   case_count: number
 }
 
@@ -226,7 +236,7 @@ export const getMarginByMonth = async (months: number = 12): Promise<MarginPoint
   const since = startOfMonthISO(months)
   const keys = monthsBackFrom(months)
   const bucket: Record<string, MarginPoint> = {}
-  keys.forEach(k => { bucket[k] = { month: k, revenue: 0, cost: 0, gross_profit: 0, margin_percent: 0 } })
+  keys.forEach(k => { bucket[k] = { month: k, revenue: 0, cost: 0, cost_durable: 0, gross_profit: 0, margin_percent: 0, margin_percent_ongoing: 0 } })
 
   // Hämta cases med completed_date från alla tre case-tabellerna
   // (case_billing_items.case_id saknar FK och kan peka mot cases / private_cases / business_cases)
@@ -244,12 +254,15 @@ export const getMarginByMonth = async (months: number = 12): Promise<MarginPoint
   if (caseIds.length > 0) {
     const items = await fetchCaseBillingItemsByCaseIds(caseIds, 'case_id, item_type, total_price, quantity, article_id')
 
-    // Hämta artiklarnas default_price för kostnadsberäkning
+    // Kostnaden är radens total_price. Tidigare default_price × quantity, vilket
+    // för doseringsartiklar (quantity i gram, pris per förpackning) blev grovt
+    // fel: en K-Othrine-rad på 3 390 kr räknades som 871 200 kr. Artikeln slås
+    // bara upp för att skilja ut varaktig utrustning.
     const articleIds = Array.from(new Set(items.map((i: any) => i.article_id).filter(Boolean)))
     const { data: articles } = articleIds.length > 0
-      ? await supabase.from('articles').select('id, default_price').in('id', articleIds)
+      ? await supabase.from('articles').select('id, is_durable').in('id', articleIds)
       : { data: [] as any[] }
-    const costById = new Map((articles || []).map((a: any) => [a.id, Number(a.default_price || 0)]))
+    const durableById = new Map((articles || []).map((a: any) => [a.id, a.is_durable === true]))
 
     items.forEach((it: any) => {
       const key = caseMonth.get(it.case_id)
@@ -257,8 +270,9 @@ export const getMarginByMonth = async (months: number = 12): Promise<MarginPoint
       if (it.item_type === 'service') {
         bucket[key].revenue += Number(it.total_price || 0)
       } else if (it.item_type === 'article') {
-        const cost = costById.get(it.article_id) || 0
-        bucket[key].cost += cost * Number(it.quantity || 0)
+        const cost = Number(it.total_price || 0)
+        bucket[key].cost += cost
+        if (durableById.get(it.article_id)) bucket[key].cost_durable += cost
       }
     })
   }
@@ -282,6 +296,7 @@ export const getMarginByMonth = async (months: number = 12): Promise<MarginPoint
     const p = bucket[k]
     p.gross_profit = p.revenue - p.cost
     p.margin_percent = p.revenue > 0 ? (p.gross_profit / p.revenue) * 100 : 0
+    p.margin_percent_ongoing = p.revenue > 0 ? ((p.revenue - (p.cost - p.cost_durable)) / p.revenue) * 100 : 0
     return p
   })
 }
@@ -315,18 +330,21 @@ export const getServiceMarginRanking = async (
 
   if (items.length === 0) return []
 
+  // Kostnad = radens total_price (se getMarginByMonth). Artikeln slås bara upp
+  // för att skilja ut varaktig utrustning.
   const articleIds = Array.from(new Set(items.map((i: any) => i.article_id).filter(Boolean)))
   const { data: articles } = articleIds.length > 0
-    ? await supabase.from('articles').select('id, default_price').in('id', articleIds)
+    ? await supabase.from('articles').select('id, is_durable').in('id', articleIds)
     : { data: [] as any[] }
-  const costById = new Map((articles || []).map((a: any) => [a.id, Number(a.default_price || 0)]))
+  const durableById = new Map((articles || []).map((a: any) => [a.id, a.is_durable === true]))
 
-  const stats = new Map<string, { revenue: number; cost: number; cases: Set<string> }>()
+  const stats = new Map<string, { revenue: number; cost: number; durable: number; cases: Set<string> }>()
 
-  const addToStats = (sid: string, revenue: number, cost: number, caseId: string | null) => {
-    const s = stats.get(sid) || { revenue: 0, cost: 0, cases: new Set<string>() }
+  const addToStats = (sid: string, revenue: number, cost: number, caseId: string | null, durable = 0) => {
+    const s = stats.get(sid) || { revenue: 0, cost: 0, durable: 0, cases: new Set<string>() }
     s.revenue += revenue
     s.cost += cost
+    s.durable += durable
     if (caseId) s.cases.add(caseId)
     stats.set(sid, s)
   }
@@ -349,11 +367,12 @@ export const getServiceMarginRanking = async (
   // Steg 3: artikel-rader → kostnad (primär: mapped_service_id, fallback: proportionell allokering)
   items.forEach((a: any) => {
     if (a.item_type !== 'article') return
-    const cost = (costById.get(a.article_id) || 0) * Number(a.quantity || 0)
+    const cost = Number(a.total_price || 0)
     if (cost === 0) return
+    const durable = durableById.get(a.article_id) ? cost : 0
 
     if (a.mapped_service_id) {
-      addToStats(a.mapped_service_id, 0, cost, a.case_id)
+      addToStats(a.mapped_service_id, 0, cost, a.case_id, durable)
       return
     }
 
@@ -362,7 +381,7 @@ export const getServiceMarginRanking = async (
     if (totalRevenue === 0 || services.length === 0) return
     services.forEach(svc => {
       const share = svc.revenue / totalRevenue
-      addToStats(svc.service_id, 0, cost * share, a.case_id)
+      addToStats(svc.service_id, 0, cost * share, a.case_id, durable * share)
     })
   })
 
@@ -390,8 +409,10 @@ export const getServiceMarginRanking = async (
         min_margin_percent: svc?.min_margin_percent ?? null,
         revenue,
         cost,
+        cost_durable: s.durable,
         gross_profit: gross,
         margin_percent: revenue > 0 ? (gross / revenue) * 100 : 0,
+        margin_percent_ongoing: revenue > 0 ? ((revenue - (cost - s.durable)) / revenue) * 100 : 0,
         cases_count: s.cases.size,
       }
     })
@@ -639,21 +660,26 @@ export const getCustomerPortfolio = async (): Promise<CustomerPortfolioRow[]> =>
     ...Array.from(caseIdsByCustomer.values()).flat(),
   ]
 
-  let costByCase = new Map<string, { revenue: number; cost: number }>()
+  let costByCase = new Map<string, { revenue: number; cost: number; durable: number }>()
 
   if (allCaseIds.length > 0) {
     const items = await fetchCaseBillingItemsByCaseIds(allCaseIds, 'case_id, item_type, total_price, quantity, article_id')
 
+    // Kostnad = radens total_price (se getMarginByMonth)
     const articleIds = Array.from(new Set(items.map((i: any) => i.article_id).filter(Boolean)))
     const { data: articles } = articleIds.length > 0
-      ? await supabase.from('articles').select('id, default_price').in('id', articleIds)
+      ? await supabase.from('articles').select('id, is_durable').in('id', articleIds)
       : { data: [] as any[] }
-    const costById = new Map((articles || []).map((a: any) => [a.id, Number(a.default_price || 0)]))
+    const durableById = new Map((articles || []).map((a: any) => [a.id, a.is_durable === true]))
 
     items.forEach((it: any) => {
-      const k = costByCase.get(it.case_id) || { revenue: 0, cost: 0 }
+      const k = costByCase.get(it.case_id) || { revenue: 0, cost: 0, durable: 0 }
       if (it.item_type === 'service') k.revenue += Number(it.total_price || 0)
-      else if (it.item_type === 'article') k.cost += (costById.get(it.article_id) || 0) * Number(it.quantity || 0)
+      else if (it.item_type === 'article') {
+        const cost = Number(it.total_price || 0)
+        k.cost += cost
+        if (durableById.get(it.article_id)) k.durable += cost
+      }
       costByCase.set(it.case_id, k)
     })
   }
@@ -667,9 +693,11 @@ export const getCustomerPortfolio = async (): Promise<CustomerPortfolioRow[]> =>
       if (!v) return acc
       acc.revenue += v.revenue
       acc.cost += v.cost
+      acc.durable += v.durable
       return acc
-    }, { revenue: 0, cost: 0 })
+    }, { revenue: 0, cost: 0, durable: 0 })
     const marginPct = agg.revenue > 0 ? ((agg.revenue - agg.cost) / agg.revenue) * 100 : 0
+    const marginOngoing = agg.revenue > 0 ? ((agg.revenue - (agg.cost - agg.durable)) / agg.revenue) * 100 : 0
     const displayName = row.is_multi && row.address_label
       ? `${row.company_name} — ${row.address_label}`
       : row.company_name
@@ -681,6 +709,8 @@ export const getCustomerPortfolio = async (): Promise<CustomerPortfolioRow[]> =>
       address_label: row.address_label,
       annual_value: row.annual_value,
       margin_percent: marginPct,
+      margin_percent_ongoing: marginOngoing,
+      cost_durable: agg.durable,
       case_count: caseIds.length,
     }
   }).filter(r => r.annual_value > 0)
@@ -709,19 +739,14 @@ export const getTechnicianMarginScatter = async (
   if (cases.length === 0) return []
 
   const caseIds = cases.map((c: any) => c.id)
-  const items = await fetchCaseBillingItemsByCaseIds(caseIds, 'case_id, item_type, total_price, quantity, article_id')
+  const items = await fetchCaseBillingItemsByCaseIds(caseIds, 'case_id, item_type, total_price')
 
-  const articleIds = Array.from(new Set(items.map((i: any) => i.article_id).filter(Boolean)))
-  const { data: articles } = articleIds.length > 0
-    ? await supabase.from('articles').select('id, default_price').in('id', articleIds)
-    : { data: [] as any[] }
-  const costById = new Map((articles || []).map((a: any) => [a.id, Number(a.default_price || 0)]))
-
+  // Kostnad = radens total_price (se getMarginByMonth)
   const caseAgg = new Map<string, { revenue: number; cost: number }>()
   items.forEach((it: any) => {
     const k = caseAgg.get(it.case_id) || { revenue: 0, cost: 0 }
     if (it.item_type === 'service') k.revenue += Number(it.total_price || 0)
-    else if (it.item_type === 'article') k.cost += (costById.get(it.article_id) || 0) * Number(it.quantity || 0)
+    else if (it.item_type === 'article') k.cost += Number(it.total_price || 0)
     caseAgg.set(it.case_id, k)
   })
 

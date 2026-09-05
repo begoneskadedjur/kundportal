@@ -154,6 +154,7 @@ export class ArticleService {
         rot_eligible: input.rot_eligible ?? false,
         rut_eligible: input.rut_eligible ?? false,
         is_dosage_product: input.is_dosage_product ?? false,
+        is_durable: input.is_durable ?? false,
         dosage_unit: input.dosage_unit || null,
         total_content: input.total_content ?? null
       })
@@ -184,6 +185,7 @@ export class ArticleService {
     if (input.rot_eligible !== undefined) updateData.rot_eligible = input.rot_eligible
     if (input.rut_eligible !== undefined) updateData.rut_eligible = input.rut_eligible
     if (input.is_dosage_product !== undefined) updateData.is_dosage_product = input.is_dosage_product
+    if (input.is_durable !== undefined) updateData.is_durable = input.is_durable
     if (input.dosage_unit !== undefined) updateData.dosage_unit = input.dosage_unit
     if (input.total_content !== undefined) updateData.total_content = input.total_content
 

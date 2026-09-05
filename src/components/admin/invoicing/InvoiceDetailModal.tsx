@@ -505,7 +505,7 @@ export default function InvoiceDetailModal({
 
         const { data } = await supabase
           .from('case_billing_items')
-          .select('*')
+          .select('*, article:articles(is_durable, category)')
           .in('case_id', caseIds)
           .eq('case_type', 'contract')
           // Makulerade rader (t.ex. från ett tidigare avslutsförsök) hör
@@ -528,7 +528,7 @@ export default function InvoiceDetailModal({
         if (contract) {
           const { data } = await supabase
             .from('case_billing_items')
-            .select('*')
+            .select('*, article:articles(is_durable, category)')
             .eq('case_id', contract.id)
             .eq('case_type', 'contract')
             .neq('status', 'cancelled')
@@ -551,7 +551,7 @@ export default function InvoiceDetailModal({
       // Hämta service-items + article-items kopplade till dessa tjänster (via mapped_service_id)
       const { data } = await supabase
         .from('case_billing_items')
-        .select('*')
+        .select('*, article:articles(is_durable, category)')
         .eq('case_id', invoice.case_id)
         .eq('case_type', invoice.case_type)
         .or(`id.in.(${serviceIds.join(',')}),mapped_service_id.in.(${serviceIds.join(',')})`)

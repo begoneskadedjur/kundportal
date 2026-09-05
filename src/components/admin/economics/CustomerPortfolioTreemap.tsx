@@ -27,11 +27,17 @@ const CustomTooltip = ({ active, payload }: any) => {
         <span className="text-slate-200 font-medium">{formatCurrency(d.annual_value)}</span>
       </div>
       <div className="flex justify-between text-xs gap-4 mb-0.5">
-        <span className="text-slate-400">Marginal</span>
+        <span className="text-slate-400">{d.cost_durable > 0 ? 'Löpande marginal' : 'Marginal'}</span>
         <span className="text-slate-200 font-medium">
-          {d.case_count === 0 ? 'Ingen data' : formatPercentage(d.margin_percent)}
+          {d.case_count === 0 ? 'Ingen data' : formatPercentage(d.margin_percent_ongoing ?? d.margin_percent)}
         </span>
       </div>
+      {d.case_count > 0 && d.cost_durable > 0 && (
+        <div className="flex justify-between text-xs gap-4 mb-0.5">
+          <span className="text-slate-400">Efter utrustning</span>
+          <span className="text-slate-300">{formatPercentage(d.margin_percent)}</span>
+        </div>
+      )}
       <div className="flex justify-between text-xs gap-4">
         <span className="text-slate-400">Ärenden (12m)</span>
         <span className="text-slate-200 font-medium">{d.case_count}</span>
@@ -41,13 +47,16 @@ const CustomTooltip = ({ active, payload }: any) => {
 }
 
 const TreemapContent: React.FC<any> = (props) => {
-  const { x, y, width, height, depth, display_name, annual_value, margin_percent, case_count } = props
+  const { x, y, width, height, depth, display_name, annual_value, margin_percent, margin_percent_ongoing, case_count } = props
   // Treemap rendrerar rot-noden (depth 0) och sedan leaf-noder. Rot saknar vår data — hoppa över.
   if (depth === 0) return null
   if (typeof width !== 'number' || typeof height !== 'number' || width < 2 || height < 2) return null
 
   const name = typeof display_name === 'string' ? display_name : ''
-  const safeMargin = typeof margin_percent === 'number' ? margin_percent : null
+  // Färgen följer löpande marginal: en etablering med fällor ska inte måla kunden röd
+  const safeMargin = typeof margin_percent_ongoing === 'number'
+    ? margin_percent_ongoing
+    : typeof margin_percent === 'number' ? margin_percent : null
   const safeCaseCount = typeof case_count === 'number' ? case_count : 0
   const safeArr = typeof annual_value === 'number' ? annual_value : 0
 

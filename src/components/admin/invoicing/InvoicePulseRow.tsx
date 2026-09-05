@@ -4,14 +4,13 @@
 // Belopp · Ekonomisignal · Förfall/Villkor · Kunden · Kontext.
 // Datat kommer från useInvoicePulse (src/hooks) — allt är read-only.
 
+import { marginTone, toneTextClass } from '../../../shared/marginEngine'
 import type { ReactNode } from 'react'
 import type { InvoiceWithItems } from '../../../types/invoice'
 import { formatInvoiceAmount } from '../../../types/invoice'
 import type { CaseBillingItem } from '../../../types/caseBilling'
 import type { CaseContext } from '../../../hooks/useCaseContext'
 import {
-  MARGIN_BAD_BELOW,
-  MARGIN_WARN_BELOW,
   PRE_SEND_STATUSES,
   SENT_LIKE_STATUSES,
   daysBetween,
@@ -83,14 +82,9 @@ export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, case
     !isContract && assignedArticles.length > 0 && subtotal > 0
       ? ((subtotal - articleCost) / subtotal) * 100
       : null
-  const marginClass =
-    marginPercent == null
-      ? 'text-slate-100'
-      : marginPercent < MARGIN_BAD_BELOW
-        ? 'text-red-400'
-        : marginPercent <= MARGIN_WARN_BELOW
-          ? 'text-amber-400'
-          : 'text-[#20c58f]'
+  // Samma trösklar som resten av systemet (var 0/15 hårdkodat här). Fakturor
+  // är engångs, så år 1 mot kopplade artiklar är rätt tal.
+  const marginClass = marginPercent == null ? 'text-slate-100' : toneTextClass(marginTone(marginPercent))
 
   // --- c) Förfall/villkor
   const sentLike = SENT_LIKE_STATUSES.includes(invoice.status)

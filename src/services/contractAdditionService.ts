@@ -187,6 +187,61 @@ export class ContractAdditionService {
    * fakturarad) och räknar om kundens kommande avtalsfakturor.
    * Returnerar antal applicerade tillägg + ny premie för toasts.
    */
+  /**
+   * Varaktig utrustning (articles.is_durable) som mappats mot tilläggsraden
+   * kopieras till avtalet som intern kostnadsrad, så § 5 ser fällan bredvid
+   * den höjda premien. Aldrig fatalt: tillägget är redan applicerat.
+   */
+  private static async copyDurableArticlesToContract(
+    serviceRowId: string,
+    caseId: string,
+    contractId: string | null | undefined,
+    billingCustomerId: string | null | undefined
+  ): Promise<void> {
+    if (!contractId || !billingCustomerId) return
+    try {
+      const { data: articles } = await supabase
+        .from('case_billing_items')
+        .select('article_id, article_name, article_code, quantity, unit_price, total_price, vat_rate, article:articles(is_durable)')
+        .eq('case_id', caseId)
+        .eq('item_type', 'article')
+        .eq('mapped_service_id', serviceRowId)
+        .neq('status', 'cancelled')
+      type Row = {
+        article_id: string | null; article_name: string | null; article_code: string | null
+        quantity: number | null; unit_price: number | null; total_price: number | null; vat_rate: number | null
+        article: { is_durable: boolean | null } | null
+      }
+      const durable = ((articles ?? []) as unknown as Row[]).filter((a) => a.article?.is_durable === true && a.article_id)
+      if (durable.length === 0) return
+      const { error } = await supabase.from('case_billing_items').insert(
+        durable.map((a) => ({
+          case_id: contractId,
+          case_type: 'contract',
+          customer_id: billingCustomerId,
+          item_type: 'article',
+          article_id: a.article_id,
+          article_code: a.article_code,
+          article_name: a.article_name,
+          quantity: Number(a.quantity ?? 1),
+          unit_price: Number(a.unit_price ?? 0),
+          discount_percent: 0,
+          discounted_price: Number(a.unit_price ?? 0),
+          total_price: Number(a.total_price ?? 0),
+          vat_rate: Number(a.vat_rate ?? 25),
+          price_source: 'standard',
+          status: 'pending',
+          requires_approval: false,
+          billing_model: 'premium',
+          notes: `Varaktig utrustning från avtalstillägg, ärende ${caseId}`,
+        }))
+      )
+      if (error) console.warn('[ContractAdditionService] Kunde inte kopiera utrustning till avtalet:', error.message)
+    } catch (err) {
+      console.warn('[ContractAdditionService] Kunde inte kopiera utrustning till avtalet:', err)
+    }
+  }
+
   static async applyAdditionsForCase(caseId: string, createdByName: string | null): Promise<{ applied: number; newAnnualValue: number | null; errors: string[] }> {
     const errors: string[] = []
     let applied = 0
@@ -255,7 +310,13 @@ export class ContractAdditionService {
         continue
       }
       const result = data as { already_applied: boolean; new_annual_value: number }
-      if (!result.already_applied) applied++
+      if (!result.already_applied) {
+        applied++
+        // Utrustningen bokförs på ärendet men intäkten höjs på avtalet, så
+        // avtalets löpande marginal skulle stiga utan att fällan syns där.
+        // Varaktiga artiklar kopieras därför till avtalets § 6 som intern kostnad.
+        await this.copyDurableArticlesToContract(row.id, caseId, quote.contractId, quote.billingCustomerId)
+      }
       newAnnualValue = Number(result.new_annual_value)
     }
 

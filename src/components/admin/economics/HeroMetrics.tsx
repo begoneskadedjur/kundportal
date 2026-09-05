@@ -21,7 +21,7 @@ const HeroMetrics: React.FC = () => {
         subtitle="Aktiv återkommande intäkt"
       />
       <SparklineKpiCard
-        label="Genomsnittlig marginal"
+        label="Marginal efter all kostnad"
         value={margin.data ? formatPercentage(margin.data.current) : '–'}
         deltaPercent={margin.data?.delta_percent ?? null}
         sparkline={margin.data?.sparkline ?? []}

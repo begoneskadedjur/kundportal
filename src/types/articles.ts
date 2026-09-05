@@ -78,6 +78,8 @@ export interface Article {
   pack_size: number | null
   pack_price: number | null
   is_dosage_product: boolean
+  /** Står kvar hos kunden i flera år (fällor, stationer): engångskostnad i marginalen, inte löpande */
+  is_durable: boolean
   dosage_unit: DosageUnit | null
   total_content: number | null
   created_at: string
@@ -135,6 +137,7 @@ export interface CreateArticleInput {
   pack_size?: number | null
   pack_price?: number | null
   is_dosage_product?: boolean
+  is_durable?: boolean
   dosage_unit?: DosageUnit | null
   total_content?: number | null
 }
@@ -159,6 +162,7 @@ export interface UpdateArticleInput {
   pack_size?: number | null
   pack_price?: number | null
   is_dosage_product?: boolean
+  is_durable?: boolean
   dosage_unit?: DosageUnit | null
   total_content?: number | null
 }

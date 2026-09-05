@@ -1,6 +1,7 @@
 // 📁 src/pages/admin/oneflow/OneflowContractCreator.tsx
 // KOMPLETT WIZARD VERSION - STEG FÖR STEG GUIDE MED ANVÄNDARINTEGRATION
 
+import { formatPayback, marginTone, summarizeBillingLines, toneTextClass, type MarginLine } from '../../shared/marginEngine'
 import React, { useState, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Confetti from 'react-confetti'
@@ -1667,10 +1668,23 @@ export default function OneflowContractCreator() {
               let serviceTotal = 0
               let articleCost = 0
               let rows: React.ReactNode[] = []
+              // Raderna till motorn: varaktig utrustning (fällor, stationer) ska
+              // ställas mot en återkommande årsintäkt, inte dras från år 1.
+              let marginLines: MarginLine[] = []
 
               if (hasPrefill) {
                 serviceTotal = wizardData.prefillServices!.reduce((s, i) => s + i.total_price, 0)
                 articleCost = wizardData.selectedArticles.reduce((s, a) => s + a.effectivePrice * a.quantity, 0)
+                marginLines = [
+                  ...wizardData.prefillServices!.map((s): MarginLine => ({ item_type: 'service', total_price: s.total_price })),
+                  ...wizardData.selectedArticles.map((a): MarginLine => ({
+                    item_type: 'article',
+                    total_price: a.effectivePrice * a.quantity,
+                    quantity: a.quantity,
+                    article_name: a.article.name,
+                    article: { is_durable: a.article.is_durable, category: a.article.category },
+                  })),
+                ]
                 rows = wizardData.prefillServices!.map(s => {
                   const mapped = wizardData.selectedArticles.filter(a => a.mapped_service_id === s.id)
                   return (
@@ -1694,6 +1708,7 @@ export default function OneflowContractCreator() {
               } else {
                 serviceTotal = draftServices.reduce((s, i) => s + i.total_price, 0)
                 articleCost = draftArticles.reduce((s, i) => s + i.total_price, 0)
+                marginLines = [...draftServices, ...draftArticles] as unknown as MarginLine[]
                 rows = draftServices.map(svc => {
                   const mapped = draftArticles.filter(a => {
                     const assigned = wizardData.draftPriceAssignments[a.id] ?? a.mapped_service_id
@@ -1719,9 +1734,13 @@ export default function OneflowContractCreator() {
                 })
               }
 
-              const marginAmount = serviceTotal - articleCost
-              const marginPercent = serviceTotal > 0 ? (marginAmount / serviceTotal) * 100 : 0
-              const marginColor = marginPercent >= 35 ? 'text-emerald-400' : marginPercent >= 20 ? 'text-yellow-400' : 'text-red-400'
+              // Ett avtalsförslag är ett avtal: löpande marginal är huvudtalet, men
+              // säljaren ska också se att år 1 går back när fällorna köps in.
+              const mb = summarizeBillingLines(marginLines, { context: 'contract' })
+              const marginAmount = mb.contribution_ongoing
+              const marginPercent = mb.headline_percent ?? 0
+              const marginColor = toneTextClass(marginTone(mb.headline_percent))
+              const hasDurable = mb.cost_durable > 0
 
               return (
                 <Card className="p-6 mb-6">
@@ -1740,12 +1759,43 @@ export default function OneflowContractCreator() {
                         <span className="text-xs text-slate-500">Intern inköpskostnad</span>
                         <span className="text-xs text-slate-400">{fmtSEK(articleCost)}</span>
                       </div>
+                      {hasDurable && (
+                        <div className="flex justify-between mt-1">
+                          <span className="text-xs text-slate-500">varav varaktig utrustning, engångs</span>
+                          <span className="text-xs text-slate-400 tabular-nums">{fmtSEK(mb.cost_durable)}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between mt-1">
-                        <span className="text-xs text-slate-500">Marginal (intern)</span>
+                        <span className="text-xs text-slate-500">{hasDurable ? 'Löpande marginal (intern)' : 'Marginal (intern)'}</span>
                         <span className={`text-xs font-semibold ${marginColor}`}>
-                          {marginPercent.toFixed(1)}% ({fmtSEK(marginAmount)})
+                          {marginPercent.toFixed(1)}% ({fmtSEK(marginAmount)}{hasDurable ? '/år' : ''})
                         </span>
                       </div>
+                      {hasDurable && (
+                        <>
+                          <div className="flex justify-between mt-1">
+                            <span className="text-xs text-slate-500">Marginal år 1</span>
+                            <span className="text-xs text-slate-400 tabular-nums">
+                              {mb.margin_percent_year1 != null ? `${mb.margin_percent_year1.toFixed(1)}%` : '–'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between mt-1">
+                            <span className="text-xs text-slate-500">Återbetald efter</span>
+                            <span className="text-xs text-slate-400 tabular-nums">
+                              {mb.payback_never ? 'återbetalas inte' : formatPayback(mb.payback_years)}
+                            </span>
+                          </div>
+                          {mb.margin_percent_3y != null && (
+                            <div className="flex justify-between mt-1">
+                              <span className="text-xs text-slate-500">Marginal över tre år</span>
+                              <span className="text-xs text-slate-400 tabular-nums">{mb.margin_percent_3y.toFixed(1)}%</span>
+                            </div>
+                          )}
+                          <p className="text-xs text-slate-500 mt-2">
+                            Fällor och stationer säljs oftast som årspris (tilläggsstation per år), inte som engångsköp.
+                          </p>
+                        </>
+                      )}
                       <p className="text-xs text-slate-600 mt-2 italic">
                         Marginalen visas bara internt och skickas inte till kund.
                       </p>

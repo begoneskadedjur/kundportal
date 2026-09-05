@@ -22,6 +22,7 @@ export default function PricingSettingsModal({ isOpen, onClose }: PricingSetting
   const [targetMargin, setTargetMargin] = useState('35')
   const [recommendedMarkup, setRecommendedMarkup] = useState('40')
   const [minCharge, setMinCharge] = useState('3490')
+  const [maxPayback, setMaxPayback] = useState('2')
 
   useEffect(() => {
     if (!isOpen) return
@@ -32,6 +33,7 @@ export default function PricingSettingsModal({ isOpen, onClose }: PricingSetting
         setTargetMargin(String(s.target_margin_percent))
         setRecommendedMarkup(String(s.recommended_markup_percent))
         setMinCharge(String(s.min_charge_amount))
+        setMaxPayback(String(s.max_payback_years ?? 2))
       })
       .catch((err: any) => toast.error(err.message))
       .finally(() => setLoading(false))
@@ -42,8 +44,9 @@ export default function PricingSettingsModal({ isOpen, onClose }: PricingSetting
     const target = parseFloat(targetMargin)
     const markup = parseFloat(recommendedMarkup)
     const charge = parseFloat(minCharge)
+    const payback = parseFloat(maxPayback)
 
-    if (isNaN(min) || isNaN(target) || isNaN(markup) || isNaN(charge)) {
+    if (isNaN(min) || isNaN(target) || isNaN(markup) || isNaN(charge) || isNaN(payback)) {
       toast.error('Alla fält måste vara giltiga tal')
       return
     }
@@ -59,6 +62,7 @@ export default function PricingSettingsModal({ isOpen, onClose }: PricingSetting
         target_margin_percent: target,
         recommended_markup_percent: markup,
         min_charge_amount: charge,
+        max_payback_years: payback,
       })
       toast.success('Inställningar sparade')
       onClose()
@@ -151,6 +155,26 @@ export default function PricingSettingsModal({ isOpen, onClose }: PricingSetting
                       <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
                       &lt; {minMargin}%
                     </span>
+                  </div>
+
+                  {/* Varaktig utrustning (fällor, stationer) står kvar hos kunden i
+                      flera år. På avtal räknas den som engångskostnad bredvid den
+                      löpande marginalen, och det här är gränsen för hur länge den
+                      får ta att tjäna in via täckningsbidraget. */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">
+                      Längsta återbetalningstid för utrustning (år)
+                    </label>
+                    <input
+                      type="number"
+                      value={maxPayback}
+                      onChange={e => setMaxPayback(e.target.value)}
+                      min={0.5} max={10} step={0.5}
+                      className={inputClass}
+                    />
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Röd varning på avtal där fällor och stationer tar längre än så att betala tillbaka
+                    </p>
                   </div>
                 </div>
 

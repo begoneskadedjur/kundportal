@@ -142,7 +142,7 @@ export function ContractInvoiceModal({
     const fetchCaseBilling = async () => {
       const { data } = await supabase
         .from('case_billing_items')
-        .select('*')
+        .select('*, article:articles(is_durable, category)')
         .in('case_id', caseIds)
         .eq('case_type', 'contract')
       if (!cancelled) setCaseBillingItems((data as CaseBillingItem[] | null) || [])

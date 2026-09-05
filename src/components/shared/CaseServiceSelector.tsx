@@ -31,6 +31,7 @@ import { ContractCoverageService, type ContractCoverage } from '../../services/c
 import { PricingSettingsService } from '../../services/pricingSettingsService'
 import type { PricingSettings } from '../../types/pricingSettings'
 import { DEFAULT_PRICING_SETTINGS } from '../../types/pricingSettings'
+import { summarizeBillingLines } from '../../shared/marginEngine'
 import type {
   CaseBillingItemWithRelations,
   ArticleWithEffectivePrice,
@@ -41,7 +42,6 @@ import type {
 import {
   calculateDiscountedPrice,
   calculateTotalPrice,
-  calculateMarginPercent,
   itemRequiresApproval
 } from '../../types/caseBilling'
 import { getEffectiveRotPercent, getEffectiveRutPercent, calculateRotRutSummary } from '../../utils/rotRutConstants'
@@ -392,7 +392,14 @@ export default function CaseServiceSelector({
   // serviceCost = summa av item.total_price som redan är exkl. i DB, så samma formel funkar för privat + företag.
   const serviceCost = serviceItems.reduce((s, i) => s + i.total_price, 0)
   const purchaseCost = articleItems.reduce((s, i) => s + i.total_price, 0)
-  const marginPercent = serviceCost > 0 ? calculateMarginPercent(serviceCost, purchaseCost) : null
+  // Genom motorn (src/shared/marginEngine.ts). Ärenden är engångsjobb: fakturan
+  // betalar för fällan, så år 1 förblir huvudtalet. Uppdelningen används bara
+  // för att visa hur mycket av kostnaden som är varaktig utrustning.
+  const marginBreakdown = summarizeBillingLines([...serviceItems, ...articleItems], {
+    context: 'case',
+    settings: pricingSettings,
+  })
+  const marginPercent = marginBreakdown.headline_percent
   const marginOk = marginPercent === null || marginPercent >= pricingSettings.min_margin_percent
 
   // Tjänsterader vars pris härleds ur mappade artiklar med kundpris (avtalat
@@ -1833,6 +1840,15 @@ export default function CaseServiceSelector({
                   <span>Total inköpskostnad</span>
                   <span className="font-medium text-slate-300">{formatPrice(purchaseCost)}</span>
                 </div>
+                {marginBreakdown.cost_durable > 0 && (
+                  <div className="flex justify-between text-xs text-slate-500 px-1">
+                    <span>
+                      varav varaktig utrustning
+                      {caseType === 'contract' ? ', återbetalas via avtalet' : ''}
+                    </span>
+                    <span className="font-medium tabular-nums">{formatPrice(marginBreakdown.cost_durable)}</span>
+                  </div>
+                )}
               </div>
             )}
 

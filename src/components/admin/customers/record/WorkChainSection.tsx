@@ -15,6 +15,7 @@
 // kopplad till sin tjänst via mapped_service_id (som pekar på TJÄNSTERADENS
 // id, inte på services.id).
 
+import { summarizeBillingLines, type MarginLine } from '../../../../shared/marginEngine'
 import { useId, useMemo, useState } from 'react'
 import { ChevronDown, Layers } from 'lucide-react'
 import { formatKr, type RecordWorkItem } from '../../../../hooks/useCustomerRecord'
@@ -150,24 +151,33 @@ export default function WorkChainSection({
       byCase.set(s.case_id, list)
     }
 
+    // Varaktig utrustning (fällor, stationer) räknas som engångskostnad på
+    // avtalsrader och fullt ut på ärenden, precis som i resten av systemet.
+    // Summan över avtalsradernas utrustning behövs för totalen nedan.
+    let durableOnContracts = 0
     const cases: CaseGroup[] = []
     for (const [caseId, services] of byCase) {
+      const first = services[0]
+      const context = first.case_number ? 'case' : 'contract'
       const groups: ServiceGroup[] = services.map((s) => {
         const own = articlesByService.get(s.id) ?? []
         const revenue = Number(s.total_price ?? 0)
         const cost = own.reduce((sum, a) => sum + Number(a.total_price ?? 0), 0)
+        const bd = summarizeBillingLines([s, ...own] as unknown as MarginLine[], { context })
         return {
           id: s.id,
           name: s.service_name || s.article_name || 'Tjänst',
           revenue,
           cost,
           articles: own,
-          margin: revenue > 0 ? ((revenue - cost) / revenue) * 100 : null,
+          margin: bd.headline_percent,
         }
       })
       const revenue = groups.reduce((s, g) => s + g.revenue, 0)
       const cost = groups.reduce((s, g) => s + g.cost, 0)
-      const first = services[0]
+      const caseLines = [...services, ...services.flatMap((s) => articlesByService.get(s.id) ?? [])] as unknown as MarginLine[]
+      const caseBreakdown = summarizeBillingLines(caseLines, { context })
+      if (context === 'contract') durableOnContracts += caseBreakdown.cost_durable
       // Ett ärendenummer betyder utfört arbete; saknas det är raden avtalets
       // årspremie. Hooken sätter case_number bara när ett verkligt ärende
       // hittats, så numret är den pålitliga skiljelinjen — inte case_type.
@@ -180,7 +190,7 @@ export default function WorkChainSection({
         services: groups,
         revenue,
         cost,
-        margin: revenue > 0 ? ((revenue - cost) / revenue) * 100 : null,
+        margin: caseBreakdown.headline_percent,
         date: first.created_at,
       })
     }
@@ -217,6 +227,9 @@ export default function WorkChainSection({
     const cost =
       visibleCases.reduce((s, c) => s + c.cost, 0) +
       unmapped.reduce((s, a) => s + Number(a.total_price ?? 0), 0)
+    // Totalen: avtalens varaktiga utrustning är engångs och dras inte från
+    // årets intäkt; ärendenas kostnad räknas fullt ut.
+    const ongoingCost = cost - durableOnContracts
 
     return {
       cases: visibleCases,
@@ -224,7 +237,7 @@ export default function WorkChainSection({
       unmapped,
       revenue,
       cost,
-      margin: revenue > 0 ? ((revenue - cost) / revenue) * 100 : null,
+      margin: revenue > 0 ? ((revenue - ongoingCost) / revenue) * 100 : null,
     }
   }, [workItems])
 

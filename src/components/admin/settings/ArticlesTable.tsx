@@ -407,6 +407,11 @@ export function ArticlesTable({
                             {formatArticlePrice(calculatePricePerDosageUnit(article.default_price, article.total_content))}/{article.dosage_unit}
                           </p>
                         )}
+                        {article.is_durable && (
+                          <p className="text-xs text-slate-500" title="Står kvar hos kunden i flera år. Engångskostnad i marginalen, inte löpande.">
+                            Varaktig utrustning
+                          </p>
+                        )}
                       </div>
                     </td>
                   )}

@@ -18,6 +18,7 @@ import { PricingSettingsService } from '../../../services/pricingSettingsService
 import type { PriceList, PriceListItemWithArticle, PriceListItemWithService } from '../../../types/articles'
 import type { CaseBillingItemWithRelations, CaseServiceSummary } from '../../../types/caseBilling'
 import type { PricingSettings } from '../../../types/pricingSettings'
+import { formatPayback, marginTone, toneTextClass } from '../../../shared/marginEngine'
 import CustomerContractButton from './CustomerContractButton'
 
 interface Props {
@@ -55,10 +56,11 @@ const fmtDate = (iso?: string | null) => {
   return new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function marginPillClass(marginPercent: number, settings: PricingSettings): string {
-  if (marginPercent >= settings.target_margin_percent) return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-  if (marginPercent >= settings.min_margin_percent) return 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-  return 'bg-red-500/20 text-red-400 border border-red-500/30'
+const TONE_DOT: Record<ReturnType<typeof marginTone>, string> = {
+  good: 'bg-emerald-400',
+  warn: 'bg-yellow-400',
+  bad: 'bg-red-400',
+  none: 'bg-slate-500',
 }
 
 function healthColor(level: string) {
@@ -280,7 +282,7 @@ export default function CustomerDetailSidePanel({
 
         const [{ services, articles }, summary] = await Promise.all([
           ImportedCustomerContractService.getItems(targetContractId),
-          CaseBillingService.getCaseServiceSummary(targetContractId, 'contract', settings.min_margin_percent),
+          CaseBillingService.getContractMarginSummary(targetContractId, settings.min_margin_percent, settings),
         ])
         if (!cancelled) setContractData({ services, articles, summary })
       } catch (err) {
@@ -662,11 +664,24 @@ export default function CustomerDetailSidePanel({
             <SectionCard
               title="Avtalsinnehåll"
               icon={Receipt}
-              action={contractData.summary?.margin_percent != null && pricingSettings ? (
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${marginPillClass(contractData.summary.margin_percent, pricingSettings)}`}>
-                  {contractData.summary.margin_percent.toFixed(1)}% marginal
-                </span>
-              ) : null}
+              action={contractData.summary?.breakdown && pricingSettings ? (() => {
+                // Samma tal som § 5 på avtalskartan: löpande marginal när avtalet
+                // bär varaktig utrustning, annars vanlig marginal. Platt text, ingen pill.
+                const b = contractData.summary.breakdown
+                const tone = b.labour_missing ? 'bad' : marginTone(b.headline_percent, pricingSettings)
+                return (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium tabular-nums">
+                    <span className={`w-1.5 h-1.5 rounded-full ${TONE_DOT[tone]}`} />
+                    <span className={toneTextClass(tone)}>
+                      {b.labour_missing ? 'arbetstid saknas' : b.headline_percent != null ? `${b.headline_percent.toFixed(1)} %` : '–'}
+                    </span>
+                    {!b.labour_missing && <span className="text-slate-500">{b.headline_label.toLowerCase()}</span>}
+                    {b.payback_years != null && (
+                      <span className="text-slate-500">· återbetald {formatPayback(b.payback_years)}</span>
+                    )}
+                  </span>
+                )
+              })() : null}
             >
               {loadingContract ? (
                 <p className="text-xs text-slate-500">Laddar...</p>

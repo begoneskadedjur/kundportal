@@ -22,7 +22,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             <span className="text-slate-400">{p.name}</span>
           </div>
           <span className="text-slate-200 font-medium">
-            {p.dataKey === 'margin_percent'
+            {p.dataKey === 'margin_percent' || p.dataKey === 'margin_percent_ongoing'
               ? formatPercentage(Number(p.value || 0))
               : formatCurrency(Number(p.value || 0))}
           </span>
@@ -36,11 +36,17 @@ const MarginTrendChart: React.FC = () => {
   const { monthsInPeriod } = useEconomicsPeriod()
   const { data, loading } = useMarginByMonth(Math.max(monthsInPeriod, 6))
 
+  // Utrustning (fällor, stationer) placerad under månaden är en engångsutgift
+  // mot en återkommande intäkt. Den visas som egen stapel så att månaden med
+  // en etablering inte ser ut som en förlust, och båda marginalerna ritas:
+  // löpande (utan utrustning) och efter all kostnad (den verkliga kassaeffekten).
   const chartData = (data || []).map(p => ({
     month: formatMonth(p.month),
     Försäljning: p.revenue,
-    Kostnad: p.cost,
+    'Löpande kostnad': p.cost - p.cost_durable,
+    Utrustning: p.cost_durable,
     margin_percent: p.margin_percent,
+    margin_percent_ongoing: p.margin_percent_ongoing,
   }))
 
   const hasAny = (data || []).some(p => p.revenue > 0 || p.cost > 0)
@@ -48,7 +54,7 @@ const MarginTrendChart: React.FC = () => {
   return (
     <SectionCard
       title="Marginaltrend"
-      subtitle="Försäljning vs intern kostnad per månad"
+      subtitle="Försäljning, löpande kostnad och utrustning per månad"
       icon={<TrendingUp className="w-4 h-4" />}
     >
       {loading ? (
@@ -68,16 +74,28 @@ const MarginTrendChart: React.FC = () => {
               <Tooltip content={<CustomTooltip />} />
               <Legend wrapperStyle={{ color: '#94a3b8', fontSize: 12 }} />
               <Bar yAxisId="left" dataKey="Försäljning" fill="#20c58f" radius={[4, 4, 0, 0]} />
-              <Bar yAxisId="left" dataKey="Kostnad" fill="#475569" radius={[4, 4, 0, 0]} />
+              <Bar yAxisId="left" dataKey="Löpande kostnad" stackId="kostnad" fill="#475569" />
+              <Bar yAxisId="left" dataKey="Utrustning" stackId="kostnad" fill="#64748b" radius={[4, 4, 0, 0]} />
               <Line
                 yAxisId="right"
                 type="monotone"
-                dataKey="margin_percent"
-                name="Marginal %"
+                dataKey="margin_percent_ongoing"
+                name="Löpande marginal %"
                 stroke="#f59e0b"
                 strokeWidth={2}
                 dot={{ fill: '#f59e0b', r: 3 }}
                 activeDot={{ r: 5 }}
+              />
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="margin_percent"
+                name="Efter utrustning %"
+                stroke="#94a3b8"
+                strokeWidth={1.5}
+                strokeDasharray="4 3"
+                dot={false}
+                activeDot={{ r: 4 }}
               />
             </ComposedChart>
           </ResponsiveContainer>

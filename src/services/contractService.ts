@@ -1,4 +1,5 @@
 // src/services/contractService.ts - Service för contracts CRUD-operationer
+import { marginTone, summarizeBillingLines, type MarginBreakdown, type MarginLine } from '../shared/marginEngine'
 import { supabase } from '../lib/supabase'
 import { Contract, ContractInsert, ContractUpdate, ContractWithBilling } from '../types/database'
 import { isLiveContract } from '../utils/contractLifecycle'
@@ -172,7 +173,9 @@ export interface ContractBillingAggregate {
   }>
   external_total: number
   internal_cost: number
+  /** Löpande marginal, avrundad: avtal är rullande och varaktig utrustning tjänas in över år */
   margin_pct: number | null
+  breakdown: MarginBreakdown
 }
 
 // ========== Tidsserier för strategisk pipeline-analys ==========
@@ -281,7 +284,7 @@ export class ContractService {
     const { data, error } = await supabase
       .from('case_billing_items')
       .select(
-        'id, case_id, item_type, service_name, article_name, quantity, unit_price, total_price, mapped_service_id'
+        'id, case_id, item_type, service_name, article_name, quantity, unit_price, total_price, mapped_service_id, status, article:articles(is_durable, category)'
       )
       .in('case_id', contractIds)
       .eq('case_type', 'contract')
@@ -316,9 +319,11 @@ export class ContractService {
         }))
       const external_total = services.reduce((s, x) => s + x.total_price, 0)
       const internal_cost = articles.reduce((s, x) => s + x.total_price, 0)
+      // Genom motorn: löpande marginal när avtalet bär varaktig utrustning
+      const breakdown = summarizeBillingLines(rows as unknown as MarginLine[], { context: 'contract' })
       const margin_pct =
-        articles.length > 0 && external_total > 0
-          ? Math.round(((external_total - internal_cost) / external_total) * 100)
+        articles.length > 0 && external_total > 0 && breakdown.headline_percent !== null
+          ? Math.round(breakdown.headline_percent)
           : null
 
       result.set(contractId, {
@@ -328,6 +333,7 @@ export class ContractService {
         external_total,
         internal_cost,
         margin_pct,
+        breakdown,
       })
     })
 
@@ -1078,12 +1084,14 @@ export class ContractService {
           unknown.count++
           return
         }
-        const marginVal = agg.external_total - agg.internal_cost
+        const marginVal = agg.breakdown.contribution_ongoing
         marginList.push(agg.margin_pct)
-        if (agg.margin_pct >= 30) {
+        // Samma trösklar som resten av systemet (var 30/15 hårdkodat här)
+        const tone = marginTone(agg.margin_pct)
+        if (tone === 'good') {
           high.count++
           high.value += agg.external_total
-        } else if (agg.margin_pct >= 15) {
+        } else if (tone === 'warn') {
           mid.count++
           mid.value += agg.external_total
         } else {

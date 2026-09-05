@@ -1,6 +1,7 @@
 // src/services/caseBillingService.ts
 // Service för hantering av ärendebaserad fakturering (artiklar/tjänster tekniker väljer per ärende)
 
+import { summarizeBillingLines, type MarginContext, type MarginSettings } from '../shared/marginEngine'
 import { supabase } from '../lib/supabase'
 import type { Article } from '../types/articles'
 import type {
@@ -491,10 +492,66 @@ export class CaseBillingService {
   static async getCaseServiceSummary(
     caseId: string,
     caseType: BillableCaseType,
-    minMarginPercent: number = 20
+    minMarginPercent: number = 20,
+    opts: {
+      /** Avtal: löpande marginal är huvudtal. Ärende (default): år 1. */
+      context?: MarginContext
+      /** Avtal: årsintäkt från annual_value + tilläggsrader i stället för radsumman */
+      revenueOverride?: number | null
+      /** Avtal: planerade besök per år, för arbetstidsspärren */
+      visitsPerYear?: number | null
+      settings?: MarginSettings | null
+    } = {}
   ): Promise<CaseServiceSummary> {
     const items = await this.getCaseBillingItems(caseId, caseType, 'all')
+    return this.summarizeItems(items, minMarginPercent, opts)
+  }
 
+  /**
+   * Avtalets marginal med rätt intäktsbas. Premieraden på avtalet är ofta
+   * 0 kr eller avviker från avtalet (var sjätte aktivt avtal), så årsintäkten
+   * hämtas från contracts.annual_value plus tilläggsraderna i § 6. Används av
+   * § 5 på avtalskartan och kundkortets sidopanel, så de visar samma tal.
+   */
+  static async getContractMarginSummary(
+    contractId: string,
+    minMarginPercent: number = 20,
+    settings?: MarginSettings | null
+  ): Promise<CaseServiceSummary> {
+    const [{ data: contract }, items] = await Promise.all([
+      supabase.from('contracts').select('annual_value, visits_per_year').eq('id', contractId).maybeSingle(),
+      this.getCaseBillingItems(contractId, 'contract', 'all'),
+    ])
+    const annual = Number((contract as { annual_value?: number | string | null } | null)?.annual_value ?? 0)
+    const visits = Number((contract as { visits_per_year?: number | null } | null)?.visits_per_year ?? 0)
+    let extra = 0
+    for (const i of items) {
+      if (i.item_type !== 'service' || i.status === 'cancelled') continue
+      const model = (i as unknown as { billing_model?: string | null }).billing_model
+      const t = Number(i.total_price || 0)
+      if (model === 'per_year') extra += t
+      else if (model === 'per_month') extra += t * 12
+      else if (model === 'per_round') extra += t * visits
+    }
+    return this.summarizeItems(items, minMarginPercent, {
+      context: 'contract',
+      revenueOverride: annual > 0 ? annual + extra : null,
+      visitsPerYear: visits,
+      settings: settings ?? null,
+    })
+  }
+
+  /** Summering av redan hämtade rader. Ren funktion, ingen databas. */
+  static summarizeItems(
+    items: CaseBillingItemWithRelations[],
+    minMarginPercent: number = 20,
+    opts: {
+      context?: MarginContext
+      revenueOverride?: number | null
+      visitsPerYear?: number | null
+      settings?: MarginSettings | null
+    } = {}
+  ): CaseServiceSummary {
     const serviceItems = items.filter(i => i.item_type === 'service')
     const articleItems = items.filter(i => i.item_type === 'article')
 
@@ -502,9 +559,15 @@ export class CaseBillingService {
     const serviceVat = serviceItems.reduce((sum, i) => sum + calculateVatAmount(i.total_price, i.vat_rate), 0)
     const purchaseCost = articleItems.reduce((sum, i) => sum + i.total_price, 0)
 
-    const marginPercent = serviceSubtotal > 0
-      ? calculateMarginPercent(serviceSubtotal, purchaseCost)
-      : null
+    // All marginal går genom motorn. margin_percent förblir år 1 (mot hela
+    // inköpet) tills alla vyer läser breakdown; margin_ok bedömer huvudtalet.
+    const breakdown = summarizeBillingLines(items, {
+      context: opts.context ?? 'case',
+      revenueOverride: opts.revenueOverride ?? null,
+      visitsPerYear: opts.visitsPerYear ?? null,
+      settings: opts.settings ?? null,
+    })
+    const headline = breakdown.headline_percent
 
     return {
       services: {
@@ -517,8 +580,9 @@ export class CaseBillingService {
         article_count: articleItems.length,
         total_purchase_cost: purchaseCost,
       },
-      margin_percent: marginPercent,
-      margin_ok: marginPercent === null || marginPercent >= minMarginPercent,
+      margin_percent: breakdown.margin_percent_year1,
+      margin_ok: headline === null || headline >= minMarginPercent,
+      breakdown,
     }
   }
 
@@ -535,6 +599,7 @@ export class CaseBillingService {
   static async getAccumulatedSummaryForCases(caseIds: string[]): Promise<AccumulatedCaseSummary> {
     const empty: AccumulatedCaseSummary = {
       case_count: 0, groups: [], unmapped_articles: [], revenue: 0, cost: 0, margin_percent: null,
+      breakdown: summarizeBillingLines([], { context: 'contract' }),
     }
     const unique = Array.from(new Set(caseIds.filter(Boolean)))
     if (unique.length === 0) return empty
@@ -549,16 +614,18 @@ export class CaseBillingService {
       total_price: number | null
       mapped_service_id: string | null
       status: string | null
+      article: { is_durable: boolean | null; category: string | null } | null
     }
     const rows: Row[] = []
     for (let i = 0; i < unique.length; i += 150) {
       const { data, error } = await supabase
         .from('case_billing_items')
-        .select('id, case_id, item_type, service_name, article_name, quantity, total_price, mapped_service_id, status')
+        .select('id, case_id, item_type, service_name, article_name, quantity, total_price, mapped_service_id, status, article:articles(is_durable, category)')
         .in('case_id', unique.slice(i, i + 150))
         .neq('status', 'cancelled')
       if (error) throw new Error(`Databasfel: ${error.message}`)
-      rows.push(...((data ?? []) as Row[]))
+      // Supabase typar många-till-en-relationen som array; den är ett objekt i praktiken
+      rows.push(...((data ?? []) as unknown as Row[]))
     }
     if (rows.length === 0) return empty
 
@@ -566,14 +633,21 @@ export class CaseBillingService {
     // under rätt tjänst även när samma tjänst förekommer i många ärenden
     const groupNameByServiceRow = new Map<string, string>()
     const groups = new Map<string, AccumulatedServiceGroup>()
+    // Raderna per grupp behålls så motorn kan räkna gruppens uppdelning
+    const rowsByGroup = new Map<string, Row[]>()
+    const emptyBreakdown = () => summarizeBillingLines([], { context: 'contract' })
     for (const r of rows) {
       if (r.item_type !== 'service') continue
       const name = r.service_name || r.article_name || 'Tjänst utan namn'
       groupNameByServiceRow.set(r.id, name)
-      const g = groups.get(name) ?? { service_name: name, occurrences: 0, revenue: 0, articles: [], cost: 0, margin_percent: null }
+      const g = groups.get(name) ?? {
+        service_name: name, occurrences: 0, revenue: 0, articles: [], cost: 0, margin_percent: null,
+        breakdown: emptyBreakdown(),
+      }
       g.occurrences += Number(r.quantity ?? 1)
       g.revenue += Number(r.total_price ?? 0)
       groups.set(name, g)
+      rowsByGroup.set(name, [...(rowsByGroup.get(name) ?? []), r])
     }
 
     const addArticle = (list: AccumulatedArticleLine[], r: Row) => {
@@ -585,7 +659,7 @@ export class CaseBillingService {
         line.quantity += qty
         line.cost += cost
       } else {
-        list.push({ article_name: name, quantity: qty, cost })
+        list.push({ article_name: name, quantity: qty, cost, is_durable: r.article?.is_durable === true })
       }
     }
 
@@ -597,6 +671,7 @@ export class CaseBillingService {
         const g = groups.get(groupName)!
         addArticle(g.articles, r)
         g.cost += Number(r.total_price ?? 0)
+        rowsByGroup.set(groupName, [...(rowsByGroup.get(groupName) ?? []), r])
       } else {
         addArticle(unmapped, r)
       }
@@ -604,18 +679,19 @@ export class CaseBillingService {
 
     const sorted = Array.from(groups.values()).sort((a, b) => b.revenue - a.revenue)
     for (const g of sorted) {
-      g.margin_percent = g.revenue > 0 ? calculateMarginPercent(g.revenue, g.cost) : null
+      g.breakdown = summarizeBillingLines(rowsByGroup.get(g.service_name) ?? [], { context: 'contract' })
+      g.margin_percent = g.breakdown.margin_percent_year1
     }
-    const revenue = sorted.reduce((s, g) => s + g.revenue, 0)
-    const cost = sorted.reduce((s, g) => s + g.cost, 0) + unmapped.reduce((s, a) => s + a.cost, 0)
+    const breakdown = summarizeBillingLines(rows, { context: 'contract' })
 
     return {
       case_count: new Set(rows.map((r) => r.case_id)).size,
       groups: sorted,
       unmapped_articles: unmapped,
-      revenue,
-      cost,
-      margin_percent: revenue > 0 ? calculateMarginPercent(revenue, cost) : null,
+      revenue: breakdown.revenue,
+      cost: breakdown.cost_total,
+      margin_percent: breakdown.margin_percent_year1,
+      breakdown,
     }
   }
 

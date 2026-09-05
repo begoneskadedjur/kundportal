@@ -1,6 +1,7 @@
 // src/types/caseBilling.ts
 // Typer för ärendebaserad fakturering (artiklar/tjänster tekniker väljer per ärende)
 
+import type { MarginBreakdown } from '../shared/marginEngine'
 import type { Article, ArticleCategory } from './articles'
 import type { Service } from './services'
 
@@ -368,8 +369,12 @@ export interface ArticleItemsSummary {
 export interface CaseServiceSummary {
   services: ServiceItemsSummary
   articles: ArticleItemsSummary
+  /** Marginal år 1, alltså mot hela inköpet. Behålls för bakåtkompatibilitet. */
   margin_percent: number | null   // null om inga tjänster
+  /** Mot huvudtalet: löpande på avtal, år 1 på ärenden */
   margin_ok: boolean
+  /** Hela uppdelningen från motorn (src/shared/marginEngine.ts) */
+  breakdown: MarginBreakdown
 }
 
 // ============================================
@@ -381,6 +386,8 @@ export interface AccumulatedArticleLine {
   article_name: string
   quantity: number
   cost: number
+  /** Varaktig utrustning: engångskostnad, räknas inte i löpande marginal */
+  is_durable: boolean
 }
 
 /** Tjänst summerad över flera ärenden, med sina interna kostnader */
@@ -392,6 +399,7 @@ export interface AccumulatedServiceGroup {
   articles: AccumulatedArticleLine[]
   cost: number
   margin_percent: number | null
+  breakdown: MarginBreakdown
 }
 
 /**
@@ -408,6 +416,7 @@ export interface AccumulatedCaseSummary {
   revenue: number
   cost: number
   margin_percent: number | null
+  breakdown: MarginBreakdown
 }
 
 // ─────────────────────────────────────────────────────────────

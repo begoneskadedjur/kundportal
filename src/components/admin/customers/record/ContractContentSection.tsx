@@ -21,6 +21,7 @@ import type {
 } from '../../../../types/caseBilling'
 import type { PricingSettings } from '../../../../types/pricingSettings'
 import { formatKr } from '../../../../hooks/useCustomerRecord'
+import { formatPayback, paybackTone, summarizeBillingLines } from '../../../../shared/marginEngine'
 
 export interface ContractContent {
   services: CaseBillingItemWithRelations[]
@@ -49,7 +50,7 @@ export function useContractContent(contractId: string | null, reloadKey = 0) {
         if (cancelled) return
         const [items, summary] = await Promise.all([
           CaseBillingService.getCaseBillingItems(contractId, 'contract', 'all'),
-          CaseBillingService.getCaseServiceSummary(contractId, 'contract', settings.min_margin_percent),
+          CaseBillingService.getContractMarginSummary(contractId, settings.min_margin_percent, settings),
         ])
         if (cancelled) return
         setContent({
@@ -167,9 +168,13 @@ export default function ContractContentSection({
     }
   }
 
-  const margin = summary?.margin_percent ?? null
-  const revenue = summary?.services.subtotal ?? 0
-  const cost = summary?.articles.total_purchase_cost ?? 0
+  // Allt från motorn: revenue är årsintäkten (annual_value + tillägg), inte
+  // radsumman, och huvudtalet är löpande marginal när avtalet bär varaktig
+  // utrustning. Se docs/varaktig-utrustning-marginal-plan.md.
+  const b = summary?.breakdown ?? null
+  const margin = b?.headline_percent ?? null
+  const revenue = b?.revenue ?? 0
+  const cost = b?.cost_total ?? 0
 
   return (
     <>
@@ -208,9 +213,9 @@ export default function ContractContentSection({
           <>
             {services.map((svc, i) => {
               const svcArticles = articlesByService.get(svc.id) ?? []
-              const svcCost = svcArticles.reduce((sum, a) => sum + Number(a.total_price ?? 0), 0)
               const svcRevenue = Number(svc.total_price ?? 0)
-              const svcMargin = svcRevenue > 0 ? ((svcRevenue - svcCost) / svcRevenue) * 100 : null
+              const svcBreakdown = summarizeBillingLines([svc, ...svcArticles], { context: 'contract' })
+              const svcMargin = svcBreakdown.headline_percent
               return (
                 <div key={svc.id} className="border-b border-dotted border-[#d9d3c2] py-2">
                   <div className="flex items-center gap-2.5 text-[13.5px]">
@@ -240,6 +245,9 @@ export default function ContractContentSection({
                             {art.article_name}
                             {Number(art.quantity ?? 1) !== 1 && ` × ${Number(art.quantity)}`}
                           </span>
+                          {art.article?.is_durable && (
+                            <span className="text-[10px] uppercase tracking-[0.08em] shrink-0">varaktig</span>
+                          )}
                           <span className="flex-1" />
                           <span className="tabular-nums shrink-0">−{formatKr(Number(art.total_price ?? 0))}</span>
                         </div>
@@ -248,7 +256,7 @@ export default function ContractContentSection({
                         <div className="flex items-center gap-2 font-sans text-[10.5px] pt-0.5">
                           <span className="flex-1" />
                           <span className="tabular-nums" style={{ color: marginInk(svcMargin, settings) }}>
-                            {svcMargin.toFixed(1)} % marginal
+                            {svcMargin.toFixed(1)} % {svcBreakdown.headline_label.toLowerCase()}
                           </span>
                         </div>
                       )}
@@ -335,15 +343,18 @@ export default function ContractContentSection({
                             {a.article_name}
                             {a.quantity !== 1 && ` × ${a.quantity}`}
                           </span>
+                          {a.is_durable && (
+                            <span className="text-[10px] uppercase tracking-[0.08em] shrink-0">varaktig</span>
+                          )}
                           <span className="flex-1" />
                           <span className="tabular-nums shrink-0">−{formatKr(a.cost)}</span>
                         </div>
                       ))}
-                      {g.margin_percent !== null && (
+                      {g.breakdown.headline_percent !== null && (
                         <div className="flex items-center gap-2 font-sans text-[10.5px] pt-0.5">
                           <span className="flex-1" />
-                          <span className="tabular-nums" style={{ color: marginInk(g.margin_percent, settings) }}>
-                            {g.margin_percent.toFixed(1)} % marginal
+                          <span className="tabular-nums" style={{ color: marginInk(g.breakdown.headline_percent, settings) }}>
+                            {g.breakdown.headline_percent.toFixed(1)} % {g.breakdown.headline_label.toLowerCase()}
                           </span>
                         </div>
                       )}
@@ -373,27 +384,33 @@ export default function ContractContentSection({
               <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 pt-2 font-sans">
                 <span className="text-[12px] text-[#5d6672]">
                   Fakturerat värde{' '}
-                  <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(accumulated.revenue)}</b>
+                  <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(accumulated.breakdown.revenue)}</b>
                 </span>
                 <span className="text-[12px] text-[#5d6672]">
-                  Vår kostnad{' '}
-                  <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(accumulated.cost)}</b>
+                  {accumulated.breakdown.cost_durable > 0 ? 'Löpande kostnad' : 'Vår kostnad'}{' '}
+                  <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(accumulated.breakdown.cost_ongoing)}</b>
                 </span>
+                {accumulated.breakdown.cost_durable > 0 && (
+                  <span className="text-[12px] text-[#5d6672]">
+                    Varaktig utrustning{' '}
+                    <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(accumulated.breakdown.cost_durable)}</b>
+                  </span>
+                )}
                 <span className="text-[12px] text-[#5d6672]">
                   Täckningsbidrag{' '}
                   <b
                     className="text-[13px] tabular-nums"
-                    style={{ color: marginInk(accumulated.margin_percent, settings) }}
+                    style={{ color: marginInk(accumulated.breakdown.headline_percent, settings) }}
                   >
-                    {formatKr(accumulated.revenue - accumulated.cost)}
+                    {formatKr(accumulated.breakdown.contribution_ongoing)}
                   </b>
                 </span>
                 <span
                   className="ml-auto text-[15px] font-bold tabular-nums"
-                  style={{ color: marginInk(accumulated.margin_percent, settings) }}
+                  style={{ color: marginInk(accumulated.breakdown.headline_percent, settings) }}
                 >
-                  {accumulated.margin_percent !== null ? `${accumulated.margin_percent.toFixed(1)} %` : '–'}
-                  <span className="text-[10.5px] font-normal text-[#8a9099]"> marginal</span>
+                  {accumulated.breakdown.headline_percent !== null ? `${accumulated.breakdown.headline_percent.toFixed(1)} %` : '–'}
+                  <span className="text-[10.5px] font-normal text-[#8a9099]"> {accumulated.breakdown.headline_label.toLowerCase()}</span>
                 </span>
               </div>
             </>
@@ -405,41 +422,144 @@ export default function ContractContentSection({
         </div>
       )}
 
-      {/* § 5 Marginal — bara när det finns tjänster att räkna på */}
-      {!showAccumulated && !loading && services.length > 0 && summary && (
+      {/* § 5 Marginal. Villkoret räknar alla tjänsterader, inte bara premien:
+          ett avtal med enbart tilläggsstationer ska också ha en marginal. */}
+      {!showAccumulated && !loading && allServices.length > 0 && summary && b && (
         <div className="mt-3.5">
           <div className="border-b-[1.5px] border-[#262e38] pb-1">
             <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 5 · Marginal</h4>
           </div>
-          <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 pt-2 font-sans">
-            <span className="text-[12px] text-[#5d6672]">
-              Avtalsvärde{' '}
-              <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(revenue)}</b>
-            </span>
-            <span className="text-[12px] text-[#5d6672]">
-              Vår kostnad{' '}
-              <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(cost)}</b>
-            </span>
-            <span className="text-[12px] text-[#5d6672]">
-              Täckningsbidrag{' '}
-              <b className="text-[13px] tabular-nums" style={{ color: marginInk(margin, settings) }}>
-                {formatKr(revenue - cost)}
-              </b>
-            </span>
-            <span
-              className="ml-auto text-[15px] font-bold tabular-nums"
-              style={{ color: marginInk(margin, settings) }}
-            >
-              {margin !== null ? `${margin.toFixed(1)} %` : '–'}
-              <span className="text-[10.5px] font-normal text-[#8a9099]"> marginal</span>
-            </span>
-          </div>
-          {margin !== null && settings && margin < settings.min_margin_percent && (
+          {b.cost_durable > 0 ? (
+            <>
+              {/* Ledger i § 4/§ 6-rytmen. Fällor och stationer står kvar hos
+                  kunden i flera år: en engångsutgift mot en återkommande intäkt,
+                  som aldrig får dras från ett enda års avtalsvärde som om den
+                  förbrukades. Avtalen är rullande, så det finns ingen avtalstid
+                  att fördela över; i stället visas hur fort den betalar sig. */}
+              <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted border-[#d9d3c2] text-[13.5px]">
+                <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.1</span>
+                <span className="font-semibold text-[#262e38]">Avtalsvärde per år</span>
+                <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
+                <span className="tabular-nums text-[#262e38] whitespace-nowrap shrink-0">{formatKr(b.revenue)}</span>
+              </div>
+              <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted border-[#d9d3c2] text-[13.5px]">
+                <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.2</span>
+                <span className="font-semibold text-[#262e38] truncate">
+                  Löpande kostnad per år
+                  <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
+                    {[
+                      b.labour_cost > 0 && `arbetstid ${formatKr(b.labour_cost)}`,
+                      b.consumable_cost > 0 && `förbrukning ${formatKr(b.consumable_cost)}`,
+                    ].filter(Boolean).join(' · ')}
+                  </span>
+                </span>
+                <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
+                <span className="tabular-nums text-[#262e38] whitespace-nowrap shrink-0">−{formatKr(b.cost_ongoing)}</span>
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 pt-2 font-sans">
+                <span className="text-[12px] text-[#5d6672]">
+                  Täckningsbidrag per år{' '}
+                  <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(b.contribution_ongoing)}</b>
+                </span>
+                <span
+                  className="ml-auto text-[15px] font-bold tabular-nums"
+                  style={{ color: b.labour_missing ? '#9b3535' : marginInk(b.margin_percent_ongoing, settings) }}
+                >
+                  {b.labour_missing
+                    ? 'arbetstid saknas'
+                    : b.margin_percent_ongoing !== null ? `${b.margin_percent_ongoing.toFixed(1)} %` : '–'}
+                  <span className="text-[10.5px] font-normal text-[#8a9099]"> löpande marginal</span>
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5 py-1.5 mt-1.5 border-t border-b border-dotted border-[#d9d3c2] text-[13.5px]">
+                <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.3</span>
+                <span className="font-semibold text-[#262e38] truncate">
+                  Varaktig utrustning, engångs
+                  <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
+                    {b.durable_lines
+                      .map((l) => `${l.article_name}${l.quantity !== 1 ? ` × ${l.quantity}` : ''}`)
+                      .join(' · ')}
+                  </span>
+                </span>
+                <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
+                <span className="tabular-nums text-[#262e38] whitespace-nowrap shrink-0">−{formatKr(b.cost_durable)}</span>
+              </div>
+              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 pt-1.5 pl-8 font-sans text-[11px] text-[#8a9099]">
+                {b.payback_never ? (
+                  <span style={{ color: '#9b3535' }}>Återbetalas inte med nuvarande löpande kostnad</span>
+                ) : (
+                  <span>
+                    Återbetald efter{' '}
+                    <b
+                      className="tabular-nums"
+                      style={{ color: paybackTone(b, settings) === 'bad' ? '#9b3535' : '#5d6672' }}
+                    >
+                      {formatPayback(b.payback_years)}
+                    </b>
+                  </span>
+                )}
+                {b.margin_percent_3y !== null && (
+                  <span>
+                    Över tre år <b className="tabular-nums text-[#5d6672]">{b.margin_percent_3y.toFixed(1)} %</b>
+                  </span>
+                )}
+                <span className="ml-auto">
+                  År 1{' '}
+                  <b className="tabular-nums">
+                    {b.margin_percent_year1 !== null ? `${b.margin_percent_year1.toFixed(1)} %` : '–'}
+                  </b>{' '}
+                  marginal
+                </span>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 pt-2 font-sans">
+              <span className="text-[12px] text-[#5d6672]">
+                Avtalsvärde{' '}
+                <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(revenue)}</b>
+              </span>
+              <span className="text-[12px] text-[#5d6672]">
+                Vår kostnad{' '}
+                <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(cost)}</b>
+              </span>
+              <span className="text-[12px] text-[#5d6672]">
+                Täckningsbidrag{' '}
+                <b className="text-[13px] tabular-nums" style={{ color: marginInk(margin, settings) }}>
+                  {formatKr(revenue - cost)}
+                </b>
+              </span>
+              <span
+                className="ml-auto text-[15px] font-bold tabular-nums"
+                style={{ color: b.labour_missing ? '#9b3535' : marginInk(margin, settings) }}
+              >
+                {b.labour_missing ? 'arbetstid saknas' : margin !== null ? `${margin.toFixed(1)} %` : '–'}
+                <span className="text-[10.5px] font-normal text-[#8a9099]"> marginal</span>
+              </span>
+            </div>
+          )}
+          {!b.labour_missing && margin !== null && settings && margin < settings.min_margin_percent && (
             <div
               className="mt-1.5 font-sans text-[11px] px-2.5 py-1.5 rounded"
               style={{ background: 'rgba(155,53,53,.08)', color: '#9b3535' }}
             >
               Under lägsta marginal ({settings.min_margin_percent} %) — se över priser eller kostnader.
+            </div>
+          )}
+          {b.labour_missing && (
+            <div
+              className="mt-1.5 font-sans text-[11px] px-2.5 py-1.5 rounded"
+              style={{ background: 'rgba(155,53,53,.08)', color: '#9b3535' }}
+            >
+              Arbetstiden på avtalet täcker inte besöken ({b.labour_hours} h för avtalets besök). Lägg in
+              årets arbetstid som intern kostnad, annars säger marginalen inget.
+            </div>
+          )}
+          {!b.payback_never && paybackTone(b, settings) === 'bad' && settings && (
+            <div
+              className="mt-1.5 font-sans text-[11px] px-2.5 py-1.5 rounded"
+              style={{ background: 'rgba(180,83,9,.08)', color: '#b45309' }}
+            >
+              Utrustningen tar över {settings.max_payback_years} år att tjäna in — se över årspriset.
             </div>
           )}
           {articles.length === 0 && (

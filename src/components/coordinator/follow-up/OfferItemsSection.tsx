@@ -2,7 +2,10 @@
 // Visar tjänster (till kund) + interna artiklar (kalkyl) för en offert/avtal
 import { Wrench, Package, TrendingUp, Loader2, Receipt } from 'lucide-react'
 import type { CaseBillingItemWithRelations } from '../../../types/caseBilling'
-import { calculateMarginPercent } from '../../../types/caseBilling'
+import { useEffect, useState } from 'react'
+import { marginTone, summarizeBillingLines, toneTextClass } from '../../../shared/marginEngine'
+import { PricingSettingsService } from '../../../services/pricingSettingsService'
+import type { PricingSettings } from '../../../types/pricingSettings'
 
 interface OfferItemsSectionProps {
   services: CaseBillingItemWithRelations[]
@@ -16,6 +19,11 @@ function formatKr(value: number): string {
 }
 
 export default function OfferItemsSection({ services, articles, loading, error }: OfferItemsSectionProps) {
+  // Marginalfärgerna följer prisinställningarna (samma trösklar som resten av systemet)
+  const [settings, setSettings] = useState<PricingSettings | null>(null)
+  useEffect(() => {
+    PricingSettingsService.get().then(setSettings).catch(() => setSettings(null))
+  }, [])
   if (loading) {
     return (
       <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl flex items-center justify-center gap-2">
@@ -49,9 +57,10 @@ export default function OfferItemsSection({ services, articles, loading, error }
     0
   )
   const articlesSubtotal = articles.reduce((sum, i) => sum + i.total_price, 0)
-  const marginPercent = servicesSubtotal > 0
-    ? calculateMarginPercent(servicesSubtotal, articlesSubtotal)
-    : null
+  // Samma motor och samma trösklar som resten av systemet (var 40/20 hårdkodat här)
+  const breakdown = summarizeBillingLines([...services, ...articles], { context: 'case' })
+  const marginPercent = breakdown.headline_percent
+  const tone = marginTone(marginPercent, settings)
 
   return (
     <div className="space-y-3">
@@ -130,15 +139,21 @@ export default function OfferItemsSection({ services, articles, loading, error }
             <span className="text-xs font-medium text-slate-400">Inköpskostnad</span>
             <span className="text-sm font-semibold text-slate-300">{formatKr(articlesSubtotal)}</span>
           </div>
+          {breakdown.cost_durable > 0 && (
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-xs text-slate-500">varav varaktig utrustning</span>
+              <span className="text-xs text-slate-400 tabular-nums">{formatKr(breakdown.cost_durable)}</span>
+            </div>
+          )}
 
           {/* Marginal */}
           {marginPercent !== null && (
             <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-700/30">
               <div className="flex items-center gap-1">
-                <TrendingUp className={`w-3.5 h-3.5 ${marginPercent >= 40 ? 'text-green-400' : marginPercent >= 20 ? 'text-amber-400' : 'text-red-400'}`} />
+                <TrendingUp className={`w-3.5 h-3.5 ${toneTextClass(tone)}`} />
                 <span className="text-xs font-medium text-slate-400">Marginal</span>
               </div>
-              <span className={`text-sm font-semibold ${marginPercent >= 40 ? 'text-green-400' : marginPercent >= 20 ? 'text-amber-400' : 'text-red-400'}`}>
+              <span className={`text-sm font-semibold ${toneTextClass(tone)}`}>
                 {marginPercent.toFixed(1)}%
               </span>
             </div>

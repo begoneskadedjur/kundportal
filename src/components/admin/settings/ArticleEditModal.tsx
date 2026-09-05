@@ -66,6 +66,7 @@ export function ArticleEditModal({
   const [packSize, setPackSize] = useState('')
   const [packPrice, setPackPrice] = useState('')
   const [isDosageProduct, setIsDosageProduct] = useState(false)
+  const [isDurable, setIsDurable] = useState(false)
   const [dosageUnit, setDosageUnit] = useState<DosageUnit>('g')
   const [totalContent, setTotalContent] = useState('')
 
@@ -129,6 +130,7 @@ export function ArticleEditModal({
       setPackSize(article.pack_size ? article.pack_size.toString() : '')
       setPackPrice(article.pack_price ? article.pack_price.toString() : '')
       setIsDosageProduct(article.is_dosage_product ?? false)
+      setIsDurable(article.is_durable ?? false)
       setDosageUnit(article.dosage_unit ?? 'g')
       setTotalContent(article.total_content ? article.total_content.toString() : '')
       setSelectedPriceListIds([]) // Vid redigering behåller vi inte prislista-val
@@ -214,6 +216,7 @@ export function ArticleEditModal({
         pack_size: packSize ? parseInt(packSize) : null,
         pack_price: packPrice ? parseFloat(packPrice) : null,
         is_dosage_product: isDosageProduct,
+        is_durable: category === 'Arbetstid' ? false : isDurable,
         dosage_unit: isDosageProduct ? dosageUnit : null,
         total_content: isDosageProduct && totalContent ? parseFloat(totalContent) : null
       }
@@ -650,6 +653,22 @@ export function ArticleEditModal({
               <span className="text-white">Aktiv</span>
               <span className="text-slate-500 text-sm">(kan väljas vid fakturering)</span>
             </label>
+
+            {/* Varaktig utrustning står kvar hos kunden i flera år. I marginalen
+                räknas den som engångskostnad bredvid den löpande, i stället för
+                att dras från ett enda års intäkt. Arbetstid är aldrig varaktig. */}
+            {category !== 'Arbetstid' && (
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isDurable}
+                  onChange={(e) => setIsDurable(e.target.checked)}
+                  className="w-5 h-5 rounded bg-slate-900 border-slate-600 text-[#20c58f] focus:ring-[#20c58f]"
+                />
+                <span className="text-white">Varaktig utrustning</span>
+                <span className="text-slate-500 text-sm">(står kvar hos kunden i flera år, engångskostnad i marginalen)</span>
+              </label>
+            )}
 
             <div className="flex gap-6">
               <label className="flex items-center gap-3 cursor-pointer">

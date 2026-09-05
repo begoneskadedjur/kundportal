@@ -9,9 +9,12 @@ import type { ServiceMarginRow } from '../../../services/economicsServiceV2'
 
 const MarginBar: React.FC<{ row: ServiceMarginRow }> = ({ row }) => {
   const target = row.min_margin_percent ?? 20
-  const aboveTarget = row.margin_percent >= target
+  // Löpande marginal, annars hamnar tjänsterna som bär fällor och stationer
+  // alltid sist trots att utrustningen tjänas in över flera år
+  const headline = row.margin_percent_ongoing ?? row.margin_percent
+  const aboveTarget = headline >= target
   const barColor = aboveTarget ? '#20c58f' : '#ef4444'
-  const pct = Math.max(0, Math.min(100, row.margin_percent))
+  const pct = Math.max(0, Math.min(100, headline))
 
   return (
     <div className="p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg">
@@ -24,8 +27,13 @@ const MarginBar: React.FC<{ row: ServiceMarginRow }> = ({ row }) => {
         </div>
         <div className="text-right shrink-0">
           <div className={`text-sm font-semibold ${aboveTarget ? 'text-[#20c58f]' : 'text-red-400'}`}>
-            {formatPercentage(row.margin_percent)}
+            {formatPercentage(headline)}
           </div>
+          {row.cost_durable > 0 && (
+            <div className="text-[10px] text-slate-500" title="Marginal när utrustningen räknas fullt ut det här året">
+              efter utrustning {formatPercentage(row.margin_percent)}
+            </div>
+          )}
           {row.min_margin_percent != null && (
             <div className="text-[10px] text-slate-500">mål {row.min_margin_percent}%</div>
           )}
