@@ -239,6 +239,8 @@ export interface RecordInspectionSession {
   contract_id: string | null
   /** Kontrollärendet sessionen hör till — kopplingen är 1:1 */
   case_id: string | null
+  /** Schemat som skapade sessionen: ronden räknas per schema, inte per avtal */
+  recurring_schedule_id: string | null
   scheduled_at: string | null
   completed_at: string | null
   status: string | null
@@ -523,11 +525,12 @@ export function useCustomerRecord(customerId: string | undefined) {
         .select('id, contract_id, event_type, title, detail, occurred_at, created_by_name, contract:contracts!inner(customer_id)')
         .in('contract.customer_id', familyIds)
         .order('occurred_at', { ascending: true }),
-      // Kontrollbesök (§ 3 Uppföljning). OBS: contract_id är null på alla
-      // sessioner i dag — matchning sker på customer_id i konsumenten.
+      // Kontrollbesök (§ 3 Uppföljning). contract_id är satt på en tredjedel
+      // av sessionerna; ronden matchar via recurring_schedule_id och faller
+      // tillbaka på customer_id.
       supabase
         .from('station_inspection_sessions')
-        .select('id, customer_id, contract_id, case_id, scheduled_at, completed_at, status, total_outdoor_stations, total_indoor_stations, inspected_outdoor_stations, inspected_indoor_stations, technician:technicians(name)')
+        .select('id, customer_id, contract_id, case_id, recurring_schedule_id, scheduled_at, completed_at, status, total_outdoor_stations, total_indoor_stations, inspected_outdoor_stations, inspected_indoor_stations, technician:technicians(name)')
         .in('customer_id', familyIds)
         .order('scheduled_at', { ascending: false }),
       // Företagsärenden. business_cases saknar customer_id — kopplingen till
@@ -546,7 +549,8 @@ export function useCustomerRecord(customerId: string | undefined) {
       supabase
         .from('recurring_schedules')
         .select('id, customer_id, contract_id, frequency, status, schedule_start_date, generated_until')
-        .in('customer_id', familyIds),
+        .in('customer_id', familyIds)
+        .order('schedule_start_date', { ascending: true }),
       // FAKTUROR — sista steget i kedjan.
       //
       // Arbetsflödet är: case_billing_items (tjänst kunden får + artiklar vi
