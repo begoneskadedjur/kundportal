@@ -13,7 +13,7 @@ import { Loader2 } from 'lucide-react'
 import DateField from '../../../ui/DateField'
 import { formatDateSv, type RecordContract } from '../../../../hooks/useCustomerRecord'
 import { todayKey } from '../../../../utils/contractLifecycle'
-import { PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk } from './paperInk'
+import { PANEL_INPUT_CLASS, PAPER_GEAR_CLASS, PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk, type SectionMode } from './paperInk'
 
 type RenewalMode = 'rolling' | 'fixed' | 'option'
 
@@ -50,21 +50,16 @@ interface Props {
   onSaveRenewal?: (input: { renewalMode: RenewalMode; optionUntil: string | null; optionDecisionDeadline: string | null; reminderDays: number | null }) => Promise<void>
   onExerciseOption?: () => Promise<void>
   onTerminate?: () => void
+  /** Ångra uppsägning och radera: bara i panelens röda zon */
+  onReactivate?: () => void
+  onDelete?: () => void
+  /** paper = läsning på pappret (default), settings = formulären öppna i panelen */
+  mode?: SectionMode
+  onOpenSettings?: () => void
 }
 
-export default function ContractTermSection({ contract, ink, archived, onSaveTerm, onSaveRenewal, onExerciseOption, onTerminate }: Props) {
-  const [editing, setEditing] = useState(false)
-  const [startInput, setStartInput] = useState('')
-  const [endInput, setEndInput] = useState('')
-  const [noticeInput, setNoticeInput] = useState('')
-  const [editingRenewal, setEditingRenewal] = useState(false)
-  const [modeInput, setModeInput] = useState<RenewalMode>('rolling')
-  const [optionUntilInput, setOptionUntilInput] = useState('')
-  const [deadlineInput, setDeadlineInput] = useState('')
-  const [reminderInput, setReminderInput] = useState('90')
-  const [saving, setSaving] = useState(false)
-
-  const today = todayKey()
+/** Bevakningen: vilket datum kräver beslut och när kundansvarig påminns. Delas av § 9 och pulsen. */
+export function termWatch(contract: RecordContract, today: string = todayKey()) {
   const start = contract.contract_start_date ?? contract.start_date ?? null
   const end = contract.contract_end_date ?? null
   const notice = contract.notice_period_months ?? null
@@ -72,12 +67,6 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
   const months = start && end ? monthsBetween(start, end) : null
   const mode: RenewalMode = contract.renewal_mode ?? 'rolling'
   const reminderDays = contract.renewal_reminder_days ?? 90
-  const canEdit = !archived && !!onSaveTerm
-  const canEditRenewal = !archived && !!onSaveRenewal
-  const rowStyle = { borderColor: ink.rule }
-  const numStyle = { color: ink.muted }
-
-  // Bevakning: vilket datum kräver beslut, och när påminns kundansvarig
   const decisionDate =
     mode === 'option' ? (contract.option_decision_deadline ?? null) : mode === 'fixed' ? end : lastDay
   const decisionKind = mode === 'option' ? 'Beslut om option' : mode === 'fixed' ? 'Slutdatum' : 'Sista uppsägningsdag'
@@ -85,32 +74,46 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
   const daysLeft = decisionDate ? daysUntil(decisionDate, today) : null
   const urgent = daysLeft !== null && daysLeft <= (mode === 'rolling' ? 30 : reminderDays)
   const optionExhausted = mode === 'option' && !!contract.option_until && !!end && end >= contract.option_until
+  const modeLabel =
+    mode === 'option'
+      ? `option${contract.option_until ? `, längst till ${formatDateSv(contract.option_until)}` : ''}`
+      : mode === 'fixed'
+        ? 'fast slutdatum, löper vidare tills uppsägning'
+        : 'rullar vidare efter slutdatumet tills avtalet sägs upp'
+  return { today, start, end, notice, lastDay, months, mode, reminderDays, decisionDate, decisionKind, remindDate, daysLeft, urgent, optionExhausted, modeLabel }
+}
 
-  const openEdit = () => {
-    setStartInput(start ?? '')
-    setEndInput(end ?? '')
-    setNoticeInput(notice ? String(notice) : '')
-    setEditing(true)
-  }
+export default function ContractTermSection({ contract, ink, archived, onSaveTerm, onSaveRenewal, onExerciseOption, onTerminate, onReactivate, onDelete, mode: sectionMode = 'paper', onOpenSettings }: Props) {
+  const settings = sectionMode === 'settings'
+  const inputClass = settings ? PANEL_INPUT_CLASS : PAPER_INPUT_CLASS
+  const w = termWatch(contract)
+  const { today, start, end, notice, lastDay, months, mode, reminderDays, decisionDate, decisionKind, remindDate, daysLeft, urgent, optionExhausted, modeLabel } = w
+  const [editing, setEditing] = useState(settings)
+  const [startInput, setStartInput] = useState(settings ? (start ?? '') : '')
+  const [endInput, setEndInput] = useState(settings ? (end ?? '') : '')
+  const [noticeInput, setNoticeInput] = useState(settings && notice ? String(notice) : '')
+  const [editingRenewal, setEditingRenewal] = useState(settings)
+  const [modeInput, setModeInput] = useState<RenewalMode>(mode)
+  const [optionUntilInput, setOptionUntilInput] = useState(settings ? (contract.option_until ?? '') : '')
+  const [deadlineInput, setDeadlineInput] = useState(settings ? (contract.option_decision_deadline ?? (lastDay ?? '')) : '')
+  const [reminderInput, setReminderInput] = useState(String(reminderDays))
+  const [saving, setSaving] = useState(false)
+
+  const rowStyle = { borderColor: ink.rule }
+  const numStyle = { color: ink.muted }
+
 
   const save = async () => {
     if (!onSaveTerm) return
     setSaving(true)
     try {
       await onSaveTerm({ startDate: startInput || null, endDate: endInput || null, noticePeriodMonths: noticeInput ? Number(noticeInput) : null })
-      setEditing(false)
+      if (!settings) setEditing(false)
     } finally {
       setSaving(false)
     }
   }
 
-  const openRenewal = () => {
-    setModeInput(mode)
-    setOptionUntilInput(contract.option_until ?? '')
-    setDeadlineInput(contract.option_decision_deadline ?? (lastDay ?? ''))
-    setReminderInput(String(reminderDays))
-    setEditingRenewal(true)
-  }
 
   const saveRenewal = async () => {
     if (!onSaveRenewal) return
@@ -122,7 +125,7 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
         optionDecisionDeadline: deadlineInput || null,
         reminderDays: reminderInput ? Number(reminderInput) : null,
       })
-      setEditingRenewal(false)
+      if (!settings) setEditingRenewal(false)
     } finally {
       setSaving(false)
     }
@@ -138,23 +141,23 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
     }
   }
 
-  const modeLabel =
-    mode === 'option'
-      ? `option${contract.option_until ? `, längst till ${formatDateSv(contract.option_until)}` : ''}`
-      : mode === 'fixed'
-        ? 'fast slutdatum, löper vidare tills uppsägning'
-        : 'rullar vidare efter slutdatumet tills avtalet sägs upp'
-
   return (
-    <div className="mt-3.5">
-      <div className="flex items-baseline gap-2 border-b-[1.5px] pb-1" style={{ borderColor: ink.primary }}>
-        <h4 className="text-xs font-bold uppercase tracking-[0.12em]" style={{ color: ink.primary }}>
-          § 9 · Löptid och option
-        </h4>
-        <span className="ml-auto font-sans text-[10.5px]" style={{ color: ink.muted }}>
-          {mode === 'option' ? 'ramavtal med option' : end ? (end < today ? 'slutdatum passerat · rullar vidare' : 'fast period') : 'löper tills vidare'}
-        </span>
-      </div>
+    <div className={settings ? '' : 'mt-3.5 group/para'}>
+      {!settings && (
+        <div className="flex items-baseline gap-2 border-b-[1.5px] pb-1" style={{ borderColor: ink.primary }}>
+          <h4 className="text-xs font-bold uppercase tracking-[0.12em]" style={{ color: ink.primary }}>
+            § 9 · Löptid och option
+          </h4>
+          {onOpenSettings && !archived && (
+            <button type="button" onClick={onOpenSettings} className={PAPER_GEAR_CLASS} style={{ borderColor: ink.rule, color: ink.muted }} title="Inställningar för löptid" aria-label="Inställningar för löptid">
+              ⚙
+            </button>
+          )}
+          <span className="ml-auto font-sans text-[10.5px]" style={{ color: ink.muted }}>
+            {mode === 'option' ? 'ramavtal med option' : end ? (end < today ? 'slutdatum passerat · rullar vidare' : 'fast period') : 'löper tills vidare'}
+          </span>
+        </div>
+      )}
 
       {!editing ? (
         <>
@@ -173,11 +176,6 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
                 'startdatum saknas'
               )}
             </span>
-            {canEdit && (
-              <button onClick={openEdit} className={PAPER_LINK_CLASS} style={{ color: ink.muted }} title="Ändra start, slut och uppsägningstid">
-                ändra
-              </button>
-            )}
           </div>
           <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
             <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>9.2</span>
@@ -191,19 +189,21 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
       ) : (
         <div className="font-sans py-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center text-[12px]" style={{ color: ink.secondary }}>
           <label htmlFor={`term-start-${contract.id}`}>Startdatum</label>
-          <DateField id={`term-start-${contract.id}`} className={`${PAPER_INPUT_CLASS} pl-7 w-full`} value={startInput} onChange={setStartInput} autoFocus />
+          <DateField id={`term-start-${contract.id}`} className={`${inputClass} pl-7 w-full`} value={startInput} onChange={setStartInput} autoFocus />
           <label htmlFor={`term-end-${contract.id}`}>Slutdatum</label>
-          <DateField id={`term-end-${contract.id}`} className={`${PAPER_INPUT_CLASS} pl-7 w-full`} value={endInput} onChange={setEndInput} clearable />
+          <DateField id={`term-end-${contract.id}`} className={`${inputClass} pl-7 w-full`} value={endInput} onChange={setEndInput} clearable />
           <label htmlFor={`term-notice-${contract.id}`}>Uppsägningstid (mån)</label>
-          <input id={`term-notice-${contract.id}`} className={PAPER_INPUT_CLASS} inputMode="numeric" value={noticeInput} onChange={(e) => setNoticeInput(e.target.value)} placeholder="t.ex. 6" />
+          <input id={`term-notice-${contract.id}`} className={inputClass} inputMode="numeric" value={noticeInput} onChange={(e) => setNoticeInput(e.target.value)} placeholder="t.ex. 6" />
           <div className="col-span-2 flex items-center gap-3 pt-1">
             <button onClick={() => void save()} disabled={saving} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-[#fff] bg-[#20c58f] rounded-lg px-3 py-1.5 hover:brightness-110 disabled:opacity-50">
               {saving && <Loader2 className="w-3 h-3 animate-spin" />}
               Spara
             </button>
-            <button onClick={() => setEditing(false)} disabled={saving} className={PAPER_LINK_CLASS} style={{ color: ink.muted }}>
-              Avbryt
-            </button>
+            {!settings && (
+              <button onClick={() => setEditing(false)} disabled={saving} className={PAPER_LINK_CLASS} style={{ color: ink.muted }}>
+                Avbryt
+              </button>
+            )}
             <span className="ml-auto text-[10.5px]" style={{ color: ink.muted }}>
               Tomt slutdatum = tills vidare.
             </span>
@@ -220,16 +220,11 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
             {modeLabel}
             {mode === 'option' && contract.option_decision_deadline ? ` · beslut senast ${formatDateSv(contract.option_decision_deadline)}` : ''}
           </span>
-          {canEditRenewal && (
-            <button onClick={openRenewal} className={PAPER_LINK_CLASS} style={{ color: ink.muted }} title="Ändra förlängningsläge, option och bevakning">
-              ändra
-            </button>
-          )}
         </div>
       ) : (
         <div className="font-sans py-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center text-[12px]" style={{ color: ink.secondary }}>
           <label htmlFor={`renew-mode-${contract.id}`}>Förlängning</label>
-          <select id={`renew-mode-${contract.id}`} className={PAPER_INPUT_CLASS} value={modeInput} onChange={(e) => setModeInput(e.target.value as RenewalMode)} autoFocus>
+          <select id={`renew-mode-${contract.id}`} className={inputClass} value={modeInput} onChange={(e) => setModeInput(e.target.value as RenewalMode)} autoFocus>
             <option value="rolling">Rullar vidare tills uppsägning</option>
             <option value="fixed">Fast slutdatum (påminnelse före slutet)</option>
             <option value="option">Option på förlängning</option>
@@ -237,15 +232,15 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
           {modeInput === 'option' && (
             <>
               <label htmlFor={`renew-until-${contract.id}`}>Längst till</label>
-              <DateField id={`renew-until-${contract.id}`} className={`${PAPER_INPUT_CLASS} pl-7 w-full`} value={optionUntilInput} onChange={setOptionUntilInput} clearable />
+              <DateField id={`renew-until-${contract.id}`} className={`${inputClass} pl-7 w-full`} value={optionUntilInput} onChange={setOptionUntilInput} clearable />
               <label htmlFor={`renew-deadline-${contract.id}`}>Beslut senast</label>
-              <DateField id={`renew-deadline-${contract.id}`} className={`${PAPER_INPUT_CLASS} pl-7 w-full`} value={deadlineInput} onChange={setDeadlineInput} clearable />
+              <DateField id={`renew-deadline-${contract.id}`} className={`${inputClass} pl-7 w-full`} value={deadlineInput} onChange={setDeadlineInput} clearable />
             </>
           )}
           {modeInput !== 'rolling' && (
             <>
               <label htmlFor={`renew-remind-${contract.id}`}>Påminn dagar före</label>
-              <input id={`renew-remind-${contract.id}`} className={PAPER_INPUT_CLASS} inputMode="numeric" value={reminderInput} onChange={(e) => setReminderInput(e.target.value)} />
+              <input id={`renew-remind-${contract.id}`} className={inputClass} inputMode="numeric" value={reminderInput} onChange={(e) => setReminderInput(e.target.value)} />
             </>
           )}
           <div className="col-span-2 flex items-center gap-3 pt-1">
@@ -253,9 +248,11 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
               {saving && <Loader2 className="w-3 h-3 animate-spin" />}
               Spara
             </button>
-            <button onClick={() => setEditingRenewal(false)} disabled={saving} className={PAPER_LINK_CLASS} style={{ color: ink.muted }}>
-              Avbryt
-            </button>
+            {!settings && (
+              <button onClick={() => setEditingRenewal(false)} disabled={saving} className={PAPER_LINK_CLASS} style={{ color: ink.muted }}>
+                Avbryt
+              </button>
+            )}
             <span className="ml-auto text-[10.5px]" style={{ color: ink.muted }}>
               Avtalet stoppas aldrig automatiskt; läget styr påminnelsen.
             </span>
@@ -263,8 +260,8 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
         </div>
       )}
 
-      {/* Bevakning */}
-      {decisionDate && !archived && (
+      {/* Bevakning: i panelen. På pappret bor den i pulsen. */}
+      {settings && decisionDate && !archived && (
         <div
           className="flex items-center gap-2.5 mt-2 px-3 py-2 rounded-md font-sans text-[11.5px] leading-relaxed"
           style={{
@@ -293,7 +290,7 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
         </div>
       )}
 
-      {!archived && (onExerciseOption || onSaveRenewal || onTerminate) && (
+      {settings && !archived && (onExerciseOption || onSaveRenewal) && (
         <div className="flex gap-2 flex-wrap pt-2 font-sans">
           {mode === 'option' && onExerciseOption && !optionExhausted && (
             <button
@@ -317,16 +314,48 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
               Förläng tills vidare
             </button>
           )}
-          {onTerminate && (
-            <button
-              onClick={onTerminate}
-              disabled={saving}
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold border rounded-md px-2.5 py-1.5 bg-[#fff]/60 hover:bg-[#fff]/90 disabled:opacity-50"
-              style={{ borderColor: ink.rule, color: '#9b3535' }}
-            >
-              Säg upp
-            </button>
-          )}
+        </div>
+      )}
+      {settings && (onTerminate || onReactivate || onDelete) && (
+        <div className="mt-4 pt-3 font-sans" style={{ borderTop: `1px solid ${ink.danger}55` }}>
+          <div className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2" style={{ color: ink.danger }}>
+            Avsluta
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {onTerminate && (
+              <button
+                onClick={onTerminate}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold border rounded-md px-2.5 py-1.5 hover:bg-red-500/10 disabled:opacity-50"
+                style={{ borderColor: `${ink.danger}80`, color: ink.danger }}
+                title="Säg upp avtalet, det bevaras som historik"
+              >
+                Säg upp avtalet
+              </button>
+            )}
+            {onReactivate && (
+              <button
+                onClick={onReactivate}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold border rounded-md px-2.5 py-1.5 disabled:opacity-50"
+                style={{ borderColor: ink.rule, color: ink.positive }}
+                title="Ångra uppsägningen"
+              >
+                Ångra uppsägning
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 text-[11.5px] border rounded-md px-2.5 py-1.5 hover:bg-red-500/10 disabled:opacity-50"
+                style={{ borderColor: `${ink.danger}55`, color: ink.danger }}
+                title="Radera avtalet"
+              >
+                Radera avtalet
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

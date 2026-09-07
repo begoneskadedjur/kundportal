@@ -22,7 +22,7 @@ import {
   type RecordContract,
 } from '../../../../hooks/useCustomerRecord'
 import { todayKey } from '../../../../utils/contractLifecycle'
-import { PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk } from './paperInk'
+import { PANEL_INPUT_CLASS, PAPER_GEAR_CLASS, PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk, type SectionMode } from './paperInk'
 
 type PremiumEvent = CustomerRecordData['premiumEvents'][number]
 
@@ -133,47 +133,30 @@ interface Props {
     annualValue: number
     note: string | null
   }) => Promise<void>
+  /** paper = läsning på pappret (default), settings = formulären öppna i panelen */
+  mode?: SectionMode
+  /** Kugghjulet i rubriken: öppna panelen på Fakturering */
+  onOpenSettings?: () => void
+  /** Var tilläggsraderna faktureras (kundens läge) */
+  equipmentInvoiceMode?: 'with_premium' | 'separate' | null
 }
 
-export default function ContractPremiumSection({
-  contract,
-  premiumEvents,
-  annualInForce,
-  ink,
-  archived,
-  onSavePremium,
-  onAddPremiumEvent,
-  invoiceMode,
-  planEntries,
-  onLinkFortnox,
-}: Props) {
-  const [editing, setEditing] = useState(false)
-  const [stepForm, setStepForm] = useState<null | { eventType: 'step_up' | 'indexation' }>(null)
-  const [saving, setSaving] = useState(false)
-
-  const [annualInput, setAnnualInput] = useState('')
-  const [freqInput, setFreqInput] = useState('')
-  const [anchorInput, setAnchorInput] = useState('')
-
-  const [stepDate, setStepDate] = useState('')
-  const [stepValue, setStepValue] = useState('')
-  const [stepPercent, setStepPercent] = useState('')
-  const [stepNote, setStepNote] = useState('')
-
-  const today = todayKey()
+/** Nästa faktura, tillägg och luckor ur fakturaplanen. Delas av § 7 och pulsen. */
+export function premiumSummary(input: {
+  contract: RecordContract
+  annualInForce: number | null
+  planEntries?: PremiumPlanEntry[]
+  today?: string
+}) {
+  const { contract, annualInForce, planEntries } = input
+  const today = input.today ?? todayKey()
   const frequency = contract.billing_frequency ?? null
   const frequencyLabel = frequency ? BILLING_FREQUENCY_LABEL[frequency] ?? frequency : null
   const anchor = contract.billing_anchor_month ?? null
   const nextStart = nextInvoicePeriodStart(contract, today)
   const paused = contract.billing_active === false
   const pausedUntil = paused && contract.billing_paused_until ? formatDateSv(contract.billing_paused_until) : null
-  const sortedEvents = [...premiumEvents].sort((a, b) => a.effective_from.localeCompare(b.effective_from))
-  const canEdit = !archived && !!onSavePremium
-  const canStep = !archived && !!onAddPremiumEvent
-  // Fakturaplanen vinner över den lokala periodberäkningen när den finns:
-  // den känner till trappan, utrustningen, Fortnox-importer och samlingsfakturor.
   const allEntries = planEntries ?? []
-  // § 7 handlar om premien; tillägg på egna fakturor får rad 7.5
   const entries = allEntries.filter((e) => !e.kind || e.kind === 'premium')
   const equipmentEntries = allEntries.filter((e) => e.kind === 'equipment' || e.kind === 'equipment_monthly')
   const uncovered = allEntries.filter((e) => e.action === 'uncovered')
@@ -192,13 +175,46 @@ export default function ContractPremiumSection({
     : nextStart
       ? { date: nextStart, text: annualInForce ? formatKr(periodAmount(annualInForce, frequency)) : 'belopp saknas' }
       : null
+  return { today, frequency, frequencyLabel, anchor, nextStart, paused, pausedUntil, entries, equipmentEntries, uncovered, nextEntry, nextEquipment, nextLabel }
+}
 
-  const openEdit = () => {
-    setAnnualInput(annualInForce != null ? String(annualInForce) : '')
-    setFreqInput(frequency ?? 'annual')
-    setAnchorInput(anchor ? String(anchor) : nextStart ? nextStart.slice(5, 7) : '')
-    setEditing(true)
-  }
+export const PREMIUM_MONTHS = MONTHS
+
+export default function ContractPremiumSection({
+  contract,
+  premiumEvents,
+  annualInForce,
+  ink,
+  archived,
+  onSavePremium,
+  onAddPremiumEvent,
+  invoiceMode,
+  planEntries,
+  onLinkFortnox,
+  mode = 'paper',
+  onOpenSettings,
+  equipmentInvoiceMode,
+}: Props) {
+  const settings = mode === 'settings'
+  const inputClass = settings ? PANEL_INPUT_CLASS : PAPER_INPUT_CLASS
+  const [editing, setEditing] = useState(settings)
+  const [stepForm, setStepForm] = useState<null | { eventType: 'step_up' | 'indexation' }>(null)
+  const [saving, setSaving] = useState(false)
+
+  const [annualInput, setAnnualInput] = useState(settings && annualInForce != null ? String(annualInForce) : '')
+  const [freqInput, setFreqInput] = useState(settings ? (contract.billing_frequency ?? 'annual') : '')
+  const [anchorInput, setAnchorInput] = useState(settings && contract.billing_anchor_month ? String(contract.billing_anchor_month) : '')
+
+  const [stepDate, setStepDate] = useState('')
+  const [stepValue, setStepValue] = useState('')
+  const [stepPercent, setStepPercent] = useState('')
+  const [stepNote, setStepNote] = useState('')
+
+  const { today, frequencyLabel, anchor, nextStart, paused, pausedUntil, uncovered } = premiumSummary({ contract, annualInForce, planEntries })
+  const sortedEvents = [...premiumEvents].sort((a, b) => a.effective_from.localeCompare(b.effective_from))
+  // Pappret läser, panelen redigerar: stegknapparna finns bara i panelen
+  const canStep = settings && !archived && !!onAddPremiumEvent
+
 
   const savePremium = async () => {
     if (!onSavePremium) return
@@ -211,7 +227,7 @@ export default function ContractPremiumSection({
         billingFrequency: freqInput || null,
         billingAnchorMonth: anchorInput ? Number(anchorInput) : null,
       })
-      setEditing(false)
+      if (!settings) setEditing(false)
     } finally {
       setSaving(false)
     }
@@ -255,19 +271,26 @@ export default function ContractPremiumSection({
   const numStyle = { color: ink.muted }
 
   return (
-    <div className="mt-3.5">
-      <div className="flex items-baseline gap-2 border-b-[1.5px] pb-1" style={{ borderColor: ink.primary }}>
-        <h4 className="text-xs font-bold uppercase tracking-[0.12em]" style={{ color: ink.primary }}>
-          § 7 · Premie och fakturering
-        </h4>
-        <span className="ml-auto font-sans text-[10.5px] tabular-nums" style={{ color: ink.muted }}>
-          {paused
-            ? (pausedUntil ? `fakturering pausad till ${pausedUntil}` : 'fakturering pausad tills vidare')
-            : frequencyLabel
-              ? `faktureras ${frequencyLabel.toLowerCase()}${anchor ? ` · ${MONTHS[anchor - 1]}` : ''}`
-              : 'faktureringsvillkor saknas'}
-        </span>
-      </div>
+    <div className={settings ? '' : 'mt-3.5 group/para'}>
+      {!settings && (
+        <div className="flex items-baseline gap-2 border-b-[1.5px] pb-1" style={{ borderColor: ink.primary }}>
+          <h4 className="text-xs font-bold uppercase tracking-[0.12em]" style={{ color: ink.primary }}>
+            § 7 · Premie och fakturering
+          </h4>
+          {onOpenSettings && !archived && (
+            <button type="button" onClick={onOpenSettings} className={PAPER_GEAR_CLASS} style={{ borderColor: ink.rule, color: ink.muted }} title="Inställningar för fakturering" aria-label="Inställningar för fakturering">
+              ⚙
+            </button>
+          )}
+          <span className="ml-auto font-sans text-[10.5px] tabular-nums" style={{ color: ink.muted }}>
+            {paused
+              ? (pausedUntil ? `fakturering pausad till ${pausedUntil}` : 'fakturering pausad tills vidare')
+              : frequencyLabel
+                ? `faktureras ${frequencyLabel.toLowerCase()}${anchor ? ` · ${MONTHS[anchor - 1]}` : ''}`
+                : ''}
+          </span>
+        </div>
+      )}
 
       {!editing ? (
         <>
@@ -278,92 +301,26 @@ export default function ContractPremiumSection({
             <span className="font-bold tabular-nums" style={{ color: annualInForce ? ink.primary : ink.warn }}>
               {annualInForce ? `${formatKr(annualInForce)}/år` : 'ej satt'}
             </span>
-            {canEdit && (
-              <button onClick={openEdit} className={PAPER_LINK_CLASS} style={{ color: ink.muted }} title="Ändra årspremie, frekvens och ankarmånad">
-                ändra
-              </button>
-            )}
           </div>
           <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
             <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.2</span>
-            <span className="font-semibold">Faktureringsfrekvens</span>
+            <span className="font-semibold">Faktureras</span>
             <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
             <span className="font-sans text-[12px] tabular-nums" style={{ color: frequencyLabel ? ink.secondary : ink.warn }}>
               {frequencyLabel
-                ? `${frequencyLabel.toLowerCase()}${anchor ? ` · ankarmånad ${MONTHS[anchor - 1]}` : ' · ankarmånad ej satt'}`
-                : 'ej satt'}
+                ? `${frequencyLabel.toLowerCase()}${anchor ? ` · ${MONTHS[anchor - 1]}` : ''}`
+                : 'villkor saknas'}
+              {frequencyLabel ? (invoiceMode === 'consolidated' ? ' · på kundens samlingsfaktura' : ' · egen faktura') : ''}
+              {equipmentInvoiceMode === 'separate' ? ' · tillägg på egna fakturor' : ''}
             </span>
           </div>
-          <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-            <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.3</span>
-            <span className="font-semibold">Nästa faktura</span>
-            <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
-            <span className="font-sans text-[12px] tabular-nums" style={{ color: ink.secondary }}>
-              {paused ? (
-                pausedUntil ? `pausad till ${pausedUntil}` : 'pausad tills vidare'
-              ) : nextLabel ? (
-                <>
-                  <b style={{ color: ink.primary }}>{formatDateSv(nextLabel.date)}</b> · {nextLabel.text}
-                </>
-              ) : (
-                'ingen planerad'
-              )}
-            </span>
-          </div>
-          <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-            <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.4</span>
-            <span className="font-semibold">Faktureras</span>
-            <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
-            <span className="font-sans text-[12px]" style={{ color: ink.secondary }}>
-              {invoiceMode === 'consolidated' ? 'på kundens samlingsfaktura, som egen rad' : 'på egen faktura'}
-            </span>
-          </div>
-          {equipmentEntries.length > 0 && (
-            <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-              <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.5</span>
-              <span className="font-semibold">Tillägg faktureras separat</span>
-              <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
-              <span className="font-sans text-[12px] tabular-nums" style={{ color: ink.secondary }}>
-                {nextEquipment ? (
-                  <>
-                    <b style={{ color: ink.primary }}>{formatDateSv(nextEquipment.periodStart)}</b> · {formatKr(nextEquipment.subtotal)}
-                    {nextEquipment.kind === 'equipment_monthly' ? ' per månad' : ' per år'}
-                    {nextEquipment.existingStatus ? (['booked', 'sent', 'paid'].includes(nextEquipment.existingStatus) ? ' · skickad' : ' · utkast') : ` · skapas ${formatDateSv(nextEquipment.invoiceDate)}`}
-                  </>
-                ) : (
-                  'ingen planerad'
-                )}
-              </span>
-            </div>
-          )}
-          {uncovered.map((u) => (
-            <div
-              key={u.periodStart}
-              className="flex items-center gap-2 mt-1.5 px-2.5 py-1.5 rounded-md font-sans text-[11px] leading-relaxed"
-              style={{ border: '1px dashed rgba(180,83,9,.5)', color: '#7a3c07' }}
-            >
-              <span>
-                {u.kind === 'equipment' || u.kind === 'equipment_monthly' ? 'Tilläggsperioden' : 'Perioden'} <b>{formatDateSv(u.periodStart)} t.o.m. {formatDateSv(u.periodEnd)}</b> saknar faktura i portalen
-                {u.subtotal > 0 ? ` (${formatKr(u.subtotal)} exkl. moms)` : ''}. Fakturerad utanför portalen? Koppla Fortnox-fakturan.
-              </span>
-              {onLinkFortnox && !archived && (
-                <button
-                  onClick={() => onLinkFortnox({ periodStart: u.periodStart, periodEnd: u.periodEnd, expectedSubtotal: u.subtotal || null, kind: u.kind })}
-                  className={`${PAPER_LINK_CLASS} ml-auto shrink-0`}
-                  style={{ color: ink.warn }}
-                >
-                  koppla Fortnox-faktura
-                </button>
-              )}
-            </div>
-          ))}
         </>
       ) : (
         <div className="font-sans py-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center text-[12px]" style={{ color: ink.secondary }}>
           <label htmlFor={`premium-annual-${contract.id}`}>Årspremie (kr/år)</label>
           <input
             id={`premium-annual-${contract.id}`}
-            className={PAPER_INPUT_CLASS}
+            className={inputClass}
             inputMode="numeric"
             value={annualInput}
             onChange={(e) => setAnnualInput(e.target.value)}
@@ -371,7 +328,7 @@ export default function ContractPremiumSection({
             autoFocus
           />
           <label htmlFor={`premium-freq-${contract.id}`}>Frekvens</label>
-          <select id={`premium-freq-${contract.id}`} className={PAPER_INPUT_CLASS} value={freqInput} onChange={(e) => setFreqInput(e.target.value)}>
+          <select id={`premium-freq-${contract.id}`} className={inputClass} value={freqInput} onChange={(e) => setFreqInput(e.target.value)}>
             {FREQUENCIES.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.label}
@@ -379,7 +336,7 @@ export default function ContractPremiumSection({
             ))}
           </select>
           <label htmlFor={`premium-anchor-${contract.id}`}>Ankarmånad</label>
-          <select id={`premium-anchor-${contract.id}`} className={PAPER_INPUT_CLASS} value={anchorInput} onChange={(e) => setAnchorInput(e.target.value)}>
+          <select id={`premium-anchor-${contract.id}`} className={inputClass} value={anchorInput} onChange={(e) => setAnchorInput(e.target.value)}>
             <option value="">Från avtalsstart</option>
             {MONTHS.map((m, i) => (
               <option key={m} value={String(i + 1)}>
@@ -396,9 +353,11 @@ export default function ContractPremiumSection({
               {saving && <Loader2 className="w-3 h-3 animate-spin" />}
               Spara
             </button>
-            <button onClick={() => setEditing(false)} disabled={saving} className={PAPER_LINK_CLASS} style={{ color: ink.muted }}>
-              Avbryt
-            </button>
+            {!settings && (
+              <button onClick={() => setEditing(false)} disabled={saving} className={PAPER_LINK_CLASS} style={{ color: ink.muted }}>
+                Avbryt
+              </button>
+            )}
             <span className="ml-auto text-[10.5px]" style={{ color: ink.muted }}>
               Perioder börjar den 1:a i ankarmånaden.
             </span>
@@ -463,19 +422,44 @@ export default function ContractPremiumSection({
             </button>
           </div>
         )}
+        {settings && uncovered.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            <div className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em]" style={{ color: ink.muted }}>
+              Perioder utan faktura i portalen
+            </div>
+            {uncovered.map((u) => (
+              <div key={u.periodStart} className="flex items-center gap-2 px-2.5 py-1.5 rounded-md font-sans text-[11.5px] leading-relaxed" style={{ border: `1px dashed ${ink.rule}`, color: ink.secondary }}>
+                <span>
+                  {u.kind === 'equipment' || u.kind === 'equipment_monthly' ? 'Tillägg ' : ''}
+                  <b style={{ color: ink.primary }}>{formatDateSv(u.periodStart)} t.o.m. {formatDateSv(u.periodEnd)}</b>
+                  {u.subtotal > 0 ? ` · ${formatKr(u.subtotal)}` : ''}
+                </span>
+                {onLinkFortnox && !archived && (
+                  <button
+                    onClick={() => onLinkFortnox({ periodStart: u.periodStart, periodEnd: u.periodEnd, expectedSubtotal: u.subtotal || null, kind: u.kind })}
+                    className={`${PAPER_LINK_CLASS} ml-auto shrink-0`}
+                    style={{ color: ink.positive }}
+                  >
+                    koppla Fortnox-faktura
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         {stepForm && (
           <div className="font-sans mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center text-[12px]" style={{ color: ink.secondary }}>
             <span className="col-span-2 font-semibold" style={{ color: ink.primary }}>
               {stepForm.eventType === 'indexation' ? 'Indexjustering' : 'Nytt steg i premietrappan'}
             </span>
             <label htmlFor={`step-date-${contract.id}`}>Gäller från</label>
-            <DateField id={`step-date-${contract.id}`} className={`${PAPER_INPUT_CLASS} pl-7 w-full`} value={stepDate} onChange={setStepDate} />
+            <DateField id={`step-date-${contract.id}`} className={`${inputClass} pl-7 w-full`} value={stepDate} onChange={setStepDate} />
             {stepForm.eventType === 'indexation' && (
               <>
                 <label htmlFor={`step-pct-${contract.id}`}>Procent</label>
                 <input
                   id={`step-pct-${contract.id}`}
-                  className={PAPER_INPUT_CLASS}
+                  className={inputClass}
                   inputMode="decimal"
                   value={stepPercent}
                   onChange={(e) => setStepPercent(e.target.value)}
@@ -486,7 +470,7 @@ export default function ContractPremiumSection({
             <label htmlFor={`step-value-${contract.id}`}>{stepForm.eventType === 'indexation' ? 'eller nytt belopp' : 'Ny årspremie'}</label>
             <input
               id={`step-value-${contract.id}`}
-              className={PAPER_INPUT_CLASS}
+              className={inputClass}
               inputMode="numeric"
               value={stepValue}
               onChange={(e) => setStepValue(e.target.value)}
@@ -495,7 +479,7 @@ export default function ContractPremiumSection({
             <label htmlFor={`step-note-${contract.id}`}>Notering</label>
             <input
               id={`step-note-${contract.id}`}
-              className={PAPER_INPUT_CLASS}
+              className={inputClass}
               value={stepNote}
               onChange={(e) => setStepNote(e.target.value)}
               placeholder={stepForm.eventType === 'indexation' ? 't.ex. AKI näringsgren N, dec 2026' : 't.ex. ny enhet ansluter'}

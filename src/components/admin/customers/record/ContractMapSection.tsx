@@ -60,10 +60,21 @@ import { isCompletedStatus, type ClickUpStatus } from '../../../../types/databas
 import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
 import ContractContentSection, { useContractContent, useAccumulatedCaseOutcome } from './ContractContentSection'
 import ContractPriceListSection, { useAvropCatalog } from './ContractPriceListSection'
-import ContractPremiumSection, { type PremiumPlanEntry } from './ContractPremiumSection'
+import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from './ContractPremiumSection'
 import ContractReferencesSection from './ContractReferencesSection'
 import ContractTermSection from './ContractTermSection'
 import ContractEquipmentSection from './ContractEquipmentSection'
+import { AgreementObjectText, SignatureLine, AccountManagerLine } from './PaperSignatures'
+import ContractSettingsDrawer, { type SettingsTab } from './ContractSettingsDrawer'
+import {
+  CONTRACT_PHASES,
+  CONTRACT_PHASE_LABEL,
+  computeCompleteness,
+  contractPhase,
+  type CompletenessInput,
+  type SettingsGroup,
+} from './contractCompleteness'
+import { PAPER_GEAR_CLASS } from './paperInk'
 import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
 import AddonDropPrompt, { type AddonDropPromptState } from './AddonDropPrompt'
 import type { AddonBrick } from '../../../../types/addonStations'
@@ -244,6 +255,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [sitePlanPrompt, setSitePlanPrompt] = useState<SitePlanPrompt | null>(null)
   /** Katalogen i Verksamhetspanelen */
   const [catalogOpen, setCatalogOpen] = useState(false)
+  // Vänsterpanelen: Verksamheten eller Katalog, inte en hopfälld details
+  const [railTab, setRailTab] = useState<'units' | 'catalog'>('units')
+  // Inställningspanelen till höger om pappren: vilket avtal, vilken grupp, vilken flik
+  const [settingsPanel, setSettingsPanel] = useState<{ contractId: string; group: SettingsGroup; tab: SettingsTab } | null>(null)
+  const openSettings = (contract: RecordContract, group: SettingsGroup, tab: SettingsTab = 'settings') =>
+    setSettingsPanel({ contractId: contract.id, group, tab })
+  useEffect(() => {
+    if (railTab === 'catalog') setCatalogOpen(true)
+  }, [railTab])
   const [catalogTab, setCatalogTab] = useState<'pricelist' | 'service' | 'equipment'>('pricelist')
   const [catalogSearch, setCatalogSearch] = useState('')
   const [catalog, setCatalog] = useState<{
@@ -717,7 +737,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         return
       }
       if (target.zone === 'refs') {
-        if (payload.type !== 'org') setRefPrompt({ contract: target.contract, unitId: payload.unitId })
+        if (payload.type !== 'org') openSettings(target.contract, 'referenser')
         return
       }
       openDatePromptForDrop(payload, target.contract, e.clientX, e.clientY)
@@ -1334,6 +1354,29 @@ export default function ContractMapSection({ data, onChanged }: Props) {
    * Brickor vars enhet inte täcks av NÅGOT avtal. De renderas annars
    * ingenstans, så tilläggsstationerna blir osynliga och obetalda.
    */
+  /** Lokalerna avtalet omfattar, i § 1:s ordning (samma regel som pappret) */
+  const coveredLocationsFor = (c: RecordContract): RecordCustomer[] => {
+    if (c.covers_all_sites) return locations
+    const owner = customerById.get(c.customer_id ?? '')
+    const sc = activeScopeByContract.get(c.id) ?? []
+    return [
+      ...(owner && locations.some((l) => l.id === owner.id) ? [owner] : []),
+      ...sc.map((cs) => customerById.get(cs.customer_id)).filter((u): u is RecordCustomer => !!u && u.id !== owner?.id),
+    ]
+  }
+  /** Kompletthetens underlag utom marginalen (pappret och panelen fyller i den) */
+  const completenessBaseFor = (c: RecordContract): Omit<CompletenessInput, 'breakdown'> => ({
+    contract: c,
+    scope: activeScopeByContract.get(c.id) ?? [],
+    isAvrop: c.contract_type === 'Avropsavtal' || c.label === 'Avropsavtal',
+    isUnitContract: !isSingleSite && unitIds.has(c.customer_id ?? ''),
+    followupUnits: followupFor(c).units,
+    pendingBricks: bricksFor(c).length,
+    uncoveredPeriods: (planEntriesByContract.get(c.id) ?? []).filter((e) => e.action === 'uncovered').length,
+    coveredUnits: coveredLocationsFor(c),
+  })
+  const incompletePapers = papers.filter((c) => !computeCompleteness({ ...completenessBaseFor(c), breakdown: null }).complete).length
+
   const orphanBricks = useMemo(() => {
     const covered = new Set<string>()
     for (const p of papers) {
@@ -2053,7 +2096,12 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         </p>
       </div>
 
-      <div ref={boardRef} className="relative grid grid-cols-1 lg:grid-cols-[290px_1fr] gap-10 items-start">
+      <div
+        ref={boardRef}
+        className={`relative grid grid-cols-1 gap-10 items-start ${
+          settingsPanel ? 'lg:grid-cols-[290px_minmax(0,1fr)_440px] gap-6' : 'lg:grid-cols-[290px_1fr]'
+        }`}
+      >
         {/* Kopplingslinjer */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none hidden lg:block" aria-hidden>
           {wires.map((w) => {
@@ -2124,13 +2172,26 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               : 'border-slate-700'
           }`}
         >
-          <h3 className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-3">
-            Verksamheten
+          <div className="flex items-center gap-4 border-b border-slate-700 mb-3">
+            {(['units', 'catalog'] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setRailTab(t)}
+                className={`pb-2 text-[11px] uppercase tracking-wider font-semibold border-b-2 -mb-px transition-colors ${
+                  railTab === t ? 'text-slate-100 border-[#20c58f]' : 'text-slate-500 border-transparent hover:text-slate-300'
+                }`}
+              >
+                {t === 'units' ? 'Verksamheten' : 'Katalog'}
+              </button>
+            ))}
             {drag?.started && drag.payload.type === 'scoperow' && (
-              <span className="ml-2 normal-case tracking-normal text-amber-300 font-medium">släpp här för att avsluta täckningen</span>
+              <span className="ml-auto pb-2 text-[10px] normal-case tracking-normal text-amber-300 font-medium">släpp här för att avsluta täckningen</span>
             )}
-          </h3>
+          </div>
 
+          {railTab === 'units' && (
+          <>
           {units.length > 0 && (
             <div
               ref={orgRef}
@@ -2238,17 +2299,18 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             <Plus className="w-3.5 h-3.5" />
             Lägg till enhet
           </button>
+          </>
+          )}
 
           {/* Katalogen: systemets prislistor, tjänster och utrustning. Dras in
-              i § 2, § 4 och § 6 på ett papper. Systemkatalog, inte kundinnehåll,
-              så regeln "inget kundnivå-innehåll i Verksamhetspanelen" håller. */}
-          {papers.length > 0 && (
-            <details className="mt-3 border border-slate-700/60 rounded-xl" open={catalogOpen} onToggle={(e) => setCatalogOpen((e.target as HTMLDetailsElement).open)}>
-              <summary className="cursor-pointer px-3 py-2 text-[10px] uppercase tracking-wider text-slate-500 font-semibold select-none flex items-center gap-2">
-                Katalog
-                <span className="ml-auto normal-case tracking-normal font-medium text-slate-500">dra in på ett avtal</span>
-              </summary>
-              <div className="px-3 pb-3">
+              i § 2, § 4 och § 6 på ett papper, eller in i panelen. Systemkatalog,
+              inte kundinnehåll, så regeln "inget kundnivå-innehåll i
+              Verksamhetspanelen" håller. Egen flik, lika synlig som enheterna. */}
+          {railTab === 'catalog' && (
+            <div>
+              <p className="text-[11px] text-slate-500 mb-2">Dra in på ett avtal: prislistor till § 2, tjänster till § 4, utrustning till § 6.</p>
+              {papers.length === 0 && <p className="text-[11px] text-slate-500 italic">Skapa ett avtal först.</p>}
+              <div className="pb-1">
                 <div className="flex gap-1 mb-2">
                   {(['pricelist', 'service', 'equipment'] as const).map((tab) => (
                     <button
@@ -2330,7 +2392,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                   )}
                 </div>
               </div>
-            </details>
+            </div>
           )}
         </aside>
 
@@ -2392,7 +2454,12 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               </button>
               {planTotals.uncovered > 0 && (
                 <span className="text-[11px] text-amber-300 whitespace-nowrap">
-                  {planTotals.uncovered} period{planTotals.uncovered === 1 ? '' : 'er'} saknar faktura, se § 7
+                  {planTotals.uncovered} period{planTotals.uncovered === 1 ? '' : 'er'} saknar faktura
+                </span>
+              )}
+              {incompletePapers > 0 && (
+                <span className="text-[11px] text-amber-300 whitespace-nowrap">
+                  {incompletePapers} avtal saknar uppgifter
                 </span>
               )}
             </div>
@@ -2510,6 +2577,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
               isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
               isSingleSite={isSingleSite}
+              onOpenSettings={(group) => openSettings(c, group)}
+              settingsOpen={settingsPanel?.contractId === c.id}
             />
           ))}
 
@@ -2730,6 +2799,107 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             </details>
           )}
         </main>
+
+        {/* Inställningar och puls: öppnas från kugghjulet på en paragraf, ligger
+            bredvid pappret så att raden uppdateras medan man skriver. */}
+        {settingsPanel && (() => {
+          const c = papers.find((x) => x.id === settingsPanel.contractId)
+          if (!c) return null
+          const events = premiumByContract.get(c.id) ?? []
+          return (
+            <ContractSettingsDrawer
+              contract={c}
+              root={root}
+              archived={false}
+              group={settingsPanel.group}
+              tab={settingsPanel.tab}
+              onChangeGroup={(group) => setSettingsPanel({ ...settingsPanel, group, tab: 'settings' })}
+              onChangeTab={(tab) => setSettingsPanel({ ...settingsPanel, tab })}
+              onClose={() => setSettingsPanel(null)}
+              completenessBase={completenessBaseFor(c)}
+              contentReloadKey={contentReloadKey}
+              rootPriceListId={root.price_list_id ?? null}
+              contractTypes={contractTypes.map((t) => t.value)}
+              onChangeType={(t) => changeContractType(c, t)}
+              onEditSignedAt={() => setSignedAtPrompt(c)}
+              staff={technicians}
+              onSaveSalesPerson={async (name) => {
+                try {
+                  await ContractScopeService.setSalesPerson(c.id, name)
+                  toast.success(name ? `Säljare satt till ${name}.` : 'Säljare borttagen.')
+                  await onChanged()
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Kunde inte spara säljare')
+                }
+              }}
+              onSaveAccountManager={(name, email) => saveAccountManager(c, name, email)}
+              oneflowUrl={oneflowContractUrl(c)}
+              scope={activeScopeByContract.get(c.id) ?? []}
+              customerById={customerById}
+              isSingleSite={isSingleSite}
+              isUnitContract={!isSingleSite && unitIds.has(c.customer_id ?? '')}
+              onClearCoversAll={() => clearCoversAll(c)}
+              onEndCoverage={(cs, x, y) => endCoverage(c, cs, x, y)}
+              onSaveAgreementText={async (text) => {
+                try {
+                  await ContractScopeService.setAgreementText(c.id, text)
+                  toast.success('Avtalsobjektet sparat.')
+                  await onChanged()
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Kunde inte spara avtalsobjektet')
+                }
+              }}
+              priceListLabel={priceListName(c.price_list_id)}
+              onEditPriceList={(x, y) => setPricePrompt({ x, y, contract: c })}
+              followup={followupFor(c)}
+              onEditFrequency={() => setFrequencyPrompt(c)}
+              onEditSitePlan={(unit) => setSitePlanPrompt({ contract: c, unit })}
+              onEditContent={() => setContentEditor(c)}
+              onChangeLineModel={(item, model) => changeLineBillingModel(c, item, model)}
+              bricks={bricksFor(c)}
+              onDecideBrick={(brick, zone, x, y) => {
+                const unit = customerById.get(brick.unitId)
+                setAddonPrompt({
+                  x,
+                  y,
+                  contract: c,
+                  state: {
+                    x,
+                    y,
+                    contractLabel: contractDisplayName(c),
+                    unitName: unit ? customerRowName(unit) : 'enhet',
+                    brick,
+                    zone,
+                    annualInForce: c.annual_value != null ? Number(c.annual_value) : null,
+                  },
+                })
+              }}
+              unitNameOf={(id) => customerRowName(customerById.get(id) ?? ({ company_name: 'Enhet' } as RecordCustomer))}
+              equipmentInvoiceMode={
+                customerById.get(c.customer_id ?? '')?.addon_invoice_mode === 'separate_per_contract' ? 'separate' : 'with_premium'
+              }
+              onChangeEquipmentInvoiceMode={(mode) => changeEquipmentInvoiceMode(c, mode)}
+              premiumEvents={events}
+              annualInForce={contractEffectiveAnnualValue(c, events)}
+              invoiceMode={papers.length > 1 ? invoiceMode : 'per_contract'}
+              planEntries={planEntriesByContract.get(c.id) ?? []}
+              onLinkFortnox={(period) => openLinkFortnox(c, period)}
+              onSavePremium={(input) => savePremium(c, input)}
+              onAddPremiumEvent={(input) => addPremiumEvent(c, input)}
+              coveredLocations={coveredLocationsFor(c)}
+              onSaveInvoiceReference={(input) => saveInvoiceReference(c, input)}
+              onSaveUnitReference={(unit, code) => saveUnitReference(c, unit, code)}
+              onSaveTerm={(input) => saveTerm(c, input)}
+              onSaveRenewal={(input) => saveRenewal(c, input)}
+              onExerciseOption={() => exerciseOption(c)}
+              onTerminate={isTerminatedButRunning(c) ? undefined : () => setTerminatePrompt(c)}
+              onReactivate={isTerminatedButRunning(c) ? () => reactivate(c) : undefined}
+              onDelete={c.template_id === 'local' ? () => setDeletePrompt(c) : undefined}
+              stationCount={stationCountFor(c)}
+              onOpenHistory={(tab, unitFilter) => setHistory({ contract: c, tab, unitFilter: unitFilter ?? '' })}
+            />
+          )
+        })()}
       </div>
 
       {/* Drag-ghost */}
@@ -3140,134 +3310,6 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 // ---------------------------------------------------------------------------
 // Avtalsobjekt: avtalstexten från Oneflow (vad som ingår, stationer per plats)
 // ---------------------------------------------------------------------------
-
-const AGREEMENT_PREVIEW_CHARS = 340
-
-function AgreementObjectText({
-  text,
-  onSave,
-  ink,
-}: {
-  text: string | null
-  /** Utelämnas på arkiverade avtal — texten blir då ren läsning. */
-  onSave?: (text: string | null) => Promise<void>
-  ink: (typeof PAPER_INK)['live' | 'archived']
-}) {
-  const [expanded, setExpanded] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(text ?? '')
-  const [saving, setSaving] = useState(false)
-
-  const trimmed = (text ?? '').trim()
-  const isLong = trimmed.length > AGREEMENT_PREVIEW_CHARS
-  // Radbrytningar bär strukturen (en rad per anläggning i Oneflow-mallen)
-  const shown = expanded || !isLong ? trimmed : trimmed.slice(0, AGREEMENT_PREVIEW_CHARS).trimEnd() + '…'
-
-  const save = async () => {
-    if (!onSave) return
-    setSaving(true)
-    try {
-      await onSave(draft)
-      setEditing(false)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // Ett arkiverat avtal utan avtalsobjekt har inget att visa och inget att
-  // fylla i — då hoppar vi över hela sektionen i stället för att visa en
-  // död rubrik.
-  if (!onSave && !trimmed) return null
-
-  return (
-    <div className="mt-3">
-      <div className="flex items-baseline gap-2 pb-1" style={{ borderBottom: `1px solid ${ink.rule}` }}>
-        <h4
-          className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em]"
-          style={{ color: ink.muted }}
-        >
-          Avtalsobjekt
-        </h4>
-        <span className="ml-auto flex items-baseline gap-2">
-          {isLong && !editing && (
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="font-sans text-[10px] underline decoration-dotted hover:opacity-70 transition-opacity"
-              style={{ color: ink.muted }}
-            >
-              {expanded ? 'visa mindre' : 'visa hela'}
-            </button>
-          )}
-          {onSave && !editing && (
-            <button
-              onClick={() => {
-                setDraft(text ?? '')
-                setEditing(true)
-              }}
-              className="font-sans text-[10px] text-[#8a9099] hover:text-[#262e38] underline decoration-dotted"
-            >
-              {trimmed ? 'redigera' : 'lägg till'}
-            </button>
-          )}
-        </span>
-      </div>
-
-      {editing ? (
-        <div className="pt-2">
-          <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={7}
-            autoFocus
-            placeholder={
-              'Beskriv vad som ingår — t.ex.\n\nAnläggning A, 5 st Aurocon digital fälla, 10 st betade lådor utvändigt, 8 st invändiga kontrollstationer\nAnläggning B, 2 st Aurocon, 4 st utv betade lådor'
-            }
-            className="w-full font-sans text-[12px] leading-relaxed text-[#262e38] bg-white/70 border border-[#d9d3c2] rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50 resize-y"
-          />
-          <div className="flex items-center gap-2 mt-1.5">
-            <button
-              onClick={save}
-              disabled={saving}
-              className="font-sans text-[11px] font-semibold text-[#fff] bg-[#20c58f] rounded-md px-3 py-1.5 hover:brightness-110 disabled:opacity-50"
-            >
-              {saving ? 'Sparar…' : 'Spara'}
-            </button>
-            <button
-              onClick={() => setEditing(false)}
-              className="font-sans text-[11px] text-[#5d6672] hover:text-[#262e38] px-2 py-1.5"
-            >
-              Avbryt
-            </button>
-            <span className="ml-auto font-sans text-[10px] text-[#8a9099]">
-              En rad per anläggning håller strukturen
-            </span>
-          </div>
-        </div>
-      ) : trimmed ? (
-        <p
-          className="text-[12.5px] leading-relaxed pt-1.5 whitespace-pre-line"
-          style={{ color: ink.secondary }}
-        >
-          {shown}
-        </p>
-      ) : onSave ? (
-        <button
-          onClick={() => {
-            setDraft('')
-            setEditing(true)
-          }}
-          className="w-full text-left font-sans text-[11.5px] italic text-[#8a9099] hover:text-[#5d6672] pt-1.5"
-        >
-          Inget avtalsobjekt registrerat — beskriv vad som ingår och vad som är installerat.
-        </button>
-      ) : (
-        <p className="font-sans text-[11.5px] italic pt-1.5" style={{ color: ink.muted }}>
-          Inget avtalsobjekt registrerat.
-        </p>
-      )}
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Säg upp avtal — per avtal, inte per kund
@@ -3938,261 +3980,10 @@ interface PaperProps {
    * utelämnas frasen helt — skriv aldrig "okänd".
    */
   terminatedBy?: string | null
-}
-
-/**
- * Signaturraden på avtalspappret. Klick öppnar en inline-inmatning i SAMMA
- * skrivstil, samma lutning och samma storlek — pappret ser likadant ut oavsett
- * om man läser eller skriver. Enter sparar, Escape avbryter.
- *
- * Saknas säljare på avtalet visas kundkortets som fallback, men i dämpad ton
- * så det syns att värdet inte hör till avtalet självt.
- */
-function SignatureLine({
-  value,
-  fallback,
-  ink,
-  archived,
-  staff,
-  onSave,
-}: {
-  value: string | null
-  fallback: string | null
-  ink: (typeof PAPER_INK)['live' | 'archived']
-  archived: boolean
-  /** Aktiv personal att välja bland — aldrig fritext */
-  staff: { id: string; name: string }[]
-  /** Utelämnas på arkiverade avtal — en avslutad underskrift ändras inte */
-  onSave?: (name: string | null) => Promise<void>
-}) {
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(value ?? fallback ?? '')
-  const [saving, setSaving] = useState(false)
-
-  const shown = value ?? fallback
-  const isFallback = !value && !!fallback
-  const signatureStyle = {
-    fontFamily: "'Segoe Script', 'Brush Script MT', cursive",
-    color: archived ? '#3a424f' : '#2f3a46',
-  }
-
-  const commitValue = async (next: string) => {
-    if (!onSave) return
-    const clean = next.trim() || null
-    if (clean === value) {
-      setEditing(false)
-      return
-    }
-    setSaving(true)
-    try {
-      await onSave(clean)
-      setEditing(false)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (editing) {
-    // Väljare, aldrig fritext: 21 unika namn hade redan hunnit uppstå i
-    // avtalen mot 12 i personalregistret. Select-elementet ärver skrivstilen
-    // så raden ser ut som en underskrift även medan man väljer.
-    return (
-      <div className="shrink-0 min-w-[190px]">
-        <select
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value)
-            void commitValue(e.target.value)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              setDraft(value ?? fallback ?? '')
-              setEditing(false)
-            }
-          }}
-          autoFocus
-          disabled={saving}
-          className="inline-block -rotate-2 text-[17px] bg-transparent border-0 border-b border-dashed p-0 pr-5 focus:outline-none focus:ring-0 w-full cursor-pointer appearance-none"
-          style={{ ...signatureStyle, borderBottomColor: ink.muted }}
-          aria-label="Säljare"
-        >
-          <option value="">— ingen säljare —</option>
-          {staff.map((s) => (
-            <option key={s.id} value={s.name}>
-              {s.name}
-            </option>
-          ))}
-          {/* Namn som redan står på avtalet men saknas i personalregistret
-              (t.ex. någon som slutat) får inte tappas bort vid redigering */}
-          {value && !staff.some((s) => s.name === value) && (
-            <option value={value}>{value} (ej i personalregistret)</option>
-          )}
-        </select>
-        <div
-          className="mt-0.5 pt-0.5 font-sans text-[9.5px] tracking-wide"
-          style={{ borderTop: `1px solid ${ink.secondary}`, color: ink.muted }}
-        >
-          {saving ? 'Sparar…' : 'Välj säljare · Esc avbryter'}
-        </div>
-      </div>
-    )
-  }
-
-  if (!shown) {
-    if (!onSave) return null
-    return (
-      <button
-        onClick={() => {
-          setDraft('')
-          setEditing(true)
-        }}
-        className="shrink-0 font-sans text-[10px] italic hover:opacity-70 transition-opacity"
-        style={{ color: ink.muted }}
-      >
-        Ange säljare
-      </button>
-    )
-  }
-
-  return (
-    <div className="shrink-0">
-      <button
-        onClick={onSave ? () => { setDraft(value ?? fallback ?? ''); setEditing(true) } : undefined}
-        disabled={!onSave}
-        className={onSave ? 'block text-left cursor-text' : 'block text-left cursor-default'}
-        title={onSave ? 'Klicka för att ändra säljare' : undefined}
-      >
-        <span
-          className="inline-block -rotate-2 text-[17px]"
-          style={{ ...signatureStyle, opacity: isFallback ? 0.6 : 1 }}
-        >
-          {shown}
-        </span>
-        <span
-          className="block mt-0.5 pt-0.5 font-sans text-[9.5px] tracking-wide"
-          style={{ borderTop: `1px solid ${ink.secondary}`, color: ink.muted }}
-        >
-          {shown} · BeGone Skadedjur &amp; Sanering AB
-          {isFallback && <span className="italic"> · från kundkortet</span>}
-        </span>
-      </button>
-    </div>
-  )
-}
-
-/**
- * Kundansvarig-raden under säljarens signatur på avtalspappret. Följer
- * AVTALET (kunden kan ha två avtal med olika ansvariga för olika enheter);
- * kundkortets värde visas som dämpad fallback tills avtalet fått ett eget.
- * Väljs ur personalregistret, aldrig fritext — e-posten följer med från
- * registret och speglas till kundraderna som avtalet omfattar.
- */
-function AccountManagerLine({
-  value,
-  email,
-  fallback,
-  ink,
-  archived,
-  staff,
-  onSave,
-}: {
-  value: string | null
-  email: string | null
-  fallback: string | null
-  ink: (typeof PAPER_INK)['live' | 'archived']
-  archived: boolean
-  staff: { id: string; name: string; email?: string | null }[]
-  /** Utelämnas på arkiverade avtal */
-  onSave?: (name: string | null, email: string | null) => Promise<void>
-}) {
-  const [editing, setEditing] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  const shown = value ?? fallback
-  const isFallback = !value && !!fallback
-  const nameColor = archived ? '#3a424f' : '#2f3a46'
-
-  const commit = async (nextName: string) => {
-    if (!onSave) return
-    const clean = nextName.trim() || null
-    if (clean === value) {
-      setEditing(false)
-      return
-    }
-    // Registerval ger registrets e-post; ett kvarstående namn utanför
-    // registret (någon som slutat) behåller sin sparade e-post.
-    const match = staff.find((s) => s.name === clean)
-    const nextEmail = clean === null ? null : match ? (match.email ?? null) : email
-    setSaving(true)
-    try {
-      await onSave(clean, nextEmail)
-      setEditing(false)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  if (editing) {
-    return (
-      <div className="font-sans text-[10px]" style={{ color: ink.muted }}>
-        Kundansvarig ·{' '}
-        <select
-          defaultValue={value ?? ''}
-          onChange={(e) => void commit(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setEditing(false)
-          }}
-          autoFocus
-          disabled={saving}
-          className="bg-transparent border-0 border-b border-dashed p-0 pr-4 text-[10px] focus:outline-none focus:ring-0 cursor-pointer appearance-none"
-          style={{ color: nameColor, borderBottomColor: ink.muted }}
-          aria-label="Kundansvarig"
-        >
-          <option value="">— ingen kundansvarig —</option>
-          {staff.map((s) => (
-            <option key={s.id} value={s.name}>
-              {s.name}
-            </option>
-          ))}
-          {value && !staff.some((s) => s.name === value) && (
-            <option value={value}>{value} (ej i personalregistret)</option>
-          )}
-        </select>
-        {saving && <span className="italic"> sparar…</span>}
-      </div>
-    )
-  }
-
-  if (!shown) {
-    if (!onSave) return null
-    return (
-      <button
-        onClick={() => setEditing(true)}
-        className="block font-sans text-[10px] text-[#b45309] hover:text-[#262e38] underline decoration-dotted transition-colors"
-        title="Ange kundansvarig för avtalet — speglas till enheterna i § 1 Omfattning"
-      >
-        Ange kundansvarig
-      </button>
-    )
-  }
-
-  return (
-    <button
-      onClick={onSave ? () => setEditing(true) : undefined}
-      disabled={!onSave}
-      className={`block text-left font-sans text-[10px] transition-opacity ${
-        onSave ? 'hover:opacity-70' : 'cursor-default'
-      }`}
-      style={{ color: ink.muted }}
-      title={onSave ? 'Klicka för att byta kundansvarig' : undefined}
-    >
-      Kundansvarig ·{' '}
-      <span className="font-semibold" style={{ color: nameColor, opacity: isFallback ? 0.6 : 1 }}>
-        {shown}
-      </span>
-      {isFallback && <span className="italic"> · från kundkortet</span>}
-    </button>
-  )
+  /** Kugghjulet på en paragraf: öppna inställningspanelen på rätt grupp */
+  onOpenSettings?: (group: SettingsGroup) => void
+  /** Panelen är öppen för det här avtalet */
+  settingsOpen?: boolean
 }
 
 /** "3 år 2 mån" — hur länge avtalet faktiskt varade. */
@@ -4236,16 +4027,7 @@ function PaperContract({
   onHover,
   onScopeRowDrag,
   onEndCoverage,
-  onEditPriceList,
   onOpenHistory,
-  contractTypes,
-  onChangeType,
-  onDelete,
-  onEditFrequency,
-  onSaveAgreementText,
-  onEditSignedAt,
-  onSaveSalesPerson,
-  onSaveAccountManager,
   staff,
   onTerminate,
   onReactivate,
@@ -4264,16 +4046,15 @@ function PaperContract({
   invoiceMode,
   planEntries,
   onLinkFortnox,
-  onChangeLineModel,
-  onEditSitePlan,
   onSaveRenewal,
   onExerciseOption,
   stationCount,
   addonBricks,
   onBrickDrag,
   unitNameOf,
-  onChangeEquipmentInvoiceMode,
   equipmentInvoiceMode = 'with_premium',
+  onOpenSettings,
+  settingsOpen,
 }: PaperProps) {
   const key = todayKey()
   const archived = state === 'archived'
@@ -4310,6 +4091,35 @@ function PaperContract({
   // länk till ett dokument som inte finns.
   const oneflowUrl = oneflowContractUrl(contract)
 
+  // Kompletthet och fas: samlar de villkor som tidigare stod utspridda som
+  // orange texter på pappret. Raden under stämpeln försvinner när allt är klart.
+  const completeness = computeCompleteness({
+    contract,
+    scope,
+    isAvrop,
+    isUnitContract,
+    followupUnits: followup.units,
+    breakdown: contentData.content.summary?.breakdown ?? null,
+    pendingBricks: (addonBricks ?? []).length,
+    uncoveredPeriods: (planEntries ?? []).filter((e) => e.action === 'uncovered').length,
+    coveredUnits: coveredLocations,
+  })
+  const phase = contractPhase(contract, state, key)
+  const nextEquipment = premiumSummary({ contract, annualInForce: annual, planEntries }).nextEquipment
+  const gear = (group: SettingsGroup, title: string) =>
+    onOpenSettings && !archived ? (
+      <button
+        type="button"
+        onClick={() => onOpenSettings(group)}
+        className={PAPER_GEAR_CLASS}
+        style={{ borderColor: ink.rule, color: ink.muted }}
+        title={title}
+        aria-label={title}
+      >
+        ⚙
+      </button>
+    ) : null
+
   const startDate = contract.contract_start_date ?? contract.start_date
   const periodLabel = startDate
     ? `${formatDateSv(startDate)} – ${contract.contract_end_date ? formatDateSv(contract.contract_end_date) : 'tills vidare'}`
@@ -4328,7 +4138,7 @@ function PaperContract({
       onMouseLeave={() => onHover(false)}
       className={`relative rounded-md rounded-tr-xl font-serif px-6 py-5 transition-all ${
         isDropTarget ? 'scale-[1.008]' : ''
-      }`}
+      } ${settingsOpen ? 'ring-2 ring-[#20c58f]/60' : ''}`}
       style={{
         background: ink.sheet,
         color: ink.primary,
@@ -4410,29 +4220,30 @@ function PaperContract({
             <h3 className="text-lg font-bold leading-snug" style={{ color: ink.primary }}>
               {contractDisplayName(contract)}
             </h3>
-            {/* Avtalstyp går att byta på portalskapade avtal — men aldrig på
-                arkiverade: ett avslutat avtal ska stå som det stod. */}
-            {onChangeType && contractTypes.length > 0 && (
-              <select
-                value={contractTypes.includes(contract.label ?? '') ? (contract.label as string) : ''}
-                onChange={(e) => e.target.value && onChangeType(e.target.value)}
-                className="font-sans text-[10px] text-[#5d6672] bg-[#fff]/60 border border-[#d9d3c2] rounded px-1.5 py-0.5 cursor-pointer hover:text-[#262e38] focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-                title="Byt avtalstyp"
-                aria-label="Avtalstyp"
-              >
-                <option value="">Välj avtalstyp…</option>
-                {contractTypes.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            )}
+            {gear('avtalet', 'Inställningar för avtalet')}
           </div>
           <div className="text-[11.5px] italic mt-0.5" style={{ color: ink.secondary }}>
             mellan BeGone Skadedjur &amp; Sanering AB och {isUnitContract && owner ? customerRowName(owner) + ', ' : ''}
             {root.company_name}
             {orgnr ? ` (${orgnr})` : ''}
+          </div>
+          {/* Fasen: Utkast, Signerat, Aktivt, Uppsagt, Arkiverat. Ett utkast ska
+              inte faktureras, och kollegan ser direkt var avtalet befinner sig. */}
+          <div className="flex items-center gap-0.5 mt-1.5 font-sans text-[9px] uppercase tracking-[0.12em]" aria-label={`Fas: ${CONTRACT_PHASE_LABEL[phase]}`}>
+            {CONTRACT_PHASES.map((ph, i) => (
+              <span key={ph} className="flex items-center gap-0.5">
+                {i > 0 && <span style={{ color: ink.rule }}>·</span>}
+                <span
+                  className={ph === phase ? 'font-bold' : ''}
+                  style={{
+                    color: ph === phase ? (phase === 'uppsagt' ? ink.warn : phase === 'arkiverat' ? ink.secondary : phase === 'utkast' ? ink.warn : ink.positive) : ink.muted,
+                    opacity: ph === phase ? 1 : 0.55,
+                  }}
+                >
+                  {CONTRACT_PHASE_LABEL[ph]}
+                </span>
+              </span>
+            ))}
           </div>
         </div>
         <div
@@ -4503,6 +4314,30 @@ function PaperContract({
         )
       })()}
 
+      {/* Kompletthetsraden: det enda stället pappret säger vad som saknas.
+          Varje punkt öppnar panelen på rätt grupp. Försvinner när allt är klart. */}
+      {!archived && !completeness.complete && (
+        <div
+          className="mt-3 px-3 py-2 rounded-md font-sans text-[11.5px] flex flex-wrap items-baseline gap-x-4 gap-y-1"
+          style={{ border: '1px solid rgba(180,83,9,.35)', background: 'rgba(180,83,9,.07)', color: ink.warn }}
+        >
+          <b>
+            Avtalet är inte komplett · {completeness.missing.length} av {completeness.vitalTotal} delar saknas
+          </b>
+          {completeness.missing.map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => onOpenSettings?.(m.group)}
+              className="underline decoration-dotted hover:opacity-80"
+              title={m.hint}
+            >
+              ○ {m.label} ({m.paragraph})
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Värderad */}
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-3.5 mb-1 px-3 py-2.5 rounded-md bg-black/[.035]">
         <span className="text-xl font-bold tabular-nums text-[#262e38]">
@@ -4526,9 +4361,10 @@ function PaperContract({
       </div>
 
       {/* § 1 Omfattning */}
-      <div className="mt-3">
+      <div className="mt-3 group/para">
         <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
           <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 1 · Omfattning</h4>
+          {gear('omfattning', 'Inställningar för omfattning')}
           <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
             {contract.covers_all_sites
               ? 'hela verksamheten'
@@ -4637,16 +4473,13 @@ function PaperContract({
       {/* Avtalsobjekt — vad som ingår, antal stationer per plats,
           besöksintervall. Kommer från Oneflow vid signering, men går att
           fylla i för hand på äldre och manuella avtal. */}
-      <AgreementObjectText
-        text={contract.agreement_text ?? null}
-        onSave={onSaveAgreementText}
-        ink={ink}
-      />
+      <AgreementObjectText text={contract.agreement_text ?? null} ink={ink} />
 
       {/* § 2 Prislista — släppzon för prislistor från katalogen */}
-      <div className="mt-3.5" data-drop-zone="pricelist">
+      <div className="mt-3.5 group/para" data-drop-zone="pricelist">
         <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
           <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 2 · Prislista för avrop</h4>
+          {gear('prislista', 'Inställningar för prislista')}
           {avropCatalog.catalog.priced.length > 0 && (
             <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
               {avropCatalog.catalog.priced.length} till fast pris
@@ -4662,15 +4495,6 @@ function PaperContract({
                 : 'Kundens prislista (eller prisguiden) gäller för avrop på avtalets enheter.'}
             </div>
           </div>
-          {onEditPriceList && (
-            <button
-              onClick={(e) => onEditPriceList(e.clientX, e.clientY)}
-              className="ml-auto shrink-0 inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#5d6672] border border-[#d9d3c2] rounded-md px-2.5 py-1.5 bg-[#fff]/50 hover:text-[#262e38] transition-colors"
-            >
-              <Pencil className="w-3 h-3" />
-              Byt prislista
-            </button>
-          )}
         </div>
 
         {/* Vad kunden kan avropa: fasta priser + övriga mot offert */}
@@ -4681,46 +4505,20 @@ function PaperContract({
         />
       </div>
 
-      {/* § 3 Uppföljning */}
-      <div className="mt-3.5">
+      {/* § 3 Uppföljning: vad kunden betalat för. Facit vid schemaläggning.
+          Utfallet (besök gjorda, nästa besök, ärenden) bor i pulsen. */}
+      <div className="mt-3.5 group/para">
         <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
           <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 3 · Uppföljning</h4>
-          {/* Besöksfrekvens: vad kunden betalat för. Facit vid schemaläggning
-              och i uppföljningen. Avropsavtal har ingen fast frekvens. */}
-          <span className="ml-auto flex items-center gap-1.5">
-            {contract.visits_per_year ? (
-              <span
-                className="font-sans text-[10.5px] font-semibold tabular-nums"
-                style={{ color: ink.positive }}
-              >
-                {contract.visits_per_year} besök/år ingår
-              </span>
-            ) : contract.visit_frequency ? (
-              <span className="font-sans text-[10.5px] font-semibold" style={{ color: ink.positive }}>
-                {VISIT_FREQUENCY_LABEL[contract.visit_frequency]}
-              </span>
-            ) : onEditFrequency ? (
-              <button
-                onClick={onEditFrequency}
-                className="font-sans text-[10.5px] text-[#b45309] hover:text-[#262e38] underline decoration-dotted"
-                title="Ange hur ofta kunden ska besökas enligt avtalet"
-              >
-                Ange besöksfrekvens
-              </button>
-            ) : (
-              <span className="font-sans text-[10.5px] italic" style={{ color: ink.muted }}>
-                Ingen fast frekvens
-              </span>
-            )}
-            {onEditFrequency && (contract.visit_frequency || contract.visits_per_year) && (
-              <button
-                onClick={onEditFrequency}
-                className="font-sans text-[10px] text-[#8a9099] hover:text-[#262e38] underline decoration-dotted"
-                title="Ändra besöksfrekvens"
-              >
-                ändra
-              </button>
-            )}
+          {gear('uppfoljning', 'Inställningar för uppföljning')}
+          <span className="ml-auto font-sans text-[10.5px] tabular-nums" style={{ color: ink.muted }}>
+            {contract.visits_per_year
+              ? `${contract.visits_per_year} besök/år`
+              : contract.visit_frequency
+                ? VISIT_FREQUENCY_LABEL[contract.visit_frequency]
+                : isAvrop
+                  ? 'avrop'
+                  : ''}
           </span>
         </div>
         {/* Per enhet: driftläge, takt och utfall i avtalsåret. Takten ärvs från
@@ -4742,24 +4540,11 @@ function PaperContract({
                   </span>
                   <span className="font-semibold">{unit ? customerRowName(unit) : 'Enhet'}</span>
                   <span className="flex-1 border-b border-dotted mx-1 translate-y-1 min-w-3" style={{ borderColor: ink.rule }} />
-                  {onEditSitePlan && !archived ? (
-                    <button
-                      onClick={() => onEditSitePlan(u)}
-                      className="font-sans text-[11px] underline decoration-dotted hover:text-[#262e38]"
-                      style={{ color: u.inherited ? ink.muted : ink.secondary }}
-                      title={u.scopeRowId ? 'Ändra driftläge och besökstakt för enheten' : 'Enheten täcks via avtalets förval, ändra i avtalets frekvens'}
-                    >
-                      {u.serviceMode === 'on_demand'
-                        ? 'avrop'
-                        : `stationskontroll${u.frequency ? ` · ${(VISIT_FREQUENCY_LABEL[u.frequency] ?? u.frequency).toLowerCase()}` : ''}`}
-                    </button>
-                  ) : (
-                    <span className="font-sans text-[11px]" style={{ color: ink.secondary }}>
-                      {u.serviceMode === 'on_demand'
-                        ? 'avrop'
-                        : `stationskontroll${u.frequency ? ` · ${(VISIT_FREQUENCY_LABEL[u.frequency] ?? u.frequency).toLowerCase()}` : ''}`}
-                    </span>
-                  )}
+                  <span className="font-sans text-[11px]" style={{ color: u.inherited ? ink.muted : ink.secondary }}>
+                    {u.serviceMode === 'on_demand'
+                      ? 'avrop'
+                      : `stationskontroll${u.frequency ? ` · ${(VISIT_FREQUENCY_LABEL[u.frequency] ?? u.frequency).toLowerCase()}` : ''}`}
+                  </span>
                   {u.serviceMode === 'inspection' && u.visitsPerYear != null && (
                     <span className="font-sans text-[11.5px] tabular-nums" style={{ color: behind ? ink.warn : ink.positive }}>
                       {u.doneThisYear} av {u.visitsPerYear} i år
@@ -4777,55 +4562,7 @@ function PaperContract({
             })}
           </div>
         )}
-        <div className="flex flex-wrap gap-2.5 pt-2.5 font-sans">
-          <button
-            onClick={() => onOpenHistory('besok')}
-            className="flex-1 min-w-36 text-left bg-white/55 border border-[#d9d3c2] rounded-lg px-3 py-2 hover:bg-white/85 transition-colors"
-          >
-            <span className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-widest font-bold text-[#8a9099]">
-              <Calendar className="w-3 h-3" /> Nästa kontrollbesök
-            </span>
-            <span className="block text-[12.5px] font-semibold mt-0.5 text-[#262e38]">
-              {followup.nextVisit
-                ? `${formatDateSv(followup.nextVisit.scheduled_at)} · ${customerRowName(
-                    customerById.get(followup.nextVisit.customer_id) ?? root
-                  )}`
-                : 'Inget bokat'}
-            </span>
-          </button>
-          <button
-            onClick={() => onOpenHistory('besok')}
-            className="flex-1 min-w-36 text-left bg-white/55 border border-[#d9d3c2] rounded-lg px-3 py-2 hover:bg-white/85 transition-colors"
-          >
-            <span className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-widest font-bold text-[#8a9099]">
-              <CalendarCheck className="w-3 h-3" /> Kontrollbesök
-            </span>
-            <span className="block text-[12.5px] font-semibold mt-0.5 text-[#262e38]">
-              {followup.visitsDone === 0 && followup.visitsBooked === 0 ? (
-                <span className="text-[#8a9099]">Inga registrerade</span>
-              ) : (
-                <>
-                  <span className="text-[#157a5b]">{followup.visitsDone} utförda</span>
-                  {followup.visitsBooked > 0 && (
-                    <span className="text-[#5d6672]"> · {followup.visitsBooked} bokade</span>
-                  )}
-                </>
-              )}
-            </span>
-          </button>
-          <button
-            onClick={() => onOpenHistory('arenden')}
-            className="flex-1 min-w-36 text-left bg-white/55 border border-[#d9d3c2] rounded-lg px-3 py-2 hover:bg-white/85 transition-colors"
-          >
-            <span className="flex items-center gap-1.5 text-[9.5px] uppercase tracking-widest font-bold text-[#8a9099]">
-              <Clock className="w-3 h-3" /> Ärenden
-            </span>
-            <span className="block text-[12.5px] font-semibold mt-0.5 text-[#262e38]">
-              <span className="text-[#157a5b]">{followup.casesDone} utförda</span>
-              {followup.casesOpen > 0 && <span className="text-[#b45309]"> · {followup.casesOpen} öppna</span>}
-            </span>
-          </button>
-        </div>
+
       </div>
 
       {/* § 4 Tjänster i avtalet + § 5 Marginal */}
@@ -4835,6 +4572,7 @@ function PaperContract({
           content={contentData.content}
           loading={contentData.loading}
           onEdit={onEditContent}
+          onOpenSettings={onOpenSettings && !archived ? () => onOpenSettings('innehall') : undefined}
           showAccumulated={isAvrop}
           accumulated={accumulatedOutcome.summary}
           accumulatedLoading={accumulatedOutcome.loading}
@@ -4850,14 +4588,15 @@ function PaperContract({
           loading={contentData.loading}
           ink={ink}
           archived={archived}
-          onEdit={onEditContent}
-          onChangeModel={onChangeLineModel}
+          onOpenSettings={onOpenSettings ? () => onOpenSettings('innehall') : undefined}
           stationCount={stationCount}
           bricks={addonBricks}
           onBrickPointerDown={onBrickDrag}
           unitNameOf={unitNameOf}
           equipmentInvoiceMode={equipmentInvoiceMode}
-          onChangeEquipmentInvoiceMode={archived ? undefined : onChangeEquipmentInvoiceMode}
+          nextEquipmentInvoice={
+            nextEquipment ? { periodStart: nextEquipment.periodStart, subtotal: nextEquipment.subtotal, monthly: nextEquipment.kind === 'equipment_monthly' } : null
+          }
         />
       </div>
 
@@ -4881,6 +4620,8 @@ function PaperContract({
           invoiceMode={invoiceMode}
           planEntries={planEntries}
           onLinkFortnox={onLinkFortnox}
+          onOpenSettings={onOpenSettings ? () => onOpenSettings('fakturering') : undefined}
+          equipmentInvoiceMode={equipmentInvoiceMode}
         />
       </div>
 
@@ -4902,6 +4643,7 @@ function PaperContract({
           onSaveUnitReference={onSaveUnitReference}
           focusUnitId={refFocusUnitId}
           onFocusHandled={onRefFocusHandled}
+          onOpenSettings={onOpenSettings ? () => onOpenSettings('referenser') : undefined}
         />
       </div>
 
@@ -4914,6 +4656,7 @@ function PaperContract({
         onSaveRenewal={onSaveRenewal}
         onExerciseOption={onExerciseOption}
         onTerminate={onTerminate}
+        onOpenSettings={onOpenSettings ? () => onOpenSettings('loptid') : undefined}
       />
 
       {/* Avslutsnotis — bara på arkiverade avtal. Sammanfattar vad som hände
@@ -5029,7 +4772,6 @@ function PaperContract({
             ink={ink}
             archived={archived}
             staff={staff}
-            onSave={onSaveSalesPerson}
           />
           {/* Kundansvarig hör till avtalet och dess omfattning — kunden kan ha
               två avtal med olika ansvariga. Kundkortets värde visas som dämpad
@@ -5041,70 +4783,30 @@ function PaperContract({
             ink={ink}
             archived={archived}
             staff={staff}
-            onSave={onSaveAccountManager}
           />
         </div>
-        {/* Signeringsdatum och åtgärder flyttar in i avslutsnotisen på
-            arkiverade avtal — inget att redigera där. */}
+        {/* Signeringsdatum som läsning. Uppsägning, ångra och radering bor
+            under Löptid i panelen, inte som länkar i foten. */}
         {!archived && (
-          <div
-            className="ml-auto text-right font-sans text-[10px] leading-relaxed"
-            style={{ color: ink.muted }}
-          >
-            {/* Signeringsdatum — signed_at, aldrig created_at (som bara är när
-                raden skapades i portalen). Går att fylla i för äldre avtal. */}
-            {onEditSignedAt &&
-              (contract.signed_at ? (
-                <button
-                  onClick={onEditSignedAt}
-                  className="hover:text-[#262e38] underline decoration-dotted"
-                  title="Ändra signeringsdatum"
-                >
-                  Signerat {formatDateSv(contract.signed_at)}
-                </button>
-              ) : (
-                <button
-                  onClick={onEditSignedAt}
-                  className="text-[#b45309] hover:text-[#262e38] underline decoration-dotted"
-                  title="Ange när kunden signerade avtalet"
-                >
-                  Ange signeringsdatum
-                </button>
-              ))}
+          <div className="ml-auto text-right font-sans text-[10px] leading-relaxed" style={{ color: ink.muted }}>
+            {contract.signed_at ? (
+              <>Signerat {formatDateSv(contract.signed_at)}</>
+            ) : onOpenSettings ? (
+              <button type="button" onClick={() => onOpenSettings('avtalet')} className="underline decoration-dotted" style={{ color: ink.warn }}>
+                Signeringsdatum saknas
+              </button>
+            ) : (
+              'Signeringsdatum saknas'
+            )}
             {contract.notice_period_months ? ` · Uppsägningstid ${contract.notice_period_months} mån` : ''}
-            <br />
-            <span className="inline-flex items-center gap-2">
-              {onTerminate && (
-                <button
-                  onClick={onTerminate}
-                  className="text-[10px] text-[#8a9099] hover:text-[#b45309] underline decoration-dotted transition-colors"
-                  title="Säg upp avtalet — det bevaras som historik"
-                >
-                  Säg upp avtalet
+            {onOpenSettings && (
+              <>
+                <br />
+                <button type="button" onClick={() => onOpenSettings('loptid')} className="underline decoration-dotted hover:opacity-70">
+                  Uppsägning och radering under Löptid
                 </button>
-              )}
-              {/* Ångra måste finnas redan här: ett avtal som sagts upp med tre
-                  månaders varsel gick tidigare inte att ångra förrän
-                  uppsägningstiden hunnit löpa ut. */}
-              {onReactivate && (
-                <button
-                  onClick={onReactivate}
-                  className="text-[10px] text-[#8a9099] hover:text-[#157a5b] underline decoration-dotted transition-colors"
-                  title="Ångra uppsägningen"
-                >
-                  Ångra uppsägning
-                </button>
-              )}
-              {onDelete && (
-                <button
-                  onClick={onDelete}
-                  className="text-[10px] text-[#8a9099] hover:text-[#9b3535] underline decoration-dotted transition-colors"
-                  title="Radera avtalet"
-                >
-                  Radera avtalet
-                </button>
-              )}
-            </span>
+              </>
+            )}
           </div>
         )}
       </div>

@@ -11,7 +11,7 @@
 // (samma editor som Oneflow-wizarden och BillingSettingsModal).
 
 import { useEffect, useState } from 'react'
-import { Loader2, Pencil, Plus } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { CaseBillingService } from '../../../../services/caseBillingService'
 import { PricingSettingsService } from '../../../../services/pricingSettingsService'
 import type {
@@ -21,7 +21,8 @@ import type {
 } from '../../../../types/caseBilling'
 import type { PricingSettings } from '../../../../types/pricingSettings'
 import { formatKr } from '../../../../hooks/useCustomerRecord'
-import { formatPayback, paybackTone, summarizeBillingLines } from '../../../../shared/marginEngine'
+import { formatPayback, summarizeBillingLines } from '../../../../shared/marginEngine'
+import { PAPER_GEAR_CLASS } from './paperInk'
 
 export interface ContractContent {
   services: CaseBillingItemWithRelations[]
@@ -125,6 +126,8 @@ interface Props {
    * avslutat avtal ska stå som det stod när avtalet gällde.
    */
   onEdit?: () => void
+  /** Kugghjulet: öppna inställningspanelen på Innehåll och utrustning */
+  onOpenSettings?: () => void
   /**
    * Avropsavtal: § 5 visar ackumulerat utfall från avtalets ärenden i stället
    * för avtalsinnehållet (som är 0 kr på avrop). Sätts av avtalskartan.
@@ -143,6 +146,7 @@ export default function ContractContentSection({
   content,
   loading,
   onEdit,
+  onOpenSettings,
   accumulated,
   accumulatedLoading,
   showAccumulated,
@@ -173,15 +177,18 @@ export default function ContractContentSection({
   // utrustning. Se docs/varaktig-utrustning-marginal-plan.md.
   const b = summary?.breakdown ?? null
   const margin = b?.headline_percent ?? null
-  const revenue = b?.revenue ?? 0
-  const cost = b?.cost_total ?? 0
 
   return (
     <>
       {/* § 4 Tjänster i avtalet */}
-      <div className="mt-3.5">
+      <div className="mt-3.5 group/para">
         <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
           <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 4 · Tjänster i avtalet</h4>
+          {onOpenSettings && (
+            <button type="button" onClick={onOpenSettings} className={PAPER_GEAR_CLASS} style={{ borderColor: '#d9d3c2', color: '#8a9099' }} title="Inställningar för innehåll och utrustning" aria-label="Inställningar för innehåll och utrustning">
+              ⚙
+            </button>
+          )}
           <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
             {loading ? '…' : `${services.length} tjänst${services.length === 1 ? '' : 'er'}`}
           </span>
@@ -195,19 +202,16 @@ export default function ContractContentSection({
         ) : services.length === 0 ? (
           <div className="flex items-center gap-3 py-3">
             <span className="font-sans text-[12.5px] italic text-[#8a9099]">
-              {onEdit
-                ? 'Inga tjänster registrerade — lägg in vad kunden får och vad det kostar oss.'
-                : 'Inga tjänster registrerade.'}
+              Inga tjänster registrerade.
+              {(onOpenSettings ?? onEdit) && (
+                <>
+                  {' '}
+                  <button type="button" onClick={onOpenSettings ?? onEdit} className="not-italic text-[11px] underline decoration-dotted text-[#b45309]">
+                    lägg till under Innehåll
+                  </button>
+                </>
+              )}
             </span>
-            {onEdit && (
-              <button
-                onClick={onEdit}
-                className="ml-auto shrink-0 inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#5d6672] border border-[#d9d3c2] rounded-md px-2.5 py-1.5 bg-[#fff]/50 hover:text-[#262e38] transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-                Lägg till tjänster
-              </button>
-            )}
           </div>
         ) : (
           <>
@@ -284,17 +288,6 @@ export default function ContractContentSection({
               </div>
             )}
 
-            {onEdit && (
-              <div className="flex justify-end pt-2">
-                <button
-                  onClick={onEdit}
-                  className="inline-flex items-center gap-1.5 font-sans text-[11px] font-semibold text-[#5d6672] border border-[#d9d3c2] rounded-md px-2.5 py-1.5 bg-[#fff]/50 hover:text-[#262e38] transition-colors"
-                >
-                  <Pencil className="w-3 h-3" />
-                  Redigera innehåll
-                </button>
-              </div>
-            )}
           </>
         )}
       </div>
@@ -422,150 +415,50 @@ export default function ContractContentSection({
         </div>
       )}
 
-      {/* § 5 Marginal. Villkoret räknar alla tjänsterader, inte bara premien:
-          ett avtal med enbart tilläggsstationer ska också ha en marginal. */}
+      {/* § 5 Marginal: två rader på pappret, hela uppdelningen i pulsen.
+          Avtalen är rullande, så utrustningen (fällor, stationer) är en
+          engångsutgift mot en återkommande intäkt och får aldrig dras från
+          ett enda års avtalsvärde som om den förbrukades. Villkoret räknar
+          alla tjänsterader: ett avtal med enbart tillägg har också marginal. */}
       {!showAccumulated && !loading && allServices.length > 0 && summary && b && (
-        <div className="mt-3.5">
-          <div className="border-b-[1.5px] border-[#262e38] pb-1">
+        <div className="mt-3.5 group/para">
+          <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
             <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 5 · Marginal</h4>
+            <span className="ml-auto font-sans text-[10.5px] text-[#8a9099]">detaljer i pulsen</span>
           </div>
-          {b.cost_durable > 0 ? (
-            <>
-              {/* Ledger i § 4/§ 6-rytmen. Fällor och stationer står kvar hos
-                  kunden i flera år: en engångsutgift mot en återkommande intäkt,
-                  som aldrig får dras från ett enda års avtalsvärde som om den
-                  förbrukades. Avtalen är rullande, så det finns ingen avtalstid
-                  att fördela över; i stället visas hur fort den betalar sig. */}
-              <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted border-[#d9d3c2] text-[13.5px]">
-                <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.1</span>
-                <span className="font-semibold text-[#262e38]">Avtalsvärde per år</span>
-                <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
-                <span className="tabular-nums text-[#262e38] whitespace-nowrap shrink-0">{formatKr(b.revenue)}</span>
-              </div>
-              <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted border-[#d9d3c2] text-[13.5px]">
-                <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.2</span>
-                <span className="font-semibold text-[#262e38] truncate">
-                  Löpande kostnad per år
-                  <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
-                    {[
-                      b.labour_cost > 0 && `arbetstid ${formatKr(b.labour_cost)}`,
-                      b.consumable_cost > 0 && `förbrukning ${formatKr(b.consumable_cost)}`,
-                    ].filter(Boolean).join(' · ')}
-                  </span>
-                </span>
-                <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
-                <span className="tabular-nums text-[#262e38] whitespace-nowrap shrink-0">−{formatKr(b.cost_ongoing)}</span>
-              </div>
-              <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 pt-2 font-sans">
-                <span className="text-[12px] text-[#5d6672]">
-                  Täckningsbidrag per år{' '}
-                  <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(b.contribution_ongoing)}</b>
-                </span>
-                <span
-                  className="ml-auto text-[15px] font-bold tabular-nums"
-                  style={{ color: b.labour_missing ? '#9b3535' : marginInk(b.margin_percent_ongoing, settings) }}
-                >
-                  {b.labour_missing
-                    ? 'arbetstid saknas'
-                    : b.margin_percent_ongoing !== null ? `${b.margin_percent_ongoing.toFixed(1)} %` : '–'}
-                  <span className="text-[10.5px] font-normal text-[#8a9099]"> löpande marginal</span>
-                </span>
-              </div>
-              <div className="flex items-center gap-2.5 py-1.5 mt-1.5 border-t border-b border-dotted border-[#d9d3c2] text-[13.5px]">
-                <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.3</span>
-                <span className="font-semibold text-[#262e38] truncate">
-                  Varaktig utrustning, engångs
-                  <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
-                    {b.durable_lines
-                      .map((l) => `${l.article_name}${l.quantity !== 1 ? ` × ${l.quantity}` : ''}`)
-                      .join(' · ')}
-                  </span>
-                </span>
-                <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
-                <span className="tabular-nums text-[#262e38] whitespace-nowrap shrink-0">−{formatKr(b.cost_durable)}</span>
-              </div>
-              <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1 pt-1.5 pl-8 font-sans text-[11px] text-[#8a9099]">
-                {b.payback_never ? (
-                  <span style={{ color: '#9b3535' }}>Återbetalas inte med nuvarande löpande kostnad</span>
-                ) : (
-                  <span>
-                    Återbetald efter{' '}
-                    <b
-                      className="tabular-nums"
-                      style={{ color: paybackTone(b, settings) === 'bad' ? '#9b3535' : '#5d6672' }}
-                    >
-                      {formatPayback(b.payback_years)}
-                    </b>
-                  </span>
+          <div className="flex items-baseline gap-2.5 py-1.5 border-b border-dotted border-[#d9d3c2] text-[13.5px]">
+            <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.1</span>
+            <span className="font-semibold text-[#262e38]">{b.headline_label}</span>
+            <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-[-3px] min-w-4" />
+            {b.labour_missing ? (
+              <span className="font-sans text-[12px] whitespace-nowrap" style={{ color: '#9b3535' }}>
+                arbetstid saknas
+                {onOpenSettings && (
+                  <>
+                    {' · '}
+                    <button type="button" onClick={onOpenSettings} className="underline decoration-dotted">lägg in under Innehåll</button>
+                  </>
                 )}
-                {b.margin_percent_3y !== null && (
-                  <span>
-                    Över tre år <b className="tabular-nums text-[#5d6672]">{b.margin_percent_3y.toFixed(1)} %</b>
-                  </span>
-                )}
-                <span className="ml-auto">
-                  År 1{' '}
-                  <b className="tabular-nums">
-                    {b.margin_percent_year1 !== null ? `${b.margin_percent_year1.toFixed(1)} %` : '–'}
-                  </b>{' '}
-                  marginal
+              </span>
+            ) : (
+              <span className="font-sans text-[13px] font-bold tabular-nums whitespace-nowrap" style={{ color: marginInk(margin, settings) }}>
+                {margin !== null ? `${margin.toFixed(1)} %` : '–'}
+                <span className="text-[10.5px] font-normal text-[#8a9099]"> · täckningsbidrag {formatKr(b.contribution_ongoing)}/år</span>
+              </span>
+            )}
+          </div>
+          {b.cost_durable > 0 && (
+            <div className="flex items-baseline gap-2.5 py-1.5 border-b border-dotted border-[#d9d3c2] text-[13.5px]">
+              <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.2</span>
+              <span className="font-semibold text-[#262e38] truncate">
+                Varaktig utrustning, engångs
+                <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
+                  {b.payback_never ? 'återbetalas inte med nuvarande löpande kostnad' : `återbetald efter ${formatPayback(b.payback_years)}`}
                 </span>
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 pt-2 font-sans">
-              <span className="text-[12px] text-[#5d6672]">
-                Avtalsvärde{' '}
-                <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(revenue)}</b>
               </span>
-              <span className="text-[12px] text-[#5d6672]">
-                Vår kostnad{' '}
-                <b className="text-[13px] text-[#262e38] tabular-nums">{formatKr(cost)}</b>
-              </span>
-              <span className="text-[12px] text-[#5d6672]">
-                Täckningsbidrag{' '}
-                <b className="text-[13px] tabular-nums" style={{ color: marginInk(margin, settings) }}>
-                  {formatKr(revenue - cost)}
-                </b>
-              </span>
-              <span
-                className="ml-auto text-[15px] font-bold tabular-nums"
-                style={{ color: b.labour_missing ? '#9b3535' : marginInk(margin, settings) }}
-              >
-                {b.labour_missing ? 'arbetstid saknas' : margin !== null ? `${margin.toFixed(1)} %` : '–'}
-                <span className="text-[10.5px] font-normal text-[#8a9099]"> marginal</span>
-              </span>
+              <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-[-3px] min-w-4" />
+              <span className="font-sans text-[12.5px] tabular-nums whitespace-nowrap text-[#262e38]">−{formatKr(b.cost_durable)}</span>
             </div>
-          )}
-          {!b.labour_missing && margin !== null && settings && margin < settings.min_margin_percent && (
-            <div
-              className="mt-1.5 font-sans text-[11px] px-2.5 py-1.5 rounded"
-              style={{ background: 'rgba(155,53,53,.08)', color: '#9b3535' }}
-            >
-              Under lägsta marginal ({settings.min_margin_percent} %) — se över priser eller kostnader.
-            </div>
-          )}
-          {b.labour_missing && (
-            <div
-              className="mt-1.5 font-sans text-[11px] px-2.5 py-1.5 rounded"
-              style={{ background: 'rgba(155,53,53,.08)', color: '#9b3535' }}
-            >
-              Arbetstiden på avtalet täcker inte besöken ({b.labour_hours} h för avtalets besök). Lägg in
-              årets arbetstid som intern kostnad, annars säger marginalen inget.
-            </div>
-          )}
-          {!b.payback_never && paybackTone(b, settings) === 'bad' && settings && (
-            <div
-              className="mt-1.5 font-sans text-[11px] px-2.5 py-1.5 rounded"
-              style={{ background: 'rgba(180,83,9,.08)', color: '#b45309' }}
-            >
-              Utrustningen tar över {settings.max_payback_years} år att tjäna in — se över årspriset.
-            </div>
-          )}
-          {articles.length === 0 && (
-            <p className="mt-1 font-sans text-[10.5px] italic text-[#8a9099]">
-              Inga interna kostnader registrerade — marginalen visar hela avtalsvärdet.
-            </p>
           )}
         </div>
       )}
