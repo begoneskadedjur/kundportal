@@ -2053,7 +2053,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const dragSourceUnitId = drag?.started ? unitIdOf(drag.payload) : null
 
   return (
-    <div>
+    // Panelen ligger som slide-over utanför sidans max-width. På breda skärmar
+    // finns tomrum utanför containern, så kartan skjuts åt vänster (relative,
+    // inte transform: transform skulle ankra fixed-popovers fel) och pappret
+    // hamnar aldrig under panelen. På 1280 px täcker panelen högerkanten.
+    <div
+      className={`transition-[left] duration-200 ${
+        settingsPanel ? 'xl:relative xl:-left-[120px] 2xl:-left-[240px]' : ''
+      }`}
+    >
       {/* Sammanfattning */}
       <div className="flex flex-wrap gap-6 bg-slate-800/30 border border-slate-700 rounded-2xl px-4 py-3 mb-5 text-sm">
         <div>
@@ -2098,9 +2106,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 
       <div
         ref={boardRef}
-        className={`relative grid grid-cols-1 gap-10 items-start ${
-          settingsPanel ? 'lg:grid-cols-[290px_minmax(0,1fr)_440px] gap-6' : 'lg:grid-cols-[290px_1fr]'
-        }`}
+        className="relative grid grid-cols-1 gap-10 items-start lg:grid-cols-[290px_1fr]"
       >
         {/* Kopplingslinjer */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none hidden lg:block" aria-hidden>

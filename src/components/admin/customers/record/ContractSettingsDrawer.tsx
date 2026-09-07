@@ -9,6 +9,7 @@
 // pappret redan visar.
 
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import {
   BILLING_FREQUENCY_LABEL,
@@ -789,9 +790,13 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
     )
   }
 
-  return (
+  // Slide-over vid skärmens högerkant, utanför gridet: pappret behåller sin
+  // bredd och sidans max-width rörs inte. Ingen dimmad bakgrund, pappret ska
+  // gå att läsa och dra brickor till medan panelen är öppen. Portal mot body
+  // så ingen förälder med transform kan ankra den fel.
+  return createPortal(
     <aside
-      className="relative z-10 flex flex-col bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden lg:sticky lg:top-4 max-h-[calc(100vh-2rem)]"
+      className="fixed inset-y-0 right-0 z-40 w-[480px] max-w-[92vw] flex flex-col bg-slate-900 border-l border-slate-700 shadow-2xl overflow-hidden"
       aria-label="Inställningar och puls för avtalet"
     >
       <div className="flex items-center border-b border-slate-700">
@@ -858,6 +863,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto">{renderPuls()}</div>
       )}
-    </aside>
+    </aside>,
+    document.body
   )
 }
