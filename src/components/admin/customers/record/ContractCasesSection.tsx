@@ -353,15 +353,19 @@ export default function ContractCasesSection({
     const completedSessions = inspections
       .filter((s) => (s.status === 'completed' || !!s.completed_at) && s.completed_at)
       .sort((a, b) => (a.completed_at ?? '').localeCompare(b.completed_at ?? ''))
-    const lateSessions = inspections
+    // Ett ärende som tagits bort tar inte alltid sin session med sig (två
+    // sådana hos FEV 2026-09-07). Sessioner vars ärende inte längre finns
+    // i listan ska varken kräva handling eller räknas som bokade.
+    const liveSessions = inspections.filter((s) => !s.case_id || caseById.has(s.case_id))
+    const lateSessions = liveSessions
       .filter((s) => sessionLateness(s.scheduled_at, s.status ?? '') !== 'ontime')
       .sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))
-    const bookedSessions = inspections
+    const bookedSessions = liveSessions
       .filter((s) => s.status === 'scheduled' && Date.parse(s.scheduled_at ?? '') >= now)
       .sort((a, b) => (a.scheduled_at ?? '').localeCompare(b.scheduled_at ?? ''))
 
     return { rows, counts, latest, completedSessions, lateSessions, bookedSessions }
-  }, [cases, inspections, units, nameById])
+  }, [cases, caseById, inspections, units, nameById])
 
   const latestDoneSession = base.completedSessions[base.completedSessions.length - 1] ?? null
   const stations = useStationData(customerIds, latestDoneSession?.id ?? null)
