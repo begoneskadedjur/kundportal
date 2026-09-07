@@ -1364,19 +1364,6 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       ...sc.map((cs) => customerById.get(cs.customer_id)).filter((u): u is RecordCustomer => !!u && u.id !== owner?.id),
     ]
   }
-  /** Kompletthetens underlag utom marginalen (pappret och panelen fyller i den) */
-  const completenessBaseFor = (c: RecordContract): Omit<CompletenessInput, 'breakdown'> => ({
-    contract: c,
-    scope: activeScopeByContract.get(c.id) ?? [],
-    isAvrop: c.contract_type === 'Avropsavtal' || c.label === 'Avropsavtal',
-    isUnitContract: !isSingleSite && unitIds.has(c.customer_id ?? ''),
-    followupUnits: followupFor(c).units,
-    pendingBricks: bricksFor(c).length,
-    uncoveredPeriods: (planEntriesByContract.get(c.id) ?? []).filter((e) => e.action === 'uncovered').length,
-    coveredUnits: coveredLocationsFor(c),
-  })
-  const incompletePapers = papers.filter((c) => !computeCompleteness({ ...completenessBaseFor(c), breakdown: null }).complete).length
-
   const orphanBricks = useMemo(() => {
     const covered = new Set<string>()
     for (const p of papers) {
@@ -1981,6 +1968,19 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     },
     [activeScopeByContract, cases, inspections, locations, locationIds]
   )
+
+  /** Kompletthetens underlag utom marginalen (pappret och panelen fyller i den) */
+  const completenessBaseFor = (c: RecordContract): Omit<CompletenessInput, 'breakdown'> => ({
+    contract: c,
+    scope: activeScopeByContract.get(c.id) ?? [],
+    isAvrop: c.contract_type === 'Avropsavtal' || c.label === 'Avropsavtal',
+    isUnitContract: !isSingleSite && unitIds.has(c.customer_id ?? ''),
+    followupUnits: followupFor(c).units,
+    pendingBricks: bricksFor(c).length,
+    uncoveredPeriods: (planEntriesByContract.get(c.id) ?? []).filter((e) => e.action === 'uncovered').length,
+    coveredUnits: coveredLocationsFor(c),
+  })
+  const incompletePapers = papers.filter((c) => !computeCompleteness({ ...completenessBaseFor(c), breakdown: null }).complete).length
 
   const saveSitePlan = async (
     contract: RecordContract,
