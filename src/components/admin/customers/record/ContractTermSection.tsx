@@ -265,9 +265,10 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
         <div
           className="flex items-center gap-2.5 mt-2 px-3 py-2 rounded-md font-sans text-[11.5px] leading-relaxed"
           style={{
-            border: `1px solid ${urgent ? 'rgba(180,83,9,.45)' : ink.rule}`,
-            background: urgent ? 'rgba(180,83,9,.08)' : 'rgba(255,255,255,.4)',
-            color: urgent ? '#7a3c07' : ink.secondary,
+            // Panelen är mörk: pappersvit bakgrund blev en grå dimma här
+            border: `1px solid ${urgent ? 'rgba(251,191,36,.45)' : ink.rule}`,
+            background: urgent ? 'rgba(251,191,36,.08)' : 'rgba(255,255,255,.04)',
+            color: urgent ? '#fbbf24' : ink.secondary,
           }}
         >
           <span>

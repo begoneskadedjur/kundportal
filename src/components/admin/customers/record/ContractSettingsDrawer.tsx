@@ -8,7 +8,7 @@
 // medan man skriver. Åtta grupper, en synlig i taget, aldrig något som
 // pappret redan visar.
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import {
@@ -27,7 +27,7 @@ import type { CaseBillingItemWithRelations } from '../../../../types/caseBilling
 import type { AddonBrick } from '../../../../types/addonStations'
 import { formatPayback, marginTone, paybackTone, toneTextClass } from '../../../../shared/marginEngine'
 import { PANEL_INK, PANEL_INPUT_CLASS } from './paperInk'
-import { AgreementObjectText, SignatureLine, AccountManagerLine } from './PaperSignatures'
+import { AgreementObjectText } from './PaperSignatures'
 import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from './ContractPremiumSection'
 import ContractReferencesSection from './ContractReferencesSection'
 import ContractTermSection, { termWatch } from './ContractTermSection'
@@ -139,6 +139,56 @@ function Label({ children }: { children: React.ReactNode }) {
   return <div className="text-[11px] text-slate-500 mb-1">{children}</div>
 }
 
+/**
+ * Personalväljare i panelen: aldrig fritext (21 namnvarianter hade uppstått
+ * i avtalen mot 12 i registret). Tomt val = ärv från kundkortet.
+ */
+function StaffSelect({
+  value,
+  fallback,
+  staff,
+  onSave,
+}: {
+  value: string | null
+  fallback: string | null
+  staff: { id: string; name: string }[]
+  onSave?: (name: string | null) => Promise<void>
+}) {
+  const [saving, setSaving] = useState(false)
+  const names = staff.map((s) => s.name)
+  // Ett namn som inte längre finns i registret måste ändå gå att visa
+  const options = value && !names.includes(value) ? [value, ...names] : names
+  const change = async (next: string) => {
+    if (!onSave) return
+    setSaving(true)
+    try {
+      await onSave(next || null)
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <div>
+      <select
+        value={value ?? ''}
+        onChange={(e) => void change(e.target.value)}
+        disabled={!onSave || saving}
+        className={`${PANEL_INPUT_CLASS} disabled:opacity-60`}
+      >
+        <option value="">{fallback ? `Som kundkortet: ${fallback}` : 'Inte angett'}</option>
+        {options.map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+      {!value && fallback && (
+        <div className="mt-1 text-[11px] text-slate-500">Ärvs från kundkortet tills avtalet får ett eget namn.</div>
+      )}
+    </div>
+  )
+}
+
 function H5({ children }: { children: React.ReactNode }) {
   return <h5 className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-slate-500 mb-2.5">{children}</h5>
 }
@@ -223,27 +273,28 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                 )}
               </div>
             </div>
+            {/* Skrivstilen hör hemma på pappret. I panelen är det vanliga
+                väljare i panelens toner, annars syns namnen inte mot mörkt. */}
             <div className="mb-3">
               <Label>Säljare, den som skrivit under för BeGone</Label>
-              <SignatureLine
+              <StaffSelect
                 value={contract.begone_employee_name ?? null}
                 fallback={p.root.sales_person ?? null}
-                ink={ink}
-                archived={archived}
                 staff={p.staff}
-                onSave={archived ? undefined : p.onSaveSalesPerson}
+                onSave={archived || !p.onSaveSalesPerson ? undefined : (name) => p.onSaveSalesPerson!(name)}
               />
             </div>
             <div className="mb-3">
               <Label>Kundansvarig</Label>
-              <AccountManagerLine
+              <StaffSelect
                 value={contract.account_manager_name ?? null}
-                email={contract.account_manager_email ?? null}
                 fallback={p.root.assigned_account_manager ?? null}
-                ink={ink}
-                archived={archived}
                 staff={p.staff}
-                onSave={archived ? undefined : p.onSaveAccountManager}
+                onSave={
+                  archived || !p.onSaveAccountManager
+                    ? undefined
+                    : (name) => p.onSaveAccountManager!(name, name ? p.staff.find((s) => s.name === name)?.email ?? null : null)
+                }
               />
             </div>
             {p.oneflowUrl && (
@@ -357,43 +408,39 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                 )}
               </div>
             </div>
-            <table className="w-full text-[12.5px]">
-              <thead>
-                <tr className="text-[10.5px] uppercase tracking-[0.06em] text-slate-500">
-                  <th className="text-left font-medium pb-1.5 border-b border-slate-700">Enhet</th>
-                  <th className="text-left font-medium pb-1.5 border-b border-slate-700">Driftläge</th>
-                  <th className="text-left font-medium pb-1.5 border-b border-slate-700">Takt</th>
-                  <th className="border-b border-slate-700"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {p.followup.units.map((u) => {
-                  const unit = p.customerById.get(u.unitId)
-                  return (
-                    <tr key={u.unitId}>
-                      <td className="py-1.5 border-b border-slate-700 text-white">{unit ? customerRowName(unit) : 'Enhet'}</td>
-                      <td className="py-1.5 border-b border-slate-700 text-slate-300">{u.serviceMode === 'on_demand' ? 'Avrop' : 'Stationskontroll'}</td>
-                      <td className="py-1.5 border-b border-slate-700 text-slate-300">
-                        {u.serviceMode === 'on_demand' ? '' : u.frequency ? VISIT_FREQUENCY_LABEL[u.frequency] ?? u.frequency : u.visitsPerYear ? `${u.visitsPerYear}/år` : ''}
-                        {u.inherited && <span className="text-slate-500"> · förval</span>}
-                      </td>
-                      <td className="py-1.5 border-b border-slate-700 text-right">
-                        {p.onEditSitePlan && !archived && (
-                          <button type="button" onClick={() => p.onEditSitePlan?.(u)} className="text-[11.5px] text-[#20c58f] underline decoration-dotted">
-                            ändra
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-                {p.followup.units.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="py-2 text-[12px] italic text-slate-500">Inga enheter i omfattningen ännu.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            {/* En rad per enhet, takten som underrad: fyra kolumner får inte
+                plats i 480 px utan att namnen bryts mitt i. */}
+            <Label>Per enhet</Label>
+            <div className="divide-y divide-slate-700 border-y border-slate-700">
+              {p.followup.units.map((u) => {
+                const unit = p.customerById.get(u.unitId)
+                const takt =
+                  u.serviceMode === 'on_demand'
+                    ? 'Avrop, inga planerade besök'
+                    : `Stationskontroll${
+                        u.frequency ? ` · ${VISIT_FREQUENCY_LABEL[u.frequency] ?? u.frequency}` : u.visitsPerYear ? ` · ${u.visitsPerYear}/år` : ''
+                      }`
+                return (
+                  <div key={u.unitId} className="flex items-center gap-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[12.5px] text-white truncate">{unit ? customerRowName(unit) : 'Enhet'}</div>
+                      <div className="text-[11.5px] text-slate-400">
+                        {takt}
+                        {u.inherited && <span className="text-slate-500"> · avtalets förval</span>}
+                      </div>
+                    </div>
+                    {p.onEditSitePlan && !archived && (
+                      <button type="button" onClick={() => p.onEditSitePlan?.(u)} className="shrink-0 text-[11.5px] text-[#20c58f] underline decoration-dotted">
+                        ändra
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+              {p.followup.units.length === 0 && (
+                <div className="py-2 text-[12px] italic text-slate-500">Inga enheter i omfattningen ännu.</div>
+              )}
+            </div>
           </div>
         )
       case 'innehall':
