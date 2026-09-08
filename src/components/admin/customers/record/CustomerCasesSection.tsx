@@ -17,6 +17,7 @@ import {
   VISITS_PER_YEAR_BY_FREQUENCY,
   type RecordCase,
   type RecordContract,
+  type RecordContractSite,
   type RecordCustomer,
   type RecordInspectionSession,
   type RecordInvoice,
@@ -35,6 +36,8 @@ interface Props {
   inspections: RecordInspectionSession[]
   schedules: RecordSchedule[]
   contracts: RecordContract[]
+  /** Avtalets omfattning per enhet, ronden i ContractCasesSection behöver den */
+  contractSites: RecordContractSite[]
   invoices: RecordInvoice[]
   onOpenCase: (c: RecordCase) => void
 }

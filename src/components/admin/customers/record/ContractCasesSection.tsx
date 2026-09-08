@@ -17,6 +17,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, Search } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../../../lib/supabase'
 import {
   formatDateSv,
@@ -25,6 +26,7 @@ import {
   VISITS_PER_YEAR_BY_FREQUENCY,
   type RecordCase,
   type RecordContract,
+  type RecordContractSite,
   type RecordCustomer,
   type RecordInspectionSession,
   type RecordInvoice,
@@ -47,6 +49,8 @@ interface Props {
   schedules: RecordSchedule[]
   contracts: RecordContract[]
   invoices: RecordInvoice[]
+  /** Avtalets omfattning per enhet: styr vilka enheter som ska ha en rond */
+  contractSites: RecordContractSite[]
   onOpenCase: (c: RecordCase) => void
 }
 
@@ -184,6 +188,8 @@ interface StationData {
   outdoor: number
   indoor: number
   missedNames: string[]
+  /** Aktiva stationer per enhet (ute + inne), för svärmens vänsterkolumn */
+  byUnit: Record<string, number>
 }
 
 function useStationData(customerIds: string[], latestSessionId: string | null): StationData | null {
@@ -195,15 +201,17 @@ function useStationData(customerIds: string[], latestSessionId: string | null): 
     ;(async () => {
       try {
         const [outRes, planRes] = await Promise.all([
-          supabase.from('equipment_placements').select('id, serial_number, comment, status').in('customer_id', customerIds),
-          supabase.from('floor_plans').select('id').in('customer_id', customerIds),
+          supabase.from('equipment_placements').select('id, customer_id, serial_number, comment, status').in('customer_id', customerIds),
+          supabase.from('floor_plans').select('id, customer_id').in('customer_id', customerIds),
         ])
-        const out = (outRes.data ?? []) as Array<{ id: string; serial_number: string | null; comment: string | null; status: string | null }>
-        const planIds = ((planRes.data ?? []) as Array<{ id: string }>).map((p) => p.id)
+        const out = (outRes.data ?? []) as Array<{ id: string; customer_id: string | null; serial_number: string | null; comment: string | null; status: string | null }>
+        const plans = (planRes.data ?? []) as Array<{ id: string; customer_id: string | null }>
+        const planIds = plans.map((p) => p.id)
+        const planCustomer = new Map(plans.map((p) => [p.id, p.customer_id]))
         const indRes = planIds.length
-          ? await supabase.from('indoor_stations').select('id, station_number, location_description, status').in('floor_plan_id', planIds)
+          ? await supabase.from('indoor_stations').select('id, floor_plan_id, station_number, location_description, status').in('floor_plan_id', planIds)
           : { data: [] }
-        const ind = (indRes.data ?? []) as Array<{ id: string; station_number: number | null; location_description: string | null; status: string | null }>
+        const ind = (indRes.data ?? []) as Array<{ id: string; floor_plan_id: string | null; station_number: number | null; location_description: string | null; status: string | null }>
         const activeOut = out.filter((s) => (s.status ?? 'active') !== 'removed')
         const activeInd = ind.filter((s) => (s.status ?? 'active') !== 'removed')
 
@@ -225,7 +233,13 @@ function useStationData(customerIds: string[], latestSessionId: string | null): 
             ]
           }
         }
-        if (alive) setData({ outdoor: activeOut.length, indoor: activeInd.length, missedNames })
+        const byUnit: Record<string, number> = {}
+        for (const s of activeOut) if (s.customer_id) byUnit[s.customer_id] = (byUnit[s.customer_id] ?? 0) + 1
+        for (const s of activeInd) {
+          const cid = s.floor_plan_id ? planCustomer.get(s.floor_plan_id) : null
+          if (cid) byUnit[cid] = (byUnit[cid] ?? 0) + 1
+        }
+        if (alive) setData({ outdoor: activeOut.length, indoor: activeInd.length, missedNames, byUnit })
       } catch {
         if (alive) setData(null)
       }
@@ -262,32 +276,60 @@ const MONTH_SHORT = ['JAN', 'FEB', 'MAR', 'APR', 'MAJ', 'JUN', 'JUL', 'AUG', 'SE
 
 interface RondVisit {
   kind: 'done' | 'missed' | 'booked'
-  x: number
+  /** completed_at för utfört, scheduled_at annars. Geometrin mappar till x. */
+  at: number
   session: RecordInspectionSession
   /** Sessionens egen bokade tid, aldrig en beräknad avtalstid */
   scheduledAt: number | null
-  /** Utfört: dagar efter bokad tid. Missat: dagar sedan bokad tid. */
+  /** Utfört: dagar efter bokad tid. Passerat: dagar sedan bokad tid. */
   driftDays: number | null
   coverage: { inspected: number; total: number } | null
 }
 
-/** En rond = ett schema på en enhet med egen rytm. Fallback per enhet. */
-interface RondTrack {
-  key: string
-  unitId: string | null
-  unitName: string | null
+/**
+ * Status per enhet. "to_book" kräver en uttalad rytm (omfattning, schema
+ * eller avtal), aldrig en gissning. LATENESS_STYLE-etiketterna renderas
+ * aldrig här: passerade bokningar heter "passerat utan avslut".
+ */
+type RondUnitStatus = 'missed' | 'to_book' | 'unscheduled' | 'booked' | 'ok' | 'on_demand'
+const URGENCY: Record<RondUnitStatus, number> = { missed: 0, to_book: 1, unscheduled: 2, booked: 3, ok: 4, on_demand: 5 }
+
+/** En rad i svärmen: en enhet, oavsett hur många scheman den har. */
+interface RondUnitRow {
+  unitId: string
+  unitName: string
+  status: RondUnitStatus
+  urgency: number
+  /** Vad som gav raden: avtalets omfattning, schema, avtal, eller bara sessioner */
+  source: 'site' | 'schedule' | 'contract' | 'orphan'
+  serviceMode: 'inspection' | 'on_demand'
   contractId: string | null
-  visitsPerYear: number | null
-  frequencyLabel: string | null
+  scheduleIds: string[]
+  rhythm: { visitsPerYear: number | null; label: string | null }
   /** max(schemastart, avtalsstart, etablering) */
   startsAt: number | null
   establishedAt: number | null
-  visits: RondVisit[]
-  done: number
-  booked: number
+  lastDone: { at: number; session: RecordInspectionSession; beyondWindow: boolean } | null
+  nextBooked: { at: number; session: RecordInspectionSession; beyondWindow: boolean } | null
   missed: number
+  missedOldestAt: number | null
+  daysSinceDone: number | null
   /** Antal, aldrig datum: bokade kommande 12 mån och vad som återstår att boka */
   planning: { booked: number; remaining: number } | null
+  /** Bara besök inom fönstret, sorterade på tid */
+  visits: RondVisit[]
+}
+
+interface RondSummary {
+  units: number
+  missed: number
+  toBook: number
+  unscheduled: number
+  onDemand: number
+  inRhythm: number
+  visitsDone12m: number
+  nextBooked: RecordInspectionSession | null
+  meanGap: number | null
 }
 
 interface RondGeometry {
@@ -300,23 +342,19 @@ interface RondGeometry {
   firstEstablishment: number | null
 }
 
-/**
- * Ett band i ronden: BOKAT-spåret ovan, UTFÖRT nedan. Ritar bara sessioner
- * som finns i databasen. Ramen (avtalsstart, etablering) är riktiga datum.
- */
-function RondBand({
-  track,
-  geometry: g,
-  first,
-  showLabel,
-  onOpen,
-}: {
-  track: RondTrack
+interface RondModel {
+  rows: RondUnitRow[]
+  summary: RondSummary
   geometry: RondGeometry
-  first: boolean
-  showLabel: boolean
-  onOpen: (v: RondVisit) => void
-}) {
+  rhythmText: string | null
+}
+
+/**
+ * Bandet för EN enhet: BOKAT-spåret ovan, UTFÖRT nedan. Detaljvyn som fälls
+ * ut från en rad i svärmen. Ritar bara sessioner som finns.
+ */
+
+function RondBand({ row, geometry: g, onOpen }: { row: RondUnitRow; geometry: RondGeometry; onOpen: (v: RondVisit) => void }) {
   const [hover, setHover] = useState<{ px: number; label: string; visit: RondVisit | null } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -334,8 +372,8 @@ function RondBand({
     const d = new Date(t)
     let best: RondVisit | null = null
     let bestDiff = 35
-    for (const v of track.visits) {
-      const diff = Math.abs(v.x - ux)
+    for (const v of row.visits) {
+      const diff = Math.abs(g.x(v.at) - ux)
       if (diff < bestDiff) {
         bestDiff = diff
         best = v
@@ -345,17 +383,17 @@ function RondBand({
   }
 
   const inDomain = (t: number | null): t is number => t != null && t >= g.domainStart && t <= g.domainEnd
-  const establishment = track.establishedAt ?? g.firstEstablishment
+  const establishment = row.establishedAt ?? g.firstEstablishment
   const width = ref.current?.clientWidth ?? 1000
 
   return (
     <div
       ref={ref}
-      className={`relative px-1 pt-1.5 ${first ? '' : 'border-t border-slate-800'}`}
+      className="relative px-1 pt-1.5"
       onMouseMove={onMove}
       onMouseLeave={() => setHover(null)}
     >
-      <svg viewBox="0 0 1000 172" className="block w-full overflow-visible" aria-label={track.unitName ? `Kontrollbesök ${track.unitName}` : 'Kontrollbesök'}>
+      <svg viewBox="0 0 1000 172" className="block w-full overflow-visible" aria-label={row.unitName ? `Kontrollbesök ${row.unitName}` : 'Kontrollbesök'}>
         {/* före etableringen finns inget att kontrollera */}
         {establishment != null && establishment > g.domainStart && (
           <rect x="20" y="6" width={Math.max(0, Math.min(g.x(establishment), 980) - 20)} height="140" fill="rgba(0,0,0,.22)" />
@@ -386,19 +424,19 @@ function RondBand({
           </g>
         )}
 
-        {showLabel && (
+        {(row.rhythm.label || row.planning) && (
           <text x="20" y="16" fontSize="10.5" fontWeight="600" fill="#c7d2e0">
-            {track.unitName ?? 'Övrigt'}
-            {track.frequencyLabel && (
+            {row.unitName ?? 'Övrigt'}
+            {row.rhythm.label && (
               <tspan fontWeight="400" fill="#5d6f88">
                 {' '}
-                · {track.frequencyLabel.toLowerCase()}
+                · {row.rhythm.label.toLowerCase()}
               </tspan>
             )}
-            {track.planning && (
-              <tspan fontWeight="400" fill={track.planning.remaining > 0 ? AMBER : '#5d6f88'}>
+            {row.planning && (
+              <tspan fontWeight="400" fill={row.planning.remaining > 0 ? AMBER : '#5d6f88'}>
                 {' '}
-                · {track.planning.booked} bokade, {track.planning.remaining} att boka
+                · {row.planning.booked} bokade, {row.planning.remaining} att boka
               </tspan>
             )}
           </text>
@@ -413,32 +451,32 @@ function RondBand({
         </text>
         <line x1="20" y1="112" x2="980" y2="112" stroke="#223247" strokeWidth="1" />
 
-        {track.visits.map((v, i) => {
+        {row.visits.map((v, i) => {
           if (v.kind === 'done') {
             return (
               <g key={`v-${i}`} className="cursor-pointer" onClick={() => onOpen(v)}>
                 {v.coverage &&
                   (v.coverage.inspected >= v.coverage.total ? (
-                    <circle cx={v.x} cy="112" r="8" stroke={GREEN} strokeOpacity=".55" strokeWidth="1.4" fill="none" />
+                    <circle cx={g.x(v.at)} cy="112" r="8" stroke={GREEN} strokeOpacity=".55" strokeWidth="1.4" fill="none" />
                   ) : (
                     <path
-                      d={arcPath(v.x, 112, 8, v.coverage.inspected / v.coverage.total)}
+                      d={arcPath(g.x(v.at), 112, 8, v.coverage.inspected / v.coverage.total)}
                       stroke={v.coverage.inspected / v.coverage.total < 0.9 ? AMBER : GREEN}
                       strokeOpacity=".7"
                       strokeWidth="1.4"
                       fill="none"
                     />
                   ))}
-                <Plomb x={v.x} y={112} />
+                <Plomb x={g.x(v.at)} y={112} />
               </g>
             )
           }
           if (v.kind === 'missed') {
             return (
               <g key={`v-${i}`} className="cursor-pointer" onClick={() => onOpen(v)}>
-                <circle cx={v.x} cy="46" r="4.5" stroke={RED} strokeWidth="1.7" fill="none" />
-                <line x1={v.x + 6} y1="46" x2={Math.max(v.x + 6, g.todayX - 2)} y2="46" stroke={RED} strokeWidth="1.3" strokeDasharray="3 3" />
-                <text x={Math.min(v.x + 18, 840)} y="36" fontSize="9.5" fill={RED}>
+                <circle cx={g.x(v.at)} cy="46" r="4.5" stroke={RED} strokeWidth="1.7" fill="none" />
+                <line x1={g.x(v.at) + 6} y1="46" x2={Math.max(g.x(v.at) + 6, g.todayX - 2)} y2="46" stroke={RED} strokeWidth="1.3" strokeDasharray="3 3" />
+                <text x={Math.min(g.x(v.at) + 18, 840)} y="36" fontSize="9.5" fill={RED}>
                   bokat {formatDateSv(v.session.scheduled_at)} · {v.driftDays} dagar utan avslut
                 </text>
               </g>
@@ -446,8 +484,8 @@ function RondBand({
           }
           return (
             <g key={`v-${i}`} className="cursor-pointer" onClick={() => onOpen(v)}>
-              <circle cx={v.x} cy="46" r="4.5" stroke="#20c58f" strokeWidth="1.6" strokeDasharray="2.5 2.5" fill="none" />
-              <text x={Math.min(v.x - 18, 930)} y="32" fontSize="9.5" fill="#20c58f">
+              <circle cx={g.x(v.at)} cy="46" r="4.5" stroke="#20c58f" strokeWidth="1.6" strokeDasharray="2.5 2.5" fill="none" />
+              <text x={Math.min(g.x(v.at) - 18, 930)} y="32" fontSize="9.5" fill="#20c58f">
                 bokat {formatDateSv(v.session.scheduled_at)}
               </text>
             </g>
@@ -471,7 +509,7 @@ function RondBand({
           {hover.visit && (
             <div
               className="pointer-events-none absolute top-8 z-[5] w-[250px] rounded-xl border border-[#33507a] bg-[#16233a] p-3 text-xs text-slate-400 shadow-2xl"
-              style={{ left: Math.min(Math.max(4, (hover.visit.x / 1000) * width + 14), width - 260) }}
+              style={{ left: Math.min(Math.max(4, (g.x(hover.visit.at) / 1000) * width + 14), width - 260) }}
             >
               {hover.visit.kind === 'done' && (
                 <>
@@ -511,6 +549,351 @@ function RondBand({
 
 // ---------------------------------------------------------------------------
 
+
+// ---------------------------------------------------------------------------
+// Svärmen: en rad per enhet på en gemensam tidsaxel. Vänsterkolumnen bär
+// namn och rytm, spåret bär bara besök som finns, högermarginalen bär nästa
+// bokning när den ligger bortom fönstret. Bandet ovan är detaljvyn per rad.
+
+const SWARM_COLS = 'grid-cols-[220px_minmax(0,1fr)_92px]'
+const STATUS_TEXT: Record<RondUnitStatus, { label: string; dot: string }> = {
+  missed: { label: 'passerat utan avslut', dot: 'bg-[#e46a5f]' },
+  to_book: { label: 'att boka', dot: 'bg-[#e0a83a]' },
+  unscheduled: { label: 'saknar rond', dot: 'bg-slate-500' },
+  booked: { label: 'bokad', dot: 'bg-[#20c58f]' },
+  ok: { label: 'i fas', dot: 'bg-[#20c58f]/50' },
+  on_demand: { label: 'avrop', dot: 'border border-slate-500' },
+}
+const isoOf = (t: number) => new Date(t).toISOString()
+const pct = (g: RondGeometry, t: number) => `${(((g.x(t) - 20) / 960) * 100).toFixed(2)}%`
+
+interface Marker {
+  kind: RondVisit['kind']
+  at: number
+  visits: RondVisit[]
+}
+
+/** Besök inom 7 dagar av samma slag blir en punkt med antal i tooltipen */
+function mergeMarkers(visits: RondVisit[]): Marker[] {
+  const out: Marker[] = []
+  for (const v of visits) {
+    const last = out[out.length - 1]
+    if (last && last.kind === v.kind && v.at - last.at <= 7 * DAY) {
+      last.visits.push(v)
+      continue
+    }
+    out.push({ kind: v.kind, at: v.at, visits: [v] })
+  }
+  return out
+}
+
+function RondRow({
+  row,
+  g,
+  stations,
+  expanded,
+  onToggle,
+  onOpen,
+}: {
+  row: RondUnitRow
+  g: RondGeometry
+  stations: number | null
+  expanded: boolean
+  onToggle: () => void
+  onOpen: (v: RondVisit) => void
+}) {
+  const [tip, setTip] = useState<Marker | null>(null)
+  const navigate = useNavigate()
+  const markers = useMemo(() => mergeMarkers(row.visits), [row.visits])
+  const st = STATUS_TEXT[row.status]
+  const meta = [stations != null ? `${stations} st` : null, row.rhythm.label?.toLowerCase() ?? (row.serviceMode === 'on_demand' ? 'avrop' : null)]
+    .filter(Boolean)
+    .join(' · ')
+  const shadeTo = row.establishedAt != null && row.establishedAt > g.domainStart ? pct(g, Math.min(row.establishedAt, g.domainEnd)) : null
+
+  return (
+    <>
+      <div
+        className={`grid ${SWARM_COLS} h-[26px] cursor-pointer items-center border-t border-slate-800/70 transition-colors hover:bg-white/[.03] ${expanded ? 'bg-white/[.03]' : ''}`}
+        onClick={onToggle}
+        role="button"
+        aria-expanded={expanded}
+        aria-label={`${row.unitName}, ${st.label}`}
+      >
+        <div className="flex min-w-0 items-baseline gap-1.5 pl-2 pr-2 text-[12.5px]">
+          <span className="w-2 shrink-0 text-[8px] text-slate-600">{expanded ? '▾' : '▸'}</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(`/admin/befintliga-kunder/${row.unitId}`)
+            }}
+            className="min-w-0 truncate text-left text-slate-200 hover:text-[#20c58f]"
+            title={row.unitName}
+          >
+            {row.unitName}
+          </button>
+          {meta && <span className="shrink-0 font-mono text-[10.5px] text-slate-500">{meta}</span>}
+          {row.lastDone?.beyondWindow && (
+            <span className="ml-auto shrink-0 font-mono text-[10px] text-slate-600" title="Senaste utförda besöket ligger före fönstret">
+              senast {formatDateSv(isoOf(row.lastDone.at))}
+            </span>
+          )}
+        </div>
+
+        <div className="relative h-full" onMouseLeave={() => setTip(null)}>
+          {shadeTo && <div className="absolute inset-y-0 left-0 bg-black/20" style={{ width: shadeTo }} />}
+          {row.status === 'unscheduled' || (row.status === 'on_demand' && markers.length === 0) ? (
+            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10.5px] text-slate-500">{st.label}</span>
+          ) : null}
+          {markers.map((m, i) => {
+            const left = pct(g, m.at)
+            const v = m.visits[0]
+            const frac = v.coverage ? v.coverage.inspected / Math.max(1, v.coverage.total) : 1
+            return (
+              <span key={i} className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ left }}>
+                {m.kind === 'missed' && <span className="pointer-events-none absolute left-1/2 top-[-13px] h-[26px] w-px bg-[#e46a5f]/45" />}
+                <button
+                  type="button"
+                  onMouseEnter={() => setTip(m)}
+                  onFocus={() => setTip(m)}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpen(v)
+                  }}
+                  className={`relative block h-[9px] w-[9px] rounded-full ${
+                    m.kind === 'done'
+                      ? 'border border-[#20c58f]'
+                      : m.kind === 'missed'
+                        ? 'bg-[#e46a5f]'
+                        : 'border border-dashed border-[#20c58f]/80'
+                  }`}
+                  style={m.kind === 'done' ? { background: `conic-gradient(#20c58f 0 ${Math.round(frac * 100)}%, transparent 0)` } : undefined}
+                  aria-label={
+                    m.kind === 'done'
+                      ? `Utfört ${formatDateSv(isoOf(m.at))}`
+                      : m.kind === 'missed'
+                        ? `Bokat ${formatDateSv(isoOf(m.at))}, passerat utan avslut`
+                        : `Bokat ${formatDateSv(isoOf(m.at))}`
+                  }
+                />
+                {m.visits.length > 1 && (
+                  <span className="pointer-events-none absolute -right-2 -top-2 font-mono text-[8px] text-slate-400">{m.visits.length}</span>
+                )}
+              </span>
+            )
+          })}
+          {tip && (
+            <div
+              className="pointer-events-none absolute top-[24px] z-[6] w-[240px] rounded-xl border border-[#33507a] bg-[#16233a] p-2.5 text-[11.5px] text-slate-400 shadow-2xl"
+              style={{ left: `min(max(0px, calc(${pct(g, tip.at)} - 120px)), calc(100% - 240px))` }}
+            >
+              {tip.visits.map((v) => (
+                <div key={v.session.id} className="py-0.5">
+                  {v.kind === 'done' && (
+                    <>
+                      <b className="text-slate-100">Kontrollbesök · {formatDateSv(v.session.completed_at)}</b>
+                      <div>
+                        {v.session.technician_name && <>{v.session.technician_name} · </>}
+                        {v.coverage && (
+                          <b className="tabular-nums text-slate-100">
+                            {v.coverage.inspected} av {v.coverage.total}
+                          </b>
+                        )}
+                        {v.coverage && ' stationer'}
+                        {v.driftDays != null && v.driftDays > 0 && <span className={v.driftDays > 14 ? 'text-[#e0a83a]' : ''}> · {v.driftDays} dagar efter bokad tid</span>}
+                      </div>
+                    </>
+                  )}
+                  {v.kind === 'missed' && (
+                    <>
+                      <b className="text-slate-100">Bokat besök · {formatDateSv(v.session.scheduled_at)}</b>
+                      <div className="text-[#e46a5f]">
+                        Passerat utan avslut, {v.driftDays} dagar{v.session.technician_name && <span className="text-slate-400"> · {v.session.technician_name}</span>}
+                      </div>
+                    </>
+                  )}
+                  {v.kind === 'booked' && (
+                    <>
+                      <b className="text-slate-100">Bokat · {formatDateSv(v.session.scheduled_at)}</b>
+                      {v.session.technician_name && <div>{v.session.technician_name}</div>}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 pr-2 pl-2 font-mono text-[10.5px] tabular-nums text-slate-500">
+          {row.nextBooked?.beyondWindow ? (
+            <span title="Nästa bokade besök, bortom fönstret">nästa {formatDateSv(isoOf(row.nextBooked.at))}</span>
+          ) : (
+            <>
+              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${st.dot}`} />
+              <span className="truncate font-sans">{st.label}</span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="border-t border-slate-800/70 bg-black/20">
+          <RondBand row={row} geometry={g} onOpen={onOpen} />
+          {row.visits.some((v) => v.kind === 'done') && (
+            <div className="grid gap-1 px-4 pb-3 text-[11.5px] text-slate-400">
+              {row.visits
+                .filter((v) => v.kind === 'done')
+                .slice(-5)
+                .reverse()
+                .map((v) => (
+                  <button
+                    key={v.session.id}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpen(v)
+                    }}
+                    className="flex items-baseline gap-3 text-left hover:text-slate-200"
+                  >
+                    <span className="font-mono tabular-nums text-slate-300">{formatDateSv(v.session.completed_at)}</span>
+                    <span>{v.session.technician_name ?? '—'}</span>
+                    {v.coverage && (
+                      <span className="ml-auto font-mono tabular-nums">
+                        {v.coverage.inspected} av {v.coverage.total}
+                      </span>
+                    )}
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
+function RondSwarm({
+  model,
+  stationsByUnit,
+  onOpen,
+}: {
+  model: RondModel
+  stationsByUnit: Record<string, number> | null
+  onOpen: (v: RondVisit) => void
+}) {
+  const { rows, summary, geometry: g } = model
+  const [filter, setFilter] = useState<RondUnitStatus | null>(null)
+  const [query, setQuery] = useState('')
+  const [showAll, setShowAll] = useState(false)
+  const [expanded, setExpanded] = useState<string | null>(rows.length === 1 ? rows[0].unitId : null)
+  const [hoverPct, setHoverPct] = useState<string | null>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
+
+  const big = rows.length >= 12
+  const q = query.trim().toLowerCase()
+  const filtered = rows.filter((r) => (!filter || r.status === filter) && (!q || r.unitName.toLowerCase().includes(q)))
+  // Över 12 enheter fälls gruppen "i fas" ihop: allt som kräver något visas alltid
+  const inRhythm = (r: RondUnitRow) => r.status === 'booked' || r.status === 'ok'
+  const collapsible = big && !filter && !q && !showAll
+  const visible = collapsible ? filtered.filter((r, i) => !inRhythm(r) || i < 12) : filtered
+  const hidden = filtered.length - visible.length
+
+  const onMove = (e: React.MouseEvent) => {
+    const el = trackRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const frac = (e.clientX - rect.left) / rect.width
+    setHoverPct(frac >= 0 && frac <= 1 ? `${(frac * 100).toFixed(2)}%` : null)
+  }
+
+  const filterBtn = (status: RondUnitStatus, n: number, label: string) => (
+    <button
+      type="button"
+      onClick={() => setFilter(filter === status ? null : status)}
+      className={`flex items-center gap-1.5 text-[12px] transition-colors ${filter === status ? 'text-slate-100' : n > 0 ? 'text-slate-300 hover:text-slate-100' : 'text-slate-600'}`}
+      aria-pressed={filter === status}
+      disabled={n === 0 && filter !== status}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${STATUS_TEXT[status].dot}`} />
+      <b className="tabular-nums">{n}</b> {label}
+    </button>
+  )
+
+  return (
+    <div className="relative">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-slate-800 px-4 py-2.5">
+        {filterBtn('missed', rows.filter((r) => r.status === 'missed').length, 'passerat utan avslut')}
+        {filterBtn('to_book', summary.toBook, 'att boka')}
+        {filterBtn('unscheduled', summary.unscheduled, 'saknar rond')}
+        {summary.onDemand > 0 && filterBtn('on_demand', summary.onDemand, 'avrop')}
+        <span className="text-[12px] text-slate-500">
+          <b className="tabular-nums text-slate-400">{summary.inRhythm}</b> i fas
+        </span>
+        {big && (
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Sök enhet…"
+            className="ml-auto w-44 rounded-md border border-slate-700 bg-slate-900/60 px-2.5 py-1 text-[12px] text-slate-200 placeholder:text-slate-600 focus:border-[#20c58f] focus:outline-none"
+          />
+        )}
+      </div>
+
+      {/* Axelrubrik */}
+      <div className={`grid ${SWARM_COLS} h-7 items-end pb-1`}>
+        <div className="pl-6 text-[9px] uppercase tracking-[0.15em] text-slate-600">Enhet</div>
+        <div ref={trackRef} className="relative h-full" onMouseMove={onMove} onMouseLeave={() => setHoverPct(null)}>
+          {g.months.map((m, i) => (
+            <span
+              key={i}
+              className={`absolute bottom-1 -translate-x-1/2 text-[8.5px] tracking-[0.08em] ${m.future ? 'text-slate-600' : 'text-slate-500'}`}
+              style={{ left: `${(((m.x - 20) / 960) * 100).toFixed(2)}%` }}
+            >
+              {m.label}
+            </span>
+          ))}
+        </div>
+        <div className="pl-2 text-[9px] uppercase tracking-[0.15em] text-slate-600">Status</div>
+      </div>
+
+      <div className="relative" onMouseMove={onMove} onMouseLeave={() => setHoverPct(null)}>
+        {visible.map((r) => (
+          <RondRow
+            key={r.unitId}
+            row={r}
+            g={g}
+            stations={stationsByUnit?.[r.unitId] ?? null}
+            expanded={expanded === r.unitId}
+            onToggle={() => setExpanded(expanded === r.unitId ? null : r.unitId)}
+            onOpen={onOpen}
+          />
+        ))}
+        {visible.length === 0 && <div className="px-4 py-3 text-xs text-slate-500">Inga enheter matchar.</div>}
+
+        {/* Lodräta linjer över alla rader: idag, avtalsstart, etablering, hovern */}
+        <div className="pointer-events-none absolute inset-y-0 z-[2]" style={{ left: 220, right: 92 }}>
+          <div className="absolute inset-y-0 w-px bg-[#20c58f]/45" style={{ left: pct(g, Date.now()) }}>
+            <span className="absolute -top-0 left-1 text-[8.5px] text-[#20c58f]/80">idag</span>
+          </div>
+          {g.contractStart != null && g.contractStart >= g.domainStart && g.contractStart <= g.domainEnd && (
+            <div className="absolute inset-y-0 w-px border-l border-dashed border-slate-600" style={{ left: pct(g, g.contractStart) }} title="Avtalsstart" />
+          )}
+          {g.firstEstablishment != null && g.firstEstablishment >= g.domainStart && g.firstEstablishment <= g.domainEnd && (
+            <div className="absolute inset-y-0 w-px border-l border-dashed border-[#e0a83a]/60" style={{ left: pct(g, g.firstEstablishment) }} title="Första etablering" />
+          )}
+          {hoverPct && <div className="absolute inset-y-0 w-px bg-slate-400/30" style={{ left: hoverPct }} />}
+        </div>
+      </div>
+
+      {hidden > 0 && (
+        <button type="button" onClick={() => setShowAll(true)} className="w-full border-t border-slate-800 py-2 text-[12px] text-slate-400 hover:text-slate-100">
+          visa {hidden} till i fas
+        </button>
+      )}
+    </div>
+  )
+}
 export default function ContractCasesSection({
   root,
   units,
@@ -519,6 +902,7 @@ export default function ContractCasesSection({
   schedules,
   contracts,
   invoices,
+  contractSites,
   onOpenCase,
 }: Props) {
   const [query, setQuery] = useState('')
@@ -620,28 +1004,28 @@ export default function ContractCasesSection({
   // -------------------------------------------------------------------------
   // Ronden: avtalets rytm mot verkligheten
 
-  const rond = useMemo(() => {
-    const hasRecurring = inspections.length > 0 || schedules.length > 0
+  const rond = useMemo((): RondModel | null => {
+    const nowMs = Date.now()
+    const activeSites = contractSites.filter((s) => !s.active_to || Date.parse(s.active_to) >= nowMs)
+    const hasRecurring = inspections.length > 0 || schedules.length > 0 || activeSites.length > 0
     if (!hasRecurring) return null
 
-    // Tidsdomän: 12 månader bakåt + 2 framåt, hela månader
+    // Fast fönster: 12 månader bakåt, 6 framåt, hela månader. Samma skala på
+    // alla kundkort; det bortom fönstret står som text i marginalen.
     const now = new Date()
-    const nowMs = Date.now()
     const domainStart = new Date(now.getFullYear(), now.getMonth() - 11, 1).getTime()
-    const domainEnd = new Date(now.getFullYear(), now.getMonth() + 3, 0, 23, 59).getTime()
+    const domainEnd = new Date(now.getFullYear(), now.getMonth() + 7, 0, 23, 59).getTime()
     const X0 = 20
     const XW = 960
     const x = (t: number) => X0 + ((t - domainStart) / (domainEnd - domainStart)) * XW
     const todayX = x(nowMs)
-
-    const months: Array<{ x: number; label: string; future: boolean }> = []
-    for (let i = 0; i < 14; i++) {
+    const months: RondGeometry['months'] = []
+    for (let i = 0; i < 18; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 15)
       months.push({ x: x(d.getTime()), label: MONTH_SHORT[d.getMonth()], future: i >= 12 })
     }
 
-    // Ramen: avtalsstart och första etablering per enhet. Riktiga datum ur
-    // avtalet och etableringsärendena, inte en rytm.
+    // Ramen: avtalsstart och etablering per enhet ur riktiga datum
     const contractStarts = contracts.map((c) => (c.start_date ? Date.parse(c.start_date) : NaN)).filter((t) => !Number.isNaN(t))
     const contractStart = contractStarts.length ? Math.min(...contractStarts) : null
     const establishedAt = new Map<string, number>()
@@ -654,10 +1038,12 @@ export default function ContractCasesSection({
       if (prev == null || t < prev) establishedAt.set(cid, t)
     }
     const firstEstablishment = establishedAt.size ? Math.min(...establishedAt.values()) : null
+    const geometry: RondGeometry = { x, domainStart, domainEnd, todayX, months, contractStart, firstEstablishment }
 
-    // Spår: ett per schema (egen enhet, egen rytm), fallback per enhet för
+    // En rad per enhet, nycklad på enhets-id. Källor i prioritetsordning:
+    // avtalets omfattning, schema, avtal på enheten eller som täcker allt,
     // sessioner utan schema. Aldrig ett avtal som rytm för hela organisationen.
-    const scheduleById = new Map(schedules.map((s) => [s.id, s]))
+    const unitById = new Map([root, ...units].map((u) => [u.id, u]))
     const contractById = new Map(contracts.map((c) => [c.id, c]))
     const contractsByUnit = new Map<string, RecordContract[]>()
     for (const c of contracts) {
@@ -665,174 +1051,176 @@ export default function ContractCasesSection({
       contractsByUnit.set(k, [...(contractsByUnit.get(k) ?? []), c])
     }
     const orgContract = contracts.find((c) => c.covers_all_sites) ?? null
-    const rhythmOf = (schedule: RecordSchedule | null, unitId: string | null) => {
-      const contract =
-        (schedule?.contract_id ? contractById.get(schedule.contract_id) : null) ?? (unitId ? contractsByUnit.get(unitId)?.[0] : null) ?? orgContract
-      const fromSchedule = schedule?.frequency ? (VISITS_PER_YEAR_BY_FREQUENCY[schedule.frequency] ?? null) : null
-      const visitsPerYear =
-        fromSchedule ??
-        (contract?.visits_per_year ? Number(contract.visits_per_year) : null) ??
-        (contract?.visit_frequency ? (VISITS_PER_YEAR_BY_FREQUENCY[contract.visit_frequency] ?? null) : null)
-      const frequencyLabel = schedule?.frequency
-        ? (VISIT_FREQUENCY_LABEL[schedule.frequency] ?? 'Anpassat schema')
-        : contract?.visit_frequency
-          ? (VISIT_FREQUENCY_LABEL[contract.visit_frequency] ?? null)
-          : null
-      return { visitsPerYear, frequencyLabel, contract }
+    const rhythmFrom = (vpy: number | null | undefined, freq: string | null | undefined): RondUnitRow['rhythm'] | null => {
+      const visitsPerYear = vpy ? Number(vpy) : freq ? (VISITS_PER_YEAR_BY_FREQUENCY[freq] ?? null) : null
+      if (!visitsPerYear) return null
+      const label = freq ? (VISIT_FREQUENCY_LABEL[freq] ?? 'Anpassat schema') : `${visitsPerYear}/år`
+      return { visitsPerYear, label }
     }
 
-    type TrackBuild = RondTrack & { sessions: RecordInspectionSession[] }
-    const tracks = new Map<string, TrackBuild>()
-    const ensure = (key: string, schedule: RecordSchedule | null, unitId: string | null): TrackBuild => {
-      const found = tracks.get(key)
+    type Build = RondUnitRow & { sessions: RecordInspectionSession[]; starts: number[] }
+    const rows = new Map<string, Build>()
+    const ensure = (unitId: string): Build => {
+      const found = rows.get(unitId)
       if (found) return found
-      const { visitsPerYear, frequencyLabel, contract } = rhythmOf(schedule, unitId)
-      const est = unitId ? (establishedAt.get(unitId) ?? null) : null
-      const starts = [
-        schedule?.schedule_start_date ? Date.parse(schedule.schedule_start_date) : NaN,
-        contract?.start_date ? Date.parse(contract.start_date) : NaN,
-        est ?? NaN,
-      ].filter((v) => !Number.isNaN(v))
-      const t: TrackBuild = {
-        key,
+      const r: Build = {
         unitId,
-        unitName: units.length > 0 && unitId ? (nameById.get(unitId) ?? null) : null,
-        contractId: schedule?.contract_id ?? contract?.id ?? null,
-        visitsPerYear,
-        frequencyLabel,
-        startsAt: starts.length ? Math.max(...starts) : null,
-        establishedAt: est,
-        visits: [],
-        done: 0,
-        booked: 0,
+        unitName: nameById.get(unitId) ?? unitById.get(unitId)?.company_name ?? 'Enhet',
+        status: 'ok',
+        urgency: URGENCY.ok,
+        source: 'orphan',
+        serviceMode: 'inspection',
+        contractId: null,
+        scheduleIds: [],
+        rhythm: { visitsPerYear: null, label: null },
+        startsAt: null,
+        establishedAt: establishedAt.get(unitId) ?? null,
+        lastDone: null,
+        nextBooked: null,
         missed: 0,
+        missedOldestAt: null,
+        daysSinceDone: null,
         planning: null,
+        visits: [],
         sessions: [],
+        starts: [],
       }
-      tracks.set(key, t)
-      return t
+      const est = establishedAt.get(unitId)
+      if (est != null) r.starts.push(est)
+      rows.set(unitId, r)
+      return r
     }
-    for (const sch of schedules) if (sch.status !== 'cancelled') ensure(sch.id, sch, sch.customer_id)
+    const applyContract = (r: Build, c: RecordContract | null | undefined) => {
+      if (!c) return
+      if (!r.contractId) r.contractId = c.id
+      if (!r.rhythm.visitsPerYear) r.rhythm = rhythmFrom(c.visits_per_year, c.visit_frequency) ?? r.rhythm
+      if (c.start_date) r.starts.push(Date.parse(c.start_date))
+    }
+    // 1. Omfattning
+    for (const s of activeSites) {
+      if (!unitById.has(s.customer_id)) continue
+      const r = ensure(s.customer_id)
+      r.source = 'site'
+      if (s.service_mode === 'on_demand') r.serviceMode = 'on_demand'
+      r.rhythm = rhythmFrom(s.visits_per_year, s.visit_frequency) ?? r.rhythm
+      applyContract(r, contractById.get(s.contract_id))
+    }
+    // 2. Scheman
+    for (const sch of schedules) {
+      if (sch.status === 'cancelled' || !unitById.has(sch.customer_id)) continue
+      const r = ensure(sch.customer_id)
+      if (r.source === 'orphan') r.source = 'schedule'
+      r.scheduleIds.push(sch.id)
+      if (!r.rhythm.visitsPerYear) r.rhythm = rhythmFrom(null, sch.frequency) ?? r.rhythm
+      if (sch.schedule_start_date) r.starts.push(Date.parse(sch.schedule_start_date))
+      applyContract(r, sch.contract_id ? contractById.get(sch.contract_id) : null)
+    }
+    // 3. Avtal på enheten eller som täcker hela verksamheten
+    for (const u of units.length > 0 ? units : [root]) {
+      const own = contractsByUnit.get(u.id) ?? []
+      if (!rows.has(u.id) && own.length === 0 && !orgContract) continue
+      const r = ensure(u.id)
+      if (r.source === 'orphan') r.source = 'contract'
+      applyContract(r, own[0] ?? orgContract)
+    }
+    // 4. Sessioner (fallback: en enhet med besök men utan omfattning får ändå en rad)
     for (const s of base.liveSessions) {
-      const sch = s.recurring_schedule_id ? (scheduleById.get(s.recurring_schedule_id) ?? null) : null
-      ensure(sch ? sch.id : `unit:${s.customer_id}`, sch, s.customer_id).sessions.push(s)
+      if (!unitById.has(s.customer_id)) continue
+      ensure(s.customer_id).sessions.push(s)
     }
 
-    // Besök per spår: bara sessioner som finns. Utfört, bokat, missat.
+    // Besök per rad: bara sessioner som finns. Utfört, bokat, passerat utan avslut.
     const yearAhead = nowMs + 365 * DAY
     const doneInWindow: RecordInspectionSession[] = []
-    for (const t of tracks.values()) {
+    for (const r of rows.values()) {
       let bookedYear = 0
-      for (const s of t.sessions) {
+      for (const s of r.sessions) {
         const total = (s.total_outdoor_stations ?? 0) + (s.total_indoor_stations ?? 0)
         const inspected = (s.inspected_outdoor_stations ?? 0) + (s.inspected_indoor_stations ?? 0)
         const coverage = total > 0 ? { inspected, total } : null
         const scheduledAt = s.scheduled_at ? Date.parse(s.scheduled_at) : null
         if ((s.status === 'completed' || !!s.completed_at) && s.completed_at) {
           const at = Date.parse(s.completed_at)
-          if (Number.isNaN(at) || at < domainStart) continue
+          if (Number.isNaN(at)) continue
+          if (!r.lastDone || at > r.lastDone.at) r.lastDone = { at, session: s, beyondWindow: at < domainStart }
+          if (at < domainStart) continue
           doneInWindow.push(s)
-          t.done++
-          t.visits.push({
-            kind: 'done',
-            x: x(at),
-            session: s,
-            scheduledAt,
-            driftDays: scheduledAt != null ? Math.round((at - scheduledAt) / DAY) : null,
-            coverage,
-          })
+          r.visits.push({ kind: 'done', at, session: s, scheduledAt, driftDays: scheduledAt != null ? Math.round((at - scheduledAt) / DAY) : null, coverage })
           continue
         }
         if (s.status !== 'scheduled' || scheduledAt == null || Number.isNaN(scheduledAt)) continue
         // Samma predikat som Kräver handling, så de aldrig säger olika
         if (sessionLateness(s.scheduled_at, s.status ?? '') !== 'ontime') {
-          t.missed++
-          t.visits.push({ kind: 'missed', x: x(scheduledAt), session: s, scheduledAt, driftDays: Math.floor((nowMs - scheduledAt) / DAY), coverage: null })
+          r.missed++
+          if (r.missedOldestAt == null || scheduledAt < r.missedOldestAt) r.missedOldestAt = scheduledAt
+          if (scheduledAt >= domainStart) {
+            r.visits.push({ kind: 'missed', at: scheduledAt, session: s, scheduledAt, driftDays: Math.floor((nowMs - scheduledAt) / DAY), coverage: null })
+          }
           continue
         }
         if (scheduledAt >= nowMs) {
-          t.booked++
+          if (!r.nextBooked || scheduledAt < r.nextBooked.at) r.nextBooked = { at: scheduledAt, session: s, beyondWindow: scheduledAt > domainEnd }
           if (scheduledAt <= yearAhead) bookedYear++
-          if (scheduledAt <= domainEnd) t.visits.push({ kind: 'booked', x: x(scheduledAt), session: s, scheduledAt, driftDays: null, coverage: null })
+          if (scheduledAt <= domainEnd) r.visits.push({ kind: 'booked', at: scheduledAt, session: s, scheduledAt, driftDays: null, coverage: null })
         }
       }
-      t.visits.sort((a, b) => a.x - b.x)
-      // Planeringsstatus: antal, aldrig datum. Bara där det finns något att
-      // kontrollera (etablering eller sessioner) och en känd rytm.
-      if (t.visitsPerYear && (t.establishedAt != null || t.sessions.length > 0)) {
-        t.planning = { booked: bookedYear, remaining: Math.max(0, t.visitsPerYear - bookedYear) }
+      r.visits.sort((a, b) => a.at - b.at)
+      r.startsAt = r.starts.length ? Math.max(...r.starts) : null
+      r.daysSinceDone = r.lastDone ? Math.floor((nowMs - r.lastDone.at) / DAY) : null
+      if (r.rhythm.visitsPerYear && r.serviceMode === 'inspection' && (r.establishedAt != null || r.sessions.length > 0)) {
+        r.planning = { booked: bookedYear, remaining: Math.max(0, r.rhythm.visitsPerYear - bookedYear) }
       }
+      // Status. "to_book" kräver en uttalad rytm, aldrig en gissning.
+      const vpy = r.rhythm.visitsPerYear
+      if (r.missed > 0) r.status = 'missed'
+      else if (r.serviceMode === 'on_demand') r.status = 'on_demand'
+      else if (r.nextBooked) r.status = 'booked'
+      else if (vpy) {
+        const overdue = r.lastDone
+          ? nowMs - r.lastDone.at > 1.25 * (365 / vpy) * DAY
+          : r.startsAt != null && nowMs - r.startsAt > 30 * DAY
+        r.status = overdue ? 'to_book' : 'ok'
+      } else if (r.scheduleIds.length === 0) r.status = 'unscheduled'
+      else r.status = 'ok'
+      r.urgency = URGENCY[r.status]
     }
 
-    // TrackBuild bär sessions också; det stör inte konsumenterna
-    const trackList: RondTrack[] = [...tracks.values()]
-      .sort((a, b) => (a.unitName ?? '\uffff').localeCompare(b.unitName ?? '\uffff', 'sv'))
-    const single = trackList.length === 1
-
-    // Fler än sex spår: ett samlat band, enheten i tooltipen
-    const bands: RondTrack[] =
-      trackList.length > 6
-        ? [
-            {
-              key: 'all',
-              unitId: null,
-              unitName: 'Alla enheter',
-              contractId: null,
-              visitsPerYear: null,
-              frequencyLabel: null,
-              startsAt: null,
-              establishedAt: firstEstablishment,
-              visits: trackList.flatMap((t) => t.visits).sort((a, b) => a.x - b.x),
-              done: trackList.reduce((n, t) => n + t.done, 0),
-              booked: trackList.reduce((n, t) => n + t.booked, 0),
-              missed: trackList.reduce((n, t) => n + t.missed, 0),
-              planning: null,
-            },
-          ]
-        : trackList
-
-    // Luckor i planeringen (aldrig "försenat")
-    const unitsWithoutBooking = trackList.filter(
-      (t) => t.planning != null && t.planning.booked === 0 && (t.establishedAt == null || nowMs - t.establishedAt > 30 * DAY)
-    )
-    const trackedUnits = new Set(trackList.map((t) => t.unitId).filter((v): v is string => !!v))
-    const unitsWithoutTrack = units.filter((u) => !trackedUnits.has(u.id) && (!!orgContract || (contractsByUnit.get(u.id)?.length ?? 0) > 0))
+    const list: RondUnitRow[] = [...rows.values()]
+      .map((b) => { const { sessions, starts, ...r } = b; void sessions; void starts; return r })
+      .sort(
+        (a, b) =>
+          a.urgency - b.urgency ||
+          (a.urgency === URGENCY.missed ? (a.missedOldestAt ?? 0) - (b.missedOldestAt ?? 0) : 0) ||
+          (a.urgency === URGENCY.to_book ? (b.daysSinceDone ?? Infinity) - (a.daysSinceDone ?? Infinity) : 0) ||
+          (a.urgency === URGENCY.booked ? (a.nextBooked?.at ?? Infinity) - (b.nextBooked?.at ?? Infinity) : 0) ||
+          a.unitName.localeCompare(b.unitName, 'sv')
+      )
 
     // Rytmer i klartext: "1 kvartalsvis, 3 halvårsvis"
     const rhythmCounts = new Map<string, number>()
-    for (const t of trackList) if (t.frequencyLabel) rhythmCounts.set(t.frequencyLabel, (rhythmCounts.get(t.frequencyLabel) ?? 0) + 1)
+    for (const r of list) if (r.rhythm.label) rhythmCounts.set(r.rhythm.label, (rhythmCounts.get(r.rhythm.label) ?? 0) + 1)
     const rhythmText = [...rhythmCounts.entries()].map(([label, n]) => `${n} ${label.toLowerCase()}`).join(', ') || null
 
-    // Snittintervall mellan utförda besök, bara när det finns underlag
     doneInWindow.sort((a, b) => (a.completed_at ?? '').localeCompare(b.completed_at ?? ''))
     const gaps: number[] = []
     for (let i = 1; i < doneInWindow.length; i++) {
       gaps.push((Date.parse(doneInWindow[i].completed_at!) - Date.parse(doneInWindow[i - 1].completed_at!)) / DAY)
     }
-    const meanGap = doneInWindow.length >= 3 ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null
-
-    return {
-      tracks: trackList,
-      bands,
-      single,
-      visitsPerYear: single ? trackList[0].visitsPerYear : null,
-      frequencyLabel: single ? trackList[0].frequencyLabel : null,
-      rhythmText,
-      x,
-      domainStart,
-      domainEnd,
-      todayX,
-      months,
-      contractStart,
-      firstEstablishment,
-      doneCount: doneInWindow.length,
-      missedCount: base.lateSessions.length,
+    const count = (s: RondUnitStatus) => list.filter((r) => r.status === s).length
+    const summary: RondSummary = {
+      units: list.length,
+      missed: base.lateSessions.length,
+      toBook: count('to_book'),
+      unscheduled: count('unscheduled'),
+      onDemand: count('on_demand'),
+      inRhythm: count('booked') + count('ok'),
+      visitsDone12m: doneInWindow.length,
       nextBooked: base.bookedSessions[0] ?? null,
-      unitsWithoutBooking,
-      unitsWithoutTrack,
-      meanGap,
+      meanGap: doneInWindow.length >= 3 ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : null,
     }
-  }, [inspections, schedules, contracts, base, units, nameById])
+
+    return { rows: list, summary, geometry, rhythmText }
+  }, [inspections, schedules, contracts, contractSites, base, units, root, nameById])
 
   // -------------------------------------------------------------------------
   // Extraärenden + tempo
@@ -984,20 +1372,27 @@ export default function ContractCasesSection({
 
     // Planeringsluckor ur ronden: aldrig "försenat", det ordet är reserverat
     // för bokningar som passerat. Det som inte bokats heter "att boka".
+    // Planeringsluckor ur ronden: aldrig "försenat", det ordet är reserverat
+    // för bokningar som passerat. Det som inte bokats heter "att boka".
     if (rond) {
-      for (const t of rond.unitsWithoutBooking.slice(0, 3)) {
+      for (const r of rond.rows.filter((r) => r.status === 'to_book').slice(0, 3)) {
         list.push({
-          key: `book-${t.key}`,
+          key: `book-${r.unitId}`,
           icon: <Glyph kind="kontroll" size={26} color={AMBER} />,
           body: (
             <>
-              {t.unitName ? <b className="text-slate-100">{t.unitName}</b> : 'Avtalet'} har ingen kontroll bokad de kommande 12 månaderna
-              {t.visitsPerYear ? (
+              {rond.rows.length > 1 ? <b className="text-slate-100">{r.unitName}</b> : 'Avtalet'} har ingen kontroll bokad de kommande 12 månaderna
+              {r.rhythm.visitsPerYear ? (
                 <>
                   {' '}
-                  — avtalet ger <b className="tabular-nums text-slate-100">{t.visitsPerYear}</b> per år
+                  — avtalet ger <b className="tabular-nums text-slate-100">{r.rhythm.visitsPerYear}</b> per år
                 </>
               ) : null}
+              {r.lastDone && (
+                <>
+                  , senast utfört <b className="tabular-nums text-slate-100">{formatDateSv(new Date(r.lastDone.at).toISOString())}</b>
+                </>
+              )}
               . <span className="font-semibold text-[#e0a83a]">Att boka.</span>
             </>
           ),
@@ -1005,13 +1400,13 @@ export default function ContractCasesSection({
           onClick: null,
         })
       }
-      for (const u of rond.unitsWithoutTrack.slice(0, 3)) {
+      for (const r of rond.rows.filter((r) => r.status === 'unscheduled').slice(0, 3)) {
         list.push({
-          key: `norond-${u.id}`,
+          key: `norond-${r.unitId}`,
           icon: <Glyph kind="kontroll" size={26} color={AMBER} />,
           body: (
             <>
-              <b className="text-slate-100">{nameById.get(u.id)}</b> har avtal men inget återkommande schema och inga kontrollbesök.{' '}
+              <b className="text-slate-100">{r.unitName}</b> ligger i avtalet men har inget återkommande schema.{' '}
               <span className="font-semibold text-[#e0a83a]">Saknar rond.</span>
             </>
           ),
@@ -1021,8 +1416,9 @@ export default function ContractCasesSection({
       }
     }
 
+
     return list
-  }, [base, extra.queue, caseById, stations, onOpenCase, rond, nameById])
+  }, [base, extra.queue, caseById, stations, onOpenCase, rond])
 
   // -------------------------------------------------------------------------
   // Ärendeflödet
@@ -1159,95 +1555,77 @@ export default function ContractCasesSection({
           <SectionHead
             title="Ronden — bokat och utfört"
             aux={
-              rond.single
-                ? rond.visitsPerYear
-                  ? `avtalet ger ${rond.visitsPerYear} kontrollbesök per år${rond.frequencyLabel ? ` · ${rond.frequencyLabel.toLowerCase()}` : ''}`
-                  : (rond.frequencyLabel ?? undefined)
-                : `${rond.tracks.length} ronder${rond.rhythmText ? ` · ${rond.rhythmText}` : ''}`
+              rond.rows.length === 1
+                ? rond.rows[0].rhythm.visitsPerYear
+                  ? `avtalet ger ${rond.rows[0].rhythm.visitsPerYear} kontrollbesök per år${rond.rows[0].rhythm.label ? ` · ${rond.rows[0].rhythm.label.toLowerCase()}` : ''}`
+                  : (rond.rows[0].rhythm.label ?? undefined)
+                : `${rond.rows.length} enheter${rond.rhythmText ? ` · ${rond.rhythmText}` : ''}`
             }
-            info="Övre spåret är bokade besök, undre är utförda — plomben är teknikerns kvittens. En röd ring är en bokning som passerat utan avslut. Avtalsstart och etablering står som lodräta linjer, och inget ritas före etableringen: bara besök som finns i systemet ritas. Allt är klickbart och öppnar ärendet."
+            info="En rad per enhet på en gemensam tidsaxel, 12 månader bakåt och 6 framåt. Fylld punkt är ett utfört besök (delvis fylld = delvis stationstäckning), streckad ring ett bokat, röd punkt en bokning som passerat utan avslut. Bokningar bortom fönstret står som datum i högermarginalen. Bara besök som finns i systemet ritas, aldrig en beräknad rytm. Klicka på en rad för enhetens band, på en punkt för ärendet."
           />
           <p className="max-w-[74ch] text-sm text-slate-400">
-            {!rond.single && (
+            {rond.rows.length > 1 && (
               <>
-                <b className="tabular-nums text-slate-100">{units.length} enheter</b>, <b className="tabular-nums text-slate-100">{contracts.length} avtal</b>
+                <b className="tabular-nums text-slate-100">{rond.rows.length} enheter</b>, <b className="tabular-nums text-slate-100">{contracts.length} avtal</b>
                 {rond.rhythmText && <> ({rond.rhythmText})</>}.{' '}
               </>
             )}
-            {rond.contractStart != null && (
+            {rond.geometry.contractStart != null && (
               <>
-                Avtalsstart <b className="tabular-nums text-slate-100">{formatDateSv(new Date(rond.contractStart).toISOString())}</b>
-                {rond.firstEstablishment != null && (
+                Avtalsstart <b className="tabular-nums text-slate-100">{formatDateSv(new Date(rond.geometry.contractStart).toISOString())}</b>
+                {rond.geometry.firstEstablishment != null && (
                   <>
-                    , stationer utsatta från <b className="tabular-nums text-slate-100">{formatDateSv(new Date(rond.firstEstablishment).toISOString())}</b>
+                    , stationer utsatta från{' '}
+                    <b className="tabular-nums text-slate-100">{formatDateSv(new Date(rond.geometry.firstEstablishment).toISOString())}</b>
                   </>
                 )}
                 .{' '}
               </>
             )}
-            <b className="tabular-nums text-slate-100">{rond.doneCount}</b> kontrollbesök utförda de senaste 12 månaderna.{' '}
-            {rond.missedCount > 0 ? (
+            <b className="tabular-nums text-slate-100">{rond.summary.visitsDone12m}</b> kontrollbesök utförda de senaste 12 månaderna.{' '}
+            {rond.summary.missed > 0 ? (
               <span className="font-semibold text-[#e46a5f]">
-                {rond.missedCount === 1 ? 'Ett bokat besök har passerat utan avslut' : `${rond.missedCount} bokade besök har passerat utan avslut`}.
+                {rond.summary.missed === 1 ? 'Ett bokat besök har passerat utan avslut' : `${rond.summary.missed} bokade besök har passerat utan avslut`}.
               </span>
             ) : (
-              <>Inga missade besök.</>
+              <>Inga passerade utan avslut.</>
             )}
-            {rond.nextBooked && (
+            {rond.summary.nextBooked && (
               <>
                 {' '}
-                Nästa är bokat <b className="tabular-nums text-slate-100">{formatDateSv(rond.nextBooked.scheduled_at)}</b>
-                {rond.nextBooked.technician_name && (
+                Nästa är bokat <b className="tabular-nums text-slate-100">{formatDateSv(rond.summary.nextBooked.scheduled_at)}</b>
+                {rond.summary.nextBooked.technician_name && (
                   <>
                     {' '}
-                    med <b className="text-slate-100">{rond.nextBooked.technician_name}</b>
+                    med <b className="text-slate-100">{rond.summary.nextBooked.technician_name}</b>
                   </>
                 )}
                 .
               </>
             )}
-            {rond.single && rond.tracks[0]?.planning && (
+            {rond.rows.length === 1 && rond.rows[0].planning && (
               <>
                 {' '}
-                Kommande 12 månader: <b className="tabular-nums text-slate-100">{rond.tracks[0].planning.booked}</b>{' '}
-                {rond.tracks[0].planning.booked === 1 ? 'bokad' : 'bokade'}
-                {rond.tracks[0].planning.remaining > 0 && (
+                Kommande 12 månader: <b className="tabular-nums text-slate-100">{rond.rows[0].planning.booked}</b>{' '}
+                {rond.rows[0].planning.booked === 1 ? 'bokad' : 'bokade'}
+                {rond.rows[0].planning.remaining > 0 && (
                   <>
-                    , <b className="tabular-nums text-slate-100">{rond.tracks[0].planning.remaining}</b> återstår att boka
+                    , <b className="tabular-nums text-slate-100">{rond.rows[0].planning.remaining}</b> återstår att boka
                   </>
                 )}
                 .
               </>
             )}
-            {!rond.single && rond.unitsWithoutBooking.length > 0 && (
+            {rond.summary.meanGap != null && (
               <>
                 {' '}
-                <span className="text-[#e0a83a]">
-                  {rond.unitsWithoutBooking.length === 1 ? 'En enhet saknar' : `${rond.unitsWithoutBooking.length} enheter saknar`} bokning framåt
-                </span>
-                .
-              </>
-            )}
-            {rond.meanGap != null && (
-              <>
-                {' '}
-                Snittintervall <b className="tabular-nums text-slate-100">{rond.meanGap} dagar</b>
-                {rond.visitsPerYear ? (
-                  <>
-                    {' '}
-                    mot avtalade <b className="tabular-nums text-slate-100">{Math.round(365 / rond.visitsPerYear)}</b>
-                  </>
-                ) : null}
-                .
+                Snittintervall <b className="tabular-nums text-slate-100">{rond.summary.meanGap} dagar</b>.
               </>
             )}
           </p>
 
           <div className="mt-3.5 overflow-hidden rounded-2xl border border-slate-700" style={PANEL_STYLE}>
-            {rond.bands.length === 0 && <div className="px-4 py-3 text-xs text-slate-500">Inga kontrollbesök i systemet ännu.</div>}
-            {rond.bands.map((t, i) => (
-              <RondBand key={t.key} track={t} geometry={rond} first={i === 0} showLabel={!rond.single} onOpen={openVisitCase} />
-            ))}
+            <RondSwarm model={rond} stationsByUnit={stations?.byUnit ?? null} onOpen={openVisitCase} />
 
             {/* Pärlband — senaste besökets stationstäckning */}
             {pearlBand && (
@@ -1333,7 +1711,7 @@ export default function ContractCasesSection({
                   const sum = rows.filter((r) => r.done).reduce((s, r) => s + Number(r.case.price ?? 0), 0)
                   const dots = rows
                     .map((r) => ({ r, t: new Date(r.date ?? 0).getTime() }))
-                    .filter((d) => d.t >= rond.domainStart)
+                    .filter((d) => d.t >= rond.geometry.domainStart)
                     .sort((a, b) => a.t - b.t)
                   let lastX = -99
                   let lane = 0
@@ -1343,7 +1721,7 @@ export default function ContractCasesSection({
                       <svg viewBox="0 0 860 22" preserveAspectRatio="none" className="block h-[22px] w-full overflow-visible">
                         <line x1="0" y1="11" x2="860" y2="11" stroke="#1a2940" strokeWidth="1" />
                         {dots.map(({ r, t }, i) => {
-                          const cx = ((rond.x(t) - 20) / 960) * 860
+                          const cx = ((rond.geometry.x(t) - 20) / 960) * 860
                           if (cx - lastX < 14) lane = (lane + 1) % 3
                           else lane = 0
                           lastX = cx
@@ -1371,7 +1749,7 @@ export default function ContractCasesSection({
                 <div className="grid grid-cols-[120px_1fr_84px] gap-3 px-4 pb-2.5 pt-0.5 max-md:grid-cols-[90px_1fr_70px]">
                   <span />
                   <div className="relative h-[14px]">
-                    {rond.months
+                    {rond.geometry.months
                       .filter((m) => !m.future)
                       .map((m, i) => (
                         <span
