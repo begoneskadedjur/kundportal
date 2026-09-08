@@ -96,7 +96,8 @@ export interface Notification {
   recipient_id: string;
   source_comment_id: string | null;
   case_id: string;
-  case_type: CaseType;
+  /** 'customer' = notis om en kund (case_id är kundens id), t.ex. tillägg att besluta */
+  case_type: CaseType | 'customer';
   title: string;
   preview: string;
   case_title: string | null;

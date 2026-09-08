@@ -28,12 +28,16 @@ import CustomerListRow, { resolveFortnoxInfo } from '../../components/admin/cust
 import Select from '../../components/ui/Select'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers, type ConsolidatedCustomer } from '../../hooks/useConsolidatedCustomers'
+import { useAddonPending, findAddonPending, type AddonPendingSummary } from '../../hooks/useAddonPending'
 import toast from 'react-hot-toast'
 
 // "Kräver åtgärd": uppsagd med slutdatum inom 90 dgr. Avtal förlängs automatiskt
 // vid periodskifte (generate-continuing-contracts-cronen), så ett kommande
 // periodskifte är INTE en åtgärd — det får en egen grupp.
-function requiresAction(c: ConsolidatedCustomer): boolean {
+// Tillägg att besluta (bara faktureringsansvariga får listan) är också en åtgärd:
+// pengar som väntar på beslut i avtalskartan.
+function requiresAction(c: ConsolidatedCustomer, addon?: AddonPendingSummary | null): boolean {
+  if (addon) return true
   if (c.isTerminated) {
     if (!c.effectiveEndDate) return false
     const days = Math.ceil((new Date(c.effectiveEndDate).getTime() - Date.now()) / 86_400_000)
@@ -43,7 +47,9 @@ function requiresAction(c: ConsolidatedCustomer): boolean {
 }
 
 // Sorteringsdatum för "Kräver åtgärd" (närmast deadline först)
-function actionDateMs(c: ConsolidatedCustomer): number {
+function actionDateMs(c: ConsolidatedCustomer, addon?: AddonPendingSummary | null): number {
+  // Uppsägningar först (deadline), sedan tillägg i markeringsordning
+  if (addon) return addon.first_marked_at ? new Date(addon.first_marked_at).getTime() + 1e13 : Number.MAX_SAFE_INTEGER
   const iso = c.isTerminated ? c.effectiveEndDate : c.nextRenewalDate
   return iso ? new Date(iso).getTime() : Number.MAX_SAFE_INTEGER
 }
@@ -167,6 +173,8 @@ export default function Customers() {
   const [managerFilter, setManagerFilter] = useState<string>('all')
   const [organizationTypeFilter, setOrganizationTypeFilter] = useState<'all' | 'multisite' | 'single'>('all')
   const [quickView, setQuickView] = useState<QuickView>('all')
+  const addonRows = useAddonPending()
+  const addonFor = useCallback((c: ConsolidatedCustomer) => findAddonPending(addonRows, c), [addonRows])
 
   // Paginering
 
@@ -186,7 +194,7 @@ export default function Customers() {
       organizationType: organizationTypeFilter === 'all' ? undefined : organizationTypeFilter
     })
 
-    if (quickView === 'atgard') return result.filter(requiresAction)
+    if (quickView === 'atgard') return result.filter((c) => requiresAction(c, addonFor(c)))
     if (quickView === 'fortnox') {
       return result.filter(c => !c.isTerminated && resolveFortnoxInfo(c).number == null)
     }
@@ -207,14 +215,14 @@ export default function Customers() {
     const uppsagda: ConsolidatedCustomer[] = []
 
     for (const c of byName) {
-      if (requiresAction(c)) atgard.push(c)
+      if (requiresAction(c, addonFor(c))) atgard.push(c)
       else if (c.isTerminated) uppsagda.push(c)
       else if (c.isPaused) pausade.push(c)
       else if (c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90) fornyelse.push(c)
       else aktiva.push(c)
     }
 
-    atgard.sort((a, b) => actionDateMs(a) - actionDateMs(b))
+    atgard.sort((a, b) => actionDateMs(a, addonFor(a)) - actionDateMs(b, addonFor(b)))
     fornyelse.sort((a, b) => (a.daysToNextRenewal ?? 9999) - (b.daysToNextRenewal ?? 9999))
 
     const sumAnnual = (rows: ConsolidatedCustomer[]) =>
@@ -227,7 +235,7 @@ export default function Customers() {
       { key: 'pausade', label: 'Pausade', rows: pausade, sum: null as number | null },
       { key: 'uppsagda', label: 'Uppsagda', rows: uppsagda, sum: null as number | null },
     ].filter(g => g.rows.length > 0)
-  }, [filteredCustomers])
+  }, [filteredCustomers, addonFor])
 
   // Ingen paginering: grupperna renderas i sin helhet så att alla statusar
   // alltid går att öppna direkt. Pausade/Uppsagda är kollapsade by default.
@@ -293,7 +301,7 @@ export default function Customers() {
 
   // Snabbvy-counts (på hela datasetet)
   const expiringCount = consolidatedCustomers.filter(c => c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90).length
-  const atgardCount = consolidatedCustomers.filter(requiresAction).length
+  const atgardCount = consolidatedCustomers.filter((c) => requiresAction(c, addonFor(c))).length
   const multisiteCount = consolidatedCustomers.filter(c => !c.isTerminated && c.organizationType === 'multisite').length
   const terminatedCount = consolidatedCustomers.filter(c => c.isTerminated).length
 
@@ -769,6 +777,11 @@ export default function Customers() {
                         onPeek={() => openPeek(org)}
                         onOpenUnit={(unitId) => navigate(`${basePath}/${unitId}`)}
                         contactCount={getContactsForOrganization(org).length}
+                        addonPending={addonFor(org)}
+                        onOpenAddons={() => {
+                          const a = addonFor(org)
+                          if (a) navigate(`${basePath}/${a.root_customer_id}?tab=avtalskarta&panel=innehall`)
+                        }}
                         highlighted={
                           activeCustomerId === org.id ||
                           (peekCustomerId != null && peekIdFor(org) === peekCustomerId)

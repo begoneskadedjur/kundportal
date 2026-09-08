@@ -6,6 +6,7 @@ import type { NavGroup, NavItem } from './adminNavConfig'
 import { useIncidentBadge } from '../../../hooks/useIncidentBadge'
 import { useIntranetBadge } from '../../../hooks/useIntranetBadge'
 import { useTicketsBadge } from '../../../hooks/useTicketsBadge'
+import { useAddonPendingBadge } from '../../../hooks/useAddonPending'
 
 interface MobileNavGroupProps {
   group: NavGroup
@@ -20,11 +21,13 @@ export function MobileNavGroup({ group, currentPath, onNavigate }: MobileNavGrou
   const incidentCount = useIncidentBadge()
   const intranetCount = useIntranetBadge()
   const ticketsCount = useTicketsBadge()
+  const addonCount = useAddonPendingBadge()
 
   const badgeCountFor = (item: NavItem) =>
     item.badgeKey === 'incidents' ? incidentCount
       : item.badgeKey === 'intranet' ? intranetCount
       : item.badgeKey === 'tickets' ? ticketsCount
+      : item.badgeKey === 'addons' ? addonCount
       : 0
   const groupBadgeCount = group.items.reduce((sum, item) => sum + badgeCountFor(item), 0)
 

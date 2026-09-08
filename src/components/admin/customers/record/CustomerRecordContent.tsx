@@ -57,7 +57,12 @@ interface Props {
 }
 
 export default function CustomerRecordContent({ data, basePath, density, onDataChanged }: Props) {
-  const [activeTab, setActiveTab] = useState<TabId>('oversikt')
+  // ?tab=avtalskarta öppnar rätt flik direkt (notiser och kundlistan länkar hit)
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    const wanted = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
+    const ids: TabId[] = ['oversikt', 'avtal', 'avtalskarta', 'fakturering', 'intakter', 'enheter', 'arenden', 'utrustning', 'atkomst']
+    return wanted && (ids as string[]).includes(wanted) ? (wanted as TabId) : 'oversikt'
+  })
   // Ärendet visas i en LÄSVY som hämtar sin egen data. Redigering sker i
   // ärendevyn — de fulla modalerna är arbetsverktyg med tabellspecifika
   // fältnamn och hör inte hemma här.

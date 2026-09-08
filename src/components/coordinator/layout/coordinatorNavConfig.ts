@@ -48,7 +48,7 @@ export const navGroups: NavGroup[] = [
     icon: Users,
     pinned: true,
     items: [
-      { label: 'Befintliga kunder', icon: Users, path: '/koordinator/befintliga-kunder' },
+      { label: 'Befintliga kunder', icon: Users, path: '/koordinator/befintliga-kunder', badgeKey: 'addons' },
       { label: 'Trafikljusöversikt', icon: Activity, path: '/koordinator/trafikljusoversikt' },
       { label: 'Kundprognos', icon: BarChart3, path: '/koordinator/kundprognos' },
       { label: 'Användarkonton (Kund)', icon: KeyRound, path: '/koordinator/customer-access' },

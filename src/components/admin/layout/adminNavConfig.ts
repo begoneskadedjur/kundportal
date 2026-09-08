@@ -39,7 +39,7 @@ export interface NavItem {
   icon: React.ElementType
   path: string
   /** Nyckel för dynamisk räknarbadge i sidomenyn (t.ex. ohanterade incidenter) */
-  badgeKey?: 'incidents' | 'intranet' | 'tickets'
+  badgeKey?: 'incidents' | 'intranet' | 'tickets' | 'addons'
 }
 
 export interface NavGroup {
@@ -58,7 +58,7 @@ export const navGroups: NavGroup[] = [
     label: 'Kunder & Avtal',
     icon: Users,
     items: [
-      { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder' },
+      { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder', badgeKey: 'addons' },
       { label: 'Egenkontroller', icon: Map, path: '/admin/egenkontroll' },
       { label: 'Rondering & Schema', icon: CalendarRange, path: '/admin/rondering-schema' },
       { label: 'Trafikljusöversikt', icon: Activity, path: '/admin/trafikljusoversikt' },
@@ -143,7 +143,7 @@ export const favoriteItems: NavItem[] = [
 
 export const mobileBottomItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/admin/dashboard' },
-  { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder' },
+  { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder', badgeKey: 'addons' },
   { label: 'Leads', icon: Target, path: '/admin/leads' },
   { label: 'Ekonomi', icon: DollarSign, path: '/admin/ekonomi' },
 ]

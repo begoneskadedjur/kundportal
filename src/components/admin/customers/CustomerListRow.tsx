@@ -19,6 +19,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import type { ConsolidatedCustomer, CustomerSite } from '../../../hooks/useConsolidatedCustomers'
+import type { AddonPendingSummary } from '../../../hooks/useAddonPending'
 
 // ---------------------------------------------------------------------------
 // Delade hjälpare (används även av portföljraden i Customers.tsx)
@@ -122,6 +123,10 @@ interface Props {
   actions: RowActions
   contactCount: number
   highlighted?: boolean
+  /** Tilläggsstationer som väntar på beslut om fakturering (bara faktureringsansvariga får den) */
+  addonPending?: AddonPendingSummary | null
+  /** Öppna kundens avtalskarta på Innehåll och utrustning */
+  onOpenAddons?: () => void
 }
 
 export default function CustomerListRow({
@@ -132,6 +137,8 @@ export default function CustomerListRow({
   onOpenUnit,
   actions,
   contactCount,
+  addonPending = null,
+  onOpenAddons,
   highlighted = false,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -218,7 +225,29 @@ export default function CustomerListRow({
               <span className="block text-[10px] leading-tight text-slate-500 font-normal">manuell fakt.</span>
             )}
           </span>
-          <span className={`${next.className} truncate md:w-44`}>{next.text}</span>
+          {addonPending ? (
+            // Tillägg att besluta går före nästa händelse: det är pengar som
+            // väntar. Platt text, bärnsten, kronor på underraden.
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onOpenAddons?.()
+              }}
+              className="text-left md:w-44 truncate hover:underline decoration-dotted"
+              title="Öppna avtalskartan på Innehåll och utrustning"
+            >
+              <span className="block truncate font-semibold text-amber-400">
+                {addonPending.stations} tillägg att besluta
+              </span>
+              <span className="block truncate text-[10px] leading-tight text-slate-500 font-normal">
+                {formatKr(addonPending.annual_kr)}/år · {addonPending.contracts} avtal
+                {addonPending.first_marked_at && ` · markerade ${formatDayMonth(addonPending.first_marked_at)}`}
+              </span>
+            </button>
+          ) : (
+            <span className={`${next.className} truncate md:w-44`}>{next.text}</span>
+          )}
           <span className="hidden lg:block text-slate-500 truncate w-28">{seller ?? '–'}</span>
           {/* Portalstatus — sista kolumnen (etapp 6) */}
           <span className="hidden lg:flex items-center gap-1.5 w-24 shrink-0">

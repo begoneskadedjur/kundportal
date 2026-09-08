@@ -73,6 +73,7 @@ import {
   contractPhase,
   type CompletenessInput,
   type SettingsGroup,
+  SETTINGS_GROUPS,
 } from './contractCompleteness'
 import { PAPER_GEAR_CLASS } from './paperInk'
 import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
@@ -1981,6 +1982,19 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     coveredUnits: coveredLocationsFor(c),
   })
   const incompletePapers = papers.filter((c) => !computeCompleteness({ ...completenessBaseFor(c), breakdown: null }).complete).length
+
+  // ?panel=innehall (från notisen eller kundlistans "tillägg att besluta"):
+  // öppna panelen på första pappret som har brickor, annars första pappret.
+  const panelFromUrl = useRef(typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('panel') : null)
+  useEffect(() => {
+    const wanted = panelFromUrl.current
+    if (!wanted || papers.length === 0) return
+    panelFromUrl.current = null
+    const group = SETTINGS_GROUPS.includes(wanted as SettingsGroup) ? (wanted as SettingsGroup) : 'innehall'
+    const target = papers.find((c) => bricksFor(c).length > 0) ?? papers[0]
+    setSettingsPanel({ contractId: target.id, group, tab: 'settings' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [papers.length])
 
   const saveSitePlan = async (
     contract: RecordContract,

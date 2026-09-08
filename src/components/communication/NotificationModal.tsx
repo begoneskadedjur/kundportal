@@ -124,6 +124,15 @@ export default function NotificationModal({
       // Navigera till rätt sida baserat på användarens portal
       const pathname = window.location.pathname;
 
+      // Kundnotis (tillägg att besluta): rakt in i kundkortets avtalskarta med
+      // panelen öppen på Innehåll och utrustning. Koordinatorer har samma
+      // kundkort under sin egen portal.
+      if (notification.case_type === 'customer') {
+        const base = pathname.includes('/koordinator') ? '/koordinator' : '/admin';
+        navigate(`${base}/befintliga-kunder/${notification.case_id}?tab=avtalskarta&panel=innehall`);
+        return;
+      }
+
       if (pathname.includes('/technician')) {
         navigate(`/technician/schedule?openCase=${notification.case_id}&caseType=${notification.case_type}`);
       } else if (pathname.includes('/admin')) {
