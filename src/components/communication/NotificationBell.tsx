@@ -70,6 +70,13 @@ export default function NotificationBell({
       // Navigera till Tickets-sidan med ärendet öppet
       const pathname = window.location.pathname;
 
+      // Kundnotis (tillägg att besluta): rakt in i kundkortets avtalskarta
+      if (notification.case_type === 'customer') {
+        const base = pathname.includes('/koordinator') ? '/koordinator' : '/admin';
+        window.location.href = `${base}/befintliga-kunder/${notification.case_id}?tab=avtalskarta&panel=innehall`;
+        return;
+      }
+
       if (pathname.includes('/technician')) {
         // Tekniker: gå till tickets
         window.location.href = `/technician/tickets?caseId=${notification.case_id}&caseType=${notification.case_type}`;

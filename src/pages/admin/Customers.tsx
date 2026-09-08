@@ -172,7 +172,11 @@ export default function Customers() {
   const [portalFilter, setPortalFilter] = useState<'all' | 'full' | 'partial' | 'none'>('all')
   const [managerFilter, setManagerFilter] = useState<string>('all')
   const [organizationTypeFilter, setOrganizationTypeFilter] = useState<'all' | 'multisite' | 'single'>('all')
-  const [quickView, setQuickView] = useState<QuickView>('all')
+  // ?quick=atgard (från avtalskartans "Tillbaka till Kräver åtgärd")
+  const [quickView, setQuickView] = useState<QuickView>(() => {
+    const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('quick') : null
+    return q === 'atgard' || q === 'fortnox' ? q : 'all'
+  })
   const addonRows = useAddonPending()
   const addonFor = useCallback((c: ConsolidatedCustomer) => findAddonPending(addonRows, c), [addonRows])
 

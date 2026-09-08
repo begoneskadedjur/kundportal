@@ -99,6 +99,11 @@ export interface ContractSettingsDrawerProps {
   onChangeLineModel?: (item: CaseBillingItemWithRelations, model: BillingModel) => Promise<void>
   bricks: AddonBrick[]
   onDecideBrick?: (brick: AddonBrick, zone: 'premium' | 'equipment', x: number, y: number) => void
+  /** Beslutat på det här avtalet sedan panelen öppnades: stationer och kr/år */
+  decided?: { count: number; kr: number } | null
+  /** Nästa avtal på kunden som fortfarande har brickor att besluta */
+  nextBricks?: { contractId: string; label: string; count: number } | null
+  onGoNext?: () => void
   unitNameOf: (unitId: string) => string
   equipmentInvoiceMode: 'with_premium' | 'separate'
   onChangeEquipmentInvoiceMode?: (mode: 'with_premium' | 'separate') => Promise<void>
@@ -447,6 +452,22 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
         return (
           <div>
             <H5>Innehåll och utrustning</H5>
+            {/* Klarrad: sista brickan på avtalet är beslutad. Kön går vidare
+                manuellt, en slide-over som byter papper av sig själv tappar
+                bort var man är. */}
+            {p.bricks.length === 0 && p.decided && p.decided.count > 0 && (
+              <div className="rounded-lg border border-[#20c58f]/35 bg-[#20c58f]/5 px-3 py-2.5 mb-3">
+                <div className="text-[12.5px] font-semibold text-white">Klart på det här avtalet</div>
+                <div className="text-[12px] text-slate-400 mt-0.5">
+                  {p.decided.count} tillägg · {formatKr(p.decided.kr)}/år beslutat
+                </div>
+                {p.nextBricks && p.onGoNext && (
+                  <button type="button" onClick={p.onGoNext} className="mt-2 text-[12px] px-3 py-1 rounded-md bg-[#20c58f] text-[#0b1220] font-semibold hover:brightness-110">
+                    Nästa avtal · {p.nextBricks.count} tillägg
+                  </button>
+                )}
+              </div>
+            )}
             {p.bricks.length > 0 && (
               <div className="rounded-lg border border-dashed border-amber-500/50 bg-amber-500/5 px-3 py-2.5 mb-3">
                 <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-amber-400 mb-1.5">Att besluta · {p.bricks.length}</div>

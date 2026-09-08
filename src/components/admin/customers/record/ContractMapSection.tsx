@@ -75,9 +75,13 @@ import {
   type SettingsGroup,
   SETTINGS_GROUPS,
 } from './contractCompleteness'
+
+/** § 6 tänds två sekunder när panelen öppnas från notisen eller remsan */
+const PARA_FLASH_CLASSES = ['shadow-[inset_3px_0_0_#20c58f]', 'bg-[#20c58f]/[.04]']
 import { PAPER_GEAR_CLASS } from './paperInk'
 import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
 import AddonDropPrompt, { type AddonDropPromptState } from './AddonDropPrompt'
+import { useAddonPending } from '../../../../hooks/useAddonPending'
 import type { AddonBrick } from '../../../../types/addonStations'
 import BillingPlanPreviewModal from '../BillingPlanPreviewModal'
 import { ContractInvoiceGenerator, type BillingPlan } from '../../../../services/contractInvoiceGenerator'
@@ -301,6 +305,21 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [terminatePrompt, setTerminatePrompt] = useState<RecordContract | null>(null)
   const { options: contractTypes } = useContractTypeOptions()
   const [busy, setBusy] = useState(false)
+  // Tillägg att besluta: kundens summa (samma källa som listan och notisen)
+  // och vad som beslutats i den här vyn, per avtal, för klarraden.
+  const addonPendingRows = useAddonPending()
+  const [decidedByContract, setDecidedByContract] = useState<Record<string, { count: number; kr: number }>>({})
+  const hadBricksRef = useRef(false)
+  /** Scrolla fram § 6 på pappret och tänd kanten i två sekunder */
+  const focusParaSix = (contractId: string) => {
+    window.setTimeout(() => {
+      const el = document.getElementById(`para6-${contractId}`)
+      if (!el) return
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' })
+      el.classList.add(...PARA_FLASH_CLASSES)
+      window.setTimeout(() => el.classList.remove(...PARA_FLASH_CLASSES), 2000)
+    }, 250)
+  }
   const [hover, setHover] = useState<{ kind: 'unit' | 'contract'; id: string } | null>(null)
 
   const boardRef = useRef<HTMLDivElement>(null)
@@ -1413,6 +1432,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         })
         toast.success(`${b.count} st ${b.stationTypeName} ligger nu som tillägg utöver ${contractDisplayName(contract)} (§ 6), ${b.model === 'per_month' ? 'per månad' : 'per år'}.`)
       }
+      setDecidedByContract((prev) => ({
+        ...prev,
+        [contract.id]: {
+          count: (prev[contract.id]?.count ?? 0) + b.count,
+          kr: (prev[contract.id]?.kr ?? 0) + input.unitPriceAnnual * b.count,
+        },
+      }))
       setStationsKey((k) => k + 1)
       setContentReloadKey((k) => k + 1)
       setBillingPlansKey((k) => k + 1)
@@ -1983,6 +2009,23 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   })
   const incompletePapers = papers.filter((c) => !computeCompleteness({ ...completenessBaseFor(c), breakdown: null }).complete).length
 
+  // Uppgiften "tillägg att besluta": brickor per papper, kundens kr/år ur
+  // samma RPC som listan och notisen, och kön mellan avtalen.
+  const papersWithBricks = papers.filter((c) => bricksFor(c).length > 0)
+  const pendingStations = papersWithBricks.reduce((sum, c) => sum + bricksFor(c).reduce((s2, b) => s2 + b.count, 0), 0)
+  if (pendingStations > 0) hadBricksRef.current = true
+  const addonSummary = addonPendingRows.find((r) => r.root_customer_id === root.id) ?? null
+  const decidedTotal = Object.values(decidedByContract).reduce((acc, d) => ({ count: acc.count + d.count, kr: acc.kr + d.kr }), { count: 0, kr: 0 })
+  const nextBricksAfter = (contractId: string | null) => {
+    const others = papersWithBricks.filter((c) => c.id !== contractId)
+    const c = others[0]
+    return c ? { contractId: c.id, label: contractDisplayName(c), count: bricksFor(c).reduce((s2, b) => s2 + b.count, 0) } : null
+  }
+  const openBricks = (c: RecordContract) => {
+    openSettings(c, 'innehall')
+    focusParaSix(c.id)
+  }
+
   // ?panel=innehall (från notisen eller kundlistans "tillägg att besluta"):
   // öppna panelen på första pappret som har brickor, annars första pappret.
   const panelFromUrl = useRef(typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('panel') : null)
@@ -1993,6 +2036,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     const group = SETTINGS_GROUPS.includes(wanted as SettingsGroup) ? (wanted as SettingsGroup) : 'innehall'
     const target = papers.find((c) => bricksFor(c).length > 0) ?? papers[0]
     setSettingsPanel({ contractId: target.id, group, tab: 'settings' })
+    if (group === 'innehall') focusParaSix(target.id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [papers.length])
 
@@ -2076,6 +2120,60 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         settingsPanel ? 'xl:relative xl:-left-[120px] 2xl:-left-[240px]' : ''
       }`}
     >
+      {/* Uppgiftsremsa: tillägg att besluta. Beskriver en uppgift med ett
+          slut, till skillnad från sammanfattningen som beskriver tillståndet.
+          Försvinner när sista brickan är beslutad, då står kvittensen kvar
+          tills man lämnar fliken. */}
+      {pendingStations > 0 && (() => {
+        const current = papersWithBricks.find((c) => c.id === settingsPanel?.contractId) ?? papersWithBricks[0]
+        const idx = papersWithBricks.findIndex((c) => c.id === current.id)
+        const here = bricksFor(current).reduce((s2, b) => s2 + b.count, 0)
+        const rest = papersWithBricks.filter((c) => c.id !== current.id)
+        return (
+          <div className="mb-3 px-3 py-2 rounded-xl border border-amber-500/40 bg-amber-500/10 flex flex-wrap items-center gap-x-4 gap-y-1">
+            <div className="min-w-0 flex-1">
+              <div className="text-[12.5px] font-semibold text-amber-200">
+                {pendingStations} tillägg att besluta
+                {addonSummary && addonSummary.annual_kr > 0 && <> · {formatKr(addonSummary.annual_kr)}/år</>}
+              </div>
+              <div className="text-[11px] text-amber-200/80 mt-0.5">
+                Tekniker har satt ut stationer utöver avtalet. Bestäm per rad om de ska faktureras som tillägg eller bakas in i premien.
+              </div>
+              <div className="text-[11px] text-amber-200/70 mt-0.5 tabular-nums">
+                Avtal {idx + 1} av {papersWithBricks.length} · {here} här
+                {rest.map((c) => (
+                  <span key={c.id}>, {bricksFor(c).reduce((s2, b) => s2 + b.count, 0)} på {contractDisplayName(c)}</span>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => openBricks(current)}
+              className="shrink-0 text-[12px] px-3 py-1 rounded-md bg-[#20c58f] text-[#0b1220] font-semibold hover:brightness-110"
+            >
+              Öppna § 6
+            </button>
+          </div>
+        )
+      })()}
+      {pendingStations === 0 && hadBricksRef.current && decidedTotal.count > 0 && (
+        <div className="mb-3 px-3 py-2 rounded-xl border border-[#20c58f]/35 bg-[#20c58f]/5 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div className="min-w-0 flex-1">
+            <div className="text-[12.5px] font-semibold text-white">Alla tillägg beslutade</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">
+              {formatKr(decidedTotal.kr)}/år på {Object.keys(decidedByContract).length} avtal. Fakturaunderlaget uppdateras vid nästa period.
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`${window.location.pathname.split('/befintliga-kunder')[0]}/befintliga-kunder?quick=atgard`)}
+            className="shrink-0 text-[12px] px-3 py-1 rounded-md border border-slate-600 text-slate-200 hover:border-[#20c58f]"
+          >
+            Tillbaka till Kräver åtgärd
+          </button>
+        </div>
+      )}
+
       {/* Sammanfattning */}
       <div className="flex flex-wrap gap-6 bg-slate-800/30 border border-slate-700 rounded-2xl px-4 py-3 mb-5 text-sm">
         <div>
@@ -2877,6 +2975,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onEditContent={() => setContentEditor(c)}
               onChangeLineModel={(item, model) => changeLineBillingModel(c, item, model)}
               bricks={bricksFor(c)}
+              decided={decidedByContract[c.id] ?? null}
+              nextBricks={nextBricksAfter(c.id)}
+              onGoNext={() => {
+                const next = nextBricksAfter(c.id)
+                const target = next ? papers.find((x) => x.id === next.contractId) : null
+                if (target) openBricks(target)
+              }}
               onDecideBrick={(brick, zone, x, y) => {
                 const unit = customerById.get(brick.unitId)
                 setAddonPrompt({
@@ -4601,7 +4706,7 @@ function PaperContract({
 
       {/* § 6 Utrustning i avtalet — samma rader som § 4/§ 5, med faktureringsläge.
           Släppzon för utrustning och stationstyper från katalogen. */}
-      <div data-drop-zone="equipment">
+      <div data-drop-zone="equipment" id={`para6-${contract.id}`} className="transition-shadow duration-500 rounded-sm">
         <ContractEquipmentSection
           services={contentData.content.services}
           articles={contentData.content.articles}
