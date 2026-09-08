@@ -108,7 +108,7 @@ begin
   v_title := 'Tillägg att besluta · ' || s.company_name;
   v_preview := s.stations || ' tilläggsstation' || case when s.stations = 1 then '' else 'er' end
     || ' på ' || s.contracts || ' avtal väntar på beslut om fakturering, '
-    || to_char(round(s.annual_kr), 'FM999G999G999') || ' kr/år.';
+    || replace(to_char(round(s.annual_kr), 'FM999G999G999'), ',', ' ') || ' kr/år.';
 
   for p in select id from public.profiles where can_approve_invoices and is_active loop
     update public.notifications
