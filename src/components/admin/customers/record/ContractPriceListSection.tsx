@@ -53,12 +53,13 @@ export function useAvropCatalog(
     setLoading(true)
     ;(async () => {
       try {
-        // Alla avropbara tjänster (avtalstyper är inte avrop — de ÄR avtalet)
+        // Alla aktiva tjänster. Avtalstyper (is_contract_service) är inte avrop
+        // och offereras aldrig här, men har kunden ett avtalat pris på en sådan
+        // (t.ex. avloppsfälla per år i en LOU-prisbilaga) ska det synas.
         const { data: services } = await supabase
           .from('services')
-          .select('id, code, name, sort_order, group:service_groups(name, sort_order)')
+          .select('id, code, name, sort_order, is_contract_service, group:service_groups(name, sort_order)')
           .eq('is_active', true)
-          .eq('is_contract_service', false)
           .order('sort_order', { ascending: true })
 
         // Prislistans fasta priser
@@ -81,29 +82,34 @@ export function useAvropCatalog(
           code: string | null
           name: string
           sort_order: number | null
+          is_contract_service: boolean | null
           group: { name: string; sort_order: number | null } | { name: string; sort_order: number | null }[] | null
         }
         const rows = (services ?? []) as unknown as ServiceRow[]
-        const mapped: AvropService[] = rows.map((s) => {
+        const mapped = rows.map((s) => {
           const g = Array.isArray(s.group) ? s.group[0] : s.group
-          return {
+          const item: AvropService = {
             serviceId: s.id,
             name: s.name,
             code: s.code,
             groupName: g?.name ?? 'Övrigt',
             price: priceByService.has(s.id) ? (priceByService.get(s.id) as number) : null,
           }
+          return { item, isContract: !!s.is_contract_service }
         })
 
-        // Tjänster som redan ingår i avtalet (§ 4) är inte avrop
+        // Avtalade priser visas alltid, även när tjänsten redan ligger i
+        // avtalet (§ 4 eller § 6): det är kundens särskilda pris, inte ett
+        // erbjudande. Utan pris offereras tjänsten, men bara om den inte redan
+        // ingår i avtalet och inte är en avtalstyp.
         const excluded = new Set(excludeKey ? excludeKey.split(',') : [])
-        const avrop = mapped.filter((s) => !excluded.has(s.serviceId))
+        const priced = mapped.filter((m) => m.item.price !== null).map((m) => m.item)
+        const quoted = mapped
+          .filter((m) => m.item.price === null && !m.isContract && !excluded.has(m.item.serviceId))
+          .map((m) => m.item)
 
         if (cancelled) return
-        setCatalog({
-          priced: avrop.filter((s) => s.price !== null),
-          quoted: avrop.filter((s) => s.price === null),
-        })
+        setCatalog({ priced, quoted })
       } catch (err) {
         console.error('Kunde inte hämta avropskatalogen:', err)
         if (!cancelled) setCatalog(EMPTY)
