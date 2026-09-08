@@ -99,6 +99,8 @@ export interface ContractSettingsDrawerProps {
   onChangeLineModel?: (item: CaseBillingItemWithRelations, model: BillingModel) => Promise<void>
   bricks: AddonBrick[]
   onDecideBrick?: (brick: AddonBrick, zone: 'premium' | 'equipment', x: number, y: number) => void
+  /** Samma beslut för flera brickor på det här avtalet (kryssade i panelen) */
+  onDecideBricks?: (bricks: AddonBrick[], zone: 'premium' | 'equipment', x: number, y: number) => void
   /** Beslutat på det här avtalet sedan panelen öppnades: stationer och kr/år */
   decided?: { count: number; kr: number } | null
   /** Nästa avtal på kunden som fortfarande har brickor att besluta */
@@ -132,6 +134,7 @@ export interface ContractSettingsDrawerProps {
 }
 
 const ink = PANEL_INK
+const brickKeyOf = (b: AddonBrick) => `${b.unitId}|${b.stationTypeId ?? ''}|${b.model}`
 
 const STATUS_DOT: Record<'ok' | 'warn' | 'note' | 'none', string> = {
   ok: 'bg-[#20c58f]',
@@ -236,6 +239,12 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
   const ps = premiumSummary({ contract, annualInForce: p.annualInForce, planEntries: p.planEntries })
   const tw = termWatch(contract)
   const nextStep = completeness.nextStep
+  // Flerval bland brickorna. Nollställs när panelen byter papper, så ett
+  // "Välj alla" aldrig följer med till fel avtal.
+  const [selectedBricks, setSelectedBricks] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    setSelectedBricks(new Set())
+  }, [contract.id])
 
   const services = content.services
   const articles = content.articles
@@ -470,12 +479,41 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
             )}
             {p.bricks.length > 0 && (
               <div className="rounded-lg border border-dashed border-amber-500/50 bg-amber-500/5 px-3 py-2.5 mb-3">
-                <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-amber-400 mb-1.5">Att besluta · {p.bricks.length}</div>
+                <div className="flex items-baseline gap-3 mb-1.5">
+                  <div className="text-[10.5px] font-semibold uppercase tracking-[0.08em] text-amber-400">Att besluta · {p.bricks.length}</div>
+                  {/* Samma beslut för flera: kryss per rad, aldrig förkryssat.
+                      Nio av tio blir två klick, men aldrig ett beslut av tröghet. */}
+                  {p.onDecideBricks && !archived && p.bricks.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBricks(selectedBricks.size === p.bricks.length ? new Set() : new Set(p.bricks.map(brickKeyOf)))}
+                      className="text-[11px] text-slate-400 underline decoration-dotted hover:text-slate-200"
+                    >
+                      {selectedBricks.size === p.bricks.length ? 'Avmarkera alla' : `Välj alla ${p.bricks.length}`}
+                    </button>
+                  )}
+                </div>
                 {p.bricks.map((br) => (
-                  <div key={`${br.unitId}|${br.stationTypeId ?? ''}|${br.model}`} className="mb-2 last:mb-0">
-                    <div className="text-[12.5px] text-white mb-1.5">
-                      {br.count} st {br.stationTypeName} · {p.unitNameOf(br.unitId)} · {br.model === 'per_month' ? 'per månad' : 'per år'}
-                    </div>
+                  <div key={brickKeyOf(br)} className="mb-2 last:mb-0">
+                    <label className="flex items-start gap-2 text-[12.5px] text-white mb-1.5 cursor-pointer">
+                      {p.onDecideBricks && !archived && p.bricks.length > 1 && (
+                        <input
+                          type="checkbox"
+                          checked={selectedBricks.has(brickKeyOf(br))}
+                          onChange={(e) => {
+                            const next = new Set(selectedBricks)
+                            if (e.target.checked) next.add(brickKeyOf(br))
+                            else next.delete(brickKeyOf(br))
+                            setSelectedBricks(next)
+                          }}
+                          className="mt-[3px] h-3.5 w-3.5 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f]"
+                          aria-label={`Välj ${br.count} st ${br.stationTypeName} på ${p.unitNameOf(br.unitId)}`}
+                        />
+                      )}
+                      <span>
+                        {br.count} st {br.stationTypeName} · {p.unitNameOf(br.unitId)} · {br.model === 'per_month' ? 'per månad' : 'per år'}
+                      </span>
+                    </label>
                     {p.onDecideBrick && !archived && (
                       <div className="flex gap-2">
                         <button type="button" onClick={(e) => p.onDecideBrick?.(br, 'premium', e.clientX, e.clientY)} className="text-[12px] px-2.5 py-1 rounded-md border border-slate-600 text-slate-200 hover:border-[#20c58f]">
@@ -488,6 +526,32 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                     )}
                   </div>
                 ))}
+                {/* Åtgärdsrad för de kryssade: samma två knappar, antal i texten */}
+                {p.onDecideBricks && !archived && selectedBricks.size > 0 && (() => {
+                  const chosen = p.bricks.filter((br) => selectedBricks.has(brickKeyOf(br)))
+                  const stations = chosen.reduce((s, br) => s + br.count, 0)
+                  return (
+                    <div className="mt-2.5 pt-2.5 border-t border-amber-500/30 flex flex-wrap items-center gap-2">
+                      <span className="text-[12px] text-slate-300 tabular-nums mr-auto">
+                        {chosen.length} {chosen.length === 1 ? 'bricka' : 'brickor'} · {stations} stationer
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => p.onDecideBricks?.(chosen, 'premium', e.clientX, e.clientY)}
+                        className="text-[12px] px-2.5 py-1 rounded-md border border-slate-600 text-slate-200 hover:border-[#20c58f]"
+                      >
+                        Baka in i premien
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => p.onDecideBricks?.(chosen, 'equipment', e.clientX, e.clientY)}
+                        className="text-[12px] px-2.5 py-1 rounded-md bg-[#20c58f] text-[#0b1220] font-semibold hover:brightness-110"
+                      >
+                        Tillägg utöver avtalet
+                      </button>
+                    </div>
+                  )
+                })()}
               </div>
             )}
             {contentLoading ? (

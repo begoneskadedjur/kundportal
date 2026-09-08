@@ -80,7 +80,7 @@ import {
 const PARA_FLASH_CLASSES = ['shadow-[inset_3px_0_0_#20c58f]', 'bg-[#20c58f]/[.04]']
 import { PAPER_GEAR_CLASS } from './paperInk'
 import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
-import AddonDropPrompt, { type AddonDropPromptState } from './AddonDropPrompt'
+import AddonDropPrompt, { type AddonDropPromptState, type AddonPromptBrick } from './AddonDropPrompt'
 import { useAddonPending } from '../../../../hooks/useAddonPending'
 import type { AddonBrick } from '../../../../types/addonStations'
 import BillingPlanPreviewModal from '../BillingPlanPreviewModal'
@@ -748,8 +748,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             x: e.clientX,
             y: e.clientY,
             contractLabel: contractDisplayName(target.contract),
-            unitName: unit ? customerRowName(unit) : 'enhet',
-            brick: payload,
+            bricks: [{ brick: payload, unitName: unit ? customerRowName(unit) : 'enhet' }],
             zone: target.zone,
             annualInForce: target.contract.annual_value != null ? Number(target.contract.annual_value) : null,
           },
@@ -1398,54 +1397,81 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     return out
   }, [papers, locations, activeScopeByContract, addonBricksByCustomer])
 
-  /** Släpp av brickan bekräftat i popovern: baka in (§ 7) eller tillägg (§ 6) */
-  const confirmAddonDrop = async (input: { effectiveFrom: string; unitPriceAnnual: number }) => {
+  /** Öppna beslutspopovern för en eller flera brickor på samma avtal */
+  const openAddonPrompt = (c: RecordContract, bricks: AddonBrick[], zone: 'premium' | 'equipment', x: number, y: number) => {
+    setAddonPrompt({
+      x,
+      y,
+      contract: c,
+      state: {
+        x,
+        y,
+        contractLabel: contractDisplayName(c),
+        bricks: bricks.map((brick) => {
+          const unit = customerById.get(brick.unitId)
+          return { brick, unitName: unit ? customerRowName(unit) : 'enhet' }
+        }),
+        zone,
+        annualInForce: c.annual_value != null ? Number(c.annual_value) : null,
+      },
+    })
+  }
+
+  /** Ett beslut per bricka: baka in (§ 7) eller tillägg (§ 6). Kastar vid fel. */
+  const confirmAddonBrick = async (item: AddonPromptBrick, input: { effectiveFrom: string; unitPriceAnnual: number }) => {
     if (!addonPrompt) return
     const { contract, state } = addonPrompt
-    const b = state.brick
+    const b = item.brick
+    if (state.zone === 'premium') {
+      await ContractScopeService.addAddonStationsToPremium(contract.id, {
+        unitId: b.unitId,
+        unitName: item.unitName,
+        stationTypeId: b.stationTypeId,
+        stationTypeName: b.stationTypeName,
+        model: b.model,
+        count: b.count,
+        outdoorIds: b.outdoorIds,
+        indoorIds: b.indoorIds,
+        unitPriceAnnual: input.unitPriceAnnual,
+        effectiveFrom: input.effectiveFrom,
+      })
+    } else {
+      await ContractScopeService.addAddonStationsSeparate(contract.id, {
+        unitId: b.unitId,
+        unitName: item.unitName,
+        stationTypeName: b.stationTypeName,
+        model: b.model,
+        count: b.count,
+        outdoorIds: b.outdoorIds,
+        indoorIds: b.indoorIds,
+        unitPriceAnnual: input.unitPriceAnnual,
+      })
+    }
+    setDecidedByContract((prev) => ({
+      ...prev,
+      [contract.id]: {
+        count: (prev[contract.id]?.count ?? 0) + b.count,
+        kr: (prev[contract.id]?.kr ?? 0) + input.unitPriceAnnual * b.count,
+      },
+    }))
+  }
+
+  /** Alla brickor i popovern beslutade: en toast, en omladdning */
+  const addonPromptDone = async (summary: { bricks: number; stations: number; annualKr: number }) => {
+    if (!addonPrompt) return
+    const { contract, state } = addonPrompt
+    const name = contractDisplayName(contract)
+    if (state.zone === 'premium') {
+      toast.success(`${summary.stations} st tilläggsstationer inbakade i ${name}: premien höjs med ${formatKr(summary.annualKr)}/år.`)
+    } else {
+      toast.success(`${summary.stations} st tilläggsstationer ligger nu som tillägg utöver ${name} (§ 6), ${formatKr(summary.annualKr)}/år.`)
+    }
     setBusy(true)
     try {
-      if (state.zone === 'premium') {
-        const res = await ContractScopeService.addAddonStationsToPremium(contract.id, {
-          unitId: b.unitId,
-          unitName: state.unitName,
-          stationTypeId: b.stationTypeId,
-          stationTypeName: b.stationTypeName,
-          model: b.model,
-          count: b.count,
-          outdoorIds: b.outdoorIds,
-          indoorIds: b.indoorIds,
-          unitPriceAnnual: input.unitPriceAnnual,
-          effectiveFrom: input.effectiveFrom,
-        })
-        toast.success(`${b.count} st ${b.stationTypeName} inbakade i ${contractDisplayName(contract)}: premien blir ${formatKr(res.newAnnual)}/år från ${formatDateSv(input.effectiveFrom)}.`)
-      } else {
-        await ContractScopeService.addAddonStationsSeparate(contract.id, {
-          unitId: b.unitId,
-          unitName: state.unitName,
-          stationTypeName: b.stationTypeName,
-          model: b.model,
-          count: b.count,
-          outdoorIds: b.outdoorIds,
-          indoorIds: b.indoorIds,
-          unitPriceAnnual: input.unitPriceAnnual,
-        })
-        toast.success(`${b.count} st ${b.stationTypeName} ligger nu som tillägg utöver ${contractDisplayName(contract)} (§ 6), ${b.model === 'per_month' ? 'per månad' : 'per år'}.`)
-      }
-      setDecidedByContract((prev) => ({
-        ...prev,
-        [contract.id]: {
-          count: (prev[contract.id]?.count ?? 0) + b.count,
-          kr: (prev[contract.id]?.kr ?? 0) + input.unitPriceAnnual * b.count,
-        },
-      }))
       setStationsKey((k) => k + 1)
       setContentReloadKey((k) => k + 1)
       setBillingPlansKey((k) => k + 1)
       await onChanged()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kunde inte spara tilläggsstationerna')
-      throw err
     } finally {
       setBusy(false)
     }
@@ -2982,23 +3008,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                 const target = next ? papers.find((x) => x.id === next.contractId) : null
                 if (target) openBricks(target)
               }}
-              onDecideBrick={(brick, zone, x, y) => {
-                const unit = customerById.get(brick.unitId)
-                setAddonPrompt({
-                  x,
-                  y,
-                  contract: c,
-                  state: {
-                    x,
-                    y,
-                    contractLabel: contractDisplayName(c),
-                    unitName: unit ? customerRowName(unit) : 'enhet',
-                    brick,
-                    zone,
-                    annualInForce: c.annual_value != null ? Number(c.annual_value) : null,
-                  },
-                })
-              }}
+              onDecideBrick={(brick, zone, x, y) => openAddonPrompt(c, [brick], zone, x, y)}
+              onDecideBricks={(bricks, zone, x, y) => openAddonPrompt(c, bricks, zone, x, y)}
               unitNameOf={(id) => customerRowName(customerById.get(id) ?? ({ company_name: 'Enhet' } as RecordCustomer))}
               equipmentInvoiceMode={
                 customerById.get(c.customer_id ?? '')?.addon_invoice_mode === 'separate_per_contract' ? 'separate' : 'with_premium'
@@ -3082,7 +3093,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 
       {/* Datum-popover */}
       {addonPrompt && (
-        <AddonDropPrompt prompt={addonPrompt.state} onClose={() => setAddonPrompt(null)} onConfirm={confirmAddonDrop} />
+        <AddonDropPrompt prompt={addonPrompt.state} onClose={() => setAddonPrompt(null)} onConfirmBrick={confirmAddonBrick} onAllDone={addonPromptDone} />
       )}
       {datePrompt && (
         <DatePromptPopover prompt={datePrompt} onClose={() => setDatePrompt(null)} />
