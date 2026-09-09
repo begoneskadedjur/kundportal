@@ -1337,6 +1337,7 @@ async function completeContractFieldsOnSign(contractId: string): Promise<void> {
           effective_from: startDate,
           annual_value: annualValue,
           event_type: 'start',
+          source: 'oneflow',
           note: 'Avtalet signerat via Oneflow',
         })
       }

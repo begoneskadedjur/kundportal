@@ -28,6 +28,7 @@ import type { AddonBrick } from '../../../../types/addonStations'
 import { formatPayback, marginTone, paybackTone, toneTextClass, type MarginBreakdown } from '../../../../shared/marginEngine'
 import { formatMonthYearSv, type LedgerTotals } from '../../../../shared/addonLedger'
 import { useAddonLedger } from '../../../../hooks/useAddonLedger'
+import { useContractFinancials } from '../../../../hooks/useContractFinancials'
 import { PANEL_INK, PANEL_INPUT_CLASS } from './paperInk'
 import { AgreementObjectText } from './PaperSignatures'
 import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from './ContractPremiumSection'
@@ -231,6 +232,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
   )
   const completeness = computeCompleteness({ ...p.completenessBase, breakdown: content.summary?.parts?.premium ?? content.summary?.breakdown ?? null })
   const { ledger } = useAddonLedger(contract, p.contentReloadKey)
+  const fin = useContractFinancials(contract.id, p.contentReloadKey)
 
   // Esc stänger panelen, som i portalens modaler
   useEffect(() => {
@@ -841,6 +843,30 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
             </>
           }
         />
+        {fin && fin.invoice_count > 0 && (
+          <Kpi
+            title="Fakturerat"
+            value={
+              <>
+                {formatKr(fin.invoiced)}
+                <small className="font-sans text-[12px] font-normal text-slate-400"> · {fin.invoice_count} faktur{fin.invoice_count === 1 ? 'a' : 'or'}</small>
+              </>
+            }
+          >
+            <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-[11.5px] mt-2">
+              <dt className="text-slate-500">Betalt</dt>
+              <dd className="font-mono tabular-nums text-slate-200 text-right">{formatKr(fin.paid)}</dd>
+              <dt className="text-slate-500">Utestående</dt>
+              <dd className={`font-mono tabular-nums text-right ${fin.outstanding > 0 ? 'text-amber-300' : 'text-slate-200'}`}>{formatKr(fin.outstanding)}</dd>
+              {fin.premium_next && (
+                <>
+                  <dt className="text-slate-500">Nästa premiesteg</dt>
+                  <dd className="font-mono tabular-nums text-slate-200 text-right">{fin.premium_next.effective_from} · {formatKr(Number(fin.premium_next.annual_value))}</dd>
+                </>
+              )}
+            </dl>
+          </Kpi>
+        )}
         <Kpi
           title="Ärenden"
           value={

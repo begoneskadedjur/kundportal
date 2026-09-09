@@ -421,6 +421,7 @@ export class ContractScopeService {
           effective_from: customer.contract_start_date,
           annual_value: annual,
           event_type: 'start',
+          source: 'karta',
           note: 'Skapat från kundkortets avtalsdata',
         })
       }
@@ -551,6 +552,7 @@ export class ContractScopeService {
           effective_from: startDate,
           annual_value: annual,
           event_type: 'start',
+          source: 'karta',
           note: 'Skapat från importerat avtal',
         })
       }
@@ -1337,6 +1339,7 @@ export class ContractScopeService {
         effective_from: current.contract_start_date ?? todayKey(),
         annual_value: annual,
         event_type: 'start',
+        source: 'karta',
         note: 'Satt i avtalskartan',
       })
       if (insErr) throw new Error(`Kunde inte spara premien: ${insErr.message}`)
@@ -1365,6 +1368,14 @@ export class ContractScopeService {
       ]
         .filter(Boolean)
         .join(' · ') || 'Inga ändrade värden',
+      // Strukturerad historik: {field, from, to} per ändrat fält, läsbart för ekonomisidan
+      metadata: {
+        changes: [
+          annual !== prevAnnual ? { field: 'annual_value', from: prevAnnual, to: annual } : null,
+          input.billingFrequency !== (current.billing_frequency ?? null) ? { field: 'billing_frequency', from: current.billing_frequency ?? null, to: input.billingFrequency ?? null } : null,
+          input.billingAnchorMonth !== (current.billing_anchor_month ?? null) ? { field: 'billing_anchor_month', from: current.billing_anchor_month ?? null, to: input.billingAnchorMonth ?? null } : null,
+        ].filter(Boolean),
+      },
     })
     if (current.customer_id) await this.mirrorSharedFields(current.customer_id)
   }
@@ -1397,6 +1408,7 @@ export class ContractScopeService {
       effective_from: input.effectiveFrom,
       annual_value: annual,
       event_type: input.eventType,
+      source: input.eventType === 'indexation' ? 'index' : 'karta',
       note: input.note ?? null,
     })
     if (error) throw new Error(`Kunde inte spara steget: ${error.message}`)
@@ -1478,6 +1490,7 @@ export class ContractScopeService {
         effective_from: input.effectiveFrom,
         annual_value: newAnnual,
         event_type: 'addition',
+        source: 'tillagg',
         note,
       })
       if (error) throw new Error(`Kunde inte spara steget: ${error.message}`)
