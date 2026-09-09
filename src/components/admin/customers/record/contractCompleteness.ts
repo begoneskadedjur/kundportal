@@ -64,7 +64,7 @@ export interface CompletenessInput {
   isAvrop: boolean
   /** Avtalet bor på en enhet (enhetsavtal): omfattningen är given */
   isUnitContract: boolean
-  followupUnits: Array<{ serviceMode: 'inspection' | 'on_demand'; frequency: string | null; visitsPerYear: number | null }>
+  followupUnits: Array<{ serviceMode: 'inspection' | 'on_demand'; frequency: string | null; visitsPerYear: number | null; nextVisitAt?: string | null }>
   breakdown: MarginBreakdown | null
   /** Antal brickor med tilläggsstationer som väntar på beslut */
   pendingBricks: number
@@ -108,6 +108,8 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
   const hasSignature = !!c.signed_at
   const hasPriceList = !!c.price_list_id
   const unitsWithoutCode = coveredUnits.filter((u) => !u.billing_reference).length
+  // Rytmen är ett löfte, schemat är verkställigheten: enheter med stationskontroll utan bokat besök
+  const unitsWithoutSchedule = isAvrop ? 0 : followupUnits.filter((u) => u.serviceMode === 'inspection' && !u.nextVisitAt).length
 
   // Ordningen är den ordning en kollega bör fylla i ett nytt avtal
   const items: CompletenessItem[] = [
@@ -116,6 +118,7 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
     { key: 'premium', label: 'Årspremie', ok: hasPremium, vital: true, group: 'fakturering', paragraph: '§ 7', hint: 'Årspremien är grunden för fakturaplanen och marginalen.' },
     { key: 'billing', label: 'Faktureringsvillkor', ok: hasBillingTerms, vital: true, group: 'fakturering', paragraph: '§ 7', hint: 'Frekvens och ankarmånad avgör när fakturorna skapas.' },
     { key: 'followup', label: 'Besöksfrekvens', ok: hasFollowup, vital: true, group: 'uppfoljning', paragraph: '§ 3', hint: 'Antal besök per år är facit vid schemaläggning och uppföljning.' },
+    { key: 'schedule', label: unitsWithoutSchedule === 1 ? 'En enhet saknar schema' : `${unitsWithoutSchedule} enheter saknar schema`, ok: unitsWithoutSchedule === 0, vital: true, group: 'uppfoljning', paragraph: '§ 3', hint: 'Skapa schemat ur § 3 i panelen så besöken finns i kalendern och teknikern ser dem.' },
     { key: 'term', label: 'Löptid och uppsägningstid', ok: hasTerm, vital: true, group: 'loptid', paragraph: '§ 9', hint: 'Startdatum och uppsägningstid styr bevakningen och när avtalet kan sägas upp.' },
     { key: 'signature', label: 'Signeringsdatum', ok: hasSignature, vital: true, group: 'avtalet', paragraph: 'fot', hint: 'Ett osignerat avtal är ett utkast och ska inte faktureras.' },
     { key: 'pricelist', label: 'Prislista för avrop', ok: hasPriceList, vital: isAvrop, group: 'prislista', paragraph: '§ 2', hint: 'Utan prislista gäller kundens lista eller prisguiden för avrop.' },

@@ -174,6 +174,8 @@ export interface UnitFollowup {
   expectedSoFar: number | null
   doneThisYear: number
   nextVisitAt: string | null
+  /** Senast när nästa besök i avtalsåret borde vara gjort (pro rata ur takten) */
+  nextDueBy: string | null
   casesThisYear: number
 }
 
@@ -1922,6 +1924,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     (
       contract: RecordContract
     ): {
+      /** Avtalsåret utfallet räknas i, "2026/27" */
+      contractYear: string
       nextVisit: RecordInspectionSession | null
       visitsDone: number
       visitsBooked: number
@@ -1996,6 +2000,11 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             .filter((s) => !s.completed_at && s.scheduled_at && (s.scheduled_at as string).slice(0, 10) >= key)
             .sort((a, b) => (a.scheduled_at as string).localeCompare(b.scheduled_at as string))[0] ?? null
         const unitCases = list.filter((c) => c.customer_id === unitId)
+        // Nästa besök borde vara gjort senast: avtalsårets start + (gjorda + 1) andelar av året
+        const nextDueBy =
+          plan && doneThisYear < plan
+            ? new Date(new Date(`${yearStart}T12:00:00`).getTime() + Math.round(((doneThisYear + 1) * 365) / plan) * 86400000).toISOString().slice(0, 10)
+            : null
         return {
           unitId,
           scopeRowId: scope?.id ?? null,
@@ -2006,11 +2015,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           expectedSoFar: plan ? Math.min(plan, Math.round((plan * daysIntoYear) / 365)) : null,
           doneThisYear,
           nextVisitAt: nextUnit?.scheduled_at ?? null,
+          nextDueBy,
           casesThisYear: unitCases.filter((c) => (c.completed_date ?? c.created_at).slice(0, 10) >= yearStart).length,
         }
       })
 
       return {
+        contractYear: `${yearStart.slice(0, 4)}/${String(Number(yearStart.slice(0, 4)) + 1).slice(2)}`,
         nextVisit,
         visitsDone,
         visitsBooked: booked.length,
@@ -2955,6 +2966,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           const events = premiumByContract.get(c.id) ?? []
           return (
             <ContractSettingsDrawer
+              onChanged={onChanged}
               contract={c}
               root={root}
               archived={false}
@@ -4033,6 +4045,7 @@ interface PaperProps {
     casesDone: number
     casesOpen: number
     casesTotal: number
+    contractYear?: string
     covered: string[]
     caseIds: string[]
     units: UnitFollowup[]
@@ -4294,7 +4307,10 @@ function PaperContract({
   const followupDeviating = followup.units.filter(
     (u) => u.serviceMode === 'inspection' && (!u.nextVisitAt || (u.expectedSoFar != null && u.doneThisYear < u.expectedSoFar))
   ).length
-  const followupInOrder = followup.units.length - followupDeviating
+  const followupNoSchedule = followup.units.filter((u) => u.serviceMode === 'inspection' && !u.nextVisitAt).length
+  // Fler än tröskeln utan schema: en samlad varningsrad i stället för en per enhet
+  const followupNoScheduleAggregated = followupNoSchedule > FOLD_THRESHOLD
+  const followupInOrder = followup.units.length - followupDeviating + (followupNoScheduleAggregated ? followupNoSchedule : 0)
   const followupFoldable = followup.units.length > FOLD_THRESHOLD && followupInOrder > 0
   const followupFold = usePaperFold({ contractId: contract.id, para: 'uppfoljning', closedByRule: followupFoldable })
   // Nästa besök bland enheterna som följer schemat, de avvikande står ovanför
@@ -4740,6 +4756,7 @@ function PaperContract({
                 : isAvrop
                   ? 'avrop'
                   : ''}
+            {!isAvrop && followup.units.length > 0 && followup.contractYear ? ` · avtalsår ${followup.contractYear}` : ''}
             {followupFoldable && (
               <>
                 {' · '}
@@ -4748,6 +4765,23 @@ function PaperContract({
             )}
           </span>
         </div>
+        {/* Samma avvikelse på många enheter är EN sak att göra: sätt schema på
+            avtalet. Orange ska betyda "här, nu", inte 28 identiska rader. */}
+        {followupNoScheduleAggregated && (
+          <FoldSummary
+            ink={ink}
+            warning={`${followupNoSchedule} enheter saknar schema`}
+            onClick={onOpenSettings && !archived ? () => onOpenSettings('uppfoljning') : undefined}
+          >
+            {contract.visit_frequency || contract.visits_per_year ? 'avtalets rytm är satt, inga besök är bokade' : 'avtalet saknar rytm'}
+            {onOpenSettings && !archived && (
+              <>
+                {' · '}
+                <span className="link font-sans text-[9.5px] underline decoration-dotted" style={{ color: ink.warn }}>sätt schema</span>
+              </>
+            )}
+          </FoldSummary>
+        )}
         {/* Per enhet: driftläge, takt och utfall i avtalsåret. Takten ärvs från
             avtalets förval tills enheten får en egen (contract_sites).
             Över FOLD_THRESHOLD enheter visas bara avvikelserna (inget schema,
@@ -4758,7 +4792,8 @@ function PaperContract({
               const unit = customerById.get(u.unitId)
               const behind = u.serviceMode === 'inspection' && u.expectedSoFar != null && u.doneThisYear < u.expectedSoFar
               const noSchedule = u.serviceMode === 'inspection' && !u.nextVisitAt
-              const folded = followupFoldable && !followupFold.open && !behind && !noSchedule
+              // Utan schema och samlad i varningsraden ovanför: fälls in som de i ordning
+              const folded = followupFoldable && !followupFold.open && !behind && (!noSchedule || followupNoScheduleAggregated)
               return (
                 <div
                   key={u.unitId}
@@ -4777,7 +4812,8 @@ function PaperContract({
                   </span>
                   {u.serviceMode === 'inspection' && u.visitsPerYear != null && (
                     <span className="font-sans text-[11.5px] tabular-nums" style={{ color: behind ? ink.warn : ink.positive }}>
-                      {u.doneThisYear} av {u.visitsPerYear} i år
+                      {u.doneThisYear} av {u.visitsPerYear}
+                      {behind ? ' · efter plan' : u.nextDueBy && !u.nextVisitAt ? ` · senast ${formatDateSv(u.nextDueBy)}` : ''}
                     </span>
                   )}
                   <span className="font-sans text-[11.5px] tabular-nums whitespace-nowrap" style={{ color: noSchedule ? ink.warn : ink.secondary }}>

@@ -29,6 +29,7 @@ import { formatPayback, marginTone, paybackTone, toneTextClass, type MarginBreak
 import { formatMonthYearSv, type LedgerTotals } from '../../../../shared/addonLedger'
 import { useAddonLedger } from '../../../../hooks/useAddonLedger'
 import { useContractFinancials } from '../../../../hooks/useContractFinancials'
+import ScheduleFromFollowupPanel from './ScheduleFromFollowupPanel'
 import { PANEL_INK, PANEL_INPUT_CLASS } from './paperInk'
 import { AgreementObjectText } from './PaperSignatures'
 import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from './ContractPremiumSection'
@@ -51,6 +52,8 @@ import {
 export type SettingsTab = 'settings' | 'puls'
 
 export interface PaperFollowup {
+  /** Avtalsåret utfallet räknas i, "2026/27" */
+  contractYear?: string
   nextVisit: RecordInspectionSession | null
   visitsDone: number
   visitsBooked: number
@@ -101,6 +104,8 @@ export interface ContractSettingsDrawerProps {
   followup: PaperFollowup
   onEditFrequency?: () => void
   onEditSitePlan?: (unit: UnitFollowup) => void
+  /** Databasen ändrad utanför kartans egna flöden (schema skapat): läs om kundkortet */
+  onChanged?: () => void | Promise<void>
   // Innehåll och utrustning
   onEditContent?: () => void
   onChangeLineModel?: (item: CaseBillingItemWithRelations, model: BillingModel) => Promise<void>
@@ -459,6 +464,15 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                 )}
               </div>
             </div>
+            {/* Avtalet spawnar besöken: schema per enhet ur rytm och startmånad */}
+            {!archived && (
+              <ScheduleFromFollowupPanel
+                contract={contract}
+                units={p.followup.units}
+                staff={p.staff}
+                onCreated={p.onChanged}
+              />
+            )}
             {/* En rad per enhet, takten som underrad: fyra kolumner får inte
                 plats i 480 px utan att namnen bryts mitt i. */}
             <Label>Per enhet</Label>
