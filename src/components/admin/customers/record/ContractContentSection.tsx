@@ -22,6 +22,7 @@ import type {
 import type { PricingSettings } from '../../../../types/pricingSettings'
 import { formatKr } from '../../../../hooks/useCustomerRecord'
 import { formatPayback, summarizeBillingLines } from '../../../../shared/marginEngine'
+import { formatMonthYearSv, type AddonLedger } from '../../../../shared/addonLedger'
 import { resolvePremiumShares } from '../../../../shared/premiumShares'
 import { PAPER_GEAR_CLASS } from './paperInk'
 
@@ -143,6 +144,8 @@ interface Props {
   annualInForce?: number | null
   /** Kugghjulet på § 7: "premie saknas" på 4.1 leder dit */
   onOpenPremium?: () => void
+  /** § 5: tilläggsstationernas resultat över tid, ur stationerna (även borttagna) */
+  ledger?: AddonLedger | null
 }
 
 /**
@@ -160,6 +163,7 @@ export default function ContractContentSection({
   showAccumulated,
   annualInForce = null,
   onOpenPremium,
+  ledger = null,
 }: Props) {
   const { services: allServices, articles, summary, settings } = content
   // § 4 visar det som ingår i premien. Rader med annat faktureringsläge
@@ -186,7 +190,8 @@ export default function ContractContentSection({
       const list = articlesByService.get(art.mapped_service_id) ?? []
       list.push(art)
       articlesByService.set(art.mapped_service_id, list)
-    } else {
+    } else if (!(art.mapped_service_id && allServices.some((s) => s.id === art.mapped_service_id))) {
+      // Mappad mot en § 6-rad (per år/månad) hör den dit, inte till premiens övriga kostnader
       unmappedArticles.push(art)
     }
   }
@@ -494,48 +499,129 @@ export default function ContractContentSection({
           engångsutgift mot en återkommande intäkt och får aldrig dras från
           ett enda års avtalsvärde som om den förbrukades. Villkoret räknar
           alla tjänsterader: ett avtal med enbart tillägg har också marginal. */}
-      {!showAccumulated && !loading && allServices.length > 0 && summary && b && (
-        <div className="mt-3.5 group/para">
-          <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
-            <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 5 · Marginal</h4>
-            <span className="ml-auto font-sans text-[10.5px] text-[#8a9099]">detaljer i pulsen</span>
-          </div>
-          <div className="flex items-baseline gap-2.5 py-1.5 border-b border-dotted border-[#d9d3c2] text-[13.5px]">
-            <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.1</span>
-            <span className="font-semibold text-[#262e38]">{b.headline_label}</span>
-            <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-[-3px] min-w-4" />
-            {b.labour_missing ? (
-              <span className="font-sans text-[12px] whitespace-nowrap" style={{ color: '#9b3535' }}>
-                arbetstid saknas
-                {onOpenSettings && (
-                  <>
-                    {' · '}
-                    <button type="button" onClick={onOpenSettings} className="underline decoration-dotted">lägg in under Innehåll</button>
-                  </>
-                )}
-              </span>
-            ) : (
-              <span className="font-sans text-[13px] font-bold tabular-nums whitespace-nowrap" style={{ color: marginInk(margin, settings) }}>
-                {margin !== null ? `${margin.toFixed(1)} %` : '–'}
-                <span className="text-[10.5px] font-normal text-[#8a9099]"> · täckningsbidrag {formatKr(b.contribution_ongoing)}/år</span>
-              </span>
-            )}
-          </div>
-          {b.cost_durable > 0 && (
-            <div className="flex items-baseline gap-2.5 py-1.5 border-b border-dotted border-[#d9d3c2] text-[13.5px]">
-              <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">5.2</span>
+      {!showAccumulated && !loading && allServices.length > 0 && summary && b && (() => {
+        // Tre grupper: premien mot sin arbetstid, tilläggen som resultat över
+        // avtalsperioden (ur ledgern, låst vid borttagning), och relationen
+        // som helhet. Docs: docs/marginal-premie-tillagg-plan.md
+        const parts = summary.parts ?? null
+        const prem = parts?.premium ?? b
+        const tot = parts?.total ?? b
+        const lt = ledger?.totals ?? null
+        const hasAddons = !!lt || !!parts?.addons
+        const premMargin = prem.headline_percent
+        const premShort = !prem.labour_missing && prem.contribution_ongoing < 0
+        const endTxt = ledger?.horizon.contractEnd ? new Date(ledger.horizon.contractEnd - 1).toISOString().slice(0, 10) : null
+        const resultInk = (v: number) => (v < 0 ? '#9b3535' : '#157a5b')
+        let no = 0
+        const nextNo = () => `5.${++no}`
+        const row = 'flex items-baseline gap-2.5 py-1.5 border-b border-dotted border-[#d9d3c2] text-[13.5px]'
+        return (
+          <div className="mt-3.5 group/para">
+            <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
+              <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 5 · Marginal</h4>
+              <span className="ml-auto font-sans text-[10.5px] text-[#8a9099]">detaljer i pulsen</span>
+            </div>
+
+            {/* Premien mot sin egen arbetstid */}
+            <div className={row}>
+              <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">{nextNo()}</span>
               <span className="font-semibold text-[#262e38] truncate">
-                Varaktig utrustning, engångs
+                Premien
                 <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
-                  {b.payback_never ? 'återbetalas inte med nuvarande löpande kostnad' : `återbetald efter ${formatPayback(b.payback_years)}`}
+                  {formatKr(prem.revenue)}/år{prem.labour_cost > 0 ? ` · arbetstid ${formatKr(prem.labour_cost)}` : ''}
                 </span>
               </span>
               <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-[-3px] min-w-4" />
-              <span className="font-sans text-[12.5px] tabular-nums whitespace-nowrap text-[#262e38]">−{formatKr(b.cost_durable)}</span>
+              {prem.labour_missing ? (
+                <span className="font-sans text-[12px] whitespace-nowrap" style={{ color: '#9b3535' }}>
+                  arbetstid saknas
+                  {onOpenSettings && (
+                    <>
+                      {' · '}
+                      <button type="button" onClick={onOpenSettings} className="underline decoration-dotted">lägg in under Innehåll</button>
+                    </>
+                  )}
+                </span>
+              ) : (
+                <span className="font-sans text-[13px] font-bold tabular-nums whitespace-nowrap" style={{ color: marginInk(premMargin, settings) }}>
+                  {premMargin !== null ? `${premMargin.toFixed(1)} %` : '–'}
+                  <span className="text-[10.5px] font-normal text-[#8a9099]"> · {formatKr(prem.contribution_ongoing)}/år</span>
+                </span>
+              )}
             </div>
-          )}
-        </div>
-      )}
+            {premShort && (
+              <div className="pl-[2.1rem] py-0.5 font-sans text-[11px]" style={{ color: '#b45309' }}>
+                Premien täcker inte sin arbetstid. Tilläggen bär avtalet.
+              </div>
+            )}
+
+            {/* Tilläggen som resultat över avtalsperioden */}
+            {hasAddons && (
+              <div className={row}>
+                <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">{nextNo()}</span>
+                <span className="font-semibold text-[#262e38] truncate">
+                  Tilläggsstationer
+                  <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
+                    {lt
+                      ? `${lt.count} st${lt.removed > 0 ? `, ${lt.removed} borttagn${lt.removed === 1 ? 'a' : 'a'}` : ''} · ${formatKr(lt.annualRunRate)}/år · fällor ${formatKr(lt.cost)}`
+                      : `${formatKr(parts?.addon_revenue ?? 0)}/år`}
+                  </span>
+                </span>
+                <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-[-3px] min-w-4" />
+                {lt ? (
+                  <span className="font-sans text-[13px] font-bold tabular-nums whitespace-nowrap" style={{ color: resultInk(lt.resultToEnd) }}>
+                    {lt.resultToEnd >= 0 ? '+' : '−'}{formatKr(Math.abs(lt.resultToEnd))}
+                    <span className="text-[10.5px] font-normal text-[#8a9099]"> {endTxt ? `till ${endTxt}` : 'hittills'}</span>
+                  </span>
+                ) : (
+                  <span className="font-sans text-[13px] font-bold tabular-nums whitespace-nowrap" style={{ color: marginInk(parts?.addons?.headline_percent ?? null, settings) }}>
+                    {parts?.addons?.headline_percent != null ? `${parts.addons.headline_percent.toFixed(1)} %` : '–'}
+                  </span>
+                )}
+              </div>
+            )}
+            {lt && (
+              <div className="pl-[2.1rem] py-0.5 font-sans text-[11px] text-[#5d6672] tabular-nums">
+                hittills {lt.resultToDate >= 0 ? '+' : '−'}{formatKr(Math.abs(lt.resultToDate))} · brytpunkt {formatMonthYearSv(lt.breakEvenAt)}
+                {lt.resultToOption != null && ledger?.horizon.optionEnd ? ` · med option +${formatKr(Math.max(0, lt.resultToOption))}` : ''}
+                {lt.priceMissing > 0 ? ` · ${lt.priceMissing} utan pris` : ''}
+              </div>
+            )}
+
+            {/* Relationen som helhet */}
+            {hasAddons && (
+              <div className={row}>
+                <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">{nextNo()}</span>
+                <span className="font-semibold text-[#262e38] truncate">
+                  Avtalsrelationen
+                  <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
+                    {formatKr(tot.revenue)}/år
+                    {tot.cost_durable > 0 ? ` · ${tot.payback_never ? 'återbetalas inte' : `återbetald efter ${formatPayback(tot.payback_years)}`}` : ''}
+                  </span>
+                </span>
+                <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-[-3px] min-w-4" />
+                <span className="font-sans text-[13px] font-bold tabular-nums whitespace-nowrap" style={{ color: marginInk(tot.labour_missing ? null : tot.headline_percent, settings) }}>
+                  {!tot.labour_missing && tot.headline_percent !== null ? `${tot.headline_percent.toFixed(1)} %` : '–'}
+                  <span className="text-[10.5px] font-normal text-[#8a9099]"> {tot.headline_label.toLowerCase()} · {formatKr(tot.contribution_ongoing)}/år</span>
+                </span>
+              </div>
+            )}
+            {!hasAddons && b.cost_durable > 0 && (
+              <div className={row}>
+                <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">{nextNo()}</span>
+                <span className="font-semibold text-[#262e38] truncate">
+                  Varaktig utrustning, engångs
+                  <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
+                    {b.payback_never ? 'återbetalas inte med nuvarande löpande kostnad' : `återbetald efter ${formatPayback(b.payback_years)}`}
+                  </span>
+                </span>
+                <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-[-3px] min-w-4" />
+                <span className="font-sans text-[12.5px] tabular-nums whitespace-nowrap text-[#262e38]">−{formatKr(b.cost_durable)}</span>
+              </div>
+            )}
+          </div>
+        )
+      })()}
     </>
   )
 }

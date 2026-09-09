@@ -1487,10 +1487,10 @@ export class ContractScopeService {
 
     // Stationerna: inbakade, kopplade till avtalet
     if (input.outdoorIds.length > 0) {
-      await supabase.from('equipment_placements').update({ addon_contract_mode: 'included', addon_contract_id: contractId }).in('id', input.outdoorIds)
+      await supabase.from('equipment_placements').update({ addon_contract_mode: 'included', addon_contract_id: contractId, addon_unit_price_annual: input.unitPriceAnnual }).in('id', input.outdoorIds)
     }
     if (input.indoorIds.length > 0) {
-      await supabase.from('indoor_stations').update({ addon_contract_mode: 'included', addon_contract_id: contractId }).in('id', input.indoorIds)
+      await supabase.from('indoor_stations').update({ addon_contract_mode: 'included', addon_contract_id: contractId, addon_unit_price_annual: input.unitPriceAnnual }).in('id', input.indoorIds)
     }
     // Eventuell § 6-rad för samma enhet/typ/modell avslutas (historiken kvar)
     let q = supabase
@@ -1531,10 +1531,10 @@ export class ContractScopeService {
     }
   ): Promise<void> {
     if (input.outdoorIds.length > 0) {
-      await supabase.from('equipment_placements').update({ addon_contract_mode: 'separate', addon_contract_id: contractId }).in('id', input.outdoorIds)
+      await supabase.from('equipment_placements').update({ addon_contract_mode: 'separate', addon_contract_id: contractId, addon_unit_price_annual: input.unitPriceAnnual }).in('id', input.outdoorIds)
     }
     if (input.indoorIds.length > 0) {
-      await supabase.from('indoor_stations').update({ addon_contract_mode: 'separate', addon_contract_id: contractId }).in('id', input.indoorIds)
+      await supabase.from('indoor_stations').update({ addon_contract_mode: 'separate', addon_contract_id: contractId, addon_unit_price_annual: input.unitPriceAnnual }).in('id', input.indoorIds)
     }
     const { error } = await supabase.rpc('sync_addon_period_lines', {
       p_customer_id: input.unitId,

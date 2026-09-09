@@ -17,6 +17,7 @@ import type { CaseBillingItemWithRelations } from '../../../../types/caseBilling
 import { formatDateSv, formatKr } from '../../../../hooks/useCustomerRecord'
 import { PAPER_GEAR_CLASS, type PaperInk } from './paperInk'
 import type { AddonBrick } from '../../../../types/addonStations'
+import { formatMonthYearSv, ledgerRowKey, type AddonLedger } from '../../../../shared/addonLedger'
 
 export type BillingModel = 'premium' | 'per_year' | 'per_month' | 'per_round'
 
@@ -75,6 +76,8 @@ interface Props {
   equipmentInvoiceMode?: 'with_premium' | 'separate' | null
   /** Nästa tilläggsfaktura, från fakturaplanen */
   nextEquipmentInvoice?: { periodStart: string; subtotal: number; monthly: boolean } | null
+  /** Resultat över tid per rad (enhet + stationstyp), ur stationerna */
+  ledger?: AddonLedger | null
 }
 
 export default function ContractEquipmentSection({
@@ -90,6 +93,7 @@ export default function ContractEquipmentSection({
   unitNameOf,
   equipmentInvoiceMode,
   nextEquipmentInvoice,
+  ledger = null,
 }: Props) {
   const extra = equipmentRows(services)
   const premiumArticles = articles.filter((a) => !isAddonArticle(a, services))
@@ -171,6 +175,34 @@ export default function ContractEquipmentSection({
             <span className="tabular-nums shrink-0">−{formatKr(Number(p.total_price))}</span>
           </div>
         ))}
+        {(() => {
+          // Resultatet över avtalsperioden för radens stationer, låst vid borttagning
+          const site = siteOf(s)
+          const typeId = (s as unknown as { station_type_id?: string | null }).station_type_id ?? null
+          const lt = site && ledger ? ledger.byRow.get(ledgerRowKey(site, typeId)) : null
+          if (!lt) return null
+          const endTxt = ledger?.horizon.contractEnd ? new Date(ledger.horizon.contractEnd - 1).toISOString().slice(0, 10) : null
+          const first = ledger?.stations.filter((x) => x.unitId === site && x.stationTypeId === typeId).reduce<number | null>((m, x) => (m == null || x.startAt < m ? x.startAt : m), null)
+          const sign = (v: number) => `${v >= 0 ? '+' : '−'}${formatKr(Math.abs(v))}`
+          return (
+            <div className="flex items-baseline gap-2 pl-[2.1rem] py-0.5 font-sans text-[11px] tabular-nums" style={{ color: ink.muted }}>
+              <span className="truncate">
+                {first != null ? `satta ${formatDateSv(new Date(first).toISOString().slice(0, 10))}` : 'satta'}
+                {lt.removed > 0 ? ` · ${lt.removed} borttagna` : ''} · brytpunkt {formatMonthYearSv(lt.breakEvenAt)}
+              </span>
+              <span className="flex-1" />
+              <span className="shrink-0 whitespace-nowrap">
+                hittills {sign(lt.resultToDate)}
+                {endTxt && (
+                  <>
+                    {' · '}
+                    <span style={{ color: lt.resultToEnd < 0 ? '#9b3535' : ink.positive }}>{sign(lt.resultToEnd)} till {endTxt}</span>
+                  </>
+                )}
+              </span>
+            </div>
+          )
+        })()}
       </div>
     )
   }

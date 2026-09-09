@@ -59,6 +59,7 @@ import type { PriceList } from '../../../../types/articles'
 import { isCompletedStatus, type ClickUpStatus } from '../../../../types/database'
 import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
 import ContractContentSection, { useContractContent, useAccumulatedCaseOutcome } from './ContractContentSection'
+import { useAddonLedger } from '../../../../hooks/useAddonLedger'
 import ContractPriceListSection, { useAvropCatalog } from './ContractPriceListSection'
 import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from './ContractPremiumSection'
 import ContractReferencesSection from './ContractReferencesSection'
@@ -4216,6 +4217,7 @@ function PaperContract({
   const terminatedRunning = state === 'terminated-running'
   const ink = PAPER_INK[archived ? 'archived' : 'live']
   const contentData = useContractContent(contract.id, contentReloadKey)
+  const { ledger: addonLedger } = useAddonLedger(contract, contentReloadKey)
   // Avropsavtal: § 5 visar ackumulerat utfall från avtalets ärenden i stället
   // för avtalsinnehållet (som är 0 kr på avrop). Samma ärendemängd som § 3.
   const isAvrop = contract.contract_type === 'Avropsavtal' || contract.label === 'Avropsavtal'
@@ -4254,7 +4256,7 @@ function PaperContract({
     isAvrop,
     isUnitContract,
     followupUnits: followup.units,
-    breakdown: contentData.content.summary?.breakdown ?? null,
+    breakdown: contentData.content.summary?.parts?.premium ?? contentData.content.summary?.breakdown ?? null,
     pendingBricks: (addonBricks ?? []).length,
     uncoveredPeriods: (planEntries ?? []).filter((e) => e.action === 'uncovered').length,
     coveredUnits: coveredLocations,
@@ -4724,6 +4726,7 @@ function PaperContract({
       {/* § 4 + § 5 — släppzon för tjänster från katalogen */}
       <div data-drop-zone="content">
         <ContractContentSection
+          ledger={addonLedger}
           content={contentData.content}
           loading={contentData.loading}
           onEdit={onEditContent}
@@ -4740,6 +4743,7 @@ function PaperContract({
           Släppzon för utrustning och stationstyper från katalogen. */}
       <div data-drop-zone="equipment" id={`para6-${contract.id}`} className="transition-shadow duration-500 rounded-sm">
         <ContractEquipmentSection
+        ledger={addonLedger}
           services={contentData.content.services}
           articles={contentData.content.articles}
           loading={contentData.loading}

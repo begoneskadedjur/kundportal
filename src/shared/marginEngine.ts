@@ -215,3 +215,84 @@ export function toneTextClass(tone: MarginTone): string {
     default: return 'text-slate-400'
   }
 }
+
+// ---------------------------------------------------------------------------
+// Marginal per del på ett avtal: premie (§ 4) och tillägg (§ 6) var för sig,
+// plus totalen. Samma motor körd på filtrerade radmängder. Vilken del en
+// artikel hör till avgörs av vilken tjänsterad den är mappad mot.
+// Plan: docs/marginal-premie-tillagg-plan.md
+
+export type ContractPart = 'premium' | 'addons'
+
+export interface ContractMarginParts {
+  /** § 4-rader och artiklar mappade dit. Intäkt = årspremien. */
+  premium: MarginBreakdown
+  /** § 6-rader och artiklar mappade dit. Null när avtalet saknar tillägg. */
+  addons: MarginBreakdown | null
+  /** Allt i en klump, som förut */
+  total: MarginBreakdown
+  /** Omappade artiklar, redan inräknade i premium */
+  unallocated_cost: number
+  addon_revenue: number
+}
+
+export interface ContractSplitLine extends MarginLine {
+  id: string
+  mapped_service_id?: string | null
+  billing_model?: string | null
+  addon_contract_mode?: string | null
+}
+
+export function splitContractLines(
+  lines: ContractSplitLine[],
+  opts: { annualValue: number; visitsPerYear: number | null; settings?: MarginSettings | null }
+): ContractMarginParts {
+  const active = lines.filter((l) => l.status !== 'cancelled')
+  const services = active.filter((l) => l.item_type === 'service')
+  const partOf = new Map<string, ContractPart>()
+  for (const s of services) {
+    const model = s.billing_model ?? 'premium'
+    const included = s.addon_contract_mode === 'included'
+    partOf.set(s.id, model === 'premium' || included ? 'premium' : 'addons')
+  }
+  const premiumLines: ContractSplitLine[] = []
+  const addonLines: ContractSplitLine[] = []
+  let unallocated = 0
+  for (const l of active) {
+    if (l.item_type === 'service') {
+      ;(partOf.get(l.id) === 'addons' ? addonLines : premiumLines).push(l)
+      continue
+    }
+    const part = l.mapped_service_id ? partOf.get(l.mapped_service_id) : undefined
+    if (part === 'addons') addonLines.push(l)
+    else {
+      premiumLines.push(l)
+      if (!part) unallocated += Number(l.total_price ?? 0)
+    }
+  }
+  const visits = opts.visitsPerYear ?? 0
+  const addonRevenue = addonLines
+    .filter((l) => l.item_type === 'service')
+    .reduce((s, l) => {
+      const t = Number(l.total_price ?? 0)
+      const m = l.billing_model
+      return s + (m === 'per_year' ? t : m === 'per_month' ? t * 12 : m === 'per_round' ? t * visits : 0)
+    }, 0)
+  const premium = summarizeBillingLines(premiumLines, {
+    context: 'contract',
+    revenueOverride: opts.annualValue > 0 ? opts.annualValue : null,
+    visitsPerYear: opts.visitsPerYear,
+    settings: opts.settings ?? null,
+  })
+  const addons =
+    addonLines.some((l) => l.item_type === 'service')
+      ? summarizeBillingLines(addonLines, { context: 'contract', revenueOverride: addonRevenue > 0 ? addonRevenue : null, visitsPerYear: null, settings: opts.settings ?? null })
+      : null
+  const total = summarizeBillingLines(active, {
+    context: 'contract',
+    revenueOverride: opts.annualValue + addonRevenue > 0 ? opts.annualValue + addonRevenue : null,
+    visitsPerYear: opts.visitsPerYear,
+    settings: opts.settings ?? null,
+  })
+  return { premium, addons, total, unallocated_cost: unallocated, addon_revenue: addonRevenue }
+}

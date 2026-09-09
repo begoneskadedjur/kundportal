@@ -1,7 +1,7 @@
 // src/services/caseBillingService.ts
 // Service för hantering av ärendebaserad fakturering (artiklar/tjänster tekniker väljer per ärende)
 
-import { summarizeBillingLines, type MarginContext, type MarginSettings } from '../shared/marginEngine'
+import { summarizeBillingLines, splitContractLines, type MarginContext, type MarginSettings } from '../shared/marginEngine'
 import { supabase } from '../lib/supabase'
 import type { Article } from '../types/articles'
 import type {
@@ -533,12 +533,29 @@ export class CaseBillingService {
       else if (model === 'per_month') extra += t * 12
       else if (model === 'per_round') extra += t * visits
     }
-    return this.summarizeItems(items, minMarginPercent, {
+    const summary = this.summarizeItems(items, minMarginPercent, {
       context: 'contract',
       revenueOverride: annual > 0 ? annual + extra : null,
       visitsPerYear: visits,
       settings: settings ?? null,
     })
+    // Premie och tillägg var för sig: samma motor på filtrerade radmängder
+    summary.parts = splitContractLines(
+      items.map((i) => ({
+        id: i.id,
+        item_type: i.item_type,
+        total_price: i.total_price,
+        quantity: i.quantity,
+        status: i.status,
+        article_name: i.article_name,
+        article: i.article ?? null,
+        mapped_service_id: i.mapped_service_id ?? null,
+        billing_model: (i as unknown as { billing_model?: string | null }).billing_model ?? null,
+        addon_contract_mode: null,
+      })),
+      { annualValue: annual, visitsPerYear: visits, settings: settings ?? null }
+    )
+    return summary
   }
 
   /** Summering av redan hämtade rader. Ren funktion, ingen databas. */

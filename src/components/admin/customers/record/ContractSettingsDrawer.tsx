@@ -25,7 +25,9 @@ import {
 } from '../../../../hooks/useCustomerRecord'
 import type { CaseBillingItemWithRelations } from '../../../../types/caseBilling'
 import type { AddonBrick } from '../../../../types/addonStations'
-import { formatPayback, marginTone, paybackTone, toneTextClass } from '../../../../shared/marginEngine'
+import { formatPayback, marginTone, paybackTone, toneTextClass, type MarginBreakdown } from '../../../../shared/marginEngine'
+import { formatMonthYearSv, type LedgerTotals } from '../../../../shared/addonLedger'
+import { useAddonLedger } from '../../../../hooks/useAddonLedger'
 import { PANEL_INK, PANEL_INPUT_CLASS } from './paperInk'
 import { AgreementObjectText } from './PaperSignatures'
 import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from './ContractPremiumSection'
@@ -227,7 +229,8 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
     contract.price_list_id ?? p.rootPriceListId ?? null,
     content.services.map((s) => s.service_id).filter((id): id is string => !!id)
   )
-  const completeness = computeCompleteness({ ...p.completenessBase, breakdown: content.summary?.breakdown ?? null })
+  const completeness = computeCompleteness({ ...p.completenessBase, breakdown: content.summary?.parts?.premium ?? content.summary?.breakdown ?? null })
+  const { ledger } = useAddonLedger(contract, p.contentReloadKey)
 
   // Esc stänger panelen, som i portalens modaler
   useEffect(() => {
@@ -239,6 +242,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
   }, [p])
 
   const b = content.summary?.breakdown ?? null
+  const parts = content.summary?.parts ?? null
   const settings = content.settings
   const ps = premiumSummary({ contract, annualInForce: p.annualInForce, planEntries: p.planEntries })
   const tw = termWatch(contract)
@@ -855,46 +859,164 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
             </button>
           }
         />
-        {b && (
-          <Kpi
-            title={b.headline_label}
-            tone={b.labour_missing ? 'warn' : undefined}
-            value={
-              b.labour_missing ? (
-                'Arbetstid saknas'
-              ) : (
-                <span className={toneTextClass(tone)}>{b.headline_percent != null ? `${b.headline_percent.toFixed(1)} %` : '–'}</span>
-              )
-            }
-          >
-            <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-[11.5px] mt-2">
-              <dt className="text-slate-500">Avtalsvärde per år</dt>
-              <dd className="font-mono tabular-nums text-slate-200 text-right">{formatKr(b.revenue)}</dd>
-              <dt className="text-slate-500">Löpande kostnad</dt>
-              <dd className="font-mono tabular-nums text-slate-200 text-right">−{formatKr(b.cost_ongoing)}</dd>
-              <dt className="text-slate-500">Täckningsbidrag per år</dt>
-              <dd className="font-mono tabular-nums text-white text-right">{formatKr(b.contribution_ongoing)}</dd>
-              {b.cost_durable > 0 && (
-                <>
-                  <dt className="text-slate-500">Varaktig utrustning, engångs</dt>
-                  <dd className="font-mono tabular-nums text-slate-200 text-right">−{formatKr(b.cost_durable)}</dd>
-                  <dt className="text-slate-500">Återbetald efter</dt>
-                  <dd className={`font-mono tabular-nums text-right ${paybackTone(b, settings) === 'bad' ? 'text-red-300' : 'text-slate-200'}`}>
-                    {b.payback_never ? 'aldrig med nuvarande kostnad' : formatPayback(b.payback_years)}
-                  </dd>
-                  <dt className="text-slate-500">Marginal år 1</dt>
-                  <dd className="font-mono tabular-nums text-slate-400 text-right">{b.margin_percent_year1 != null ? `${b.margin_percent_year1.toFixed(1)} %` : '–'}</dd>
-                  {b.margin_percent_3y != null && (
+        {b && (() => {
+          // Marginal i tre delar: premien mot sin arbetstid, tilläggen som
+          // resultat över tid (ledgern), relationen som helhet. Se
+          // docs/marginal-premie-tillagg-plan.md
+          const prem: MarginBreakdown = parts?.premium ?? b
+          const tot: MarginBreakdown = parts?.total ?? b
+          const lt: LedgerTotals | null = ledger?.totals ?? null
+          const hasAddons = !!lt || !!parts?.addons
+          const premTone = prem.labour_missing ? 'warn' : marginTone(prem.headline_percent, settings)
+          const premShort = !prem.labour_missing && prem.contribution_ongoing < 0
+          const pct = (v: number | null) => (v != null ? `${v.toFixed(1)} %` : '–')
+          const signed = (v: number) => `${v >= 0 ? '+' : '−'}${formatKr(Math.abs(v))}`
+          const resultCls = (v: number) => (v < 0 ? 'text-red-300' : 'text-emerald-300')
+          const endTxt = ledger?.horizon.contractEnd ? new Date(ledger.horizon.contractEnd - 1).toISOString().slice(0, 10) : null
+          return (
+            <>
+              <Kpi
+                title={hasAddons ? 'Marginal' : b.headline_label}
+                tone={prem.labour_missing ? 'warn' : premShort ? 'warn' : undefined}
+                value={
+                  prem.labour_missing ? (
+                    'Arbetstid saknas'
+                  ) : hasAddons ? (
+                    <span className={toneTextClass(tone)}>{pct(tot.headline_percent)}</span>
+                  ) : (
+                    <span className={toneTextClass(tone)}>{pct(b.headline_percent)}</span>
+                  )
+                }
+              >
+                <dl className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-[11.5px] mt-2">
+                  {hasAddons ? (
                     <>
-                      <dt className="text-slate-500">Över tre år</dt>
-                      <dd className="font-mono tabular-nums text-slate-400 text-right">{b.margin_percent_3y.toFixed(1)} %</dd>
+                      <dt className="text-slate-400 font-semibold pt-1">Premien</dt>
+                      <dd className={`font-mono tabular-nums text-right pt-1 ${prem.labour_missing ? 'text-amber-300' : toneTextClass(premTone)}`}>{prem.labour_missing ? 'arbetstid saknas' : pct(prem.headline_percent)}</dd>
+                      <dt className="text-slate-500">Årspremie</dt>
+                      <dd className="font-mono tabular-nums text-slate-200 text-right">{formatKr(prem.revenue)}</dd>
+                      <dt className="text-slate-500">Arbetstid och förbrukning</dt>
+                      <dd className="font-mono tabular-nums text-slate-200 text-right">−{formatKr(prem.cost_ongoing)}</dd>
+                      <dt className="text-slate-500">Täckningsbidrag per år</dt>
+                      <dd className={`font-mono tabular-nums text-right ${prem.contribution_ongoing < 0 ? 'text-red-300' : 'text-white'}`}>{signed(prem.contribution_ongoing)}</dd>
+                      {premShort && (
+                        <dd className="col-span-2 text-amber-300 text-[11px] pb-1">Premien täcker inte sin arbetstid. Tilläggen bär avtalet.</dd>
+                      )}
+
+                      <dt className="text-slate-400 font-semibold pt-2">Tillägg</dt>
+                      <dd className={`font-mono tabular-nums text-right pt-2 ${lt ? resultCls(lt.resultToEnd) : 'text-slate-200'}`}>
+                        {lt ? `${signed(lt.resultToEnd)}${endTxt ? ` till ${endTxt}` : ''}` : pct(parts?.addons?.headline_percent ?? null)}
+                      </dd>
+                      {lt && (
+                        <>
+                          <dt className="text-slate-500">Stationer</dt>
+                          <dd className="font-mono tabular-nums text-slate-200 text-right">
+                            {lt.count} st{lt.removed > 0 ? `, ${lt.removed} borttagna` : ''}
+                          </dd>
+                          <dt className="text-slate-500">Intäkt per år just nu</dt>
+                          <dd className="font-mono tabular-nums text-slate-200 text-right">{formatKr(lt.annualRunRate)}</dd>
+                          <dt className="text-slate-500">Fällor, engångs</dt>
+                          <dd className="font-mono tabular-nums text-slate-200 text-right">−{formatKr(lt.cost)}</dd>
+                          <dt className="text-slate-500">Hittills</dt>
+                          <dd className={`font-mono tabular-nums text-right ${resultCls(lt.resultToDate)}`}>{signed(lt.resultToDate)}</dd>
+                          <dt className="text-slate-500">Brytpunkt</dt>
+                          <dd className="font-mono tabular-nums text-slate-200 text-right">{formatMonthYearSv(lt.breakEvenAt)}</dd>
+                          {lt.resultToOption != null && ledger?.horizon.optionEnd && (
+                            <>
+                              <dt className="text-slate-500">Med option</dt>
+                              <dd className={`font-mono tabular-nums text-right ${resultCls(lt.resultToOption)}`}>{signed(lt.resultToOption)}</dd>
+                            </>
+                          )}
+                          {lt.priceMissing > 0 && <dd className="col-span-2 text-amber-300 text-[11px]">{lt.priceMissing} stationer saknar årspris</dd>}
+                        </>
+                      )}
+
+                      <dt className="text-slate-400 font-semibold pt-2">Avtalsrelationen</dt>
+                      <dd className={`font-mono tabular-nums text-right pt-2 ${toneTextClass(tone)}`}>{tot.labour_missing ? '–' : pct(tot.headline_percent)}</dd>
+                      <dt className="text-slate-500">Avtalsvärde per år</dt>
+                      <dd className="font-mono tabular-nums text-slate-200 text-right">{formatKr(tot.revenue)}</dd>
+                      <dt className="text-slate-500">Täckningsbidrag per år</dt>
+                      <dd className="font-mono tabular-nums text-white text-right">{signed(tot.contribution_ongoing)}</dd>
+                      {tot.cost_durable > 0 && (
+                        <>
+                          <dt className="text-slate-500">Återbetald efter</dt>
+                          <dd className={`font-mono tabular-nums text-right ${paybackTone(tot, settings) === 'bad' ? 'text-red-300' : 'text-slate-200'}`}>
+                            {tot.payback_never ? 'aldrig med nuvarande kostnad' : formatPayback(tot.payback_years)}
+                          </dd>
+                          <dt className="text-slate-500">Marginal år 1</dt>
+                          <dd className="font-mono tabular-nums text-slate-400 text-right">{pct(tot.margin_percent_year1)}</dd>
+                          {tot.margin_percent_3y != null && (
+                            <>
+                              <dt className="text-slate-500">Över tre år</dt>
+                              <dd className="font-mono tabular-nums text-slate-400 text-right">{pct(tot.margin_percent_3y)}</dd>
+                            </>
+                          )}
+                        </>
+                      )}
+                      {parts && parts.unallocated_cost > 0 && (
+                        <dd className="col-span-2 text-slate-500 text-[11px] pt-1">Omappade artiklar {formatKr(parts.unallocated_cost)} ligger på premien.</dd>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <dt className="text-slate-500">Avtalsvärde per år</dt>
+                      <dd className="font-mono tabular-nums text-slate-200 text-right">{formatKr(b.revenue)}</dd>
+                      <dt className="text-slate-500">Löpande kostnad</dt>
+                      <dd className="font-mono tabular-nums text-slate-200 text-right">−{formatKr(b.cost_ongoing)}</dd>
+                      <dt className="text-slate-500">Täckningsbidrag per år</dt>
+                      <dd className="font-mono tabular-nums text-white text-right">{formatKr(b.contribution_ongoing)}</dd>
+                      {b.cost_durable > 0 && (
+                        <>
+                          <dt className="text-slate-500">Varaktig utrustning, engångs</dt>
+                          <dd className="font-mono tabular-nums text-slate-200 text-right">−{formatKr(b.cost_durable)}</dd>
+                          <dt className="text-slate-500">Återbetald efter</dt>
+                          <dd className={`font-mono tabular-nums text-right ${paybackTone(b, settings) === 'bad' ? 'text-red-300' : 'text-slate-200'}`}>
+                            {b.payback_never ? 'aldrig med nuvarande kostnad' : formatPayback(b.payback_years)}
+                          </dd>
+                          <dt className="text-slate-500">Marginal år 1</dt>
+                          <dd className="font-mono tabular-nums text-slate-400 text-right">{pct(b.margin_percent_year1)}</dd>
+                          {b.margin_percent_3y != null && (
+                            <>
+                              <dt className="text-slate-500">Över tre år</dt>
+                              <dd className="font-mono tabular-nums text-slate-400 text-right">{pct(b.margin_percent_3y)}</dd>
+                            </>
+                          )}
+                        </>
+                      )}
                     </>
                   )}
-                </>
+                </dl>
+              </Kpi>
+              {ledger && ledger.byType.length > 0 && (
+                <Kpi title="Tillägg över tid" value={<span className={resultCls(ledger.totals.resultToEnd)}>{signed(ledger.totals.resultToEnd)}</span>}>
+                  <table className="w-full text-[11px] mt-2 tabular-nums">
+                    <thead>
+                      <tr className="text-slate-500 text-left">
+                        <th className="font-normal pb-1">Typ</th>
+                        <th className="font-normal pb-1 text-right">Hittills</th>
+                        <th className="font-normal pb-1 text-right">{endTxt ? 'Till slut' : 'Vid slut'}</th>
+                        <th className="font-normal pb-1 text-right">Bryt</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ledger.byType.map((g) => (
+                        <tr key={g.stationTypeName} className="border-t border-slate-800">
+                          <td className="py-1 text-slate-300">
+                            {g.stationTypeName}
+                            <span className="text-slate-500"> {g.totals.count} st{g.totals.removed > 0 ? `, ${g.totals.removed} borttagna` : ''}</span>
+                          </td>
+                          <td className={`py-1 text-right font-mono ${resultCls(g.totals.resultToDate)}`}>{signed(g.totals.resultToDate)}</td>
+                          <td className={`py-1 text-right font-mono ${resultCls(g.totals.resultToEnd)}`}>{signed(g.totals.resultToEnd)}</td>
+                          <td className="py-1 text-right font-mono text-slate-300">{formatMonthYearSv(g.totals.breakEvenAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Kpi>
               )}
-            </dl>
-          </Kpi>
-        )}
+            </>
+          )
+        })()}
         <Kpi
           title="Stationer"
           value={

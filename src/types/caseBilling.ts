@@ -1,7 +1,7 @@
 // src/types/caseBilling.ts
 // Typer för ärendebaserad fakturering (artiklar/tjänster tekniker väljer per ärende)
 
-import type { MarginBreakdown } from '../shared/marginEngine'
+import type { MarginBreakdown, ContractMarginParts } from '../shared/marginEngine'
 import type { Article, ArticleCategory } from './articles'
 import type { Service } from './services'
 
@@ -379,6 +379,8 @@ export interface CaseServiceSummary {
   margin_ok: boolean
   /** Hela uppdelningen från motorn (src/shared/marginEngine.ts) */
   breakdown: MarginBreakdown
+  /** Avtal: premie och tillägg var för sig (docs/marginal-premie-tillagg-plan.md) */
+  parts?: ContractMarginParts
 }
 
 // ============================================
