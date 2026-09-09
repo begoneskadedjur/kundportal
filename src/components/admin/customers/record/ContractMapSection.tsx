@@ -49,7 +49,8 @@ import {
 } from '../../../../hooks/useCustomerRecord'
 import { daysUntilEnd, isTerminatedButRunning } from '../../../../utils/contractLifecycle'
 import { buildRenewalPrefill } from '../../../../utils/contractRenewalPrefill'
-import { ContractScopeService } from '../../../../services/contractScopeService'
+import { ContractScopeService, FrameworkAgreementService } from '../../../../services/contractScopeService'
+import { useFrameworkAgreements } from '../../../../hooks/useFrameworkAgreements'
 import ContractStamp from './ContractStamp'
 import DateField from '../../../ui/DateField'
 import { PriceListService } from '../../../../services/priceListService'
@@ -243,6 +244,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [contentEditor, setContentEditor] = useState<RecordContract | null>(null)
   /** Bumpas när innehållet sparats så pappren hämtar om tjänster + marginal */
   const [contentReloadKey, setContentReloadKey] = useState(0)
+  // Ramavtal: § 2, referens och § 8 ärvs. Listan laddas om med innehållet.
+  const frameworks = useFrameworkAgreements(root.id, contracts.map((c) => c.framework_id ?? null), contentReloadKey)
   /**
    * Val av avtalstyp innan ett nytt avtal skapas. `blankPayload` = enheten
    * (eller Hela verksamheten) som släpptes på det tomma avtalsbladet; då
@@ -2751,6 +2754,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onSaveRenewal={(input) => saveRenewal(c, input)}
               onExerciseOption={() => exerciseOption(c)}
               stationCount={stationCountFor(c)}
+              frameworkName={c.framework_id ? frameworks.byId.get(c.framework_id)?.name ?? null : null}
               addonBricks={bricksFor(c)}
               onBrickDrag={(e, brick) => startDrag(e, { type: 'addon_stations', ...brick })}
               unitNameOf={(id) => customerRowName(customerById.get(id) ?? ({ company_name: 'Enhet' } as RecordCustomer))}
@@ -2927,6 +2931,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                     onReactivate={() => reactivate(c)}
                     locations={locations}
                     stationCount={stationCountFor(c)}
+              frameworkName={c.framework_id ? frameworks.byId.get(c.framework_id)?.name ?? null : null}
                   />
                 ))}
               </div>
@@ -3021,6 +3026,37 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           return (
             <ContractSettingsDrawer
               onChanged={onChanged}
+              frameworks={frameworks.list}
+              onSetFramework={async (id) => {
+                try {
+                  await FrameworkAgreementService.setFramework(c.id, id)
+                  toast.success(id ? 'Avtalet ärver nu ramavtalets prislista, löptid, option, referens och rytm.' : 'Ramavtalet bortkopplat, avtalets egna värden gäller.')
+                  setContentReloadKey((k) => k + 1)
+                  await onChanged()
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Kunde inte koppla ramavtalet')
+                }
+              }}
+              onCreateFramework={async (name) => {
+                try {
+                  await FrameworkAgreementService.createFromContract(c.id, name)
+                  toast.success(`Ramavtal ${name} skapat ur avtalet. Koppla kundens andra avtal under Avtalet.`)
+                  setContentReloadKey((k) => k + 1)
+                  await onChanged()
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Kunde inte skapa ramavtalet')
+                }
+              }}
+              onSyncFramework={async () => {
+                try {
+                  await FrameworkAgreementService.syncFromContract(c.id)
+                  toast.success('Ramavtalet uppdaterat, alla avtal som ärver fick de nya värdena.')
+                  setContentReloadKey((k) => k + 1)
+                  await onChanged()
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Kunde inte uppdatera ramavtalet')
+                }
+              }}
               contract={c}
               root={root}
               archived={false}
@@ -4177,6 +4213,8 @@ interface PaperProps {
   onChangeLineModel?: (item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_month' | 'per_round') => Promise<void>
   /** § 5: aktiva stationer på avtalets enheter */
   stationCount?: { outdoor: number; indoor: number; addon: number } | null
+  /** Ramavtalets namn när avtalet ärver (markeras "ur X" på § 2, § 7 och § 8) */
+  frameworkName?: string | null
   /** § 5: brickor med tilläggsstationer att besluta om, och drag av dem */
   addonBricks?: AddonBrick[]
   onBrickDrag?: (e: React.PointerEvent, brick: AddonBrick) => void
@@ -4273,6 +4311,7 @@ function PaperContract({
   onSaveRenewal,
   onExerciseOption,
   stationCount,
+  frameworkName = null,
   addonBricks,
   onBrickDrag,
   unitNameOf,
@@ -4335,6 +4374,8 @@ function PaperContract({
   // avvikelserna och fäller in enheterna i ordning.
   // Kundens vy: pappret byter till kundportalens komponent med databasens projektion
   const [asCustomer, setAsCustomer] = useState(false)
+  // Ärvt fält = ramavtal finns och fältet inte är en avvikelse
+  const fwInherits = (field: string) => !!frameworkName && !!contract.framework_id && !(contract.framework_overrides ?? []).includes(field)
   const scopeFoldable = !contract.covers_all_sites && !isUnitContract && scope.length > FOLD_THRESHOLD
   const scopeFold = usePaperFold({
     contractId: contract.id,
@@ -4786,9 +4827,11 @@ function PaperContract({
         <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
           <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 2 · Prislista för avrop</h4>
           {gear('prislista', 'Inställningar för prislista')}
-          {avropCatalog.catalog.priced.length > 0 && (
+          {(avropCatalog.catalog.priced.length > 0 || fwInherits('price_list_id')) && (
             <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
-              {avropCatalog.catalog.priced.length} till fast pris
+              {fwInherits('price_list_id') ? `ur ${frameworkName}` : ''}
+              {fwInherits('price_list_id') && avropCatalog.catalog.priced.length > 0 ? ' · ' : ''}
+              {avropCatalog.catalog.priced.length > 0 ? `${avropCatalog.catalog.priced.length} till fast pris` : ''}
             </span>
           )}
         </div>
@@ -4994,6 +5037,7 @@ function PaperContract({
           focusUnitId={refFocusUnitId}
           onFocusHandled={onRefFocusHandled}
           onOpenSettings={onOpenSettings ? () => onOpenSettings('referenser') : undefined}
+          frameworkLabel={fwInherits('invoice_reference') ? frameworkName : null}
         />
       </div>
 
@@ -5007,6 +5051,7 @@ function PaperContract({
         onExerciseOption={onExerciseOption}
         onTerminate={onTerminate}
         onOpenSettings={onOpenSettings ? () => onOpenSettings('loptid') : undefined}
+        frameworkLabel={fwInherits('contract_end_date') || fwInherits('option_until') ? frameworkName : null}
       />
 
       {/* Bilaga A · Enheter: en rad per enhet när § 1, § 3 och § 7 annars

@@ -46,6 +46,10 @@ export type RecordContract = Contract & {
   option_until?: string | null
   option_decision_deadline?: string | null
   renewal_reminder_days?: number | null
+  /** Ramavtal (framework_agreements) avtalet ärver § 2, referens och § 8 från */
+  framework_id?: string | null
+  /** Fält avtalet äger själv trots ramavtal (avvikelser). Tomt = allt ärvs. */
+  framework_overrides?: string[] | null
   /** Fakturapaus till datum (billing_active=false). Tomt = tills vidare. */
   billing_paused_until?: string | null
 }

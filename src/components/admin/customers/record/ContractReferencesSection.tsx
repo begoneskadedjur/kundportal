@@ -29,6 +29,8 @@ interface Props {
   /** paper = läsning på pappret (default), settings = formulären öppna i panelen */
   mode?: SectionMode
   onOpenSettings?: () => void
+  /** Ramavtalets namn när avtalets referens ärvs därifrån */
+  frameworkLabel?: string | null
 }
 
 export default function ContractReferencesSection({
@@ -42,6 +44,7 @@ export default function ContractReferencesSection({
   onFocusHandled,
   mode = 'paper',
   onOpenSettings,
+  frameworkLabel = null,
 }: Props) {
   const settings = mode === 'settings'
   const inputClass = settings ? PANEL_INPUT_CLASS : PAPER_INPUT_CLASS
@@ -98,7 +101,7 @@ export default function ContractReferencesSection({
             </button>
           )}
           <span className="ml-auto font-sans text-[10.5px]" style={{ color: ink.muted }}>
-            skrivs som Er referens på fakturan
+            {frameworkLabel ? `ur ${frameworkLabel} · ` : ''}skrivs som Er referens på fakturan
           </span>
         </div>
       )}

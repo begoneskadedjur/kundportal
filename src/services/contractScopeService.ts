@@ -2077,3 +2077,69 @@ export class ContractScopeService {
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Ramavtal (framework_agreements): § 2, § 7-referens och § 8 skrivs en gång,
+// avtalen ärver. Databasen kopierar ur ramavtalet till varje fält avtalet
+// inte äger (contracts.framework_overrides). Migration 20260910_ramavtal.sql.
+// ---------------------------------------------------------------------------
+export interface FrameworkAgreement {
+  id: string
+  name: string
+  diary_number: string | null
+  customer_id: string | null
+  organization_id: string | null
+  price_list_id: string | null
+  contract_start_date: string | null
+  contract_end_date: string | null
+  notice_period_months: number | null
+  renewal_mode: string | null
+  option_until: string | null
+  invoice_reference: string | null
+  visit_frequency: string | null
+  visits_per_year: number | null
+  billing_frequency: string | null
+  billing_anchor_month: number | null
+}
+
+export class FrameworkAgreementService {
+  /** Ramavtal som är relevanta för kunden: egna, organisationens och de som kundens avtal pekar på */
+  static async listForCustomer(customerId: string, contractFrameworkIds: string[]): Promise<FrameworkAgreement[]> {
+    const { data: cust } = await supabase.from('customers').select('organization_id, parent_customer_id').eq('id', customerId).maybeSingle()
+    const ids = contractFrameworkIds.filter(Boolean)
+    const ors = [`customer_id.eq.${customerId}`]
+    if (cust?.parent_customer_id) ors.push(`customer_id.eq.${cust.parent_customer_id}`)
+    if (cust?.organization_id) ors.push(`organization_id.eq.${cust.organization_id}`)
+    if (ids.length > 0) ors.push(`id.in.(${ids.join(',')})`)
+    const { data, error } = await supabase.from('framework_agreements').select('*').or(ors.join(',')).order('name')
+    if (error) {
+      console.warn('[FrameworkAgreementService]', error.message)
+      return []
+    }
+    return (data ?? []) as FrameworkAgreement[]
+  }
+
+  static async setFramework(contractId: string, frameworkId: string | null): Promise<void> {
+    const { error } = await supabase.from('contracts').update({ framework_id: frameworkId }).eq('id', contractId)
+    if (error) throw new Error(`Kunde inte koppla ramavtalet: ${error.message}`)
+    await ContractScopeService.logEvent(contractId, {
+      event_type: 'billing',
+      title: frameworkId ? 'Kopplat till ramavtal' : 'Ramavtal bortkopplat',
+      detail: frameworkId ? 'Prislista, löptid, option, referens och rytm ärvs från ramavtalet' : 'Avtalets egna värden gäller',
+      metadata: { changes: [{ field: 'framework_id', to: frameworkId }] },
+    })
+  }
+
+  static async createFromContract(contractId: string, name: string): Promise<string> {
+    const { data, error } = await supabase.rpc('create_framework_from_contract', { p_contract_id: contractId, p_name: name })
+    if (error) throw new Error(`Kunde inte skapa ramavtalet: ${error.message}`)
+    await ContractScopeService.logEvent(contractId, { event_type: 'billing', title: `Ramavtal ${name} skapat ur avtalet` })
+    return data as string
+  }
+
+  static async syncFromContract(contractId: string): Promise<void> {
+    const { error } = await supabase.rpc('sync_framework_from_contract', { p_contract_id: contractId })
+    if (error) throw new Error(`Kunde inte uppdatera ramavtalet: ${error.message}`)
+    await ContractScopeService.logEvent(contractId, { event_type: 'billing', title: 'Ramavtalet uppdaterat ur avtalet', detail: 'Alla avtal som ärver fick de nya värdena' })
+  }
+}

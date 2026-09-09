@@ -30,6 +30,7 @@ import { formatMonthYearSv, type LedgerTotals } from '../../../../shared/addonLe
 import { useAddonLedger } from '../../../../hooks/useAddonLedger'
 import { useContractFinancials } from '../../../../hooks/useContractFinancials'
 import ScheduleFromFollowupPanel from './ScheduleFromFollowupPanel'
+import type { FrameworkAgreement } from '../../../../services/contractScopeService'
 import { PANEL_INK, PANEL_INPUT_CLASS } from './paperInk'
 import { AgreementObjectText } from './PaperSignatures'
 import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from './ContractPremiumSection'
@@ -85,6 +86,11 @@ export interface ContractSettingsDrawerProps {
   /** Andel av premien på en icke-bärande § 4-rad (0..1), null = ingår utan debitering */
   onChangeLineShare?: (item: CaseBillingItemWithRelations, share: number | null) => Promise<void>
   onEditSignedAt?: () => void
+  /** Ramavtal att välja bland (kundens, organisationens, avtalens) */
+  frameworks?: FrameworkAgreement[]
+  onSetFramework?: (frameworkId: string | null) => Promise<void>
+  onCreateFramework?: (name: string) => Promise<void>
+  onSyncFramework?: () => Promise<void>
   staff: { id: string; name: string; email?: string | null }[]
   onSaveSalesPerson?: (name: string | null) => Promise<void>
   onSaveAccountManager?: (name: string | null, email: string | null) => Promise<void>
@@ -299,6 +305,61 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                 <div className="text-[13px] text-white">{(contract as { display_name?: string | null }).display_name ?? contract.label ?? contract.contract_type ?? 'Avtal'}</div>
               )}
             </div>
+            {/* Ramavtal: § 2, referens och § 8 skrivs en gång och ärvs.
+                Avvikelser lagras uttryckligen (framework_overrides). */}
+            {p.frameworks && (
+              <div className="mb-3">
+                <Label>Ramavtal</Label>
+                {p.onSetFramework && !archived ? (
+                  <select
+                    value={contract.framework_id ?? ''}
+                    onChange={(e) => void p.onSetFramework?.(e.target.value || null)}
+                    className={PANEL_INPUT_CLASS}
+                    aria-label="Ramavtal"
+                  >
+                    <option value="">Inget ramavtal, egna värden</option>
+                    {p.frameworks.map((f) => (
+                      <option key={f.id} value={f.id}>{f.name}{f.diary_number && f.diary_number !== f.name ? ` · ${f.diary_number}` : ''}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="text-[13px] text-white">{p.frameworks.find((f) => f.id === contract.framework_id)?.name ?? 'Inget ramavtal'}</div>
+                )}
+                {contract.framework_id ? (
+                  <div className="mt-1 text-[11px] text-slate-500">
+                    Prislista, löptid, option, referens och rytm ärvs.
+                    {(contract.framework_overrides ?? []).length > 0
+                      ? ` ${contract.framework_overrides!.length} fält avviker: ${contract.framework_overrides!.join(', ')}.`
+                      : ' Inga avvikelser.'}
+                    {p.onSyncFramework && !archived && (
+                      <>
+                        {' '}
+                        <button type="button" onClick={() => void p.onSyncFramework?.()} className="text-[#20c58f] underline decoration-dotted">
+                          skriv avtalets värden till ramavtalet
+                        </button>
+                        , så följer de andra avtalen.
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  p.onCreateFramework && !archived && (
+                    <div className="mt-1 text-[11px] text-slate-500">
+                      Flera avtal på samma upphandling?{' '}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const name = window.prompt('Ramavtalets namn', contract.diary_number ?? '')
+                          if (name != null && name.trim()) void p.onCreateFramework?.(name.trim())
+                        }}
+                        className="text-[#20c58f] underline decoration-dotted"
+                      >
+                        skapa ramavtal ur det här avtalet
+                      </button>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
             <div className="mb-3">
               <Label>Avtalstyp</Label>
               {p.onChangeType && !archived ? (

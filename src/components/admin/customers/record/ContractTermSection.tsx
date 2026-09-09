@@ -56,6 +56,8 @@ interface Props {
   /** paper = läsning på pappret (default), settings = formulären öppna i panelen */
   mode?: SectionMode
   onOpenSettings?: () => void
+  /** Ramavtalets namn när löptid och option ärvs därifrån */
+  frameworkLabel?: string | null
 }
 
 /** Bevakningen: vilket datum kräver beslut och när kundansvarig påminns. Delas av § 8 och pulsen. */
@@ -83,7 +85,7 @@ export function termWatch(contract: RecordContract, today: string = todayKey()) 
   return { today, start, end, notice, lastDay, months, mode, reminderDays, decisionDate, decisionKind, remindDate, daysLeft, urgent, optionExhausted, modeLabel }
 }
 
-export default function ContractTermSection({ contract, ink, archived, onSaveTerm, onSaveRenewal, onExerciseOption, onTerminate, onReactivate, onDelete, mode: sectionMode = 'paper', onOpenSettings }: Props) {
+export default function ContractTermSection({ contract, ink, archived, onSaveTerm, onSaveRenewal, onExerciseOption, onTerminate, onReactivate, onDelete, mode: sectionMode = 'paper', onOpenSettings, frameworkLabel = null }: Props) {
   const settings = sectionMode === 'settings'
   const inputClass = settings ? PANEL_INPUT_CLASS : PAPER_INPUT_CLASS
   const w = termWatch(contract)
@@ -154,6 +156,7 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
             </button>
           )}
           <span className="ml-auto font-sans text-[10.5px]" style={{ color: ink.muted }}>
+            {frameworkLabel ? `ur ${frameworkLabel} · ` : ''}
             {mode === 'option' ? 'ramavtal med option' : end ? (end < today ? 'slutdatum passerat · rullar vidare' : 'fast period') : 'löper tills vidare'}
           </span>
         </div>
