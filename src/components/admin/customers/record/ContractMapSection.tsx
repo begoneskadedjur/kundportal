@@ -1562,6 +1562,19 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     }
   }, [billingPlans, root.id])
 
+  const [nextInvoiceOpen, setNextInvoiceOpen] = useState(false)
+  /** Avtalens rader på nästa faktureringsdatum, som fakturaplaneraren byggt dem */
+  const nextConsolidated = useMemo(() => {
+    const next = planTotals.next
+    if (!next) return [] as Array<{ contract: RecordContract; entry: PremiumPlanEntry }>
+    return papers.flatMap((c) => {
+      const entry = (planEntriesByContract.get(c.id) ?? []).find(
+        (e) => e.periodStart === next.periodStart && (e.kind ?? 'premium') === 'premium' && e.action !== 'uncovered' && e.action !== 'delete'
+      )
+      return entry ? [{ contract: c, entry }] : []
+    })
+  }, [papers, planEntriesByContract, planTotals.next])
+
   const annualSum = useMemo(
     () => papers.reduce((s, c) => s + (contractEffectiveAnnualValue(c, premiumByContract.get(c.id) ?? []) ?? 0), 0),
     [papers, premiumByContract]
@@ -2621,6 +2634,45 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                   {incompletePapers} avtal saknar uppgifter
                 </span>
               )}
+              {planTotals.next && nextConsolidated.length > 0 && (
+                <button
+                  onClick={() => setNextInvoiceOpen((v) => !v)}
+                  className="text-[12px] text-slate-300 underline decoration-dotted hover:text-slate-100"
+                  title="Nästa faktura med alla avtal, raderna som Fortnox får dem"
+                >
+                  {nextInvoiceOpen ? 'dölj nästa faktura' : 'nästa faktura'}
+                </button>
+              )}
+            </div>
+          )}
+          {/* Nästa samlingsfaktura: det enda stället där tre papper blir en
+              helhet. Ur fakturaplaneraren på riktiga data, aldrig egen räkning. */}
+          {papers.length > 0 && nextInvoiceOpen && planTotals.next && nextConsolidated.length > 0 && (
+            <div className="-mt-3 bg-slate-800/30 border border-slate-700 border-t-0 rounded-b-xl px-4 py-3 font-sans text-[12px]">
+              <div className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-slate-400 mb-1.5">
+                Nästa {invoiceMode === 'consolidated' && papers.length > 1 ? 'samlingsfaktura' : 'faktura'} · {formatDateSv(planTotals.next.invoiceDate)} · period fr. {formatDateSv(planTotals.next.periodStart)}
+              </div>
+              <div className="divide-y divide-slate-700/60">
+                {nextConsolidated.map(({ contract: c, entry }) => (
+                  <div key={c.id} className="py-1.5">
+                    <div className="flex items-baseline gap-3 text-slate-200">
+                      <span className="min-w-0 flex-1 truncate">{contractDisplayName(c)}</span>
+                      <span className="tabular-nums font-semibold">{formatKr(entry.subtotal)}</span>
+                    </div>
+                    {(entry.rows ?? []).map((r, i) => (
+                      <div key={i} className={`flex items-baseline gap-3 pl-3 text-[11.5px] ${r.total_price > 0 ? 'text-slate-400' : 'text-slate-500'}`}>
+                        <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                        <span className="tabular-nums">{r.quantity} st</span>
+                        <span className="tabular-nums w-20 text-right">{formatKr(r.total_price)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-baseline gap-3 pt-2 text-slate-100 font-semibold">
+                <span className="flex-1">Summa exkl. moms · {nextConsolidated.length} avtal</span>
+                <span className="tabular-nums">{formatKr(nextConsolidated.reduce((s, x) => s + x.entry.subtotal, 0))}</span>
+              </div>
             </div>
           )}
 

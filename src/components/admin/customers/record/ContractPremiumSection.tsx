@@ -212,7 +212,7 @@ export default function ContractPremiumSection({
   const [stepPercent, setStepPercent] = useState('')
   const [stepNote, setStepNote] = useState('')
 
-  const { today, frequencyLabel, anchor, nextStart, paused, pausedUntil, uncovered, nextEntry } = premiumSummary({ contract, annualInForce, planEntries })
+  const { today, frequencyLabel, anchor, nextStart, paused, pausedUntil, uncovered, nextEntry, nextEquipment } = premiumSummary({ contract, annualInForce, planEntries })
   const sortedEvents = [...premiumEvents].sort((a, b) => a.effective_from.localeCompare(b.effective_from))
   // Pappret läser, panelen redigerar: stegknapparna finns bara i panelen
   const canStep = settings && !archived && !!onAddPremiumEvent
@@ -316,6 +316,41 @@ export default function ContractPremiumSection({
               {equipmentInvoiceMode === 'separate' ? ' · tillägg på egna fakturor' : ''}
             </span>
           </div>
+          {/* Nästa faktura står på pappret: fel syns på skärmen, inte hos
+              kunden. Raderna (som Fortnox får dem) finns i panelen. Talet
+              kommer ur fakturaplaneraren på riktiga data, aldrig egen räkning. */}
+          {!settings && nextEntry && (
+            <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
+              <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>6.3</span>
+              <span className="font-semibold">Nästa faktura</span>
+              <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
+              <span className="font-sans text-[12px] tabular-nums whitespace-nowrap" style={{ color: ink.secondary }}>
+                {formatDateSv(nextEntry.invoiceDate)} · <b style={{ color: ink.primary }}>{formatKr(nextEntry.subtotal)}</b>
+                {nextEntry.rows && nextEntry.rows.length > 0 ? ` · ${nextEntry.rows.length} rad${nextEntry.rows.length === 1 ? '' : 'er'}` : ''}
+                {nextEntry.existingStatus ? ` · ${nextEntry.existingStatus === 'draft' ? 'utkast finns' : nextEntry.existingStatus}` : ''}
+                {onOpenSettings && !archived && (
+                  <>
+                    {' · '}
+                    <button type="button" onClick={onOpenSettings} className="underline decoration-dotted" style={{ color: ink.muted }}>
+                      visa raderna
+                    </button>
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+          {!settings && nextEquipment && (
+            <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
+              <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>6.4</span>
+              <span className="font-semibold">Nästa tilläggsfaktura</span>
+              <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
+              <span className="font-sans text-[12px] tabular-nums whitespace-nowrap" style={{ color: ink.secondary }}>
+                {formatDateSv(nextEquipment.invoiceDate)} · <b style={{ color: ink.primary }}>{formatKr(nextEquipment.subtotal)}</b>
+                {nextEquipment.kind === 'equipment_monthly' ? '/mån' : ''}
+                {nextEquipment.rows && nextEquipment.rows.length > 0 ? ` · ${nextEquipment.rows.length} rad${nextEquipment.rows.length === 1 ? '' : 'er'}` : ''}
+              </span>
+            </div>
+          )}
         </>
       ) : (
         <div className="font-sans py-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 items-center text-[12px]" style={{ color: ink.secondary }}>
