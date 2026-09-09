@@ -186,7 +186,7 @@ export default function ContractEquipmentSection({
           </span>
         </div>
         {products.map((p) => (
-          <div key={p.id} className="flex items-baseline gap-2 pl-[2.1rem] py-0.5 font-sans text-[11px]" style={{ color: ink.muted }}>
+          <div key={p.id} className="print:hidden flex items-baseline gap-2 pl-[2.1rem] py-0.5 font-sans text-[11px]" style={{ color: ink.muted }} data-internal-note>
             <span className="truncate">
               {p.article_name}
               {Number(p.quantity ?? 1) !== 1 ? ` × ${Number(p.quantity)}` : ''}
@@ -210,7 +210,7 @@ export default function ContractEquipmentSection({
           const first = ledger?.stations.filter((x) => x.unitId === site && x.stationTypeId === typeId).reduce<number | null>((m, x) => (m == null || x.startAt < m ? x.startAt : m), null)
           const sign = (v: number) => `${v >= 0 ? '+' : '−'}${formatKr(Math.abs(v))}`
           return (
-            <div className="flex items-baseline gap-2 pl-[2.1rem] py-0.5 font-sans text-[11px] tabular-nums" style={{ color: ink.muted }}>
+            <div className="print:hidden flex items-baseline gap-2 pl-[2.1rem] py-0.5 font-sans text-[11px] tabular-nums" style={{ color: ink.muted }} data-internal-note>
               <span className="truncate">
                 {first != null ? `satta ${formatDateSv(new Date(first).toISOString().slice(0, 10))}` : 'satta'}
                 {lt.removed > 0 ? ` · ${lt.removed} borttagna` : ''} · brytpunkt {formatMonthYearSv(lt.breakEvenAt)}
@@ -289,6 +289,29 @@ export default function ContractEquipmentSection({
         </p>
       ) : (
         <>
+          {/* Kopplingen till faktureringen står först, innan siffrorna */}
+          {extra.length > 0 && (
+            <div className="flex items-baseline gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
+              <span className="font-sans text-[10.5px] w-6 tabular-nums shrink-0" style={numStyle}>{nextNo()}</span>
+              <span className="font-semibold" style={{ color: ink.primary }}>Tilläggen faktureras</span>
+              <span className="flex-1 border-b border-dotted translate-y-[-3px] min-w-3" style={rowStyle} />
+              <span className="font-sans text-[12px] tabular-nums whitespace-nowrap shrink-0" style={{ color: ink.secondary }}>
+                {equipmentInvoiceMode === 'separate' ? 'egna fakturor' : 'på premiefakturan'}
+                {nextEquipmentInvoice
+                  ? ` · nästa ${formatDateSv(nextEquipmentInvoice.periodStart)} · ${formatKr(nextEquipmentInvoice.subtotal)}${nextEquipmentInvoice.monthly ? '/mån' : ''}`
+                  : addonStationCount > 0
+                    ? ` · ${addonStationCount} stationer`
+                    : ''}
+              </span>
+            </div>
+          )}
+          {extra.length > 0 && (
+            <div className="font-sans text-[8.5px] font-bold uppercase tracking-[0.14em] pt-2 pb-0.5 flex" style={{ color: ink.muted }}>
+              <span className="w-6 shrink-0" />
+              <span>Stationstyp</span>
+              <span className="ml-auto">Faktureras per år</span>
+            </div>
+          )}
           {/* Brickor: tilläggsstationer som väntar på beslut. En rad, dragbar. */}
           {bricks && bricks.length > 0 && (
             <div className="mt-2 space-y-1">
@@ -341,7 +364,7 @@ export default function ContractEquipmentSection({
             )
           })}
           {strayAddonArticles.map((p) => (
-            <div key={p.id} className="flex items-baseline gap-2 pl-[2.1rem] py-0.5 font-sans text-[11px]" style={{ color: ink.muted }}>
+            <div key={p.id} className="print:hidden flex items-baseline gap-2 pl-[2.1rem] py-0.5 font-sans text-[11px]" style={{ color: ink.muted }} data-internal-note>
               <span className="truncate">
                 {p.article_name}
                 {Number(p.quantity ?? 1) !== 1 ? ` × ${Number(p.quantity)}` : ''}
@@ -361,21 +384,6 @@ export default function ContractEquipmentSection({
               <span className="font-sans text-[12px] tabular-nums whitespace-nowrap shrink-0" style={{ color: ink.secondary }}>
                 {stationCount.outdoor} ute · {stationCount.indoor} inne
                 {stationCount.addon > 0 ? ` · varav ${stationCount.addon} tillägg` : ''}
-              </span>
-            </div>
-          )}
-          {extra.length > 0 && (
-            <div className="flex items-baseline gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-              <span className="font-sans text-[10.5px] w-6 tabular-nums shrink-0" style={numStyle}>{nextNo()}</span>
-              <span className="font-semibold" style={{ color: ink.primary }}>Tilläggen faktureras</span>
-              <span className="flex-1 border-b border-dotted translate-y-[-3px] min-w-3" style={rowStyle} />
-              <span className="font-sans text-[12px] tabular-nums whitespace-nowrap shrink-0" style={{ color: ink.secondary }}>
-                {equipmentInvoiceMode === 'separate' ? 'egna fakturor' : 'på premiefakturan'}
-                {nextEquipmentInvoice
-                  ? ` · nästa ${formatDateSv(nextEquipmentInvoice.periodStart)} · ${formatKr(nextEquipmentInvoice.subtotal)}${nextEquipmentInvoice.monthly ? '/mån' : ''}`
-                  : addonStationCount > 0
-                    ? ` · ${addonStationCount} stationer`
-                    : ''}
               </span>
             </div>
           )}

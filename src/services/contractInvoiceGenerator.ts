@@ -88,6 +88,8 @@ export interface InvoiceRowSpec {
   discount_percent: number
   rot_rut_type?: string | null
   fastighetsbeteckning?: string | null
+  /** Tilläggsstationerna raden avsåg när fakturan skapades (fryst kopia) */
+  station_ids?: string[] | null
 }
 
 // Publika actions visas i preview, _historical-actions filtreras bort där
@@ -637,16 +639,17 @@ export class ContractInvoiceGenerator {
     } catch (err) {
       console.warn('[ContractInvoiceGenerator] Antalssynk av tilläggsstationer misslyckades:', err)
     }
-    const [{ data: contract }, { data: steps }, { data: items }] = await Promise.all([
+    const [{ data: contract }, { data: steps }, { data: items }, { data: ledgerRows }] = await Promise.all([
       supabase.from('contracts').select('label, contract_type, display_name, invoice_reference, diary_number, customer_id, customers!contracts_customer_id_fkey(addon_invoice_mode)').eq('id', contractId).maybeSingle(),
       supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
       supabase
         .from('case_billing_items')
         .select(
-          'id, article_id, article_code, article_name, service_id, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, rot_rut_type, fastighetsbeteckning, billing_model, billing_start_date, site_customer_id, status, is_premium_carrier, premium_share'
+          'id, article_id, article_code, article_name, service_id, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, rot_rut_type, fastighetsbeteckning, billing_model, billing_start_date, site_customer_id, station_type_id, status, is_premium_carrier, premium_share'
         )
         .eq('case_id', contractId)
         .eq('case_type', 'contract')
+      supabase.rpc('contract_addon_ledger', { p_contract_id: contractId }),
         .eq('item_type', 'service')
         .neq('status', 'cancelled'),
     ])
@@ -668,10 +671,18 @@ export class ContractInvoiceGenerator {
       billing_model: string | null
       billing_start_date?: string | null
       site_customer_id?: string | null
+      station_type_id?: string | null
       is_premium_carrier?: boolean | null
       premium_share?: number | string | null
     }
     const rows = (items ?? []) as unknown as Item[]
+    // Stationerna bakom varje § 5-rad (enhet + stationstyp), fryses på fakturaraden
+    const stationIdsByRow = new Map<string, string[]>()
+    for (const l of (ledgerRows ?? []) as Array<{ station_id: string; unit_id: string; station_type_id: string | null; removed_at: string | null }>) {
+      if (l.removed_at) continue
+      const k = `${l.unit_id}|${l.station_type_id ?? ''}`
+      stationIdsByRow.set(k, [...(stationIdsByRow.get(k) ?? []), l.station_id])
+    }
     const premiumItems: ContractServiceItem[] = rows
       .filter((r) => (r.billing_model ?? 'premium') === 'premium')
       .map((s) => ({
@@ -702,6 +713,7 @@ export class ContractInvoiceGenerator {
         vat_rate: Number(s.vat_rate),
         billing_model: s.billing_model === 'per_month' ? ('per_month' as const) : ('per_year' as const),
         billing_start_date: s.billing_start_date ?? null,
+        station_ids: s.site_customer_id ? (stationIdsByRow.get(`${s.site_customer_id}|${s.station_type_id ?? ''}`) ?? null) : null,
       }))
     const c = contract as {
       label?: string | null
@@ -806,6 +818,7 @@ export class ContractInvoiceGenerator {
           total_price: eq.total_price,
           vat_rate: eq.vat_rate,
           discount_percent: 0,
+          station_ids: sources.equipment.find((e) => e.id === eq.source_id)?.station_ids ?? null,
         })
       }
       return rows
@@ -1486,6 +1499,7 @@ export class ContractInvoiceGenerator {
       discount_percent: r.discount_percent,
       rot_rut_type: r.rot_rut_type ?? null,
       fastighetsbeteckning: r.fastighetsbeteckning ?? null,
+      station_ids: r.station_ids ?? null,
     }))
   }
 

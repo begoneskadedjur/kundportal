@@ -58,6 +58,8 @@ export interface EquipmentLine {
   vat_rate: number
   billing_model?: 'per_year' | 'per_month'
   billing_start_date?: string | null
+  /** Tilläggsstationerna bakom raden just nu, fryses på fakturaraden */
+  station_ids?: string[] | null
 }
 
 /** En utrustningsrad skalad till fakturaperioden. */
