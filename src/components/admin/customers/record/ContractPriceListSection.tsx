@@ -103,12 +103,12 @@ export function useAvropCatalog(
         // erbjudande. Utan pris offereras tjänsten, men bara om den inte redan
         // ingår i avtalet och inte är en avtalstyp.
         const excluded = new Set(excludeKey ? excludeKey.split(',') : [])
-        // 0 kr är aldrig ett fast pris: en sådan rad i prislistan är ett
-        // misstag (tjänsten hör hemma i § 4 om den ingår) och visas som offert.
-        const priced = mapped.filter((m) => m.item.price !== null && m.item.price > 0).map((m) => m.item)
+        // Ett avtalat pris visas alltid, även 0 kr: det betyder att tjänsten
+        // ingår för kunden och ska stå på pappret som "ingår", inte som offert.
+        const priced = mapped.filter((m) => m.item.price !== null).map((m) => m.item)
         const quoted = mapped
-          .filter((m) => !(m.item.price !== null && m.item.price > 0) && !m.isContract && !excluded.has(m.item.serviceId))
-          .map((m) => ({ ...m.item, price: null }))
+          .filter((m) => m.item.price === null && !m.isContract && !excluded.has(m.item.serviceId))
+          .map((m) => m.item)
 
         if (cancelled) return
         setCatalog({ priced, quoted })
@@ -180,9 +180,15 @@ export default function ContractPriceListSection({ catalog, loading, priceListLa
                 >
                   <span className="text-[#262e38] truncate">{s.name}</span>
                   <span className="flex-1 border-b border-dotted border-[#e5e0d0] translate-y-[-2px] min-w-3" />
-                  <span className="tabular-nums text-[#262e38] font-semibold whitespace-nowrap shrink-0">
-                    {formatKr(s.price as number)}
-                  </span>
+                  {(s.price as number) <= 0 ? (
+                    <span className="font-sans text-[11px] text-[#8a9099] whitespace-nowrap shrink-0">
+                      ingår · <span className="tabular-nums">0 kr</span>
+                    </span>
+                  ) : (
+                    <span className="tabular-nums text-[#262e38] font-semibold whitespace-nowrap shrink-0">
+                      {formatKr(s.price as number)}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
