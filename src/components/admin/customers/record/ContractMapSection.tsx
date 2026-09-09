@@ -61,6 +61,7 @@ import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
 import ContractContentSection, { useContractContent, useAccumulatedCaseOutcome } from './ContractContentSection'
 import { useAddonLedger } from '../../../../hooks/useAddonLedger'
 import CustomerContractPaper from '../../../shared/CustomerContractPaper'
+import ContractUnitsAppendix from './ContractUnitsAppendix'
 import ContractPriceListSection, { useAvropCatalog } from './ContractPriceListSection'
 import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from './ContractPremiumSection'
 import ContractReferencesSection from './ContractReferencesSection'
@@ -4675,7 +4676,7 @@ function PaperContract({
           >
             {scopeNames.slice(0, 3).join(', ')}
             {scope.length > 3 ? ` … och ${scope.length - 3} till` : ''}
-            {scopeDateSpan ? ` · ${scopeDateSpan}` : ''}
+            {scopeDateSpan ? ` · ${scopeDateSpan}` : ''}{coveredLocations.length > FOLD_THRESHOLD ? ' · bilaga A' : ''}
           </FoldSummary>
         )}
         <div className={foldBodyClass(!scopeFoldable || scopeFold.open)}>
@@ -4900,7 +4901,7 @@ function PaperContract({
             {followupFoldable && !followupFold.open && followupInOrder > 0 && (
               <FoldSummary onClick={followupFold.toggle} ink={ink}>
                 {followupInOrder} enhet{followupInOrder === 1 ? '' : 'er'} följer schemat
-                {followupNextAt ? ` · nästa ${formatDateSv(followupNextAt)}` : ''}
+                {followupNextAt ? ` · nästa ${formatDateSv(followupNextAt)}` : ''}{coveredLocations.length > FOLD_THRESHOLD ? ' · bilaga A' : ''}
               </FoldSummary>
             )}
           </div>
@@ -5007,6 +5008,20 @@ function PaperContract({
         onTerminate={onTerminate}
         onOpenSettings={onOpenSettings ? () => onOpenSettings('loptid') : undefined}
       />
+
+      {/* Bilaga A · Enheter: en rad per enhet när § 1, § 3 och § 7 annars
+          skulle lista samma enheter tre gånger. Samma släppzon som § 1. */}
+      {!contract.covers_all_sites && !isUnitContract && coveredLocations.length > FOLD_THRESHOLD && (
+        <ContractUnitsAppendix
+          units={coveredLocations}
+          scope={scope}
+          followup={followup.units}
+          ledger={addonLedger}
+          ink={ink}
+          archived={archived}
+          onOpenSettings={onOpenSettings ? (g) => onOpenSettings(g) : undefined}
+        />
+      )}
 
       {/* Avslutsnotis — bara på arkiverade avtal. Sammanfattar vad som hände
           och hur länge relationen varade, plus den enda framåtriktade

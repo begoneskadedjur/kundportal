@@ -13,6 +13,7 @@ import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { customerRowName, type RecordContract, type RecordCustomer } from '../../../../hooks/useCustomerRecord'
 import { PANEL_INPUT_CLASS, PAPER_GEAR_CLASS, PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk, type SectionMode } from './paperInk'
+import { FOLD_THRESHOLD } from './paperFold'
 
 interface Props {
   contract: RecordContract
@@ -152,11 +153,70 @@ export default function ContractReferencesSection({
         </div>
       )}
 
-      {/* 8.2+ Enheterna i omfattningen */}
+      {/* 7.2+ Enheterna i omfattningen. Över tröskeln på pappret: bara
+          mönstret och avvikelserna, raderna står i Bilaga A. */}
       {coveredLocations.length === 0 ? (
         <p className="font-sans text-[11px] italic py-2" style={{ color: ink.muted }}>
           Inga enheter i § 1 ännu.
         </p>
+      ) : !settings && coveredLocations.length > FOLD_THRESHOLD ? (
+        (() => {
+          const withCode = coveredLocations.filter((u) => u.billing_reference)
+          const counts = new Map<string, number>()
+          for (const u of withCode) counts.set(u.billing_reference as string, (counts.get(u.billing_reference as string) ?? 0) + 1)
+          const common = [...counts.entries()].sort((a, b) => b[1] - a[1])[0] ?? null
+          const deviating = common ? withCode.filter((u) => u.billing_reference !== common[0]) : []
+          const missing = coveredLocations.length - withCode.length
+          let no = 1
+          return (
+            <>
+              {common && (
+                <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
+                  <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.{++no}</span>
+                  <span className="font-semibold" style={{ color: ink.secondary }}>
+                    {common[1]} enhet{common[1] === 1 ? '' : 'er'}
+                    <span className="font-normal font-sans text-[11.5px] ml-1.5" style={{ color: ink.muted }}>se bilaga A</span>
+                  </span>
+                  <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
+                  <span className="font-sans text-[12px] tabular-nums" style={{ color: ink.secondary }}>
+                    <b style={{ color: ink.primary }}>{common[0]}</b> · Er referens
+                  </span>
+                </div>
+              )}
+              {deviating.map((unit) => (
+                <div key={unit.id} className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
+                  <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.{++no}</span>
+                  <span className="font-semibold">
+                    {customerRowName(unit)}
+                    <span className="font-normal font-sans text-[11.5px] ml-1.5" style={{ color: ink.muted }}>avvikande</span>
+                  </span>
+                  <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
+                  <span className="font-sans text-[12px] tabular-nums" style={{ color: ink.secondary }}>
+                    <b style={{ color: ink.primary }}>{unit.billing_reference}</b> · Er referens
+                  </span>
+                </div>
+              ))}
+              {missing > 0 && (
+                <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
+                  <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.{++no}</span>
+                  <span className="font-semibold" style={{ color: ink.warn }}>
+                    {missing} enhet{missing === 1 ? '' : 'er'} saknar kod
+                  </span>
+                  <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
+                  <span className="font-sans text-[12px]" style={{ color: ink.secondary }}>
+                    {onOpenSettings && !archived ? (
+                      <button type="button" onClick={onOpenSettings} className="underline decoration-dotted" style={{ color: ink.warn }}>
+                        sätt under Referenser
+                      </button>
+                    ) : (
+                      'beställaren anger kod på ärendet'
+                    )}
+                  </span>
+                </div>
+              )}
+            </>
+          )
+        })()
       ) : (
         coveredLocations.map((unit, i) => {
           const isEditing = settings || editingUnit === unit.id
