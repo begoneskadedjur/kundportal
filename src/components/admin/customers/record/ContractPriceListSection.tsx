@@ -103,10 +103,12 @@ export function useAvropCatalog(
         // erbjudande. Utan pris offereras tjänsten, men bara om den inte redan
         // ingår i avtalet och inte är en avtalstyp.
         const excluded = new Set(excludeKey ? excludeKey.split(',') : [])
-        const priced = mapped.filter((m) => m.item.price !== null).map((m) => m.item)
+        // 0 kr är aldrig ett fast pris: en sådan rad i prislistan är ett
+        // misstag (tjänsten hör hemma i § 4 om den ingår) och visas som offert.
+        const priced = mapped.filter((m) => m.item.price !== null && m.item.price > 0).map((m) => m.item)
         const quoted = mapped
-          .filter((m) => m.item.price === null && !m.isContract && !excluded.has(m.item.serviceId))
-          .map((m) => m.item)
+          .filter((m) => !(m.item.price !== null && m.item.price > 0) && !m.isContract && !excluded.has(m.item.serviceId))
+          .map((m) => ({ ...m.item, price: null }))
 
         if (cancelled) return
         setCatalog({ priced, quoted })

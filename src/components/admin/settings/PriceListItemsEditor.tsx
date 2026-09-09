@@ -243,6 +243,15 @@ export function PriceListItemsEditor({
           }))
           return
         }
+        // 0 kr i prislistan betyder gratis per ärende för ALLA kunder på listan.
+        // Ingår tjänsten i ett avtal hör den hemma i § 4 på det avtalet.
+        if (price === 0 && !window.confirm('0 kr betyder gratis per ärende för alla kunder som har den här prislistan. Ingår tjänsten i premien hör den hemma i § 4 på avtalet, inte här.\n\nSpara ändå som 0 kr?')) {
+          setPriceStates(prev => ({
+            ...prev,
+            [serviceId]: { ...prev[serviceId], isSaving: false }
+          }))
+          return
+        }
         await PriceListService.upsertPriceListServiceItem({
           price_list_id: priceListId,
           service_id: serviceId,
@@ -370,6 +379,11 @@ export function PriceListItemsEditor({
       const removals: string[] = []
       const upserts: { price_list_id: string; service_id: string; custom_price: number }[] = []
 
+      const zeroCount = dirtyEntries.filter(([, s]) => s.mode !== 'guide' && parseFloat(s.customPrice) === 0).length
+      if (zeroCount > 0 && !window.confirm(`${zeroCount} rad${zeroCount === 1 ? '' : 'er'} sparas med 0 kr, alltså gratis per ärende för alla kunder på listan. Ingår tjänsten i premien hör den hemma i § 4 på avtalet.\n\nSpara ändå?`)) {
+        setIsBulkSaving(false)
+        return
+      }
       for (const [serviceId, state] of dirtyEntries) {
         if (state.mode === 'guide') {
           removals.push(serviceId)

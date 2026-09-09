@@ -58,6 +58,10 @@ export interface CaseBillingItem {
   is_addon_prorata_line?: boolean | null
   /** Raden täcks av kundens avtal (§ 4) och faktureras inte som merförsäljning */
   covered_by_contract?: boolean | null
+  /** § 4: bärande rad (avtalstypens tjänst). Beloppet är härlett ur § 7, aldrig lagrat. */
+  is_premium_carrier?: boolean | null
+  /** § 4: andel av årspremien (0..1) på en icke-bärande rad. Null = 0, ingår utan debitering. */
+  premium_share?: number | null
   /** Kundens avtalade pris per enhet från prislistan (ögonblicksbild). unit_price är alltid inköpspris. Null = inget kundpris. */
   customer_unit_price?: number | null
   quantity: number

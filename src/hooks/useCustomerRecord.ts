@@ -970,8 +970,10 @@ export function oneflowContractUrl(c: RecordContract): string | null {
   return `https://app.oneflow.com/contracts/${id}`
 }
 
-/** Avtalsnamn: label (backfylld) → contract_type → 'Avtal #<oneflow-id>' */
+/** Avtalsnamn: display_name (användarsatt) → label (backfylld) → contract_type → 'Avtal #<oneflow-id>' */
 export function contractDisplayName(c: RecordContract): string {
+  const own = (c as { display_name?: string | null }).display_name
+  if (own && own.trim()) return own.trim()
   if (c.label) return c.label
   if (c.contract_type) return c.contract_type
   if (isImportedContract(c)) return 'Importerat avtal'

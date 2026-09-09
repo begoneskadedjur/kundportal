@@ -567,6 +567,8 @@ export type Database = {
           contract_type: string | null
           address_label: string | null
           display_order: number | null
+          /** Avtalets namn, satt av användaren. Tomt = avtalstypen. Skrivs aldrig av synk. */
+          display_name?: string | null
 
           created_at: string
           updated_at: string

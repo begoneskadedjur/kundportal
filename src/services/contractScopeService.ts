@@ -1126,6 +1126,21 @@ export class ContractScopeService {
     if (customerId) await this.mirrorSharedFields(customerId)
   }
 
+  /** Avtalets eget namn (fakturarad, listor, rubrik). Tomt = avtalstypen. */
+  static async setDisplayName(contractId: string, name: string | null): Promise<void> {
+    const clean = name?.trim() || null
+    const { error } = await supabase.from('contracts').update({ display_name: clean }).eq('id', contractId)
+    if (error) throw new Error(`Kunde inte spara avtalets namn: ${error.message}`)
+    await this.logEvent(contractId, { event_type: 'other', title: 'Avtalets namn', detail: clean ?? 'tomt (avtalstypen)' })
+  }
+
+  /** Andel av premien på en icke-bärande § 4-rad (0..1). Null = ingår utan debitering. */
+  static async setLineShare(itemId: string, share: number | null): Promise<void> {
+    const v = share == null ? null : Math.max(0, Math.min(1, share))
+    const { error } = await supabase.from('case_billing_items').update({ premium_share: v }).eq('id', itemId).eq('is_premium_carrier', false)
+    if (error) throw new Error(`Kunde inte spara andelen: ${error.message}`)
+  }
+
   /** Sätt avtalstyp: namnet blir både label (visningsnamn) och contract_type */
   static async setContractType(contractId: string, typeName: string): Promise<void> {
     const { data, error } = await supabase

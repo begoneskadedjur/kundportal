@@ -74,6 +74,10 @@ export interface ContractSettingsDrawerProps {
   // Avtalet
   contractTypes: string[]
   onChangeType?: (typeName: string) => void
+  /** Avtalets eget namn: rubrik, kundlista, fakturarad. Tomt = avtalstypen. */
+  onSaveDisplayName?: (name: string | null) => Promise<void>
+  /** Andel av premien på en icke-bärande § 4-rad (0..1), null = ingår utan debitering */
+  onChangeLineShare?: (item: CaseBillingItemWithRelations, share: number | null) => Promise<void>
   onEditSignedAt?: () => void
   staff: { id: string; name: string; email?: string | null }[]
   onSaveSalesPerson?: (name: string | null) => Promise<void>
@@ -242,9 +246,11 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
   // Flerval bland brickorna. Nollställs när panelen byter papper, så ett
   // "Välj alla" aldrig följer med till fel avtal.
   const [selectedBricks, setSelectedBricks] = useState<Set<string>>(new Set())
+  const [nameDraft, setNameDraft] = useState((contract as { display_name?: string | null }).display_name ?? '')
   useEffect(() => {
     setSelectedBricks(new Set())
-  }, [contract.id])
+    setNameDraft((contract as { display_name?: string | null }).display_name ?? '')
+  }, [contract.id, (contract as { display_name?: string | null }).display_name])
 
   const services = content.services
   const articles = content.articles
@@ -257,6 +263,31 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
         return (
           <div>
             <H5>Avtalet</H5>
+            <div className="mb-3">
+              <Label>Avtalets namn</Label>
+              {p.onSaveDisplayName && !archived ? (
+                <>
+                  <input
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onBlur={() => {
+                      const clean = nameDraft.trim() || null
+                      const current = (contract as { display_name?: string | null }).display_name ?? null
+                      if (clean !== current) void p.onSaveDisplayName?.(clean)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                    }}
+                    placeholder={contract.label ?? contract.contract_type ?? 'Skadedjursavtal generell'}
+                    className={PANEL_INPUT_CLASS}
+                    aria-label="Avtalets namn"
+                  />
+                  <div className="mt-1 text-[11px] text-slate-500">Visas i kundlistan, i rubriken och på fakturaraden. Tomt ger avtalstypen.</div>
+                </>
+              ) : (
+                <div className="text-[13px] text-white">{(contract as { display_name?: string | null }).display_name ?? contract.label ?? contract.contract_type ?? 'Avtal'}</div>
+              )}
+            </div>
             <div className="mb-3">
               <Label>Avtalstyp</Label>
               {p.onChangeType && !archived ? (
@@ -571,16 +602,52 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                     {[...premiumServices, ...addonServices].map((s) => {
                       const model = billingModelOf(s)
                       const site = siteOf(s)
+                      const isCarrier = !!s.is_premium_carrier
+                      const isPremiumRow = model === 'premium'
                       return (
                         <tr key={s.id}>
                           <td className="py-1.5 border-b border-slate-700 text-white">
                             {s.service_name ?? s.article_name}
+                            {isCarrier && <span className="text-slate-500"> · avtalstypen</span>}
                             {site && <span className="text-slate-500"> · {p.unitNameOf(site)}</span>}
                           </td>
-                          <td className="py-1.5 border-b border-slate-700 text-right font-mono tabular-nums text-slate-300">{Number(s.quantity ?? 1)}</td>
-                          <td className="py-1.5 border-b border-slate-700 text-right font-mono tabular-nums text-slate-300">{formatKr(Number(s.unit_price ?? 0))}</td>
+                          <td className="py-1.5 border-b border-slate-700 text-right font-mono tabular-nums text-slate-300">{isCarrier ? 1 : Number(s.quantity ?? 1)}</td>
+                          <td className="py-1.5 border-b border-slate-700 text-right font-mono tabular-nums text-slate-300">
+                            {/* § 4-rader bär andel av premien, aldrig belopp. Bärande raden är resten. */}
+                            {isCarrier ? (
+                              <span className="text-slate-500 font-sans text-[11px]">följer § 7.1</span>
+                            ) : isPremiumRow ? (
+                              p.onChangeLineShare && !archived ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    defaultValue={s.premium_share != null ? Math.round(Number(s.premium_share) * 100) : ''}
+                                    placeholder="0"
+                                    onBlur={(e) => {
+                                      const v = e.target.value.trim()
+                                      const pct = v === '' ? null : Number(v)
+                                      const next = pct == null || Number.isNaN(pct) || pct <= 0 ? null : Math.min(100, pct) / 100
+                                      if ((next ?? null) !== (s.premium_share ?? null)) void p.onChangeLineShare?.(s, next)
+                                    }}
+                                    className="w-14 bg-slate-800/70 border border-slate-700 rounded px-1.5 py-0.5 text-[11.5px] text-right text-slate-200"
+                                    aria-label={`Andel av premien för ${s.service_name ?? s.article_name}`}
+                                  />
+                                  <span className="text-slate-500 text-[11px]">%</span>
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">{s.premium_share ? `${Math.round(Number(s.premium_share) * 100)} %` : 'ingår'}</span>
+                              )
+                            ) : (
+                              formatKr(Number(s.unit_price ?? 0))
+                            )}
+                          </td>
                           <td className="py-1.5 pl-3 border-b border-slate-700">
-                            {p.onChangeLineModel && !archived ? (
+                            {isCarrier ? (
+                              <span className="text-slate-500 text-[11px]">Ingår i premien</span>
+                            ) : p.onChangeLineModel && !archived ? (
                               <select
                                 value={model}
                                 onChange={(e) => void p.onChangeLineModel?.(s, e.target.value as BillingModel)}

@@ -111,6 +111,8 @@ export interface PremiumPlanEntry {
   existingStatus?: string | null
   consolidated?: boolean
   reason?: string
+  /** Fakturans rader som Fortnox får dem (förhandsvisning i panelen) */
+  rows?: Array<{ name: string; quantity: number; unit_price: number; total_price: number }>
 }
 
 interface Props {
@@ -210,7 +212,7 @@ export default function ContractPremiumSection({
   const [stepPercent, setStepPercent] = useState('')
   const [stepNote, setStepNote] = useState('')
 
-  const { today, frequencyLabel, anchor, nextStart, paused, pausedUntil, uncovered } = premiumSummary({ contract, annualInForce, planEntries })
+  const { today, frequencyLabel, anchor, nextStart, paused, pausedUntil, uncovered, nextEntry } = premiumSummary({ contract, annualInForce, planEntries })
   const sortedEvents = [...premiumEvents].sort((a, b) => a.effective_from.localeCompare(b.effective_from))
   // Pappret läser, panelen redigerar: stegknapparna finns bara i panelen
   const canStep = settings && !archived && !!onAddPremiumEvent
@@ -445,6 +447,45 @@ export default function ContractPremiumSection({
                 )}
               </div>
             ))}
+          </div>
+        )}
+        {/* Fakturaförhandsvisning: nästa fakturas rader exakt som Fortnox får dem.
+            Textrader (0 kr) är det som ingår utan debitering. */}
+        {settings && nextEntry && (
+          <div className="mt-3">
+            <div className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em]" style={{ color: ink.muted }}>
+              Nästa faktura · {formatDateSv(nextEntry.invoiceDate)} · {formatDateSv(nextEntry.periodStart)} t.o.m. {formatDateSv(nextEntry.periodEnd)}
+            </div>
+            {nextEntry.rows && nextEntry.rows.length > 0 ? (
+              <div className="mt-1.5 rounded-md font-sans text-[11.5px]" style={{ border: `1px solid ${ink.rule}` }}>
+                {nextEntry.rows.filter((r) => r.total_price > 0).map((r, i) => (
+                  <div key={`r-${i}`} className="flex items-baseline gap-3 px-2.5 py-1.5" style={{ borderBottom: `1px dashed ${ink.rule}`, color: ink.primary }}>
+                    <span className="min-w-0 flex-1 truncate" title={r.name}>{r.name}</span>
+                    <span className="shrink-0 tabular-nums" style={{ color: ink.secondary }}>{r.quantity} st</span>
+                    <span className="shrink-0 tabular-nums font-semibold">{formatKr(r.total_price)}</span>
+                  </div>
+                ))}
+                {nextEntry.rows.some((r) => r.total_price <= 0) && (
+                  <div className="px-2.5 pt-1.5 pb-0.5 text-[9.5px] font-bold uppercase tracking-[0.12em]" style={{ color: ink.muted }}>
+                    Ingår utan debitering
+                  </div>
+                )}
+                {nextEntry.rows.filter((r) => r.total_price <= 0).map((r, i) => (
+                  <div key={`z-${i}`} className="flex items-baseline gap-3 px-2.5 py-1" style={{ color: ink.muted }}>
+                    <span className="min-w-0 flex-1 truncate" title={r.name}>{r.name}</span>
+                    <span className="shrink-0 tabular-nums">0 kr</span>
+                  </div>
+                ))}
+                <div className="flex items-baseline gap-3 px-2.5 py-1.5" style={{ color: ink.primary }}>
+                  <span className="flex-1 font-semibold">Summa exkl. moms</span>
+                  <span className="shrink-0 tabular-nums font-semibold">{formatKr(nextEntry.subtotal)}</span>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-1 font-sans text-[11.5px]" style={{ color: ink.secondary }}>
+                {formatKr(nextEntry.subtotal)} · raderna byggs när fakturan planeras
+              </div>
+            )}
           </div>
         )}
         {stepForm && (

@@ -26,6 +26,7 @@ import { PaymentTermsService } from './paymentTermsService'
 import { InvoiceService } from './invoiceService'
 import { ContractService, isSyntheticContract } from './contractService'
 import { resolveOrganizationNumber } from '../utils/multisiteHelpers'
+import { resolvePremiumShares, allocateByShares } from '../shared/premiumShares'
 import type { ContractWithBilling } from '../types/database'
 import {
   computePlannedEquipmentPeriods,
@@ -61,6 +62,10 @@ interface ContractServiceItem {
   discount_percent: number
   rot_rut_type: string | null
   fastighetsbeteckning: string | null
+  /** Bärande § 4-rad (avtalstypen): restposten av premien */
+  is_premium_carrier?: boolean
+  /** Andel av premien på icke-bärande rad, null = 0 */
+  premium_share?: number | null
 }
 
 /** En planerad faktura: en period med belopp. Fälten från PlannedPeriod plus etikett. */
@@ -633,12 +638,12 @@ export class ContractInvoiceGenerator {
       console.warn('[ContractInvoiceGenerator] Antalssynk av tilläggsstationer misslyckades:', err)
     }
     const [{ data: contract }, { data: steps }, { data: items }] = await Promise.all([
-      supabase.from('contracts').select('label, contract_type, invoice_reference, diary_number, customer_id, customers!contracts_customer_id_fkey(addon_invoice_mode)').eq('id', contractId).maybeSingle(),
+      supabase.from('contracts').select('label, contract_type, display_name, invoice_reference, diary_number, customer_id, customers!contracts_customer_id_fkey(addon_invoice_mode)').eq('id', contractId).maybeSingle(),
       supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
       supabase
         .from('case_billing_items')
         .select(
-          'id, article_id, article_code, article_name, service_id, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, rot_rut_type, fastighetsbeteckning, billing_model, billing_start_date, site_customer_id, status'
+          'id, article_id, article_code, article_name, service_id, service_code, service_name, quantity, unit_price, total_price, vat_rate, discount_percent, rot_rut_type, fastighetsbeteckning, billing_model, billing_start_date, site_customer_id, status, is_premium_carrier, premium_share'
         )
         .eq('case_id', contractId)
         .eq('case_type', 'contract')
@@ -663,6 +668,8 @@ export class ContractInvoiceGenerator {
       billing_model: string | null
       billing_start_date?: string | null
       site_customer_id?: string | null
+      is_premium_carrier?: boolean | null
+      premium_share?: number | string | null
     }
     const rows = (items ?? []) as unknown as Item[]
     const premiumItems: ContractServiceItem[] = rows
@@ -679,6 +686,8 @@ export class ContractInvoiceGenerator {
         discount_percent: Number(s.discount_percent ?? 0),
         rot_rut_type: s.rot_rut_type ?? null,
         fastighetsbeteckning: s.fastighetsbeteckning ?? null,
+        is_premium_carrier: !!s.is_premium_carrier,
+        premium_share: s.premium_share == null ? null : Number(s.premium_share),
       }))
     const equipment: EquipmentLine[] = rows
       .filter((r) => r.billing_model === 'per_year' || r.billing_model === 'per_month')
@@ -697,6 +706,7 @@ export class ContractInvoiceGenerator {
     const c = contract as {
       label?: string | null
       contract_type?: string | null
+      display_name?: string | null
       invoice_reference?: string | null
       diary_number?: string | null
       customers?: { addon_invoice_mode?: string | null } | null
@@ -713,7 +723,8 @@ export class ContractInvoiceGenerator {
       // (contracts.equipment_invoice_mode är deprecated och läses inte).
       equipmentInvoiceMode:
         c?.customers?.addon_invoice_mode === 'separate_per_contract' ? 'separate' : 'with_premium',
-      label: c?.label ?? c?.contract_type ?? null,
+      // Avtalets namn på fakturaraden: användarsatt namn → label → typ
+      label: (c?.display_name && c.display_name.trim()) || c?.label || c?.contract_type || null,
       invoiceReference: c?.invoice_reference ?? null,
       diaryNumber: c?.diary_number ?? null,
     }
@@ -777,6 +788,9 @@ export class ContractInvoiceGenerator {
     const period = periodLabel(planned)
     const diary = sources.diaryNumber ? ` (${sources.diaryNumber})` : ''
     const rows: InvoiceRowSpec[] = []
+    // Frekvensen behövs inte längre för premieraderna: beloppet är periodens
+    // premie ur trappan och fördelas efter andelar, inte skalat radpris.
+    void freq
 
     // Egna tilläggsfakturor: bara utrustningsraderna
     if (planned.kind === 'equipment' || planned.kind === 'equipment_monthly') {
@@ -797,35 +811,67 @@ export class ContractInvoiceGenerator {
       return rows
     }
 
-    if (sources.premiumItems.length > 0) {
-      // § 4-raderna speglas, skalade per period. Beloppet i trappan vinner:
-      // skiljer sig radsumman från periodens premie (indexering, tillägg
-      // utan rad) fördelas skillnaden proportionellt så fakturan stämmer.
-      const divisor = periodDivisor(freq)
-      const scaled = sources.premiumItems.map((it) => ({
-        it,
-        unit: Math.round((it.unit_price * 100) / divisor) / 100,
-        total: Math.round((it.total_price * 100) / divisor) / 100,
+    // § 4-raderna bär ANDELAR av premien, aldrig belopp. Beloppet är alltid
+    // periodens premie ur § 7-trappan. Bärande raden (avtalstypen) är
+    // restposten; rader med andel 0 skrivs som textrad "ingår" (0 kr) så
+    // kunden ser vad premien täcker. Fakturan kan aldrig bli 0 kr så länge
+    // § 7 har en premie: saknas andelar helt skrivs en vanlig premierad.
+    const shareResult = resolvePremiumShares(
+      sources.premiumItems.map((it) => ({
+        id: it.case_billing_item_id,
+        is_premium_carrier: it.is_premium_carrier,
+        premium_share: it.premium_share,
+        quantity: it.quantity,
+        unit_price: it.unit_price,
+        total_price: it.total_price,
       }))
-      const sum = scaled.reduce((s, r) => s + r.total, 0)
-      const factor = sum > 0 && Math.abs(sum - planned.amount) >= 0.5 ? planned.amount / sum : 1
-      for (const r of scaled) {
-        const total = Math.round(r.total * factor * 100) / 100
-        const unit = r.it.quantity > 0 ? Math.round((total / r.it.quantity) * 100) / 100 : total
+    )
+    const order = [...sources.premiumItems]
+      .sort((a, b) => Number(!!b.is_premium_carrier) - Number(!!a.is_premium_carrier))
+      .map((it) => it.case_billing_item_id)
+    const anyShare = order.some((id) => (shareResult.shares.get(id) ?? 0) > 0)
+
+    if (sources.premiumItems.length > 0 && anyShare && planned.amount > 0) {
+      const amounts = allocateByShares(planned.amount, order, shareResult.shares)
+      for (const id of order) {
+        const it = sources.premiumItems.find((x) => x.case_billing_item_id === id)!
+        const total = amounts.get(id) ?? 0
+        if (total <= 0) {
+          // Ingår utan debitering: textrad, 0 kr (samma hantering som index_note vid sändning)
+          rows.push({
+            contract_id: contractId,
+            line_kind: 'index_note',
+            case_billing_item_id: it.case_billing_item_id,
+            article_id: null,
+            article_code: it.display_code,
+            article_name: `${it.display_name}, ingår i avtalet${it.quantity > 1 ? `, ${it.quantity} st` : ''}`,
+            quantity: 0,
+            unit_price: 0,
+            total_price: 0,
+            vat_rate: it.vat_rate,
+            discount_percent: 0,
+          })
+          continue
+        }
+        const isCarrier = !!it.is_premium_carrier
+        const quantity = isCarrier ? 1 : it.quantity > 0 ? it.quantity : 1
+        const unit = Math.round((total / quantity) * 100) / 100
         rows.push({
           contract_id: contractId,
           line_kind: 'premium',
-          case_billing_item_id: r.it.case_billing_item_id,
+          case_billing_item_id: it.case_billing_item_id,
           article_id: null,
-          article_code: r.it.display_code,
-          article_name: `${r.it.display_name}, årspremie ${period}${diary}`,
-          quantity: r.it.quantity,
+          article_code: it.display_code,
+          article_name: isCarrier
+            ? `Årspremie ${sources.label ?? it.display_name}, ${period}${diary}`
+            : `${it.display_name}, andel av årspremien ${period}${diary}`,
+          quantity,
           unit_price: unit,
           total_price: total,
-          vat_rate: r.it.vat_rate,
-          discount_percent: r.it.discount_percent,
-          rot_rut_type: r.it.rot_rut_type,
-          fastighetsbeteckning: r.it.fastighetsbeteckning,
+          vat_rate: it.vat_rate,
+          discount_percent: it.discount_percent,
+          rot_rut_type: it.rot_rut_type,
+          fastighetsbeteckning: it.fastighetsbeteckning,
         })
       }
     } else if (planned.amount > 0) {

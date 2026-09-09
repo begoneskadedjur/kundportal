@@ -1535,6 +1535,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           existingStatus: e.existingStatus ?? null,
           consolidated: e.consolidated ?? plan.consolidated ?? false,
           reason: e.reason,
+          rows: e.rows?.map((r) => ({ name: r.article_name, quantity: r.quantity, unit_price: r.unit_price, total_price: r.total_price })),
         }
         for (const id of ids) map.set(id, [...(map.get(id) ?? []), entry])
       }
@@ -2964,6 +2965,24 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               contentReloadKey={contentReloadKey}
               rootPriceListId={root.price_list_id ?? null}
               contractTypes={contractTypes.map((t) => t.value)}
+              onSaveDisplayName={async (name) => {
+                try {
+                  await ContractScopeService.setDisplayName(c.id, name)
+                  toast.success(name ? `Avtalet heter nu ${name}.` : 'Avtalets namn borttaget, avtalstypen visas.')
+                  await onChanged()
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Kunde inte spara namnet')
+                }
+              }}
+              onChangeLineShare={async (item, share) => {
+                try {
+                  await ContractScopeService.setLineShare(item.id, share)
+                  setContentReloadKey((k) => k + 1)
+                  setBillingPlansKey((k) => k + 1)
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : 'Kunde inte spara andelen')
+                }
+              }}
               onChangeType={(t) => changeContractType(c, t)}
               onEditSignedAt={() => setSignedAtPrompt(c)}
               staff={technicians}
@@ -4709,6 +4728,8 @@ function PaperContract({
           loading={contentData.loading}
           onEdit={onEditContent}
           onOpenSettings={onOpenSettings && !archived ? () => onOpenSettings('innehall') : undefined}
+          annualInForce={annual > 0 ? annual : null}
+          onOpenPremium={onOpenSettings && !archived ? () => onOpenSettings('fakturering') : undefined}
           showAccumulated={isAvrop}
           accumulated={accumulatedOutcome.summary}
           accumulatedLoading={accumulatedOutcome.loading}

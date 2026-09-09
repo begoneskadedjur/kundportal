@@ -22,6 +22,7 @@ import type {
 import type { PricingSettings } from '../../../../types/pricingSettings'
 import { formatKr } from '../../../../hooks/useCustomerRecord'
 import { formatPayback, summarizeBillingLines } from '../../../../shared/marginEngine'
+import { resolvePremiumShares } from '../../../../shared/premiumShares'
 import { PAPER_GEAR_CLASS } from './paperInk'
 
 export interface ContractContent {
@@ -135,6 +136,13 @@ interface Props {
   accumulated?: AccumulatedCaseSummary | null
   accumulatedLoading?: boolean
   showAccumulated?: boolean
+  /**
+   * Årspremien som gäller nu (§ 7). § 4-radernas belopp är andelar av den,
+   * aldrig lagrade priser. Null eller 0 = premie saknas, 4.1 visar "— kr".
+   */
+  annualInForce?: number | null
+  /** Kugghjulet på § 7: "premie saknas" på 4.1 leder dit */
+  onOpenPremium?: () => void
 }
 
 /**
@@ -150,14 +158,25 @@ export default function ContractContentSection({
   accumulated,
   accumulatedLoading,
   showAccumulated,
+  annualInForce = null,
+  onOpenPremium,
 }: Props) {
   const { services: allServices, articles, summary, settings } = content
   // § 4 visar det som ingår i premien. Rader med annat faktureringsläge
-  // (per styck och år, per kontrollrunda) bor i § 6 Utrustning.
-  const services = allServices.filter((s) => {
-    const m = (s as unknown as { billing_model?: string | null }).billing_model
-    return !m || m === 'premium'
-  })
+  // (per styck och år, per kontrollrunda) bor i § 6 Utrustning. Bärande
+  // raden (avtalstypen) först: den är restposten av premien.
+  const services = allServices
+    .filter((s) => {
+      const m = (s as unknown as { billing_model?: string | null }).billing_model
+      return !m || m === 'premium'
+    })
+    .sort((a, b) => Number(!!b.is_premium_carrier) - Number(!!a.is_premium_carrier))
+  const shareResult = resolvePremiumShares(services)
+  const premium = annualInForce != null && annualInForce > 0 ? annualInForce : null
+  const amountOf = (id: string) => (premium == null ? null : Math.round(premium * (shareResult.shares.get(id) ?? 0) * 100) / 100)
+  const allocated = services.reduce((s, svc) => s + (amountOf(svc.id) ?? 0), 0)
+  // Rader med lagrat pris men utan andel: priset räknas inte längre, granska
+  const stalePriced = services.filter((s) => !s.is_premium_carrier && Number(s.total_price ?? 0) > 0 && !(Number(s.premium_share ?? 0) > 0))
 
   // Artiklar grupperade per tjänsterad (mapped_service_id → tjänstens item-id)
   const articlesByService = new Map<string, CaseBillingItemWithRelations[]>()
@@ -190,9 +209,18 @@ export default function ContractContentSection({
             </button>
           )}
           <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
-            {loading ? '…' : `${services.length} tjänst${services.length === 1 ? '' : 'er'}`}
+            {loading ? '…' : `${services.length} tjänst${services.length === 1 ? '' : 'er'}${shareResult.carrierId ? ' · täcks av § 7' : ''}`}
           </span>
         </div>
+        <div className="font-sans text-[9px] font-bold uppercase tracking-[0.14em] text-[#8a9099] mt-1.5">
+          Ingår i premien · kunden betalar inget per ärende
+        </div>
+        {!loading && services.length > 0 && (
+          <div className="flex justify-between font-sans text-[9px] uppercase tracking-[0.12em] text-[#8a9099] mt-1.5 mb-0.5">
+            <span>Tjänst</span>
+            <span>Andel av premien</span>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex items-center gap-2 py-3 font-sans text-[12px] text-[#8a9099]">
@@ -217,9 +245,22 @@ export default function ContractContentSection({
           <>
             {services.map((svc, i) => {
               const svcArticles = articlesByService.get(svc.id) ?? []
-              const svcRevenue = Number(svc.total_price ?? 0)
-              const svcBreakdown = summarizeBillingLines([svc, ...svcArticles], { context: 'contract' })
-              const svcMargin = svcBreakdown.headline_percent
+              const isCarrier = !!svc.is_premium_carrier
+              const share = shareResult.shares.get(svc.id) ?? 0
+              const svcRevenue = amountOf(svc.id)
+              // Marginal per rad mot radens andel av premien, inte mot lagrat pris
+              const svcBreakdown = summarizeBillingLines([svc, ...svcArticles], { context: 'contract', revenueOverride: svcRevenue ?? 0 })
+              const svcMargin = svcRevenue != null && svcRevenue > 0 ? svcBreakdown.headline_percent : null
+              const qualifier = isCarrier
+                ? premium == null
+                  ? 'premie saknas i § 7'
+                  : share >= 0.999
+                    ? 'hela premien'
+                    : 'andel av premien'
+                : share > 0
+                  ? 'andel av premien'
+                  : 'ingår'
+              const warn = isCarrier && premium == null
               return (
                 <div key={svc.id} className="border-b border-dotted border-[#d9d3c2] py-2">
                   <div className="flex items-center gap-2.5 text-[13.5px]">
@@ -227,14 +268,22 @@ export default function ContractContentSection({
                     <span className="font-semibold text-[#262e38] truncate">
                       {svc.service_name || svc.article_name}
                     </span>
-                    {Number(svc.quantity ?? 1) !== 1 && (
+                    {Number(svc.quantity ?? 1) !== 1 && !isCarrier && (
                       <span className="font-sans text-[11px] text-[#8a9099] shrink-0">
                         × {Number(svc.quantity)}
                       </span>
                     )}
                     <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-1 min-w-4" />
-                    <span className="tabular-nums text-[#262e38] whitespace-nowrap shrink-0">
-                      {formatKr(svcRevenue)}
+                    {warn && onOpenPremium ? (
+                      <button type="button" onClick={onOpenPremium} className="font-sans text-[11px] underline decoration-dotted shrink-0" style={{ color: '#b45309' }}>
+                        {qualifier} →
+                      </button>
+                    ) : (
+                      <span className="font-sans text-[11px] shrink-0" style={{ color: warn ? '#b45309' : '#8a9099' }}>{qualifier}</span>
+                    )}
+                    <span className="tabular-nums whitespace-nowrap shrink-0" style={{ color: warn ? '#b45309' : '#262e38' }}>
+                      {svcRevenue == null ? (isCarrier ? '— kr' : '0 kr') : formatKr(svcRevenue)}
+                      {isCarrier && <span className="font-sans text-[10px] text-[#8a9099] ml-1" title="Beloppet följer § 7.1 och går inte att skriva i">🔒</span>}
                     </span>
                   </div>
                   {/* Interna kostnadsrader — når aldrig kunden */}
@@ -269,6 +318,31 @@ export default function ContractContentSection({
                 </div>
               )
             })}
+
+            {/* Summeringsrad: § 4 ska stämma mot 7.1. Avvikelsen står här, inte i en text. */}
+            {premium != null && (
+              <div className="flex justify-end items-baseline gap-2 pt-1.5 font-sans text-[11.5px] text-[#5d6672]">
+                <span>Summa fördelad premie</span>
+                <b className="tabular-nums" style={{ color: Math.abs(allocated - premium) < 1 && !shareResult.overAllocated ? '#157a5b' : '#b45309' }}>
+                  {formatKr(allocated)}
+                </b>
+                {Math.abs(allocated - premium) < 1 && !shareResult.overAllocated ? (
+                  <span className="text-[#8a9099]">= 7.1</span>
+                ) : (
+                  <span style={{ color: '#b45309' }}>({shareResult.overAllocated ? 'överfördelat' : `av ${formatKr(premium)}`})</span>
+                )}
+              </div>
+            )}
+            {shareResult.carrierBelowTenPercent && (
+              <div className="font-sans text-[11px] text-right" style={{ color: '#b45309' }}>
+                4.1 under tio procent av premien: kontrollera de andra radernas andelar.
+              </div>
+            )}
+            {stalePriced.length > 0 && (
+              <div className="font-sans text-[11px] text-right" style={{ color: '#b45309' }}>
+                {stalePriced.length} rad{stalePriced.length === 1 ? '' : 'er'} har ett gammalt pris som inte längre räknas. Sätt andel under Innehåll eller lämna som ingår.
+              </div>
+            )}
 
             {unmappedArticles.length > 0 && (
               <div className="pt-2 pl-8 space-y-0.5">
