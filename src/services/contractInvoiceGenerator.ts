@@ -649,9 +649,9 @@ export class ContractInvoiceGenerator {
         )
         .eq('case_id', contractId)
         .eq('case_type', 'contract')
-      supabase.rpc('contract_addon_ledger', { p_contract_id: contractId }),
         .eq('item_type', 'service')
         .neq('status', 'cancelled'),
+      supabase.rpc('contract_addon_ledger', { p_contract_id: contractId }),
     ])
     type Item = {
       id: string
