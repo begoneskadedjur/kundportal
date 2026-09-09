@@ -551,24 +551,28 @@ export default function ContractContentSection({
             </div>
             {premShort && (
               <div className="pl-[2.1rem] py-0.5 font-sans text-[11px]" style={{ color: '#b45309' }}>
-                Premien täcker inte sin arbetstid. Tilläggen bär avtalet.
+                Premien täcker inte sin arbetstid.{hasAddons && tot.contribution_ongoing >= 0 ? ' Tilläggen bär avtalet.' : ''}
               </div>
             )}
 
-            {/* Tilläggen som resultat över avtalsperioden */}
-            {hasAddons && (
-              <div className={row}>
-                <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">{nextNo()}</span>
-                <span className="font-semibold text-[#262e38] truncate">
-                  Tilläggsstationer
-                  <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
-                    {lt
-                      ? `${lt.count} st${lt.removed > 0 ? `, ${lt.removed} borttagn${lt.removed === 1 ? 'a' : 'a'}` : ''} · ${formatKr(lt.annualRunRate)}/år · fällor ${formatKr(lt.cost)}`
+            {/* Tilläggen som resultat över avtalsperioden. Raden finns alltid
+                så att avtalen läses likadant; utan tillägg står "inga". */}
+            <div className={row}>
+              <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">{nextNo()}</span>
+              <span className="font-semibold text-[#262e38] truncate">
+                Tilläggsstationer
+                <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
+                  {!hasAddons
+                    ? 'inga'
+                    : lt
+                      ? `${lt.count} st${lt.removed > 0 ? `, ${lt.removed} borttagna` : ''} · ${formatKr(lt.annualRunRate)}/år · fällor ${formatKr(lt.cost)}`
                       : `${formatKr(parts?.addon_revenue ?? 0)}/år`}
-                  </span>
                 </span>
-                <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-[-3px] min-w-4" />
-                {lt ? (
+              </span>
+              <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-[-3px] min-w-4" />
+              {!hasAddons ? (
+                <span className="font-sans text-[13px] tabular-nums whitespace-nowrap text-[#8a9099]">–</span>
+              ) : lt ? (
                   <span className="font-sans text-[13px] font-bold tabular-nums whitespace-nowrap" style={{ color: resultInk(lt.resultToEnd) }}>
                     {lt.resultToEnd >= 0 ? '+' : '−'}{formatKr(Math.abs(lt.resultToEnd))}
                     <span className="text-[10.5px] font-normal text-[#8a9099]"> {endTxt ? `till ${endTxt}` : 'hittills'}</span>
@@ -578,8 +582,7 @@ export default function ContractContentSection({
                     {parts?.addons?.headline_percent != null ? `${parts.addons.headline_percent.toFixed(1)} %` : '–'}
                   </span>
                 )}
-              </div>
-            )}
+            </div>
             {lt && (
               <div className="pl-[2.1rem] py-0.5 font-sans text-[11px] text-[#5d6672] tabular-nums">
                 hittills {lt.resultToDate >= 0 ? '+' : '−'}{formatKr(Math.abs(lt.resultToDate))} · brytpunkt {formatMonthYearSv(lt.breakEvenAt)}

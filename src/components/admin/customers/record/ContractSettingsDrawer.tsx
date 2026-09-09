@@ -900,7 +900,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                       <dt className="text-slate-500">Täckningsbidrag per år</dt>
                       <dd className={`font-mono tabular-nums text-right ${prem.contribution_ongoing < 0 ? 'text-red-300' : 'text-white'}`}>{signed(prem.contribution_ongoing)}</dd>
                       {premShort && (
-                        <dd className="col-span-2 text-amber-300 text-[11px] pb-1">Premien täcker inte sin arbetstid. Tilläggen bär avtalet.</dd>
+                        <dd className="col-span-2 text-amber-300 text-[11px] pb-1">Premien täcker inte sin arbetstid.{tot.contribution_ongoing >= 0 ? ' Tilläggen bär avtalet.' : ''}</dd>
                       )}
 
                       <dt className="text-slate-400 font-semibold pt-2">Tillägg</dt>

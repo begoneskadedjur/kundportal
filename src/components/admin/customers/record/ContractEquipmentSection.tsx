@@ -106,7 +106,11 @@ export default function ContractEquipmentSection({
   // Hopfällning: stängd när det finns rader men inget att besluta. Brickor
   // eller nya/borttagna rader sedan senast sedd öppnar stycket, alltid.
   const hasBricks = !!bricks && bricks.length > 0
-  const rowIds = [...extra.map((s) => s.id), ...articles.map((a) => a.id)]
+  // Premiens artiklar (arbetstid, förbrukning) visas bara i § 4 under
+  // avtalsraden. § 6 är tilläggen: tjänsterader per år/månad/runda och
+  // produkterna under dem. En siffra, ett ställe.
+  const addonArticles = articles.filter((a) => isAddonArticle(a, services))
+  const rowIds = [...extra.map((s) => s.id), ...addonArticles.map((a) => a.id)]
   const foldId = contractId ?? 'none'
   // Under laddning räknas stycket som hopfällt så att det inte hoppar
   const foldable = !!contractId && (loading || extra.length > 0)
@@ -118,7 +122,6 @@ export default function ContractEquipmentSection({
     forceOpen: hasBricks || rowsChanged,
     dragOver,
   })
-  const premiumArticles = articles.filter((a) => !isAddonArticle(a, services))
   // Produkterna under sin stationstyp, via mapped_service_id
   const articlesByService = new Map<string, CaseBillingItemWithRelations[]>()
   for (const a of articles) {
@@ -139,7 +142,7 @@ export default function ContractEquipmentSection({
     bySite.set(key, [...(bySite.get(key) ?? []), s])
   }
   const siteKeys = Array.from(bySite.keys())
-  const showSiteHeaders = siteKeys.length > 1 || (siteKeys.length === 1 && siteKeys[0] !== '' && !!unitNameOf && premiumArticles.length > 0)
+  const showSiteHeaders = siteKeys.length > 1
 
   const annualExtra = extra.reduce((s, it) => {
     const m = billingModelOf(it)
@@ -229,7 +232,7 @@ export default function ContractEquipmentSection({
     )
   }
 
-  const empty = !loading && extra.length === 0 && articles.length === 0 && !(bricks && bricks.length > 0)
+  const empty = !loading && extra.length === 0 && addonArticles.length === 0 && !(bricks && bricks.length > 0)
 
   return (
     <div className="mt-3.5 group/para">
@@ -268,7 +271,6 @@ export default function ContractEquipmentSection({
         <FoldSummary onClick={fold.toggle} ink={ink}>
           {extra.length} tilläggsrad{extra.length === 1 ? '' : 'er'} på {siteKeys.filter((k) => k).length || 1} enhet{siteKeys.filter((k) => k).length === 1 ? '' : 'er'}
           {addonStationCount > 0 ? ` · ${addonStationCount} stationer` : ''}
-          {premiumArticles.length > 0 ? ` · ${premiumArticles.length} rad${premiumArticles.length === 1 ? '' : 'er'} ingår i premien` : ''}
         </FoldSummary>
       )}
 
@@ -326,7 +328,7 @@ export default function ContractEquipmentSection({
             const count = rows.reduce((s, it) => s + Number(it.quantity ?? 0), 0)
             return (
               <div key={siteKey || 'all'}>
-                {showSiteHeaders || premiumArticles.length > 0 ? (
+                {showSiteHeaders ? (
                   <div className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] pt-2.5 pb-0.5 flex" style={{ color: ink.muted }}>
                     {siteKey && unitNameOf ? unitNameOf(siteKey) : 'Tilläggsstationer'}
                     <span className="ml-auto font-normal normal-case tracking-normal text-[10.5px] tabular-nums">
@@ -349,35 +351,6 @@ export default function ContractEquipmentSection({
               <span className="tabular-nums shrink-0">−{formatKr(Number(p.total_price))}</span>
             </div>
           ))}
-
-          {/* Ingår i premien: intern kostnad utan egen fakturarad */}
-          {premiumArticles.length > 0 && (
-            <>
-              <div className="font-sans text-[9.5px] font-bold uppercase tracking-[0.14em] pt-2.5 pb-0.5" style={{ color: ink.muted }}>
-                Ingår i premien
-              </div>
-              {premiumArticles.map((a) => (
-                <div key={a.id} className="flex items-baseline gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-                  <span className="font-sans text-[10.5px] w-6 tabular-nums shrink-0" style={numStyle}>{nextNo()}</span>
-                  <span className="font-semibold truncate" style={{ color: ink.primary }}>
-                    {a.article_name}
-                    <span className="font-normal font-sans text-[11.5px] ml-1.5 tabular-nums" style={{ color: ink.secondary }}>
-                      {Number(a.quantity).toLocaleString('sv-SE')} {a.article?.category === 'Arbetstid' ? 'h' : 'st'}
-                    </span>
-                    {a.article?.is_durable && (
-                      <span className="font-normal font-sans ml-1.5 text-[10px] uppercase tracking-[0.08em]" style={{ color: ink.muted }}>
-                        varaktig
-                      </span>
-                    )}
-                  </span>
-                  <span className="flex-1 border-b border-dotted translate-y-[-3px] min-w-3" style={rowStyle} />
-                  <span className="font-sans text-[12px] tabular-nums whitespace-nowrap shrink-0" style={{ color: ink.secondary }}>
-                    −{formatKr(Number(a.total_price))}
-                  </span>
-                </div>
-              ))}
-            </>
-          )}
 
           {/* Vad som faktiskt händer med just det här avtalets tillägg */}
           {stationCount && stationCount.outdoor + stationCount.indoor > 0 && (
