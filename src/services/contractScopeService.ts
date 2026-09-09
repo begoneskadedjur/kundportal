@@ -1197,7 +1197,7 @@ export class ContractScopeService {
   /**
    * Spegla avtalens fält till kundraden när avtalen är källan.
    *
-   * annual_value på kundraden = SUMMAN av kundens levande avtal, så att
+   * annual_value på kundraden sätts av databasens trigger (summan av levande avtal), så att
    * synth-fallbacken, dashboards och gamla listor visar rätt tal även för
    * kunder med flera avtal (FEV: fyra prisposter). Frekvens, ankarmånad,
    * datum och uppsägningstid speglas bara när ALLA levande avtal delar
@@ -1208,8 +1208,8 @@ export class ContractScopeService {
     try {
       const live = await this.liveContractsOnCustomer(customerId)
       if (live.length === 0) return
-      const sum = live.reduce((s, c) => s + Number(c.annual_value ?? 0), 0)
-      const patch: Record<string, unknown> = { annual_value: sum > 0 ? sum : null }
+      // annual_value på kundraden sätts av databasens trigger (summan av levande avtal)
+      const patch: Record<string, unknown> = {}
       const shared = <T>(pick: (c: LiveContractRow) => T): T | undefined => {
         const first = pick(live[0])
         return live.every((c) => pick(c) === first) ? first : undefined
@@ -1305,11 +1305,12 @@ export class ContractScopeService {
     if (readError || !current) throw new Error(`Kunde inte läsa avtalet: ${readError?.message ?? 'okänt fel'}`)
 
     const annual = input.annualValue && input.annualValue > 0 ? Math.round(input.annualValue) : null
+    // Premien har EN källa: trappan. contracts.annual_value och kundens
+    // summa sätts av databasens trigger (20260910_premie_en_kalla.sql),
+    // klienten skriver aldrig kolumnen.
     const { error } = await supabase
       .from('contracts')
       .update({
-        annual_value: annual,
-        total_value: annual,
         billing_frequency: input.billingFrequency ?? null,
         billing_anchor_month: input.billingAnchorMonth ?? null,
         billing_active: true,
@@ -1317,24 +1318,34 @@ export class ContractScopeService {
       .eq('id', contractId)
     if (error) throw new Error(`Kunde inte spara premien: ${error.message}`)
 
-    if (annual) {
-      const { data: events } = await supabase
-        .from('contract_premium_events')
-        .select('id, event_type, effective_from')
-        .eq('contract_id', contractId)
-        .order('effective_from', { ascending: true })
-      const list = (events ?? []) as { id: string; event_type: string; effective_from: string }[]
-      if (list.length === 0) {
-        await supabase.from('contract_premium_events').insert({
-          contract_id: contractId,
-          effective_from: current.contract_start_date ?? todayKey(),
-          annual_value: annual,
-          event_type: 'start',
-          note: 'Satt i avtalskartan',
-        })
-      } else if (list.length === 1) {
-        await supabase.from('contract_premium_events').update({ annual_value: annual }).eq('id', list[0].id)
+    const { data: events } = await supabase
+      .from('contract_premium_events')
+      .select('id, event_type, effective_from')
+      .eq('contract_id', contractId)
+      .order('effective_from', { ascending: true })
+    const list = (events ?? []) as { id: string; event_type: string; effective_from: string }[]
+    if (!annual) {
+      // Premien tas bort: trappan töms, triggern nollar kolumnen
+      if (list.length > 0) {
+        const { error: delErr } = await supabase.from('contract_premium_events').delete().eq('contract_id', contractId)
+        if (delErr) throw new Error(`Kunde inte ta bort premien: ${delErr.message}`)
       }
+      await supabase.from('contracts').update({ annual_value: null }).eq('id', contractId)
+    } else if (list.length === 0) {
+      const { error: insErr } = await supabase.from('contract_premium_events').insert({
+        contract_id: contractId,
+        effective_from: current.contract_start_date ?? todayKey(),
+        annual_value: annual,
+        event_type: 'start',
+        note: 'Satt i avtalskartan',
+      })
+      if (insErr) throw new Error(`Kunde inte spara premien: ${insErr.message}`)
+    } else {
+      // Steget som gäller i dag får det nya värdet (annars glider trappan från pappret)
+      const today = todayKey()
+      const inForce = [...list].filter((s) => s.effective_from <= today).pop() ?? list[0]
+      const { error: updErr } = await supabase.from('contract_premium_events').update({ annual_value: annual }).eq('id', inForce.id)
+      if (updErr) throw new Error(`Kunde inte spara premien: ${updErr.message}`)
     }
 
     const prevAnnual = current.annual_value == null ? null : Number(current.annual_value)
@@ -1390,10 +1401,8 @@ export class ContractScopeService {
     })
     if (error) throw new Error(`Kunde inte spara steget: ${error.message}`)
 
+    // contracts.annual_value sätts av triggern på trappan
     const inForce = input.effectiveFrom <= todayKey()
-    if (inForce) {
-      await supabase.from('contracts').update({ annual_value: annual, total_value: annual }).eq('id', contractId)
-    }
     const labels: Record<typeof input.eventType, string> = {
       step_up: 'Upptrappning',
       indexation: 'Indexjustering',
@@ -1480,10 +1489,7 @@ export class ContractScopeService {
         .update({ annual_value: Math.round((Number(later.annual_value) + add) * 100) / 100 })
         .eq('id', later.id)
     }
-    if (input.effectiveFrom <= todayKey()) {
-      const latestInForce = Math.max(newAnnual, ...all.filter((s) => s.effective_from <= todayKey() && s.effective_from > input.effectiveFrom).map((s) => Number(s.annual_value) + add))
-      await supabase.from('contracts').update({ annual_value: latestInForce, total_value: latestInForce }).eq('id', contractId)
-    }
+    // contracts.annual_value sätts av triggern på trappan
 
     // Stationerna: inbakade, kopplade till avtalet
     if (input.outdoorIds.length > 0) {
