@@ -504,7 +504,7 @@ export default function BillingSettingsModal({
     if (error) throw error
 
     // Med avtal i scope skrivs bara faktureringsläget (på/paus) till avtalet.
-    // Premie, datum, frekvens och ankarmånad ägs av avtalskartan (§ 7, § 9)
+    // Premie, datum, frekvens och ankarmånad ägs av avtalskartan (§ 6, § 8)
     // och visas här bara som läsning. Kundraden speglas som summa.
     if (contractId) {
       try {
@@ -633,7 +633,7 @@ export default function BillingSettingsModal({
 
   const sel = 'w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none'
   // Avtalskartan som motor: med avtal i scope är premie, datum, frekvens och
-  // ankarmånad läsbara här och ändras på avtalet (§ 7, § 9).
+  // ankarmånad läsbara här och ändras på avtalet (§ 6, § 8).
   const contractScoped = !!contractId
   const avtalskartaHref = `/admin/befintliga-kunder/${headquarterCustomerId ?? customerId}`
 
@@ -727,7 +727,7 @@ export default function BillingSettingsModal({
                   <span>Årspremie</span>
                   <span className="text-slate-200 tabular-nums text-right">{fixedVal != null ? fmt(fixedVal) : '–'}</span>
                 </div>
-                <p className="text-slate-500">Premie, datum och fakturamånad ändras i § 7 och § 9 på avtalet. Fakturaplanen visas där.</p>
+                <p className="text-slate-500">Premie, datum och fakturamånad ändras i § 6 och § 8 på avtalet. Fakturaplanen visas där.</p>
               </div>
             ) : (<>
             <div className="grid grid-cols-2 gap-3">
@@ -980,7 +980,7 @@ export default function BillingSettingsModal({
               />
               <p className="text-xs text-slate-500 mt-1">
                 {contractScoped ? (
-                  'Årspremien ägs av avtalets premietrappa (§ 7 i avtalskartan)'
+                  'Årspremien ägs av avtalets premietrappa (§ 6 i avtalskartan)'
                 ) : calculatedTotal > 0 ? (
                   <>
                     Beräknat från tjänsterader: <span className="text-slate-300 font-medium">{fmt(calculatedTotal)}</span>

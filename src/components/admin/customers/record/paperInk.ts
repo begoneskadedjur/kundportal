@@ -1,6 +1,6 @@
 // src/components/admin/customers/record/paperInk.ts
 // Färgerna på avtalspappret, som en strukturell typ så att sektionsfilerna
-// (§ 7 Premie, § 8 Referenser, § 9 Löptid) kan ta emot PAPER_INK från
+// (§ 6 Premie, § 7 Referenser, § 8 Löptid) kan ta emot PAPER_INK från
 // ContractMapSection utan att importera hela kartan.
 
 export interface PaperInk {
@@ -27,7 +27,7 @@ export const PAPER_LINK_CLASS =
 
 /**
  * Inställningspanelen är verktygets yta, inte dokumentets: mörkt slate-tema.
- * Sektionerna (§ 7, § 8, § 9) renderar sina formulär där med de här tonerna
+ * Sektionerna (§ 6, § 7, § 8) renderar sina formulär där med de här tonerna
  * i stället för papprets, så samma komponent fungerar på båda ytorna.
  */
 export const PANEL_INK: PaperInk = {

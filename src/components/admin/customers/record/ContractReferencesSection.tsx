@@ -1,5 +1,5 @@
 // src/components/admin/customers/record/ContractReferencesSection.tsx
-// § 8 Referenser på avtalspappret i Avtalskartan.
+// § 7 Referenser på avtalspappret i Avtalskartan.
 //
 // 8.1 är avtalets egen referens (Er referens på årspremiefakturan) och
 // diarienummer (contracts.invoice_reference / diary_number). Raderna
@@ -53,7 +53,7 @@ export default function ContractReferencesSection({
   const [codeDrafts, setCodeDrafts] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
 
-  // Släpp av en enhet på § 8 öppnar numera panelen (hanteras av kartan); här bara kvitto
+  // Släpp av en enhet på § 7 öppnar numera panelen (hanteras av kartan); här bara kvitto
   if (focusUnitId && !settings) onFocusHandled?.()
 
   const rowStyle = { borderColor: ink.rule }
@@ -89,7 +89,7 @@ export default function ContractReferencesSection({
       {!settings && (
         <div className="flex items-baseline gap-2 border-b-[1.5px] pb-1" style={{ borderColor: ink.primary }}>
           <h4 className="text-xs font-bold uppercase tracking-[0.12em]" style={{ color: ink.primary }}>
-            § 8 · Referenser
+            § 7 · Referenser
           </h4>
           {onOpenSettings && !archived && (
             <button type="button" onClick={onOpenSettings} className={PAPER_GEAR_CLASS} style={{ borderColor: ink.rule, color: ink.muted }} title="Inställningar för referenser" aria-label="Inställningar för referenser">
@@ -105,7 +105,7 @@ export default function ContractReferencesSection({
       {/* 8.1 Avtalets referens */}
       {!editingContract ? (
         <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-          <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>8.1</span>
+          <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.1</span>
           <span className="font-semibold">
             Avtalets referens
             <span className="font-normal text-[11.5px] ml-1.5" style={{ color: ink.secondary }}>

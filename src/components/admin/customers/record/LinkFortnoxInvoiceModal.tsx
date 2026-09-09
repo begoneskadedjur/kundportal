@@ -1,6 +1,6 @@
 // src/components/admin/customers/record/LinkFortnoxInvoiceModal.tsx
 // Koppla en Fortnox-faktura till en avtalsperiod som saknar faktura i
-// portalen (§ 7 på avtalskartan visar perioden som "saknar faktura").
+// portalen (§ 6 på avtalskartan visar perioden som "saknar faktura").
 // Hämtar fakturan från Fortnox, visar rader och belopp, och sparar den som
 // historisk avtalsfaktura F-{nr} som täcker perioden.
 

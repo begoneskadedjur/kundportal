@@ -146,7 +146,7 @@ export function summarizeBillingLines(lines: MarginLine[], opts: SummarizeOption
   const visits = num(opts.visitsPerYear)
   const labour_missing = opts.context === 'contract' && visits > 0 && labour_hours < visits
 
-  // Samma artikel på flera rader slås ihop, så § 5 kan skriva "Aurotrap × 7"
+  // Samma artikel på flera rader slås ihop, så marginalnotisen kan skriva "Aurotrap × 7"
   const merged = new Map<string, DurableLine>()
   for (const l of durableLines) {
     const name = l.article_name || 'Utrustning'
@@ -217,7 +217,7 @@ export function toneTextClass(tone: MarginTone): string {
 }
 
 // ---------------------------------------------------------------------------
-// Marginal per del på ett avtal: premie (§ 4) och tillägg (§ 6) var för sig,
+// Marginal per del på ett avtal: premie (§ 4) och tillägg (§ 5) var för sig,
 // plus totalen. Samma motor körd på filtrerade radmängder. Vilken del en
 // artikel hör till avgörs av vilken tjänsterad den är mappad mot.
 // Plan: docs/marginal-premie-tillagg-plan.md
@@ -227,7 +227,7 @@ export type ContractPart = 'premium' | 'addons'
 export interface ContractMarginParts {
   /** § 4-rader och artiklar mappade dit. Intäkt = årspremien. */
   premium: MarginBreakdown
-  /** § 6-rader och artiklar mappade dit. Null när avtalet saknar tillägg. */
+  /** § 5-rader och artiklar mappade dit. Null när avtalet saknar tillägg. */
   addons: MarginBreakdown | null
   /** Allt i en klump, som förut */
   total: MarginBreakdown

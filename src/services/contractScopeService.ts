@@ -1163,8 +1163,8 @@ export class ContractScopeService {
   }
 
   // ---------------------------------------------------------------------------
-  // Avtalskartan som motor (fas 1): tomt avtalsblad, § 7 Premie, § 8 Referenser,
-  // § 9 Löptid. Se docs/avtalskarta-motor-plan.md.
+  // Avtalskartan som motor (fas 1): tomt avtalsblad, § 6 Premie, § 7 Referenser,
+  // § 8 Löptid. Se docs/avtalskarta-motor-plan.md.
   // ---------------------------------------------------------------------------
 
   /** Levande, riktiga avtal (ej importrester) på en kundrad. */
@@ -1291,7 +1291,7 @@ export class ContractScopeService {
   }
 
   /**
-   * § 7 Premie och fakturering: årspremie, frekvens och ankarmånad.
+   * § 6 Premie och fakturering: årspremie, frekvens och ankarmånad.
    * Premietrappan får en startpunkt om den saknas (annars uppdateras det
    * enda steget); har trappan flera steg lämnas den åt användaren.
    */
@@ -1431,9 +1431,9 @@ export class ContractScopeService {
   }
 
   /**
-   * Tilläggsstationer inbakade i årspremien (släpp av brickan på § 7):
+   * Tilläggsstationer inbakade i årspremien (släpp av brickan på § 6):
    * ett steg i premietrappan från valt datum med text om antal och datum,
-   * stationerna märks included, eventuell § 6-rad för dem avslutas.
+   * stationerna märks included, eventuell § 5-rad för dem avslutas.
    * Samma dag och typ: steget summeras och texten byggs på (unik nyckel).
    */
   static async addAddonStationsToPremium(
@@ -1511,7 +1511,7 @@ export class ContractScopeService {
     if (input.indoorIds.length > 0) {
       await supabase.from('indoor_stations').update({ addon_contract_mode: 'included', addon_contract_id: contractId, addon_unit_price_annual: input.unitPriceAnnual }).in('id', input.indoorIds)
     }
-    // Eventuell § 6-rad för samma enhet/typ/modell avslutas (historiken kvar)
+    // Eventuell § 5-rad för samma enhet/typ/modell avslutas (historiken kvar)
     let q = supabase
       .from('case_billing_items')
       .update({ status: 'cancelled', updated_at: new Date().toISOString() })
@@ -1532,8 +1532,8 @@ export class ContractScopeService {
   }
 
   /**
-   * Tilläggsstationer som tillägg utöver avtalet (släpp av brickan på § 6):
-   * stationerna märks separate och kopplas till avtalet, § 6-raden synkas
+   * Tilläggsstationer som tillägg utöver avtalet (släpp av brickan på § 5):
+   * stationerna märks separate och kopplas till avtalet, § 5-raden synkas
    * via RPC (antal, pris, startdatum = nästa periodstart).
    */
   static async addAddonStationsSeparate(
@@ -1560,7 +1560,7 @@ export class ContractScopeService {
       p_contract_id: contractId,
       p_annual_price: input.unitPriceAnnual,
     })
-    if (error) throw new Error(`Kunde inte synka § 6-raden: ${error.message}`)
+    if (error) throw new Error(`Kunde inte synka § 5-raden: ${error.message}`)
     await this.logEvent(contractId, {
       event_type: 'billing',
       title: `Tilläggsstationer utöver avtalet: ${input.count} st ${input.stationTypeName} på ${input.unitName}`,
@@ -1569,7 +1569,7 @@ export class ContractScopeService {
   }
 
   /**
-   * § 6: var per år-rader faktureras, på premiefakturan eller på egna fakturor.
+   * § 5: var per år-rader faktureras, på premiefakturan eller på egna fakturor.
    *
    * Läget bor på KUNDEN sedan 2026-09-04: en kund med flera avtal ska inte
    * kunna hamna i ett läge där hälften av tilläggen ligger på premien och
@@ -1593,11 +1593,11 @@ export class ContractScopeService {
     await this.logEvent(contractId, {
       event_type: 'billing',
       title: mode === 'separate' ? 'Utrustning faktureras på egna fakturor' : 'Utrustning faktureras på premiefakturan',
-      detail: mode === 'separate' ? 'Per år-rader i § 6 får egna fakturor parallellt med årspremien' : 'Per år-rader i § 6 ligger som rader på årspremiefakturan',
+      detail: mode === 'separate' ? 'Per år-rader i § 5 får egna fakturor parallellt med årspremien' : 'Per år-rader i § 5 ligger som rader på årspremiefakturan',
     })
   }
 
-  /** § 9 Löptid: start, slut och uppsägningstid. */
+  /** § 8 Löptid: start, slut och uppsägningstid. */
   static async setTerm(
     contractId: string,
     input: { startDate: string | null; endDate: string | null; noticePeriodMonths: number | null }
@@ -1625,7 +1625,7 @@ export class ContractScopeService {
     if (data[0].customer_id) await this.mirrorSharedFields(data[0].customer_id)
   }
 
-  /** § 8 Referenser: avtalets Er referens och diarienummer (skrivs på årspremiefakturan). */
+  /** § 7 Referenser: avtalets Er referens och diarienummer (skrivs på årspremiefakturan). */
   static async setInvoiceReference(
     contractId: string,
     input: { invoiceReference: string | null; diaryNumber: string | null }
@@ -1649,7 +1649,7 @@ export class ContractScopeService {
   }
 
   /**
-   * § 8 Referenser per enhet: skriver enhetens fält "Märkning faktura"
+   * § 7 Referenser per enhet: skriver enhetens fält "Märkning faktura"
    * (customers.billing_reference), samma fält som Redigera enhet. Koden
    * förifylls sedan som Er referens på alla ärenden och fakturor för enheten,
    * oavsett avtal. Loggas på avtalet den sattes ifrån.
@@ -1677,7 +1677,7 @@ export class ContractScopeService {
   }
 
   /**
-   * § 6 Utrustning: faktureringsläge på en tjänsterad i avtalsinnehållet.
+   * § 5 Utrustning: faktureringsläge på en tjänsterad i avtalsinnehållet.
    *   premium   = ingår i årspremien (§ 4)
    *   per_year  = debiteras utöver premien, antal x pris per år, rad på årsfakturan
    *   per_round = tilläggsstation per kontrollrunda (tjänst 43), aldrig från avtalet
@@ -1749,7 +1749,7 @@ export class ContractScopeService {
   }
 
   /**
-   * § 9 Förlängning: läge och optionsfält. Styr bara bevakningen: inget
+   * § 8 Förlängning: läge och optionsfält. Styr bara bevakningen: inget
    * avtal stoppas automatiskt (beslut 2026-09-02).
    */
   static async setRenewal(
@@ -1894,7 +1894,7 @@ export class ContractScopeService {
   /**
    * Katalogen: lägg en tjänst eller utrustning på avtalet som rad i
    * avtalsinnehållet. premium = ingår i premien (§ 4), per_year = utöver
-   * premien (§ 6), per_round = tilläggsstation per kontrollrunda (§ 6).
+   * premien (§ 5), per_round = tilläggsstation per kontrollrunda (§ 5).
    */
   static async addContentServiceRow(
     contractId: string,
@@ -1942,7 +1942,7 @@ export class ContractScopeService {
     if (error || !data) throw new Error(`Kunde inte lägga till raden: ${error?.message ?? 'okänt fel'}`)
     await this.logEvent(contractId, {
       event_type: input.billingModel === 'premium' ? 'other' : 'billing',
-      title: `${input.serviceName} tillagd i ${input.billingModel === 'premium' ? '§ 4' : '§ 6'}`,
+      title: `${input.serviceName} tillagd i ${input.billingModel === 'premium' ? '§ 4' : '§ 5'}`,
       detail:
         input.billingModel === 'premium'
           ? `Ingår i premien${input.unitPrice ? ` · ${input.unitPrice.toLocaleString('sv-SE')} kr/år` : ''}`

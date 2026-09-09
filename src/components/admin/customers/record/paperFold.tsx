@@ -103,7 +103,7 @@ export function usePaperFold(opts: {
 /**
  * Har raderna i stycket ändrats sedan användaren senast såg det öppet?
  * Nycklarna sparas i localStorage per avtal när stycket är öppet, så en ny
- * eller borttagen rad öppnar stycket nästa gång (§ 6).
+ * eller borttagen rad öppnar stycket nästa gång (§ 5).
  */
 export function useSeenRows(opts: { contractId: string; para: string; ids: string[]; ready: boolean }): boolean {
   const { contractId, para, ids, ready } = opts

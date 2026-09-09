@@ -12,7 +12,7 @@ import type { Contract, Customer } from '../types/database'
 // customers har kolumner som ännu inte finns i database.ts-typen
 // (fortnox_verified_at är ny, notice_period_months finns i DB men saknas i typen)
 export type RecordCustomer = Customer & {
-  /** Faktureringsläge för tilläggsstationer (§ 6). Ersätter contracts.equipment_invoice_mode. */
+  /** Faktureringsläge för tilläggsstationer (§ 5). Ersätter contracts.equipment_invoice_mode. */
   addon_invoice_mode?: 'with_contract' | 'separate_per_contract' | null
   fortnox_verified_at?: string | null
   notice_period_months?: number | null
@@ -41,7 +41,7 @@ export type RecordContract = Contract & {
   diary_number?: string | null
   /** Ankarmånad (1–12) för fakturaperioderna */
   billing_anchor_month?: number | null
-  /** § 9: rolling (löper vidare), fixed (fast slut), option (fast period med option). Styr bara bevakningen. */
+  /** § 8: rolling (löper vidare), fixed (fast slut), option (fast period med option). Styr bara bevakningen. */
   renewal_mode?: 'rolling' | 'fixed' | 'option' | null
   option_until?: string | null
   option_decision_deadline?: string | null

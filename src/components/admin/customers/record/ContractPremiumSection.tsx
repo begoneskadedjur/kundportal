@@ -1,5 +1,5 @@
 // src/components/admin/customers/record/ContractPremiumSection.tsx
-// § 7 Premie och fakturering på avtalspappret i Avtalskartan.
+// § 6 Premie och fakturering på avtalspappret i Avtalskartan.
 //
 // Här bor det som styr årspremiefakturan: årspremie, faktureringsfrekvens,
 // ankarmånad och premietrappan (contract_premium_events). Nästa faktura
@@ -143,7 +143,7 @@ interface Props {
   equipmentInvoiceMode?: 'with_premium' | 'separate' | null
 }
 
-/** Nästa faktura, tillägg och luckor ur fakturaplanen. Delas av § 7 och pulsen. */
+/** Nästa faktura, tillägg och luckor ur fakturaplanen. Delas av § 6 och pulsen. */
 export function premiumSummary(input: {
   contract: RecordContract
   annualInForce: number | null
@@ -277,7 +277,7 @@ export default function ContractPremiumSection({
       {!settings && (
         <div className="flex items-baseline gap-2 border-b-[1.5px] pb-1" style={{ borderColor: ink.primary }}>
           <h4 className="text-xs font-bold uppercase tracking-[0.12em]" style={{ color: ink.primary }}>
-            § 7 · Premie och fakturering
+            § 6 · Premie och fakturering
           </h4>
           {onOpenSettings && !archived && (
             <button type="button" onClick={onOpenSettings} className={PAPER_GEAR_CLASS} style={{ borderColor: ink.rule, color: ink.muted }} title="Inställningar för fakturering" aria-label="Inställningar för fakturering">
@@ -297,7 +297,7 @@ export default function ContractPremiumSection({
       {!editing ? (
         <>
           <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-            <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.1</span>
+            <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>6.1</span>
             <span className="font-semibold">Årspremie</span>
             <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
             <span className="font-bold tabular-nums" style={{ color: annualInForce ? ink.primary : ink.warn }}>
@@ -305,7 +305,7 @@ export default function ContractPremiumSection({
             </span>
           </div>
           <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-            <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>7.2</span>
+            <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>6.2</span>
             <span className="font-semibold">Faktureras</span>
             <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
             <span className="font-sans text-[12px] tabular-nums" style={{ color: frequencyLabel ? ink.secondary : ink.warn }}>

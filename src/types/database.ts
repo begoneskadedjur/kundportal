@@ -1859,7 +1859,7 @@ export interface EquipmentPlacement {
   is_addon?: boolean
   /** Tilläggsstation: per_year | per_month | per_round (valt vid utsättning) */
   addon_billing_model?: 'per_year' | 'per_month' | 'per_round' | null
-  /** Per år/månad: included (i premien, § 7) eller separate (egna fakturor, § 6); null = ej beslutat */
+  /** Per år/månad: included (i premien, § 6) eller separate (egna fakturor, § 5); null = ej beslutat */
   addon_contract_mode?: 'included' | 'separate' | null
   /** Avtalet stationen kopplats till från avtalskartan */
   addon_contract_id?: string | null

@@ -10,7 +10,7 @@
 //     annual_value är fallback.
 //   * § 4-raderna (billing_model = premium) på avtalets EGET innehåll blir
 //     fakturarader, för alla riktiga avtal, inte bara importcontainrar.
-//   * § 6-rader "per styck och år" blir egna rader (line_kind equipment_annual).
+//   * § 5-rader "per styck och år" blir egna rader (line_kind equipment_annual).
 //   * Samlad faktura (gemet): en faktura per period för kunden, en rad per
 //     avtal, invoice_items.contract_id pekar på avtalet, invoices.contract_id
 //     är null och is_consolidated = true.
@@ -211,7 +211,7 @@ type ContractSources = {
   /** Tilläggssteg i trappan med text ("Tilläggsstationer adderade …"): textrad på periodens premiefaktura */
   additionNotes: Array<{ effective_from: string; note: string }>
   premiumItems: ContractServiceItem[]
-  /** § 6-rader per år och per månad (billing_model på raden) */
+  /** § 5-rader per år och per månad (billing_model på raden) */
   equipment: EquipmentLine[]
   equipmentInvoiceMode: EquipmentInvoiceMode
   label: string | null
@@ -627,9 +627,9 @@ export class ContractInvoiceGenerator {
     return row
   }
 
-  /** Premietrappa, § 4-rader (premium) och § 6-rader (per_year, per_month) för ett riktigt avtal. */
+  /** Premietrappa, § 4-rader (premium) och § 5-rader (per_year, per_month) för ett riktigt avtal. */
   private static async loadContractSources(contractId: string): Promise<ContractSources> {
-    // Antal tilläggsstationer vid debiteringstillfället: § 6-raderna synkas
+    // Antal tilläggsstationer vid debiteringstillfället: § 5-raderna synkas
     // från utplacerade stationer innan planen räknas (SECURITY DEFINER-RPC).
     try {
       await supabase.rpc('sync_addon_period_lines', { p_customer_id: null, p_contract_id: contractId, p_annual_price: null })
@@ -812,10 +812,10 @@ export class ContractInvoiceGenerator {
     }
 
     // § 4-raderna bär ANDELAR av premien, aldrig belopp. Beloppet är alltid
-    // periodens premie ur § 7-trappan. Bärande raden (avtalstypen) är
+    // periodens premie ur § 6-trappan. Bärande raden (avtalstypen) är
     // restposten; rader med andel 0 skrivs som textrad "ingår" (0 kr) så
     // kunden ser vad premien täcker. Fakturan kan aldrig bli 0 kr så länge
-    // § 7 har en premie: saknas andelar helt skrivs en vanlig premierad.
+    // § 6 har en premie: saknas andelar helt skrivs en vanlig premierad.
     const shareResult = resolvePremiumShares(
       sources.premiumItems.map((it) => ({
         id: it.case_billing_item_id,

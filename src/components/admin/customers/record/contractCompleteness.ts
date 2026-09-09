@@ -115,17 +115,17 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
   const items: CompletenessItem[] = [
     { key: 'type', label: 'Avtalstyp', ok: hasType, vital: true, group: 'avtalet', paragraph: 'huvud', hint: 'Avtalstypen styr vad som ingår och hur avtalet namnges.' },
     { key: 'scope', label: 'Omfattning', ok: hasScope, vital: true, group: 'omfattning', paragraph: '§ 1', hint: 'Dra in minst en enhet, eller hela verksamheten, i § 1.' },
-    { key: 'premium', label: 'Årspremie', ok: hasPremium, vital: true, group: 'fakturering', paragraph: '§ 7', hint: 'Årspremien är grunden för fakturaplanen och marginalen.' },
-    { key: 'billing', label: 'Faktureringsvillkor', ok: hasBillingTerms, vital: true, group: 'fakturering', paragraph: '§ 7', hint: 'Frekvens och ankarmånad avgör när fakturorna skapas.' },
+    { key: 'premium', label: 'Årspremie', ok: hasPremium, vital: true, group: 'fakturering', paragraph: '§ 6', hint: 'Årspremien är grunden för fakturaplanen och marginalen.' },
+    { key: 'billing', label: 'Faktureringsvillkor', ok: hasBillingTerms, vital: true, group: 'fakturering', paragraph: '§ 6', hint: 'Frekvens och ankarmånad avgör när fakturorna skapas.' },
     { key: 'followup', label: 'Besöksfrekvens', ok: hasFollowup, vital: true, group: 'uppfoljning', paragraph: '§ 3', hint: 'Antal besök per år är facit vid schemaläggning och uppföljning.' },
     { key: 'schedule', label: unitsWithoutSchedule === 1 ? 'En enhet saknar schema' : `${unitsWithoutSchedule} enheter saknar schema`, ok: unitsWithoutSchedule === 0, vital: true, group: 'uppfoljning', paragraph: '§ 3', hint: 'Skapa schemat ur § 3 i panelen så besöken finns i kalendern och teknikern ser dem.' },
-    { key: 'term', label: 'Löptid och uppsägningstid', ok: hasTerm, vital: true, group: 'loptid', paragraph: '§ 9', hint: 'Startdatum och uppsägningstid styr bevakningen och när avtalet kan sägas upp.' },
+    { key: 'term', label: 'Löptid och uppsägningstid', ok: hasTerm, vital: true, group: 'loptid', paragraph: '§ 8', hint: 'Startdatum och uppsägningstid styr bevakningen och när avtalet kan sägas upp.' },
     { key: 'signature', label: 'Signeringsdatum', ok: hasSignature, vital: true, group: 'avtalet', paragraph: 'fot', hint: 'Ett osignerat avtal är ett utkast och ska inte faktureras.' },
     { key: 'pricelist', label: 'Prislista för avrop', ok: hasPriceList, vital: isAvrop, group: 'prislista', paragraph: '§ 2', hint: 'Utan prislista gäller kundens lista eller prisguiden för avrop.' },
     { key: 'labour', label: 'Arbetstid för marginal', ok: !breakdown?.labour_missing, vital: false, group: 'innehall', paragraph: '§ 4', hint: 'Utan årets arbetstid som intern kostnad säger marginalen ingenting.' },
-    { key: 'bricks', label: pendingBricks === 1 ? 'En tilläggsstation väntar på beslut' : `${pendingBricks} tilläggsstationer väntar på beslut`, ok: pendingBricks === 0, vital: false, group: 'innehall', paragraph: '§ 6', hint: 'Bestäm om stationerna bakas in i premien eller faktureras som tillägg.' },
-    { key: 'uncovered', label: uncoveredPeriods === 1 ? 'En period saknar faktura' : `${uncoveredPeriods} perioder saknar faktura`, ok: uncoveredPeriods === 0, vital: false, group: 'fakturering', paragraph: '§ 7', hint: 'Koppla Fortnox-fakturan om perioden fakturerats utanför portalen.' },
-    { key: 'refs', label: unitsWithoutCode === 1 ? 'Kod saknas på en enhet' : `Kod saknas på ${unitsWithoutCode} enheter`, ok: unitsWithoutCode === 0 || coveredUnits.length === 0, vital: false, group: 'referenser', paragraph: '§ 8', hint: 'Enhetens kod blir Er referens på fakturan. Saknas den anger beställaren kod på ärendet.' },
+    { key: 'bricks', label: pendingBricks === 1 ? 'En tilläggsstation väntar på beslut' : `${pendingBricks} tilläggsstationer väntar på beslut`, ok: pendingBricks === 0, vital: false, group: 'innehall', paragraph: '§ 5', hint: 'Bestäm om stationerna bakas in i premien eller faktureras som tillägg.' },
+    { key: 'uncovered', label: uncoveredPeriods === 1 ? 'En period saknar faktura' : `${uncoveredPeriods} perioder saknar faktura`, ok: uncoveredPeriods === 0, vital: false, group: 'fakturering', paragraph: '§ 6', hint: 'Koppla Fortnox-fakturan om perioden fakturerats utanför portalen.' },
+    { key: 'refs', label: unitsWithoutCode === 1 ? 'Kod saknas på en enhet' : `Kod saknas på ${unitsWithoutCode} enheter`, ok: unitsWithoutCode === 0 || coveredUnits.length === 0, vital: false, group: 'referenser', paragraph: '§ 7', hint: 'Enhetens kod blir Er referens på fakturan. Saknas den anger beställaren kod på ärendet.' },
   ]
 
   const vital = items.filter((i) => i.vital)

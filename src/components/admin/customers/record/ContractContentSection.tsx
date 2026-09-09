@@ -1,5 +1,5 @@
 // src/components/admin/customers/record/ContractContentSection.tsx
-// § 4 Tjänster i avtalet + § 5 Marginal på avtalsdokumentet i Avtalskartan.
+// § 4 Tjänster i avtalet + marginalnotisen Marginal på avtalsdokumentet i Avtalskartan.
 //
 // Datamodellen är den befintliga: case_billing_items med case_type='contract'
 // och case_id = contracts.id. Tjänsterader (item_type='service') är vad kunden
@@ -78,7 +78,7 @@ export function useContractContent(contractId: string | null, reloadKey = 0) {
 }
 
 /**
- * Ackumulerat utfall från avtalets ärenden — § 5 på avropsavtal. Hämtar
+ * Ackumulerat utfall från avtalets ärenden — marginalnotisen på avropsavtal. Hämtar
  * faktureringsraderna för ALLA ärenden som hör till avtalet (samma ärendemängd
  * som § 3 Uppföljning räknar) och summerar dem med ärendemodalens prisregler.
  * Ärenden från gamla systemet saknar rader och bidrar med noll — avsiktligt.
@@ -131,25 +131,25 @@ interface Props {
   /** Kugghjulet: öppna inställningspanelen på Innehåll och utrustning */
   onOpenSettings?: () => void
   /**
-   * Avropsavtal: § 5 visar ackumulerat utfall från avtalets ärenden i stället
+   * Avropsavtal: marginalnotisen visar ackumulerat utfall från avtalets ärenden i stället
    * för avtalsinnehållet (som är 0 kr på avrop). Sätts av avtalskartan.
    */
   accumulated?: AccumulatedCaseSummary | null
   accumulatedLoading?: boolean
   showAccumulated?: boolean
   /**
-   * Årspremien som gäller nu (§ 7). § 4-radernas belopp är andelar av den,
+   * Årspremien som gäller nu (§ 6). § 4-radernas belopp är andelar av den,
    * aldrig lagrade priser. Null eller 0 = premie saknas, 4.1 visar "— kr".
    */
   annualInForce?: number | null
-  /** Kugghjulet på § 7: "premie saknas" på 4.1 leder dit */
+  /** Kugghjulet på § 6: "premie saknas" på 4.1 leder dit */
   onOpenPremium?: () => void
-  /** § 5: tilläggsstationernas resultat över tid, ur stationerna (även borttagna) */
+  /** marginalnotisen: tilläggsstationernas resultat över tid, ur stationerna (även borttagna) */
   ledger?: AddonLedger | null
 }
 
 /**
- * § 4 Tjänster i avtalet + § 5 Marginal, renderade som paragrafer på
+ * § 4 Tjänster i avtalet + marginalnotisen Marginal, renderade som paragrafer på
  * avtalsdokumentet. Artiklarna visas som indragna kostnadsrader under den
  * tjänst de hör till — de är interna och når aldrig kunden.
  */
@@ -167,7 +167,7 @@ export default function ContractContentSection({
 }: Props) {
   const { services: allServices, articles, summary, settings } = content
   // § 4 visar det som ingår i premien. Rader med annat faktureringsläge
-  // (per styck och år, per kontrollrunda) bor i § 6 Utrustning. Bärande
+  // (per styck och år, per kontrollrunda) bor i § 5 Utrustning. Bärande
   // raden (avtalstypen) först: den är restposten av premien.
   const services = allServices
     .filter((s) => {
@@ -191,7 +191,7 @@ export default function ContractContentSection({
       list.push(art)
       articlesByService.set(art.mapped_service_id, list)
     } else if (!(art.mapped_service_id && allServices.some((s) => s.id === art.mapped_service_id))) {
-      // Mappad mot en § 6-rad (per år/månad) hör den dit, inte till premiens övriga kostnader
+      // Mappad mot en § 5-rad (per år/månad) hör den dit, inte till premiens övriga kostnader
       unmappedArticles.push(art)
     }
   }
@@ -214,7 +214,7 @@ export default function ContractContentSection({
             </button>
           )}
           <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
-            {loading ? '…' : `${services.length} tjänst${services.length === 1 ? '' : 'er'}${shareResult.carrierId ? ' · täcks av § 7' : ''}`}
+            {loading ? '…' : `${services.length} tjänst${services.length === 1 ? '' : 'er'}${shareResult.carrierId ? ' · täcks av § 6' : ''}`}
           </span>
         </div>
         <div className="font-sans text-[9px] font-bold uppercase tracking-[0.14em] text-[#8a9099] mt-1.5">
@@ -258,7 +258,7 @@ export default function ContractContentSection({
               const svcMargin = svcRevenue != null && svcRevenue > 0 ? svcBreakdown.headline_percent : null
               const qualifier = isCarrier
                 ? premium == null
-                  ? 'premie saknas i § 7'
+                  ? 'premie saknas i § 6'
                   : share >= 0.999
                     ? 'hela premien'
                     : 'andel av premien'
@@ -288,7 +288,7 @@ export default function ContractContentSection({
                     )}
                     <span className="tabular-nums whitespace-nowrap shrink-0" style={{ color: warn ? '#b45309' : '#262e38' }}>
                       {svcRevenue == null ? (isCarrier ? '— kr' : '0 kr') : formatKr(svcRevenue)}
-                      {isCarrier && <span className="font-sans text-[10px] text-[#8a9099] ml-1" title="Beloppet följer § 7.1 och går inte att skriva i">🔒</span>}
+                      {isCarrier && <span className="font-sans text-[10px] text-[#8a9099] ml-1" title="Beloppet följer § 6.1 och går inte att skriva i">🔒</span>}
                     </span>
                   </div>
                   {/* Interna kostnadsrader — når aldrig kunden */}
@@ -371,12 +371,12 @@ export default function ContractContentSection({
         )}
       </div>
 
-      {/* § 5 Marginal — avropsavtal: ackumulerat utfall från avtalets ärenden */}
+      {/* marginalnotisen Marginal — avropsavtal: ackumulerat utfall från avtalets ärenden */}
       {showAccumulated && (
         <div className="mt-3.5">
           <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
             <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">
-              § 5 · Marginal — ackumulerat från ärenden
+              Vår marginal · ackumulerat från ärenden
             </h4>
             <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
               {accumulatedLoading ? '…' : accumulated ? `${accumulated.case_count} ärenden` : ''}
@@ -494,7 +494,7 @@ export default function ContractContentSection({
         </div>
       )}
 
-      {/* § 5 Marginal: två rader på pappret, hela uppdelningen i pulsen.
+      {/* marginalnotisen Marginal: två rader på pappret, hela uppdelningen i pulsen.
           Avtalen är rullande, så utrustningen (fällor, stationer) är en
           engångsutgift mot en återkommande intäkt och får aldrig dras från
           ett enda års avtalsvärde som om den förbrukades. Villkoret räknar
@@ -513,12 +513,12 @@ export default function ContractContentSection({
         const endTxt = ledger?.horizon.contractEnd ? new Date(ledger.horizon.contractEnd - 1).toISOString().slice(0, 10) : null
         const resultInk = (v: number) => (v < 0 ? '#9b3535' : '#157a5b')
         let no = 0
-        const nextNo = () => `5.${++no}`
+        const nextNo = () => { no += 1; return '' }
         const row = 'flex items-baseline gap-2.5 py-1.5 border-b border-dotted border-[#d9d3c2] text-[13.5px]'
         return (
-          <div className="mt-3.5 group/para">
-            <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
-              <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 5 · Marginal</h4>
+          <div className="mt-3.5 group/para font-sans border-l-2 border-[#8a9099] pl-3 py-1.5 bg-black/[.025] print:hidden" data-internal-note>
+            <div className="flex items-baseline gap-2 pb-1">
+              <h4 className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#8a9099]">Intern notis · Vår marginal</h4>
               <span className="ml-auto font-sans text-[10.5px] text-[#8a9099]">detaljer i pulsen</span>
             </div>
 

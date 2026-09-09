@@ -15,6 +15,7 @@ import PremiumWelcomeHero from '../../components/customer/PremiumWelcomeHero'
 import ServiceExcellenceDashboard from '../../components/customer/ServiceExcellenceDashboard'
 import RelationshipShowcase from '../../components/customer/RelationshipShowcase'
 import ContractValueCard from '../../components/customer/ContractValueCard'
+import CustomerContractsSection from '../../components/customer/CustomerContractsSection'
 import PremiumServiceRequest from '../../components/customer/PremiumServiceRequest'
 import ServiceAssessmentSummary from '../../components/customer/ServiceAssessmentSummary'
 import PartnershipValueSection from '../../components/customer/PartnershipValueSection'
@@ -379,6 +380,9 @@ const CustomerPortal: React.FC = () => {
             <ContractValueCard
               customer={customer}
             />
+
+            {/* Avtalen som papper, ur kundens projektion i databasen */}
+            <CustomerContractsSection customerId={effectiveCustomerId} />
 
             {/* Service Assessment Summary */}
             {customer && (

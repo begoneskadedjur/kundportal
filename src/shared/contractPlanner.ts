@@ -6,20 +6,20 @@
 //
 // Avtalet är källan: beloppet per period kommer ur premietrappan
 // (contract_premium_events) och faller tillbaka på annual_value när trappan
-// saknar steg. Utrustning "per styck och år" (§ 6) blir egna rader på samma
+// saknar steg. Utrustning "per styck och år" (§ 5) blir egna rader på samma
 // faktura, skalade per period precis som premien.
 
 export type BillingFrequency = 'monthly' | 'quarterly' | 'semi_annual' | 'annual' | 'on_demand'
 
 /**
- * Fakturatyp för avtalsfakturor. premium = årspremien (med § 6 per år-rader
+ * Fakturatyp för avtalsfakturor. premium = årspremien (med § 5 per år-rader
  * när avtalet fakturerar utrustning på premiefakturan), equipment = egna
- * fakturor för § 6 per år-rader, equipment_monthly = egna månadsfakturor för
- * § 6 per månad-rader. Diffen mot befintliga fakturor görs alltid per typ.
+ * fakturor för § 5 per år-rader, equipment_monthly = egna månadsfakturor för
+ * § 5 per månad-rader. Diffen mot befintliga fakturor görs alltid per typ.
  */
 export type ContractInvoiceKind = 'premium' | 'equipment' | 'equipment_monthly'
 
-/** Var § 6 per år-rader hamnar: på premiefakturan eller på egna fakturor. */
+/** Var § 5 per år-rader hamnar: på premiefakturan eller på egna fakturor. */
 export type EquipmentInvoiceMode = 'with_premium' | 'separate'
 
 /** Fält planeringen behöver från ett avtal (eller kundraden för synth-avtal). */
@@ -41,7 +41,7 @@ export interface PremiumStep {
 }
 
 /**
- * § 6-rad med faktureringsläge per år eller per månad.
+ * § 5-rad med faktureringsläge per år eller per månad.
  * per_year: unit_price_annual = pris per styck och år.
  * per_month: unit_price_month = pris per styck och månad (årspris / 12).
  * billing_start_date: raden tas bara med i perioder som börjar från och med
@@ -113,7 +113,7 @@ export interface PlanOptions {
    * (t.ex. 12 månader framåt) i stället för att stanna vid slutdatumet.
    */
   horizonEnd?: string
-  /** Var § 6 per år-rader hamnar (default with_premium = på premiefakturan) */
+  /** Var § 5 per år-rader hamnar (default with_premium = på premiefakturan) */
   equipmentMode?: EquipmentInvoiceMode
 }
 
@@ -333,7 +333,7 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
 }
 
 /**
- * Egna fakturor (kind equipment) för § 6 per år-rader: samma perioder som
+ * Egna fakturor (kind equipment) för § 5 per år-rader: samma perioder som
  * premien, bara utrustningsraderna. Används när avtalet fakturerar
  * utrustning separat (equipment_invoice_mode = separate).
  */
@@ -358,7 +358,7 @@ export function computePlannedEquipmentPeriods(contract: PlanningContract, opts:
 }
 
 /**
- * Egna månadsfakturor (kind equipment_monthly) för § 6 per månad-rader.
+ * Egna månadsfakturor (kind equipment_monthly) för § 5 per månad-rader.
  * Perioder = kalendermånader från och med innevarande månad (aldrig bakåt:
  * inga krediteringar, inga efterdebiteringar) fram till horisonten eller
  * uppsägningens kapningsdatum. Fakturadatum = månadens första dag.

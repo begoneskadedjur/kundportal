@@ -35,7 +35,7 @@ const actionMeta: Partial<Record<BillingPlanAction, { label: string; className: 
   locked: { label: 'LÅST', className: 'bg-slate-600/40 text-slate-300 border-slate-500/40' },
   keep: { label: 'OFÖRÄNDRAD', className: 'bg-slate-700/40 text-slate-400 border-slate-600/40' },
   // Passerad period utan faktura på ett riktigt avtal: skapas aldrig här,
-  // importeras från Fortnox (avtalskartan § 7).
+  // importeras från Fortnox (avtalskartan § 6).
   uncovered: { label: 'SAKNAR FAKTURA', className: 'bg-amber-500/15 text-amber-300 border-amber-500/40' },
   consolidated: { label: 'SAMLINGSFAKTURA', className: 'bg-slate-700/40 text-slate-400 border-slate-600/40' },
 }

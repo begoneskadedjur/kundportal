@@ -175,7 +175,7 @@ export const FortnoxService = {
 
   /**
    * En faktura med rader, för import av redan fakturerade avtalsperioder
-   * (avtalskartan § 7: "koppla Fortnox-faktura").
+   * (avtalskartan § 6: "koppla Fortnox-faktura").
    */
   async getInvoice(documentNumber: string | number): Promise<FortnoxInvoiceDetail> {
     const data = await fortnoxRequest<{ Invoice: FortnoxInvoiceDetail }>(`invoices/${documentNumber}`)

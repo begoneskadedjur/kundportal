@@ -1,10 +1,10 @@
 // src/components/admin/customers/record/ContractEquipmentSection.tsx
-// § 6 Utrustning i avtalet på avtalspappret i Avtalskartan.
+// § 5 Utrustning i avtalet på avtalspappret i Avtalskartan.
 //
 // Ingen ny datamängd: utrustningen är avtalsinnehållets rader
 // (case_billing_items, case_type = contract). Tjänsteraderna bär
 // faktureringsläget (premium, per_year, per_month, per_round), artikelraderna
-// är den interna kostnaden som § 5 räknar marginal på.
+// är den interna kostnaden som marginalnotisen räknar marginal på.
 //
 // EN RAD PER STATIONSTYP OCH ENHET. Stationstypen (Ljusfälla, 2 st, 1 686 kr)
 // och dess produkt (PW Titan 300, kostnad 4 838) är samma sak sedd från två
@@ -68,10 +68,10 @@ interface Props {
   onOpenSettings?: () => void
   /** Aktiva stationer (ute + inne) på avtalets enheter, ur utplaceringarna */
   stationCount?: { outdoor: number; indoor: number; addon: number } | null
-  /** Tilläggsstationer per år/månad utan beslutat läge: brickor att dra till § 7 eller § 6 */
+  /** Tilläggsstationer per år/månad utan beslutat läge: brickor att dra till § 6 eller § 5 */
   bricks?: AddonBrick[]
   onBrickPointerDown?: (e: React.PointerEvent, brick: AddonBrick) => void
-  /** Enhetens namn för § 6-rader som avser en enhet */
+  /** Enhetens namn för § 5-rader som avser en enhet */
   unitNameOf?: (unitId: string) => string
   /** Var per år-rader faktureras (kundens läge) */
   equipmentInvoiceMode?: 'with_premium' | 'separate' | null
@@ -81,7 +81,7 @@ interface Props {
   ledger?: AddonLedger | null
   /** Hopfällning: stängd tills något behöver beslutas eller rader ändrats */
   contractId?: string
-  /** En bricka dras över § 6: öppna efter 400 ms */
+  /** En bricka dras över § 5: öppna efter 400 ms */
   dragOver?: boolean
 }
 
@@ -107,7 +107,7 @@ export default function ContractEquipmentSection({
   // eller nya/borttagna rader sedan senast sedd öppnar stycket, alltid.
   const hasBricks = !!bricks && bricks.length > 0
   // Premiens artiklar (arbetstid, förbrukning) visas bara i § 4 under
-  // avtalsraden. § 6 är tilläggen: tjänsterader per år/månad/runda och
+  // avtalsraden. § 5 är tilläggen: tjänsterader per år/månad/runda och
   // produkterna under dem. En siffra, ett ställe.
   const addonArticles = articles.filter((a) => isAddonArticle(a, services))
   const rowIds = [...extra.map((s) => s.id), ...addonArticles.map((a) => a.id)]
@@ -153,7 +153,7 @@ export default function ContractEquipmentSection({
   const rowStyle = { borderColor: ink.rule }
   const numStyle = { color: ink.muted }
   let rowNo = 0
-  const nextNo = () => `6.${++rowNo}`
+  const nextNo = () => `5.${++rowNo}`
 
   const modelSuffix = (m: BillingModel) => (m === 'per_year' ? '/år' : m === 'per_month' ? '/mån' : m === 'per_round' ? '/runda' : '')
 
@@ -242,7 +242,7 @@ export default function ContractEquipmentSection({
         onClick={foldable ? fold.onHeaderClick : undefined}
       >
         <h4 className="text-xs font-bold uppercase tracking-[0.12em]" style={{ color: ink.primary }}>
-          § 6 · Utrustning i avtalet
+          § 5 · Utrustning i avtalet
         </h4>
         {onOpenSettings && !archived && (
           <button
@@ -300,7 +300,7 @@ export default function ContractEquipmentSection({
                     onBrickPointerDown && !archived ? 'cursor-grab active:cursor-grabbing' : ''
                   }`}
                   style={{ borderColor: ink.rule, color: ink.secondary, touchAction: 'none', background: 'rgba(255,255,255,.35)' }}
-                  title="Dra till § 7 för att baka in i årspremien, eller till § 6 för tillägg utöver avtalet"
+                  title="Dra till § 6 för att baka in i årspremien, eller till § 5 för tillägg utöver avtalet"
                 >
                   <span className="tracking-[-2px]" style={{ color: ink.muted }}>⠿</span>
                   <span>

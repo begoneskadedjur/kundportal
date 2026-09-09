@@ -4,7 +4,7 @@
 // låses resultatet på borttagningsdatumet och räknas aldrig upp igen.
 // Ren funktion: läser stationsrader från contract_addon_ledger(), ingen DB.
 //
-// Delas av § 5, § 6 och pulsen så de aldrig säger olika.
+// Delas av marginalnotisen, § 5 och pulsen så de aldrig säger olika.
 
 const DAY = 86_400_000
 const YEAR_DAYS = 365.25
@@ -70,7 +70,7 @@ export interface AddonLedger {
   totals: LedgerTotals
   /** Per stationstyp (namn) */
   byType: Array<{ stationTypeName: string; totals: LedgerTotals }>
-  /** Per § 6-rad: enhet + stationstyp */
+  /** Per § 5-rad: enhet + stationstyp */
   byRow: Map<string, LedgerTotals>
   horizon: { today: number; contractEnd: number | null; optionEnd: number | null }
 }

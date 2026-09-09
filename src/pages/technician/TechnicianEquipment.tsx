@@ -377,7 +377,7 @@ export default function TechnicianEquipment() {
         }
 
         // Redigering ändrar tilläggsläget lika ofta som utsättningen gör:
-        // markeras en befintlig station som tillägg i efterhand måste § 6
+        // markeras en befintlig station som tillägg i efterhand måste § 5
         // och pro rata följa med, annars ligger den osynlig till nästa synk.
         if (formData.is_addon || editingEquipment.is_addon) {
           const missing = await AddonStationBillingService.syncAfterStationChange(
@@ -730,7 +730,7 @@ export default function TechnicianEquipment() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (profile as any)?.full_name || profile?.email || null
       )
-      // Per år/månad: § 6-rader på avtalet + pro rata-rad på ärendet
+      // Per år/månad: § 5-rader på avtalet + pro rata-rad på ärendet
       await AddonStationBillingService.syncAddonPeriodLines(customerId)
       await AddonStationBillingService.syncAddonProrataLine(
         customerId,

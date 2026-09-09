@@ -510,8 +510,8 @@ export class CaseBillingService {
   /**
    * Avtalets marginal med rätt intäktsbas. Premieraden på avtalet är ofta
    * 0 kr eller avviker från avtalet (var sjätte aktivt avtal), så årsintäkten
-   * hämtas från contracts.annual_value plus tilläggsraderna i § 6. Används av
-   * § 5 på avtalskartan och kundkortets sidopanel, så de visar samma tal.
+   * hämtas från contracts.annual_value plus tilläggsraderna i § 5. Används av
+   * marginalnotisen på avtalskartan och kundkortets sidopanel, så de visar samma tal.
    */
   static async getContractMarginSummary(
     contractId: string,
@@ -604,7 +604,7 @@ export class CaseBillingService {
   }
 
   /**
-   * Ackumulerat utfall över flera ärendens faktureringsrader — § 5 på
+   * Ackumulerat utfall över flera ärendens faktureringsrader — marginalnotisen på
    * avropsavtal i Avtalskartan. Samma beräkningsregler som per-ärende-
    * summeringen ovan: tjänsterader = intäkt, artikelrader = intern kostnad.
    *

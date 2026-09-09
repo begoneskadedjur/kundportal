@@ -1,7 +1,7 @@
 // src/components/admin/customers/record/AddonDropPrompt.tsx
 // Popover när brickor med tilläggsstationer beslutas i avtalskartan:
-// § 7 = baka in i årspremien (trappsteg med text), § 6 = tillägg utöver avtalet
-// (synkad § 6-rad, egna fakturor). En eller flera brickor på samma avtal:
+// § 6 = baka in i årspremien (trappsteg med text), § 5 = tillägg utöver avtalet
+// (synkad § 5-rad, egna fakturor). En eller flera brickor på samma avtal:
 // gemensamt datum, pris per rad ur prislistan (rättas per rad), besluten
 // körs ett i taget med progress i knappen. Faller ett stannar körningen,
 // de klara ligger kvar beslutade och raden som brast pekas ut.
@@ -219,7 +219,7 @@ export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onAll
             </>
           ) : (
             <>
-              § 6: <b>{stations} st, {formatKr(addAnnual)}/år</b> i egna rader
+              § 5: <b>{stations} st, {formatKr(addAnnual)}/år</b> i egna rader
               <span className="block text-slate-500 mt-0.5">
                 Egna fakturor parallellt med årspremien, antal vid varje debitering. Perioden fram till nästa faktura pro rata.
               </span>

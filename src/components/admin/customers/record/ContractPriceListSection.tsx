@@ -99,7 +99,7 @@ export function useAvropCatalog(
         })
 
         // Avtalade priser visas alltid, även när tjänsten redan ligger i
-        // avtalet (§ 4 eller § 6): det är kundens särskilda pris, inte ett
+        // avtalet (§ 4 eller § 5): det är kundens särskilda pris, inte ett
         // erbjudande. Utan pris offereras tjänsten, men bara om den inte redan
         // ingår i avtalet och inte är en avtalstyp.
         const excluded = new Set(excludeKey ? excludeKey.split(',') : [])

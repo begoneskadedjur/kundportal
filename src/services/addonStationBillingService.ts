@@ -137,7 +137,7 @@ export class AddonStationBillingService {
   }
 
   /**
-   * § 6-rader för per år/per månad-stationer: antal synkas från enhetens
+   * § 5-rader för per år/per månad-stationer: antal synkas från enhetens
    * aktiva stationer (SECURITY DEFINER-RPC, vikarie-säker). Sväljer fel.
    */
   static async syncAddonPeriodLines(

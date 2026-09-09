@@ -459,7 +459,7 @@ export default function ServiceCatalogEditModal({
                   </label>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Per år och per månad (årspriset delat med tolv): priset i kundens prislista på denna tjänst
-                    styr § 6-raderna och pro rata vid utsättning. Endast en tjänst åt gången kan ha denna inställning.
+                    styr § 5-raderna och pro rata vid utsättning. Endast en tjänst åt gången kan ha denna inställning.
                   </p>
                 </div>
 

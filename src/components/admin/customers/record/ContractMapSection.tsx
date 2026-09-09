@@ -60,6 +60,7 @@ import { isCompletedStatus, type ClickUpStatus } from '../../../../types/databas
 import ContractHistoryModal, { type HistoryTab } from './ContractHistoryModal'
 import ContractContentSection, { useContractContent, useAccumulatedCaseOutcome } from './ContractContentSection'
 import { useAddonLedger } from '../../../../hooks/useAddonLedger'
+import CustomerContractPaper from '../../../shared/CustomerContractPaper'
 import ContractPriceListSection, { useAvropCatalog } from './ContractPriceListSection'
 import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from './ContractPremiumSection'
 import ContractReferencesSection from './ContractReferencesSection'
@@ -77,7 +78,7 @@ import {
   SETTINGS_GROUPS,
 } from './contractCompleteness'
 
-/** § 6 tänds två sekunder när panelen öppnas från notisen eller remsan */
+/** § 5 tänds två sekunder när panelen öppnas från notisen eller remsan */
 const PARA_FLASH_CLASSES = ['shadow-[inset_3px_0_0_#20c58f]', 'bg-[#20c58f]/[.04]']
 import { PAPER_GEAR_CLASS } from './paperInk'
 import { FOLD_THRESHOLD, FoldLink, FoldSummary, foldBodyClass, usePaperFold } from './paperFold'
@@ -108,7 +109,7 @@ type DragPayload =
   | { type: 'scoperow'; unitId: string; scopeRowId: string; fromContractId: string }
   /** Ett papper: släpps på arkivet (uppsägning) eller på ett annat papper (byt ordning) */
   | { type: 'paper'; contractId: string }
-  /** Katalogen: prislista → § 2, tjänst → § 4, utrustning → § 6 */
+  /** Katalogen: prislista → § 2, tjänst → § 4, utrustning → § 5 */
   | {
       type: 'catalog'
       kind: 'pricelist' | 'service' | 'equipment' | 'station_type'
@@ -117,7 +118,7 @@ type DragPayload =
       code?: string | null
       basePrice?: number | null
     }
-  /** Bricka med tilläggsstationer (per enhet och typ): § 7 = inbakat, § 6 = tillägg */
+  /** Bricka med tilläggsstationer (per enhet och typ): § 6 = inbakat, § 5 = tillägg */
   | ({ type: 'addon_stations' } & AddonBrick)
 
 /** Enheten en dragning handlar om (null för verksamheten, papper och katalog) */
@@ -138,7 +139,7 @@ interface DragState {
   overAside: boolean
   /** Papper över arkivet (uppsägning) */
   overArchive: boolean
-  /** Släppzon inuti pappret: 'scope' (§ 1, standard) eller 'refs' (§ 8) */
+  /** Släppzon inuti pappret: 'scope' (§ 1, standard) eller 'refs' (§ 7) */
   overZone: DropZone
 }
 
@@ -154,7 +155,7 @@ type DropTarget =
   | { kind: 'archive' }
   | null
 
-/** Enhet som släppts på § 8 Referenser: sätt Er referens */
+/** Enhet som släppts på § 7 Referenser: sätt Er referens */
 interface RefPrompt {
   contract: RecordContract
   unitId: string
@@ -247,9 +248,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
    * skapas ett tomt avtal på kundraden och enheten skrivs in i § 1 direkt.
    */
   const [typePrompt, setTypePrompt] = useState<{ source: RecordContract | null; blankPayload?: DragPayload } | null>(null)
-  /** Enhet släppt på § 8 — raden öppnas för inmatning av Er referens */
+  /** Enhet släppt på § 7 — raden öppnas för inmatning av Er referens */
   const [refPrompt, setRefPrompt] = useState<RefPrompt | null>(null)
-  /** Fakturaplanen för kundens avtal (gemet, § 7). Läses om efter varje skrivning. */
+  /** Fakturaplanen för kundens avtal (gemet, § 6). Läses om efter varje skrivning. */
   const [billingPlans, setBillingPlans] = useState<BillingPlan[]>([])
   const [billingPlansKey, setBillingPlansKey] = useState(0)
   /** Förhandsgranskning innan fakturaplanen appliceras */
@@ -258,7 +259,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const [planLoading, setPlanLoading] = useState(false)
   /** "Indexera alla avtal" på gemet */
   const [indexAllOpen, setIndexAllOpen] = useState(false)
-  /** Koppla Fortnox-faktura till en passerad period (§ 7) */
+  /** Koppla Fortnox-faktura till en passerad period (§ 6) */
   const [fortnoxTarget, setFortnoxTarget] = useState<LinkFortnoxTarget | null>(null)
   /** § 3: enhetens besöksplan redigeras */
   const [sitePlanPrompt, setSitePlanPrompt] = useState<SitePlanPrompt | null>(null)
@@ -314,7 +315,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   const addonPendingRows = useAddonPending()
   const [decidedByContract, setDecidedByContract] = useState<Record<string, { count: number; kr: number }>>({})
   const hadBricksRef = useRef(false)
-  /** Scrolla fram § 6 på pappret och tänd kanten i två sekunder */
+  /** Scrolla fram § 5 på pappret och tänd kanten i två sekunder */
   const focusParaSix = (contractId: string) => {
     window.setTimeout(() => {
       const el = document.getElementById(`para6-${contractId}`)
@@ -613,13 +614,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     if (payload.type === 'catalog') {
       if (target.kind !== 'paper') return 'Släpp på ett avtal'
       if (isTerminatedButRunning(target.contract)) return 'Avtalet är uppsagt'
-      if (target.zone === 'premium') return 'Katalogen släpps på § 2, § 4 eller § 6'
+      if (target.zone === 'premium') return 'Katalogen släpps på § 2, § 4 eller § 5'
       return null
     }
     if (payload.type === 'addon_stations') {
-      if (target.kind !== 'paper') return 'Släpp på § 7 (baka in i premien) eller § 6 (tillägg utöver avtalet)'
+      if (target.kind !== 'paper') return 'Släpp på § 6 (baka in i premien) eller § 5 (tillägg utöver avtalet)'
       if (isTerminatedButRunning(target.contract)) return 'Avtalet är uppsagt'
-      if (target.zone !== 'premium' && target.zone !== 'equipment') return 'Släpp på § 7 för att baka in i premien, eller på § 6 för tillägg utöver avtalet'
+      if (target.zone !== 'premium' && target.zone !== 'equipment') return 'Släpp på § 6 för att baka in i premien, eller på § 5 för tillägg utöver avtalet'
       if (!contractCoversUnit(target.contract, payload.unitId)) return 'Enheten står inte i avtalets omfattning'
       return null
     }
@@ -630,7 +631,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     return validateDrop(payload, target.contract)
   }
 
-  /** Släpp på § 8: enheten måste redan stå i avtalets omfattning */
+  /** Släpp på § 7: enheten måste redan stå i avtalets omfattning */
   const validateRefDrop = useCallback(
     (payload: DragPayload, contract: RecordContract): string | null => {
       if (payload.type === 'org') return 'Dra in en enskild enhet för att sätta dess referens'
@@ -920,7 +921,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 
   /**
    * Katalogen: prislista → § 2, tjänst → § 4 (ingår i premien), utrustning →
-   * § 6 (per styck och år), stationstyp → § 6 (per kontrollrunda). Priset tas
+   * § 5 (per styck och år), stationstyp → § 5 (per kontrollrunda). Priset tas
    * från avtalets prislista, annars kundens, annars tjänstens grundpris.
    */
   const dropCatalog = async (payload: Extract<DragPayload, { type: 'catalog' }>, contract: RecordContract, zone: DropZone) => {
@@ -971,7 +972,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       setContentReloadKey((k) => k + 1)
       setBillingPlansKey((k) => k + 1)
       undoToast(
-        `${serviceName} tillagd i ${billingModel === 'premium' ? '§ 4 Tjänster i avtalet' : '§ 6 Utrustning'} för ${contractDisplayName(contract)}${
+        `${serviceName} tillagd i ${billingModel === 'premium' ? '§ 4 Tjänster i avtalet' : '§ 5 Utrustning'} för ${contractDisplayName(contract)}${
           unitPrice ? ` (${formatKr(unitPrice)}${billingModel === 'per_round' ? '/runda' : '/år'})` : ' (pris saknas, sätt i redigeraren)'
         }.`,
         async () => {
@@ -1061,7 +1062,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   /**
    * Tomt avtalsblad: en enhet (eller Hela verksamheten) släpptes på det
    * streckade pappret. Skapar ett tomt avtal på kundraden och skriver in
-   * enheten i § 1 från idag. Premie och löptid fylls i på pappret (§ 7, § 9).
+   * enheten i § 1 från idag. Premie och löptid fylls i på pappret (§ 6, § 8).
    * Detta är vägen till FLERA avtal på samma kund — "Skapa avtal" ovan
    * materialiserar bara kundradens första.
    */
@@ -1081,13 +1082,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           today
         )
         toast.success(
-          `Nytt avtal${typeName ? ` (${typeName})` : ''} skapat med alla ${locations.length} enheter i § 1. Fyll i årspremie i § 7 och löptid i § 9.`
+          `Nytt avtal${typeName ? ` (${typeName})` : ''} skapat med alla ${locations.length} enheter i § 1. Fyll i årspremie i § 6 och löptid i § 8.`
         )
       } else {
         const unit = customerById.get(payload.unitId)
         await ContractScopeService.addSite(contractId, payload.unitId, today)
         toast.success(
-          `Nytt avtal${typeName ? ` (${typeName})` : ''} skapat med ${unit ? customerRowName(unit) : 'enheten'} i § 1 från idag. Fyll i årspremie i § 7 och löptid i § 9.`
+          `Nytt avtal${typeName ? ` (${typeName})` : ''} skapat med ${unit ? customerRowName(unit) : 'enheten'} i § 1 från idag. Fyll i årspremie i § 6 och löptid i § 8.`
         )
       }
       await onChanged()
@@ -1255,7 +1256,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
   }
 
   // -------------------------------------------------------------------------
-  // Fakturaplan (gemet + § 7): avtalen är källan till årspremiefakturan
+  // Fakturaplan (gemet + § 6): avtalen är källan till årspremiefakturan
   // -------------------------------------------------------------------------
 
   useEffect(() => {
@@ -1279,7 +1280,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     // billingPlansKey bumpas efter varje skrivning som påverkar fakturorna.
   }, [root.id, papers.length, contentReloadKey, billingPlansKey, contracts])
 
-  // § 6: aktiva stationer per kundrad, ur utplaceringarna (ute) och planritningarna (inne)
+  // § 5: aktiva stationer per kundrad, ur utplaceringarna (ute) och planritningarna (inne)
   const [stationsByCustomer, setStationsByCustomer] = useState<Map<string, { outdoor: number; indoor: number; addon: number }>>(new Map())
   /** Tilläggsstationer per år/månad utan beslutat läge, per enhet och stationstyp */
   const [addonBricksByCustomer, setAddonBricksByCustomer] = useState<Map<string, AddonBrick[]>>(new Map())
@@ -1421,7 +1422,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     })
   }
 
-  /** Ett beslut per bricka: baka in (§ 7) eller tillägg (§ 6). Kastar vid fel. */
+  /** Ett beslut per bricka: baka in (§ 6) eller tillägg (§ 5). Kastar vid fel. */
   const confirmAddonBrick = async (item: AddonPromptBrick, input: { effectiveFrom: string; unitPriceAnnual: number }) => {
     if (!addonPrompt) return
     const { contract, state } = addonPrompt
@@ -1468,7 +1469,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     if (state.zone === 'premium') {
       toast.success(`${summary.stations} st tilläggsstationer inbakade i ${name}: premien höjs med ${formatKr(summary.annualKr)}/år.`)
     } else {
-      toast.success(`${summary.stations} st tilläggsstationer ligger nu som tillägg utöver ${name} (§ 6), ${formatKr(summary.annualKr)}/år.`)
+      toast.success(`${summary.stations} st tilläggsstationer ligger nu som tillägg utöver ${name} (§ 5), ${formatKr(summary.annualKr)}/år.`)
     }
     setBusy(true)
     try {
@@ -1485,7 +1486,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     setBusy(true)
     try {
       await ContractScopeService.setEquipmentInvoiceMode(contract.id, mode)
-      toast.success(mode === 'separate' ? 'Utrustning i § 6 faktureras nu på egna fakturor.' : 'Utrustning i § 6 ligger nu på premiefakturan.')
+      toast.success(mode === 'separate' ? 'Utrustning i § 5 faktureras nu på egna fakturor.' : 'Utrustning i § 5 ligger nu på premiefakturan.')
       setBillingPlansKey((k) => k + 1)
       await onChanged()
     } catch (err) {
@@ -1518,7 +1519,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       ? 'consolidated'
       : 'per_contract'
 
-  /** Planens rader per avtal, för § 7 (samlade rader räknas till varje avtal de bär) */
+  /** Planens rader per avtal, för § 6 (samlade rader räknas till varje avtal de bär) */
   const planEntriesByContract = useMemo(() => {
     const map = new Map<string, PremiumPlanEntry[]>()
     for (const plan of billingPlans) {
@@ -1598,7 +1599,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         setPlanPreview(null)
         toast.success(
           merged.summary.uncovered > 0
-            ? `Fakturorna stämmer redan. ${merged.summary.uncovered} passerad period saknar faktura i portalen, koppla den från § 7.`
+            ? `Fakturorna stämmer redan. ${merged.summary.uncovered} passerad period saknar faktura i portalen, koppla den från § 6.`
             : 'Fakturorna stämmer redan med avtalen.'
         )
       }
@@ -2191,7 +2192,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onClick={() => openBricks(current)}
               className="shrink-0 text-[12px] px-3 py-1 rounded-md bg-[#20c58f] text-[#0b1220] font-semibold hover:brightness-110"
             >
-              Öppna § 6
+              Öppna § 5
             </button>
           </div>
         )
@@ -2461,12 +2462,12 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           )}
 
           {/* Katalogen: systemets prislistor, tjänster och utrustning. Dras in
-              i § 2, § 4 och § 6 på ett papper, eller in i panelen. Systemkatalog,
+              i § 2, § 4 och § 5 på ett papper, eller in i panelen. Systemkatalog,
               inte kundinnehåll, så regeln "inget kundnivå-innehåll i
               Verksamhetspanelen" håller. Egen flik, lika synlig som enheterna. */}
           {railTab === 'catalog' && (
             <div>
-              <p className="text-[11px] text-slate-500 mb-2">Dra in på ett avtal: prislistor till § 2, tjänster till § 4, utrustning till § 6.</p>
+              <p className="text-[11px] text-slate-500 mb-2">Dra in på ett avtal: prislistor till § 2, tjänster till § 4, utrustning till § 5.</p>
               {papers.length === 0 && <p className="text-[11px] text-slate-500 italic">Skapa ett avtal först.</p>}
               <div className="pb-1">
                 <div className="flex gap-1 mb-2">
@@ -2764,7 +2765,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
             <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
               {drag?.started && drag.overBlank
                 ? `Släpp: ett nytt avtal skapas med ${drag.payload.type === 'org' ? 'alla enheter' : payloadLabel(drag.payload)} i § 1`
-                : 'Dra in en enhet eller Hela verksamheten hit. Du väljer avtalstyp, sedan fylls premie (§ 7) och löptid (§ 9) i på pappret.'}
+                : 'Dra in en enhet eller Hela verksamheten hit. Du väljer avtalstyp, sedan fylls premie (§ 6) och löptid (§ 8) i på pappret.'}
             </p>
           </div>
 
@@ -3101,15 +3102,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                       : drag.overContractId
                         ? drag.payload.type === 'addon_stations'
                           ? drag.overZone === 'premium'
-                            ? 'Släpp för att baka in i årspremien (§ 7)'
-                            : 'Släpp för att lägga som tillägg utöver avtalet (§ 6)'
+                            ? 'Släpp för att baka in i årspremien (§ 6)'
+                            : 'Släpp för att lägga som tillägg utöver avtalet (§ 5)'
                           : drag.payload.type === 'paper'
                           ? 'Släpp för att byta ordning'
                           : drag.payload.type === 'catalog'
                             ? drag.payload.kind === 'pricelist'
                               ? 'Släpp för att byta prislista (§ 2)'
                               : drag.overZone === 'equipment' || drag.payload.kind !== 'service'
-                                ? 'Släpp för att lägga till i § 6 Utrustning'
+                                ? 'Släpp för att lägga till i § 5 Utrustning'
                                 : 'Släpp för att lägga till i § 4 Tjänster'
                             : drag.overZone === 'refs'
                               ? 'Släpp för att sätta Er referens'
@@ -3144,7 +3145,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         }}
       />
 
-      {/* Koppla Fortnox-faktura till en passerad period (§ 7) */}
+      {/* Koppla Fortnox-faktura till en passerad period (§ 6) */}
       <LinkFortnoxInvoiceModal
         target={fortnoxTarget}
         onClose={() => setFortnoxTarget(null)}
@@ -3803,7 +3804,7 @@ function IndexAllModal({
             onChange={(e) => setIncludeEquipment(e.target.checked)}
             className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
           />
-          Räkna även upp utrustning per styck och år (§ 6)
+          Räkna även upp utrustning per styck och år (§ 5)
         </label>
         <div className="flex items-center justify-end gap-3 pt-2 border-t border-slate-700/50">
           <button onClick={onClose} disabled={busy} className="text-xs text-slate-400 hover:text-slate-200">
@@ -4052,7 +4053,7 @@ interface PaperProps {
   }
   /** § 3 per enhet: öppna redigering av enhetens besöksplan */
   onEditSitePlan?: (unit: UnitFollowup) => void
-  /** § 9: förlängningsläge, option och nyttjande */
+  /** § 8: förlängningsläge, option och nyttjande */
   onSaveRenewal?: (input: { renewalMode: 'rolling' | 'fixed' | 'option'; optionUntil: string | null; optionDecisionDeadline: string | null; reminderDays: number | null }) => Promise<void>
   onExerciseOption?: () => Promise<void>
   priceListLabel: string | null
@@ -4065,7 +4066,7 @@ interface PaperProps {
    */
   state: PaperState
   onClearCoversAll?: () => void
-  /** Bumpas när avtalsinnehållet sparats — tvingar omhämtning av § 4/§ 5 */
+  /** Bumpas när avtalsinnehållet sparats — tvingar omhämtning av § 4 och marginalnotisen */
   contentReloadKey: number
   onEditContent?: () => void
   isDropTarget: boolean
@@ -4095,11 +4096,11 @@ interface PaperProps {
   onEditFrequency?: () => void
   /** Spara avtalsobjektets text */
   onSaveAgreementText?: (text: string | null) => Promise<void>
-  /** Alla lokaler (enheter, eller kundraden själv) — § 8 listar dem avtalet omfattar */
+  /** Alla lokaler (enheter, eller kundraden själv) — § 7 listar dem avtalet omfattar */
   locations: RecordCustomer[]
-  /** Släppzon under pekaren just nu ('refs' = § 8 Referenser) */
+  /** Släppzon under pekaren just nu ('refs' = § 7 Referenser) */
   dropZone?: DropZone
-  /** § 7 Premie och fakturering */
+  /** § 6 Premie och fakturering */
   onSavePremium?: (input: { annualValue: number | null; billingFrequency: string | null; billingAnchorMonth: number | null }) => Promise<void>
   onAddPremiumEvent?: (input: {
     eventType: 'step_up' | 'indexation' | 'adjustment'
@@ -4107,28 +4108,28 @@ interface PaperProps {
     annualValue: number
     note: string | null
   }) => Promise<void>
-  /** § 9 Löptid */
+  /** § 8 Löptid */
   onSaveTerm?: (input: { startDate: string | null; endDate: string | null; noticePeriodMonths: number | null }) => Promise<void>
-  /** § 8 Referenser */
+  /** § 7 Referenser */
   onSaveInvoiceReference?: (input: { invoiceReference: string | null; diaryNumber: string | null }) => Promise<void>
   onSaveUnitReference?: (unit: RecordCustomer, code: string | null) => Promise<void>
-  /** Enhet som just släppts på § 8 — dess rad öppnas för inmatning */
+  /** Enhet som just släppts på § 7 — dess rad öppnas för inmatning */
   refFocusUnitId?: string | null
   onRefFocusHandled?: () => void
-  /** § 7: kundens faktureringsläge och fakturaplanens rader för avtalet */
+  /** § 6: kundens faktureringsläge och fakturaplanens rader för avtalet */
   invoiceMode?: 'per_contract' | 'consolidated'
   planEntries?: PremiumPlanEntry[]
   onLinkFortnox?: (period: { periodStart: string; periodEnd: string; expectedSubtotal: number | null; kind?: string }) => void
-  /** § 6: byt faktureringsläge på en tjänsterad */
+  /** § 5: byt faktureringsläge på en tjänsterad */
   onChangeLineModel?: (item: CaseBillingItemWithRelations, model: 'premium' | 'per_year' | 'per_month' | 'per_round') => Promise<void>
-  /** § 6: aktiva stationer på avtalets enheter */
+  /** § 5: aktiva stationer på avtalets enheter */
   stationCount?: { outdoor: number; indoor: number; addon: number } | null
-  /** § 6: brickor med tilläggsstationer att besluta om, och drag av dem */
+  /** § 5: brickor med tilläggsstationer att besluta om, och drag av dem */
   addonBricks?: AddonBrick[]
   onBrickDrag?: (e: React.PointerEvent, brick: AddonBrick) => void
   unitNameOf?: (unitId: string) => string
   onChangeEquipmentInvoiceMode?: (mode: 'with_premium' | 'separate') => Promise<void>
-  /** Kundens läge för § 6 (bor på kunden, inte avtalet) */
+  /** Kundens läge för § 5 (bor på kunden, inte avtalet) */
   equipmentInvoiceMode?: 'with_premium' | 'separate'
   /** Öppna väljaren för signeringsdatum */
   onEditSignedAt?: () => void
@@ -4232,7 +4233,7 @@ function PaperContract({
   const ink = PAPER_INK[archived ? 'archived' : 'live']
   const contentData = useContractContent(contract.id, contentReloadKey)
   const { ledger: addonLedger } = useAddonLedger(contract, contentReloadKey)
-  // Avropsavtal: § 5 visar ackumulerat utfall från avtalets ärenden i stället
+  // Avropsavtal: marginalnotisen visar ackumulerat utfall från avtalets ärenden i stället
   // för avtalsinnehållet (som är 0 kr på avrop). Samma ärendemängd som § 3.
   const isAvrop = contract.contract_type === 'Avropsavtal' || contract.label === 'Avropsavtal'
   const accumulatedOutcome = useAccumulatedCaseOutcome(isAvrop ? followup.caseIds : null, contentReloadKey)
@@ -4279,6 +4280,8 @@ function PaperContract({
   // Hopfällning (paperFold.tsx). § 1 fälls in över FOLD_THRESHOLD enheter
   // och öppnar sig när en enhet dras över pappret. § 3 visar alltid
   // avvikelserna och fäller in enheterna i ordning.
+  // Kundens vy: pappret byter till kundportalens komponent med databasens projektion
+  const [asCustomer, setAsCustomer] = useState(false)
   const scopeFoldable = !contract.covers_all_sites && !isUnitContract && scope.length > FOLD_THRESHOLD
   const scopeFold = usePaperFold({
     contractId: contract.id,
@@ -4389,20 +4392,20 @@ function PaperContract({
             ? invalidReason
             : dragKind === 'addon_stations'
               ? dropZone === 'premium'
-                ? `Släpp: ${dragSubject} bakas in i årspremien (§ 7)`
-                : `Släpp: ${dragSubject} läggs som tillägg utöver avtalet (§ 6)`
+                ? `Släpp: ${dragSubject} bakas in i årspremien (§ 6)`
+                : `Släpp: ${dragSubject} läggs som tillägg utöver avtalet (§ 5)`
             : dragKind === 'paper'
               ? `Släpp: ${dragSubject} byter plats med det här pappret`
               : dragKind === 'catalog'
                 ? dropZone === 'pricelist'
                   ? `Släpp: ${dragSubject} blir avtalets prislista (§ 2)`
                   : dropZone === 'equipment'
-                    ? `Släpp: ${dragSubject} läggs till i § 6 Utrustning`
+                    ? `Släpp: ${dragSubject} läggs till i § 5 Utrustning`
                     : dropZone === 'content'
                       ? `Släpp: ${dragSubject} läggs till i § 4 Tjänster i avtalet`
                       : `Släpp: ${dragSubject} läggs till på avtalet`
                 : dropZone === 'refs'
-                  ? `Släpp: sätt Er referens för ${dragSubject} i § 8`
+                  ? `Släpp: sätt Er referens för ${dragSubject} i § 7`
                   : `Släpp: ${dragSubject} skrivs in i § 1 Omfattning`}
         </div>
       )}
@@ -4570,8 +4573,24 @@ function PaperContract({
             : 'Tidslinje'}
           <span className="underline decoration-dotted text-[10px] text-[#8a9099]">visa händelser</span>
         </button>
+        {/* Kundens vy: samma komponent som kundportalen, ur databasens projektion */}
+        <button
+          type="button"
+          onClick={() => setAsCustomer((v) => !v)}
+          className="print:hidden font-sans text-[10px] underline decoration-dotted text-[#8a9099] hover:text-[#262e38] px-1"
+          title={asCustomer ? 'Tillbaka till vår vy' : 'Visa avtalet som kunden ser det i portalen'}
+        >
+          {asCustomer ? 'vår vy' : 'visa som kund'}
+        </button>
         {periodLabel && <span className="ml-auto text-[11.5px] italic text-[#5d6672]">{periodLabel}</span>}
       </div>
+      {asCustomer ? (
+        <div className="mt-3 border-t border-dashed border-[#d9d3c2] pt-3">
+          <div className="font-sans text-[10px] uppercase tracking-[0.14em] text-[#8a9099] mb-2">Så ser kunden avtalet i portalen</div>
+          <CustomerContractPaper contractId={contract.id} embedded />
+        </div>
+      ) : (
+      <>
 
       {/* § 1 Omfattning: hopfälld över FOLD_THRESHOLD enheter, öppnas av drag */}
       <div className="mt-3 group/para">
@@ -4837,8 +4856,8 @@ function PaperContract({
 
       </div>
 
-      {/* § 4 Tjänster i avtalet + § 5 Marginal */}
-      {/* § 4 + § 5 — släppzon för tjänster från katalogen */}
+      {/* § 4 Tjänster i avtalet + marginalnotisen Marginal */}
+      {/* § 4 + marginalnotisen — släppzon för tjänster från katalogen */}
       <div data-drop-zone="content">
         <ContractContentSection
           ledger={addonLedger}
@@ -4854,7 +4873,7 @@ function PaperContract({
         />
       </div>
 
-      {/* § 6 Utrustning i avtalet — samma rader som § 4/§ 5, med faktureringsläge.
+      {/* § 5 Utrustning i avtalet — samma rader som § 4 och marginalnotisen, med faktureringsläge.
           Släppzon för utrustning och stationstyper från katalogen. */}
       <div data-drop-zone="equipment" id={`para6-${contract.id}`} className="transition-shadow duration-500 rounded-sm">
         <ContractEquipmentSection
@@ -4878,7 +4897,7 @@ function PaperContract({
         />
       </div>
 
-      {/* § 7 Premie och fakturering — avtalet är källan till årspremiefakturan.
+      {/* § 6 Premie och fakturering — avtalet är källan till årspremiefakturan.
           Släppzon: dra en bricka med tilläggsstationer hit för att baka in dem i premien. */}
       <div
         data-drop-zone="premium"
@@ -4903,7 +4922,7 @@ function PaperContract({
         />
       </div>
 
-      {/* § 8 Referenser — avtalets referens + Er referens per enhet i omfattningen.
+      {/* § 7 Referenser — avtalets referens + Er referens per enhet i omfattningen.
           Släppzon: dra in en enhet från vänster för att sätta dess kod. */}
       <div
         data-drop-zone="refs"
@@ -4925,7 +4944,7 @@ function PaperContract({
         />
       </div>
 
-      {/* § 9 Löptid och option */}
+      {/* § 8 Löptid och option */}
       <ContractTermSection
         contract={contract}
         ink={ink}
@@ -5088,6 +5107,8 @@ function PaperContract({
           </div>
         )}
       </div>
+      </>
+      )}
     </section>
   )
 }

@@ -665,7 +665,7 @@ export default function CustomerDetailSidePanel({
               title="Avtalsinnehåll"
               icon={Receipt}
               action={contractData.summary?.breakdown && pricingSettings ? (() => {
-                // Samma tal som § 5 på avtalskartan: löpande marginal när avtalet
+                // Samma tal som marginalnotisen på avtalskartan: löpande marginal när avtalet
                 // bär varaktig utrustning, annars vanlig marginal. Platt text, ingen pill.
                 const b = contractData.summary.breakdown
                 const tone = b.labour_missing ? 'bad' : marginTone(b.headline_percent, pricingSettings)

@@ -7,8 +7,8 @@ export type AddonBillingModel = 'per_year' | 'per_month' | 'per_round'
 
 /**
  * Avtalsläge för per år/per månad-stationer, satt från avtalskartan.
- * included = inbakad i årspremien (§ 7), separate = tillägg utöver avtalet
- * på egna fakturor (§ 6). null = ej beslutat (brickan visas i avtalskartan).
+ * included = inbakad i årspremien (§ 6), separate = tillägg utöver avtalet
+ * på egna fakturor (§ 5). null = ej beslutat (brickan visas i avtalskartan).
  */
 export type AddonContractMode = 'included' | 'separate'
 
@@ -76,7 +76,7 @@ export function defaultAddonBillingModel(prices: AddonPrices | null | undefined)
 
 /**
  * Bricka i avtalskartan: tilläggsstationer per enhet och stationstyp som
- * ännu inte fått ett avtalsläge (dras till § 7 = inbakat, § 6 = tillägg).
+ * ännu inte fått ett avtalsläge (dras till § 6 = inbakat, § 5 = tillägg).
  */
 export interface AddonBrick {
   unitId: string

@@ -6,7 +6,7 @@
 // Avtalskartan som motor (fas 2): tillägget skrivs på AVTALET, inte
 // kundraden. RPC:n apply_contract_addition (SECURITY DEFINER) höjer
 // contracts.annual_value, lägger ett 'addition'-steg i premietrappan och
-// en § 6-rad (billing_model per_year) på avtalsinnehållet, så utrustningen
+// en § 5-rad (billing_model per_year) på avtalsinnehållet, så utrustningen
 // följer med nästa årspremiefaktura. Avtalet löses via ärendets
 // cases.contract_id, annars via resolvern (eget avtal, omfattning,
 // täcker-alla). Kunder utan avtalsrad (synth) faller tillbaka på kundraden.
@@ -113,15 +113,15 @@ export class ContractAdditionService {
       return { reason: 'Avtalet är uppsagt - avtalstillägg kan inte läggas. Kontakta kontoret.' }
     }
     if (!billing.billing_frequency || billing.billing_frequency === 'on_demand') {
-      return { reason: 'Avtalet saknar faktureringsfrekvens - sätt den i § 7 på avtalskartan eller kontakta kontoret.' }
+      return { reason: 'Avtalet saknar faktureringsfrekvens - sätt den i § 6 på avtalskartan eller kontakta kontoret.' }
     }
     if (!billing.contract_start_date || !billing.contract_end_date) {
-      return { reason: 'Avtalets datum är inte kompletta - sätt löptiden i § 9 på avtalskartan eller kontakta kontoret.' }
+      return { reason: 'Avtalets datum är inte kompletta - sätt löptiden i § 8 på avtalskartan eller kontakta kontoret.' }
     }
 
     const currentAnnual = Number(billing.annual_value ?? 0)
     if (currentAnnual <= 0) {
-      return { reason: 'Avtalet saknar årspremie - sätt den i § 7 på avtalskartan eller kontakta kontoret.' }
+      return { reason: 'Avtalet saknar årspremie - sätt den i § 6 på avtalskartan eller kontakta kontoret.' }
     }
 
     // Planera perioderna med generatorns rena matematik
@@ -189,7 +189,7 @@ export class ContractAdditionService {
    */
   /**
    * Varaktig utrustning (articles.is_durable) som mappats mot tilläggsraden
-   * kopieras till avtalet som intern kostnadsrad, så § 5 ser fällan bredvid
+   * kopieras till avtalet som intern kostnadsrad, så marginalnotisen ser fällan bredvid
    * den höjda premien. Aldrig fatalt: tillägget är redan applicerat.
    */
   private static async copyDurableArticlesToContract(
@@ -314,7 +314,7 @@ export class ContractAdditionService {
         applied++
         // Utrustningen bokförs på ärendet men intäkten höjs på avtalet, så
         // avtalets löpande marginal skulle stiga utan att fällan syns där.
-        // Varaktiga artiklar kopieras därför till avtalets § 6 som intern kostnad.
+        // Varaktiga artiklar kopieras därför till avtalets § 5 som intern kostnad.
         await this.copyDurableArticlesToContract(row.id, caseId, quote.contractId, quote.billingCustomerId)
       }
       newAnnualValue = Number(result.new_annual_value)

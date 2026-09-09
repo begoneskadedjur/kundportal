@@ -48,17 +48,17 @@ export interface CaseBillingItem {
   service_name: string | null
   // Gemensamma fält
   item_type: CaseBillingItemType
-  /** Avtalsinnehåll (§ 6): premium = ingår i årspremien, per_year = egen rad på årsfakturan, per_round = tilläggsstation per kontrollrunda */
+  /** Avtalsinnehåll (§ 5): premium = ingår i årspremien, per_year = egen rad på årsfakturan, per_round = tilläggsstation per kontrollrunda */
   billing_model?: 'premium' | 'per_year' | 'per_month' | 'per_round' | null
-  /** § 6-rad för tilläggsstationer: enheten raden avser */
+  /** § 5-rad för tilläggsstationer: enheten raden avser */
   site_customer_id?: string | null
-  /** § 6-rad: första periodstart raden faktureras i (pro rata dessförinnan) */
+  /** § 5-rad: första periodstart raden faktureras i (pro rata dessförinnan) */
   billing_start_date?: string | null
   /** Pro rata-rad för per år/månad-stationer på etableringsärendet */
   is_addon_prorata_line?: boolean | null
   /** Raden täcks av kundens avtal (§ 4) och faktureras inte som merförsäljning */
   covered_by_contract?: boolean | null
-  /** § 4: bärande rad (avtalstypens tjänst). Beloppet är härlett ur § 7, aldrig lagrat. */
+  /** § 4: bärande rad (avtalstypens tjänst). Beloppet är härlett ur § 6, aldrig lagrat. */
   is_premium_carrier?: boolean | null
   /** § 4: andel av årspremien (0..1) på en icke-bärande rad. Null = 0, ingår utan debitering. */
   premium_share?: number | null
@@ -409,7 +409,7 @@ export interface AccumulatedServiceGroup {
 }
 
 /**
- * Ackumulerat utfall från ärendenas faktureringsrader — § 5 på avropsavtal.
+ * Ackumulerat utfall från ärendenas faktureringsrader — marginalnotisen på avropsavtal.
  * Källan är enbart case_billing_items (samma rader som ärendemodalerna
  * prissätter med); ärenden utan rader (gamla systemet) bidrar med noll.
  */

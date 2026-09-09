@@ -635,7 +635,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                           <td className="py-1.5 border-b border-slate-700 text-right font-mono tabular-nums text-slate-300">
                             {/* § 4-rader bär andel av premien, aldrig belopp. Bärande raden är resten. */}
                             {isCarrier ? (
-                              <span className="text-slate-500 font-sans text-[11px]">följer § 7.1</span>
+                              <span className="text-slate-500 font-sans text-[11px]">följer § 6.1</span>
                             ) : isPremiumRow ? (
                               p.onChangeLineShare && !archived ? (
                                 <span className="inline-flex items-center gap-1">

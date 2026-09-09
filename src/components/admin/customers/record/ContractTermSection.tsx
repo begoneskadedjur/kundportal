@@ -1,5 +1,5 @@
 // src/components/admin/customers/record/ContractTermSection.tsx
-// § 9 Löptid och option på avtalspappret i Avtalskartan.
+// § 8 Löptid och option på avtalspappret i Avtalskartan.
 //
 // Start, slut och uppsägningstid (contracts.contract_start_date,
 // contract_end_date, notice_period_months), förlängningsläge och option
@@ -58,7 +58,7 @@ interface Props {
   onOpenSettings?: () => void
 }
 
-/** Bevakningen: vilket datum kräver beslut och när kundansvarig påminns. Delas av § 9 och pulsen. */
+/** Bevakningen: vilket datum kräver beslut och när kundansvarig påminns. Delas av § 8 och pulsen. */
 export function termWatch(contract: RecordContract, today: string = todayKey()) {
   const start = contract.contract_start_date ?? contract.start_date ?? null
   const end = contract.contract_end_date ?? null
@@ -146,7 +146,7 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
       {!settings && (
         <div className="flex items-baseline gap-2 border-b-[1.5px] pb-1" style={{ borderColor: ink.primary }}>
           <h4 className="text-xs font-bold uppercase tracking-[0.12em]" style={{ color: ink.primary }}>
-            § 9 · Löptid och option
+            § 8 · Löptid och option
           </h4>
           {onOpenSettings && !archived && (
             <button type="button" onClick={onOpenSettings} className={PAPER_GEAR_CLASS} style={{ borderColor: ink.rule, color: ink.muted }} title="Inställningar för löptid" aria-label="Inställningar för löptid">
@@ -162,7 +162,7 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
       {!editing ? (
         <>
           <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-            <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>9.1</span>
+            <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>8.1</span>
             <span className="font-semibold">Avtalstid</span>
             <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
             <span className="font-sans text-[12px] tabular-nums" style={{ color: start ? ink.secondary : ink.warn }}>
@@ -178,7 +178,7 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
             </span>
           </div>
           <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-            <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>9.2</span>
+            <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>8.2</span>
             <span className="font-semibold">Uppsägningstid</span>
             <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
             <span className="font-sans text-[12px] tabular-nums" style={{ color: notice ? ink.secondary : ink.warn }}>
@@ -213,7 +213,7 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
 
       {!editingRenewal ? (
         <div className="flex items-center gap-2.5 py-1.5 border-b border-dotted text-[13px]" style={rowStyle}>
-          <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>9.3</span>
+          <span className="font-sans text-[10.5px] w-6 tabular-nums" style={numStyle}>8.3</span>
           <span className="font-semibold">Förlängning</span>
           <span className="flex-1 border-b border-dotted mx-1 translate-y-1" style={rowStyle} />
           <span className="font-sans text-[12px] tabular-nums" style={{ color: ink.secondary }}>

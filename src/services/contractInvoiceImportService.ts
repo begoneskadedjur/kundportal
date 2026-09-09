@@ -2,7 +2,7 @@
 // Koppla en redan skickad Fortnox-faktura till en avtalsperiod.
 //
 // Fakturaplaneringen skapar aldrig "betald historik" för riktiga avtal: en
-// passerad period utan faktura i portalen visas som 'uncovered' (§ 7 på
+// passerad period utan faktura i portalen visas som 'uncovered' (§ 6 på
 // avtalskartan). Vägen att täcka perioden är att hämta fakturan från
 // Fortnox och spara den som F-{nr} med is_historical = true, samma form som
 // kundimporten ger. Täckningsfiltret i generatorn läser då perioden som
