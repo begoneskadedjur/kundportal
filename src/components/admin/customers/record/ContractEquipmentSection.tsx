@@ -18,6 +18,7 @@ import { formatDateSv, formatKr } from '../../../../hooks/useCustomerRecord'
 import { PAPER_GEAR_CLASS, type PaperInk } from './paperInk'
 import type { AddonBrick } from '../../../../types/addonStations'
 import { formatMonthYearSv, ledgerRowKey, type AddonLedger } from '../../../../shared/addonLedger'
+import { FoldLink, FoldSummary, foldBodyClass, usePaperFold, useSeenRows } from './paperFold'
 
 export type BillingModel = 'premium' | 'per_year' | 'per_month' | 'per_round'
 
@@ -78,6 +79,10 @@ interface Props {
   nextEquipmentInvoice?: { periodStart: string; subtotal: number; monthly: boolean } | null
   /** Resultat över tid per rad (enhet + stationstyp), ur stationerna */
   ledger?: AddonLedger | null
+  /** Hopfällning: stängd tills något behöver beslutas eller rader ändrats */
+  contractId?: string
+  /** En bricka dras över § 6: öppna efter 400 ms */
+  dragOver?: boolean
 }
 
 export default function ContractEquipmentSection({
@@ -94,8 +99,25 @@ export default function ContractEquipmentSection({
   equipmentInvoiceMode,
   nextEquipmentInvoice,
   ledger = null,
+  contractId,
+  dragOver = false,
 }: Props) {
   const extra = equipmentRows(services)
+  // Hopfällning: stängd när det finns rader men inget att besluta. Brickor
+  // eller nya/borttagna rader sedan senast sedd öppnar stycket, alltid.
+  const hasBricks = !!bricks && bricks.length > 0
+  const rowIds = [...extra.map((s) => s.id), ...articles.map((a) => a.id)]
+  const foldId = contractId ?? 'none'
+  // Under laddning räknas stycket som hopfällt så att det inte hoppar
+  const foldable = !!contractId && (loading || extra.length > 0)
+  const rowsChanged = useSeenRows({ contractId: foldId, para: 'utrustning', ids: rowIds, ready: !!contractId && !loading }) && !!contractId
+  const fold = usePaperFold({
+    contractId: foldId,
+    para: 'utrustning',
+    closedByRule: foldable,
+    forceOpen: hasBricks || rowsChanged,
+    dragOver,
+  })
   const premiumArticles = articles.filter((a) => !isAddonArticle(a, services))
   // Produkterna under sin stationstyp, via mapped_service_id
   const articlesByService = new Map<string, CaseBillingItemWithRelations[]>()
@@ -211,7 +233,11 @@ export default function ContractEquipmentSection({
 
   return (
     <div className="mt-3.5 group/para">
-      <div className="flex items-baseline gap-2 border-b-[1.5px] pb-1" style={{ borderColor: ink.primary }}>
+      <div
+        className={`flex items-baseline gap-2 border-b-[1.5px] pb-1 ${foldable ? 'cursor-pointer' : ''}`}
+        style={{ borderColor: ink.primary }}
+        onClick={foldable ? fold.onHeaderClick : undefined}
+      >
         <h4 className="text-xs font-bold uppercase tracking-[0.12em]" style={{ color: ink.primary }}>
           § 6 · Utrustning i avtalet
         </h4>
@@ -229,9 +255,24 @@ export default function ContractEquipmentSection({
         )}
         <span className="ml-auto font-sans text-[10.5px] tabular-nums" style={{ color: ink.muted }}>
           {loading ? 'hämtar' : annualExtra > 0 ? `${formatKr(annualExtra)}/år utöver premien` : extra.length > 0 ? `${extra.length} rader` : ''}
+          {foldable && !loading && (
+            <>
+              {' · '}
+              <FoldLink fold={fold} label={`visa ${extra.length} rader`} ink={ink} />
+            </>
+          )}
         </span>
       </div>
 
+      {foldable && !loading && !fold.open && (
+        <FoldSummary onClick={fold.toggle} ink={ink}>
+          {extra.length} tilläggsrad{extra.length === 1 ? '' : 'er'} på {siteKeys.filter((k) => k).length || 1} enhet{siteKeys.filter((k) => k).length === 1 ? '' : 'er'}
+          {addonStationCount > 0 ? ` · ${addonStationCount} stationer` : ''}
+          {premiumArticles.length > 0 ? ` · ${premiumArticles.length} rad${premiumArticles.length === 1 ? '' : 'er'} ingår i premien` : ''}
+        </FoldSummary>
+      )}
+
+      <div className={foldBodyClass(!foldable || fold.open)}>
       {empty ? (
         <p className="font-serif text-[12.5px] italic py-2" style={{ color: ink.muted }}>
           Ingen utrustning i avtalet.
@@ -367,6 +408,7 @@ export default function ContractEquipmentSection({
           )}
         </>
       )}
+      </div>
     </div>
   )
 }

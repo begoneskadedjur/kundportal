@@ -80,6 +80,7 @@ import {
 /** § 6 tänds två sekunder när panelen öppnas från notisen eller remsan */
 const PARA_FLASH_CLASSES = ['shadow-[inset_3px_0_0_#20c58f]', 'bg-[#20c58f]/[.04]']
 import { PAPER_GEAR_CLASS } from './paperInk'
+import { FOLD_THRESHOLD, FoldLink, FoldSummary, foldBodyClass, usePaperFold } from './paperFold'
 import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
 import AddonDropPrompt, { type AddonDropPromptState, type AddonPromptBrick } from './AddonDropPrompt'
 import { useAddonPending } from '../../../../hooks/useAddonPending'
@@ -4262,6 +4263,45 @@ function PaperContract({
     coveredUnits: coveredLocations,
   })
   const phase = contractPhase(contract, state, key)
+  // Hopfällning (paperFold.tsx). § 1 fälls in över FOLD_THRESHOLD enheter
+  // och öppnar sig när en enhet dras över pappret. § 3 visar alltid
+  // avvikelserna och fäller in enheterna i ordning.
+  const scopeFoldable = !contract.covers_all_sites && !isUnitContract && scope.length > FOLD_THRESHOLD
+  const scopeFold = usePaperFold({
+    contractId: contract.id,
+    para: 'omfattning',
+    closedByRule: scopeFoldable,
+    dragOver: isDropTarget && dropZone === 'scope',
+  })
+  const scopeNames = scope.map((cs) => {
+    const u = customerById.get(cs.customer_id)
+    return u ? (isSingleSite ? u.company_name : customerRowName(u)) : 'Okänd enhet'
+  })
+  const scopeDateSpan = (() => {
+    const dates = scope.map((cs) => cs.active_from).filter((d): d is string => !!d).sort()
+    if (dates.length === 0) return ''
+    const a = formatDateSv(dates[0])
+    const b = formatDateSv(dates[dates.length - 1])
+    return a === b ? `alla gäller fr. ${a}` : `gäller fr. ${a} till ${b}`
+  })()
+  const scopeEndingSoon = archived
+    ? 0
+    : scope.filter((cs) => {
+        if (!cs.active_to) return false
+        const days = (Date.parse(cs.active_to) - Date.parse(key)) / 86_400_000
+        return days >= 0 && days <= 30
+      }).length
+  const followupDeviating = followup.units.filter(
+    (u) => u.serviceMode === 'inspection' && (!u.nextVisitAt || (u.expectedSoFar != null && u.doneThisYear < u.expectedSoFar))
+  ).length
+  const followupInOrder = followup.units.length - followupDeviating
+  const followupFoldable = followup.units.length > FOLD_THRESHOLD && followupInOrder > 0
+  const followupFold = usePaperFold({ contractId: contract.id, para: 'uppfoljning', closedByRule: followupFoldable })
+  // Nästa besök bland enheterna som följer schemat, de avvikande står ovanför
+  const followupNextAt = followup.units
+    .filter((u) => u.nextVisitAt && !(u.expectedSoFar != null && u.doneThisYear < u.expectedSoFar))
+    .map((u) => u.nextVisitAt as string)
+    .sort()[0] ?? null
   const nextEquipment = premiumSummary({ contract, annualInForce: annual, planEntries }).nextEquipment
   const gear = (group: SettingsGroup, title: string) =>
     onOpenSettings && !archived ? (
@@ -4517,9 +4557,12 @@ function PaperContract({
         {periodLabel && <span className="ml-auto text-[11.5px] italic text-[#5d6672]">{periodLabel}</span>}
       </div>
 
-      {/* § 1 Omfattning */}
+      {/* § 1 Omfattning: hopfälld över FOLD_THRESHOLD enheter, öppnas av drag */}
       <div className="mt-3 group/para">
-        <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
+        <div
+          className={`flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1 ${scopeFoldable ? 'cursor-pointer' : ''}`}
+          onClick={scopeFoldable ? scopeFold.onHeaderClick : undefined}
+        >
           <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 1 · Omfattning</h4>
           {gear('omfattning', 'Inställningar för omfattning')}
           <span className="ml-auto font-sans text-[10.5px] text-[#8a9099] tabular-nums">
@@ -4530,8 +4573,25 @@ function PaperContract({
                 : isSingleSite
                   ? `${scope.length} av 1 lokal`
                   : `${scope.length} enhet${scope.length === 1 ? '' : 'er'}`}
+            {scopeFoldable && (
+              <>
+                {' · '}
+                <FoldLink fold={scopeFold} label={`visa ${scope.length} rader`} ink={ink} />
+              </>
+            )}
           </span>
         </div>
+        {scopeFoldable && !scopeFold.open && (
+          <FoldSummary
+            onClick={scopeFold.toggle}
+            warning={scopeEndingSoon > 0 ? `${scopeEndingSoon} enhet${scopeEndingSoon === 1 ? '' : 'er'} upphör inom 30 dagar` : undefined}
+          >
+            {scopeNames.slice(0, 3).join(', ')}
+            {scope.length > 3 ? ` … och ${scope.length - 3} till` : ''}
+            {scopeDateSpan ? ` · ${scopeDateSpan}` : ''}
+          </FoldSummary>
+        )}
+        <div className={foldBodyClass(!scopeFoldable || scopeFold.open)}>
         {contract.covers_all_sites ? (
           <div className="flex items-center gap-2.5 py-2 text-[13.5px] border-b border-dotted border-[#d9d3c2]">
             <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">1.1</span>
@@ -4625,6 +4685,7 @@ function PaperContract({
             )}
           </>
         )}
+        </div>
       </div>
 
       {/* Avtalsobjekt — vad som ingår, antal stationer per plats,
@@ -4665,7 +4726,10 @@ function PaperContract({
       {/* § 3 Uppföljning: vad kunden betalat för. Facit vid schemaläggning.
           Utfallet (besök gjorda, nästa besök, ärenden) bor i pulsen. */}
       <div className="mt-3.5 group/para">
-        <div className="flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1">
+        <div
+          className={`flex items-baseline gap-2 border-b-[1.5px] border-[#262e38] pb-1 ${followupFoldable ? 'cursor-pointer' : ''}`}
+          onClick={followupFoldable ? followupFold.onHeaderClick : undefined}
+        >
           <h4 className="text-xs font-bold uppercase tracking-[0.12em] text-[#262e38]">§ 3 · Uppföljning</h4>
           {gear('uppfoljning', 'Inställningar för uppföljning')}
           <span className="ml-auto font-sans text-[10.5px] tabular-nums" style={{ color: ink.muted }}>
@@ -4676,20 +4740,29 @@ function PaperContract({
                 : isAvrop
                   ? 'avrop'
                   : ''}
+            {followupFoldable && (
+              <>
+                {' · '}
+                <FoldLink fold={followupFold} label={`visa alla ${followup.units.length}`} ink={ink} />
+              </>
+            )}
           </span>
         </div>
         {/* Per enhet: driftläge, takt och utfall i avtalsåret. Takten ärvs från
-            avtalets förval tills enheten får en egen (contract_sites). */}
+            avtalets förval tills enheten får en egen (contract_sites).
+            Över FOLD_THRESHOLD enheter visas bara avvikelserna (inget schema,
+            efter plan); enheterna i ordning fälls in bakom en summeringsrad. */}
         {followup.units.length > 0 && (
           <div className="pt-1">
             {followup.units.map((u, i) => {
               const unit = customerById.get(u.unitId)
               const behind = u.serviceMode === 'inspection' && u.expectedSoFar != null && u.doneThisYear < u.expectedSoFar
               const noSchedule = u.serviceMode === 'inspection' && !u.nextVisitAt
+              const folded = followupFoldable && !followupFold.open && !behind && !noSchedule
               return (
                 <div
                   key={u.unitId}
-                  className="flex items-center gap-2.5 py-1.5 text-[13px]"
+                  className={`${folded ? 'hidden print:flex' : 'flex'} items-center gap-2.5 py-1.5 text-[13px]`}
                   style={{ borderBottom: `1px dotted ${ink.rule}` }}
                 >
                   <span className="font-sans text-[10.5px] w-6 tabular-nums" style={{ color: ink.muted }}>
@@ -4717,6 +4790,12 @@ function PaperContract({
                 </div>
               )
             })}
+            {followupFoldable && !followupFold.open && followupInOrder > 0 && (
+              <FoldSummary onClick={followupFold.toggle} ink={ink}>
+                {followupInOrder} enhet{followupInOrder === 1 ? '' : 'er'} följer schemat
+                {followupNextAt ? ` · nästa ${formatDateSv(followupNextAt)}` : ''}
+              </FoldSummary>
+            )}
           </div>
         )}
 
@@ -4743,6 +4822,8 @@ function PaperContract({
           Släppzon för utrustning och stationstyper från katalogen. */}
       <div data-drop-zone="equipment" id={`para6-${contract.id}`} className="transition-shadow duration-500 rounded-sm">
         <ContractEquipmentSection
+          contractId={contract.id}
+          dragOver={isDropTarget && dropZone === 'equipment'}
         ledger={addonLedger}
           services={contentData.content.services}
           articles={contentData.content.articles}
