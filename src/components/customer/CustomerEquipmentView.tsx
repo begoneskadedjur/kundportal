@@ -11,9 +11,11 @@ import {
   ExternalLink,
   Search,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download
 } from 'lucide-react'
 import { EquipmentService } from '../../services/equipmentService'
+import { StationMapService } from '../../services/stationMapService'
 import { FloorPlanService } from '../../services/floorPlanService'
 import { IndoorStationService } from '../../services/indoorStationService'
 import { getOutdoorInspectionsByStation } from '../../services/inspectionSessionService'
@@ -54,6 +56,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   const [indoorStationsByPlan, setIndoorStationsByPlan] = useState<Record<string, IndoorStationWithRelations[]>>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [downloadingMap, setDownloadingMap] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Utomhus detail sheet
@@ -135,6 +138,20 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
       }
     }
   }, [externalHighlightedStationId, externalHighlightedStationType, externalHighlightedFloorPlanId])
+
+  const handleDownloadMap = async () => {
+    setDownloadingMap(true)
+    const toastId = toast.loading('Skapar stationskarta...')
+    try {
+      await StationMapService.downloadStationMap(customerId)
+      toast.success('Stationskartan är nedladdad', { id: toastId })
+    } catch (err) {
+      console.error('Stationskarta:', err)
+      toast.error(err instanceof Error ? err.message : 'Kunde inte skapa stationskartan', { id: toastId })
+    } finally {
+      setDownloadingMap(false)
+    }
+  }
 
   const handleRefresh = async () => {
     setRefreshing(true)
@@ -274,6 +291,16 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {(equipment.length + totalIndoorStations) > 0 && (
+              <button
+                onClick={handleDownloadMap}
+                disabled={downloadingMap}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] text-[#fff] rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {downloadingMap ? 'Skapar...' : 'Ladda ned stationskarta'}
+              </button>
+            )}
             <button
               onClick={handleRefresh}
               disabled={refreshing}

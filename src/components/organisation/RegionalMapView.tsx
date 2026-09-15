@@ -1,7 +1,9 @@
 // Kartvy för regionalkunder — stationer med normala stationstyps-färger + transparenta regionpolygoner.
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { MapPin, Layers, Search, Camera, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
+import { MapPin, Layers, Search, Camera, ExternalLink, ChevronDown, ChevronUp, Download } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { StationMapService } from '../../services/stationMapService'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
@@ -79,6 +81,26 @@ export default function RegionalMapView({
   const [loading, setLoading] = useState(true)
   const [activeRegions, setActiveRegions] = useState<Set<string>>(new Set(sites.map(s => s.id)))
   const [selectedStation, setSelectedStation] = useState<EquipmentPlacementWithRelations | null>(null)
+  const [downloadingOverview, setDownloadingOverview] = useState(false)
+
+  const handleDownloadOverview = async () => {
+    const organizationId = organization?.organization_id
+    if (!organizationId) {
+      toast.error('Organisationen kunde inte identifieras')
+      return
+    }
+    setDownloadingOverview(true)
+    const toastId = toast.loading('Skapar stationsöversikt...')
+    try {
+      await StationMapService.downloadStationOverview(organizationId)
+      toast.success('Stationsöversikten är nedladdad', { id: toastId })
+    } catch (err) {
+      console.error('Stationsöversikt:', err)
+      toast.error(err instanceof Error ? err.message : 'Kunde inte skapa stationsöversikten', { id: toastId })
+    } finally {
+      setDownloadingOverview(false)
+    }
+  }
 
   // Senaste rondering per region: { caseId, scheduledStart, inspected, total, actionRequired }
   const [latestRondering, setLatestRondering] = useState<Map<string, {
@@ -251,9 +273,21 @@ export default function RegionalMapView({
                 {sites.length} regioner · {totalStations} aktiva stationer
               </p>
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <Layers className="w-4 h-4" />
-              Regionkarta
+            <div className="flex items-center gap-3">
+              {totalStations > 0 && (
+                <button
+                  onClick={handleDownloadOverview}
+                  disabled={downloadingOverview}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07f] text-[#fff] rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  {downloadingOverview ? 'Skapar...' : 'Ladda ned stationsöversikt'}
+                </button>
+              )}
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Layers className="w-4 h-4" />
+                Regionkarta
+              </div>
             </div>
           </div>
         </div>

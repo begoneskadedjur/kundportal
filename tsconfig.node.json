@@ -28,6 +28,9 @@
     "src/utils/inspectionDateGenerator.ts",
     "src/utils/swedishHolidays.ts",
 
+    // Fritext-stationstyp → station_types.code (generate-station-map-pdf)
+    "src/utils/stationTaxonomy.ts",
+
     // Delad periodmatematik för årspremiefakturor (generate-continuing-contracts)
     "src/shared/contractPlanner.ts",
 
