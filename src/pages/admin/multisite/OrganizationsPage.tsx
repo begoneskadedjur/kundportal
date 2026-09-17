@@ -100,6 +100,7 @@ interface OrganizationSite {
   id: string
   site_name: string
   site_code: string
+  billing_reference?: string
   region: string
   contact_person?: string
   contact_email?: string
@@ -409,6 +410,8 @@ export default function OrganizationsPage() {
           // Kontaktinfo
           contact_phone: org.contact_phone,
           contact_person: org.contact_person,
+          contact_email: org.contact_email,
+          primary_contact_email: org.contact_email,
           // Enheter
           sites: sites || [],
           // Trafikljusdata
@@ -762,9 +765,8 @@ export default function OrganizationsPage() {
         if (!organizationUsers[org.id]) {
           await fetchOrganizationUsers(org.id, org.organization_id)
         }
-        if (!organizationSites[org.id]) {
-          await fetchOrganizationSites(org.id, org.organization_id)
-        }
+        // Enheterna laddas om varje gång: de kan ha redigerats från kundkortet
+        await fetchOrganizationSites(org.id, org.organization_id)
       }
     }
   }
@@ -829,6 +831,7 @@ export default function OrganizationsPage() {
         id: site.id,
         site_name: site.site_name || '',
         site_code: site.site_code || '',
+        billing_reference: site.billing_reference || undefined,
         region: site.region || '',
         contact_person: site.contact_person || undefined,
         contact_email: site.contact_email || undefined,

@@ -56,7 +56,6 @@ export default function SiteModal({
   
   // Grundinformation
   const [siteName, setSiteName] = useState('')
-  const [siteCode, setSiteCode] = useState('')
   const [region, setRegion] = useState('')
   const [organizationNumber, setOrganizationNumber] = useState('')
   
@@ -84,7 +83,6 @@ export default function SiteModal({
       if (existingSite) {
         // Fyll i fält från befintlig enhet
         setSiteName(existingSite.site_name || '')
-        setSiteCode(existingSite.site_code || '')
         setRegion(existingSite.region || '')
         setOrganizationNumber(existingSite.organization_number || '')
         setContactPerson(existingSite.contact_person || '')
@@ -120,7 +118,6 @@ export default function SiteModal({
 
   const resetForm = () => {
     setSiteName('')
-    setSiteCode('')
     setRegion('')
     setOrganizationNumber('')
     setContactPerson('')
@@ -196,7 +193,8 @@ export default function SiteModal({
       const formValues = {
         company_name: `${organizationName} - ${siteName}`,
         site_name: siteName,
-        site_code: siteCode.trim() ? siteCode.trim().toUpperCase() : null,
+        // Enhetens kod ÄR fakturamärkningen (billing_reference). Den gamla
+        // kolumnen site_code lämnas orörd och skrivs inte längre härifrån.
         region: region,
         organization_number: organizationNumber || null,
         contact_person: contactPerson || null,
@@ -208,11 +206,9 @@ export default function SiteModal({
         billing_reference: billingReference.trim() || null,
       }
 
-      // Enhetskoden är unik i databasen; felet ser olika ut beroende på om
-      // constraintet slår eller Postgres hinner formulera meddelandet.
       const describeError = (error: { code?: string; message?: string }) => {
-        if (error.code === '23505' || error.message?.includes('site_code')) {
-          return new Error('Enhetskoden används redan')
+        if (error.code === '23505') {
+          return new Error('En enhet med samma uppgifter finns redan')
         }
         return error
       }
@@ -332,17 +328,6 @@ export default function SiteModal({
                   onChange={(e) => setSiteName(e.target.value)}
                   placeholder="t.ex. Stockholm City"
                   required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Enhetskod
-                </label>
-                <Input
-                  type="text"
-                  value={siteCode}
-                  onChange={(e) => setSiteCode(e.target.value.toUpperCase())}
-                  placeholder="t.ex. STO01"
                 />
               </div>
               <div>
@@ -479,16 +464,16 @@ export default function SiteModal({
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Märkning faktura
+                  Enhetskod (märkning faktura)
                 </label>
                 <Input
                   type="text"
                   value={billingReference}
                   onChange={(e) => setBillingReference(e.target.value)}
-                  placeholder="t.ex. PO-nummer eller kostnadsställe"
+                  placeholder="t.ex. YX301, PO-nummer eller kostnadsställe"
                 />
                 <p className="text-xs text-slate-500 mt-1">
-                  Blir Er referens på fakturan och fylls i automatiskt när ärenden skapas mot enheten.
+                  Enhetens kod. Blir Er referens på fakturan och fylls i automatiskt när ärenden skapas mot enheten.
                 </p>
               </div>
             </div>

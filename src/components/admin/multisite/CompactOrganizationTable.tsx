@@ -98,6 +98,7 @@ interface Site {
   id: string
   site_name: string
   site_code: string
+  billing_reference?: string
   region: string
   contact_person?: string
   contact_email?: string
@@ -814,10 +815,15 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                                 </div>
                                 <div className="min-w-0">
                                   <p className="text-sm text-white font-medium truncate">
-                                    {site.site_name} ({site.site_code})
+                                    {site.site_name}
+                                    {(site.billing_reference || site.site_code) && (
+                                      <span className="ml-2 font-mono text-xs text-slate-400">
+                                        {site.billing_reference || site.site_code}
+                                      </span>
+                                    )}
                                   </p>
                                   <p className="text-xs text-slate-400 truncate">
-                                    {site.region} • {site.contact_email}
+                                    {[site.region, site.contact_person, site.contact_email].filter(Boolean).join(' • ')}
                                   </p>
                                 </div>
                               </div>

@@ -140,6 +140,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   // Samma sak för fakturamärkningen, som ärvs enhet → huvudkontor. Utan detta
   // skulle ett enhetsbyte skriva över en märkning koordinatorn skrivit själv.
   const autofilledMarkingRef = useRef<string | null>(null);
+  // Kontaktuppgifterna som autofyllet skrev senast. Kunden väljs före
+  // enheten, så huvudkontorets kontakt hinner fyllas i först; den ska få
+  // ersättas av enhetens, medan en handskriven kontakt eller en kontakt från
+  // kundens förfrågan står kvar.
+  const autofilledContactRef = useRef<{ person: string; phone: string; email: string } | null>(null);
   // Sant när adressen i fältet kommer från huvudkontoret för att enheten
   // saknar egen. Styr hjälptexten under fältet.
   const [addressFromParent, setAddressFromParent] = useState(false);
@@ -169,6 +174,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setCustomerDropdownOpen(false);
     autofilledAddressRef.current = null;
     autofilledMarkingRef.current = null;
+    autofilledContactRef.current = null;
     setAddressFromParent(false);
     // Städa upp bildförhandsvisningar
     setSelectedImages(prev => {
@@ -582,15 +588,33 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
           // Kontaktuppgifterna följer samma regel som adressen: kunden kan ha
           // angett en egen kontaktperson i sin förfrågan, och den får inte
-          // skrivas över av enhetens standarduppgifter.
-          const keepOwn = (current: string | null | undefined, next: string | null | undefined) =>
-            current?.trim() ? current : (next || '');
+          // skrivas över av enhetens standarduppgifter. Men det autofyllet
+          // självt skrev (huvudkontorets kontakt, innan enheten valdes) får
+          // ersättas av enhetens.
+          const ours = autofilledContactRef.current;
+          const contactIsOurs =
+            (!prev.kontaktperson?.trim() || prev.kontaktperson === ours?.person) &&
+            (!prev.telefon_kontaktperson?.trim() || prev.telefon_kontaktperson === ours?.phone) &&
+            (!prev.e_post_kontaktperson?.trim() || prev.e_post_kontaktperson === ours?.email);
+          const nextContact = {
+            person: dataSource.contact_person || '',
+            phone: dataSource.contact_phone || '',
+            email: dataSource.contact_email || '',
+          };
+          const fill = (current: string | null | undefined, next: string) =>
+            contactIsOurs ? (next || current || '') : (current?.trim() ? current : next);
+          const kontaktperson = fill(prev.kontaktperson, nextContact.person);
+          const telefon_kontaktperson = fill(prev.telefon_kontaktperson, nextContact.phone);
+          const e_post_kontaktperson = fill(prev.e_post_kontaktperson, nextContact.email);
+          if (contactIsOurs) {
+            autofilledContactRef.current = { person: kontaktperson, phone: telefon_kontaktperson, email: e_post_kontaktperson };
+          }
 
           return {
           ...prev,
-          kontaktperson: keepOwn(prev.kontaktperson, dataSource.contact_person),
-          telefon_kontaktperson: keepOwn(prev.telefon_kontaktperson, dataSource.contact_phone),
-          e_post_kontaktperson: keepOwn(prev.e_post_kontaktperson, dataSource.contact_email),
+          kontaktperson,
+          telefon_kontaktperson,
+          e_post_kontaktperson,
           org_nr: dataSource.organization_number || parentCustomer?.organization_number || '',
           bestallare: dataSource.company_name || '',
           company_name: dataSource.company_name || customer?.company_name || parentCustomer?.company_name || '',
@@ -731,6 +755,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     // Koordinatorn har tagit över märkningen: autofyllet får inte skriva över
     // den när enhet byts.
     if (name === 'markning_faktura') autofilledMarkingRef.current = null;
+    // Samma sak för kontaktuppgifterna: skriver koordinatorn i något av
+    // fälten ska ett enhetsbyte inte längre röra dem.
+    if (name === 'kontaktperson' || name === 'telefon_kontaktperson' || name === 'e_post_kontaktperson') {
+      autofilledContactRef.current = null;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
