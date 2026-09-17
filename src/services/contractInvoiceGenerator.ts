@@ -405,13 +405,17 @@ export class ContractInvoiceGenerator {
   ): Promise<BillingPlanEntry[]> {
     const out: BillingPlanEntry[] = []
     const freq = contract.billing_frequency as BillingFrequency | null
+    // Tilläggsfakturor är alltid en per avtal. consolidated sätts uttryckligen
+    // till false: mergePlans ärver annars gruppens samlingsflagga, och då
+    // sparas fakturan utan contract_id och krockar på invoices_consolidated_period_key.
     const decorate = (e: BillingPlanEntry, kind: ContractInvoiceKind): BillingPlanEntry => {
-      if (!e.planned) return { ...e, kind, contractId: contract.id, contractLabel: sources.label }
+      if (!e.planned) return { ...e, kind, contractId: contract.id, contractLabel: sources.label, consolidated: false }
       return {
         ...e,
         kind,
         contractId: contract.id,
         contractLabel: sources.label,
+        consolidated: false,
         rows: this.buildRowsForContract(contract.id, sources, e.planned, freq),
         marking,
         notes: this.buildNotes(e.planned, sources.label, sources.diaryNumber),
