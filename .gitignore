@@ -48,3 +48,5 @@ src/lib/pdf-generator.d.ts
 src/types/database.js
 src/types/database.d.ts
 *.tsbuildinfo
+
+.vercel

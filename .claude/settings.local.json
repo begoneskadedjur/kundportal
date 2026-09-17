@@ -107,19 +107,5 @@
       "C:\\mnt\\c\\Users\\chris",
       "C:\\c\\Users\\chris"
     ]
-  },
-  "mcpServers": {
-    "supabase": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@supabase/mcp-server-supabase@latest",
-        "--read-only",
-        "--project-ref=rfyufytjwvqiqwueinoj"
-      ],
-      "env": {
-        "SUPABASE_ACCESS_TOKEN": "sbp_fb971bff3af98ae4ad70bc40a551e5e8c16de236"
-      }
-    }
   }
 }
