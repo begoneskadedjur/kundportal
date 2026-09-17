@@ -172,6 +172,22 @@ export interface RecordInvoice {
   is_historical: boolean | null
   due_date: string | null
   created_at: string
+  /** premium | equipment | equipment_monthly | adjustment (null = premium) */
+  contract_invoice_kind?: string | null
+  /** Samlad faktura: en per period för kunden, avtalen som rader (contract_id null) */
+  is_consolidated?: boolean | null
+  /** Er referens på fakturan */
+  invoice_marking?: string | null
+  /** Raderna, för att visa vilka avtal en samlad faktura bär och vad ett tillägg avser */
+  items?: RecordInvoiceItem[]
+}
+
+export interface RecordInvoiceItem {
+  contract_id: string | null
+  article_name: string | null
+  line_kind: string | null
+  quantity: number | null
+  total_price: number | null
 }
 
 /**
@@ -564,7 +580,8 @@ export function useCustomerRecord(customerId: string | undefined) {
         .select(
           'id, customer_id, contract_id, case_id, invoice_type, invoice_number, status, ' +
             'subtotal, total_amount, billing_period_start, billing_period_end, ' +
-            'is_historical, due_date, created_at'
+            'is_historical, due_date, created_at, contract_invoice_kind, is_consolidated, invoice_marking, ' +
+            'items:invoice_items(contract_id, article_name, line_kind, quantity, total_price)'
         )
         .in('customer_id', familyIds)
         .order('billing_period_start', { ascending: false }),

@@ -6,12 +6,19 @@
 // bara 13 av 73 rader blir fakturor. För HSB Tallen visades därför 19 400 kr
 // av 52 976 kr, för Swedish Pelican 100 809 av 398 409.
 //
+// Fakturorna delas efter VAD kunden betalar för, med samma ord som
+// faktureringssidan och avtalskartans § 6:
+//   Årspremie            invoice_type contract, kind premium (samlad eller per avtal)
+//   Merförsäljning avtal tilläggsstationer (kind equipment) + ärendefakturor (adhoc)
+// Kommande fakturor räknas ur avtalskartans planerare och visas utan att
+// finnas i databasen; klick öppnar en förhandsvisning.
+//
 // Fakturor skapade i portalen är klickbara och öppnar hela fakturan.
 // Fortnox-importerad historik (is_historical) är läsbar men inte klickbar —
 // det finns inget underlag i systemet att öppna.
 
-import { lazy, Suspense, useMemo, useState } from 'react'
-import { AlertTriangle, CheckCircle2, ChevronRight, Circle, Clock, XCircle } from 'lucide-react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, Circle, Clock, XCircle } from 'lucide-react'
 import {
   contractDisplayName,
   customerRowName,
@@ -25,7 +32,9 @@ import {
   type RecordInvoice,
 } from '../../../../hooks/useCustomerRecord'
 import { isCaseCompleted } from '../../../../utils/customerRevenue'
+import { ContractInvoiceGenerator, type BillingPlanEntry } from '../../../../services/contractInvoiceGenerator'
 import InvoiceSlip, { type SlipVariant } from './InvoiceSlip'
+import PlannedInvoicePreviewModal from './PlannedInvoicePreviewModal'
 
 const InvoiceDetailModal = lazy(() => import('../../invoicing/InvoiceDetailModal'))
 
@@ -63,9 +72,19 @@ function invoiceStatus(inv: RecordInvoice): AggStatus {
   return 'pending'
 }
 
-/** Årspremie eller arbete utanför avtalet. */
-function isContractRevenue(inv: RecordInvoice): boolean {
-  return (inv.invoice_type ?? '') === 'contract'
+/** Vad fakturan avser: årspremie, tilläggsstationer eller arbete utöver avtalet. */
+type InvoiceKind = 'premium' | 'equipment' | 'upsell'
+function invoiceKind(inv: RecordInvoice): InvoiceKind {
+  if ((inv.invoice_type ?? '') !== 'contract') return 'upsell'
+  const k = inv.contract_invoice_kind ?? 'premium'
+  if (k === 'equipment' || k === 'equipment_monthly') return 'equipment'
+  return 'premium'
+}
+
+const PLAN_KIND_LABEL: Record<string, string> = {
+  premium: 'Årspremie',
+  equipment: 'Tilläggsstationer, per år',
+  equipment_monthly: 'Tilläggsstationer, per månad',
 }
 
 interface Props {
@@ -79,44 +98,40 @@ interface Props {
   billingItems: RecordBillingItem[]
 }
 
-export default function BillingChainSection({ root, units, contracts, invoices, cases, billingItems }: Props) {
+export default function BillingChainSection({ root, contracts, invoices, cases, billingItems }: Props) {
   const [openInvoiceId, setOpenInvoiceId] = useState<string | null>(null)
+  const [openPlanned, setOpenPlanned] = useState<BillingPlanEntry | null>(null)
+
+  const contractNames = useMemo(() => new Map(contracts.map((c) => [c.id, contractDisplayName(c)])), [contracts])
+  /** Radens beskrivning: vilket avtal, eller vad tillägget/ärendet avser. */
+  const describe = (inv: RecordInvoice): string => {
+    const kind = invoiceKind(inv)
+    const contractName = inv.contract_id ? contractNames.get(inv.contract_id) : null
+    if (kind === 'premium') {
+      if (inv.is_consolidated) {
+        const n = new Set((inv.items ?? []).map((i) => i.contract_id).filter(Boolean)).size
+        return n > 1 ? `Samlad faktura · ${n} avtal` : 'Samlad faktura'
+      }
+      return contractName ?? 'Årspremie'
+    }
+    if (kind === 'equipment') {
+      const monthly = inv.contract_invoice_kind === 'equipment_monthly'
+      const units = new Set((inv.items ?? []).map((i) => i.article_name?.split(' · ')[1]).filter(Boolean))
+      const where = contractName ?? (units.size > 0 ? Array.from(units).join(', ') : null)
+      return `Tilläggsstationer${monthly ? ' per månad' : ''}${where ? ` · ${where}` : ''}`
+    }
+    const first = (inv.items ?? []).find((i) => i.article_name)?.article_name
+    return first ? `Ärende · ${first}` : 'Ärende'
+  }
 
   const groups = useMemo(() => {
-    const byContract = new Map<string, RecordInvoice[]>()
-    const unlinked: RecordInvoice[] = []
-    for (const inv of invoices) {
-      if (inv.contract_id) {
-        const list = byContract.get(inv.contract_id) ?? []
-        list.push(inv)
-        byContract.set(inv.contract_id, list)
-      } else {
-        unlinked.push(inv)
-      }
-    }
-
-    const contractGroups = contracts
-      .map((c) => ({
-        key: c.id,
-        title: contractDisplayName(c),
-        subtitle: customerRowName(
-          [root, ...units].find((r) => r.id === c.customer_id) ?? root
-        ),
-        rows: (byContract.get(c.id) ?? []).sort((a, b) =>
-          (b.billing_period_start ?? '').localeCompare(a.billing_period_start ?? '')
-        ),
-      }))
-      .filter((g) => g.rows.length > 0)
-
+    const byPeriod = (a: RecordInvoice, b: RecordInvoice) =>
+      (b.billing_period_start ?? '').localeCompare(a.billing_period_start ?? '')
     return {
-      contractGroups,
-      // Merförsäljning och äldre rader utan avtalskoppling. De hör till kunden,
-      // inte till ett specifikt avtal — merförsäljning mäts per kund.
-      unlinked: unlinked.sort((a, b) =>
-        (b.billing_period_start ?? '').localeCompare(a.billing_period_start ?? '')
-      ),
+      premium: invoices.filter((i) => invoiceKind(i) === 'premium').sort(byPeriod),
+      extra: invoices.filter((i) => invoiceKind(i) !== 'premium').sort(byPeriod),
     }
-  }, [invoices, contracts, root, units])
+  }, [invoices])
 
   const totals = useMemo(() => {
     const live = invoices.filter((i) => (i.status ?? '') !== 'cancelled')
@@ -142,10 +157,13 @@ export default function BillingChainSection({ root, units, contracts, invoices, 
     )
     const orphanRevenue = orphanItems.reduce((s, b) => s + Number(b.total_price ?? 0), 0)
 
+    const equipment = sum(live.filter((i) => invoiceKind(i) === 'equipment'))
+    const upsell = sum(live.filter((i) => invoiceKind(i) === 'upsell')) + caseRevenue
     return {
       all: sum(live) + caseRevenue + orphanRevenue,
-      contract: sum(live.filter(isContractRevenue)),
-      extra: sum(live.filter((i) => !isContractRevenue(i))) + caseRevenue,
+      premium: sum(live.filter((i) => invoiceKind(i) === 'premium')),
+      equipment,
+      extra: equipment + upsell,
       overdue: sum(live.filter((i) => invoiceStatus(i) === 'overdue')),
       historical: sum(live.filter((i) => i.is_historical)) + caseRevenue + orphanRevenue,
       caseRevenue,
@@ -154,17 +172,61 @@ export default function BillingChainSection({ root, units, contracts, invoices, 
     }
   }, [invoices, cases, billingItems])
 
-  if (invoices.length === 0 && totals.caseRevenue === 0 && totals.orphanItems.length === 0) {
+  // Kommande fakturor ur avtalskartans planerare: bara poster som INTE finns
+  // i databasen (action create). Utkast som redan finns står i listorna ovan.
+  const [upcoming, setUpcoming] = useState<BillingPlanEntry[] | null>(null)
+  const [upcomingError, setUpcomingError] = useState<string | null>(null)
+  useEffect(() => {
+    if (contracts.length === 0) {
+      setUpcoming([])
+      return
+    }
+    let cancelled = false
+    setUpcoming(null)
+    setUpcomingError(null)
+    ;(async () => {
+      try {
+        const plans = await ContractInvoiceGenerator.planCombinedForCustomer(root.id)
+        const merged = ContractInvoiceGenerator.mergePlans(root.id, plans)
+        const list = merged.entries
+          .filter((e) => e.action === 'create' && e.planned)
+          .sort((a, b) => (a.planned!.invoiceDate + a.planned!.periodStart).localeCompare(b.planned!.invoiceDate + b.planned!.periodStart))
+        if (!cancelled) setUpcoming(list)
+      } catch (err) {
+        if (!cancelled) setUpcomingError(err instanceof Error ? err.message : 'Kunde inte räkna fram kommande fakturor')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [root.id, contracts.length, invoices.length])
+
+  const describePlanned = (e: BillingPlanEntry): string => {
+    const kind = PLAN_KIND_LABEL[e.kind ?? 'premium'] ?? 'Årspremie'
+    if (e.consolidated) {
+      const n = new Set((e.rows ?? []).map((r) => r.contract_id).filter(Boolean)).size
+      return `${kind} · samlad faktura${n > 1 ? ` · ${n} avtal` : ''}`
+    }
+    const name = e.contractLabel ?? (e.contractId ? contractNames.get(e.contractId) : null)
+    return name ? `${kind} · ${name}` : kind
+  }
+
+  if (invoices.length === 0 && totals.caseRevenue === 0 && totals.orphanItems.length === 0 && (upcoming?.length ?? 0) === 0) {
     return <p className="text-sm text-slate-500">Inga fakturor registrerade för kunden.</p>
   }
 
   return (
     <div className="space-y-5">
-      {/* Sammanfattning: avtalat mot merförsäljning, allt ex moms */}
+      {/* Sammanfattning: årspremie mot merförsäljning avtal, allt ex moms */}
       <div className="grid grid-cols-2 lg:grid-cols-4 rounded-2xl border border-slate-800 bg-slate-900/60 divide-x divide-y lg:divide-y-0 divide-slate-800 overflow-hidden">
         <SumCell label="Fakturerat totalt" value={totals.all} hint="ex moms" />
-        <SumCell label="Avtalsintäkt" value={totals.contract} hint="årspremie" tone="brand" />
-        <SumCell label="Merförsäljning" value={totals.extra} hint="utanför avtalet" tone="brand" />
+        <SumCell label="Årspremie" value={totals.premium} hint="avtalens premie" tone="brand" />
+        <SumCell
+          label="Merförsäljning avtal"
+          value={totals.extra}
+          hint={totals.equipment > 0 ? `varav tilläggsstationer ${formatKr(totals.equipment)}` : 'tillägg och arbete utöver avtalet'}
+          tone="brand"
+        />
         {totals.overdue > 0 ? (
           <SumCell label="Förfallet" value={totals.overdue} hint="obetalt" tone="bad" />
         ) : (
@@ -172,23 +234,87 @@ export default function BillingChainSection({ root, units, contracts, invoices, 
         )}
       </div>
 
-      {groups.contractGroups.map((g) => (
+      {groups.premium.length > 0 && (
         <InvoiceGroup
-          key={g.key}
-          title={g.title}
-          subtitle={g.subtitle}
-          rows={g.rows}
+          title="Årspremie"
+          subtitle="avtalens premie, per period"
+          rows={groups.premium}
+          describe={describe}
           onOpen={setOpenInvoiceId}
         />
-      ))}
+      )}
 
-      {groups.unlinked.length > 0 && (
+      {groups.extra.length > 0 && (
         <InvoiceGroup
-          title="Utan avtalskoppling"
-          subtitle="merförsäljning och äldre rader"
-          rows={groups.unlinked}
+          title="Merförsäljning avtal"
+          subtitle="tilläggsstationer och arbete utöver avtalet"
+          rows={groups.extra}
+          describe={describe}
           onOpen={setOpenInvoiceId}
         />
+      )}
+
+      {/* Kommande fakturor: ur planeraren, finns inte i databasen. Klick visar
+          fakturan som den kommer att se ut. */}
+      {contracts.length > 0 && (
+        <section>
+          <div className="flex items-baseline gap-3 pb-1.5 border-b border-slate-800">
+            <h3 className="text-sm font-semibold text-slate-100">Kommande fakturor</h3>
+            <span className="text-xs text-slate-500 truncate">
+              ur avtalskartan, inte skapade ännu
+            </span>
+            {upcoming && upcoming.length > 0 && (
+              <span className="ml-auto text-xs text-slate-400 tabular-nums shrink-0">
+                {formatKr(upcoming.reduce((s, e) => s + (e.planned?.subtotal ?? 0), 0))} <span className="text-slate-600">ex moms</span>
+              </span>
+            )}
+          </div>
+          {upcoming === null && !upcomingError && (
+            <p className="text-xs text-slate-500 mt-2">Räknar ur avtalen …</p>
+          )}
+          {upcomingError && <p className="text-xs text-amber-300 mt-2">{upcomingError}</p>}
+          {upcoming && upcoming.length === 0 && (
+            <p className="text-xs text-slate-500 mt-2">
+              Inget att skapa: alla perioder inom avtalstiden har redan en faktura eller ett utkast.
+            </p>
+          )}
+          {upcoming && upcoming.length > 0 && (
+            <ul className="divide-y divide-slate-800/60 mt-1">
+              {upcoming.map((e, i) => {
+                const p = e.planned!
+                return (
+                  <li key={`${e.contractId ?? 'c'}-${e.kind ?? 'premium'}-${p.periodStart}-${i}`}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenPlanned(e)}
+                      className="w-full flex items-center gap-3 px-2 py-2 -mx-2 rounded-lg text-left hover:bg-slate-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] transition-colors group"
+                      title="Visa fakturan som den kommer att se ut"
+                    >
+                      <span className="w-6 h-6 rounded-md border border-dashed border-slate-600 flex items-center justify-center shrink-0">
+                        <CalendarClock className="w-3.5 h-3.5 text-slate-500" />
+                      </span>
+                      <span className="text-xs text-slate-400 tabular-nums w-[76px] shrink-0">
+                        {formatMonthSv(p.periodStart)}
+                      </span>
+                      <span className="text-sm text-slate-200 tabular-nums w-24 shrink-0 text-right">
+                        {formatKr(p.subtotal)}
+                      </span>
+                      <span className="flex items-center gap-1.5 w-24 shrink-0 text-slate-500">
+                        <Circle className="w-3.5 h-3.5 shrink-0" />
+                        <span className="text-xs">Planerad</span>
+                      </span>
+                      <span className="text-xs text-slate-500 truncate min-w-0 flex-1">
+                        {describePlanned(e)}
+                        <span className="text-slate-600"> · skapas {formatDateSv(p.invoiceDate)}</span>
+                      </span>
+                      <ChevronRight className="w-3.5 h-3.5 text-slate-700 group-hover:text-[#20c58f] transition-colors shrink-0" />
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
       )}
 
       {/* Fortnox-fakturor som bara finns i faktureringsunderlaget. Läsbara men
@@ -257,6 +383,15 @@ export default function BillingChainSection({ root, units, contracts, invoices, 
           />
         </Suspense>
       )}
+
+      {openPlanned && (
+        <PlannedInvoicePreviewModal
+          entry={openPlanned}
+          customerName={customerRowName(root)}
+          contractNames={contractNames}
+          onClose={() => setOpenPlanned(null)}
+        />
+      )}
     </div>
   )
 }
@@ -293,11 +428,13 @@ function InvoiceGroup({
   title,
   subtitle,
   rows,
+  describe,
   onOpen,
 }: {
   title: string
   subtitle: string
   rows: RecordInvoice[]
+  describe: (inv: RecordInvoice) => string
   onOpen: (id: string) => void
 }) {
   const groupTotal = rows
@@ -364,7 +501,8 @@ function InvoiceGroup({
                 </span>
               )}
               <span className="text-xs text-slate-500 truncate min-w-0 flex-1">
-                {inv.invoice_number && <span className="font-mono">{inv.invoice_number}</span>}
+                <span className="text-slate-400">{describe(inv)}</span>
+                {inv.invoice_number && <span className="font-mono"> · {inv.invoice_number}</span>}
                 {inv.due_date && status === 'overdue' && (
                   <span className="text-red-400"> · förföll {formatDateSv(inv.due_date)}</span>
                 )}
