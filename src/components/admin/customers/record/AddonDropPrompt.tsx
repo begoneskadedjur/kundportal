@@ -6,7 +6,7 @@
 // körs ett i taget med progress i knappen. Faller ett stannar körningen,
 // de klara ligger kvar beslutade och raden som brast pekas ut.
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Calendar, Loader2 } from 'lucide-react'
 import DateField from '../../../ui/DateField'
 import { AddonStationBillingService } from '../../../../services/addonStationBillingService'
@@ -123,10 +123,37 @@ export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onAll
   const title = isPremium ? 'Baka in i årspremien' : 'Tillägg utöver avtalet'
   const single = items[0]
 
+  // Rutan öppnas vid klicket men får aldrig hamna utanför skärmen: med nio
+  // brickor är den högre än 420 px, och från panelen till höger hamnar
+  // klicket nära kanten. Mät rutan och kläm in den med 12 px marginal.
+  const boxRef = useRef<HTMLDivElement | null>(null)
+  const [pos, setPos] = useState<{ left: number; top: number }>({ left: Math.max(12, Math.min(prompt.x, window.innerWidth - 400)), top: Math.max(12, Math.min(prompt.y, window.innerHeight - 420)) })
+  useLayoutEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const place = () => {
+      const w = el.offsetWidth
+      const h = el.offsetHeight
+      setPos({
+        left: Math.max(12, Math.min(prompt.x, window.innerWidth - w - 12)),
+        top: Math.max(12, Math.min(prompt.y, window.innerHeight - h - 12)),
+      })
+    }
+    place()
+    const ro = new ResizeObserver(place)
+    ro.observe(el)
+    window.addEventListener('resize', place)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', place)
+    }
+  }, [prompt.x, prompt.y])
+
   return (
     <div
-      className="fixed z-[130] w-[380px] max-w-[92vw] bg-slate-950 border border-slate-700 rounded-2xl p-3 shadow-2xl shadow-black/60"
-      style={{ left: Math.min(prompt.x, window.innerWidth - 400), top: Math.min(prompt.y, window.innerHeight - 420) }}
+      ref={boxRef}
+      className="fixed z-[130] w-[380px] max-w-[92vw] max-h-[calc(100vh-24px)] overflow-y-auto bg-slate-950 border border-slate-700 rounded-2xl p-3 shadow-2xl shadow-black/60"
+      style={{ left: pos.left, top: pos.top }}
     >
       <h4 className="text-sm font-semibold text-slate-100 flex items-center gap-2 mb-0.5">
         <Calendar className="w-3.5 h-3.5 text-[#20c58f]" />
