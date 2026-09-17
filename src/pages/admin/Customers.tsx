@@ -29,6 +29,7 @@ import Select from '../../components/ui/Select'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers, type ConsolidatedCustomer } from '../../hooks/useConsolidatedCustomers'
 import { useAddonPending, findAddonPending, type AddonPendingSummary } from '../../hooks/useAddonPending'
+import { useContractMapStatus, findContractMapStatus } from '../../hooks/useContractMapStatus'
 import toast from 'react-hot-toast'
 
 // "Kräver åtgärd": uppsagd med slutdatum inom 90 dgr. Avtal förlängs automatiskt
@@ -61,7 +62,10 @@ function formatAnnualSum(v: number): string {
   return `${Math.round(v / 1000).toLocaleString('sv-SE')} tkr/år`
 }
 
-type QuickView = 'all' | 'atgard' | 'fortnox'
+// karta_saknas: inget avtalspapper alls (bara kundrad/importrest).
+// karta_ofullstandig: papper finns men vitala delar saknas i avtalskartan.
+type QuickView = 'all' | 'atgard' | 'fortnox' | 'karta_saknas' | 'karta_ofullstandig'
+const QUICK_VIEWS: QuickView[] = ['all', 'atgard', 'fortnox', 'karta_saknas', 'karta_ofullstandig']
 
 export default function Customers() {
   const navigate = useNavigate()
@@ -175,10 +179,12 @@ export default function Customers() {
   // ?quick=atgard (från avtalskartans "Tillbaka till Kräver åtgärd")
   const [quickView, setQuickView] = useState<QuickView>(() => {
     const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('quick') : null
-    return q === 'atgard' || q === 'fortnox' ? q : 'all'
+    return q && (QUICK_VIEWS as string[]).includes(q) ? (q as QuickView) : 'all'
   })
   const addonRows = useAddonPending()
   const addonFor = useCallback((c: ConsolidatedCustomer) => findAddonPending(addonRows, c), [addonRows])
+  const mapRows = useContractMapStatus()
+  const mapFor = useCallback((c: ConsolidatedCustomer) => findContractMapStatus(mapRows, c), [mapRows])
 
   // Paginering
 
@@ -202,9 +208,11 @@ export default function Customers() {
     if (quickView === 'fortnox') {
       return result.filter(c => !c.isTerminated && resolveFortnoxInfo(c).number == null)
     }
+    if (quickView === 'karta_saknas') return result.filter(c => !c.isTerminated && mapFor(c)?.status === 'none')
+    if (quickView === 'karta_ofullstandig') return result.filter(c => !c.isTerminated && mapFor(c)?.status === 'incomplete')
     return result
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [consolidatedCustomers, searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, quickView, filterConsolidatedCustomers])
+  }, [consolidatedCustomers, searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, quickView, filterConsolidatedCustomers, mapFor])
 
   // Grupperade sektioner (ersätter gamla statusgrupperna)
   const groups = useMemo(() => {
@@ -308,10 +316,14 @@ export default function Customers() {
   const atgardCount = consolidatedCustomers.filter((c) => requiresAction(c, addonFor(c))).length
   const multisiteCount = consolidatedCustomers.filter(c => !c.isTerminated && c.organizationType === 'multisite').length
   const terminatedCount = consolidatedCustomers.filter(c => c.isTerminated).length
+  const mapMissingCount = consolidatedCustomers.filter(c => !c.isTerminated && mapFor(c)?.status === 'none').length
+  const mapIncompleteCount = consolidatedCustomers.filter(c => !c.isTerminated && mapFor(c)?.status === 'incomplete').length
 
   // Aktiv preset-detektering
   const activePreset: string = quickView === 'atgard' ? 'atgard'
     : quickView === 'fortnox' ? 'fortnox'
+    : quickView === 'karta_saknas' ? 'karta_saknas'
+    : quickView === 'karta_ofullstandig' ? 'karta_ofullstandig'
     : statusFilter === 'expiring' ? 'expiring'
     : statusFilter === 'terminated' ? 'terminated'
     : organizationTypeFilter === 'multisite' ? 'multisite'
@@ -338,6 +350,10 @@ export default function Customers() {
         break
       case 'fortnox':
         setStatusFilter('all'); setOrganizationTypeFilter('all'); setQuickView('fortnox')
+        break
+      case 'karta_saknas':
+      case 'karta_ofullstandig':
+        setStatusFilter('all'); setOrganizationTypeFilter('all'); setQuickView(preset)
         break
       case 'multisite':
         setStatusFilter('all'); setOrganizationTypeFilter('multisite')
@@ -730,6 +746,32 @@ export default function Customers() {
             >
               Multisite ({multisiteCount})
             </button>
+            {mapMissingCount > 0 && (
+              <button
+                onClick={() => applyPreset('karta_saknas')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  activePreset === 'karta_saknas'
+                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-red-400 hover:border-red-500/30'
+                }`}
+                title="Kunder utan avtalspapper i avtalskartan (avtalet ligger bara på kundraden)"
+              >
+                Saknar avtalskarta ({mapMissingCount})
+              </button>
+            )}
+            {mapIncompleteCount > 0 && (
+              <button
+                onClick={() => applyPreset('karta_ofullstandig')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  activePreset === 'karta_ofullstandig'
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-amber-400 hover:border-amber-500/30'
+                }`}
+                title="Avtalskartan finns men vitala delar saknas"
+              >
+                Ofullständig karta ({mapIncompleteCount})
+              </button>
+            )}
             {terminatedCount > 0 && (
               <button
                 onClick={() => applyPreset('terminated')}
@@ -785,6 +827,11 @@ export default function Customers() {
                         onOpenAddons={() => {
                           const a = addonFor(org)
                           if (a) navigate(`${basePath}/${a.root_customer_id}?tab=avtalskarta&panel=innehall`)
+                        }}
+                        mapStatus={mapFor(org)}
+                        onOpenMap={() => {
+                          const m = mapFor(org)
+                          navigate(`${basePath}/${m?.root_customer_id ?? org.headquarterCustomer?.id ?? org.id}?tab=avtalskarta`)
                         }}
                         highlighted={
                           activeCustomerId === org.id ||

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import type { ConsolidatedCustomer, CustomerSite } from '../../../hooks/useConsolidatedCustomers'
 import type { AddonPendingSummary } from '../../../hooks/useAddonPending'
+import type { ContractMapStatus } from '../../../hooks/useContractMapStatus'
 
 // ---------------------------------------------------------------------------
 // Delade hjälpare (används även av portföljraden i Customers.tsx)
@@ -127,6 +128,10 @@ interface Props {
   addonPending?: AddonPendingSummary | null
   /** Öppna kundens avtalskarta på Innehåll och utrustning */
   onOpenAddons?: () => void
+  /** Avtalskartans status: saknar karta, N steg kvar eller komplett */
+  mapStatus?: ContractMapStatus | null
+  /** Öppna kundens avtalskarta */
+  onOpenMap?: () => void
 }
 
 export default function CustomerListRow({
@@ -139,6 +144,8 @@ export default function CustomerListRow({
   contactCount,
   addonPending = null,
   onOpenAddons,
+  mapStatus = null,
+  onOpenMap,
   highlighted = false,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -218,6 +225,30 @@ export default function CustomerListRow({
         <span className="flex items-center gap-x-3 md:gap-x-4 basis-full md:basis-auto pl-[86px] md:pl-0 md:shrink-0 text-xs md:text-sm min-w-0">
           <span className="text-slate-400 tabular-nums shrink-0 md:w-14 md:text-right">
             {contractCount > 0 ? `${contractCount} avtal` : '–'}
+            {/* Avtalskartans status: platt text under antalet, klick öppnar kartan.
+                Röd = inget papper alls (bara kundrad/importrest), bärnsten = papper
+                finns men vitala delar saknas. Komplett visar inget. */}
+            {mapStatus && !org.isTerminated && mapStatus.status !== 'complete' && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onOpenMap?.()
+                }}
+                className={`block w-full md:text-right text-[10px] leading-tight font-medium hover:underline decoration-dotted ${
+                  mapStatus.status === 'none' ? 'text-red-400' : 'text-amber-400'
+                }`}
+                title={
+                  mapStatus.status === 'none'
+                    ? 'Ingen avtalskarta: avtalet finns bara på kundraden. Öppna kartan och skapa avtalet.'
+                    : `Avtalskartan saknar: ${mapStatus.missing.join(', ')}`
+                }
+              >
+                {mapStatus.status === 'none'
+                  ? 'ingen karta'
+                  : `${mapStatus.missing_count} steg kvar`}
+              </button>
+            )}
           </span>
           <span className="text-slate-200 tabular-nums shrink-0 md:w-24 md:text-right">
             {annual > 0 ? formatKr(annual) : '–'}

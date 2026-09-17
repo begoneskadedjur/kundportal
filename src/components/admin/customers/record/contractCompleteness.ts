@@ -70,6 +70,8 @@ export interface CompletenessInput {
   pendingBricks: number
   /** Passerade fakturaperioder utan faktura i portalen */
   uncoveredPeriods: number
+  /** Nästa period finns som faktura (utkast eller skickad): fakturaplanen är gjord */
+  hasPlannedInvoice: boolean
   /** Enheterna i omfattningen, för Er referens-koder */
   coveredUnits: Array<{ billing_reference?: string | null }>
 }
@@ -92,7 +94,7 @@ export interface CompletenessResult {
 }
 
 export function computeCompleteness(input: CompletenessInput): CompletenessResult {
-  const { contract: c, scope, isAvrop, isUnitContract, followupUnits, breakdown, pendingBricks, uncoveredPeriods, coveredUnits } = input
+  const { contract: c, scope, isAvrop, isUnitContract, followupUnits, breakdown, pendingBricks, uncoveredPeriods, hasPlannedInvoice, coveredUnits } = input
   const annual = Number(c.annual_value ?? 0)
   const start = c.contract_start_date ?? c.start_date ?? null
   const hasScope = !!c.covers_all_sites || isUnitContract || scope.length > 0
@@ -104,6 +106,10 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
   const hasPremium = isAvrop || annual > 0
   const hasBillingTerms = isAvrop || annual <= 0 || (!!c.billing_frequency && (!!c.billing_anchor_month || c.billing_frequency === 'on_demand'))
   const hasTerm = !!start && !!c.notice_period_months && (!!c.contract_end_date || c.renewal_mode === 'rolling' || !c.renewal_mode)
+  // Fakturaplanen är ett eget steg: villkoren kan vara satta utan att någon
+  // klickat Planera fakturor. Pausad fakturering (gamla kunder som faktureras
+  // utanför portalen) och avrop har ingen plan att göra.
+  const hasPlan = isAvrop || annual <= 0 || c.billing_active === false || hasPlannedInvoice
   const hasType = !!(c.label ?? c.contract_type)
   const hasSignature = !!c.signed_at
   const hasPriceList = !!c.price_list_id
@@ -117,6 +123,7 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
     { key: 'scope', label: 'Omfattning', ok: hasScope, vital: true, group: 'omfattning', paragraph: '§ 1', hint: 'Dra in minst en enhet, eller hela verksamheten, i § 1.' },
     { key: 'premium', label: 'Årspremie', ok: hasPremium, vital: true, group: 'fakturering', paragraph: '§ 6', hint: 'Årspremien är grunden för fakturaplanen och marginalen.' },
     { key: 'billing', label: 'Faktureringsvillkor', ok: hasBillingTerms, vital: true, group: 'fakturering', paragraph: '§ 6', hint: 'Frekvens och ankarmånad avgör när fakturorna skapas.' },
+    { key: 'plan', label: 'Fakturaplan', ok: hasPlan, vital: true, group: 'fakturering', paragraph: '§ 6', hint: 'Klicka Planera fakturor så nästa period ligger som utkast i portalen.' },
     { key: 'followup', label: 'Besöksfrekvens', ok: hasFollowup, vital: true, group: 'uppfoljning', paragraph: '§ 3', hint: 'Antal besök per år är facit vid schemaläggning och uppföljning.' },
     { key: 'schedule', label: unitsWithoutSchedule === 1 ? 'En enhet saknar schema' : `${unitsWithoutSchedule} enheter saknar schema`, ok: unitsWithoutSchedule === 0, vital: true, group: 'uppfoljning', paragraph: '§ 3', hint: 'Skapa schemat ur § 3 i panelen så besöken finns i kalendern och teknikern ser dem.' },
     { key: 'term', label: 'Löptid och uppsägningstid', ok: hasTerm, vital: true, group: 'loptid', paragraph: '§ 8', hint: 'Startdatum och uppsägningstid styr bevakningen och när avtalet kan sägas upp.' },

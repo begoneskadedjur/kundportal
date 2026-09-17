@@ -101,6 +101,12 @@ const ACCENTS = ['#20c58f', '#38bdf8', '#f59e0b', '#a78bfa', '#f472b6', '#34d399
 
 const todayKey = () => new Date().toISOString().slice(0, 10)
 
+/** Fakturaplanen är gjord när nästa period redan finns som faktura (utkast eller skickad) */
+const hasPlannedInvoice = (entries: PremiumPlanEntry[]): boolean => {
+  const today = todayKey()
+  return entries.some((e) => (!e.kind || e.kind === 'premium') && e.periodStart > today && !!e.existingStatus && e.action !== 'delete')
+}
+
 // ---------------------------------------------------------------------------
 // Typer för interaktionen
 // ---------------------------------------------------------------------------
@@ -2063,6 +2069,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     followupUnits: followupFor(c).units,
     pendingBricks: bricksFor(c).length,
     uncoveredPeriods: (planEntriesByContract.get(c.id) ?? []).filter((e) => e.action === 'uncovered').length,
+    hasPlannedInvoice: hasPlannedInvoice(planEntriesByContract.get(c.id) ?? []),
     coveredUnits: coveredLocationsFor(c),
   })
   const incompletePapers = papers.filter((c) => !computeCompleteness({ ...completenessBaseFor(c), breakdown: null }).complete).length
@@ -4366,6 +4373,7 @@ function PaperContract({
     breakdown: contentData.content.summary?.parts?.premium ?? contentData.content.summary?.breakdown ?? null,
     pendingBricks: (addonBricks ?? []).length,
     uncoveredPeriods: (planEntries ?? []).filter((e) => e.action === 'uncovered').length,
+    hasPlannedInvoice: hasPlannedInvoice(planEntries ?? []),
     coveredUnits: coveredLocations,
   })
   const phase = contractPhase(contract, state, key)
