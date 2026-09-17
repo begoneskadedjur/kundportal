@@ -2087,7 +2087,18 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     hasPlannedInvoice: hasPlannedInvoice(planEntriesByContract.get(c.id) ?? []),
     coveredUnits: coveredLocationsFor(c),
   })
-  const incompletePapers = papers.filter((c) => !computeCompleteness({ ...completenessBaseFor(c), breakdown: null }).complete).length
+  // Ofullständiga avtal med sin första saknade del, så att varningen ovanför
+  // pappren kan namnge avtalet och leda till rätt paragraf.
+  const incompleteList = papers.flatMap((c) => {
+    const r = computeCompleteness({ ...completenessBaseFor(c), breakdown: null })
+    return r.complete || !r.nextStep ? [] : [{ contract: c, step: r.nextStep }]
+  })
+  const incompletePapers = incompleteList.length
+  /** Scrolla fram pappret och öppna panelen på gruppen där uppgiften fylls i */
+  const goToMissing = (contract: RecordContract, group: SettingsGroup) => {
+    document.querySelector<HTMLElement>(`[data-paper-id="${contract.id}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    openSettings(contract, group)
+  }
 
   // Uppgiften "tillägg att besluta": brickor per papper, kundens kr/år ur
   // samma RPC som listan och notisen, och kön mellan avtalen.
@@ -2656,8 +2667,28 @@ export default function ContractMapSection({ data, onChanged }: Props) {
                 </span>
               )}
               {incompletePapers > 0 && (
-                <span className="text-[11px] text-amber-300 whitespace-nowrap">
-                  {incompletePapers} avtal saknar uppgifter
+                <span className="flex items-baseline gap-2 text-[11px] text-amber-300 min-w-0">
+                  {incompleteList.slice(0, 2).map(({ contract: c, step }) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => goToMissing(c, step.group)}
+                      className="truncate max-w-[260px] underline decoration-dotted hover:text-amber-100"
+                      title={`${step.paragraph} · ${step.hint} Klicka för att öppna avtalet på rätt ställe.`}
+                    >
+                      {contractDisplayName(c)}: {step.label.toLowerCase()}
+                    </button>
+                  ))}
+                  {incompleteList.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={() => goToMissing(incompleteList[2].contract, incompleteList[2].step.group)}
+                      className="whitespace-nowrap underline decoration-dotted hover:text-amber-100"
+                      title={incompleteList.slice(2).map(({ contract: c, step }) => `${contractDisplayName(c)}: ${step.label}`).join('\n')}
+                    >
+                      +{incompleteList.length - 2} till
+                    </button>
+                  )}
                 </span>
               )}
               {planTotals.next && nextConsolidated.length > 0 && (
