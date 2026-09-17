@@ -1305,12 +1305,12 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         const [{ data: outdoor }, { data: indoor }] = await Promise.all([
           supabase
             .from('equipment_placements')
-            .select('id, customer_id, is_addon, station_type_id, addon_billing_model, addon_contract_mode, station_type:station_types(name)')
+            .select('id, customer_id, is_addon, station_type_id, addon_billing_model, addon_contract_mode, addon_contract_id, station_type:station_types(name)')
             .in('customer_id', ids)
             .eq('status', 'active'),
           supabase
             .from('indoor_stations')
-            .select('id, is_addon, station_type_id, addon_billing_model, addon_contract_mode, station_type:station_types(name), floor_plan:floor_plans!inner(customer_id)')
+            .select('id, is_addon, station_type_id, addon_billing_model, addon_contract_mode, addon_contract_id, station_type:station_types(name), floor_plan:floor_plans!inner(customer_id)')
             .eq('status', 'active')
             .in('floor_plan.customer_id', ids),
         ])
@@ -1324,6 +1324,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           station_type_id: string | null
           addon_billing_model: string | null
           addon_contract_mode: string | null
+          addon_contract_id: string | null
           station_type: { name: string } | { name: string }[] | null
         }
         const typeName = (st: Row['station_type']): string => {
@@ -1335,8 +1336,14 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           cur[kind] += 1
           if (r.is_addon) cur.addon += 1
           map.set(r.customer_id, cur)
-          // Bricka: per år/månad utan beslutat läge
-          if (r.is_addon && (r.addon_billing_model === 'per_year' || r.addon_billing_model === 'per_month') && !r.addon_contract_mode) {
+          // Bricka: per år/månad utan beslut. Ett läge utan avtal (satt via
+          // SQL eller äldre flöde) är också obeslutat: synken till § 6
+          // räknar bara stationer med avtal, så de fakturerades aldrig.
+          if (
+            r.is_addon &&
+            (r.addon_billing_model === 'per_year' || r.addon_billing_model === 'per_month') &&
+            (!r.addon_contract_mode || !r.addon_contract_id)
+          ) {
             const key = `${r.customer_id}|${r.station_type_id ?? ''}|${r.addon_billing_model}`
             const b = bricks.get(key) ?? {
               unitId: r.customer_id,
@@ -1550,7 +1557,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           existingStatus: e.existingStatus ?? null,
           consolidated: e.consolidated ?? plan.consolidated ?? false,
           reason: e.reason,
-          rows: e.rows?.map((r) => ({ name: r.article_name, quantity: r.quantity, unit_price: r.unit_price, total_price: r.total_price })),
+          rows: e.rows?.map((r) => ({ name: r.article_name, quantity: r.quantity, unit_price: r.unit_price, total_price: r.total_price, contract_id: r.contract_id ?? null })),
         }
         for (const id of ids) map.set(id, [...(map.get(id) ?? []), entry])
       }
@@ -1581,7 +1588,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       const entry = (planEntriesByContract.get(c.id) ?? []).find(
         (e) => e.periodStart === next.periodStart && (e.kind ?? 'premium') === 'premium' && e.action !== 'uncovered' && e.action !== 'delete'
       )
-      return entry ? [{ contract: c, entry }] : []
+      if (!entry) return []
+      // Samlad planpost bär alla avtalens rader: visa bara det här avtalets
+      // rader och deras summa, annars räknas premien en gång per papper.
+      if (entry.consolidated && entry.rows?.some((r) => r.contract_id)) {
+        const rows = entry.rows.filter((r) => r.contract_id === c.id)
+        const subtotal = Math.round(rows.reduce((s, r) => s + r.total_price, 0) * 100) / 100
+        return [{ contract: c, entry: { ...entry, rows, subtotal } }]
+      }
+      return [{ contract: c, entry }]
     })
   }, [papers, planEntriesByContract, planTotals.next])
 

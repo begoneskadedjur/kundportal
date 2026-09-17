@@ -112,7 +112,7 @@ export interface PremiumPlanEntry {
   consolidated?: boolean
   reason?: string
   /** Fakturans rader som Fortnox får dem (förhandsvisning i panelen) */
-  rows?: Array<{ name: string; quantity: number; unit_price: number; total_price: number }>
+  rows?: Array<{ name: string; quantity: number; unit_price: number; total_price: number; contract_id?: string | null }>
 }
 
 interface Props {
