@@ -78,6 +78,7 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
                 <span className="text-red-400">{plan.summary.delete} raderas</span>
                 <span className="text-slate-400">{plan.summary.locked} låsta</span>
                 <span className="text-slate-500">{plan.summary.keep} oförändrade</span>
+                <span className="text-slate-500 ml-auto">belopp exkl. moms</span>
               </div>
               {hasHistorical && (
                 <div className="text-xs text-slate-500">
@@ -113,12 +114,13 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
                           {entry.kind === 'equipment_monthly' ? 'tillägg per månad' : 'tillägg per år'}
                         </span>
                       )}
-                      <span className="text-slate-400 font-mono w-28">
+                      {/* Exkl. moms, samma tal som § 6 på pappret och kundens avtal */}
+                      <span className="text-slate-400 font-mono w-28" title="exkl. moms">
                         {entry.action === 'update' && entry.existingAmount != null && entry.planned
-                          ? `${formatAmount(entry.existingAmount)} → ${formatAmount(entry.planned.totalAmount)}`
+                          ? `${formatAmount(entry.existingSubtotal ?? entry.existingAmount)} → ${formatAmount(entry.planned.subtotal)}`
                           : entry.planned
-                          ? formatAmount(entry.planned.totalAmount)
-                          : formatAmount(entry.existingAmount)}
+                          ? formatAmount(entry.planned.subtotal)
+                          : formatAmount(entry.existingSubtotal ?? entry.existingAmount)}
                       </span>
                       {entry.existingStatus && (
                         <span className="text-slate-500 ml-auto">status: {entry.existingStatus}</span>

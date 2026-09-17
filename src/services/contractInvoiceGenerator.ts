@@ -115,6 +115,8 @@ export interface BillingPlanEntry {
   existingId?: string
   existingStatus?: string
   existingAmount?: number
+  /** Exkl. moms, samma tal som pappret visar */
+  existingSubtotal?: number
   reason?: string
   /** Avtalet raden gäller (null = synth/kundnivå) */
   contractId?: string | null
@@ -583,7 +585,7 @@ export class ContractInvoiceGenerator {
             action: 'delete',
             existingId: ex.id,
             existingStatus: status,
-            existingAmount: ex.total_amount,
+            existingAmount: ex.total_amount, existingSubtotal: ex.subtotal,
             contractId: ex.contract_id ?? null,
             reason: 'Ersätts av samlingsfakturan',
           })
@@ -592,7 +594,7 @@ export class ContractInvoiceGenerator {
             action: 'locked',
             existingId: ex.id,
             existingStatus: status,
-            existingAmount: ex.total_amount,
+            existingAmount: ex.total_amount, existingSubtotal: ex.subtotal,
             contractId: ex.contract_id ?? null,
             reason: 'Redan skickad per avtal, samlingsfakturan hoppar över perioden',
           })
@@ -993,7 +995,7 @@ export class ContractInvoiceGenerator {
           planned: p,
           existingId: consolidated.id,
           existingStatus: consolidated.status ?? undefined,
-          existingAmount: consolidated.total_amount,
+          existingAmount: consolidated.total_amount, existingSubtotal: consolidated.subtotal,
           reason: 'Ligger på kundens samlingsfaktura',
         })
         continue
@@ -1018,9 +1020,9 @@ export class ContractInvoiceGenerator {
 
       if (p.isHistorical) {
         if (!opts.real && (status !== 'paid' || !ex.is_historical)) {
-          entries.push({ action: 'backfill-historical-paid', planned: p, existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount })
+          entries.push({ action: 'backfill-historical-paid', planned: p, existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal })
         } else {
-          entries.push({ action: 'keep', planned: p, existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount })
+          entries.push({ action: 'keep', planned: p, existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal })
         }
         continue
       }
@@ -1031,7 +1033,7 @@ export class ContractInvoiceGenerator {
           planned: p,
           existingId: ex.id,
           existingStatus: status,
-          existingAmount: ex.total_amount,
+          existingAmount: ex.total_amount, existingSubtotal: ex.subtotal,
           reason: 'Faktura redan bokförd/skickad/betald',
         })
         continue
@@ -1043,7 +1045,7 @@ export class ContractInvoiceGenerator {
         planned: p,
         existingId: ex.id,
         existingStatus: status,
-        existingAmount: ex.total_amount,
+        existingAmount: ex.total_amount, existingSubtotal: ex.subtotal,
       })
     }
 
@@ -1053,11 +1055,11 @@ export class ContractInvoiceGenerator {
       if (plannedByKey.has(ex.billing_period_start)) continue
       const status = ex.status ?? 'draft'
       if (LOCKED_STATUSES.has(status)) {
-        entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, reason: 'Utanför nuvarande plan men redan bokförd/skickad/betald' })
+        entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Utanför nuvarande plan men redan bokförd/skickad/betald' })
       } else if (EDITABLE_STATUSES.has(status)) {
-        entries.push({ action: 'delete', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount })
+        entries.push({ action: 'delete', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal })
       } else {
-        entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, reason: `Okänd status "${status}" - rör ej` })
+        entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: `Okänd status "${status}" - rör ej` })
       }
     }
 
