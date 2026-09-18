@@ -136,6 +136,8 @@ export interface BillingPlanEntry {
   notes?: string
   /** Raden hör till en samlad faktura (invoices.contract_id null, is_consolidated) */
   consolidated?: boolean
+  /** Kundraden fakturan hör till: enhetens vid enhetsavtal, annars planens */
+  customerId?: string
 }
 
 export interface BillingPlan {
@@ -361,6 +363,9 @@ export class ContractInvoiceGenerator {
         contractId: e.contractId ?? p.contractId,
         contractLabel: e.contractLabel ?? p.contractLabel ?? null,
         consolidated: e.consolidated ?? p.consolidated ?? false,
+        // Enhetsavtalets faktura hör till enheten: den ihopslagna planen bär
+        // huvudkundens id, så varje post måste minnas sin egen kundrad.
+        customerId: e.customerId ?? p.customerId,
       }))
     )
     entries.sort((a, b) => (a.planned?.periodStart ?? '').localeCompare(b.planned?.periodStart ?? ''))
@@ -1185,6 +1190,17 @@ export class ContractInvoiceGenerator {
       ? this.refineWithRows(plan.entries, await this.loadExisting(plan.customerId, null, { consolidated: true }))
       : plan.entries
 
+    // Kundraden per post: enhetsavtalets faktura skrivs på enheten.
+    const customerCache = new Map<string, CustomerRow>([[plan.customerId, customer]])
+    const customerFor = async (entry: BillingPlanEntry): Promise<CustomerRow> => {
+      const id = entry.consolidated ? plan.customerId : (entry.customerId ?? plan.customerId)
+      const cached = customerCache.get(id)
+      if (cached) return cached
+      const loaded = await this.loadCustomer(id)
+      customerCache.set(id, loaded)
+      return loaded
+    }
+
     for (const entry of entries) {
       const contractId = entry.consolidated ? null : (entry.contractId ?? plan.contractId)
       if (entry.action === 'keep' || entry.action === 'consolidated' || entry.action === 'later') continue
@@ -1204,22 +1220,22 @@ export class ContractInvoiceGenerator {
         continue
       }
       if (entry.action === 'create' && entry.planned) {
-        const id = await this.insertContractInvoice(customer, entry.planned, contractId, entry)
+        const id = await this.insertContractInvoice(await customerFor(entry), entry.planned, contractId, entry)
         result.createdIds.push(id)
         continue
       }
       if (entry.action === 'create-historical' && entry.planned) {
-        const id = await this.insertHistoricalPaidInvoice(customer, entry.planned, contractId)
+        const id = await this.insertHistoricalPaidInvoice(await customerFor(entry), entry.planned, contractId)
         result.historicalIds.push(id)
         continue
       }
       if (entry.action === 'backfill-historical-paid' && entry.existingId && entry.planned) {
-        await this.backfillHistoricalPaid(entry.existingId, customer, entry.planned, contractId)
+        await this.backfillHistoricalPaid(entry.existingId, await customerFor(entry), entry.planned, contractId)
         result.historicalIds.push(entry.existingId)
         continue
       }
       if (entry.action === 'update' && entry.existingId && entry.planned) {
-        await this.updateContractInvoice(entry.existingId, customer, entry.planned, contractId, entry)
+        await this.updateContractInvoice(entry.existingId, await customerFor(entry), entry.planned, contractId, entry)
         result.updatedIds.push(entry.existingId)
       }
     }
@@ -1674,9 +1690,18 @@ export class ContractInvoiceGenerator {
     planned: PlannedInvoice,
     input: { amount: number; invoicedAt: string; note: string | null }
   ): Promise<string> {
-    const customer = await this.loadCustomer(customerId)
+    // Ett enhetsavtal faktureras på enhetens kundrad, inte på huvudkontoret:
+    // annars hamnar historiken på fel kund i fakturafliken (Huddinge Pastorat
+    // 2026-09-18). Avtalets egen customer_id vinner över den som anropade.
+    let billedCustomerId = customerId
+    if (contractId) {
+      const { data: c } = await supabase.from('contracts').select('customer_id').eq('id', contractId).maybeSingle()
+      const owner = (c as { customer_id?: string | null } | null)?.customer_id
+      if (owner) billedCustomerId = owner
+    }
+    const customer = await this.loadCustomer(billedCustomerId)
     const label = contractId ? (await this.loadContractSources(contractId)).label : null
-    const invoiceNumber = `HIST-${planned.periodStart.slice(0, 7)}-${customerId.slice(0, 8)}`
+    const invoiceNumber = `HIST-${planned.periodStart.slice(0, 7)}-${billedCustomerId.slice(0, 8)}`
     const { data: dup } = await supabase.from('invoices').select('id').eq('invoice_number', invoiceNumber).maybeSingle()
     if (dup) throw new Error('Perioden är redan registrerad som fakturerad utanför portalen')
 
