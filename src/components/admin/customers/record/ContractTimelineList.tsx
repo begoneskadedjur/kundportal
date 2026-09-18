@@ -4,6 +4,7 @@
 // Innehåller även byggarna som gör tidslinjehändelser av avtal, tillägg och fakturarader.
 
 import { useMemo } from 'react'
+import { rollingEndDate } from '../../../../shared/contractPlanner'
 import {
   contractDisplayName,
   formatDateSv,
@@ -110,13 +111,17 @@ export function buildContractEvents(contract: RecordContract, tag?: string): Rec
   }
 
   // Slutdatum: uppsägningens effective_end_date vinner över contract_end_date.
-  const lastDay = contract.effective_end_date ?? contract.contract_end_date
+  // Ett avtal som rullar vidare visar nästa periodskifte, inte ett passerat:
+  // slutdatumet räknas fram år för år (rollingEndDate), databasen rörs inte.
+  const isEnded = isEndedContract(contract)
+  const lastDay =
+    contract.effective_end_date ??
+    (isEnded ? contract.contract_end_date : rollingEndDate(contract as unknown as Parameters<typeof rollingEndDate>[0]))
   if (lastDay) {
     // Ett avslutat avtal upphör — det får ALDRIG ett framtida periodskifte.
     // Kollen gick tidigare bara på terminated_at, vilket missade avtal som
     // avslutats via status (t.ex. "ersatt av nytt avtal"): de fick falska
     // periodskiften långt efter att de tagit slut.
-    const isEnded = isEndedContract(contract)
     // Uppsägningen har redan sin egen rad på samma datum — undvik dubbletten.
     const alreadyCoveredByTermination =
       !!contract.terminated_at && toDateKey(lastDay) === toDateKey(contract.effective_end_date ?? lastDay)

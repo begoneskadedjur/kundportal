@@ -16,6 +16,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireCronSecret } from '../_lib/cronAuth'
 import { withCronLog } from '../_lib/cronLogger'
+import { rollingEndDate } from '../../src/shared/contractPlanner'
 
 export const config = { maxDuration: 120 }
 
@@ -77,14 +78,18 @@ function watchFor(c: ContractRow): { decisionDate: string; kind: 'option' | 'fix
       text: `Beslut om option senast ${c.option_decision_deadline}${c.option_until ? ` (avtalet kan förlängas till ${c.option_until})` : ''}`,
     }
   }
+  // Periodens slut i dag: ett passerat slutdatum på ett avtal som rullar
+  // vidare flyttas fram år för år, så påminnelsen går inför varje skifte
+  // och inte bara en gång inför det första slutdatumet.
+  const endNow = rollingEndDate(c, todayLocalIso())
   if (mode === 'fixed') {
-    if (!c.contract_end_date) return null
-    return { decisionDate: c.contract_end_date, kind: 'fixed', text: `Avtalet når sitt slutdatum ${c.contract_end_date} och löper sedan vidare tills det sägs upp` }
+    if (!endNow) return null
+    return { decisionDate: endNow, kind: 'fixed', text: `Avtalet når sitt periodslut ${endNow} och löper sedan vidare tills det sägs upp` }
   }
   // rolling: uppsägningsfönstret
-  if (!c.contract_end_date || !c.notice_period_months) return null
-  const windowCloses = addMonths(c.contract_end_date, -c.notice_period_months)
-  return { decisionDate: windowCloses, kind: 'notice', text: `Sista dag att säga upp inför ${c.contract_end_date} är ${windowCloses}` }
+  if (!endNow || !c.notice_period_months) return null
+  const windowCloses = addMonths(endNow, -c.notice_period_months)
+  return { decisionDate: windowCloses, kind: 'notice', text: `Sista dag att säga upp inför ${endNow} är ${windowCloses}` }
 }
 
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {

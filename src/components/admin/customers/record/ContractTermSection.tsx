@@ -13,6 +13,7 @@ import { Loader2 } from 'lucide-react'
 import DateField from '../../../ui/DateField'
 import { formatDateSv, type RecordContract } from '../../../../hooks/useCustomerRecord'
 import { todayKey } from '../../../../utils/contractLifecycle'
+import { rollingEndDate } from '../../../../shared/contractPlanner'
 import { PANEL_INPUT_CLASS, PAPER_GEAR_CLASS, PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk, type SectionMode } from './paperInk'
 
 type RenewalMode = 'rolling' | 'fixed' | 'option'
@@ -65,12 +66,15 @@ export function termWatch(contract: RecordContract, today: string = todayKey()) 
   const start = contract.contract_start_date ?? contract.start_date ?? null
   const end = contract.contract_end_date ?? null
   const notice = contract.notice_period_months ?? null
-  const lastDay = lastTerminationDay(end, notice)
+  // Periodens slut i dag: ett passerat slutdatum på ett avtal som rullar
+  // vidare flyttas fram år för år, så bevakningen pekar på nästa skifte.
+  const endNow = rollingEndDate(contract as unknown as Parameters<typeof rollingEndDate>[0], today)
+  const lastDay = lastTerminationDay(endNow, notice)
   const months = start && end ? monthsBetween(start, end) : null
   const mode: RenewalMode = contract.renewal_mode ?? 'rolling'
   const reminderDays = contract.renewal_reminder_days ?? 90
   const decisionDate =
-    mode === 'option' ? (contract.option_decision_deadline ?? null) : mode === 'fixed' ? end : lastDay
+    mode === 'option' ? (contract.option_decision_deadline ?? null) : mode === 'fixed' ? endNow : lastDay
   const decisionKind = mode === 'option' ? 'Beslut om option' : mode === 'fixed' ? 'Slutdatum' : 'Sista uppsägningsdag'
   const remindDate = decisionDate ? shiftDays(decisionDate, -(mode === 'rolling' ? 30 : reminderDays)) : null
   const daysLeft = decisionDate ? daysUntil(decisionDate, today) : null
@@ -82,14 +86,14 @@ export function termWatch(contract: RecordContract, today: string = todayKey()) 
       : mode === 'fixed'
         ? 'fast slutdatum, löper vidare tills uppsägning'
         : 'rullar vidare efter slutdatumet tills avtalet sägs upp'
-  return { today, start, end, notice, lastDay, months, mode, reminderDays, decisionDate, decisionKind, remindDate, daysLeft, urgent, optionExhausted, modeLabel }
+  return { today, start, end, endNow, notice, lastDay, months, mode, reminderDays, decisionDate, decisionKind, remindDate, daysLeft, urgent, optionExhausted, modeLabel }
 }
 
 export default function ContractTermSection({ contract, ink, archived, onSaveTerm, onSaveRenewal, onExerciseOption, onTerminate, onReactivate, onDelete, mode: sectionMode = 'paper', onOpenSettings, frameworkLabel = null }: Props) {
   const settings = sectionMode === 'settings'
   const inputClass = settings ? PANEL_INPUT_CLASS : PAPER_INPUT_CLASS
   const w = termWatch(contract)
-  const { today, start, end, notice, lastDay, months, mode, reminderDays, decisionDate, decisionKind, remindDate, daysLeft, urgent, optionExhausted, modeLabel } = w
+  const { today, start, end, endNow, notice, lastDay, months, mode, reminderDays, decisionDate, decisionKind, remindDate, daysLeft, urgent, optionExhausted, modeLabel } = w
   const [editing, setEditing] = useState(settings)
   const [startInput, setStartInput] = useState(settings ? (start ?? '') : '')
   const [endInput, setEndInput] = useState(settings ? (end ?? '') : '')
@@ -174,6 +178,7 @@ export default function ContractTermSection({ contract, ink, archived, onSaveTer
                   <b style={{ color: ink.primary }}>{formatDateSv(start)}</b> t.o.m.{' '}
                   <b style={{ color: ink.primary }}>{end ? formatDateSv(end) : 'tills vidare'}</b>
                   {months ? ` · ${months} mån` : ''}
+                  {endNow && end && endNow !== end ? ` · förlängt, period till ${formatDateSv(endNow)}` : ''}
                 </>
               ) : (
                 'startdatum saknas'

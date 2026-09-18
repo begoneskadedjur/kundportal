@@ -162,6 +162,32 @@ export function computeTerminationCutoff(c: PlanningContract): Date | null {
   return cutoff
 }
 
+/**
+ * Slutet på den avtalsperiod som gäller i dag. Ett avtal som rullar vidare
+ * förlängs ett år i taget efter slutdatumet, så ett passerat slutdatum
+ * flyttas fram tills det ligger framför i dag. Uppsagda avtal och avtal med
+ * option behåller sitt datum; slutdatumet i databasen rörs aldrig, det är
+ * bara beräkningen (sista uppsägningsdag, periodskifte, påminnelse) som
+ * följer avtalet.
+ */
+export function rollingEndDate(
+  c: { contract_end_date: string | null; terminated_at?: string | null; renewal_mode?: string | null; effective_end_date?: string | null },
+  todayIso: string = toLocalIsoDate(todayLocal())
+): string | null {
+  const end = c.contract_end_date ?? null
+  if (!end) return null
+  if (c.terminated_at) return c.effective_end_date ?? end
+  if ((c.renewal_mode ?? 'rolling') === 'option') return end
+  if (end >= todayIso) return end
+  const d = parseLocalDate(end)
+  let guard = 0
+  while (toLocalIsoDate(d) < todayIso && guard < 100) {
+    d.setFullYear(d.getFullYear() + 1)
+    guard++
+  }
+  return toLocalIsoDate(d)
+}
+
 export function periodDivisor(freq: string | null): number {
   if (freq === 'monthly') return 12
   if (freq === 'quarterly') return 4

@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { VISIBLE_CONTRACT_STATUSES } from '../utils/contractLifecycle'
+import { rollingEndDate } from '../shared/contractPlanner'
 import type { Contract, Customer } from '../types/database'
 
 // customers har kolumner som ännu inte finns i database.ts-typen
@@ -1078,10 +1079,15 @@ export function formatDayMonthSv(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
 }
 
-/** Sista uppsägningsdag: contract_end_date − notice_period_months */
+/**
+ * Sista uppsägningsdag: periodens slut − notice_period_months. För avtal som
+ * rullar vidare räknas slutet fram år för år (rollingEndDate), så datumet är
+ * alltid det nästa, inte ett passerat.
+ */
 export function lastNoticeDate(c: RecordContract): Date | null {
-  if (!c.contract_end_date || !c.notice_period_months) return null
-  const d = new Date(c.contract_end_date)
+  const end = rollingEndDate(c as unknown as Parameters<typeof rollingEndDate>[0])
+  if (!end || !c.notice_period_months) return null
+  const d = new Date(end)
   d.setMonth(d.getMonth() - c.notice_period_months)
   return d
 }
