@@ -1001,10 +1001,22 @@ export class ContractInvoiceGenerator {
       )
       .map((e) => ({ start: e.billing_period_start as string, end: e.billing_period_end as string }))
 
+    // En Fortnox-faktura täcker perioden om den överlappar minst halva
+    // perioden. Ren överlappning räckte inte: fakturan för 2026-02-16 till
+    // 2027-02-15 överlappade planens 2027-02-01 med två veckor och gjorde att
+    // nästa årsfaktura aldrig föreslogs (Drottningens Pizzeria 2026-09-18).
+    const overlapShare = (p: PlannedInvoice, r: { start: string; end: string }): number => {
+      const ps = parseLocalDate(p.periodStart).getTime()
+      const pe = parseLocalDate(p.periodEnd).getTime()
+      const os = Math.max(ps, parseLocalDate(r.start).getTime())
+      const oe = Math.min(pe, parseLocalDate(r.end).getTime())
+      if (oe < os || pe <= ps) return 0
+      return (oe - os) / (pe - ps)
+    }
     const filteredPlanned =
       coveredRanges.length === 0
         ? planned
-        : planned.filter((p) => !coveredRanges.some((r) => p.periodStart <= r.end && p.periodEnd >= r.start))
+        : planned.filter((p) => !coveredRanges.some((r) => overlapShare(p, r) >= 0.5))
 
     const contractInvoices = existing.filter((e) => e.invoice_type === 'contract' && !(e.invoice_number ?? '').startsWith('F-'))
     // Nyckel = periodens MÅNAD. Importerade fakturor bär ofta avtalets startdag

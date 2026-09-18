@@ -189,7 +189,10 @@ export interface UnitFollowup {
   /** Förväntat antal utförda besök hittills i avtalsåret (pro rata) */
   expectedSoFar: number | null
   doneThisYear: number
+  /** Nästa bokade besök, annars schemats startdag när ett aktivt schema finns */
   nextVisitAt: string | null
+  /** Enheten har ett aktivt återkommande schema (även om inga besök genererats ännu) */
+  hasSchedule: boolean
   /** Senast när nästa besök i avtalsåret borde vara gjort (pro rata ur takten) */
   nextDueBy: string | null
   casesThisYear: number
@@ -239,7 +242,7 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 export default function ContractMapSection({ data, onChanged }: Props) {
-  const { root, units, contracts, additions, billingItems, premiumEvents, contractSites, cases, contractEvents, inspections } =
+  const { root, units, contracts, additions, billingItems, premiumEvents, contractSites, cases, contractEvents, inspections, schedules } =
     data
   const navigate = useNavigate()
   // Aktiv personal — säljaren väljs ur registret, aldrig som fritext.
@@ -2057,6 +2060,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           unitVisits
             .filter((s) => !s.completed_at && s.scheduled_at && (s.scheduled_at as string).slice(0, 10) >= key)
             .sort((a, b) => (a.scheduled_at as string).localeCompare(b.scheduled_at as string))[0] ?? null
+        // Ett aktivt schema utan genererade besök (start längre fram, eller
+        // cron har inte hunnit) är inte "saknar schema": nästa besök är
+        // schemats startdag tills en riktig session finns.
+        const unitSchedule =
+          (schedules ?? []).find(
+            (s) => s.customer_id === unitId && s.status === 'active' && (!s.contract_id || s.contract_id === contract.id)
+          ) ?? null
+        const scheduleStart =
+          unitSchedule?.schedule_start_date && unitSchedule.schedule_start_date >= key ? `${unitSchedule.schedule_start_date}T08:00:00` : null
         const unitCases = list.filter((c) => c.customer_id === unitId)
         // Nästa besök borde vara gjort senast: avtalsårets start + (gjorda + 1) andelar av året
         const nextDueBy =
@@ -2072,7 +2084,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           inherited: !scope?.visit_frequency && !scope?.visits_per_year,
           expectedSoFar: plan ? Math.min(plan, Math.round((plan * daysIntoYear) / 365)) : null,
           doneThisYear,
-          nextVisitAt: nextUnit?.scheduled_at ?? null,
+          nextVisitAt: nextUnit?.scheduled_at ?? scheduleStart,
+          hasSchedule: !!unitSchedule,
           nextDueBy,
           casesThisYear: unitCases.filter((c) => (c.completed_date ?? c.created_at).slice(0, 10) >= yearStart).length,
         }
@@ -2091,7 +2104,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         units,
       }
     },
-    [activeScopeByContract, cases, inspections, locations, locationIds]
+    [activeScopeByContract, cases, inspections, locations, locationIds, schedules]
   )
 
   /** Kompletthetens underlag utom marginalen (pappret och panelen fyller i den) */
