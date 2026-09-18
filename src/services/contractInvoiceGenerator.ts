@@ -106,6 +106,13 @@ export type BillingPlanAction =
   | 'uncovered'
   /** Perioden ligger på kundens samlingsfaktura (per-avtal-planen rör den inte) */
   | 'consolidated'
+  /**
+   * Förlängningsperiod efter avtalets slutdatum vars fakturadatum inte är
+   * inne: visas som kommande men blir utkast först 40 dagar före periodstart
+   * (samma regel som cron). Ett ettårsavtal ska inte få nästa års utkast i
+   * september.
+   */
+  | 'later'
 
 export interface BillingPlanEntry {
   action: BillingPlanAction
@@ -149,6 +156,8 @@ export interface BillingPlan {
     keep: number
     historical: number // create-historical + backfill-historical-paid
     uncovered: number
+    /** Förlängningsperioder som väntar på sitt fakturadatum */
+    later: number
   }
 }
 
@@ -233,6 +242,7 @@ const EMPTY_SUMMARY = (): BillingPlan['summary'] => ({
   locked: 0,
   historical: 0,
   uncovered: 0,
+  later: 0,
 })
 
 /**
@@ -248,6 +258,7 @@ function summarize(entries: BillingPlanEntry[]): BillingPlan['summary'] {
   return entries.reduce((acc, e) => {
     if (e.action === 'create-historical' || e.action === 'backfill-historical-paid') acc.historical += 1
     else if (e.action === 'uncovered') acc.uncovered += 1
+    else if (e.action === 'later') acc.later += 1
     else if (e.action === 'consolidated') acc.keep += 1
     else acc[e.action] += 1
     return acc
@@ -997,6 +1008,7 @@ export class ContractInvoiceGenerator {
     )
 
     const entries: BillingPlanEntry[] = []
+    const todayIso = toLocalIsoDate(todayLocal())
 
     for (const p of filteredPlanned) {
       const consolidated = opts.consolidatedPeriods?.get(p.periodStart)
@@ -1013,6 +1025,9 @@ export class ContractInvoiceGenerator {
       }
 
       const ex = existingByKey.get(p.periodStart)
+      // Förlängningsperiod (efter avtalets slutdatum) vars fakturadatum inte
+      // är inne: utkastet skapas av cron 40 dagar före start, inte här.
+      const notDueYet = opts.real && !!p.beyondContractEnd && !p.isHistorical && p.invoiceDate > todayIso
 
       if (!ex) {
         if (p.isHistorical) {
@@ -1021,6 +1036,8 @@ export class ContractInvoiceGenerator {
               ? { action: 'uncovered', planned: p, reason: 'Passerad period utan faktura i portalen. Importera från Fortnox.' }
               : { action: 'create-historical', planned: p }
           )
+        } else if (notDueYet) {
+          entries.push({ action: 'later', planned: p, reason: `Förlängning efter slutdatumet, utkastet skapas ${p.invoiceDate}` })
         } else {
           entries.push({ action: 'create', planned: p })
         }
@@ -1028,6 +1045,20 @@ export class ContractInvoiceGenerator {
       }
 
       const status = ex.status ?? 'draft'
+
+      // Ett utkast som skapats för tidigt för en förlängningsperiod tas bort;
+      // det kommer tillbaka när fakturadatumet är inne.
+      if (notDueYet && EDITABLE_STATUSES.has(status)) {
+        entries.push({
+          action: 'delete',
+          planned: p,
+          existingId: ex.id,
+          existingStatus: status,
+          existingAmount: ex.total_amount, existingSubtotal: ex.subtotal,
+          reason: `För tidigt skapad förlängningsperiod, utkastet skapas igen ${p.invoiceDate}`,
+        })
+        continue
+      }
 
       if (p.isHistorical) {
         if (!opts.real && (status !== 'paid' || !ex.is_historical)) {
@@ -1107,7 +1138,7 @@ export class ContractInvoiceGenerator {
 
     for (const entry of entries) {
       const contractId = entry.consolidated ? null : (entry.contractId ?? plan.contractId)
-      if (entry.action === 'keep' || entry.action === 'consolidated') continue
+      if (entry.action === 'keep' || entry.action === 'consolidated' || entry.action === 'later') continue
       if (entry.action === 'uncovered') {
         result.uncovered++
         continue

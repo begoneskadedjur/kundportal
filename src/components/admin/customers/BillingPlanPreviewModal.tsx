@@ -50,6 +50,8 @@ const actionMeta: Partial<Record<BillingPlanAction, { label: string; className: 
   // fakturerad utanför portalen med knappen på raden.
   uncovered: { label: 'SAKNAR FAKTURA', className: 'bg-amber-500/15 text-amber-300 border-amber-500/40' },
   consolidated: { label: 'SAMLINGSFAKTURA', className: 'bg-slate-700/40 text-slate-400 border-slate-600/40' },
+  // Förlängningsperiod efter slutdatumet: utkastet skapas automatiskt 40 dagar före periodstart
+  later: { label: 'SKAPAS SENARE', className: 'bg-slate-700/40 text-slate-400 border-slate-600/40' },
 }
 
 // Actions som inte visas i listan (historiska skapas/backfillas silent)

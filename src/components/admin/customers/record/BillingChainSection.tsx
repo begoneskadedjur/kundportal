@@ -193,7 +193,7 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
         // (keep/update) och sådana planeraren skulle skapa (create).
         const today = new Date().toISOString().slice(0, 10)
         const list = merged.entries
-          .filter((e) => e.planned && e.planned.periodStart >= today && (e.action === 'create' || e.action === 'keep' || e.action === 'update'))
+          .filter((e) => e.planned && e.planned.periodStart >= today && (e.action === 'create' || e.action === 'keep' || e.action === 'update' || e.action === 'later'))
           .sort((a, b) => (a.planned!.periodStart + (a.kind ?? 'premium')).localeCompare(b.planned!.periodStart + (b.kind ?? 'premium')))
         if (!cancelled) setUpcoming(list)
       } catch (err) {

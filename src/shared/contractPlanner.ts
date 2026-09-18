@@ -95,6 +95,11 @@ export interface PlannedPeriod {
   isHistorical: boolean
   sequenceNumber: number
   totalSequenceCount: number
+  /**
+   * Perioden ligger efter avtalets eget slutdatum och finns bara för att
+   * avtalet rullar vidare. Utkast skapas först när fakturadatumet är inne.
+   */
+  beyondContractEnd?: boolean
 }
 
 export interface PlanOptions {
@@ -353,6 +358,7 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
 
     return {
       kind: 'premium' as const,
+      beyondContractEnd: endIsHorizon && !!declaredEnd && periodStart >= declaredEnd,
       periodStart: periodStartIso,
       periodEnd: toLocalIsoDate(periodEnd),
       amount,

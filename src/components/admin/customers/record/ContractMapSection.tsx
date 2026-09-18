@@ -104,7 +104,14 @@ const todayKey = () => new Date().toISOString().slice(0, 10)
 /** Fakturaplanen är gjord när nästa period redan finns som faktura (utkast eller skickad) */
 const hasPlannedInvoice = (entries: PremiumPlanEntry[]): boolean => {
   const today = todayKey()
-  return entries.some((e) => (!e.kind || e.kind === 'premium') && e.periodStart > today && !!e.existingStatus && e.action !== 'delete')
+  return entries.some(
+    (e) =>
+      (!e.kind || e.kind === 'premium') &&
+      e.periodStart > today &&
+      // Utkast finns, eller nästa period är en förlängning som får sitt utkast
+      // automatiskt 40 dagar före start: inget att göra för hand.
+      ((!!e.existingStatus && e.action !== 'delete') || e.action === 'later')
+  )
 }
 
 // ---------------------------------------------------------------------------
