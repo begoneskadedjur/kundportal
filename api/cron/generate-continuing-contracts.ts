@@ -300,6 +300,8 @@ async function loadCoveredPeriods(customerId: string): Promise<{
     .select('id, invoice_number, invoice_type, is_historical, is_consolidated, contract_id, contract_invoice_kind, billing_period_start, billing_period_end, invoice_items(contract_id)')
     .eq('customer_id', customerId)
     .in('invoice_type', ['contract', 'adhoc'])
+    // Makulerade fakturor täcker ingen period (samma regel som planeraren)
+    .neq('status', 'cancelled')
   type Inv = {
     invoice_number: string | null
     invoice_type: string | null
