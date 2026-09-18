@@ -33,6 +33,7 @@ import {
 } from '../../../../hooks/useCustomerRecord'
 import { isCaseCompleted } from '../../../../utils/customerRevenue'
 import { ContractInvoiceGenerator, type BillingPlanEntry } from '../../../../services/contractInvoiceGenerator'
+import { computePlannedPeriods, parseLocalDate, toLocalIsoDate, DEFAULT_INVOICE_LEAD_DAYS, type PlanningContract } from '../../../../shared/contractPlanner'
 import InvoiceSlip, { type SlipVariant } from './InvoiceSlip'
 import PlannedInvoicePreviewModal from './PlannedInvoicePreviewModal'
 
@@ -188,9 +189,12 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
       try {
         const plans = await ContractInvoiceGenerator.planCombinedForCustomer(root.id)
         const merged = ContractInvoiceGenerator.mergePlans(root.id, plans)
+        // Kommande = perioder som inte börjat: både utkast som redan finns
+        // (keep/update) och sådana planeraren skulle skapa (create).
+        const today = new Date().toISOString().slice(0, 10)
         const list = merged.entries
-          .filter((e) => e.action === 'create' && e.planned)
-          .sort((a, b) => (a.planned!.invoiceDate + a.planned!.periodStart).localeCompare(b.planned!.invoiceDate + b.planned!.periodStart))
+          .filter((e) => e.planned && e.planned.periodStart >= today && (e.action === 'create' || e.action === 'keep' || e.action === 'update'))
+          .sort((a, b) => (a.planned!.periodStart + (a.kind ?? 'premium')).localeCompare(b.planned!.periodStart + (b.kind ?? 'premium')))
         if (!cancelled) setUpcoming(list)
       } catch (err) {
         if (!cancelled) setUpcomingError(err instanceof Error ? err.message : 'Kunde inte räkna fram kommande fakturor')
@@ -200,6 +204,33 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
       cancelled = true
     }
   }, [root.id, contracts.length, invoices.length])
+
+  // Perioden efter planerarens horisont: visar att avtalet rullar vidare och
+  // när nästa faktura efter de kända kommer att skapas, förutsatt att ingen
+  // säger upp. Samma periodmatematik som planeraren, bara längre horisont.
+  const beyond = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const known = new Set((upcoming ?? []).map((e) => `${e.contractId ?? ''}|${e.planned!.periodStart}`))
+    const lastKnown = (upcoming ?? []).reduce((m, e) => (e.planned!.periodStart > m ? e.planned!.periodStart : m), today)
+    const d = new Date()
+    const horizon = toLocalIsoDate(new Date(d.getFullYear() + 2, d.getMonth(), d.getDate()))
+    const out: Array<{ contract: RecordContract; periodStart: string; periodEnd: string; invoiceDate: string; amount: number; noticeDeadline: string | null }> = []
+    for (const c of contracts) {
+      const pc = c as unknown as PlanningContract
+      if (pc.terminated_at || pc.billing_active === false) continue
+      const periods = computePlannedPeriods(pc, { horizonEnd: horizon, leadDays: DEFAULT_INVOICE_LEAD_DAYS })
+      const next = periods.find((p) => p.periodStart > lastKnown && !known.has(`${c.id}|${p.periodStart}`))
+      if (!next) continue
+      const notice = pc.notice_period_months
+      let noticeDeadline: string | null = null
+      if (notice && notice > 0) {
+        const ps = parseLocalDate(next.periodStart)
+        noticeDeadline = toLocalIsoDate(new Date(ps.getFullYear(), ps.getMonth() - notice, ps.getDate() - 1))
+      }
+      out.push({ contract: c, periodStart: next.periodStart, periodEnd: next.periodEnd, invoiceDate: next.invoiceDate, amount: next.amount, noticeDeadline })
+    }
+    return out.sort((a, b) => a.periodStart.localeCompare(b.periodStart))
+  }, [contracts, upcoming])
 
   const describePlanned = (e: BillingPlanEntry): string => {
     const kind = PLAN_KIND_LABEL[e.kind ?? 'premium'] ?? 'Årspremie'
@@ -261,7 +292,7 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
           <div className="flex items-baseline gap-3 pb-1.5 border-b border-slate-800">
             <h3 className="text-sm font-semibold text-slate-100">Kommande fakturor</h3>
             <span className="text-xs text-slate-500 truncate">
-              ur avtalskartan, inte skapade ännu
+              ur avtalen, så länge de inte sägs upp
             </span>
             {upcoming && upcoming.length > 0 && (
               <span className="ml-auto text-xs text-slate-400 tabular-nums shrink-0">
@@ -273,26 +304,30 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
             <p className="text-xs text-slate-500 mt-2">Räknar ur avtalen …</p>
           )}
           {upcomingError && <p className="text-xs text-amber-300 mt-2">{upcomingError}</p>}
-          {upcoming && upcoming.length === 0 && (
-            <p className="text-xs text-slate-500 mt-2">
-              Inget att skapa: alla perioder inom avtalstiden har redan en faktura eller ett utkast.
-            </p>
+          {upcoming && upcoming.length === 0 && beyond.length === 0 && (
+            <p className="text-xs text-slate-500 mt-2">Inga kommande perioder: avtalet är uppsagt eller faktureringen pausad.</p>
           )}
-          {upcoming && upcoming.length > 0 && (
+          {upcoming && (upcoming.length > 0 || beyond.length > 0) && (
             <ul className="divide-y divide-slate-800/60 mt-1">
               {upcoming.map((e, i) => {
                 const p = e.planned!
+                const exists = e.action !== 'create' && !!e.existingId
+                const existingNumber = exists ? invoices.find((inv) => inv.id === e.existingId)?.invoice_number : null
                 return (
                   <li key={`${e.contractId ?? 'c'}-${e.kind ?? 'premium'}-${p.periodStart}-${i}`}>
                     <button
                       type="button"
-                      onClick={() => setOpenPlanned(e)}
+                      onClick={() => (exists ? setOpenInvoiceId(e.existingId!) : setOpenPlanned(e))}
                       className="w-full flex items-center gap-3 px-2 py-2 -mx-2 rounded-lg text-left hover:bg-slate-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] transition-colors group"
-                      title="Visa fakturan som den kommer att se ut"
+                      title={exists ? 'Öppna utkastet' : 'Visa fakturan som den kommer att se ut'}
                     >
-                      <span className="w-6 h-6 rounded-md border border-dashed border-slate-600 flex items-center justify-center shrink-0">
-                        <CalendarClock className="w-3.5 h-3.5 text-slate-500" />
-                      </span>
+                      {exists ? (
+                        <InvoiceSlip variant="pending" size={24} />
+                      ) : (
+                        <span className="w-6 h-6 rounded-md border border-dashed border-slate-600 flex items-center justify-center shrink-0">
+                          <CalendarClock className="w-3.5 h-3.5 text-slate-500" />
+                        </span>
+                      )}
                       <span className="text-xs text-slate-400 tabular-nums w-[76px] shrink-0">
                         {formatMonthSv(p.periodStart)}
                       </span>
@@ -301,17 +336,43 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
                       </span>
                       <span className="flex items-center gap-1.5 w-24 shrink-0 text-slate-500">
                         <Circle className="w-3.5 h-3.5 shrink-0" />
-                        <span className="text-xs">Planerad</span>
+                        <span className="text-xs">{exists ? 'Utkast finns' : 'Planerad'}</span>
                       </span>
                       <span className="text-xs text-slate-500 truncate min-w-0 flex-1">
                         {describePlanned(e)}
-                        <span className="text-slate-600"> · skapas {formatDateSv(p.invoiceDate)}</span>
+                        {existingNumber && <span className="font-mono"> · {existingNumber}</span>}
+                        <span className="text-slate-600">
+                          {exists ? ` · skickas till Fortnox när den godkänts` : ` · skapas ${formatDateSv(p.invoiceDate)}`}
+                        </span>
                       </span>
                       <ChevronRight className="w-3.5 h-3.5 text-slate-700 group-hover:text-[#20c58f] transition-colors shrink-0" />
                     </button>
                   </li>
                 )
               })}
+              {/* Därefter: avtalet rullar vidare. Nästa period efter de kända,
+                  med datumet fakturan skapas och sista dag att säga upp. */}
+              {beyond.map((b) => (
+                <li key={`beyond-${b.contract.id}-${b.periodStart}`} className="flex items-center gap-3 px-2 py-2 -mx-2 text-slate-500">
+                  <span className="w-6 h-6 rounded-md border border-dotted border-slate-700 flex items-center justify-center shrink-0">
+                    <CalendarClock className="w-3.5 h-3.5 text-slate-600" />
+                  </span>
+                  <span className="text-xs tabular-nums w-[76px] shrink-0">{formatMonthSv(b.periodStart)}</span>
+                  <span className="text-sm tabular-nums w-24 shrink-0 text-right text-slate-400">{formatKr(b.amount)}</span>
+                  <span className="flex items-center gap-1.5 w-24 shrink-0">
+                    <Circle className="w-3.5 h-3.5 shrink-0 opacity-60" />
+                    <span className="text-xs">Därefter</span>
+                  </span>
+                  <span className="text-xs truncate min-w-0 flex-1">
+                    {contracts.length > 1 ? `${contractDisplayName(b.contract)} · ` : ''}
+                    {formatDateSv(b.periodStart)} till {formatDateSv(b.periodEnd)}
+                    <span className="text-slate-600"> · skapas {formatDateSv(b.invoiceDate)}</span>
+                    {b.noticeDeadline && (
+                      <span className="text-slate-600"> · om avtalet inte sägs upp senast {formatDateSv(b.noticeDeadline)}</span>
+                    )}
+                  </span>
+                </li>
+              ))}
             </ul>
           )}
         </section>
