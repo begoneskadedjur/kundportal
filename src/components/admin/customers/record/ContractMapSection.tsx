@@ -89,7 +89,7 @@ import AddonDropPrompt, { type AddonDropPromptState, type AddonPromptBrick } fro
 import { useAddonPending } from '../../../../hooks/useAddonPending'
 import type { AddonBrick } from '../../../../types/addonStations'
 import BillingPlanPreviewModal from '../BillingPlanPreviewModal'
-import { ContractInvoiceGenerator, type BillingPlan } from '../../../../services/contractInvoiceGenerator'
+import { ContractInvoiceGenerator, type BillingPlan, type BillingPlanEntry } from '../../../../services/contractInvoiceGenerator'
 import type { CaseBillingItemWithRelations } from '../../../../types/caseBilling'
 import ContractCaseServiceSelector from '../ContractCaseServiceSelector'
 import Modal from '../../../ui/Modal'
@@ -1632,7 +1632,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       setBillingPlans(plans)
       const merged = ContractInvoiceGenerator.mergePlans(root.id, plans)
       setPlanPreview(merged)
-      if (merged.summary.create + merged.summary.update + merged.summary.delete + merged.summary.historical === 0) {
+      // Passerade perioder utan faktura håller modalen öppen: där finns
+      // knappen för att registrera perioden som fakturerad utanför portalen.
+      if (merged.summary.create + merged.summary.update + merged.summary.delete + merged.summary.historical + merged.summary.uncovered === 0) {
         setPlanPreviewOpen(false)
         setPlanPreview(null)
         toast.success(
@@ -1647,6 +1649,16 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     } finally {
       setPlanLoading(false)
     }
+  }
+
+  /** Passerad period utan faktura: registrera som fakturerad utanför portalen och räkna om planen */
+  const markPeriodOutside = async (entry: BillingPlanEntry, input: { amount: number; invoicedAt: string; note: string | null }) => {
+    if (!entry.planned) return
+    await ContractInvoiceGenerator.markPeriodInvoicedOutside(root.id, entry.contractId ?? null, entry.planned, input)
+    toast.success(`Perioden ${formatDateSv(entry.planned.periodStart)} är registrerad som fakturerad utanför portalen.`)
+    await onChanged()
+    setBillingPlansKey((k) => k + 1)
+    await openPlanPreview()
   }
 
   const applyPlanPreview = async () => {
@@ -3281,6 +3293,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         plan={planPreview}
         loading={planLoading}
         onConfirm={() => void applyPlanPreview()}
+        onMarkOutside={markPeriodOutside}
         onCancel={() => {
           setPlanPreviewOpen(false)
           setPlanPreview(null)

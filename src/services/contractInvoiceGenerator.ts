@@ -1581,6 +1581,87 @@ export class ContractInvoiceGenerator {
    * Historisk faktura direkt som status=paid, is_historical=true. Bara för
    * synth-avtal (kunder utan avtalsrad); riktiga avtal får 'uncovered'.
    */
+  /**
+   * En passerad period som fakturerats utanför portalen (systemet före
+   * Fortnox, manuell faktura) registreras som historisk, betald faktura så
+   * att planen räknar perioden som täckt. Motsvarar "koppla Fortnox-faktura"
+   * för perioder som inte finns i Fortnox. Beloppet är det användaren anger,
+   * märkt som ej verifierat i noteringen.
+   */
+  static async markPeriodInvoicedOutside(
+    customerId: string,
+    contractId: string | null,
+    planned: PlannedInvoice,
+    input: { amount: number; invoicedAt: string; note: string | null }
+  ): Promise<string> {
+    const customer = await this.loadCustomer(customerId)
+    const label = contractId ? (await this.loadContractSources(contractId)).label : null
+    const invoiceNumber = `HIST-${planned.periodStart.slice(0, 7)}-${customerId.slice(0, 8)}`
+    const { data: dup } = await supabase.from('invoices').select('id').eq('invoice_number', invoiceNumber).maybeSingle()
+    if (dup) throw new Error('Perioden är redan registrerad som fakturerad utanför portalen')
+
+    const amount = Math.round(input.amount * 100) / 100
+    const vat = Math.round(amount * 25) / 100
+    const invoicedAt = parseLocalDate(input.invoicedAt).toISOString()
+    const notes = `Årspremie · Period ${periodLabel(planned)} · Fakturerad utanför portalen ${input.invoicedAt}, belopp ej verifierat mot Fortnox.${
+      input.note ? ` ${input.note}` : ''
+    }`
+
+    const { data: inv, error } = await supabase
+      .from('invoices')
+      .insert({
+        invoice_number: invoiceNumber,
+        invoice_type: 'contract',
+        contract_invoice_kind: planned.kind ?? 'premium',
+        is_consolidated: false,
+        customer_id: customer.id,
+        contract_id: contractId,
+        case_id: null,
+        case_type: null,
+        customer_name: customer.company_name,
+        customer_email: customer.billing_email ?? customer.contact_email,
+        customer_phone: customer.contact_phone,
+        customer_address: customer.billing_address ?? customer.contact_address,
+        organization_number: customer.organization_number,
+        subtotal: amount,
+        vat_amount: vat,
+        total_amount: Math.round((amount + vat) * 100) / 100,
+        status: 'paid',
+        requires_approval: false,
+        billing_period_start: planned.periodStart,
+        billing_period_end: planned.periodEnd,
+        due_date: input.invoicedAt,
+        booked_at: invoicedAt,
+        sent_at: invoicedAt,
+        paid_at: invoicedAt,
+        is_historical: true,
+        notes,
+        created_at: invoicedAt,
+      })
+      .select('id')
+      .single()
+    if (error) throw new Error(`Kunde inte registrera perioden: ${error.message}`)
+    if (!inv) throw new Error('Perioden registrerades inte')
+
+    const { error: itemErr } = await supabase.from('invoice_items').insert(
+      this.toItemRows(inv.id, [
+        {
+          contract_id: contractId,
+          line_kind: 'premium',
+          article_code: null,
+          article_name: `Årspremie ${label ?? 'avtal'}, ${periodLabel(planned)} (fakturerad utanför portalen)`,
+          quantity: 1,
+          unit_price: amount,
+          total_price: amount,
+          vat_rate: 25,
+          discount_percent: 0,
+        },
+      ])
+    )
+    if (itemErr) throw new Error(`Kunde inte skapa fakturarad: ${itemErr.message}`)
+    return inv.id
+  }
+
   private static async insertHistoricalPaidInvoice(customer: CustomerRow, planned: PlannedInvoice, contractId: string | null): Promise<string> {
     const invoiceNumber = await this.generateInvoiceNumber()
     const periodStart = parseLocalDate(planned.periodStart)
