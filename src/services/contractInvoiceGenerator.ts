@@ -769,6 +769,9 @@ export class ContractInvoiceGenerator {
       .eq('customer_id', customerId)
       .in('invoice_type', ['contract', 'adhoc'])
       .eq('contract_invoice_kind', kind)
+      // Makulerade fakturor täcker ingen period: de unika indexen släpper
+      // igenom en ny faktura för perioden, och planen ska göra detsamma.
+      .neq('status', 'cancelled')
     if (opts?.consolidated) q = q.eq('is_consolidated', true)
     else if (contractId) q = q.or(`contract_id.eq.${contractId},contract_id.is.null`).eq('is_consolidated', false)
     else q = q.eq('is_consolidated', false)
