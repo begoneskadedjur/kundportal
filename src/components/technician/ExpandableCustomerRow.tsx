@@ -167,6 +167,13 @@ export function ExpandableCustomerRow({
             {customer.customer_address && (
               <p className="text-sm text-slate-500 truncate">{customer.customer_address}</p>
             )}
+            {/* Vem som placerat stationerna — antalen ovan är kundens totala,
+                så tekniker som varvar hos samma kund ser att kollegan varit där */}
+            {customer.technician_names.length > 0 && (
+              <p className="text-xs text-slate-500 truncate">
+                Placerade av {customer.technician_names.join(', ')}
+              </p>
+            )}
 
             {/* Metadata-rad: stationsantal, hälsa och åtgärder */}
             <div className="flex items-center gap-3 flex-wrap mt-1.5">

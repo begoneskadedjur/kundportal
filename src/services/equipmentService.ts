@@ -84,25 +84,38 @@ export class EquipmentService {
   }
 
   /**
-   * Hämta utrustning placerad av en specifik tekniker
+   * Hämta utrustning för teknikerns utrustningssida.
+   * scope 'all' (standard) = alla utplaceringar, 'own' = bara teknikerns egna.
    */
-  static async getEquipmentByTechnician(technicianId: string): Promise<EquipmentPlacementWithRelations[]> {
+  static async getEquipmentByTechnician(
+    technicianId: string,
+    scope: StationScope = 'all'
+  ): Promise<EquipmentPlacementWithRelations[]> {
     try {
-      console.log('Hämtar utrustning för tekniker:', technicianId)
+      console.log('Hämtar utrustning för tekniker:', technicianId, 'scope:', scope)
 
-      const { data, error } = await supabase
+      // 2026-09-18: scope 'all' är standard. Tekniker som varvar hos samma kund
+      // (Hans/Liam-fallet) såg tidigare bara sina egna stationer på kartan och i
+      // kundlistan, och placerade därför ovanpå varandra. 'own' finns kvar som filter.
+      let query = supabase
         .from('equipment_placements')
         .select(`
           *,
           customer:customers!customer_id(id, company_name, contact_address),
+          technician:technicians!placed_by_technician_id(id, name),
           station_type_data:station_types!station_type_id(
             id, code, name, color, icon, prefix,
             measurement_unit, measurement_label,
             threshold_warning, threshold_critical, threshold_direction
           )
         `)
-        .eq('placed_by_technician_id', technicianId)
         .order('placed_at', { ascending: false })
+
+      if (scope === 'own') {
+        query = query.eq('placed_by_technician_id', technicianId)
+      }
+
+      const { data, error } = await query
 
       if (error) {
         console.error('Fel vid hämtning av teknikers utrustning:', error)
@@ -579,21 +592,30 @@ export class EquipmentService {
    * Kombinerar utomhus- och inomhusstationer med hälsostatus
    */
   static async getCustomerStationSummaries(
-    technicianId: string
+    technicianId: string,
+    scope: StationScope = 'all'
   ): Promise<CustomerStationSummary[]> {
     try {
-      console.log('Hämtar kundsammanfattningar för tekniker:', technicianId)
+      console.log('Hämtar kundsammanfattningar för tekniker:', technicianId, 'scope:', scope)
+
+      // 2026-09-18: räknar KUNDENS alla stationer, inte bara teknikerns egna.
+      // Antalet här ligger till grund för schemaläggningen; när två tekniker
+      // varvar etableringar hos samma kund måste båda se hela bilden.
+      // own_*_count + technician_names gör det synligt vem som placerat vad.
 
       // Hämta utomhusstationer grupperat per kund
-      const { data: outdoorData, error: outdoorError } = await supabase
+      let outdoorQuery = supabase
         .from('equipment_placements')
         .select(`
           customer_id,
           status,
           placed_at,
+          placed_by_technician_id,
+          technician:technicians!placed_by_technician_id(name),
           customer:customers!customer_id(id, company_name, contact_address, organization_number, organization_id, parent_customer_id, is_multisite, site_type, site_name, contract_start_date, contract_end_date)
         `)
-        .eq('placed_by_technician_id', technicianId)
+      if (scope === 'own') outdoorQuery = outdoorQuery.eq('placed_by_technician_id', technicianId)
+      const { data: outdoorData, error: outdoorError } = await outdoorQuery
 
       if (outdoorError) {
         console.error('Fel vid hämtning av utomhusstationer:', outdoorError)
@@ -601,18 +623,21 @@ export class EquipmentService {
       }
 
       // Hämta inomhusstationer via floor_plans
-      const { data: indoorData, error: indoorError } = await supabase
+      let indoorQuery = supabase
         .from('indoor_stations')
         .select(`
           id,
           status,
           placed_at,
+          placed_by_technician_id,
+          technician:technicians!placed_by_technician_id(name),
           floor_plan:floor_plans!floor_plan_id(
             customer_id,
             customer:customers!customer_id(id, company_name, contact_address, organization_number, organization_id, parent_customer_id, is_multisite, site_type, site_name, contract_start_date, contract_end_date)
           )
         `)
-        .eq('placed_by_technician_id', technicianId)
+      if (scope === 'own') indoorQuery = indoorQuery.eq('placed_by_technician_id', technicianId)
+      const { data: indoorData, error: indoorError } = await indoorQuery
 
       if (indoorError) {
         console.error('Fel vid hämtning av inomhusstationer:', indoorError)
@@ -632,8 +657,8 @@ export class EquipmentService {
         site_name: string | null
         contract_start_date: string | null
         contract_end_date: string | null
-        outdoor_stations: Array<{ status: string; placed_at: string }>
-        indoor_stations: Array<{ status: string; placed_at: string }>
+        outdoor_stations: Array<{ status: string; placed_at: string; placed_by: string | null; technician_name: string | null }>
+        indoor_stations: Array<{ status: string; placed_at: string; placed_by: string | null; technician_name: string | null }>
       }>()
 
       // Lägg till utomhusstationer
@@ -661,7 +686,9 @@ export class EquipmentService {
 
         customerMap.get(customerId)!.outdoor_stations.push({
           status: item.status,
-          placed_at: item.placed_at
+          placed_at: item.placed_at,
+          placed_by: item.placed_by_technician_id || null,
+          technician_name: item.technician?.name || null
         })
       })
 
@@ -691,7 +718,9 @@ export class EquipmentService {
 
         customerMap.get(customerId)!.indoor_stations.push({
           status: item.status,
-          placed_at: item.placed_at
+          placed_at: item.placed_at,
+          placed_by: item.placed_by_technician_id || null,
+          technician_name: item.technician?.name || null
         })
       })
 
@@ -719,6 +748,10 @@ export class EquipmentService {
           ? new Date(Math.max(...allDates.map(d => d.getTime())))
           : null
 
+        const technicianNames = Array.from(new Set(
+          allStations.map(s => s.technician_name).filter((n): n is string => !!n)
+        )).sort((a, b) => a.localeCompare(b, 'sv'))
+
         return {
           customer_id: customer.customer_id,
           customer_name: customer.customer_name,
@@ -726,6 +759,9 @@ export class EquipmentService {
           organization_number: customer.organization_number,
           outdoor_count: customer.outdoor_stations.length,
           indoor_count: customer.indoor_stations.length,
+          own_outdoor_count: customer.outdoor_stations.filter(s => s.placed_by === technicianId).length,
+          own_indoor_count: customer.indoor_stations.filter(s => s.placed_by === technicianId).length,
+          technician_names: technicianNames,
           health_status,
           latest_inspection_date: latestDate?.toISOString() || null,
           latest_inspector_name: null, // Kräver separat query om vi vill ha detta
@@ -901,13 +937,22 @@ export class EquipmentService {
 }
 
 // Typer för aggregerad data
+/** Omfång på teknikerns utrustningssida: alla stationer hos kunden eller bara egna. */
+export type StationScope = 'all' | 'own'
+
 export interface CustomerStationSummary {
   customer_id: string
   customer_name: string
   customer_address: string | null
   organization_number?: string | null
+  // Kundens ALLA stationer (oavsett vem som placerade dem)
   outdoor_count: number
   indoor_count: number
+  // Den inloggade teknikerns egna
+  own_outdoor_count: number
+  own_indoor_count: number
+  // Alla tekniker som placerat stationer hos kunden, sorterade
+  technician_names: string[]
   health_status: 'excellent' | 'good' | 'fair' | 'poor'
   latest_inspection_date: string | null
   latest_inspector_name: string | null

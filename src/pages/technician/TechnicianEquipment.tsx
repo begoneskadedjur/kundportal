@@ -12,6 +12,10 @@ import {
   getEquipmentTypeLabel
 } from '../../types/database'
 import { EquipmentService, CustomerStationSummary } from '../../services/equipmentService'
+import type { StationScope } from '../../services/equipmentService'
+
+// Teknikerns valda omfång (Alla/Mina) på utrustningssidan, sparas per webbläsare
+const STATION_SCOPE_STORAGE_KEY = 'technician-equipment-station-scope'
 import { ContractService } from '../../services/contractService'
 import { EquipmentPlacementForm, type FormData as EquipmentFormData } from '../../components/shared/equipment/EquipmentPlacementForm'
 import type { ExistingStation } from '../../components/shared/equipment/MapLocationPicker'
@@ -100,8 +104,37 @@ export default function TechnicianEquipment() {
   }
 
   // State
-  const [allEquipment, setAllEquipment] = useState<EquipmentPlacementWithRelations[]>([])
-  const [allCustomers, setAllCustomers] = useState<CustomerStationSummary[]>([])
+  // 2026-09-18: sidan hämtar ALLA stationer hos kunderna (inte bara teknikerns egna)
+  // så att tekniker som varvar etableringar hos samma kund ser hela bilden.
+  // Omfånget Alla/Mina är ett rent klientfilter ovanpå den hämtade datan.
+  const [fetchedEquipment, setFetchedEquipment] = useState<EquipmentPlacementWithRelations[]>([])
+  const [fetchedCustomers, setFetchedCustomers] = useState<CustomerStationSummary[]>([])
+  const technicianId = profile?.technician_id || ''
+  const [stationScope, setStationScope] = useState<StationScope>(() => {
+    try {
+      return localStorage.getItem(STATION_SCOPE_STORAGE_KEY) === 'own' ? 'own' : 'all'
+    } catch {
+      return 'all'
+    }
+  })
+  const allEquipment = useMemo(
+    () => stationScope === 'own'
+      ? fetchedEquipment.filter(e => e.placed_by_technician_id === technicianId)
+      : fetchedEquipment,
+    [fetchedEquipment, stationScope, technicianId]
+  )
+  // I läget Mina visas kunder där teknikern placerat något, men antalen är
+  // fortfarande kundens totala — det är dem schemat ska bygga på.
+  const allCustomers = useMemo(
+    () => stationScope === 'own'
+      ? fetchedCustomers.filter(c => c.own_outdoor_count + c.own_indoor_count > 0)
+      : fetchedCustomers,
+    [fetchedCustomers, stationScope]
+  )
+  const handleScopeChange = (scope: StationScope) => {
+    setStationScope(scope)
+    try { localStorage.setItem(STATION_SCOPE_STORAGE_KEY, scope) } catch { /* privat läge */ }
+  }
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -186,9 +219,6 @@ export default function TechnicianEquipment() {
   } | null>(null)
   const [deleteType, setDeleteType] = useState<'removed' | 'missing' | 'damaged' | 'permanent'>('removed')
 
-  // Hämta tekniker-ID från profil
-  const technicianId = profile?.technician_id || ''
-
   const customerParamHandled = useRef(false)
 
   // Cache för avtalsuppslag per kund (batch-placering, se handleFormSubmit)
@@ -214,12 +244,14 @@ export default function TechnicianEquipment() {
     }
   }, [allEquipment, allCustomers])
 
-  // Befintliga stationer för vald kund — visas på kartväljaren under placering
+  // Befintliga stationer för vald kund — visas på kartväljaren under placering.
+  // Läser ALLTID ur hela hämtningen, oavsett Alla/Mina: kollegans stationer
+  // måste synas på kartan så man inte placerar ovanpå dem.
   const customerExistingStations = useMemo<ExistingStation[]>(() => {
     const cid = wizardCustomerId
     if (!cid) return []
 
-    const customerStations = allEquipment.filter(
+    const customerStations = fetchedEquipment.filter(
       e => e.customer_id === cid && e.latitude && e.longitude
     )
 
@@ -235,7 +267,7 @@ export default function TechnicianEquipment() {
       equipment_type: e.equipment_type,
       color: e.station_type_data?.color || undefined
     }))
-  }, [allEquipment, wizardCustomerId])
+  }, [fetchedEquipment, wizardCustomerId])
 
   // Hämta alla teknikerns placeringar och kunder med stationer vid mount
   useEffect(() => {
@@ -251,8 +283,8 @@ export default function TechnicianEquipment() {
           EquipmentService.getEquipmentByTechnician(technicianId),
           EquipmentService.getCustomerStationSummaries(technicianId)
         ])
-        setAllEquipment(equipmentData)
-        setAllCustomers(customerData)
+        setFetchedEquipment(equipmentData)
+        setFetchedCustomers(customerData)
       } catch (error) {
         console.error('Fel vid hämtning av utrustning:', error)
         toast.error('Kunde inte hämta utrustning')
@@ -300,8 +332,8 @@ export default function TechnicianEquipment() {
         EquipmentService.getEquipmentByTechnician(technicianId),
         EquipmentService.getCustomerStationSummaries(technicianId)
       ])
-      setAllEquipment(equipmentData)
-      setAllCustomers(customerData)
+      setFetchedEquipment(equipmentData)
+      setFetchedCustomers(customerData)
     } catch (error) {
       console.error('Fel vid uppdatering av utrustning:', error)
     } finally {
@@ -1056,9 +1088,29 @@ export default function TechnicianEquipment() {
                   ))}
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white mb-4">
-                    Kunder med stationer
-                  </h2>
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <h2 className="text-lg font-semibold text-white">
+                      Kunder med stationer
+                    </h2>
+                    {/* Omfång: alla stationer hos kunderna, eller bara de teknikern själv placerat.
+                        Antalen per kund är alltid kundens totala — schemat bygger på dem. */}
+                    <div className="flex items-center gap-4 text-sm">
+                      {([['all', 'Alla'], ['own', 'Mina']] as Array<[StationScope, string]>).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => handleScopeChange(value)}
+                          className={`pb-0.5 border-b-2 transition-colors ${
+                            stationScope === value
+                              ? 'border-[#20c58f] text-white'
+                              : 'border-transparent text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <AllCustomersList
                     customers={allCustomers}
                     loading={loading}

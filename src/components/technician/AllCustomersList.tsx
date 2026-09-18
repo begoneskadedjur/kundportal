@@ -328,8 +328,8 @@ export function AllCustomersList({
             <>
               <h3 className="text-lg font-medium text-white mb-2">Inga stationer ännu</h3>
               <p className="text-slate-400 text-sm max-w-xs">
-                Du har inte placerat några stationer hos någon kund ännu.
-                Klicka på + för att börja.
+                Inga kunder med utplacerade stationer att visa.
+                Klicka på + för att placera ut den första.
               </p>
             </>
           )}
