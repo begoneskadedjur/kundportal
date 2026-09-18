@@ -301,12 +301,40 @@ export class ContractInvoiceGenerator {
    * Fakturaplaner för ALLA aktiva kontrakt på en kund, en plan per avtal.
    */
   static async planAllForCustomer(customerId: string): Promise<BillingPlan[]> {
-    const contracts = await ContractService.getActiveContracts(customerId)
+    const contracts = await this.liveContractsForFamily(customerId)
     const plans: BillingPlan[] = []
     for (const contract of contracts) {
-      plans.push(await this.planForContract(contract, { customerId }))
+      // Enhetsavtal faktureras på sin egen kundrad: planen (och fakturan)
+      // hör till enheten, inte till huvudkontoret.
+      plans.push(await this.planForContract(contract, { customerId: contract.customer_id ?? customerId }))
     }
     return plans
+  }
+
+  /**
+   * Levande avtal för kunden OCH dess enheter. Huddinge Pastorat har sina tre
+   * avtal på enheterna (enhetsavtal), så en sökning enbart på huvudkontorets
+   * customer_id gav noll avtal och "Fakturorna stämmer redan med avtalen".
+   */
+  private static async liveContractsForFamily(customerId: string): Promise<ContractWithBilling[]> {
+    const own = await ContractService.getActiveContracts(customerId)
+    const { data: unitRows } = await supabase.from('customers').select('id').eq('parent_customer_id', customerId)
+    const unitIds = (unitRows ?? []).map((u) => (u as { id: string }).id)
+    if (unitIds.length === 0) return own
+
+    const seen = new Set(own.map((c) => c.id))
+    const all = [...own]
+    for (const unitId of unitIds) {
+      for (const c of await ContractService.getActiveContracts(unitId)) {
+        // Synth-avtal från en enhets kundrad är inte ett eget avtal att
+        // fakturera när huvudkontoret redan har riktiga avtal.
+        if (isSyntheticContract(c) && own.some((o) => !isSyntheticContract(o))) continue
+        if (seen.has(c.id)) continue
+        seen.add(c.id)
+        all.push(c)
+      }
+    }
+    return all
   }
 
   /**
@@ -503,7 +531,8 @@ export class ContractInvoiceGenerator {
    * som egna planer. Synth-avtal samfaktureras aldrig (de har inget avtal).
    */
   static async planConsolidatedForCustomer(customerId: string): Promise<BillingPlan[]> {
-    const contracts = (await ContractService.getActiveContracts(customerId)).filter((c) => !isSyntheticContract(c))
+    // Enhetsavtal räknas med: en samlad faktura kan bära flera enheters avtal.
+    const contracts = (await this.liveContractsForFamily(customerId)).filter((c) => !isSyntheticContract(c))
     if (contracts.length === 0) return this.planAllForCustomer(customerId)
 
     const groups = new Map<string, ContractWithBilling[]>()
