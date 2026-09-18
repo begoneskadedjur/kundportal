@@ -286,7 +286,8 @@ function buildRows(contract: ContractRow, sources: Sources, p: PlannedPeriod): R
 
 /** Täckningsnyckel: fakturatyp + periodstart. Diffen är alltid per typ. */
 function periodKey(kind: string | null | undefined, periodStart: string): string {
-  return `${kind ?? 'premium'}|${periodStart}`
+  // Nyckel per MÅNAD: importerade fakturor bär avtalets startdag, planen den 1:a
+  return `${kind ?? 'premium'}|${periodStart.slice(0, 7)}`
 }
 
 /** Perioder som redan har faktura (per avtal, samlat eller Fortnox-import) på kunden, per fakturatyp. */

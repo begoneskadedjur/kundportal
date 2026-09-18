@@ -265,6 +265,11 @@ function summarize(entries: BillingPlanEntry[]): BillingPlan['summary'] {
   }, EMPTY_SUMMARY())
 }
 
+/** Periodnyckel för matchning: ÅÅÅÅ-MM, dagen i månaden ignoreras. */
+function monthKey(iso: string): string {
+  return iso.slice(0, 7)
+}
+
 function periodLabel(p: Pick<PlannedPeriod, 'periodStart' | 'periodEnd'>): string {
   return `${p.periodStart} t.o.m. ${p.periodEnd}`
 }
@@ -808,7 +813,7 @@ export class ContractInvoiceGenerator {
     const map = new Map<string, ExistingInvoice>()
     for (const inv of rows) {
       if (!inv.billing_period_start) continue
-      if ((inv.invoice_items ?? []).some((it) => it.contract_id === contractId)) map.set(inv.billing_period_start, inv)
+      if ((inv.invoice_items ?? []).some((it) => it.contract_id === contractId)) map.set(monthKey(inv.billing_period_start), inv)
     }
     return map
   }
@@ -1002,16 +1007,19 @@ export class ContractInvoiceGenerator {
         : planned.filter((p) => !coveredRanges.some((r) => p.periodStart <= r.end && p.periodEnd >= r.start))
 
     const contractInvoices = existing.filter((e) => e.invoice_type === 'contract' && !(e.invoice_number ?? '').startsWith('F-'))
-    const plannedByKey = new Map(filteredPlanned.map((p) => [p.periodStart, p]))
+    // Nyckel = periodens MÅNAD. Importerade fakturor bär ofta avtalets startdag
+    // (2025-11-18) medan planen räknar från den 1:a (2025-11-01); samma period
+    // ska matcha, annars flaggas den som saknad och fakturan som utanför plan.
+    const plannedByKey = new Map(filteredPlanned.map((p) => [monthKey(p.periodStart), p]))
     const existingByKey = new Map(
-      contractInvoices.filter((e) => e.billing_period_start).map((e) => [e.billing_period_start as string, e])
+      contractInvoices.filter((e) => e.billing_period_start).map((e) => [monthKey(e.billing_period_start as string), e])
     )
 
     const entries: BillingPlanEntry[] = []
     const todayIso = toLocalIsoDate(todayLocal())
 
     for (const p of filteredPlanned) {
-      const consolidated = opts.consolidatedPeriods?.get(p.periodStart)
+      const consolidated = opts.consolidatedPeriods?.get(monthKey(p.periodStart))
       if (consolidated) {
         entries.push({
           action: 'consolidated',
@@ -1024,7 +1032,7 @@ export class ContractInvoiceGenerator {
         continue
       }
 
-      const ex = existingByKey.get(p.periodStart)
+      const ex = existingByKey.get(monthKey(p.periodStart))
       // Förlängningsperiod (efter avtalets slutdatum) vars fakturadatum inte
       // är inne: utkastet skapas av cron 40 dagar före start, inte här.
       const notDueYet = opts.real && !!p.beyondContractEnd && !p.isHistorical && p.invoiceDate > todayIso
@@ -1094,7 +1102,7 @@ export class ContractInvoiceGenerator {
     // Befintliga utan motsvarande plan
     for (const ex of contractInvoices) {
       if (!ex.billing_period_start) continue
-      if (plannedByKey.has(ex.billing_period_start)) continue
+      if (plannedByKey.has(monthKey(ex.billing_period_start))) continue
       const status = ex.status ?? 'draft'
       if (LOCKED_STATUSES.has(status)) {
         entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Utanför nuvarande plan men redan bokförd/skickad/betald' })
