@@ -1212,6 +1212,88 @@ const createCustomerFromSignedContract = async (contractId: string): Promise<voi
 }
 
 /**
+ * Notis till faktureringsansvariga (profiles.can_approve_invoices) när ett
+ * avtal signerats: kunden behöver ses över i avtalskartan (omfattning,
+ * fakturering, schema). Säljaren är ofta en tekniker utan åtkomst till
+ * Befintliga kunder, så notisen går till dem som faktiskt kan fylla i kartan.
+ * Samma notiskedja som "Tillägg att besluta": case_type 'customer' med
+ * kundens id, klick öppnar avtalskartan. Idempotent per avtal och mottagare.
+ */
+const notifyInvoiceApproversOfSignedContract = async (contractId: string): Promise<void> => {
+  try {
+    const { data: contract } = await supabase
+      .from('contracts')
+      .select('id, type, status, customer_id, company_name, label, contract_type, annual_value, total_value, billing_frequency, contract_start_date, start_date')
+      .eq('oneflow_contract_id', contractId)
+      .maybeSingle()
+    if (!contract || contract.type !== 'contract' || contract.status !== 'signed') return
+    if (!contract.customer_id) {
+      console.log('ℹ️ Ingen kund kopplad till avtalet, ingen notis:', contractId)
+      return
+    }
+
+    // Notisen pekar på huvudkunden: avtalskartan ligger där även för enheter
+    const { data: cust } = await supabase
+      .from('customers')
+      .select('id, parent_customer_id, company_name')
+      .eq('id', contract.customer_id)
+      .maybeSingle()
+    const rootId = cust?.parent_customer_id ?? contract.customer_id
+    const companyName = cust?.company_name ?? contract.company_name ?? 'Ny avtalskund'
+
+    const { data: approvers } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('can_approve_invoices', true)
+      .eq('is_active', true)
+    const recipients = (approvers ?? []).map((p) => p.user_id as string).filter(Boolean)
+    if (recipients.length === 0) return
+
+    const annual = contract.annual_value ?? contract.total_value
+    const freqLabel: Record<string, string> = { annual: 'årsvis', semi_annual: 'halvårsvis', quarterly: 'kvartalsvis', monthly: 'månadsvis' }
+    const bits = [
+      contract.label ?? contract.contract_type ?? 'Avtal',
+      annual ? `${new Intl.NumberFormat('sv-SE').format(Math.round(Number(annual)))} kr per år` : null,
+      contract.billing_frequency ? freqLabel[contract.billing_frequency] ?? contract.billing_frequency : 'faktureringsintervall saknas',
+      contract.contract_start_date ?? contract.start_date ? `start ${contract.contract_start_date ?? contract.start_date}` : null,
+    ].filter(Boolean)
+    const title = `Nytt avtal signerat · ${companyName}`
+    const preview = `${bits.join(' · ')}. Kontrollera avtalskartan: omfattning, fakturering och schema.`
+
+    // En notis per mottagare och avtal: hoppa över dem som redan har en oläst
+    const { data: existing } = await supabase
+      .from('notifications')
+      .select('recipient_id')
+      .eq('case_type', 'customer')
+      .eq('case_id', rootId)
+      .eq('title', title)
+      .eq('is_read', false)
+    const already = new Set((existing ?? []).map((n) => n.recipient_id as string))
+
+    const rows = recipients
+      .filter((id) => !already.has(id))
+      .map((id) => ({
+        recipient_id: id,
+        case_id: rootId,
+        case_type: 'customer',
+        title,
+        preview,
+        case_title: companyName,
+        sender_id: id,
+        sender_name: 'Systemet',
+        is_read: false,
+      }))
+    if (rows.length === 0) return
+    const { error } = await supabase.from('notifications').insert(rows)
+    if (error) throw error
+    console.log(`🔔 Notis om signerat avtal till ${rows.length} faktureringsansvariga:`, companyName)
+  } catch (err) {
+    // Aldrig kritiskt: signeringen får inte fallera på en notis
+    console.error('⚠️ Kunde inte notifiera faktureringsansvariga:', err)
+  }
+}
+
+/**
  * Fyll avtalsfälten på contracts-raden vid signering.
  *
  * Oneflow-flödet skrev historiskt bara metadata (parter, mall, avtalstext,
@@ -1847,6 +1929,9 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
 
             // Automatisk kundregistrering för signerade avtal
             await createCustomerFromSignedContract(contractId)
+
+            // Faktureringsansvariga får veta att kunden behöver ses över i avtalskartan
+            await notifyInvoiceApproversOfSignedContract(contractId)
 
             // Uppdatera ärendets huvudstatus till bokningsbar (för offerter).
             // Spara även oneflow_contract_id direkt på ärendet (Fas 13b) så
