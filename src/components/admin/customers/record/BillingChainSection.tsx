@@ -513,11 +513,18 @@ function InvoiceGroup({
           // Historik saknar underlag i systemet — läsbar, men inget att öppna.
           // Etiketten "Fortnox" förklarar varför raden beter sig annorlunda.
           if (historical) {
+            // Bara F-nummer är hämtade ur Fortnox. Övrig historik skapades av
+            // importen som antagande om betalda perioder och får inte se ut
+            // som Fortnox-fakta (RBFG-fallet 2026-09-18).
+            const fromFortnox = (inv.invoice_number ?? '').startsWith('F-')
             return (
               <li key={inv.id} className="flex items-center gap-3 px-2 py-2 -mx-2">
                 {content}
-                <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-slate-600 border border-slate-700/70 rounded px-1.5 py-0.5">
-                  Fortnox
+                <span
+                  className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-slate-600 border border-slate-700/70 rounded px-1.5 py-0.5"
+                  title={fromFortnox ? 'Hämtad från Fortnox' : 'Skapad av importen som antagande om betald period, inte verifierad mot Fortnox'}
+                >
+                  {fromFortnox ? 'Fortnox' : 'Import'}
                 </span>
               </li>
             )

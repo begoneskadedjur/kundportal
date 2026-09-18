@@ -364,6 +364,9 @@ export class ContractInvoiceGenerator {
       equipment: sources.equipment,
       leadDays: DEFAULT_INVOICE_LEAD_DAYS,
       equipmentMode: sources.equipmentInvoiceMode,
+      // Rullande avtal fortsätter efter slutdatumet tills de sägs upp: samma
+      // horisont som cron, annars saknas nästa period när avtalsåret tar slut.
+      horizonEnd: contract.terminated_at ? undefined : rollingHorizonEnd(),
     })
     const existing = await this.loadExisting(customerId, contract.id, { kind: 'premium' })
     const consolidatedPeriods = await this.loadConsolidatedPeriodsForContract(customerId, contract.id)
@@ -515,6 +518,7 @@ export class ContractInvoiceGenerator {
           equipment: sources.equipment,
           leadDays: DEFAULT_INVOICE_LEAD_DAYS,
           equipmentMode: sources.equipmentInvoiceMode,
+          horizonEnd: contract.terminated_at ? undefined : rollingHorizonEnd(),
         })
         perContract.push({ contract, sources, periods })
         // Tillägg på egna fakturor samlas aldrig: de planeras per avtal
