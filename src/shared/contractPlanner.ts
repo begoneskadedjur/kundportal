@@ -178,7 +178,14 @@ export function iterPeriodsPure(
   start: Date,
   end: Date,
   freq: string,
-  anchorMonth: number | null
+  anchorMonth: number | null,
+  /**
+   * Hela perioden måste rymmas före end. Gäller avtalets eget slutdatum.
+   * När end är en rullande horisont (avtalet förlängs period för period)
+   * räcker det att perioden BÖRJAR före horisonten: annars syns nästa
+   * årsperiod bara i ett smalt fönster strax innan den börjar.
+   */
+  requireFullPeriod = true
 ): Array<{ periodStart: Date; periodEnd: Date }> {
   const out: Array<{ periodStart: Date; periodEnd: Date }> = []
 
@@ -200,7 +207,7 @@ export function iterPeriodsPure(
     let cur = new Date(start.getFullYear(), start.getMonth(), 1)
     while (cur < end) {
       const fiveAhead = new Date(cur.getFullYear(), cur.getMonth() + 5, 1)
-      if (fiveAhead > end) break
+      if (requireFullPeriod && fiveAhead > end) break
       out.push({ periodStart: new Date(cur), periodEnd: new Date(cur.getFullYear(), cur.getMonth() + 6, 0) })
       cur = new Date(cur.getFullYear(), cur.getMonth() + 6, 1)
     }
@@ -214,7 +221,7 @@ export function iterPeriodsPure(
     // < inte <=: en period som börjar exakt på slutdatumet ligger efter avtalstiden.
     while (cur < end) {
       const elevenAhead = new Date(cur.getFullYear(), cur.getMonth() + 11, 1)
-      if (elevenAhead > end) break
+      if (requireFullPeriod && elevenAhead > end) break
       out.push({ periodStart: new Date(cur), periodEnd: new Date(cur.getFullYear() + 1, cur.getMonth(), 0) })
       cur = new Date(cur.getFullYear() + 1, cur.getMonth(), 1)
     }
@@ -273,7 +280,10 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
   const cutoff = computeTerminationCutoff(contract)
   if (cutoff && cutoff < effectiveEnd) effectiveEnd = cutoff
 
-  const intervals = iterPeriodsPure(start, effectiveEnd, freq, contract.billing_anchor_month)
+  // Slutet är en rullande horisont (inte avtalets eget slutdatum eller en
+  // uppsägning): då får perioden börja före horisonten utan att rymmas helt.
+  const endIsHorizon = !cutoff && !!opts.horizonEnd && (!declaredEnd || declaredEnd < effectiveEnd)
+  const intervals = iterPeriodsPure(start, effectiveEnd, freq, contract.billing_anchor_month, !endIsHorizon)
   const today = opts.today ? parseLocalDate(opts.today) : todayLocal()
   const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1)
   const paymentTermsDays = opts.paymentTermsDays ?? 30
