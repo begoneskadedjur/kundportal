@@ -119,6 +119,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       targetStatus = 'booked'
     }
 
+    // Kvar att betala speglas alltid, oavsett statusskydd: en delbetalning
+    // ändrar saldot utan att ändra status, och fliken ska visa resten,
+    // inte hela fakturan som obetald.
+    if (typeof invoice.Balance === 'number') {
+      await supabase
+        .from('invoices')
+        .update({ balance_due: Math.round(invoice.Balance * 100) / 100 })
+        .eq('fortnox_document_number', documentNumber)
+    }
+
     if (!targetStatus) {
       // Utkast i Fortnox — inget att synka
       return res.status(200).json({ ok: true, skipped: 'draft-only' })

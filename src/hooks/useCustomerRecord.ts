@@ -179,6 +179,13 @@ export interface RecordInvoice {
   is_consolidated?: boolean | null
   /** Er referens på fakturan */
   invoice_marking?: string | null
+  /** Kvar att betala inkl. moms enligt Fortnox; null = okänt, 0 = fullt betald */
+  balance_due?: number | null
+  fortnox_document_number?: string | null
+  notes?: string | null
+  vat_amount?: number | null
+  sent_at?: string | null
+  paid_at?: string | null
   /** Raderna, för att visa vilka avtal en samlad faktura bär och vad ett tillägg avser */
   items?: RecordInvoiceItem[]
 }
@@ -188,6 +195,7 @@ export interface RecordInvoiceItem {
   article_name: string | null
   line_kind: string | null
   quantity: number | null
+  unit_price?: number | null
   total_price: number | null
 }
 
@@ -582,7 +590,8 @@ export function useCustomerRecord(customerId: string | undefined) {
           'id, customer_id, contract_id, case_id, invoice_type, invoice_number, status, ' +
             'subtotal, total_amount, billing_period_start, billing_period_end, ' +
             'is_historical, due_date, created_at, contract_invoice_kind, is_consolidated, invoice_marking, ' +
-            'items:invoice_items(contract_id, article_name, line_kind, quantity, total_price)'
+            'balance_due, fortnox_document_number, notes, vat_amount, sent_at, paid_at, ' +
+            'items:invoice_items(contract_id, article_name, line_kind, quantity, unit_price, total_price)'
         )
         .in('customer_id', familyIds)
         .order('billing_period_start', { ascending: false }),

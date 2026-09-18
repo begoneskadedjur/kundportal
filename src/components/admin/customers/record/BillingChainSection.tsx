@@ -36,14 +36,16 @@ import { ContractInvoiceGenerator, type BillingPlanEntry } from '../../../../ser
 import { computePlannedPeriods, parseLocalDate, toLocalIsoDate, DEFAULT_INVOICE_LEAD_DAYS, type PlanningContract } from '../../../../shared/contractPlanner'
 import InvoiceSlip, { type SlipVariant } from './InvoiceSlip'
 import PlannedInvoicePreviewModal from './PlannedInvoicePreviewModal'
+import ImportedInvoicePreviewModal from './ImportedInvoicePreviewModal'
 
 const InvoiceDetailModal = lazy(() => import('../../invoicing/InvoiceDetailModal'))
 
-type AggStatus = 'paid' | 'sent' | 'pending' | 'overdue' | 'cancelled'
+type AggStatus = 'paid' | 'sent' | 'partial' | 'pending' | 'overdue' | 'cancelled'
 
 const STATUS_META: Record<AggStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
   paid: { label: 'Betald', className: 'text-[#20c58f]', Icon: CheckCircle2 },
   sent: { label: 'Skickad', className: 'text-blue-400', Icon: Clock },
+  partial: { label: 'Delbetald', className: 'text-amber-300', Icon: Clock },
   pending: { label: 'Väntar', className: 'text-slate-500', Icon: Circle },
   overdue: { label: 'Förfallen', className: 'text-red-400', Icon: AlertTriangle },
   cancelled: { label: 'Makulerad', className: 'text-slate-600', Icon: XCircle },
@@ -66,11 +68,25 @@ function invoiceStatus(inv: RecordInvoice): AggStatus {
   const s = (inv.status ?? '').toLowerCase()
   if (s === 'cancelled') return 'cancelled'
   if (s === 'paid') return 'paid'
+  // Kvar att betala enligt Fortnox: 0 = betald även om statusen hängt kvar,
+  // en rest = delbetald. Utan saldo gäller statusen.
+  const balance = inv.balance_due != null ? Number(inv.balance_due) : null
+  if (balance === 0) return 'paid'
   const today = new Date().toISOString().slice(0, 10)
   if (DELIVERED.includes(s)) {
-    return inv.due_date && inv.due_date < today ? 'overdue' : 'sent'
+    if (inv.due_date && inv.due_date < today) return 'overdue'
+    return balance != null && balance > 0 && balance < Number(inv.total_amount ?? 0) ? 'partial' : 'sent'
   }
   return 'pending'
+}
+
+/** Kvar att betala exkl. moms, om Fortnox-saldot är känt och en del är betald. */
+function remainingExVat(inv: RecordInvoice): number | null {
+  const balance = inv.balance_due != null ? Number(inv.balance_due) : null
+  const total = Number(inv.total_amount ?? 0)
+  const subtotal = Number(inv.subtotal ?? 0)
+  if (balance == null || balance <= 0 || total <= 0) return null
+  return Math.round(balance * (subtotal / total) * 100) / 100
 }
 
 /** Vad fakturan avser: årspremie, tilläggsstationer eller arbete utöver avtalet. */
@@ -102,6 +118,7 @@ interface Props {
 export default function BillingChainSection({ root, contracts, invoices, cases, billingItems }: Props) {
   const [openInvoiceId, setOpenInvoiceId] = useState<string | null>(null)
   const [openPlanned, setOpenPlanned] = useState<BillingPlanEntry | null>(null)
+  const [openImported, setOpenImported] = useState<RecordInvoice | null>(null)
 
   const contractNames = useMemo(() => new Map(contracts.map((c) => [c.id, contractDisplayName(c)])), [contracts])
   /** Radens beskrivning: vilket avtal, eller vad tillägget/ärendet avser. */
@@ -165,7 +182,8 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
       premium: sum(live.filter((i) => invoiceKind(i) === 'premium')),
       equipment,
       extra: equipment + upsell,
-      overdue: sum(live.filter((i) => invoiceStatus(i) === 'overdue')),
+      // Förfallet = det som faktiskt kvarstår, inte hela fakturan när en del är betald
+      overdue: live.filter((i) => invoiceStatus(i) === 'overdue').reduce((s, i) => s + (remainingExVat(i) ?? Number(i.subtotal ?? 0)), 0),
       historical: sum(live.filter((i) => i.is_historical)) + caseRevenue + orphanRevenue,
       caseRevenue,
       orphanItems,
@@ -272,6 +290,7 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
           rows={groups.premium}
           describe={describe}
           onOpen={setOpenInvoiceId}
+          onOpenImported={setOpenImported}
         />
       )}
 
@@ -282,6 +301,7 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
           rows={groups.extra}
           describe={describe}
           onOpen={setOpenInvoiceId}
+          onOpenImported={setOpenImported}
         />
       )}
 
@@ -445,6 +465,10 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
         </Suspense>
       )}
 
+      {openImported && (
+        <ImportedInvoicePreviewModal invoice={openImported} customerName={customerRowName(root)} onClose={() => setOpenImported(null)} />
+      )}
+
       {openPlanned && (
         <PlannedInvoicePreviewModal
           entry={openPlanned}
@@ -491,12 +515,14 @@ function InvoiceGroup({
   rows,
   describe,
   onOpen,
+  onOpenImported,
 }: {
   title: string
   subtitle: string
   rows: RecordInvoice[]
   describe: (inv: RecordInvoice) => string
   onOpen: (id: string) => void
+  onOpenImported: (inv: RecordInvoice) => void
 }) {
   const groupTotal = rows
     .filter((r) => (r.status ?? '') !== 'cancelled')
@@ -516,8 +542,10 @@ function InvoiceGroup({
           const status = invoiceStatus(inv)
           const meta = STATUS_META[status]
           const historical = !!inv.is_historical
-          const variant: SlipVariant = historical ? 'historical' : status
-          const reachedIdx = STEP_ORDER.indexOf(status)
+          const variant: SlipVariant = historical ? 'historical' : status === 'partial' ? 'sent' : status
+          const reachedIdx = status === 'partial' ? STEP_ORDER.indexOf('sent') : STEP_ORDER.indexOf(status)
+          const remaining = remainingExVat(inv)
+          const partlyPaid = remaining != null && remaining < Number(inv.subtotal ?? 0)
 
           const content = (
             <>
@@ -567,26 +595,36 @@ function InvoiceGroup({
                 {inv.due_date && status === 'overdue' && (
                   <span className="text-red-400"> · förföll {formatDateSv(inv.due_date)}</span>
                 )}
+                {partlyPaid && (status === 'overdue' || status === 'partial') && (
+                  <span className={status === 'overdue' ? 'text-red-400' : 'text-amber-300'}>
+                    {' '}· {formatKr(remaining)} kvar av {formatKr(Number(inv.subtotal ?? 0))}
+                  </span>
+                )}
               </span>
             </>
           )
 
-          // Historik saknar underlag i systemet — läsbar, men inget att öppna.
-          // Etiketten "Fortnox" förklarar varför raden beter sig annorlunda.
+          // Historik ägs av Fortnox eller det gamla systemet: öppnas i en läsvy
+          // med rader, betalt och kvar att betala. Etiketten säger var den kommer från.
           if (historical) {
             // Bara F-nummer är hämtade ur Fortnox. Övrig historik skapades av
             // importen som antagande om betalda perioder och får inte se ut
             // som Fortnox-fakta (RBFG-fallet 2026-09-18).
-            const fromFortnox = (inv.invoice_number ?? '').startsWith('F-')
+            const fromFortnox = (inv.invoice_number ?? '').startsWith('F-') || !!inv.fortnox_document_number
             return (
-              <li key={inv.id} className="flex items-center gap-3 px-2 py-2 -mx-2">
-                {content}
-                <span
-                  className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-slate-600 border border-slate-700/70 rounded px-1.5 py-0.5"
-                  title={fromFortnox ? 'Hämtad från Fortnox' : 'Skapad av importen som antagande om betald period, inte verifierad mot Fortnox'}
+              <li key={inv.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpenImported(inv)}
+                  className="w-full flex items-center gap-3 px-2 py-2 -mx-2 rounded-lg text-left hover:bg-slate-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] transition-colors group"
+                  title={fromFortnox ? 'Hämtad från Fortnox, visa rader och saldo' : 'Skapad av importen som antagande om betald period, inte verifierad mot Fortnox'}
                 >
-                  {fromFortnox ? 'Fortnox' : 'Import'}
-                </span>
+                  {content}
+                  <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wide text-slate-600 border border-slate-700/70 rounded px-1.5 py-0.5">
+                    {fromFortnox ? 'Fortnox' : 'Import'}
+                  </span>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-700 group-hover:text-[#20c58f] transition-colors shrink-0" />
+                </button>
               </li>
             )
           }

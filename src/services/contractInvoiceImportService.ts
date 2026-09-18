@@ -114,6 +114,8 @@ export class ContractInvoiceImportService {
       paid_at: paid ? `${detail.FinalPayDate ?? detail.DueDate ?? detail.InvoiceDate}T12:00:00+02:00` : null,
       is_historical: true,
       fortnox_document_number: nr,
+      // Kvar att betala inkl. moms: en delbetald faktura ska inte se ut som obetald i sin helhet
+      balance_due: Math.round(num(detail.Balance) * 100) / 100,
       invoice_marking: detail.YourReference || null,
       notes: `Importerad från Fortnox ${nr}. ${input.kind === 'equipment' ? 'Tilläggsstationer utöver avtal' : 'Årspremie'}, period ${input.periodStart} t.o.m. ${input.periodEnd}${
         detail.Remarks ? ` · ${detail.Remarks.replace(/\s+/g, ' ').trim().slice(0, 200)}` : ''
