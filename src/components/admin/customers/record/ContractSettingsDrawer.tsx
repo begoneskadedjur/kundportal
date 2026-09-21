@@ -981,7 +981,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                 tone={prem.labour_missing ? 'warn' : premShort ? 'warn' : undefined}
                 value={
                   prem.labour_missing ? (
-                    'Arbetstid saknas'
+                    prem.labour_warning === 'arbetstid för låg' ? 'Arbetstid för låg' : 'Arbetstid saknas'
                   ) : hasAddons ? (
                     <span className={toneTextClass(tone)}>{pct(tot.headline_percent)}</span>
                   ) : (
@@ -993,7 +993,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                   {hasAddons ? (
                     <>
                       <dt className="text-slate-400 font-semibold pt-1">Premien</dt>
-                      <dd className={`font-mono tabular-nums text-right pt-1 ${prem.labour_missing ? 'text-amber-300' : toneTextClass(premTone)}`}>{prem.labour_missing ? 'arbetstid saknas' : pct(prem.headline_percent)}</dd>
+                      <dd className={`font-mono tabular-nums text-right pt-1 ${prem.labour_missing ? 'text-amber-300' : toneTextClass(premTone)}`}>{prem.labour_missing ? (prem.labour_warning ?? 'arbetstid saknas') : pct(prem.headline_percent)}</dd>
                       <dt className="text-slate-500">Årspremie</dt>
                       <dd className="font-mono tabular-nums text-slate-200 text-right">{formatKr(prem.revenue)}</dd>
                       <dt className="text-slate-500">Arbetstid och förbrukning</dt>

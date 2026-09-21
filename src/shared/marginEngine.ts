@@ -50,11 +50,14 @@ export interface MarginBreakdown {
   labour_cost: number
   labour_hours: number
   /**
-   * Avtal med besök men mindre än en timme arbetstid per besök. Löpande
+   * Avtal med besök men mindre än en halvtimme arbetstid per besök. Löpande
    * marginal är då exakt så bra som de saknade raderna, och ska inte visas
-   * som en procentsiffra.
+   * som en procentsiffra. En halvtimme räcker när teknikern redan är på
+   * plats (Lövmovägen: teknikern bor i föreningen), en hel timme är normalfallet.
    */
   labour_missing: boolean
+  /** Texten att visa i stället för procent: saknas helt, eller för låg för besöken */
+  labour_warning: 'arbetstid saknas' | 'arbetstid för låg' | null
   consumable_cost: number
   /** (revenue - cost_total) / revenue: dagens siffra */
   margin_percent_year1: number | null
@@ -111,6 +114,14 @@ export interface SummarizeOptions {
   visitsPerYear?: number | null
 }
 
+/**
+ * Arbetstidsspärren: färre timmar än så här per besök ger "arbetstid för låg"
+ * i stället för en marginalprocent. Normalfallet är en timme per besök inkl.
+ * resa och rapport; en halvtimme är golvet för kunder där teknikern redan är
+ * på plats.
+ */
+export const MIN_LABOUR_HOURS_PER_VISIT = 0.5
+
 export function summarizeBillingLines(lines: MarginLine[], opts: SummarizeOptions): MarginBreakdown {
   const active = lines.filter((l) => l.status !== 'cancelled')
   const services = active.filter((l) => l.item_type === 'service')
@@ -144,7 +155,8 @@ export function summarizeBillingLines(lines: MarginLine[], opts: SummarizeOption
     revenue > 0 ? ((3 * revenue - 3 * cost_ongoing - cost_durable) / (3 * revenue)) * 100 : null
 
   const visits = num(opts.visitsPerYear)
-  const labour_missing = opts.context === 'contract' && visits > 0 && labour_hours < visits
+  const labour_missing = opts.context === 'contract' && visits > 0 && labour_hours < visits * MIN_LABOUR_HOURS_PER_VISIT
+  const labour_warning = !labour_missing ? null : labour_hours > 0 ? 'arbetstid för låg' : 'arbetstid saknas'
 
   // Samma artikel på flera rader slås ihop, så marginalnotisen kan skriva "Aurotrap × 7"
   const merged = new Map<string, DurableLine>()
@@ -167,6 +179,7 @@ export function summarizeBillingLines(lines: MarginLine[], opts: SummarizeOption
     labour_cost,
     labour_hours,
     labour_missing,
+    labour_warning,
     consumable_cost,
     margin_percent_year1,
     margin_percent_ongoing,

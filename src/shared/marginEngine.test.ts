@@ -49,9 +49,13 @@ describe('summarizeBillingLines på avtal', () => {
     expect(b.margin_percent_3y).toBeCloseTo(62.25, 1)
   })
 
-  it('arbetstidsspärren slår när timmarna är färre än besöken', () => {
+  it('arbetstidsspärren slår under en halvtimme per besök', () => {
     const b = summarizeBillingLines(lines, { context: 'contract', revenueOverride: 28998, visitsPerYear: 4 })
     expect(b.labour_missing).toBe(true)
+    expect(b.labour_warning).toBe('arbetstid för låg')
+    // Halvtimme per besök godtas: teknikern kan redan vara på plats
+    const half = summarizeBillingLines([...lines, labour(1)], { context: 'contract', revenueOverride: 28998, visitsPerYear: 4 })
+    expect(half.labour_missing).toBe(false)
     const ok = summarizeBillingLines([...lines, labour(7)], { context: 'contract', revenueOverride: 28998, visitsPerYear: 4 })
     expect(ok.labour_missing).toBe(false)
     expect(ok.margin_percent_ongoing).toBeCloseTo(71.97, 1)

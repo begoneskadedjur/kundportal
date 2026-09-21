@@ -673,7 +673,7 @@ export default function CustomerDetailSidePanel({
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium tabular-nums">
                     <span className={`w-1.5 h-1.5 rounded-full ${TONE_DOT[tone]}`} />
                     <span className={toneTextClass(tone)}>
-                      {b.labour_missing ? 'arbetstid saknas' : b.headline_percent != null ? `${b.headline_percent.toFixed(1)} %` : '–'}
+                      {b.labour_missing ? (b.labour_warning ?? 'arbetstid saknas') : b.headline_percent != null ? `${b.headline_percent.toFixed(1)} %` : '–'}
                     </span>
                     {!b.labour_missing && <span className="text-slate-500">{b.headline_label.toLowerCase()}</span>}
                     {b.payback_years != null && (

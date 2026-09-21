@@ -534,7 +534,7 @@ export default function ContractContentSection({
               <span className="flex-1 border-b border-dotted border-[#d9d3c2] translate-y-[-3px] min-w-4" />
               {prem.labour_missing ? (
                 <span className="font-sans text-[12px] whitespace-nowrap" style={{ color: '#9b3535' }}>
-                  arbetstid saknas
+                  {prem.labour_warning ?? 'arbetstid saknas'}
                   {onOpenSettings && (
                     <>
                       {' · '}
