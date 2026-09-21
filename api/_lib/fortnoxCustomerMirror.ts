@@ -47,6 +47,8 @@ export interface MirrorSyncResult {
   missing: number
   pages: number
   since: string | null
+  /** Antal kunder som fick respektive förlorade Fortnox-stämpeln i denna synk. */
+  verified: { set: number; cleared: number } | null
 }
 
 /** Fortnox lastmodified vill ha svensk lokal tid utan sekunder. */
@@ -177,6 +179,13 @@ export async function syncFortnoxCustomerMirror(mode: 'full' | 'incremental'): P
       missing = gone?.length ?? 0
     }
 
+    // Verifieringsstämpeln följer spegeln: kundnummer + org.nr som matchar en
+    // aktiv Fortnox-rad ger fortnox_verified_at, tappad matchning tar bort den.
+    let verified: { set: number; cleared: number } | null = null
+    const { data: verifyResult, error: verifyError } = await supabase.rpc('refresh_fortnox_verification')
+    if (verifyError) console.warn('Kunde inte uppdatera Fortnox-verifiering:', verifyError.message)
+    else verified = verifyResult as { set: number; cleared: number }
+
     const stateUpdate: Record<string, unknown> = {
       watermark: seenAt,
       last_error: null,
@@ -195,6 +204,7 @@ export async function syncFortnoxCustomerMirror(mode: 'full' | 'incremental'): P
       missing,
       pages: counter.pages,
       since: since ? since.toISOString() : null,
+      verified,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
