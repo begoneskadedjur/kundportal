@@ -1582,10 +1582,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     const next = merged?.entries
       .filter((e) => e.planned && e.planned.periodStart > today && e.action !== 'uncovered' && e.action !== 'delete')
       .sort((a, b) => a.planned!.periodStart.localeCompare(b.planned!.periodStart))[0]
+    const changes = merged ? merged.summary.create + merged.summary.update + merged.summary.delete : 0
+    const uncovered = merged?.summary.uncovered ?? 0
     return {
-      changes: merged ? merged.summary.create + merged.summary.update + merged.summary.delete : 0,
-      uncovered: merged?.summary.uncovered ?? 0,
+      changes,
+      uncovered,
       next: next?.planned ?? null,
+      // Planen är i fas: inget att skapa, ändra eller ta bort och ingen period
+      // utan faktura. Då ska knappen inte pocka på, det finns inget att göra.
+      done: merged != null && changes === 0 && uncovered === 0,
     }
   }, [billingPlans, root.id])
 
@@ -2680,19 +2685,37 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               >
                 indexera alla
               </button>
-              <button
-                onClick={() => void openPlanPreview()}
-                disabled={busy || planLoading}
-                className={`inline-flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 ${
-                  planTotals.changes > 0
-                    ? 'bg-[#20c58f] text-[#fff] hover:brightness-110'
-                    : 'border border-slate-600 text-slate-200 hover:border-[#20c58f]'
-                }`}
-                title="Jämför avtalen med fakturorna och skapa, uppdatera eller ta bort utkast"
-              >
-                Planera fakturor
-                {planTotals.changes > 0 && <span className="tabular-nums opacity-90">· {planTotals.changes}</span>}
-              </button>
+              {planTotals.done && !planLoading ? (
+                // Allt är planerat: säg det, och låt knappen bli en stillsam länk.
+                // Att planera om ändrar ingenting förrän avtalet ändras.
+                <span className="inline-flex items-center gap-2 text-[12px] whitespace-nowrap" title="Alla perioder fram till horisonten har en faktura som stämmer med avtalen. Planera om behövs bara om du ändrat något i avtalen.">
+                  <span className="text-slate-200 font-semibold">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#20c58f] mr-1.5 align-middle" aria-hidden />
+                    fakturorna är planerade
+                  </span>
+                  <button
+                    onClick={() => void openPlanPreview()}
+                    disabled={busy}
+                    className="text-slate-400 underline decoration-dotted hover:text-slate-100 disabled:opacity-50"
+                  >
+                    kontrollera
+                  </button>
+                </span>
+              ) : (
+                <button
+                  onClick={() => void openPlanPreview()}
+                  disabled={busy || planLoading}
+                  className={`inline-flex items-center gap-1.5 text-[12px] font-semibold rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 ${
+                    planTotals.changes > 0
+                      ? 'bg-[#20c58f] text-[#fff] hover:brightness-110'
+                      : 'border border-slate-600 text-slate-200 hover:border-[#20c58f]'
+                  }`}
+                  title="Jämför avtalen med fakturorna och skapa, uppdatera eller ta bort utkast"
+                >
+                  Planera fakturor
+                  {planTotals.changes > 0 && <span className="tabular-nums opacity-90">· {planTotals.changes}</span>}
+                </button>
+              )}
               {planTotals.uncovered > 0 && (
                 <span className="text-[11px] text-amber-300 whitespace-nowrap">
                   {planTotals.uncovered} period{planTotals.uncovered === 1 ? '' : 'er'} saknar faktura
