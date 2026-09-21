@@ -26,6 +26,7 @@ import {
   buildFamilyTimeline,
   nextUpcomingEvent,
 } from './ContractTimelineList'
+import { buildUpcomingInvoiceEvents, useUpcomingInvoices } from './useUpcomingInvoices'
 import ContractTimeline from './ContractTimeline'
 import BillingChainSection from './BillingChainSection'
 import UnitsSection from './UnitsSection'
@@ -152,14 +153,15 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     // realContracts, inte sortedContracts: importresterna är samma avtal i sin
     // gamla form, så varje avtalsstart, periodskifte och slutdatum skrevs två
     // gånger i tidslinjen.
-    const timelineEvents = buildFamilyTimeline(
+    // Det som redan hänt och avtalens egna datum. Kommande fakturor läggs på
+    // nedan när planeraren räknat, de finns inte i databasen förrän utkastet gör det.
+    const baseTimelineEvents = buildFamilyTimeline(
       realContracts,
       additionsByCustomer,
       billingByCustomer,
       nameById,
       premiumByContract
     )
-    const nextEvent = nextUpcomingEvent(timelineEvents)
 
     const totalCases = Object.values(caseCounts).reduce((sum, n) => sum + n, 0)
 
@@ -178,8 +180,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       activeContracts,
       familyAnnualValue,
       contractDistribution,
-      timelineEvents,
-      nextEvent,
+      baseTimelineEvents,
       totalCases,
     }
   }, [data])
@@ -200,10 +201,19 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     activeContracts,
     familyAnnualValue,
     contractDistribution,
-    timelineEvents,
-    nextEvent,
+    baseTimelineEvents,
     totalCases,
   } = derived
+
+  // Kommande fakturor ur planeraren: utkast som väntar, perioder som skapas
+  // längre fram och första perioden efter horisonten. Samma källa som
+  // Fakturering-flikens "Kommande fakturor", så tidslinjen och listan stämmer.
+  const { upcoming, beyond } = useUpcomingInvoices(root.id, liveContracts, data.invoices.length)
+  const timelineEvents = useMemo(
+    () => [...baseTimelineEvents, ...buildUpcomingInvoiceEvents(upcoming, beyond, liveContracts)],
+    [baseTimelineEvents, upcoming, beyond, liveContracts]
+  )
+  const nextEvent = useMemo(() => nextUpcomingEvent(timelineEvents), [timelineEvents])
 
   const renderContractCards = (compact: boolean, list: RecordContract[] = realContracts) =>
     list.map((contract) => {

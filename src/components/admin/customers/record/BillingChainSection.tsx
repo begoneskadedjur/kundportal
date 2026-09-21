@@ -17,7 +17,7 @@
 // Fortnox-importerad historik (is_historical) är läsbar men inte klickbar —
 // det finns inget underlag i systemet att öppna.
 
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { AlertTriangle, CalendarClock, CheckCircle2, ChevronRight, Circle, Clock, XCircle } from 'lucide-react'
 import {
   contractDisplayName,
@@ -32,8 +32,8 @@ import {
   type RecordInvoice,
 } from '../../../../hooks/useCustomerRecord'
 import { isCaseCompleted } from '../../../../utils/customerRevenue'
-import { ContractInvoiceGenerator, type BillingPlanEntry } from '../../../../services/contractInvoiceGenerator'
-import { computePlannedPeriods, parseLocalDate, toLocalIsoDate, DEFAULT_INVOICE_LEAD_DAYS, type PlanningContract } from '../../../../shared/contractPlanner'
+import type { BillingPlanEntry } from '../../../../services/contractInvoiceGenerator'
+import { useUpcomingInvoices } from './useUpcomingInvoices'
 import InvoiceSlip, { type SlipVariant } from './InvoiceSlip'
 import PlannedInvoicePreviewModal from './PlannedInvoicePreviewModal'
 import ImportedInvoicePreviewModal from './ImportedInvoicePreviewModal'
@@ -191,64 +191,10 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
     }
   }, [invoices, cases, billingItems])
 
-  // Kommande fakturor ur avtalskartans planerare: bara poster som INTE finns
-  // i databasen (action create). Utkast som redan finns står i listorna ovan.
-  const [upcoming, setUpcoming] = useState<BillingPlanEntry[] | null>(null)
-  const [upcomingError, setUpcomingError] = useState<string | null>(null)
-  useEffect(() => {
-    if (contracts.length === 0) {
-      setUpcoming([])
-      return
-    }
-    let cancelled = false
-    setUpcoming(null)
-    setUpcomingError(null)
-    ;(async () => {
-      try {
-        const plans = await ContractInvoiceGenerator.planCombinedForCustomer(root.id)
-        const merged = ContractInvoiceGenerator.mergePlans(root.id, plans)
-        // Kommande = perioder som inte börjat: både utkast som redan finns
-        // (keep/update) och sådana planeraren skulle skapa (create).
-        const today = new Date().toISOString().slice(0, 10)
-        const list = merged.entries
-          .filter((e) => e.planned && e.planned.periodStart >= today && (e.action === 'create' || e.action === 'keep' || e.action === 'update' || e.action === 'later'))
-          .sort((a, b) => (a.planned!.periodStart + (a.kind ?? 'premium')).localeCompare(b.planned!.periodStart + (b.kind ?? 'premium')))
-        if (!cancelled) setUpcoming(list)
-      } catch (err) {
-        if (!cancelled) setUpcomingError(err instanceof Error ? err.message : 'Kunde inte räkna fram kommande fakturor')
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [root.id, contracts.length, invoices.length])
-
-  // Perioden efter planerarens horisont: visar att avtalet rullar vidare och
-  // när nästa faktura efter de kända kommer att skapas, förutsatt att ingen
-  // säger upp. Samma periodmatematik som planeraren, bara längre horisont.
-  const beyond = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
-    const known = new Set((upcoming ?? []).map((e) => `${e.contractId ?? ''}|${e.planned!.periodStart}`))
-    const lastKnown = (upcoming ?? []).reduce((m, e) => (e.planned!.periodStart > m ? e.planned!.periodStart : m), today)
-    const d = new Date()
-    const horizon = toLocalIsoDate(new Date(d.getFullYear() + 2, d.getMonth(), d.getDate()))
-    const out: Array<{ contract: RecordContract; periodStart: string; periodEnd: string; invoiceDate: string; amount: number; noticeDeadline: string | null }> = []
-    for (const c of contracts) {
-      const pc = c as unknown as PlanningContract
-      if (pc.terminated_at || pc.billing_active === false) continue
-      const periods = computePlannedPeriods(pc, { horizonEnd: horizon, leadDays: DEFAULT_INVOICE_LEAD_DAYS })
-      const next = periods.find((p) => p.periodStart > lastKnown && !known.has(`${c.id}|${p.periodStart}`))
-      if (!next) continue
-      const notice = pc.notice_period_months
-      let noticeDeadline: string | null = null
-      if (notice && notice > 0) {
-        const ps = parseLocalDate(next.periodStart)
-        noticeDeadline = toLocalIsoDate(new Date(ps.getFullYear(), ps.getMonth() - notice, ps.getDate() - 1))
-      }
-      out.push({ contract: c, periodStart: next.periodStart, periodEnd: next.periodEnd, invoiceDate: next.invoiceDate, amount: next.amount, noticeDeadline })
-    }
-    return out.sort((a, b) => a.periodStart.localeCompare(b.periodStart))
-  }, [contracts, upcoming])
+  // Kommande fakturor ur avtalskartans planerare (delad med Översiktens
+  // tidslinje): utkast som finns, perioder som skapas, och första perioden
+  // efter horisonten. Se useUpcomingInvoices.
+  const { upcoming, error: upcomingError, beyond } = useUpcomingInvoices(root.id, contracts, invoices.length)
 
   const describePlanned = (e: BillingPlanEntry): string => {
     const kind = PLAN_KIND_LABEL[e.kind ?? 'premium'] ?? 'Årspremie'
