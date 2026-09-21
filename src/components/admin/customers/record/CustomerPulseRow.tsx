@@ -65,11 +65,13 @@ export default function CustomerPulseRow({
   ).length
 
   const liveInvoices = invoices.filter((i) => (i.status ?? '') !== 'cancelled')
-  const latestInvoice =
-    [...liveInvoices].sort((a, b) =>
-      (b.billing_period_start ?? '').localeCompare(a.billing_period_start ?? '')
-    )[0] ?? null
   const todayKey = today.slice(0, 10)
+  // Senaste = den som faktiskt nått kunden eller vars period börjat. Utkast
+  // för kommande år ligger med framtida period och är inte "senaste" något.
+  const latestInvoice =
+    [...liveInvoices]
+      .filter((i) => !!i.sent_at || (i.billing_period_start ?? '') <= todayKey)
+      .sort((a, b) => (b.billing_period_start ?? '').localeCompare(a.billing_period_start ?? ''))[0] ?? null
   // Bara SKICKADE fakturor kan förfalla — en faktura som väntar på godkännande
   // har aldrig nått kunden, hur gammalt förfallodatumet än är.
   const overdue = liveInvoices.filter(
