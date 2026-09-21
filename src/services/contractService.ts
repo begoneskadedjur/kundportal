@@ -714,7 +714,9 @@ export class ContractService {
       // Beräkna grundläggande statistik
       const contractsOnly = contracts.filter(c => c.type === 'contract')
       const offersOnly = contracts.filter(c => c.type === 'offer')
-      const signedContracts = contracts.filter(c => c.status === 'signed')
+      // Signerade avtal blir 'active' av sig själva när avtalstiden börjat
+      // (trigger contract_signed_becomes_active), så båda räknas som signerade här.
+      const signedContracts = contracts.filter(c => c.status === 'signed' || c.status === 'active')
       const pendingContracts = contracts.filter(c => c.status === 'pending')
       const activeContracts = contracts.filter(c => c.status === 'active')
       const declinedContracts = contracts.filter(c => c.status === 'declined')

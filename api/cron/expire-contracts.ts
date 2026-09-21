@@ -43,6 +43,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const result = await withCronLog<Summary>('expire-contracts', async () => {
     const today = todayLocalIso()
 
+    // Signerade avtal vars avtalstid börjat blir aktiva. Triggern på contracts
+    // tar de som skrivs i dag, den här raden tar de som når sitt startdatum.
+    const { data: activated, error: activateErr } = await supabase.rpc('activate_started_contracts')
+    if (activateErr) console.error('[expire-contracts] Kunde inte aktivera signerade avtal:', activateErr.message)
+    else if (activated) console.log(`[expire-contracts] ${activated} signerade avtal blev aktiva`)
+
     const { data: candidates, error } = await supabase
       .from('contracts')
       .select('id, customer_id, company_name, label, effective_end_date, terminated_at')
