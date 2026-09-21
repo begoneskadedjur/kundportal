@@ -88,8 +88,18 @@ export function useUpcomingInvoices(rootId: string, contracts: RecordContract[],
       const notice = pc.notice_period_months
       let noticeDeadline: string | null = null
       if (notice && notice > 0) {
-        const ps = parseLocalDate(next.periodStart)
-        noticeDeadline = toLocalIsoDate(new Date(ps.getFullYear(), ps.getMonth() - notice, ps.getDate() - 1))
+        // Uppsägningen räknas från avtalets eget slutdatum (och dess årsdagar
+        // när avtalet rullar), inte från fakturaperiodens första dag. Perioderna
+        // är månadsankrade (1 nov), avtalet slutar t.ex. den 18:e.
+        let anchor: Date
+        if (pc.contract_end_date) {
+          anchor = parseLocalDate(pc.contract_end_date)
+          while (toLocalIsoDate(anchor) < next.periodStart) anchor = new Date(anchor.getFullYear() + 1, anchor.getMonth(), anchor.getDate())
+          noticeDeadline = toLocalIsoDate(new Date(anchor.getFullYear(), anchor.getMonth() - notice, anchor.getDate()))
+        } else {
+          const ps = parseLocalDate(next.periodStart)
+          noticeDeadline = toLocalIsoDate(new Date(ps.getFullYear(), ps.getMonth() - notice, ps.getDate() - 1))
+        }
       }
       out.push({ contract: c, periodStart: next.periodStart, periodEnd: next.periodEnd, invoiceDate: next.invoiceDate, amount: next.amount, noticeDeadline })
     }
