@@ -27,6 +27,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.10.1',
+    date: '2026-09-23',
+    title: 'Uppdateringar fungerar på telefonen',
+    items: [
+      'Listan under Uppdateringar går att scrolla och stänga på mobilen, även i appläget',
+    ],
+  },
+  {
     version: '3.10.0',
     date: '2026-09-23',
     title: 'Portalen som app på mobilen',

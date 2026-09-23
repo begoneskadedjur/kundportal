@@ -8,8 +8,12 @@
 // Renderas via Portal med EGET container-id. Sidofältet har backdrop-blur-xl,
 // vilket gör det till containing block för fixed-positionering - utan portal
 // blir modalen instängd i sidofältets bredd. Eget id i stället för delade
-// 'modal-root' eftersom den containern har pointerEvents: none och en egen
-// flex-layout som krockar med den här.
+// 'modal-root' så att den containerns flex-layout inte krockar med den här.
+//
+// OBS: Portal sätter pointer-events: none på VARJE container den skapar, även
+// med eget id. Roten här måste därför ha pointer-events-auto, annars går alla
+// pekningar rakt igenom till sidan bakom - varken stängning eller scroll
+// fungerar då på telefonen (upptäckt i appläget 2026-09-23).
 
 import { useEffect } from 'react'
 import { X, Sparkles } from 'lucide-react'
@@ -40,14 +44,14 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
   return (
     <Portal containerId="changelog-modal-root">
       <div
-        className="fixed inset-0 z-[110] flex items-start sm:items-center justify-center p-4 overflow-y-auto"
+        className="fixed inset-0 z-[110] flex items-start sm:items-center justify-center p-4 overflow-y-auto pointer-events-auto"
         role="dialog"
         aria-modal="true"
         aria-label="Uppdateringar"
       >
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
 
-        <div className="relative w-full max-w-xl my-auto bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="relative w-full max-w-xl my-auto bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col max-h-[85vh] max-h-[85dvh]">
           {/* Header */}
           <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3 border-b border-slate-700/50 flex-shrink-0">
             <div className="min-w-0">
@@ -67,7 +71,7 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
           </div>
 
           {/* Lista */}
-          <div className="overflow-y-auto px-4 py-4 space-y-3">
+          <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-4 space-y-3">
             {CHANGELOG.map(entry => {
               const isLatest = entry.version === LATEST_VERSION
               return (
