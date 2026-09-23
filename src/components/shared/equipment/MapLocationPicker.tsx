@@ -89,19 +89,29 @@ export function MapLocationPicker({
     setShowOthers(next)
   }
 
-  // Grannar i kartvyn, närmast mitten först, med tak så kartan inte dränks
+  // Grannar i kartvyn, närmast mitten först, med tak så kartan inte dränks.
+  // Samma array returneras så länge urvalet är detsamma, så markörerna inte
+  // ritas om vid varje panorering.
+  const prevVisibleOthersRef = useRef<ExistingStation[]>([])
   const visibleOthers = useMemo<ExistingStation[]>(() => {
-    if (!showOthers || !viewport || !otherCustomerStations?.length) return []
-    const inView = otherCustomerStations.filter(s =>
-      s.latitude <= viewport.north && s.latitude >= viewport.south &&
-      s.longitude <= viewport.east && s.longitude >= viewport.west
-    )
-    if (inView.length <= OTHER_CUSTOMERS_MAX_MARKERS) return inView
-    return inView
-      .map(s => ({ s, d: distanceMeters(viewport.lat, viewport.lng, s.latitude, s.longitude) }))
-      .sort((a, b) => a.d - b.d)
-      .slice(0, OTHER_CUSTOMERS_MAX_MARKERS)
-      .map(x => x.s)
+    let next: ExistingStation[] = []
+    if (showOthers && viewport && otherCustomerStations?.length) {
+      const inView = otherCustomerStations.filter(s =>
+        s.latitude <= viewport.north && s.latitude >= viewport.south &&
+        s.longitude <= viewport.east && s.longitude >= viewport.west
+      )
+      next = inView.length <= OTHER_CUSTOMERS_MAX_MARKERS
+        ? inView
+        : inView
+            .map(s => ({ s, d: distanceMeters(viewport.lat, viewport.lng, s.latitude, s.longitude) }))
+            .sort((a, b) => a.d - b.d)
+            .slice(0, OTHER_CUSTOMERS_MAX_MARKERS)
+            .map(x => x.s)
+    }
+    const prev = prevVisibleOthersRef.current
+    if (prev.length === next.length && prev.every((s, i) => s.id === next[i].id)) return prev
+    prevVisibleOthersRef.current = next
+    return next
   }, [showOthers, viewport, otherCustomerStations])
 
   // Uppdatera markörposition (state + Google Maps marker)

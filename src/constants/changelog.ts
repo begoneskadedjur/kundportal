@@ -21,6 +21,113 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.09.11',
+    date: '2026-09-23',
+    title: 'Tydligare kartor vid utplacering',
+    items: [
+      'Andra kunders stationer visas nedtonade på kartan när du placerar ut, så de inte blandas ihop med kundens egna',
+      'Knappen "Dölj andra kunder" på kartan stänger av dem helt - valet kommer ihåg sig',
+      'Fliken Karta följer den kund du håller på med och visar grannarna inom 500 meter nedtonade',
+      'Kundfiltret på fliken Karta är en kundväljare i stället för kryssrutor',
+    ],
+  },
+  {
+    version: '2026.09.10',
+    date: '2026-09-21',
+    title: 'Signerade avtal aktiveras själva',
+    items: [
+      'Ett avtal som signeras i Oneflow blir aktivt av sig självt och kundraden följer det riktiga avtalet',
+      'Kundkortets tidslinje visar när kommande fakturor skapas och skickas',
+      'Fortnox-verifieringen stämplas automatiskt ur kundspegeln',
+      'Avtalskartan går ner i lugnt läge när fakturorna redan är planerade',
+    ],
+  },
+  {
+    version: '2026.09.9',
+    date: '2026-09-18',
+    title: 'Fakturaplan och utrustning',
+    items: [
+      'Avtal som förlängs får rullande slutdatum och planeras förbi det gamla slutdatumet',
+      'En passerad period kan registreras som fakturerad utanför portalen',
+      'Kvar att betala hämtas från Fortnox, delbetalda fakturor får egen status',
+      'Faktureringsansvariga får en notis när ett avtal signeras',
+      'Utrustningssidan visar kundens alla stationer, med växeln Alla/Mina',
+    ],
+  },
+  {
+    version: '2026.09.8',
+    date: '2026-09-17',
+    title: 'Fakturafliken på kundkortet',
+    items: [
+      'Fakturafliken delar upp årspremie, merförsäljning och avtal, och visar kommande fakturor',
+      'Avtalskartan har fakturaplanen som eget steg och en markör i kundlistan',
+      'Enhetskoden är fakturamärkningen och kontakten följer enheten',
+      'Tilläggsstationer utan avtal syns som brickor att besluta',
+    ],
+  },
+  {
+    version: '2026.09.7',
+    date: '2026-09-15',
+    title: 'Stationskarta som PDF',
+    items: [
+      'Kunden kan ladda ned stationskarta och stationsöversikt som PDF från kundportalen',
+    ],
+  },
+  {
+    version: '2026.09.6',
+    date: '2026-09-09',
+    title: 'Avtalet har en källa för premien',
+    items: [
+      'Avtalstypen bär premien, § 4 visar andelar och trappan styr kolumnerna',
+      'Kontrollschemat kommer ur § 3 och nästa faktura står på pappret',
+      'Ramavtalet skrivs en gång och enheterna står i en bilaga',
+      'Ekonomin har fått en egen läsyta med strukturerad historik och hopfällbara paragrafer',
+    ],
+  },
+  {
+    version: '2026.09.5',
+    date: '2026-09-08',
+    title: 'Avtalskartan i tre lager',
+    items: [
+      'Pappret läser, panelen styr och pulsen visar hur avtalet mår',
+      'Ronden visas som en svärm på ärendefliken - en rad per enhet på gemensam tidsaxel',
+      'Obeslutade tilläggsstationer letar upp faktureringsansvarig och kan beslutas samlat per avtal',
+    ],
+  },
+  {
+    version: '2026.09.4',
+    date: '2026-09-05',
+    title: 'Stationstyper med produkt och pris',
+    items: [
+      'Varje stationstyp har produkt och pris, tilläggsstationer faktureras i tre lägen',
+      'Kundens prislista styrs av avtalskartan',
+      'Varaktig utrustning bokförs som engångskostnad och all marginal räknas i en motor',
+      'Tekniker kan avsluta ärenden med faktura och kunder ser inga inköpspriser',
+    ],
+  },
+  {
+    version: '2026.09.3',
+    date: '2026-09-03',
+    title: 'Tilläggsstationer och kundpriser',
+    items: [
+      'Tilläggsstationer kan betalas på tre sätt och teknikern väljer vid utsättningen',
+      'Avtalade kundpriser på artiklar följer med till fakturan med låst tjänst och specifikation',
+      'Engångskunder får kundnummer från Fortnox via en spegel som synkas var tionde minut',
+      'Privatpersoner får priser inklusive moms på fakturautkasten',
+    ],
+  },
+  {
+    version: '2026.09.2',
+    date: '2026-09-02',
+    title: 'Avtalskartans motor',
+    items: [
+      'Avtalsbladet har fått § 7 Premie, § 8 Referenser och § 9 Löptid, och avtalet är källan till årspremiefakturan',
+      'Besök per enhet, optioner och bevakning planeras ur avtalet',
+      'Ingår i avtalet, katalog, arkiv och ångra på avtalskartan',
+      'Fakturering kan pausas per avtal och kundkortsavtal nollas när kunden fått ett riktigt avtal',
+    ],
+  },
+  {
     version: '2026.09.1',
     date: '2026-09-01',
     title: 'Kundansvarig och prislistor',
