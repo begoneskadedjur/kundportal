@@ -27,6 +27,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.11.0',
+    date: '2026-09-23',
+    title: 'Ny version av sig själv',
+    items: [
+      'Portalen märker när en ny version finns, till exempel när appen öppnas igen efter en paus, och visar "Ny version finns" med en knapp för att ladda om',
+      'Vid nästa sidbyte hämtas den nya versionen av sig själv, aldrig mitt i ett formulär',
+    ],
+  },
+  {
     version: '3.10.1',
     date: '2026-09-23',
     title: 'Uppdateringar fungerar på telefonen',

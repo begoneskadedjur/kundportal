@@ -7,6 +7,7 @@ import { MultisiteProvider } from './contexts/MultisiteContext';
 import { ImpersonationProvider, useImpersonation } from './contexts/ImpersonationContext';
 import { useAuth } from './contexts/AuthContext';
 import { ThemedToaster } from './components/shared/ThemedToaster';
+import { UpdateWatcher } from './components/shared/UpdateWatcher';
 
 // Auth pages
 import Login from './pages/auth/Login';
@@ -447,6 +448,8 @@ function App() {
           </Routes>
 
           <ThemedToaster />
+          {/* Versionsvakt: "Ny version finns" + omladdning vid nästa sidbyte */}
+          <UpdateWatcher />
         </div>
         </AppLayout>
         </MultisiteProvider>
