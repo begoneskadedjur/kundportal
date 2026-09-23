@@ -18,7 +18,14 @@
 import { useEffect } from 'react'
 import { X, Sparkles } from 'lucide-react'
 import Portal from '../ui/Portal'
-import { CHANGELOG, LATEST_VERSION } from '../../constants/changelog'
+import { CHANGELOG, CHANGELOG_KIND_LABEL, LATEST_VERSION, type ChangelogKind } from '../../constants/changelog'
+
+// Kategori som platt text med statuspunkt - inga piller
+const KIND_DOT: Record<ChangelogKind, string> = {
+  nyhet: 'bg-[#20c58f]',
+  andring: 'bg-blue-400',
+  buggfix: 'bg-amber-400',
+}
 
 interface ChangelogModalProps {
   isOpen: boolean
@@ -98,13 +105,26 @@ export function ChangelogModal({ isOpen, onClose }: ChangelogModalProps) {
                     </time>
                   </div>
 
-                  <ul className="space-y-1">
-                    {entry.items.map((item, i) => (
-                      <li key={i} className="flex gap-2 text-sm text-slate-300 leading-snug">
-                        <span className="text-slate-600 flex-shrink-0 select-none">–</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
+                  <ul className="space-y-1.5">
+                    {entry.items.map((item, i) => {
+                      const text = typeof item === 'string' ? item : item.text
+                      const kind = typeof item === 'string' ? null : item.kind
+                      return (
+                        <li key={i} className="flex gap-2 text-sm text-slate-300 leading-snug">
+                          {kind ? (
+                            <span className="flex items-center gap-1.5 flex-shrink-0 w-[4.5rem] pt-0.5 self-start">
+                              <span className={`w-1.5 h-1.5 rounded-full ${KIND_DOT[kind]}`} aria-hidden="true" />
+                              <span className="text-[10px] uppercase tracking-wider text-slate-500">
+                                {CHANGELOG_KIND_LABEL[kind]}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-600 flex-shrink-0 select-none">–</span>
+                          )}
+                          <span>{text}</span>
+                        </li>
+                      )
+                    })}
                   </ul>
                 </article>
               )

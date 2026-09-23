@@ -13,6 +13,24 @@
 //     som Fakturering 2.0 (2.0.0) eller Avtalskartans motor (3.0.0).
 //   - Ny release (andra siffran) för varje leverans med ny funktion.
 //   - Rättning (tredje siffran) för en leverans som bara rättar fel.
+//
+// Varje punkt får en kategori: nyhet (kan göra något nytt), andring (något
+// bekant fungerar annorlunda) eller buggfix (något som var fel är rättat).
+// Skriv { kind, text }. Punkter från tiden före kategorierna är rena
+// strängar och visas utan etikett.
+//
+// VARJE leverans till main ska in här, samma dag: ny post om dagen saknar en,
+// annars en punkt till i dagens post. Loggen är det personalen läser.
+
+export type ChangelogKind = 'nyhet' | 'andring' | 'buggfix'
+
+export type ChangelogItem = string | { kind: ChangelogKind; text: string }
+
+export const CHANGELOG_KIND_LABEL: Record<ChangelogKind, string> = {
+  nyhet: 'Nyhet',
+  andring: 'Ändring',
+  buggfix: 'Buggfix',
+}
 
 export interface ChangelogEntry {
   /** Visas som mono-etikett, t.ex. "3.10.0" */
@@ -22,7 +40,7 @@ export interface ChangelogEntry {
   /** Kort rubrik för vad releasen handlar om */
   title: string
   /** En rad per punkt, skriven som nytta för användaren */
-  items: string[]
+  items: ChangelogItem[]
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
@@ -31,8 +49,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-09-23',
     title: 'Ny version av sig själv',
     items: [
-      'Portalen märker när en ny version finns, till exempel när appen öppnas igen efter en paus, och visar "Ny version finns" med en knapp för att ladda om',
-      'Vid nästa sidbyte hämtas den nya versionen av sig själv, aldrig mitt i ett formulär',
+      { kind: 'nyhet', text: 'Portalen märker när en ny version finns, till exempel när appen öppnas igen efter en paus, och visar "Ny version finns" med en knapp för att ladda om' },
+      { kind: 'nyhet', text: 'Vid nästa sidbyte hämtas den nya versionen av sig själv, aldrig mitt i ett formulär' },
+      { kind: 'andring', text: 'Punkterna under Uppdateringar är märkta Nyhet, Ändring eller Buggfix' },
     ],
   },
   {
@@ -40,7 +59,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-09-23',
     title: 'Uppdateringar fungerar på telefonen',
     items: [
-      'Listan under Uppdateringar går att scrolla och stänga på mobilen, även i appläget',
+      { kind: 'buggfix', text: 'Listan under Uppdateringar går att scrolla och stänga på mobilen, även i appläget' },
     ],
   },
   {
@@ -48,9 +67,9 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-09-23',
     title: 'Portalen som app på mobilen',
     items: [
-      'Under Mitt konto finns "Använd som app": lägg portalen på hemskärmen och kör den utan adressfält, med egen ikon',
-      'Android installerar direkt från knappen, iPhone får en kort guide till Dela-menyn',
-      'Ny version hämtas av sig själv vid nästa start - inga omladdningar mitt i arbetet',
+      { kind: 'nyhet', text: 'Under Mitt konto finns "Använd som app": lägg portalen på hemskärmen och kör den utan adressfält, med egen ikon' },
+      { kind: 'nyhet', text: 'Android installerar direkt från knappen, iPhone får en kort guide till Dela-menyn' },
+      { kind: 'nyhet', text: 'Ny version hämtas av sig själv vid nästa start - inga omladdningar mitt i arbetet' },
     ],
   },
   {
@@ -58,10 +77,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-09-23',
     title: 'Tydligare kartor vid utplacering',
     items: [
-      'Andra kunders stationer visas nedtonade på kartan när du placerar ut, så de inte blandas ihop med kundens egna',
-      'Knappen "Dölj andra kunder" på kartan stänger av dem helt - valet kommer ihåg sig',
-      'Fliken Karta följer den kund du håller på med och visar grannarna inom 500 meter nedtonade',
-      'Kundfiltret på fliken Karta är en kundväljare i stället för kryssrutor',
+      { kind: 'nyhet', text: 'Andra kunders stationer visas nedtonade på kartan när du placerar ut, så de inte blandas ihop med kundens egna' },
+      { kind: 'nyhet', text: 'Knappen "Dölj andra kunder" på kartan stänger av dem helt - valet kommer ihåg sig' },
+      { kind: 'nyhet', text: 'Fliken Karta följer den kund du håller på med och visar grannarna inom 500 meter nedtonade' },
+      { kind: 'andring', text: 'Kundfiltret på fliken Karta är en kundväljare i stället för kryssrutor' },
     ],
   },
   {
