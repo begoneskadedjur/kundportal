@@ -1,9 +1,15 @@
 // src/components/shared/equipment/MapLocationPicker.tsx - Interaktiv kartväljare med Google Maps
-import { useEffect, useRef, useState, useCallback } from 'react'
-import { MapPin, Navigation, Search, Check, X, Crosshair, Loader2 } from 'lucide-react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { MapPin, Navigation, Search, Check, X, Crosshair, Loader2, Eye, EyeOff } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { searchAddresses, type GeocodeResult } from '../../../services/geocoding'
 import { useGoogleMaps } from '../../../hooks/useGoogleMaps'
+import {
+  OTHER_CUSTOMERS_MAX_MARKERS,
+  distanceMeters,
+  readShowOtherCustomers,
+  writeShowOtherCustomers
+} from '../../../utils/equipmentMapUtils'
 
 // Stockholm som default center
 const SWEDEN_CENTER = { lat: 59.3293, lng: 18.0686 }
@@ -17,6 +23,16 @@ export interface ExistingStation {
   number: number
   equipment_type: string
   color?: string
+  customerName?: string
+}
+
+interface MapViewport {
+  north: number
+  south: number
+  east: number
+  west: number
+  lat: number
+  lng: number
 }
 
 interface MapLocationPickerProps {
@@ -26,6 +42,9 @@ interface MapLocationPickerProps {
   onCancel: () => void
   height?: string
   existingStations?: ExistingStation[]
+  // Andra kunders stationer: ritas nedtonade som kontext, bara de som ligger i
+  // kartvyn just nu. Kan döljas med knappen på kartan (valet sparas).
+  otherCustomerStations?: ExistingStation[]
 }
 
 export function MapLocationPicker({
@@ -34,7 +53,8 @@ export function MapLocationPicker({
   onPositionSelect,
   onCancel,
   height = '400px',
-  existingStations
+  existingStations,
+  otherCustomerStations
 }: MapLocationPickerProps) {
   const { isLoaded } = useGoogleMaps({ libraries: ['marker'] })
 
@@ -57,6 +77,32 @@ export function MapLocationPicker({
   const mapRef = useRef<google.maps.Map | null>(null)
   const markerRef = useRef<google.maps.Marker | null>(null)
   const existingMarkersRef = useRef<google.maps.Marker[]>([])
+  const otherMarkersRef = useRef<google.maps.Marker[]>([])
+
+  // Andra kunders stationer: på/av (sparas) + aktuell kartvy för urvalet
+  const [showOthers, setShowOthers] = useState<boolean>(readShowOtherCustomers)
+  const [viewport, setViewport] = useState<MapViewport | null>(null)
+
+  const toggleShowOthers = () => {
+    const next = !showOthers
+    writeShowOtherCustomers(next)
+    setShowOthers(next)
+  }
+
+  // Grannar i kartvyn, närmast mitten först, med tak så kartan inte dränks
+  const visibleOthers = useMemo<ExistingStation[]>(() => {
+    if (!showOthers || !viewport || !otherCustomerStations?.length) return []
+    const inView = otherCustomerStations.filter(s =>
+      s.latitude <= viewport.north && s.latitude >= viewport.south &&
+      s.longitude <= viewport.east && s.longitude >= viewport.west
+    )
+    if (inView.length <= OTHER_CUSTOMERS_MAX_MARKERS) return inView
+    return inView
+      .map(s => ({ s, d: distanceMeters(viewport.lat, viewport.lng, s.latitude, s.longitude) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, OTHER_CUSTOMERS_MAX_MARKERS)
+      .map(x => x.s)
+  }, [showOthers, viewport, otherCustomerStations])
 
   // Uppdatera markörposition (state + Google Maps marker)
   const updateMarkerPosition = useCallback((lat: number, lng: number) => {
@@ -96,6 +142,19 @@ export function MapLocationPicker({
       scaleControl: true
     })
     mapRef.current = map
+
+    // Kartvyn styr vilka av andra kunders stationer som ritas
+    map.addListener('idle', () => {
+      const bounds = map.getBounds()
+      const center = map.getCenter()
+      if (!bounds || !center) return
+      const ne = bounds.getNorthEast()
+      const sw = bounds.getSouthWest()
+      setViewport({
+        north: ne.lat(), south: sw.lat(), east: ne.lng(), west: sw.lng(),
+        lat: center.lat(), lng: center.lng()
+      })
+    })
 
     // Klick → flytta markör
     map.addListener('click', (e: google.maps.MapMouseEvent) => {
@@ -172,6 +231,39 @@ export function MapLocationPicker({
       existingMarkersRef.current = []
     }
   }, [existingStations, isLoaded])
+
+  // Rendera andra kunders stationer nedtonade: ingen siffra, ingen klickyta,
+  // under kundens egna markörer
+  useEffect(() => {
+    if (!mapRef.current) return
+
+    otherMarkersRef.current.forEach(m => m.setMap(null))
+    otherMarkersRef.current = []
+
+    visibleOthers.forEach(station => {
+      const marker = new google.maps.Marker({
+        position: { lat: station.latitude, lng: station.longitude },
+        map: mapRef.current!,
+        draggable: false,
+        clickable: false,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 9,
+          fillColor: station.color || '#6b7280',
+          fillOpacity: 0.35,
+          strokeColor: '#cbd5e1',
+          strokeWeight: 1,
+        },
+        zIndex: 0
+      })
+      otherMarkersRef.current.push(marker)
+    })
+
+    return () => {
+      otherMarkersRef.current.forEach(m => m.setMap(null))
+      otherMarkersRef.current = []
+    }
+  }, [visibleOthers, isLoaded])
 
   // Stäng dropdown vid klick utanför
   useEffect(() => {
@@ -368,6 +460,26 @@ export function MapLocationPicker({
           </div>
         ) : (
           <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} />
+        )}
+
+        {/* Andra kunders stationer: enkel på/av, valet sparas */}
+        {isLoaded && !!otherCustomerStations?.length && (
+          <button
+            type="button"
+            onClick={toggleShowOthers}
+            title={showOthers
+              ? 'Andra kunders stationer visas nedtonade. Tryck för att dölja dem.'
+              : 'Andra kunders stationer är dolda. Tryck för att visa dem nedtonade.'}
+            className="absolute top-3 left-3 z-[1000] flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 text-xs text-slate-300 hover:text-white transition-colors"
+          >
+            {showOthers
+              ? <Eye className="w-3.5 h-3.5 text-slate-400" />
+              : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
+            <span>{showOthers ? 'Dölj andra kunder' : 'Visa andra kunder'}</span>
+            {showOthers && visibleOthers.length > 0 && (
+              <span className="text-slate-500 tabular-nums">{visibleOthers.length}</span>
+            )}
+          </button>
         )}
 
         {/* Koordinatvisning överlagd på kartan */}

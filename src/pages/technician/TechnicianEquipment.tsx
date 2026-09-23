@@ -269,6 +269,33 @@ export default function TechnicianEquipment() {
     }))
   }, [fetchedEquipment, wizardCustomerId])
 
+  // Andra kunders stationer som kontext på kartväljaren: nedtonade, bara de
+  // som ligger i kartvyn, och kan döljas med knappen på kartan. Utan detta
+  // blandade tekniker ihop grannenheternas stationer med kundens egna
+  // (Heimstaden i Gävle, september 2026).
+  const otherCustomerStations = useMemo<ExistingStation[]>(() => {
+    const cid = wizardCustomerId
+    if (!cid) return []
+    return fetchedEquipment
+      .filter(e => e.customer_id !== cid && e.latitude && e.longitude && e.status !== 'removed')
+      .map(e => ({
+        id: e.id,
+        latitude: e.latitude,
+        longitude: e.longitude,
+        number: 0,
+        equipment_type: e.equipment_type,
+        color: e.station_type_data?.color || undefined,
+        customerName: e.customer?.company_name || undefined
+      }))
+  }, [fetchedEquipment, wizardCustomerId])
+
+  // Fliken Karta följer pågående etablering: den kund som senast valdes i
+  // wizarden blir fokuskund på kartan och ligger kvar tills teknikern byter
+  const [mapFocusCustomerId, setMapFocusCustomerId] = useState<string | null>(null)
+  useEffect(() => {
+    if (wizardCustomerId) setMapFocusCustomerId(wizardCustomerId)
+  }, [wizardCustomerId])
+
   // Hämta alla teknikerns placeringar och kunder med stationer vid mount
   useEffect(() => {
     const fetchData = async () => {
@@ -1131,6 +1158,8 @@ export default function TechnicianEquipment() {
                 stats={stats}
                 onEquipmentClick={handleEquipmentClick}
                 defaultExpanded={true}
+                focusCustomerId={mapFocusCustomerId}
+                onFocusCustomerChange={setMapFocusCustomerId}
               />
             )}
 
@@ -1264,6 +1293,7 @@ export default function TechnicianEquipment() {
                         addonPrices={addonPrices}
                         addonPricesLoading={addonPricesLoading}
                         existingStations={customerExistingStations}
+                        otherCustomerStations={otherCustomerStations}
                         inspections={editingEquipment ? outdoorInspections : []}
                         onSubmit={handleFormSubmit}
                         onCancel={handleFinishBatch}

@@ -119,3 +119,44 @@ export const isValidCoordinate = (lat: number, lng: number): boolean => {
 export const isWithinSweden = (lat: number, lng: number): boolean => {
   return lat >= 55.0 && lat <= 69.5 && lng >= 10.5 && lng <= 24.5
 }
+
+// ---------------------------------------------------------------------------
+// Andra kunders stationer på teknikerns kartor (nedtonade grannar)
+// ---------------------------------------------------------------------------
+// Ett gemensamt val för kartväljaren i placeringsformuläret och fliken Karta:
+// andra kunders stationer ritas nedtonade som kontext, eller döljs helt.
+export const SHOW_OTHER_CUSTOMERS_STORAGE_KEY = 'technician-map-show-other-customers'
+// Radie runt kundens egna stationer inom vilken grannar visas på fliken Karta
+export const OTHER_CUSTOMERS_RADIUS_M = 500
+// Tak för antal nedtonade grannar i kartväljaren (närmast kartans mitt vinner)
+export const OTHER_CUSTOMERS_MAX_MARKERS = 300
+
+export const readShowOtherCustomers = (): boolean => {
+  try {
+    return localStorage.getItem(SHOW_OTHER_CUSTOMERS_STORAGE_KEY) !== 'hidden'
+  } catch {
+    return true
+  }
+}
+
+export const writeShowOtherCustomers = (show: boolean): void => {
+  try {
+    localStorage.setItem(SHOW_OTHER_CUSTOMERS_STORAGE_KEY, show ? 'shown' : 'hidden')
+  } catch {
+    /* privat läge */
+  }
+}
+
+/**
+ * Avstånd i meter mellan två punkter (haversine)
+ */
+export const distanceMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371000
+  const toRad = (d: number) => d * (Math.PI / 180)
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}

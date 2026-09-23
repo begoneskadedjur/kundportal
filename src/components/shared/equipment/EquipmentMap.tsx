@@ -38,6 +38,9 @@ interface EquipmentMapProps {
   showNumbers?: boolean
   inspectedStationIds?: Set<string>
   highlightedStationId?: string | null
+  // Andra kunders stationer som bara är kontext: nedtonade, utan siffra,
+  // under övriga markörer och utan att styra zoomen
+  dimmedStationIds?: Set<string>
   newStationIds?: Set<string>
   regionPolygons?: Array<{
     id: string
@@ -83,6 +86,7 @@ export function EquipmentMap({
   showNumbers = false,
   inspectedStationIds,
   highlightedStationId,
+  dimmedStationIds,
   newStationIds,
   regionPolygons,
   onRegionClick,
@@ -140,7 +144,8 @@ export function EquipmentMap({
   // Nummermappning (sorterat på placed_at)
   const equipmentNumberMap = useMemo(() => {
     if (!showNumbers) return new Map<string, number>()
-    const sorted = [...equipment].sort((a, b) => {
+    // Nedtonade grannar tar inga nummer
+    const sorted = equipment.filter(item => !dimmedStationIds?.has(item.id)).sort((a, b) => {
       const dateA = new Date(a.placed_at).getTime()
       const dateB = new Date(b.placed_at).getTime()
       return dateA - dateB
@@ -150,7 +155,7 @@ export function EquipmentMap({
       map.set(item.id, index + 1)
     })
     return map
-  }, [equipment, showNumbers])
+  }, [equipment, showNumbers, dimmedStationIds])
 
   // Hantera klick på markör
   const handleMarkerClick = useCallback((item: EquipmentPlacementWithRelations) => {
@@ -379,25 +384,27 @@ export function EquipmentMap({
       }
 
       const isRelocating = item.id === relocatingStationId
+      // Nedtonad = annan kunds station som bara visas som kontext
+      const isDimmed = !!dimmedStationIds?.has(item.id) && !isRelocating && !isHighlighted
 
       const marker = new google.maps.Marker({
         position: { lat: item.latitude, lng: item.longitude },
         map: enableClustering ? null : map,
         icon: {
           path: google.maps.SymbolPath.CIRCLE,
-          scale: isRelocating ? 18 : isHighlighted ? 16 : 14,
+          scale: isRelocating ? 18 : isHighlighted ? 16 : isDimmed ? 9 : 14,
           fillColor: isRelocating ? '#f59e0b' : bgColor,
-          fillOpacity: opacity,
-          strokeColor: isRelocating ? '#ffffff' : strokeColor,
-          strokeWeight: isRelocating ? 3 : strokeWeight
+          fillOpacity: isDimmed ? 0.35 : opacity,
+          strokeColor: isRelocating ? '#ffffff' : isDimmed ? '#cbd5e1' : strokeColor,
+          strokeWeight: isRelocating ? 3 : isDimmed ? 1 : strokeWeight
         },
-        label: labelText ? {
+        label: isDimmed ? undefined : labelText ? {
           text: isRelocating ? '✥' : labelText,
           color: '#ffffff',
           fontSize: number && number >= 100 ? '9px' : isHighlighted ? '13px' : '11px',
           fontWeight: 'bold'
         } : (isRelocating ? { text: '✥', color: '#ffffff', fontSize: '14px', fontWeight: 'bold' } : undefined),
-        zIndex: isRelocating ? 2000 : isHighlighted ? 1000 : isInspected ? 500 : 100,
+        zIndex: isRelocating ? 2000 : isHighlighted ? 1000 : isInspected ? 500 : isDimmed ? 50 : 100,
         clickable: true,
         draggable: isRelocating,
         cursor: isRelocating ? 'grab' : 'pointer'
@@ -445,18 +452,21 @@ export function EquipmentMap({
       })
     }
 
-    // Auto-bounds vid equipment-ändring
-    if (equipment.length > 1 && !highlightedStationId) {
+    // Auto-bounds vid equipment-ändring — nedtonade grannar styr inte zoomen
+    const focusItems = dimmedStationIds?.size
+      ? equipment.filter(item => !dimmedStationIds.has(item.id))
+      : equipment
+    if (focusItems.length > 1 && !highlightedStationId) {
       const bounds = new google.maps.LatLngBounds()
-      equipment.forEach(item => {
+      focusItems.forEach(item => {
         bounds.extend({ lat: item.latitude, lng: item.longitude })
       })
       map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 })
-    } else if (equipment.length === 1) {
-      map.setCenter({ lat: equipment[0].latitude, lng: equipment[0].longitude })
+    } else if (focusItems.length === 1) {
+      map.setCenter({ lat: focusItems[0].latitude, lng: focusItems[0].longitude })
       map.setZoom(DETAIL_ZOOM)
     }
-  }, [equipment, isLoaded, getEquipmentColor, inspectedStationIds, highlightedStationId, equipmentNumberMap, handleMarkerClick, relocatingStationId, enableClustering])
+  }, [equipment, isLoaded, getEquipmentColor, inspectedStationIds, highlightedStationId, equipmentNumberMap, handleMarkerClick, relocatingStationId, enableClustering, dimmedStationIds])
 
   // Panorera till highlighted station (wizard-läge)
   useEffect(() => {

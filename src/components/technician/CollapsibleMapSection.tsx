@@ -3,8 +3,15 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Map as MapIcon, ChevronDown, MapPin, Home, Building2, CheckCircle2, AlertTriangle, AlertCircle, SlidersHorizontal } from 'lucide-react'
+import { Map as MapIcon, ChevronDown, MapPin, Home, Building2, CheckCircle2, AlertTriangle, AlertCircle, SlidersHorizontal, Eye, EyeOff } from 'lucide-react'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
+import Select from '../ui/Select'
+import {
+  OTHER_CUSTOMERS_RADIUS_M,
+  distanceMeters,
+  readShowOtherCustomers,
+  writeShowOtherCustomers
+} from '../../utils/equipmentMapUtils'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG } from '../../types/database'
 import { StationTypeService } from '../../services/stationTypeService'
 import type { StationType } from '../../types/stationTypes'
@@ -48,6 +55,11 @@ interface CollapsibleMapSectionProps {
   onEquipmentClick?: (equipment: EquipmentPlacementWithRelations) => void
   defaultExpanded?: boolean
   className?: string
+  // Fokuskund (t.ex. pågående etablering): kundens stationer i full styrka,
+  // andra kunders stationer inom OTHER_CUSTOMERS_RADIUS_M nedtonade eller dolda.
+  // Skickas den in styr föräldern valet, annars väljs kund lokalt i filtret.
+  focusCustomerId?: string | null
+  onFocusCustomerChange?: (customerId: string | null) => void
 }
 
 export function CollapsibleMapSection({
@@ -55,13 +67,27 @@ export function CollapsibleMapSection({
   stats,
   onEquipmentClick,
   defaultExpanded = true,
-  className = ''
+  className = '',
+  focusCustomerId: focusCustomerIdProp,
+  onFocusCustomerChange
 }: CollapsibleMapSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const [showMobileFilter, setShowMobileFilter] = useState(false)
   const [stationTypes, setStationTypes] = useState<StationType[]>([])
   const [hiddenTypeKeys, setHiddenTypeKeys] = useState<Set<string>>(new Set())
-  const [hiddenCustomerIds, setHiddenCustomerIds] = useState<Set<string>>(new Set())
+  const [localFocusId, setLocalFocusId] = useState<string | null>(null)
+  const focusCustomerId = focusCustomerIdProp !== undefined ? focusCustomerIdProp : localFocusId
+  const setFocusCustomer = (id: string | null) => {
+    setLocalFocusId(id)
+    onFocusCustomerChange?.(id)
+  }
+  // Andra kunders stationer på/av — samma sparade val som kartväljaren i wizarden
+  const [showOthers, setShowOthers] = useState<boolean>(readShowOtherCustomers)
+  const toggleShowOthers = () => {
+    const next = !showOthers
+    writeShowOtherCustomers(next)
+    setShowOthers(next)
+  }
 
   const activeCount = stats.byStatus?.active || 0
   const problematicCount = (stats.byStatus?.damaged || 0) + (stats.byStatus?.missing || 0) + (stats.byStatus?.needs_service || 0)
@@ -107,13 +133,39 @@ export function CollapsibleMapSection({
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'sv'))
   }, [equipment])
 
-  const filteredEquipment = useMemo(
-    () => equipment.filter(e =>
-      !hiddenTypeKeys.has(resolveTypeInfo(e, typeLookup).key) &&
-      (!e.customer_id || !hiddenCustomerIds.has(e.customer_id))
-    ),
-    [equipment, typeLookup, hiddenTypeKeys, hiddenCustomerIds]
+  // Fokuskund utan stationer (ny kund före första placeringen) = inget fokus,
+  // kartan visar allt som vanligt tills första stationen finns
+  const effectiveFocusId = useMemo(
+    () => focusCustomerId && customerOptions.some(c => c.id === focusCustomerId) ? focusCustomerId : null,
+    [focusCustomerId, customerOptions]
   )
+
+  // Utan fokuskund: allt som passerar typfiltret. Med fokuskund: kundens egna
+  // stationer, plus grannar inom OTHER_CUSTOMERS_RADIUS_M nedtonade om de är på.
+  const { filteredEquipment, dimmedStationIds, neighbourCount } = useMemo(() => {
+    const byType = equipment.filter(e => !hiddenTypeKeys.has(resolveTypeInfo(e, typeLookup).key))
+    if (!effectiveFocusId) {
+      return { filteredEquipment: byType, dimmedStationIds: undefined, neighbourCount: 0 }
+    }
+    const own = byType.filter(e => e.customer_id === effectiveFocusId)
+    const latSpan = OTHER_CUSTOMERS_RADIUS_M / 111_000
+    const neighbours = own.length === 0 ? [] : byType.filter(e =>
+      e.customer_id !== effectiveFocusId &&
+      e.status !== 'removed' &&
+      own.some(o =>
+        Math.abs(o.latitude - e.latitude) <= latSpan &&
+        distanceMeters(o.latitude, o.longitude, e.latitude, e.longitude) <= OTHER_CUSTOMERS_RADIUS_M
+      )
+    )
+    if (!showOthers || neighbours.length === 0) {
+      return { filteredEquipment: own, dimmedStationIds: undefined, neighbourCount: neighbours.length }
+    }
+    return {
+      filteredEquipment: [...own, ...neighbours],
+      dimmedStationIds: new Set(neighbours.map(e => e.id)),
+      neighbourCount: neighbours.length
+    }
+  }, [equipment, typeLookup, hiddenTypeKeys, effectiveFocusId, showOthers])
 
   const toggleInSet = (set: Set<string>, value: string): Set<string> => {
     const next = new Set(set)
@@ -122,7 +174,10 @@ export function CollapsibleMapSection({
     return next
   }
 
-  const hasActiveFilter = hiddenTypeKeys.size > 0 || hiddenCustomerIds.size > 0
+  const hasActiveFilter = hiddenTypeKeys.size > 0 || !!effectiveFocusId
+  const emptyText = effectiveFocusId
+    ? 'Kunden har inga utomhusstationer att visa'
+    : 'Inga utomhusstationer att visa'
   const showFilterPanel = typeOptions.length > 1 || customerOptions.length > 1
 
   // Filterpanel med kryssrader — används i statistikkolumnen (desktop)
@@ -136,7 +191,7 @@ export function CollapsibleMapSection({
         </p>
         {hasActiveFilter && (
           <button
-            onClick={() => { setHiddenTypeKeys(new Set()); setHiddenCustomerIds(new Set()) }}
+            onClick={() => { setHiddenTypeKeys(new Set()); setFocusCustomer(null) }}
             className="text-xs text-[#20c58f] hover:text-[#1ab07f] transition-colors"
           >
             Visa allt
@@ -169,30 +224,44 @@ export function CollapsibleMapSection({
 
       {customerOptions.length > 1 && (
         <div>
-          <p className="text-xs font-medium text-slate-500 mb-1 px-1.5">Kunder</p>
-          <div className="space-y-0.5 max-h-44 overflow-y-auto">
-            {customerOptions.map(c => (
-              <label
-                key={c.id}
-                className="flex items-center gap-2.5 px-1.5 py-1 rounded-lg hover:bg-slate-700/30 cursor-pointer transition-colors"
-              >
-                <input
-                  type="checkbox"
-                  checked={!hiddenCustomerIds.has(c.id)}
-                  onChange={() => setHiddenCustomerIds(prev => toggleInSet(prev, c.id))}
-                  className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-900 text-[#20c58f] focus:ring-[#20c58f] focus:ring-offset-0"
-                />
-                <span className={`text-sm flex-1 min-w-0 truncate ${hiddenCustomerIds.has(c.id) ? 'text-slate-500' : 'text-slate-300'}`}>
-                  {c.name}
-                </span>
-                <span className="text-xs text-slate-500 tabular-nums">{c.count}</span>
-              </label>
-            ))}
-          </div>
+          <Select
+            label="Kund"
+            value={effectiveFocusId ?? ''}
+            onChange={(value) => setFocusCustomer(value || null)}
+            options={[
+              { value: '', label: 'Alla kunder' },
+              ...customerOptions.map(c => ({ value: c.id, label: `${c.name} (${c.count})` }))
+            ]}
+          />
+          {effectiveFocusId && (
+            <p className="mt-1.5 px-1.5 text-xs text-slate-500">
+              {neighbourCount > 0
+                ? `${neighbourCount} ${neighbourCount === 1 ? 'station' : 'stationer'} hos andra kunder inom ${OTHER_CUSTOMERS_RADIUS_M} m`
+                : `Inga andra kunders stationer inom ${OTHER_CUSTOMERS_RADIUS_M} m`}
+            </p>
+          )}
         </div>
       )}
     </div>
   )
+
+  // Knapp på kartan: andra kunders stationer på/av (valet sparas)
+  const othersToggle = effectiveFocusId && neighbourCount > 0 ? (
+    <button
+      type="button"
+      onClick={toggleShowOthers}
+      title={showOthers
+        ? 'Andra kunders stationer visas nedtonade. Tryck för att dölja dem.'
+        : 'Andra kunders stationer är dolda. Tryck för att visa dem nedtonade.'}
+      className="absolute top-3 left-3 z-[1000] flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-sm rounded-lg px-2.5 py-1.5 text-xs text-slate-300 hover:text-white transition-colors"
+    >
+      {showOthers
+        ? <Eye className="w-3.5 h-3.5 text-slate-400" />
+        : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
+      <span>{showOthers ? 'Dölj andra kunder' : 'Visa andra kunder'}</span>
+      {showOthers && <span className="text-slate-500 tabular-nums">{neighbourCount}</span>}
+    </button>
+  ) : null
 
   return (
     <div className={`bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 overflow-hidden ${className}`}>
@@ -270,20 +339,24 @@ export function CollapsibleMapSection({
 
         {/* Höger: Karta */}
         <div className="relative">
-          {equipment.length > 0 ? (
-            <EquipmentMap
-              equipment={filteredEquipment}
-              onEquipmentClick={onEquipmentClick}
-              height="300px"
-              showControls={true}
-              readOnly={true}
-              enableClustering={true}
-            />
+          {filteredEquipment.length > 0 ? (
+            <>
+              <EquipmentMap
+                equipment={filteredEquipment}
+                dimmedStationIds={dimmedStationIds}
+                onEquipmentClick={onEquipmentClick}
+                height="300px"
+                showControls={true}
+                readOnly={true}
+                enableClustering={!effectiveFocusId}
+              />
+              {othersToggle}
+            </>
           ) : (
             <div className="h-[300px] flex items-center justify-center bg-slate-900/30">
               <div className="text-center">
                 <MapIcon className="w-12 h-12 text-slate-600 mx-auto mb-2" />
-                <p className="text-slate-500 text-sm">Inga utomhusstationer att visa</p>
+                <p className="text-slate-500 text-sm">{emptyText}</p>
               </div>
             </div>
           )}
@@ -365,21 +438,25 @@ export function CollapsibleMapSection({
               )}
 
               {/* Karta */}
-              <div className="border-t border-slate-700/50">
-                {equipment.length > 0 ? (
-                  <EquipmentMap
-                    equipment={filteredEquipment}
-                    onEquipmentClick={onEquipmentClick}
-                    height="200px"
-                    showControls={false}
-                    readOnly={true}
-                    enableClustering={true}
-                  />
+              <div className="relative border-t border-slate-700/50">
+                {filteredEquipment.length > 0 ? (
+                  <>
+                    <EquipmentMap
+                      equipment={filteredEquipment}
+                      dimmedStationIds={dimmedStationIds}
+                      onEquipmentClick={onEquipmentClick}
+                      height="200px"
+                      showControls={false}
+                      readOnly={true}
+                      enableClustering={!effectiveFocusId}
+                    />
+                    {othersToggle}
+                  </>
                 ) : (
                   <div className="h-[200px] flex items-center justify-center bg-slate-900/30">
                     <div className="text-center">
                       <MapIcon className="w-10 h-10 text-slate-600 mx-auto mb-2" />
-                      <p className="text-slate-500 text-sm">Inga stationer att visa</p>
+                      <p className="text-slate-500 text-sm">{emptyText}</p>
                     </div>
                   </div>
                 )}

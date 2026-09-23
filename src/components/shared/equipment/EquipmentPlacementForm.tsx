@@ -92,6 +92,7 @@ interface EquipmentPlacementFormProps {
   initialArticleId?: string | null
   // Befintliga stationer att visa på kartan
   existingStations?: ExistingStation[]
+  otherCustomerStations?: ExistingStation[]
   // Kontrollhistorik
   inspections?: OutdoorInspectionWithRelations[]
 }
@@ -141,6 +142,7 @@ export function EquipmentPlacementForm({
   addonPricesLoading = false,
   initialArticleId = null,
   existingStations,
+  otherCustomerStations,
   inspections = []
 }: EquipmentPlacementFormProps) {
   const isEditing = !!existingEquipment
@@ -864,6 +866,7 @@ export function EquipmentPlacementForm({
                 onCancel={() => setShowMapPicker(false)}
                 height="350px"
                 existingStations={existingStations}
+                otherCustomerStations={otherCustomerStations}
               />
             </motion.div>
           )}
