@@ -7,9 +7,15 @@
 //
 // Vid ny release: lägg till högst upp och höj versionen. Alla som inte sett den
 // versionen får en prick i sidomenyn.
+//
+// Versionsnummer: generation.release.rättning, utan koppling till datum.
+//   - Ny generation (första siffran) när en central del byggs om i grunden,
+//     som Fakturering 2.0 (2.0.0) eller Avtalskartans motor (3.0.0).
+//   - Ny release (andra siffran) för varje leverans med ny funktion.
+//   - Rättning (tredje siffran) för en leverans som bara rättar fel.
 
 export interface ChangelogEntry {
-  /** Visas som mono-etikett, t.ex. "2026.09.1" */
+  /** Visas som mono-etikett, t.ex. "3.10.0" */
   version: string
   /** ÅÅÅÅ-MM-DD */
   date: string
@@ -21,7 +27,7 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '2026.09.12',
+    version: '3.10.0',
     date: '2026-09-23',
     title: 'Portalen som app på mobilen',
     items: [
@@ -31,7 +37,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.11',
+    version: '3.9.0',
     date: '2026-09-23',
     title: 'Tydligare kartor vid utplacering',
     items: [
@@ -42,7 +48,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.10',
+    version: '3.8.0',
     date: '2026-09-21',
     title: 'Signerade avtal aktiveras själva',
     items: [
@@ -53,7 +59,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.9',
+    version: '3.7.0',
     date: '2026-09-18',
     title: 'Fakturaplan och utrustning',
     items: [
@@ -65,7 +71,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.8',
+    version: '3.6.0',
     date: '2026-09-17',
     title: 'Fakturafliken på kundkortet',
     items: [
@@ -76,7 +82,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.7',
+    version: '3.5.0',
     date: '2026-09-15',
     title: 'Stationskarta som PDF',
     items: [
@@ -84,7 +90,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.6',
+    version: '3.4.0',
     date: '2026-09-09',
     title: 'Avtalet har en källa för premien',
     items: [
@@ -95,7 +101,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.5',
+    version: '3.3.0',
     date: '2026-09-08',
     title: 'Avtalskartan i tre lager',
     items: [
@@ -105,7 +111,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.4',
+    version: '3.2.0',
     date: '2026-09-05',
     title: 'Stationstyper med produkt och pris',
     items: [
@@ -116,7 +122,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.3',
+    version: '3.1.0',
     date: '2026-09-03',
     title: 'Tilläggsstationer och kundpriser',
     items: [
@@ -127,7 +133,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.2',
+    version: '3.0.0',
     date: '2026-09-02',
     title: 'Avtalskartans motor',
     items: [
@@ -138,7 +144,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.09.1',
+    version: '2.4.0',
     date: '2026-09-01',
     title: 'Kundansvarig och prislistor',
     items: [
@@ -148,7 +154,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.12',
+    version: '2.3.0',
     date: '2026-08-31',
     title: 'Tilläggsstationer',
     items: [
@@ -159,7 +165,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.11',
+    version: '2.2.0',
     date: '2026-08-30',
     title: 'Säkrad åtkomst till systemets API:er',
     items: [
@@ -168,7 +174,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.10',
+    version: '2.1.0',
     date: '2026-08-28',
     title: 'Besök och provisioner',
     items: [
@@ -179,7 +185,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.9',
+    version: '2.0.0',
     date: '2026-08-26',
     title: 'Fakturering 2.0 och Provisioner 2.0',
     items: [
@@ -190,7 +196,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.8',
+    version: '1.9.0',
     date: '2026-08-25',
     title: 'Fakturamodal och ärendehistorik',
     items: [
@@ -201,7 +207,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.7',
+    version: '1.8.0',
     date: '2026-08-24',
     title: 'Rumsanalys',
     items: [
@@ -211,7 +217,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.6',
+    version: '1.7.0',
     date: '2026-08-21',
     title: 'Intäktsmodell och säljare',
     items: [
@@ -222,7 +228,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.5',
+    version: '1.6.0',
     date: '2026-08-20',
     title: 'Avtalskartan',
     items: [
@@ -233,7 +239,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.4',
+    version: '1.5.0',
     date: '2026-08-19',
     title: 'Ny kundvy och utrustningssida',
     items: [
@@ -244,7 +250,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.3',
+    version: '1.4.0',
     date: '2026-08-18',
     title: 'Dokumentsignering',
     items: [
@@ -254,7 +260,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.2',
+    version: '1.3.0',
     date: '2026-08-17',
     title: 'Rapporter enligt dokumentstandarden',
     items: [
@@ -265,7 +271,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.1',
+    version: '1.2.0',
     date: '2026-08-12',
     title: 'Avtalstillägg och rabattgodkännande',
     items: [
@@ -276,7 +282,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.08.0',
+    version: '1.1.0',
     date: '2026-08-11',
     title: 'Intranät och handbok',
     items: [
@@ -287,7 +293,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
-    version: '2026.07.9',
+    version: '1.0.0',
     date: '2026-08-10',
     title: 'Ljust läge och incidentflöde',
     items: [
