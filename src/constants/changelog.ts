@@ -21,6 +21,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '2026.09.12',
+    date: '2026-09-23',
+    title: 'Portalen som app på mobilen',
+    items: [
+      'Under Mitt konto finns "Använd som app": lägg portalen på hemskärmen och kör den utan adressfält, med egen ikon',
+      'Android installerar direkt från knappen, iPhone får en kort guide till Dela-menyn',
+      'Ny version hämtas av sig själv vid nästa start - inga omladdningar mitt i arbetet',
+    ],
+  },
+  {
     version: '2026.09.11',
     date: '2026-09-23',
     title: 'Tydligare kartor vid utplacering',

@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button'
 import Input from '../../components/ui/Input'
 import Card from '../../components/ui/Card'
 import { PageHeader } from '../../components/shared'
+import { PwaInstallSection } from '../../components/shared/PwaInstallSection'
 import { 
   User, 
   Mail, 
@@ -568,6 +569,9 @@ export default function UserProfile({ embedded = false }: UserProfileProps) {
             </div>
           </div>
         </Card>
+
+        {/* Använd som app - visas bara på mobil */}
+        <PwaInstallSection />
       </div>
     </div>
   )
