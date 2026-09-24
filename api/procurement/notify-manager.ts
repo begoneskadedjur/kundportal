@@ -33,13 +33,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const link = `${PORTAL_URL}/admin/upphandlingar`
   const name = profile.display_name || profile.email
 
-  await insertNotifications(
-    [profile.user_id],
-    null,
-    'Du är nu upphandlingsansvarig',
-    'Du har fått åtkomst till Upphandlingar under Försäljning: bevakning, marknad, avtalsklocka och anbudskalkyl.',
-    'Upphandlingar'
-  )
+  // Notisen och mejlet är oberoende: misslyckas det ena ska det andra ändå gå.
+  let notified = false
+  let notifyError: string | null = null
+  try {
+    await insertNotifications(
+      [profile.user_id],
+      null,
+      'Du är nu upphandlingsansvarig',
+      'Du har fått åtkomst till Upphandlingar under Försäljning: bevakning, marknad, avtalsklocka och anbudskalkyl.',
+      'Upphandlingar'
+    )
+    notified = true
+  } catch (err) {
+    notifyError = err instanceof Error ? err.message : String(err)
+    console.error('[procurement/notify-manager] notis misslyckades', notifyError)
+  }
 
   let emailed = false
   let emailError: string | null = null
@@ -62,10 +71,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   await sb.from('procurement_events').insert({
     event_type: 'manager_added',
     title: `${name} blev upphandlingsansvarig`,
-    detail: emailed ? 'Notis och mejl skickade' : `Notis skickad, mejlet misslyckades: ${emailError}`,
+    detail: [
+      notified ? 'Notis skickad' : `Notisen misslyckades: ${notifyError}`,
+      emailed ? 'mejl skickat' : `mejlet misslyckades: ${emailError}`,
+    ].join(', '),
     metadata: { user_id: profile.user_id, by: auth.userId },
     actor_id: auth.userId,
   })
 
-  return res.status(200).json({ success: true, emailed, emailError })
+  return res.status(200).json({ success: true, notified, notifyError, emailed, emailError })
 }
