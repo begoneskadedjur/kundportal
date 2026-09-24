@@ -251,7 +251,10 @@ function takeFollowup(
   title: string | null,
   date: string | null
 ) {
-  if (!status) return
+  // Bara ny annons och ny tilldelning tas från databasen. Slut passerat och
+  // gammalt avtal räknas ur gruppens eget slutdatum (followupOf), så att en
+  // sammanslagen grupp aldrig visar en status som motsäger datumet.
+  if (status !== 'new_notice' && status !== 'new_award') return
   if (g.followupStatus && FOLLOWUP_RANK[g.followupStatus] >= FOLLOWUP_RANK[status]) return
   g.followupStatus = status
   g.followupNoticeId = noticeId
@@ -633,8 +636,9 @@ export function isInWindow(g: Pick<ProcurementGroup, 'windowStart' | 'windowEnd'
 export function expectedAnnouncementQuarter(g: Pick<ProcurementGroup, 'windowStart' | 'endDate'> & Partial<Pick<ProcurementGroup, 'followupStatus'>>, today: string): string | null {
   // Ny annons eller ny tilldelning finns: inget förväntat. Slut passerat utan
   // ny annons: annonsen väntas nu, aldrig i en förfluten kvartalsruta.
-  if (g.followupStatus === 'new_notice' || g.followupStatus === 'new_award' || g.followupStatus === 'stale') return null
-  if (g.followupStatus === 'passed_no_notice') return quarterOf(today)
+  const f = followupOf({ followupStatus: g.followupStatus ?? null, endDate: g.endDate }, today)
+  if (f === 'new_notice' || f === 'new_award' || f === 'stale') return null
+  if (f === 'passed_no_notice') return quarterOf(today)
   if (!g.windowStart) return null
   if (g.windowStart < today && g.endDate && g.endDate >= today) return quarterOf(today)
   return quarterOf(g.windowStart)
@@ -663,15 +667,27 @@ export function isReannounced(g: Pick<ProcurementGroup, 'followupStatus'>): bool
   return g.followupStatus === 'new_notice' || g.followupStatus === 'new_award'
 }
 
+/**
+ * Uppföljningen för en grupp: ny annons eller ny tilldelning från databasen,
+ * annars ur gruppens slutdatum: passerat under de senaste två åren ger
+ * "slut passerat, ingen ny annons", äldre ger "stale".
+ */
+export function followupOf(g: Pick<ProcurementGroup, 'followupStatus' | 'endDate'>, today: string): ProcurementFollowupStatus | null {
+  if (isReannounced(g)) return g.followupStatus
+  if (!g.endDate || g.endDate >= today) return null
+  return g.endDate >= addMonthsIso(today, -24) ? 'passed_no_notice' : 'stale'
+}
+
 /** Avtalsklockans tidsfilter */
 export function matchesHorizon(g: ProcurementGroup, horizon: HorizonFilter, today: string): boolean {
   if (horizon === 'all') return true
   if (horizon === 'reannounced') return isReannounced(g)
-  if (horizon === 'passed') return g.followupStatus === 'passed_no_notice'
+  const f = followupOf(g, today)
+  if (horizon === 'passed') return f === 'passed_no_notice'
   // Köpare som redan annonserat eller tilldelat på nytt tas ur fönstret
-  if (isReannounced(g) || g.followupStatus === 'stale') return false
+  if (f === 'new_notice' || f === 'new_award' || f === 'stale') return false
   // Slut passerat utan ny annons: annonsen väntas nu, visas i alla framåtblickande filter
-  if (g.followupStatus === 'passed_no_notice') return true
+  if (f === 'passed_no_notice') return true
   if (!g.endDate) return false
   if (horizon === 'window') return isInWindow(g, today)
   if (g.endDate < today) return false
@@ -712,8 +728,9 @@ export function pipelineByQuarter(
     row.contribution += Number(n.expected_contribution ?? 0) || 0
   }
   for (const g of groups) {
-    if (g.status === 'ignored' || g.status === 'done' || isReannounced(g) || g.followupStatus === 'stale') continue
-    if (!g.endDate || (g.endDate < today && g.followupStatus !== 'passed_no_notice')) continue
+    const f = followupOf(g, today)
+    if (g.status === 'ignored' || g.status === 'done' || f === 'new_notice' || f === 'new_award' || f === 'stale') continue
+    if (!g.endDate) continue
     const row = rows.get(expectedAnnouncementQuarter(g, today) ?? '')
     if (!row) continue
     row.clock += 1

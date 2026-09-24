@@ -20,6 +20,7 @@ import {
   VALUE_KIND_LABEL,
   annualValueOfGroup,
   expectedAnnouncementQuarter,
+  followupOf,
   isInWindow,
   type ProcurementGroup,
 } from '../market/marketStats'
@@ -38,9 +39,10 @@ interface Props {
 }
 
 /** Uppföljningen: ny annons (med länk), ny tilldelning eller slut passerat */
-function FollowupCell({ g }: { g: ProcurementGroup }) {
-  if (!g.followupStatus) return null
-  if (g.followupStatus === 'new_notice') {
+function FollowupCell({ g, today }: { g: ProcurementGroup; today: string }) {
+  const status = followupOf(g, today)
+  if (!status) return null
+  if (status === 'new_notice') {
     return (
       <div className="mt-1 space-y-0.5">
         <StatusDot tone="good">{FOLLOWUP_LABEL.new_notice}</StatusDot>
@@ -60,7 +62,7 @@ function FollowupCell({ g }: { g: ProcurementGroup }) {
       </div>
     )
   }
-  if (g.followupStatus === 'new_award') {
+  if (status === 'new_award') {
     return (
       <div className="mt-1 space-y-0.5">
         <StatusDot tone="neutral">{FOLLOWUP_LABEL.new_award}</StatusDot>
@@ -71,7 +73,7 @@ function FollowupCell({ g }: { g: ProcurementGroup }) {
       </div>
     )
   }
-  if (g.followupStatus === 'passed_no_notice') return <div className="mt-1"><StatusDot tone="bad">{FOLLOWUP_LABEL.passed_no_notice}</StatusDot></div>
+  if (status === 'passed_no_notice') return <div className="mt-1"><StatusDot tone="bad">{FOLLOWUP_LABEL.passed_no_notice}</StatusDot></div>
   return <div className="mt-1"><StatusDot tone="muted">{FOLLOWUP_LABEL.stale}</StatusDot></div>
 }
 
@@ -160,7 +162,8 @@ export function ClockTable({ rows, today, managers, onStatus, onOwner, onCorrect
         </thead>
         <tbody>
           {rows.map((g) => {
-            const settled = !!g.followupStatus && g.followupStatus !== 'passed_no_notice'
+            const followup = followupOf(g, today)
+            const settled = !!followup && followup !== 'passed_no_notice'
             const inWindow = !settled && isInWindow(g, today)
             const late = !settled && !!g.windowEnd && g.windowEnd < today && !!g.endDate && g.endDate >= today
             const annual = annualValueOfGroup(g)
@@ -192,12 +195,12 @@ export function ClockTable({ rows, today, managers, onStatus, onOwner, onCorrect
                       {late && <StatusDot tone="warn">Fönstret har passerat, avtalet löper</StatusDot>}
                     </>
                   ) : '–'}
-                  <FollowupCell g={g} />
+                  <FollowupCell g={g} today={today} />
                 </td>
                 <td className={tableCls.td}>
-                  {g.followupStatus === 'passed_no_notice' ? (
+                  {followup === 'passed_no_notice' ? (
                     <span className="text-amber-400">Nu</span>
-                  ) : g.followupStatus === 'new_notice' || g.followupStatus === 'new_award' ? (
+                  ) : followup === 'new_notice' || followup === 'new_award' ? (
                     <span className="text-slate-500">Annonserad</span>
                   ) : (
                     expectedAnnouncementQuarter(g, today)?.replace('-', ' ') ?? '–'
