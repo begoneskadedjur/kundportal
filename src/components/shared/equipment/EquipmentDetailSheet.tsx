@@ -168,7 +168,9 @@ export function EquipmentDetailSheet({
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">
-                {equipment.serial_number ? `#${equipment.serial_number}` : getEquipmentTypeLabel(equipment.equipment_type)}
+                {equipment.serial_number
+                  ? `#${equipment.serial_number.replace(/^#+/, '')}`
+                  : getEquipmentTypeLabel(equipment.equipment_type)}
               </h3>
               <p className="text-sm text-slate-400">{getEquipmentTypeLabel(equipment.equipment_type)}</p>
             </div>

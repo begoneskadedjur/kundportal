@@ -24,6 +24,11 @@ export interface OutdoorStation {
   comment: string | null
   photo_path: string | null
   station_type_id: string | null
+  status: string | null
+  is_addon: boolean | null
+  placed_by_technician_id: string | null
+  /** Teknikern som satte ut stationen, till "Placerad av" i detaljpanelen */
+  technician: { id: string; name: string } | null
 }
 
 export interface FloorPlan {
@@ -174,7 +179,7 @@ export function useCustomerEquipment(
       supabase
         .from('equipment_placements')
         .select(
-          'id, customer_id, serial_number, equipment_type, latitude, longitude, placed_at, comment, photo_path, station_type_id'
+          'id, customer_id, serial_number, equipment_type, latitude, longitude, placed_at, comment, photo_path, station_type_id, status, is_addon, placed_by_technician_id, technician:technicians!placed_by_technician_id(id, name)'
         )
         .in('customer_id', familyIds)
         .order('placed_at', { ascending: true }),

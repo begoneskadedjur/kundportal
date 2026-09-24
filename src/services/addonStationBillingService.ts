@@ -194,15 +194,12 @@ export class AddonStationBillingService {
     technicianName?: string | null
   ): Promise<{ found: boolean; count?: number; total?: number; row_id?: string | null; covered_by_open_invoice?: string | null; no_contract?: boolean } | null> {
     try {
-      const annual = await this.getAddonAnnualService()
-      let annualPrice: number | null = null
-      if (annual) {
-        const eff = await PriceListService.getEffectiveServicePrice(annual.id, customerId)
-        annualPrice = eff?.price ?? annual.base_price ?? null
-      }
+      // p_annual_price lämnas null: RPC:n slår upp priset per stationstyp
+      // (ljusfällan har egen tjänst). Ett pris härifrån skrev tidigare över
+      // typpriset så att alla stationer fick tjänst 144:s pris.
       const { data, error } = await supabase.rpc('sync_addon_prorata_line', {
         p_customer_id: customerId,
-        p_annual_price: annualPrice,
+        p_annual_price: null,
         p_technician_id: technicianId ?? null,
         p_technician_name: technicianName ?? null,
       })

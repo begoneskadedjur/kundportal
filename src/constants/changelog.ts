@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.11.1',
+    date: '2026-09-24',
+    title: 'Tilläggsstationer på kartan och kundkortet',
+    items: [
+      { kind: 'buggfix', text: 'Kartans förklaring säger nu vad den violetta ringen betyder: stationen är ett tillägg utöver avtalet' },
+      { kind: 'buggfix', text: 'Kundkortets utrustning visar vilken tekniker som satte ut stationen, i stället för "Okänd"' },
+      { kind: 'buggfix', text: 'Pro rata-raden för tilläggsstationer räknar med rätt årspris per stationstyp, så ljusfällor får sitt eget pris' },
+    ],
+  },
+  {
     version: '3.11.0',
     date: '2026-09-23',
     title: 'Ny version av sig själv',

@@ -720,6 +720,13 @@ export function EquipmentMap({
     }))
   }, [equipment, typeColorMap])
 
+  // Den violetta ringen betyder tilläggsstation. Utan förklaring ser
+  // teknikern bara "lila prickar" och vet inte varför.
+  const hasAddonStations = useMemo(
+    () => equipment.some(item => item.is_addon === true && item.status === 'active'),
+    [equipment]
+  )
+
   if (!isLoaded) {
     return (
       <div style={{ height }} className="flex items-center justify-center bg-slate-800/50 rounded-lg">
@@ -799,6 +806,15 @@ export function EquipmentMap({
               <span className="text-xs text-slate-600">{label}</span>
             </div>
           ))}
+          {hasAddonStations && (
+            <div className="flex items-center gap-2 mt-1 pt-1 border-t border-slate-200">
+              <div
+                className="w-3 h-3 rounded-full bg-white"
+                style={{ border: '2px solid #a855f7' }}
+              />
+              <span className="text-xs text-slate-600">Ring: tillägg utöver avtal</span>
+            </div>
+          )}
         </div>
       </div>
 
