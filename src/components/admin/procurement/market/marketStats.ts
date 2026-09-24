@@ -22,6 +22,7 @@ import type {
   ProcurementAwardSource,
   ProcurementAwardStatus,
   ProcurementEndSource,
+  ProcurementFollowupStatus,
   ProcurementNotice,
   ProcurementSourceHealth,
   ProcurementValueKind,
@@ -145,11 +146,16 @@ function yearFromRaw(raw: Record<string, unknown> | null): number | null {
  * datum och har året i rådatan; som sista reserv räknas antagandet två plus två
  * år baklänges från det beräknade slutet.
  */
-export function awardYear(a: Pick<AwardWithRelations, 'award_date' | 'contract_signed_date' | 'contract_start' | 'raw' | 'calc_end_source' | 'calc_end_date'>): number | null {
+export function awardYear(
+  a: Pick<AwardWithRelations, 'award_date' | 'contract_signed_date' | 'contract_start' | 'raw' | 'calc_end_source' | 'calc_end_date'> &
+    Partial<Pick<AwardWithRelations, 'start_basis_date'>>
+): number | null {
   const d = a.award_date ?? a.contract_signed_date ?? a.contract_start
   if (d && /^\d{4}/.test(d)) return Number(d.slice(0, 4))
   const fromRaw = yearFromRaw(a.raw)
   if (fromRaw) return fromRaw
+  // Äldre TED-XML: tilldelningsannonsens datum är startbasen
+  if (a.start_basis_date && /^\d{4}/.test(a.start_basis_date)) return Number(a.start_basis_date.slice(0, 4))
   if (a.calc_end_source === 'assumption_2_2' && a.calc_end_date) return Number(a.calc_end_date.slice(0, 4)) - 4
   return null
 }
@@ -157,12 +163,17 @@ export function awardYear(a: Pick<AwardWithRelations, 'award_date' | 'contract_s
 const VALUE_KIND_RANK: Record<ProcurementValueKind, number> = { actual: 3, ceiling: 2, estimated: 1, unknown: 0 }
 
 const END_SOURCE_RANK: Record<ProcurementEndSource, number> = {
-  manual: 5,
-  ted_end_plus_renewals: 4,
-  ted_end: 3,
-  mercell_expiry: 2,
+  manual: 7,
+  ted_end_plus_renewals: 6,
+  ted_end: 5,
+  mercell_expiry: 4,
+  contract_duration: 3,
+  text_duration: 2,
   assumption_2_2: 1,
 }
+
+/** Starkaste uppföljningen vinner när källor slås ihop */
+const FOLLOWUP_RANK: Record<ProcurementFollowupStatus, number> = { new_notice: 4, new_award: 3, passed_no_notice: 2, stale: 1 }
 
 /** Räknas in i marknadens storlek och andelar: ramtak eller verkligt pris */
 export function isContractedKind(kind: ProcurementValueKind | null | undefined): boolean {
@@ -217,11 +228,36 @@ export interface ProcurementGroup {
   endSource: ProcurementEndSource | null
   windowStart: string | null
   windowEnd: string | null
+  /** Beräkningen av slutdatumet i klartext (procurement_awards.calc_basis) */
+  calcBasis: string | null
+  /** Ny annons, ny tilldelning eller slut passerat (procurement_refresh_award_followups) */
+  followupStatus: ProcurementFollowupStatus | null
+  followupNoticeId: string | null
+  followupUrl: string | null
+  followupTitle: string | null
+  followupDate: string | null
   status: ProcurementAwardStatus
   ownerId: string | null
   notes: string | null
   /** Rådata från första raden (uppskattat mot kontrakterat värde i UHM) */
   raw: Record<string, unknown> | null
+}
+
+function takeFollowup(
+  g: ProcurementGroup,
+  status: ProcurementFollowupStatus | null,
+  noticeId: string | null,
+  url: string | null,
+  title: string | null,
+  date: string | null
+) {
+  if (!status) return
+  if (g.followupStatus && FOLLOWUP_RANK[g.followupStatus] >= FOLLOWUP_RANK[status]) return
+  g.followupStatus = status
+  g.followupNoticeId = noticeId
+  g.followupUrl = url
+  g.followupTitle = title
+  g.followupDate = date
 }
 
 function groupValue(winners: GroupWinner[]): { value: number | null; kind: ProcurementValueKind } {
@@ -285,6 +321,12 @@ export function groupAwards(awards: AwardWithRelations[]): ProcurementGroup[] {
         endSource: null,
         windowStart: null,
         windowEnd: null,
+        calcBasis: null,
+        followupStatus: null,
+        followupNoticeId: null,
+        followupUrl: null,
+        followupTitle: null,
+        followupDate: null,
         status: a.status ?? 'open',
         ownerId: a.owner_id ?? null,
         notes: a.notes ?? null,
@@ -315,8 +357,10 @@ export function groupAwards(awards: AwardWithRelations[]): ProcurementGroup[] {
       if (rank > cur || (rank === cur && (!g.calcEndDate || a.calc_end_date > g.calcEndDate))) {
         g.calcEndDate = a.calc_end_date
         g.calcEndSource = a.calc_end_source
+        g.calcBasis = a.calc_basis ?? null
       }
     }
+    takeFollowup(g, a.followup_status ?? null, a.followup_notice_id ?? null, a.followup_url ?? null, a.followup_title ?? null, a.followup_date ?? null)
     const org = normalizeOrgNumber(a.winner_org_number ?? a.supplier?.org_number ?? null)
     const name = a.supplier?.name ?? a.winner_name ?? 'Okänd leverantör'
     const wKey = a.supplier_id ?? org ?? normalizeName(name)
@@ -414,7 +458,9 @@ export function mergeCrossSource(groups: ProcurementGroup[]): ProcurementGroup[]
     if (g.calcEndDate && gr > mr) {
       match.calcEndDate = g.calcEndDate
       match.calcEndSource = g.calcEndSource
+      match.calcBasis = g.calcBasis
     }
+    takeFollowup(match, g.followupStatus, g.followupNoticeId, g.followupUrl, g.followupTitle, g.followupDate)
     if (match.status === 'open' && g.status !== 'open') match.status = g.status
     match.ownerId ??= g.ownerId
     match.notes ??= g.notes
@@ -584,7 +630,11 @@ export function isInWindow(g: Pick<ProcurementGroup, 'windowStart' | 'windowEnd'
  * Förväntad annons: kvartalet då bearbetningsfönstret öppnar. Har fönstret
  * redan öppnat men avtalet inte löpt ut räknas innevarande kvartal.
  */
-export function expectedAnnouncementQuarter(g: Pick<ProcurementGroup, 'windowStart' | 'endDate'>, today: string): string | null {
+export function expectedAnnouncementQuarter(g: Pick<ProcurementGroup, 'windowStart' | 'endDate'> & Partial<Pick<ProcurementGroup, 'followupStatus'>>, today: string): string | null {
+  // Ny annons eller ny tilldelning finns: inget förväntat. Slut passerat utan
+  // ny annons: annonsen väntas nu, aldrig i en förfluten kvartalsruta.
+  if (g.followupStatus === 'new_notice' || g.followupStatus === 'new_award' || g.followupStatus === 'stale') return null
+  if (g.followupStatus === 'passed_no_notice') return quarterOf(today)
   if (!g.windowStart) return null
   if (g.windowStart < today && g.endDate && g.endDate >= today) return quarterOf(today)
   return quarterOf(g.windowStart)
@@ -606,11 +656,22 @@ export function nextQuarters(today: string, count: number): string[] {
   return out
 }
 
-export type HorizonFilter = 'window' | '12' | '18' | '24' | 'upcoming' | 'all'
+export type HorizonFilter = 'window' | '12' | '18' | '24' | 'upcoming' | 'passed' | 'reannounced' | 'all'
+
+/** Har köparen redan annonserat eller tilldelat en ny upphandling? */
+export function isReannounced(g: Pick<ProcurementGroup, 'followupStatus'>): boolean {
+  return g.followupStatus === 'new_notice' || g.followupStatus === 'new_award'
+}
 
 /** Avtalsklockans tidsfilter */
 export function matchesHorizon(g: ProcurementGroup, horizon: HorizonFilter, today: string): boolean {
   if (horizon === 'all') return true
+  if (horizon === 'reannounced') return isReannounced(g)
+  if (horizon === 'passed') return g.followupStatus === 'passed_no_notice'
+  // Köpare som redan annonserat eller tilldelat på nytt tas ur fönstret
+  if (isReannounced(g) || g.followupStatus === 'stale') return false
+  // Slut passerat utan ny annons: annonsen väntas nu, visas i alla framåtblickande filter
+  if (g.followupStatus === 'passed_no_notice') return true
   if (!g.endDate) return false
   if (horizon === 'window') return isInWindow(g, today)
   if (g.endDate < today) return false
@@ -651,7 +712,8 @@ export function pipelineByQuarter(
     row.contribution += Number(n.expected_contribution ?? 0) || 0
   }
   for (const g of groups) {
-    if (!g.endDate || g.endDate < today || g.status === 'ignored' || g.status === 'done') continue
+    if (g.status === 'ignored' || g.status === 'done' || isReannounced(g) || g.followupStatus === 'stale') continue
+    if (!g.endDate || (g.endDate < today && g.followupStatus !== 'passed_no_notice')) continue
     const row = rows.get(expectedAnnouncementQuarter(g, today) ?? '')
     if (!row) continue
     row.clock += 1

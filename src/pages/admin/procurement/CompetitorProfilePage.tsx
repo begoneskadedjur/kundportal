@@ -36,17 +36,16 @@ export default function CompetitorProfilePage() {
     if (!supplierId) return
     setLoading(true)
     try {
-      const [s, all, a, b] = await Promise.all([
+      const [s, all, d] = await Promise.all([
         ProcurementService.getSupplier(supplierId),
         ProcurementService.listSuppliers(),
-        ProcurementService.listAwards(),
-        ProcurementService.listBidders(),
+        ProcurementService.listMarketDataset(),
       ])
       setSupplier(s)
       setNotes(s?.notes ?? '')
       setSuppliers(all)
-      setAwards(a)
-      setBidders(b)
+      setAwards(d.awards)
+      setBidders(d.bidders)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Kunde inte hämta leverantören')
     } finally {

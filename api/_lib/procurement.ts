@@ -16,9 +16,12 @@ import {
   NOTIFY_SCORE,
   SE_COUNTIES,
   annualValueOf,
+  awardRelevance,
   buildDedupKey,
+  canonicalOrgNumber,
   cleanText,
   computeContractEnd,
+  parseDurationText,
   estimateWinProbability,
   normalizeName,
   normalizeOrgNumber,
@@ -198,11 +201,28 @@ export interface SupplierInput {
   name: string
 }
 
+const orgAliasCache = new Map<string, string>()
+
+/**
+ * Leverantörens rätta orgnr: kända felskrivningar i ORG_ALIASES och alias som
+ * registrerats i procurement_suppliers.org_aliases slås ihop med leverantören.
+ */
+export async function resolveSupplierOrg(raw: string | null | undefined): Promise<string | null> {
+  const org = canonicalOrgNumber(raw)
+  if (!org) return null
+  const cached = orgAliasCache.get(org)
+  if (cached) return cached
+  const { data } = await db().from('procurement_suppliers').select('org_number').contains('org_aliases', [org]).limit(1)
+  const target = ((data ?? [])[0]?.org_number as string | undefined) ?? org
+  orgAliasCache.set(org, target)
+  return target
+}
+
 /** Leverantör på orgnr, med namnet som alias när stavningen skiljer. Utan orgnr: namn. */
 export async function upsertSupplier(input: SupplierInput): Promise<{ id: string; isBegone: boolean } | null> {
   const name = cleanText(input.name)
   if (!name) return null
-  const org = normalizeOrgNumber(input.orgNumber)
+  const org = await resolveSupplierOrg(input.orgNumber)
   const norm = normalizeName(name)
   const key = org ? `o:${org}` : `n:${norm}`
   const cached = supplierCache.get(key)
@@ -526,6 +546,12 @@ export interface AwardCandidate {
   contractEnd?: string | null
   renewalMax?: number | null
   mercellExpiry?: string | null
+  /** Avtalstid i månader utan förlängningar (TED duration-period-value-lot) */
+  durationMonths?: number | null
+  /** Fritext där avtalstiden kan stå (TED description-lot, Mercell description) */
+  durationText?: string | null
+  /** Publicering av upphandlingsannonsen, bas när inga avtalsdatum finns */
+  tenderPublishedDate?: string | null
   wasAppealed?: boolean | null
   raw?: unknown
 }
@@ -535,15 +561,32 @@ export async function upsertAward(a: AwardCandidate): Promise<string> {
   const sb = db()
   const buyerId = a.buyerName ? await upsertBuyer({ orgNumber: a.buyerOrgNumber, name: a.buyerName, nuts: a.nuts }) : null
   const supplier = a.winnerName ? await upsertSupplier({ orgNumber: a.winnerOrgNumber, name: a.winnerName }) : null
-  const winnerKey = normalizeOrgNumber(a.winnerOrgNumber) ?? normalizeName(a.winnerName) ?? 'okand'
+  const winnerOrg = await resolveSupplierOrg(a.winnerOrgNumber)
+  const winnerKey = winnerOrg ?? normalizeName(a.winnerName) ?? 'okand'
   const award_key = `${a.source}:${a.sourceRef}:${winnerKey || 'okand'}`
+  const textDuration = a.durationMonths ? null : parseDurationText(a.durationText)
   const end = computeContractEnd({
     tedEnd: a.contractEnd,
-    renewalMax: a.renewalMax,
+    renewalMax: a.renewalMax ?? (textDuration && textDuration.renewalMonths > 0 ? textDuration.renewalMonths / 12 : null),
     mercellExpiry: a.mercellExpiry,
-    startOrAwardDate: a.contractStart ?? a.contractSignedDate ?? a.awardDate,
+    contractStart: a.contractStart,
+    contractSignedDate: a.contractSignedDate,
+    awardDate: a.awardDate,
+    tenderPublishedDate: a.tenderPublishedDate,
+    durationMonths: a.durationMonths ?? textDuration?.months ?? null,
+    durationFrom: a.durationMonths ? 'ted' : textDuration ? 'text' : null,
   })
   const win = workWindow(end.date)
+  const relevance = awardRelevance(a.cpv ?? [], a.title)
+
+  // Felträffsflaggan sätts automatiskt, utom när en människa har tagit
+  // ställning (excluded_at satt utan automatisk orsak): då behålls beslutet.
+  const sb0 = db()
+  const { data: existing } = await sb0.from('procurement_awards').select('excluded_reason, excluded_at').eq('award_key', award_key).maybeSingle()
+  const manual = !!existing?.excluded_at && (!existing.excluded_reason || String(existing.excluded_reason).startsWith('Manuellt'))
+  const exclusion = manual
+    ? {}
+    : { excluded_reason: relevance.relevant ? null : relevance.reason, excluded_at: relevance.relevant ? null : new Date().toISOString() }
   const row = {
     award_key,
     notice_id: a.noticeId ?? null,
@@ -555,7 +598,7 @@ export async function upsertAward(a: AwardCandidate): Promise<string> {
     source: a.source,
     source_ref: a.sourceRef,
     supplier_id: supplier?.id ?? null,
-    winner_org_number: normalizeOrgNumber(a.winnerOrgNumber),
+    winner_org_number: winnerOrg,
     winner_name: a.winnerName ? cleanText(a.winnerName) : null,
     value: a.value ?? null,
     value_kind: a.valueKind ?? 'unknown',
@@ -572,10 +615,14 @@ export async function upsertAward(a: AwardCandidate): Promise<string> {
     renewal_max: a.renewalMax ?? null,
     calc_end_date: end.date,
     calc_end_source: end.source,
+    start_basis_date: end.startBasis,
+    duration_months: a.durationMonths ?? textDuration?.months ?? null,
+    calc_basis: end.basis,
     window_start: win.start,
     window_end: win.end,
     was_appealed: a.wasAppealed ?? null,
     raw: a.raw ?? null,
+    ...exclusion,
   }
   const { data, error } = await sb.from('procurement_awards').upsert(row, { onConflict: 'award_key' }).select('id').single()
   if (error) throw error
@@ -599,17 +646,24 @@ export interface BidderCandidate {
 
 export async function upsertBidder(b: BidderCandidate): Promise<void> {
   const supplier = await upsertSupplier({ orgNumber: b.orgNumber, name: b.name })
-  const who = normalizeOrgNumber(b.orgNumber) ?? normalizeName(b.name)
+  const org = await resolveSupplierOrg(b.orgNumber)
+  const who = org ?? normalizeName(b.name)
+  // Handlingar (e-post och uppladdning) om samma upphandling ger samma
+  // anbudsgivare: nyckeln är upphandlingen plus orgnr (eller namn), inte
+  // dokumentet eller vägen in, så en omkörning uppdaterar raden i stället för
+  // att skapa en dubblett. Källorna ted, ted_xml och uhm behåller sin nyckel.
+  const isDocument = b.source === 'email' || b.source === 'document'
+  const bidder_key = isDocument && b.noticeId ? `handling:${b.noticeId}:${who}` : `${b.source}:${b.sourceRef}:${who}`
   await db()
     .from('procurement_bidders')
     .upsert(
       {
-        bidder_key: `${b.source}:${b.sourceRef}:${who}`,
+        bidder_key,
         notice_id: b.noticeId ?? null,
         award_id: b.awardId ?? null,
         source_ref: b.sourceRef,
         supplier_id: supplier?.id ?? null,
-        org_number: normalizeOrgNumber(b.orgNumber),
+        org_number: org,
         name: cleanText(b.name),
         price: b.price ?? null,
         score: b.score ?? null,
@@ -622,6 +676,20 @@ export async function upsertBidder(b: BidderCandidate): Promise<void> {
       },
       { onConflict: 'bidder_key' }
     )
+}
+
+/**
+ * Efter en synk: län på nya köpare (kommunlistan, regioner, NUTS) och
+ * avtalsklockans uppföljning (ny annons, ny tilldelning, slut passerat).
+ * Fel loggas men stoppar aldrig synken.
+ */
+export async function refreshAwardDerivedData(): Promise<{ counties: number | null; followups: unknown }> {
+  const sb = db()
+  const counties = await sb.rpc('procurement_resolve_buyer_counties')
+  if (counties.error) console.warn('[procurement] län på köpare misslyckades', counties.error.message)
+  const followups = await sb.rpc('procurement_refresh_award_followups')
+  if (followups.error) console.warn('[procurement] avtalsklockans uppföljning misslyckades', followups.error.message)
+  return { counties: (counties.data as number | null) ?? null, followups: followups.data ?? null }
 }
 
 // ---------------------------------------------------------------------------

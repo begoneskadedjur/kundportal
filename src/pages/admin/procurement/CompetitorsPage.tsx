@@ -41,10 +41,12 @@ export default function CompetitorsPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [s, a, b] = await Promise.all([ProcurementService.listSuppliers(), ProcurementService.listAwards(), ProcurementService.listBidders()])
-      setSuppliers(s)
-      setAwards(a)
-      setBidders(b)
+      // Tilldelningar och anbudsgivare i ett RPC-anrop (procurement_market_dataset), utan max-rows-tak
+      const [s, d] = await Promise.all([ProcurementService.listSuppliers(), ProcurementService.listMarketDataset()])
+      // Sammanslagna leverantörsrader (merged_into) visas inte som egna konkurrenter
+      setSuppliers(s.filter((x) => !x.merged_into))
+      setAwards(d.awards)
+      setBidders(d.bidders)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Kunde inte hämta konkurrenter')
     } finally {

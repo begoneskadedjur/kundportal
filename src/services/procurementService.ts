@@ -281,8 +281,48 @@ export class ProcurementService {
   // -------------------------------------------------------------------------
   // Tilldelningar och anbudsgivare
 
-  static async listAwards(opts: { buyerId?: string; supplierId?: string; noticeId?: string; limit?: number } = {}): Promise<AwardWithRelations[]> {
+  /**
+   * Alla tilldelningar (utom felträffar) och anbudsgivare i ett anrop via RPC
+   * procurement_market_dataset. PostgREST kapar vanliga svar vid max-rows
+   * (1 000), vilket gav tysta tapp i Marknad och Konkurrenter.
+   */
+  static async listMarketDataset(): Promise<{ awards: AwardWithRelations[]; bidders: BidderWithSupplier[] }> {
+    const { data, error } = await supabase.rpc('procurement_market_dataset')
+    if (error) fail('Kunde inte hämta marknadsdatan', error)
+    const d = (data ?? {}) as { awards?: unknown; bidders?: unknown }
+    return { awards: rows<AwardWithRelations>(d.awards), bidders: rows<BidderWithSupplier>(d.bidders) }
+  }
+
+  /** Tilldelningar som flaggats som felträffar (visas och kan återställas i avtalsklockan) */
+  static async listExcludedAwards(): Promise<Array<Pick<ProcurementAward, 'id' | 'title' | 'buyer_name' | 'source' | 'source_ref' | 'excluded_reason' | 'excluded_at'>>> {
+    const { data, error } = await supabase
+      .from('procurement_awards')
+      .select('id, title, buyer_name, source, source_ref, excluded_reason, excluded_at')
+      .not('excluded_reason', 'is', null)
+      .order('buyer_name')
+      .limit(1000)
+    if (error) fail('Kunde inte hämta felträffar', error)
+    return rows(data)
+  }
+
+  /**
+   * Markerar tilldelningar som felträff (reason satt) eller som relevanta
+   * (reason null). excluded_at sätts i båda fallen, så att synken och
+   * omräkningen behåller människans beslut.
+   */
+  static async setAwardsExcluded(ids: string[], reason: string | null): Promise<void> {
+    if (ids.length === 0) return
+    const { error } = await supabase
+      .from('procurement_awards')
+      .update({ excluded_reason: reason ? (reason.startsWith('Manuellt') ? reason : `Manuellt: ${reason}`) : null, excluded_at: new Date().toISOString() } as never)
+      .in('id', ids)
+    if (error) fail('Kunde inte spara felträffen', error)
+    await this.addEvent(null, reason ? 'award_excluded' : 'award_included', reason ? 'Tilldelning markerad som felträff' : 'Tilldelning återställd', reason, { award_ids: ids }, ids[0])
+  }
+
+  static async listAwards(opts: { buyerId?: string; supplierId?: string; noticeId?: string; limit?: number; includeExcluded?: boolean } = {}): Promise<AwardWithRelations[]> {
     let q = supabase.from('procurement_awards').select(AWARD_SELECT)
+    if (!opts.includeExcluded) q = q.is('excluded_reason', null)
     if (opts.buyerId) q = q.eq('buyer_id', opts.buyerId)
     if (opts.supplierId) q = q.eq('supplier_id', opts.supplierId)
     if (opts.noticeId) q = q.eq('notice_id', opts.noticeId)

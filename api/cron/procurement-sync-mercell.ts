@@ -21,8 +21,12 @@
 // lng, page, pageSize; svaret { numRes, page, pageSize, results[] }; fälten nedan.
 // Mercells TED-poster har sourceId 'TED' och sourceNoticeId som TED-numret med
 // inledande nollor (00657962-2026), vilket normaliseras för dedup mot TED-synken.
-// EJ verifierat: länkformatet till Mercells egen annonssida (discover.app nås
-// inte från utvecklingsmiljön), därför mallen MERCELL_NOTICE_URL_TEMPLATE.
+// Verifierat 2026-09-25: Mercells annonssida är https://app.mercell.com/tender/{id}
+// med samma id som sök-API:et (även negativa id). Mallen kan bytas med
+// MERCELL_NOTICE_URL_TEMPLATE.
+// Kommers-poster har sourceId som börjar på 'Kom' (Kom Traf, Kom Lite ...) och
+// sourceNoticeId = Kommers annons-id. De får external_ref kommers:{id} så att
+// Kommers-synken (procurement-sync-kommers) dedupar mot dem.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireCronSecret } from '../_lib/cronAuth'
@@ -37,6 +41,7 @@ import {
   recordHealth,
   sleep,
   upsertAward,
+  refreshAwardDerivedData,
   type IngestResult,
   type NoticeCandidate,
 } from '../_lib/procurement'
@@ -57,7 +62,7 @@ const API = 'https://search-service-api.discover.app.mercell.com/public/api/v1/s
 const PAGE_SIZE = 100
 const TIME_BUDGET_MS = 240_000
 const MAX_PAGES = 80
-const URL_TEMPLATE = process.env.MERCELL_NOTICE_URL_TEMPLATE || 'https://discover.app.mercell.com/tender/{id}'
+const URL_TEMPLATE = process.env.MERCELL_NOTICE_URL_TEMPLATE || 'https://app.mercell.com/tender/{id}'
 
 interface MercellItem {
   id: string
@@ -124,11 +129,13 @@ function toCandidate(it: MercellItem): NoticeCandidate {
   )
   const isTed = (it.sourceId ?? '').trim().toUpperCase() === 'TED'
   const tedRef = isTed ? normalizeTedNumber(it.sourceNoticeId) : null
+  const isKommers = /^kom/i.test((it.sourceId ?? '').trim())
+  const kommersRef = isKommers && it.sourceNoticeId ? `kommers:${String(it.sourceNoticeId).trim()}` : null
   return {
     source: 'mercell',
     sourceId: String(it.id),
     sourceSub: it.sourceId?.trim() || null,
-    externalRef: tedRef,
+    externalRef: tedRef ?? kommersRef,
     url: tedRef ? `https://ted.europa.eu/sv/notice/-/detail/${tedRef}` : URL_TEMPLATE.replace('{id}', encodeURIComponent(String(it.id))),
     raw: it,
     title: cleanText(it.title) || 'Utan titel',
@@ -206,6 +213,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   valueKind: cand.estimatedValue != null ? 'ceiling' : 'unknown',
                   awardDate: swedishDate(it.publicationDate),
                   mercellExpiry: it.contractExpiryDate,
+                  durationText: it.description,
                   raw: it,
                 })
                 awards++
@@ -249,6 +257,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const notified = await notifyNewMatches(ingested)
+      if (awards > 0) await refreshAwardDerivedData()
       // Cursorn flyttas bara när vi faktiskt nått förra körningens nyaste post
       // (eller det här var första körningen och hela indexet gicks igenom),
       // annars riskerar vi att hoppa över poster efter en avbruten körning.

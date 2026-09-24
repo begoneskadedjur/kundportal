@@ -41,17 +41,20 @@ export default function MarketPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [a, b, n, h] = await Promise.allSettled([
-      ProcurementService.listAwards(),
-      ProcurementService.listBidders(),
+    // Tilldelningar och anbudsgivare i ett RPC-anrop (procurement_market_dataset):
+    // ingen klientberäkning över kapade svar, felträffar är redan bortfiltrerade
+    const [d, n, h] = await Promise.allSettled([
+      ProcurementService.listMarketDataset(),
       ProcurementService.listNotices({ minScore: NOTIFY_SCORE, openOnly: true, limit: 1000 }),
       ProcurementService.listSourceHealth(),
     ])
-    if (a.status === 'fulfilled') setAwards(a.value)
-    if (b.status === 'fulfilled') setBidders(b.value)
+    if (d.status === 'fulfilled') {
+      setAwards(d.value.awards)
+      setBidders(d.value.bidders)
+    }
     if (n.status === 'fulfilled') setNotices(n.value)
     if (h.status === 'fulfilled') setHealth(h.value)
-    const failed = [a, b, n, h].filter((r) => r.status === 'rejected')
+    const failed = [d, n, h].filter((r) => r.status === 'rejected')
     if (failed.length > 0) toast.error('Delar av marknadsdatan kunde inte hämtas')
     setLoading(false)
   }, [])

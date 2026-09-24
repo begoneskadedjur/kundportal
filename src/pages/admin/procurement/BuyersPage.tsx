@@ -41,9 +41,9 @@ export default function BuyersPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [b, a] = await Promise.all([ProcurementService.listBuyers(), ProcurementService.listAwards()])
+      const [b, d] = await Promise.all([ProcurementService.listBuyers(), ProcurementService.listMarketDataset()])
       setBuyers(b)
-      setAwards(a)
+      setAwards(d.awards)
       const linked = b.map((x) => x.customer_id).filter((x): x is string => !!x)
       if (linked.length > 0) {
         const cs = await ProcurementService.getCustomersByIds(linked).catch(() => [])

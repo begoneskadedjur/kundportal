@@ -334,8 +334,31 @@ export interface EndDateInput {
   renewalMax?: number | null
   /** Mercell contractExpiryDate */
   mercellExpiry?: string | null
-  /** Avtalsstart, tecknat eller tilldelningsdatum: basen för antagandet */
+  /** Äldre fält: avtalsstart eller tecknat avtal. Används som contractStart om det saknas. */
   startOrAwardDate?: string | null
+  /** Avtalsstart (TED contract-duration-start-date-lot) */
+  contractStart?: string | null
+  /** Avtal tecknat (TED contract-conclusion-date) */
+  contractSignedDate?: string | null
+  /** Tilldelningsbeslut: avtalet antas starta en månad senare (avtalsspärr och tecknande) */
+  awardDate?: string | null
+  /** Publicering av tilldelningsannonsen (äldre TED-XML): avtalet är tecknat */
+  awardNoticeDate?: string | null
+  /** Publicering av upphandlingsannonsen (UHM): avtalet antas starta sex månader senare */
+  tenderPublishedDate?: string | null
+  /** Avtalstid i månader, utan förlängningar */
+  durationMonths?: number | null
+  /** Var avtalstiden kommer från: TED-fält/förfrågan ('ted') eller annonstexten ('text') */
+  durationFrom?: 'ted' | 'text' | null
+}
+
+export interface EndDateResult {
+  date: string | null
+  source: ProcurementEndSource | null
+  /** Avtalsstarten som slutet räknades från, när den användes */
+  startBasis: string | null
+  /** Beräkningen i klartext, visas i avtalsklockan */
+  basis: string | null
 }
 
 /**
@@ -344,19 +367,190 @@ export interface EndDateInput {
  */
 export const RENEWAL_YEARS_EACH = 1
 
-/** Beräknat avtalsslut i planens ordning: TED + förlängningar, Mercell, två plus två år. */
-export function computeContractEnd(input: EndDateInput): { date: string | null; source: ProcurementEndSource | null } {
+/** Avtalsstarten som slutdatumet räknas från, i fallande säkerhet */
+export function startBasisOf(input: EndDateInput): { date: string | null; label: string | null } {
+  const start = tedDate(input.contractStart ?? input.startOrAwardDate)
+  if (start) return { date: start, label: 'avtalsstart' }
+  const signed = tedDate(input.contractSignedDate)
+  if (signed) return { date: signed, label: 'tecknat avtal' }
+  const award = tedDate(input.awardDate)
+  if (award) return { date: addMonthsIso(award, 1), label: 'tilldelning plus en månad' }
+  const notice = tedDate(input.awardNoticeDate)
+  if (notice) return { date: notice, label: 'tilldelningsannonsen' }
+  const tender = tedDate(input.tenderPublishedDate)
+  if (tender) return { date: addMonthsIso(tender, 6), label: 'annonsen plus sex månader' }
+  return { date: null, label: null }
+}
+
+function yearsText(months: number): string {
+  if (months % 12 === 0) {
+    const y = months / 12
+    return y === 1 ? 'ett år' : `${['noll', 'ett', 'två', 'tre', 'fyra', 'fem', 'sex', 'sju', 'åtta'][y] ?? y} år`
+  }
+  return `${months} månader`
+}
+
+/**
+ * Beräknat avtalsslut, i ordningen:
+ *   1. TED slutdatum plus förlängningar (ett år per förlängning)
+ *   2. Mercell contractExpiryDate
+ *   3. Avtalsstart plus avtalstid (TED eller annonstexten) plus förlängningar
+ *   4. Antagandet två plus två år från avtalsstarten (två år plus kända
+ *      förlängningar när antalet är känt)
+ * Avtalsstarten tas från avtalsstart, tecknat avtal, tilldelning plus en månad,
+ * tilldelningsannonsen eller annonsen plus sex månader, aldrig rått från
+ * tilldelningsdatumet.
+ */
+export function computeContractEnd(input: EndDateInput): EndDateResult {
+  const renewalsKnown = input.renewalMax != null && Number.isFinite(Number(input.renewalMax))
+  const renewals = renewalsKnown ? Math.max(0, Number(input.renewalMax)) : 0
+  const startInfo = startBasisOf(input)
+
   const ted = tedDate(input.tedEnd)
   if (ted) {
-    const renewals = Math.max(0, Number(input.renewalMax ?? 0) || 0)
-    if (renewals > 0) return { date: addMonthsIso(ted, renewals * 12 * RENEWAL_YEARS_EACH), source: 'ted_end_plus_renewals' }
-    return { date: ted, source: 'ted_end' }
+    if (renewals > 0) {
+      return {
+        date: addMonthsIso(ted, renewals * 12 * RENEWAL_YEARS_EACH),
+        source: 'ted_end_plus_renewals',
+        startBasis: startInfo.date,
+        basis: `TED slutdatum ${ted} plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}`,
+      }
+    }
+    return { date: ted, source: 'ted_end', startBasis: startInfo.date, basis: `TED slutdatum ${ted}` }
   }
   const mercell = input.mercellExpiry ? swedishDate(input.mercellExpiry) : null
-  if (mercell) return { date: mercell, source: 'mercell_expiry' }
-  const base = tedDate(input.startOrAwardDate)
-  if (base) return { date: addMonthsIso(base, 48), source: 'assumption_2_2' }
-  return { date: null, source: null }
+  if (mercell) return { date: mercell, source: 'mercell_expiry', startBasis: startInfo.date, basis: `Mercell avtalsslut ${mercell}` }
+
+  if (!startInfo.date) return { date: null, source: null, startBasis: null, basis: null }
+
+  const duration = input.durationMonths != null && input.durationMonths > 0 ? Math.round(input.durationMonths) : null
+  if (duration) {
+    const total = duration + renewals * 12 * RENEWAL_YEARS_EACH
+    return {
+      date: addMonthsIso(startInfo.date, total),
+      source: input.durationFrom === 'text' ? 'text_duration' : 'contract_duration',
+      startBasis: startInfo.date,
+      basis:
+        `Start ${startInfo.date} (${startInfo.label}) plus ${yearsText(duration)}` +
+        (renewals > 0 ? ` plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}` : '') +
+        (input.durationFrom === 'text' ? ', avtalstid ur annonstexten' : ''),
+    }
+  }
+
+  const renewalMonths = renewalsKnown ? renewals * 12 * RENEWAL_YEARS_EACH : 24
+  return {
+    date: addMonthsIso(startInfo.date, 24 + renewalMonths),
+    source: 'assumption_2_2',
+    startBasis: startInfo.date,
+    basis: `Antagande: start ${startInfo.date} (${startInfo.label}) plus två år${
+      renewalsKnown ? (renewals > 0 ? ` plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}` : ', inga förlängningar') : ' plus två förlängningsår'
+    }`,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Avtalstid ur fritext ("avtalstid två år med möjlighet till förlängning 1 + 1 år")
+
+const NUM_WORDS: Record<string, number> = { en: 1, ett: 1, två: 2, tre: 3, fyra: 4, fem: 5, sex: 6, sju: 7, åtta: 8, tio: 10, tolv: 12 }
+
+function num(word: string): number | null {
+  const w = word.toLowerCase()
+  if (/^\d+$/.test(w)) return Number(w)
+  return NUM_WORDS[w] ?? null
+}
+
+function toMonths(n: number, unit: string): number {
+  return /^m/i.test(unit) ? n : n * 12
+}
+
+/**
+ * Avtalstid och förlängningar ur annons- eller beskrivningstext. Returnerar
+ * null när inget säkert går att läsa ut. Mönster:
+ *   "2+1+1 år", "2 + 1 + 1 år"                         -> 24 månader, 24 förlängning
+ *   "avtalstiden är två (2) år", "avtalstid 24 månader" -> 24
+ *   "förlängning 2 x 12 månader", "förlängas två gånger om ett år"
+ *   "förlängning upp till 2 år", "förlängning med ytterligare 1 år"
+ */
+export function parseDurationText(text: string | null | undefined): { months: number; renewalMonths: number } | null {
+  const t = cleanText(text).toLowerCase().replace(/\(\d+\)/g, ' ').replace(/\s+/g, ' ')
+  if (!t) return null
+  const N = '(\\d+|en|ett|två|tre|fyra|fem|sex|sju|åtta|tio|tolv)'
+  const U = '(år|månader|mån)'
+
+  // 2+1+1 år
+  const plus = t.match(new RegExp(`\\b(\\d{1,2})\\s*\\+\\s*(\\d{1,2})(?:\\s*\\+\\s*(\\d{1,2}))?(?:\\s*\\+\\s*(\\d{1,2}))?\\s*${U}`))
+  if (plus) {
+    const unit = plus[5]
+    const base = Number(plus[1])
+    const ren = [plus[2], plus[3], plus[4]].filter(Boolean).reduce((s, x) => s + Number(x), 0)
+    if (base > 0 && base <= 10) return { months: toMonths(base, unit), renewalMonths: toMonths(ren, unit) }
+  }
+
+  let months: number | null = null
+  const dur = t.match(new RegExp(`avtals(?:tid|perioden?)(?:en)?\\s*(?:är|blir|om|på|:)?\\s*(?:[a-zåäö]+\\s+){0,3}?${N}\\s*${U}`))
+  if (dur) {
+    const n = num(dur[1])
+    if (n != null && n > 0) months = toMonths(n, dur[2])
+  }
+  if (months == null) return null
+
+  let renewalMonths = 0
+  const times = t.match(new RegExp(`förläng\\w*[^.]{0,60}?${N}\\s*(?:x|gånger|ggr)\\s*(?:om|med|á|à|a)?\\s*(?:högst\\s+)?${N}\\s*${U}`))
+  const upTo = t.match(new RegExp(`förläng\\w*[^.]{0,60}?(?:upp till|högst|maximalt|ytterligare|med|i|om)\\s+(?:[a-zåäö]+\\s+){0,2}?${N}\\s*${U}`))
+  if (times) {
+    const a = num(times[1])
+    const b = num(times[2])
+    if (a != null && b != null) renewalMonths = a * toMonths(b, times[3])
+  } else if (upTo) {
+    const n = num(upTo[1])
+    if (n != null) renewalMonths = toMonths(n, upTo[2])
+  }
+  if (renewalMonths > 120) renewalMonths = 0
+  return { months, renewalMonths }
+}
+
+// ---------------------------------------------------------------------------
+// Relevans för tilldelningar (felträffar i marknad och avtalsklocka)
+
+/** Skadedjursord i en titel */
+export const PEST_TITLE_WORDS =
+  /skadedjur|skadeinsekt|råtta|råttor|råttbekämp|gnagare|möss|kackerlack|vägglöss|insektsbekämp|fågelsäkr|fågelskydd|duvor|getingar|myror|mygg|ohyra|pest control|pest-control|rodent/i
+
+/**
+ * Ord som visar att tilldelningen gäller något annat. "städ" och
+ * "lokalvård" räknas bara när titeln saknar skadedjursord.
+ */
+export const NOT_PEST_TITLE_WORDS =
+  /vassklipp|grönyt|grönområd|gräs|snö|städ|lokalvård|fönsterputs|fasadtvätt|kärltvätt|hiss|sotning|försäkring|elektriker|kylservice|storkök|byggservice|facility|fastighetsdrift|fastighetsförvaltning|förvaltningsentreprenör|property maintenance|laboratori|asbest|pcb|marksaner|radon|rivning|fukt|mögel|klotter|brandsaner|industrisaner|avfukt|förorenad|efterbehandling/i
+
+/**
+ * Är tilldelningen skadedjursbekämpning? Skadedjursord i titeln räcker.
+ * Annars krävs att huvud-CPV (första koden) är 90921 till 90924 och att titeln
+ * inte pekar på något annat (vassklippning, lokalvård, hissar ...). Rådatan
+ * rörs aldrig; felträffar flaggas med excluded_reason.
+ */
+export function awardRelevance(cpvCodes: Array<string | null | undefined> | null | undefined, title: string | null | undefined): { relevant: boolean; reason: string | null } {
+  const t = cleanText(title)
+  if (PEST_TITLE_WORDS.test(t)) return { relevant: true, reason: null }
+  const neg = t.match(NOT_PEST_TITLE_WORDS)
+  if (neg) return { relevant: false, reason: `Titeln gäller annat än skadedjur (${neg[0].toLowerCase()})` }
+  const main = String((cpvCodes ?? [])[0] ?? '').replace(/\D/g, '')
+  if (/^9092[1-9]/.test(main)) return { relevant: true, reason: null }
+  return { relevant: false, reason: 'Inget skadedjursord i titeln och huvud-CPV är inte 90921 till 90924' }
+}
+
+// ---------------------------------------------------------------------------
+// Orgnr-alias: felskrivna orgnr i källorna som ska räknas som en annan leverantör
+
+export const ORG_ALIASES: Record<string, string> = {
+  // Nomor AB: TED-XML 2019 har 556529-3976, rätt är 556526-3976
+  '5565293976': '5565263976',
+}
+
+/** normalizeOrgNumber plus kända alias */
+export function canonicalOrgNumber(raw: string | null | undefined): string | null {
+  const o = normalizeOrgNumber(raw)
+  return o ? ORG_ALIASES[o] ?? o : null
 }
 
 /** Bearbetningsfönstret: 18 till 12 månader före slutdatum */

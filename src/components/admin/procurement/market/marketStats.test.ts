@@ -325,3 +325,28 @@ describe('källhälsa', () => {
     expect(sourceHealthState({ last_run_at: '2026-09-24T11:00:00Z', last_success_at: '2026-09-24T10:00:00Z', consecutive_failures: 3 }, now).tone).toBe('bad')
   })
 })
+
+describe('avtalsklockans uppföljning', () => {
+  const today = '2026-09-24'
+  it('slut passerat utan ny annons väntas nu, inte i ett förflutet kvartal', () => {
+    const [g] = groupAwards([award({ source_ref: 'F1', calc_end_date: '2026-04-01', calc_end_source: 'assumption_2_2', followup_status: 'passed_no_notice' })])
+    expect(expectedAnnouncementQuarter(g, today)).toBe('2026-Q3')
+    expect(matchesHorizon(g, '18', today)).toBe(true)
+    expect(matchesHorizon(g, 'passed', today)).toBe(true)
+  })
+  it('ny annons tas ur fönstret men syns under Ny upphandling', () => {
+    const [g] = groupAwards([award({ source_ref: 'F2', calc_end_date: '2027-01-01', followup_status: 'new_notice', followup_title: 'Ny annons' })])
+    expect(expectedAnnouncementQuarter(g, today)).toBeNull()
+    expect(matchesHorizon(g, '18', today)).toBe(false)
+    expect(matchesHorizon(g, 'reannounced', today)).toBe(true)
+    expect(g.followupTitle).toBe('Ny annons')
+  })
+  it('starkaste uppföljningen vinner vid sammanslagning', () => {
+    const groups = buildProcurements([
+      award({ source: 'uhm', source_ref: 'U1', award_date: '2022-05-01', followup_status: 'passed_no_notice' }),
+      award({ source: 'ted', source_ref: 'T1', award_date: '2022-06-01', followup_status: 'new_award' }),
+    ])
+    expect(groups).toHaveLength(1)
+    expect(groups[0].followupStatus).toBe('new_award')
+  })
+})

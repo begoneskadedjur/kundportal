@@ -16,7 +16,17 @@ export type ProcurementAwardSource = 'mercell' | 'ted' | 'ted_xml' | 'uhm' | 'em
 
 export type ProcurementValueKind = 'ceiling' | 'actual' | 'estimated' | 'unknown'
 
-export type ProcurementEndSource = 'ted_end_plus_renewals' | 'ted_end' | 'mercell_expiry' | 'assumption_2_2' | 'manual'
+export type ProcurementEndSource =
+  | 'ted_end_plus_renewals'
+  | 'ted_end'
+  | 'mercell_expiry'
+  | 'contract_duration'
+  | 'text_duration'
+  | 'assumption_2_2'
+  | 'manual'
+
+/** Avtalsklockans uppföljning (procurement_refresh_award_followups) */
+export type ProcurementFollowupStatus = 'new_notice' | 'new_award' | 'passed_no_notice' | 'stale'
 
 export type ProcurementAwardStatus = 'open' | 'contacted' | 'planned' | 'done' | 'ignored'
 
@@ -76,6 +86,10 @@ export interface ProcurementSupplier {
   name: string
   normalized_name: string
   aliases: string[]
+  /** Felskrivna eller äldre orgnr som räknas som den här leverantören */
+  org_aliases?: string[]
+  /** Satt när raden slagits ihop med en annan leverantör */
+  merged_into?: string | null
   is_begone: boolean
   notes: string | null
   created_at: string
@@ -186,6 +200,21 @@ export interface ProcurementAward {
   owner_id: string | null
   notes: string | null
   raw: Record<string, unknown> | null
+  /** Felträff: gäller inte skadedjur. Räknas inte i marknad eller avtalsklocka. */
+  excluded_reason?: string | null
+  excluded_at?: string | null
+  /** Avtalsstart som slutdatumet räknas från */
+  start_basis_date?: string | null
+  duration_months?: number | null
+  /** Hur slutdatumet räknades, i klartext */
+  calc_basis?: string | null
+  followup_status?: ProcurementFollowupStatus | null
+  followup_notice_id?: string | null
+  followup_award_id?: string | null
+  followup_url?: string | null
+  followup_title?: string | null
+  followup_date?: string | null
+  followup_checked_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -371,6 +400,8 @@ export interface ProcurementSignalSource {
   kind: 'kommun' | 'region' | 'bostadsbolag' | 'stat' | 'other'
   county_code: string | null
   content_hash: string | null
+  /** sha256 per PDF-adress från senaste lyckade läsningen */
+  pdf_hashes?: Record<string, string>
   last_text: string | null
   last_fetched_at: string | null
   last_changed_at: string | null
@@ -550,7 +581,9 @@ export const END_SOURCE_LABEL: Record<ProcurementEndSource, string> = {
   ted_end_plus_renewals: 'TED slutdatum plus förlängningar',
   ted_end: 'TED slutdatum',
   mercell_expiry: 'Mercell avtalsslut',
-  assumption_2_2: 'Antagande två plus två år',
+  contract_duration: 'Avtalsstart plus avtalstid',
+  text_duration: 'Avtalstid ur annonstexten',
+  assumption_2_2: 'Antagande två plus två år från avtalsstart',
   manual: 'Rättat manuellt',
 }
 
@@ -560,3 +593,10 @@ export const DOCUMENT_REQUEST_TYPES: Array<{ key: string; label: string }> = [
   { key: 'evaluation_report', label: 'Utvärderingsrapport' },
   { key: 'price_appendix', label: 'Vinnande anbudsgivares prisbilaga' },
 ]
+
+export const FOLLOWUP_LABEL: Record<ProcurementFollowupStatus, string> = {
+  new_notice: 'Ny upphandling annonserad',
+  new_award: 'Ny upphandling tilldelad',
+  passed_no_notice: 'Slut passerat, ingen ny annons',
+  stale: 'Slut passerat för över två år sedan',
+}

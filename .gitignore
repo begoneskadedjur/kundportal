@@ -60,3 +60,4 @@ scripts/data/procurement/ua/*.sh
 scripts/data/procurement/ua/*.cjs
 scripts/data/procurement/ua/cat.json
 scripts/data/procurement/ua/m*.json
+scripts/data/procurement/cn/

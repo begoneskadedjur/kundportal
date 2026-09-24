@@ -146,19 +146,138 @@ export function countiesFromNuts(codes) {
 
 export const RENEWAL_YEARS_EACH = 1
 
-/** Beräknat avtalsslut i planens ordning: TED + förlängningar, Mercell, två plus två år. */
+/** Avtalsstarten som slutdatumet räknas från. Spegel av startBasisOf i procurementRules.ts */
+export function startBasisOf(input) {
+  const start = tedDate(input.contractStart ?? input.startOrAwardDate)
+  if (start) return { date: start, label: 'avtalsstart' }
+  const signed = tedDate(input.contractSignedDate)
+  if (signed) return { date: signed, label: 'tecknat avtal' }
+  const award = tedDate(input.awardDate)
+  if (award) return { date: addMonthsIso(award, 1), label: 'tilldelning plus en månad' }
+  const notice = tedDate(input.awardNoticeDate)
+  if (notice) return { date: notice, label: 'tilldelningsannonsen' }
+  const tender = tedDate(input.tenderPublishedDate)
+  if (tender) return { date: addMonthsIso(tender, 6), label: 'annonsen plus sex månader' }
+  return { date: null, label: null }
+}
+
+function yearsText(months) {
+  if (months % 12 === 0) {
+    const y = months / 12
+    return y === 1 ? 'ett år' : `${['noll', 'ett', 'två', 'tre', 'fyra', 'fem', 'sex', 'sju', 'åtta'][y] ?? y} år`
+  }
+  return `${months} månader`
+}
+
+/** Beräknat avtalsslut. Spegel av computeContractEnd i procurementRules.ts, håll i synk. */
 export function computeContractEnd(input) {
+  const renewalsKnown = input.renewalMax != null && Number.isFinite(Number(input.renewalMax))
+  const renewals = renewalsKnown ? Math.max(0, Number(input.renewalMax)) : 0
+  const startInfo = startBasisOf(input)
+
   const ted = tedDate(input.tedEnd)
   if (ted) {
-    const renewals = Math.max(0, Number(input.renewalMax ?? 0) || 0)
-    if (renewals > 0) return { date: addMonthsIso(ted, renewals * 12 * RENEWAL_YEARS_EACH), source: 'ted_end_plus_renewals' }
-    return { date: ted, source: 'ted_end' }
+    if (renewals > 0) {
+      return {
+        date: addMonthsIso(ted, renewals * 12 * RENEWAL_YEARS_EACH),
+        source: 'ted_end_plus_renewals',
+        startBasis: startInfo.date,
+        basis: `TED slutdatum ${ted} plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}`,
+      }
+    }
+    return { date: ted, source: 'ted_end', startBasis: startInfo.date, basis: `TED slutdatum ${ted}` }
   }
   const mercell = input.mercellExpiry ? swedishDate(input.mercellExpiry) : null
-  if (mercell) return { date: mercell, source: 'mercell_expiry' }
-  const base = tedDate(input.startOrAwardDate)
-  if (base) return { date: addMonthsIso(base, 48), source: 'assumption_2_2' }
-  return { date: null, source: null }
+  if (mercell) return { date: mercell, source: 'mercell_expiry', startBasis: startInfo.date, basis: `Mercell avtalsslut ${mercell}` }
+
+  if (!startInfo.date) return { date: null, source: null, startBasis: null, basis: null }
+
+  const duration = input.durationMonths != null && input.durationMonths > 0 ? Math.round(input.durationMonths) : null
+  if (duration) {
+    const total = duration + renewals * 12 * RENEWAL_YEARS_EACH
+    return {
+      date: addMonthsIso(startInfo.date, total),
+      source: input.durationFrom === 'text' ? 'text_duration' : 'contract_duration',
+      startBasis: startInfo.date,
+      basis:
+        `Start ${startInfo.date} (${startInfo.label}) plus ${yearsText(duration)}` +
+        (renewals > 0 ? ` plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}` : '') +
+        (input.durationFrom === 'text' ? ', avtalstid ur annonstexten' : ''),
+    }
+  }
+
+  const renewalMonths = renewalsKnown ? renewals * 12 * RENEWAL_YEARS_EACH : 24
+  return {
+    date: addMonthsIso(startInfo.date, 24 + renewalMonths),
+    source: 'assumption_2_2',
+    startBasis: startInfo.date,
+    basis: `Antagande: start ${startInfo.date} (${startInfo.label}) plus två år${
+      renewalsKnown ? (renewals > 0 ? ` plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}` : ', inga förlängningar') : ' plus två förlängningsår'
+    }`,
+  }
+}
+
+const NUM_WORDS = { en: 1, ett: 1, två: 2, tre: 3, fyra: 4, fem: 5, sex: 6, sju: 7, åtta: 8, tio: 10, tolv: 12 }
+const numWord = (w) => (/^\d+$/.test(w) ? Number(w) : NUM_WORDS[String(w).toLowerCase()] ?? null)
+const toMonths = (n, unit) => (/^m/i.test(unit) ? n : n * 12)
+
+/** Avtalstid ur fritext. Spegel av parseDurationText i procurementRules.ts */
+export function parseDurationText(text) {
+  const t = cleanText(text).toLowerCase().replace(/\(\d+\)/g, ' ').replace(/\s+/g, ' ')
+  if (!t) return null
+  const N = '(\\d+|en|ett|två|tre|fyra|fem|sex|sju|åtta|tio|tolv)'
+  const U = '(år|månader|mån)'
+  const plus = t.match(new RegExp(`\\b(\\d{1,2})\\s*\\+\\s*(\\d{1,2})(?:\\s*\\+\\s*(\\d{1,2}))?(?:\\s*\\+\\s*(\\d{1,2}))?\\s*${U}`))
+  if (plus) {
+    const unit = plus[5]
+    const base = Number(plus[1])
+    const ren = [plus[2], plus[3], plus[4]].filter(Boolean).reduce((s, x) => s + Number(x), 0)
+    if (base > 0 && base <= 10) return { months: toMonths(base, unit), renewalMonths: toMonths(ren, unit) }
+  }
+  let months = null
+  const dur = t.match(new RegExp(`avtals(?:tid|perioden?)(?:en)?\\s*(?:är|blir|om|på|:)?\\s*(?:[a-zåäö]+\\s+){0,3}?${N}\\s*${U}`))
+  if (dur) {
+    const n = numWord(dur[1])
+    if (n != null && n > 0) months = toMonths(n, dur[2])
+  }
+  if (months == null) return null
+  let renewalMonths = 0
+  const times = t.match(new RegExp(`förläng\\w*[^.]{0,60}?${N}\\s*(?:x|gånger|ggr)\\s*(?:om|med|á|à|a)?\\s*(?:högst\\s+)?${N}\\s*${U}`))
+  const upTo = t.match(new RegExp(`förläng\\w*[^.]{0,60}?(?:upp till|högst|maximalt|ytterligare|med|i|om)\\s+(?:[a-zåäö]+\\s+){0,2}?${N}\\s*${U}`))
+  if (times) {
+    const a = numWord(times[1])
+    const b = numWord(times[2])
+    if (a != null && b != null) renewalMonths = a * toMonths(b, times[3])
+  } else if (upTo) {
+    const n = numWord(upTo[1])
+    if (n != null) renewalMonths = toMonths(n, upTo[2])
+  }
+  if (renewalMonths > 120) renewalMonths = 0
+  return { months, renewalMonths }
+}
+
+export const PEST_TITLE_WORDS =
+  /skadedjur|skadeinsekt|råtta|råttor|råttbekämp|gnagare|möss|kackerlack|vägglöss|insektsbekämp|fågelsäkr|fågelskydd|duvor|getingar|myror|mygg|ohyra|pest control|pest-control|rodent/i
+export const NOT_PEST_TITLE_WORDS =
+  /vassklipp|grönyt|grönområd|gräs|snö|städ|lokalvård|fönsterputs|fasadtvätt|kärltvätt|hiss|sotning|försäkring|elektriker|kylservice|storkök|byggservice|facility|fastighetsdrift|fastighetsförvaltning|förvaltningsentreprenör|property maintenance|laboratori|asbest|pcb|marksaner|radon|rivning|fukt|mögel|klotter|brandsaner|industrisaner|avfukt|förorenad|efterbehandling/i
+
+/** Är tilldelningen skadedjursbekämpning? Spegel av awardRelevance i procurementRules.ts */
+export function awardRelevance(cpvCodes, title) {
+  const t = cleanText(title)
+  if (PEST_TITLE_WORDS.test(t)) return { relevant: true, reason: null }
+  const neg = t.match(NOT_PEST_TITLE_WORDS)
+  if (neg) return { relevant: false, reason: `Titeln gäller annat än skadedjur (${neg[0].toLowerCase()})` }
+  const main = String((cpvCodes ?? [])[0] ?? '').replace(/\D/g, '')
+  if (/^9092[1-9]/.test(main)) return { relevant: true, reason: null }
+  return { relevant: false, reason: 'Inget skadedjursord i titeln och huvud-CPV är inte 90921 till 90924' }
+}
+
+/** Felskrivna orgnr. Spegel av ORG_ALIASES i procurementRules.ts */
+export const ORG_ALIASES = { '5565293976': '5565263976' }
+
+export function canonicalOrgNumber(raw) {
+  const o = normalizeOrgNumber(raw)
+  return o ? ORG_ALIASES[o] ?? o : null
 }
 
 /** Bearbetningsfönstret: 18 till 12 månader före slutdatum */
@@ -183,12 +302,12 @@ export function guessSector(name, org) {
 // Nycklar, samma form som upsertAward och upsertBidder
 
 export function awardKey(source, sourceRef, winnerOrg, winnerName) {
-  const winnerKey = normalizeOrgNumber(winnerOrg) ?? normalizeName(winnerName) ?? 'okand'
+  const winnerKey = canonicalOrgNumber(winnerOrg) ?? normalizeName(winnerName) ?? 'okand'
   return `${source}:${sourceRef}:${winnerKey || 'okand'}`
 }
 
 export function bidderKey(source, sourceRef, org, name) {
-  const who = normalizeOrgNumber(org) ?? normalizeName(name)
+  const who = canonicalOrgNumber(org) ?? normalizeName(name)
   return `${source}:${sourceRef}:${who}`
 }
 
@@ -211,6 +330,8 @@ export function isPestRelevant(cpvCodes, title) {
   if (codes.some((c) => /^9092[1-9]/.test(c))) return true
   const t = String(title ?? '')
   return PEST_WORDS.test(t) && !NEGATIVE_WORDS.test(t)
+  // Obs: urvalet är brett med avsikt. awardRelevance avgör sedan per rad om
+  // tilldelningen är en felträff (flaggas, tas inte bort).
 }
 
 // ===========================================================================
@@ -399,7 +520,8 @@ export class EntityRegistry {
   resolve(input) {
     const name = cleanText(input.name)
     if (!name) return null
-    const org = normalizeOrgNumber(input.orgNumber)
+    // Leverantörer: kända felskrivna orgnr (ORG_ALIASES) blir det rätta
+    const org = this.kind === 'supplier' ? canonicalOrgNumber(input.orgNumber) : normalizeOrgNumber(input.orgNumber)
     const norm = normalizeName(name)
     let row = org ? this.byOrg.get(org) ?? null : null
     if (!row && norm) {
@@ -531,12 +653,22 @@ export function buildRows(records, buyers, suppliers, noticeIdByRef = new Map())
     const noticeId = (rec.noticeRefs ?? []).map((r) => noticeIdByRef.get(r)).find(Boolean) ?? null
     const f = rec.fields ?? {}
     // Samma bas som upsertAward, med publiceringsdatum som sista reserv
+    // UHM: fallbackStart är upphandlingsannonsen (start sex månader senare).
+    // TED: fallbackStart är tilldelningsannonsen (avtalet tecknat).
+    const textDuration = f.durationMonths ? null : parseDurationText(f.durationText)
     const end = computeContractEnd({
       tedEnd: f.contractEnd,
-      renewalMax: f.renewalMax,
-      startOrAwardDate: f.contractStart ?? f.contractSignedDate ?? f.awardDate ?? f.fallbackStart ?? null,
+      renewalMax: f.renewalMax ?? (textDuration && textDuration.renewalMonths > 0 ? textDuration.renewalMonths / 12 : null),
+      contractStart: f.contractStart ?? null,
+      contractSignedDate: f.contractSignedDate ?? null,
+      awardDate: f.awardDate ?? null,
+      awardNoticeDate: rec.source === 'uhm' ? null : f.fallbackStart ?? null,
+      tenderPublishedDate: rec.source === 'uhm' ? f.fallbackStart ?? null : null,
+      durationMonths: f.durationMonths ?? textDuration?.months ?? null,
+      durationFrom: f.durationMonths ? 'ted' : textDuration ? 'text' : null,
     })
     const win = workWindow(end.date)
+    const relevance = awardRelevance(rec.cpv ?? [], rec.title)
     const firstKeys = []
     for (const w of rec.winners) {
       const supplier = w.name ? suppliers.resolve({ orgNumber: w.orgNumber, name: w.name }) : null
@@ -555,7 +687,7 @@ export function buildRows(records, buyers, suppliers, noticeIdByRef = new Map())
         source: rec.source,
         source_ref: rec.sourceRef,
         // Nyckeln följer upsertAward (orgnr ur källan), kolumnen får leverantörens orgnr när källan saknar det och rec.enrichOrg är satt
-        winner_org_number: normalizeOrgNumber(w.orgNumber) ?? (rec.enrichOrg ? supplier?.org_number ?? null : null),
+        winner_org_number: canonicalOrgNumber(w.orgNumber) ?? (rec.enrichOrg ? supplier?.org_number ?? null : null),
         winner_name: w.name ? cleanText(w.name) : null,
         value: w.value ?? null,
         value_kind: w.valueKind ?? 'unknown',
@@ -572,6 +704,11 @@ export function buildRows(records, buyers, suppliers, noticeIdByRef = new Map())
         renewal_max: f.renewalMax ?? null,
         calc_end_date: end.date,
         calc_end_source: end.source,
+        start_basis_date: end.startBasis,
+        duration_months: f.durationMonths ?? textDuration?.months ?? null,
+        calc_basis: end.basis,
+        // Felträff flaggas, rådatan behålls (writeAll respekterar manuella beslut)
+        excluded_reason: relevance.relevant ? null : relevance.reason,
         window_start: win.start,
         window_end: win.end,
         was_appealed: f.wasAppealed ?? null,
@@ -589,7 +726,7 @@ export function buildRows(records, buyers, suppliers, noticeIdByRef = new Map())
         bidder_key: key,
         notice_id: noticeId,
         source_ref: rec.sourceRef,
-        org_number: normalizeOrgNumber(b.orgNumber) ?? (rec.enrichOrg ? supplier?.org_number ?? null : null),
+        org_number: canonicalOrgNumber(b.orgNumber) ?? (rec.enrichOrg ? supplier?.org_number ?? null : null),
         name: cleanText(b.name),
         price: b.price ?? prev?.price ?? null,
         score: null,
@@ -639,6 +776,24 @@ export async function writeAll(sb, buyers, suppliers, rows) {
     is_begone: !!b._supplier?.is_begone || b.org_number === BEGONE_ORG,
   }))
   if (sb) {
+    // Felträffsflaggan: ett manuellt beslut (excluded_at satt utan automatisk
+    // orsak, eller orsak som börjar på Manuellt) behålls vid omkörning
+    const now = new Date().toISOString()
+    const existing = new Map()
+    for (const part of chunk(awardRows.map((r) => r.award_key))) {
+      const { data } = await sb.from('procurement_awards').select('award_key, excluded_reason, excluded_at').in('award_key', part)
+      for (const r of data ?? []) existing.set(r.award_key, r)
+    }
+    for (const r of awardRows) {
+      const e = existing.get(r.award_key)
+      const manual = !!e?.excluded_at && (!e.excluded_reason || String(e.excluded_reason).startsWith('Manuellt'))
+      if (manual) {
+        r.excluded_reason = e.excluded_reason
+        r.excluded_at = e.excluded_at
+      } else {
+        r.excluded_at = r.excluded_reason ? e?.excluded_at ?? now : null
+      }
+    }
     for (const part of chunk(awardRows)) {
       const { data, error } = await sb.from('procurement_awards').upsert(part, { onConflict: 'award_key' }).select('id, award_key')
       if (error) throw new Error(`procurement_awards: ${error.message}`)

@@ -33,6 +33,7 @@ import {
   sleep,
   upsertAward,
   upsertBidder,
+  refreshAwardDerivedData,
   type IngestResult,
 } from '../_lib/procurement'
 import {
@@ -108,7 +109,10 @@ function criteriaOf(types: string[]): ProcurementCriteriaType | null {
 
 function durationMonths(n: TedNotice): number | null {
   const v = num(n['duration-period-value-lot'])
-  const unit = (first(n['duration-period-unit-lot']) ?? '').toLowerCase()
+  const periods = n['contract-duration-period-lot']
+  const period: unknown = Array.isArray(periods) ? periods[0] : periods
+  const periodUnit = period && typeof period === 'object' ? String((period as { unit?: unknown }).unit ?? '') || null : null
+  const unit = (first(n['duration-period-unit-lot']) ?? periodUnit ?? '').toLowerCase()
   if (v != null) {
     if (unit.startsWith('year') || unit === 'ann') return v * 12
     if (unit.startsWith('month') || unit === 'mon') return v
@@ -198,6 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const notified = await notifyNewMatches(ingested)
+      const derived = await refreshAwardDerivedData()
       await recordHealth('ted', true, { count: fetched })
       return {
         status: errors.length > 0 ? ('partial' as const) : ('success' as const),
@@ -210,6 +215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           bidders,
           signals,
           notified,
+          followups: derived.followups,
           errors: errors.slice(0, 20),
         },
       }
@@ -351,6 +357,8 @@ async function handleNotice(
       contractStart,
       contractEnd,
       renewalMax,
+      durationMonths: durationMonths(n),
+      durationText: lang(n['description-lot'])[0] ?? null,
       raw: i === 0 ? raw : null,
     })
     awardCount++

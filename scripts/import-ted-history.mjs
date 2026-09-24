@@ -247,6 +247,8 @@ function parseEforms(n) {
       contractStart: minDate(n['contract-duration-start-date-lot']),
       contractEnd: minDate(n['contract-duration-end-date-lot']),
       renewalMax: renewals.length ? Math.max(...renewals) : null,
+      durationMonths: eformsDurationMonths(n),
+      durationText: lang(n['description-lot'])[0] ?? null,
       fallbackStart: pubDate,
     },
     winners: [...winners.values()].map((w) => {
@@ -277,6 +279,18 @@ async function tedSearch(query, fields, limit = null) {
     if (limit && out.length >= limit) break
   }
   return limit ? out.slice(0, limit) : out
+}
+
+/** Avtalstid i månader utan förlängningar (duration-period-value-lot och -unit-lot), samma regel som TED-synken */
+function eformsDurationMonths(n) {
+  const v = Number(arr(n['duration-period-value-lot'])[0])
+  const period = arr(n['contract-duration-period-lot'])[0]
+  const unit = String(arr(n['duration-period-unit-lot'])[0] ?? (period && typeof period === 'object' ? period.unit : '') ?? arr(n['BT-36-Lot-Unit'])[0] ?? '').toLowerCase()
+  if (!Number.isFinite(v) || v <= 0) return null
+  if (unit.startsWith('year') || unit === 'ann') return v * 12
+  if (unit.startsWith('month') || unit === 'mon') return v
+  if (unit.startsWith('day')) return Math.round(v / 30)
+  return null
 }
 
 async function loadEforms() {
