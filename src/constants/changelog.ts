@@ -45,6 +45,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.14.0',
+    date: '2026-09-25',
+    title: 'Upphandlingsbevakning på egen adress, säkrare avtalsklocka och anbudsstöd',
+    items: [
+      { kind: 'nyhet', text: 'Upphandlingsbevakningen har en egen adress, upphandling.begone.se, med egen inloggning och bara upphandlingarna. Menyposten Upphandlingar öppnar den i en ny flik' },
+      { kind: 'andring', text: 'Avtalsklockan räknar slutdatum från avtalets start och avtalstid när den finns, visar hur datumet räknats och skriver "annons väntas nu" i stället för att lägga gamla avtal i ett passerat kvartal' },
+      { kind: 'andring', text: 'Köpare som redan annonserat eller tilldelat en ny upphandling tas ur fönstret och visas med länk till den nya annonsen. Felträffar som lokalvård och hissar är bortfiltrerade och kan granskas längst ned i avtalsklockan' },
+      { kind: 'nyhet', text: 'Under fliken Fråga kan du ställa frågor om marknaden i vanlig svenska och få svar med länkar till upphandlingarna' },
+      { kind: 'nyhet', text: 'I anbudsverkstaden skriver knappen Skriv utkast ett förslag på svar per kvalitetskriterium ur vårt eget material. Bra svar sparas i anbudsbiblioteket och kan användas igen. Lärdomar från vunna och förlorade anbud visas under Marknad' },
+    ],
+  },
+  {
     version: '3.13.0',
     date: '2026-09-24',
     title: 'Upphandlingar: bevakning, marknad och anbudskalkyl',

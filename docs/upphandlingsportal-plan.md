@@ -220,6 +220,31 @@ Rådata och skript från utredningen ligger i scripts/data/procurement/: mse.jso
 
 Byggt 2026-09-24 (etapp 1 och delar av etapp 2 och 3). Migrationen `supabase/migrations/20260924_upphandlingsportal.sql` är applicerad på projektet.
 
+Byggt 2026-09-25 (version 3.14.0): fristående plattform på upphandling.begone.se, datakvalitet i avtalsklockan, Kommers, Fråga datan, kvalitetssvar, anbudsbibliotek och lärdomar. Migrationerna `20260925_upphandling_etapp3_4.sql` och `20260925_upphandling_uppfoljning_relevans.sql` är applicerade.
+
+### Fristående plattform: upphandling.begone.se
+
+Samma kodbas och Vercel-projekt (`kundportal`) som kundportalen. När appen körs på värdnamnet `upphandling.begone.se` renderas ett eget skal (`src/pages/procurement/ProcurementApp.tsx`) med egen inloggning, flikrad, notisklocka för upphandlingsnotiser, temaväxlare, Mitt konto och Logga ut. Routes ligger på roten: `/`, `/bevakning`, `/avtalsklocka`, `/signaler`, `/kopare`, `/konkurrenter`, `/fraga`, `/installningar`, `/mitt-konto` och `/{upphandlingens id}`. Inga andra portaldelar nås; okända adresser går till startsidan. Bara profiler med admin eller `is_procurement_manager` släpps in. Gamla länkar `/admin/upphandlingar/...` på subdomänen skickas vidare.
+
+I adminportalen öppnar menyposten Upphandlingar subdomänen i ny flik. Routes under `/admin/upphandlingar` finns kvar som reserv för utveckling. Lokalt: öppna `http://localhost:5173/login?procurement=1` (flaggan sparas i fliken, `?procurement=0` stänger av) eller sätt `VITE_PROCUREMENT_HOST`.
+
+DNS och Vercel (görs av Christian eller huvudsessionen):
+
+1. Cloudflare: CNAME `upphandling` till `cname.vercel-dns.com`, proxy av (DNS only, grått moln).
+2. Vercel: lägg till domänen `upphandling.begone.se` på projektet `kundportal`. Kontrollerat 2026-09-25: domänen är redan tillagd och verifierad på projektet.
+3. `vercel.json` behöver ingen ändring: SPA-omskrivningarna gäller alla värdnamn och `/api/*` fungerar på båda.
+4. Supabase Auth: lägg till `https://upphandling.begone.se` under Authentication, URL Configuration (Site URL eller Redirect URLs) om lösenordsåterställning ska kunna landa där.
+5. Sätt `PROCUREMENT_PORTAL_URL` och `VITE_PROCUREMENT_PORTAL_URL` om adressen någon gång ändras.
+
+### Avtalsklockan efter 2026-09-25
+
+- Slutdatum i ordningen TED slutdatum plus förlängningar, Mercell `contractExpiryDate`, avtalsstart plus avtalstid (TED eller annonstexten, `contract_duration` och `text_duration`), sist två plus två år från avtalsstarten. Avtalsstarten tas från avtalsstart, tecknat avtal, tilldelning plus en månad, tilldelningsannonsen eller UHM-annonsen plus sex månader. Beräkningen står i klartext i `calc_basis`.
+- Äldre TED-XML: den ursprungliga annonsen läses (`--fetch-cn`) för avtalstid, start, slut och förlängningar.
+- Felträffar flaggas i `excluded_reason`, rådatan behålls. Kräver skadedjursord i titeln eller huvud-CPV 90921 till 90924, och titlar om lokalvård, hissar, vassklippning, grönytor, snö, städning med mera räknas bort. Manuella beslut i portalen (Felträff, Återställ) behålls vid omkörning.
+- Uppföljning (`procurement_refresh_award_followups`, körs efter TED- och Mercell-synken): ny annons om skadedjur från samma köpare, senare tilldelning från samma köpare, eller slut passerat. Köpare som annonserat på nytt tas ur fönstret.
+- Omräkning av allt: `node scripts/recompute-procurement-awards.mjs --fetch-cn` (`--dry-run` visar bara). Kördes 2026-09-25: 123 av 303 tilldelningar flaggades som felträffar.
+- Län på köpare: `procurement_municipalities` (SCB:s 290 kommuner) och `procurement_resolve_buyer_counties()`.
+
 ### Miljövariabler i Vercel
 
 | Variabel | Krävs | Vad |
@@ -232,8 +257,12 @@ Byggt 2026-09-24 (etapp 1 och delar av etapp 2 och 3). Migrationen `supabase/mig
 | `PROCUREMENT_FROM_EMAIL` | valfri | Avsändare, standard `BeGone Upphandling <upphandling@begone.se>`. Domänen måste vara verifierad i Resend |
 | `PROCUREMENT_REPLY_LOCAL` | valfri | Lokal del i svarsadressen, standard `upphandling` |
 | `PROCUREMENT_USER_AGENT` | valfri | User agent mot Mercell, TED och signalkällor, standard med kontaktadress upphandling@begone.se |
-| `MERCELL_NOTICE_URL_TEMPLATE` | valfri | Länkmall till Mercells annonssida, standard `https://discover.app.mercell.com/tender/{id}` (ej verifierad) |
-| `PORTAL_URL` | finns | Länkar i notiser och mejl |
+| `MERCELL_NOTICE_URL_TEMPLATE` | valfri | Länkmall till Mercells annonssida, standard `https://app.mercell.com/tender/{id}` (verifierad 2026-09-25, samma id som sök-API:et) |
+| `PORTAL_URL` | finns | Kundportalens adress |
+| `PROCUREMENT_PORTAL_URL` | valfri | Upphandlingsportalens adress för alla länkar i procurement-mejl, notiser och sammandrag. Standard `https://upphandling.begone.se` |
+| `VITE_PROCUREMENT_PORTAL_URL` | valfri | Samma adress i klienten (menyposten och notislänkar i kundportalen). Standard `https://upphandling.begone.se` |
+| `VITE_MAIN_PORTAL_URL` | valfri | Kundportalens adress från den fristående portalen (länken till Användarkonton). Standard `https://kundportal.vercel.app` |
+| `VITE_PROCUREMENT_HOST` | valfri | Extra värdnamn som ska ge det fristående skalet, t.ex. `upphandling.localhost` vid utveckling |
 
 ### DNS för inkommande post (Resend inbound)
 
@@ -256,6 +285,7 @@ Webhooken bär inte brödtext eller bilagor. Endpointen hämtar dem från `GET h
 | `procurement-deadlines` | `0 4 * * *` | 06:00 |
 | `procurement-digest` | `45 5,6 * * 1-5` | 07:45, skickar bara när klockan är 7 i Sverige (fungerar både sommar och vinter) |
 | `procurement-signals` | `30 3 * * *` | 05:30 |
+| `procurement-sync-kommers` | `30 5 * * *` | 07:30, reserv: Kommers annonser och förhandsannonser. Manuellt `?since=ÅÅÅÅ-MM-DD`, `?old=1` tar med utgångna |
 
 Vintertid ligger övriga jobb en timme tidigare i svensk tid. Manuell körning: `curl -H "Authorization: Bearer $CRON_SECRET" https://<portal>/api/cron/procurement-sync-ted?since=2026-07-01`. Sammandraget kan tvingas med `?force=1`.
 
@@ -265,6 +295,11 @@ Vintertid ligger övriga jobb en timme tidigare i svensk tid. Manuell körning: 
 - `node scripts/import-ted-history.mjs` fyller TED-historiken (eForms via API från 2023-11, äldre XML).
 
 ### Kvar att göra efter driftsättning
+
+- Kör Kommers-synken manuellt en gång med `?since=` och följ den i `cron_runs` (kördes lokalt mot databasen 2026-09-25: 23 listade, 1 inläst, 0 dubbletter).
+- Nationella Kommers-annonser saknar köpare och exakt sista anbudsdag (bara listans "N dagar kvar"). Mercell-synkens Kommers-nyckel saknar instans, id kan i teorin krocka mellan Kommers-instanser.
+- Kvalitetssvar: export som docx är inte byggd. Spara i biblioteket skapar alltid ett nytt svar.
+- Fråga datan använder textmatchning, inte embeddings (inga procurement-rader i document_embeddings).
 
 - Granska de 20 seedade signalkällorna under Upphandlingar, Inställningar. De är markerade som overifierade och flera pekar på startsidor.
 - Sätt Upphandlingsansvarig på rätt personer under Användarkonton (Personal).
