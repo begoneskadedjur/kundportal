@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.12.0',
+    date: '2026-09-24',
+    title: 'Tilläggsstationer med plustecken, stationer som står tätt sprids ut',
+    items: [
+      { kind: 'andring', text: 'Tilläggsstationer visas med ett litet plustecken i markörens kant i stället för en violett ring, både på kartan och på planritningen. Plustecknet syns även när stationen är kontrollerad eller markerad' },
+      { kind: 'nyhet', text: 'Stationer som står så tätt att de täcker varandra sprids ut i en liten ring med en tunn linje till pricken där stationen faktiskt står. Alla går att trycka på, och linjerna försvinner när man zoomat in så att de får plats' },
+      { kind: 'andring', text: 'Kartans förklaring ritar symbolerna som markörerna ser ut och förklarar linjen när någon grupp är utspridd' },
+    ],
+  },
+  {
     version: '3.11.1',
     date: '2026-09-24',
     title: 'Tilläggsstationer på kartan och kundkortet',

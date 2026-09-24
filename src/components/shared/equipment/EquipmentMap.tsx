@@ -18,6 +18,8 @@ import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
 import { Navigation } from 'lucide-react'
 import { EquipmentDetailSheet } from './EquipmentDetailSheet'
+import { buildStationMarkerIcon, stationMarkerSvg } from './stationMarkerIcon'
+import { createFanOut, type FanOutEntry, type FanOutHandle } from './markerFanOut'
 
 interface EquipmentMapProps {
   equipment: EquipmentPlacementWithRelations[]
@@ -107,6 +109,7 @@ export function EquipmentMap({
   const regionPolygonsRef = useRef<google.maps.Polygon[]>([])
   const regionLabelsRef = useRef<google.maps.Marker[]>([])
   const clustererRef = useRef<MarkerClusterer | null>(null)
+  const fanOutRef = useRef<FanOutHandle | null>(null)
   const hasAutoZoomedRef = useRef(false)
 
   // State
@@ -114,6 +117,8 @@ export function EquipmentMap({
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false)
   const [stationTypes, setStationTypes] = useState<StationType[]>([])
   const [pendingRelocatePos, setPendingRelocatePos] = useState<{ lat: number; lng: number } | null>(null)
+  // Antal högar som just nu är utspridda med linje till verklig plats
+  const [spreadGroups, setSpreadGroups] = useState(0)
 
   // Hämta stationstyper
   useEffect(() => {
@@ -319,17 +324,22 @@ export function EquipmentMap({
   useEffect(() => {
     if (!mapRef.current || !isLoaded) return
 
-    // Rensa gamla markörer och clusterer
+    // Rensa gamla markörer, clusterer och utspridning
     if (clustererRef.current) {
       clustererRef.current.clearMarkers()
       clustererRef.current.setMap(null)
       clustererRef.current = null
+    }
+    if (fanOutRef.current) {
+      fanOutRef.current.dispose()
+      fanOutRef.current = null
     }
     markersRef.current.forEach(m => m.setMap(null))
     markersRef.current = []
 
     const map = mapRef.current
     const newMarkers: google.maps.Marker[] = []
+    const fanOutEntries: FanOutEntry[] = []
 
     equipment.forEach(item => {
       const color = getEquipmentColor(item)
@@ -362,11 +372,6 @@ export function EquipmentMap({
       } else if (isInspected) {
         strokeColor = '#16a34a'
         strokeWeight = 3
-      } else if (item.is_addon === true && item.status === 'active') {
-        // Tilläggsstation (utöver avtal): violett ring — krockar inte med
-        // status- (amber/röd/slate), inspekterad- (grön) eller highlight-färg (blå)
-        strokeColor = '#a855f7'
-        strokeWeight = 3
       }
 
       // Bestäm label-text
@@ -387,17 +392,22 @@ export function EquipmentMap({
       // Nedtonad = annan kunds station som bara visas som kontext
       const isDimmed = !!dimmedStationIds?.has(item.id) && !isRelocating && !isHighlighted
 
+      // Tillägg utöver avtal: plusbricka i kanten. Visas för alla tillägg
+      // som inte är borttagna, även när stationen är kontrollerad, markerad,
+      // saknas eller är skadad. Fyllningen bär typ, kanten bär status.
+      const showAddon = item.is_addon === true && item.status !== 'removed' && !isDimmed && !isRelocating
+
       const marker = new google.maps.Marker({
         position: { lat: item.latitude, lng: item.longitude },
         map: enableClustering ? null : map,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: isRelocating ? 18 : isHighlighted ? 16 : isDimmed ? 9 : 14,
-          fillColor: isRelocating ? '#f59e0b' : bgColor,
+        icon: buildStationMarkerIcon({
+          radius: isRelocating ? 18 : isHighlighted ? 16 : isDimmed ? 9 : 14,
+          fill: isRelocating ? '#f59e0b' : bgColor,
           fillOpacity: isDimmed ? 0.35 : opacity,
-          strokeColor: isRelocating ? '#ffffff' : isDimmed ? '#cbd5e1' : strokeColor,
-          strokeWeight: isRelocating ? 3 : isDimmed ? 1 : strokeWeight
-        },
+          stroke: isRelocating ? '#ffffff' : isDimmed ? '#cbd5e1' : strokeColor,
+          strokeWeight: isRelocating ? 3 : isDimmed ? 1 : strokeWeight,
+          addon: showAddon,
+        }),
         label: isDimmed ? undefined : labelText ? {
           text: isRelocating ? '✥' : labelText,
           color: '#ffffff',
@@ -424,9 +434,20 @@ export function EquipmentMap({
         marker.addListener('click', () => handleMarkerClick(item))
       }
       newMarkers.push(marker)
+      fanOutEntries.push({
+        marker,
+        position: { lat: item.latitude, lng: item.longitude },
+        pinned: isRelocating || isHighlighted || isDimmed,
+      })
     })
 
     markersRef.current = newMarkers
+
+    // Täta markörer sprids ut med linje till verklig plats. Över 80 stationer
+    // tar klustret över i stället.
+    if (!enableClustering && newMarkers.length > 1) {
+      fanOutRef.current = createFanOut(map, fanOutEntries, { onChange: setSpreadGroups })
+    }
 
     // Sätt upp clusterer om enableClustering, annars sätt map direkt
     if (enableClustering && newMarkers.length > 0) {
@@ -723,9 +744,23 @@ export function EquipmentMap({
   // Den violetta ringen betyder tilläggsstation. Utan förklaring ser
   // teknikern bara "lila prickar" och vet inte varför.
   const hasAddonStations = useMemo(
-    () => equipment.some(item => item.is_addon === true && item.status === 'active'),
-    [equipment]
+    () => equipment.some(item => item.is_addon === true && item.status !== 'removed' && !dimmedStationIds?.has(item.id)),
+    [equipment, dimmedStationIds]
   )
+
+  // Legendens symboler ritas med samma SVG som markörerna på kartan
+  const legendSymbol = useCallback((fill: string, addon: boolean) => {
+    const { svg } = stationMarkerSvg({ fill, fillOpacity: 1, stroke: '#ffffff', strokeWeight: 2, radius: 14, addon })
+    return `url("data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}")`
+  }, [])
+
+  // Städa utspridningen när kartan avmonteras
+  useEffect(() => {
+    return () => {
+      fanOutRef.current?.dispose()
+      fanOutRef.current = null
+    }
+  }, [])
 
   if (!isLoaded) {
     return (
@@ -800,19 +835,33 @@ export function EquipmentMap({
           {legendItems.map(({ key, color, label }) => (
             <div key={key} className="flex items-center gap-2">
               <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: color }}
+                className="w-4 h-4 bg-no-repeat bg-center bg-contain shrink-0"
+                style={{ backgroundImage: legendSymbol(color, false) }}
               />
               <span className="text-xs text-slate-600">{label}</span>
             </div>
           ))}
-          {hasAddonStations && (
-            <div className="flex items-center gap-2 mt-1 pt-1 border-t border-slate-200">
-              <div
-                className="w-3 h-3 rounded-full bg-white"
-                style={{ border: '2px solid #a855f7' }}
-              />
-              <span className="text-xs text-slate-600">Ring: tillägg utöver avtal</span>
+          {(hasAddonStations || spreadGroups > 0) && (
+            <div className="flex flex-col gap-1 mt-1 pt-1 border-t border-slate-200">
+              {hasAddonStations && (
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-4 h-4 bg-no-repeat bg-center bg-contain shrink-0"
+                    style={{ backgroundImage: legendSymbol('#64748b', true) }}
+                  />
+                  <span className="text-xs text-slate-600">Tillägg utöver avtal</span>
+                </div>
+              )}
+              {spreadGroups > 0 && (
+                <div className="flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="shrink-0">
+                    <line x1="3" y1="13" x2="13" y2="3" stroke="#475569" strokeWidth="1.4" />
+                    <circle cx="3" cy="13" r="2.4" fill="#ffffff" stroke="#0f172a" strokeWidth="1" />
+                    <circle cx="13" cy="3" r="2.6" fill="#475569" />
+                  </svg>
+                  <span className="text-xs text-slate-600">Stationen står vid pricken</span>
+                </div>
+              )}
             </div>
           )}
         </div>

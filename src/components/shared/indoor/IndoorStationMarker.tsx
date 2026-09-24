@@ -199,13 +199,17 @@ export function IndoorStationMarker({
         )}
       </div>
 
-      {/* Tilläggsstation (utöver avtal): violett hörnmarkering uppe till vänster */}
-      {station.is_addon === true && (
+      {/* Tilläggsstation (utöver avtal): vit plusbricka uppe till vänster,
+          samma märke som utomhuskartans markör */}
+      {station.is_addon === true && station.status !== 'removed' && (
         <div
-          className="absolute -top-1 -left-1 w-3 h-3 rounded-full border border-white"
-          style={{ backgroundColor: '#a855f7' }}
-          title="Tilläggsstation (utöver avtal)"
-        />
+          className="absolute -top-1 -left-1 w-3.5 h-3.5 rounded-full bg-white border border-slate-900 flex items-center justify-center"
+          title="Tillägg utöver avtal"
+        >
+          <svg width="8" height="8" viewBox="0 0 8 8" aria-hidden="true">
+            <path d="M1 4h6M4 1v6" stroke="#0f172a" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </div>
       )}
 
       {/* Status badge for non-active stations OR calculated status warning/critical */}
@@ -238,7 +242,7 @@ export function IndoorStationMarker({
           <p className="font-medium">{station.station_number || 'Utan nummer'}</p>
           <p className="text-slate-400">{typeConfig.label}</p>
           {station.is_addon === true && (
-            <p className="text-violet-400">Tillägg utöver avtal</p>
+            <p className="text-slate-300">Tillägg utöver avtal</p>
           )}
         </div>
       </div>
@@ -307,11 +311,12 @@ export function StationLegend() {
         )
       })}
       <div className="flex items-center gap-1.5">
-        <div
-          className="w-4 h-4 rounded-full border border-white/50"
-          style={{ backgroundColor: '#a855f7' }}
-        />
-        <span className="text-xs text-slate-400">Tilläggsstation (utöver avtal)</span>
+        <div className="w-4 h-4 rounded-full bg-white border border-slate-900 flex items-center justify-center">
+          <svg width="9" height="9" viewBox="0 0 8 8" aria-hidden="true">
+            <path d="M1 4h6M4 1v6" stroke="#0f172a" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+        </div>
+        <span className="text-xs text-slate-400">Tillägg utöver avtal</span>
       </div>
     </div>
   )
