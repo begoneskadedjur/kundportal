@@ -1,6 +1,6 @@
 // src/components/admin/layout/SidebarNavGroup.tsx
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { NavItemLink } from './NavItemLink'
 import { ChevronDown } from 'lucide-react'
 import type { NavGroup, NavItem } from './adminNavConfig'
 import { useIncidentBadge } from '../../../hooks/useIncidentBadge'
@@ -75,9 +75,9 @@ export function SidebarNavGroup({ group: groupIn, collapsed, currentPath }: Side
               const Icon = item.icon
               const isActive = currentPath.startsWith(item.path)
               return (
-                <Link
+                <NavItemLink
                   key={item.path}
-                  to={item.path}
+                  item={item}
                   className={`
                     flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-150 text-sm
                     focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800 outline-none
@@ -90,7 +90,7 @@ export function SidebarNavGroup({ group: groupIn, collapsed, currentPath }: Side
                   <Icon className="w-4 h-4 flex-shrink-0" />
                   <span>{item.label}</span>
                   <ItemBadge count={badgeCountFor(item)} />
-                </Link>
+                </NavItemLink>
               )
             })}
           </div>
@@ -126,9 +126,9 @@ export function SidebarNavGroup({ group: groupIn, collapsed, currentPath }: Side
             const Icon = item.icon
             const isActive = currentPath.startsWith(item.path)
             return (
-              <Link
+              <NavItemLink
                 key={item.path}
-                to={item.path}
+                item={item}
                 className={`
                   flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm
                   focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 outline-none
@@ -141,7 +141,7 @@ export function SidebarNavGroup({ group: groupIn, collapsed, currentPath }: Side
                 <Icon className="w-4 h-4 flex-shrink-0" />
                 <span>{item.label}</span>
                 <ItemBadge count={badgeCountFor(item)} />
-              </Link>
+              </NavItemLink>
             )
           })}
         </div>

@@ -40,6 +40,8 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export const PORTAL_URL = process.env.PORTAL_URL || 'https://kundportal.vercel.app'
+/** Den fristående upphandlingsportalen. Alla länkar i procurement-mejl, notiser och sammandrag går hit. */
+export const PROCUREMENT_PORTAL_URL = (process.env.PROCUREMENT_PORTAL_URL || 'https://upphandling.begone.se').replace(/\/+$/, '')
 /** Avsändare för upphandlingsposten. Domänen måste vara verifierad i Resend. */
 export const PROCUREMENT_FROM_EMAIL = process.env.PROCUREMENT_FROM_EMAIL || 'BeGone Upphandling <upphandling@begone.se>'
 /** Lokal del och domän för svarsadresser upphandling+bgu-{nr}@{domän} */
@@ -688,7 +690,7 @@ export async function getManagers(): Promise<Manager[]> {
 
 /**
  * Notis i notifications. case_type 'procurement': klick öppnar
- * /admin/upphandlingar/{case_id}, eller startsidan när case_id saknas.
+ * {PROCUREMENT_PORTAL_URL}/{case_id} (adminportalen: /admin/upphandlingar/{case_id}), eller startsidan när case_id saknas.
  */
 export async function insertNotifications(
   recipients: string[],
@@ -763,7 +765,7 @@ ${bodyHtml}
 }
 
 export function noticeLink(noticeId: string): string {
-  return `${PORTAL_URL}/admin/upphandlingar/${noticeId}`
+  return `${PROCUREMENT_PORTAL_URL}/${noticeId}`
 }
 
 /**

@@ -28,6 +28,7 @@ import { VALUE_KIND_LABEL, buildProcurements, median, type ProcurementGroup } fr
 import { HistoryEmpty, SupplierName } from '../../../components/admin/procurement/market/shared'
 import { countyLabel, criteriaLabel } from '../../../components/admin/procurement/market/format'
 import { countBy, sortKey, supplierSwitches } from '../../../components/admin/procurement/registry/registryStats'
+import { procurementPath } from '../../../lib/procurementPortal'
 
 type Customer = { id: string; company_name: string; organization_number: string | null }
 
@@ -293,7 +294,7 @@ export default function BuyerProfilePage() {
   if (!buyer) {
     return (
       <div className="space-y-4">
-        <Link to="/admin/upphandlingar/kopare" className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200">
+        <Link to={procurementPath('/kopare')} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200">
           <ArrowLeft className="w-3.5 h-3.5" /> Köpare
         </Link>
         <EmptyState title="Köparen finns inte" hint="Den kan ha slagits ihop med en annan köpare vid importen." />
@@ -304,7 +305,7 @@ export default function BuyerProfilePage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link to="/admin/upphandlingar/kopare" className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 mb-2">
+        <Link to={procurementPath('/kopare')} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 mb-2">
           <ArrowLeft className="w-3.5 h-3.5" /> Köpare
         </Link>
         <h2 className="text-lg font-semibold text-slate-100">{buyer.name}</h2>
@@ -394,7 +395,7 @@ export default function BuyerProfilePage() {
                             {g.isFramework != null ? (g.isFramework ? ' · ramavtal' : ' · kontrakt') : ''}
                             {g.wasAppealed ? ' · överprövad' : ''}
                           </div>
-                          {g.noticeId && <Link to={`/admin/upphandlingar/${g.noticeId}`} className="text-[11px] text-[#20c58f] hover:underline">Öppna annonsen</Link>}
+                          {g.noticeId && <Link to={procurementPath(`/${g.noticeId}`)} className="text-[11px] text-[#20c58f] hover:underline">Öppna annonsen</Link>}
                         </div>
                       </td>
                       <td className={tableCls.td}>
@@ -471,7 +472,7 @@ export default function BuyerProfilePage() {
             {notices.map((n) => (
               <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                 <div className="min-w-0">
-                  <Link to={`/admin/upphandlingar/${n.id}`} className="text-[13px] text-slate-200 hover:text-[#20c58f] hover:underline">
+                  <Link to={procurementPath(`/${n.id}`)} className="text-[13px] text-slate-200 hover:text-[#20c58f] hover:underline">
                     {n.title}
                   </Link>
                   <div className="text-[11px] text-slate-500 tabular-nums">
@@ -506,7 +507,7 @@ export default function BuyerProfilePage() {
                     <td className={`${tableCls.td} whitespace-nowrap`}>{fmtDate(r.sent_at ?? r.created_at)}</td>
                     <td className={tableCls.td}>
                       {r.notice_id ? (
-                        <Link to={`/admin/upphandlingar/${r.notice_id}`} className="hover:text-[#20c58f] hover:underline">{r.subject ?? 'Begäran'}</Link>
+                        <Link to={procurementPath(`/${r.notice_id}`)} className="hover:text-[#20c58f] hover:underline">{r.subject ?? 'Begäran'}</Link>
                       ) : (r.subject ?? 'Begäran')}
                     </td>
                     <td className={tableCls.td}>{r.recipient_email}</td>

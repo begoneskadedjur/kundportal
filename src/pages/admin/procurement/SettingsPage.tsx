@@ -14,6 +14,7 @@ import { EmptyState, Section } from '../../../components/admin/procurement/ui'
 import { SourceHealthTable } from '../../../components/admin/procurement/market/shared'
 import { WatchRulesSection } from '../../../components/admin/procurement/settings/WatchRulesSection'
 import { SignalSourcesSection } from '../../../components/admin/procurement/settings/SignalSourcesSection'
+import { MAIN_PORTAL_URL, isProcurementStandalone } from '../../../lib/procurementPortal'
 
 function DigestToggle() {
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -106,9 +107,15 @@ export default function SettingsPage() {
         title="Upphandlingsansvariga"
         hint="Får notiser vid träffar, påminnelser och sammandraget. Admin har alltid åtkomst."
         action={
-          <Link to="/admin/anvandarkonton-personal" className="inline-flex items-center gap-1 text-xs font-medium text-[#20c58f] hover:text-[#3ddba5]">
-            Användarkonton (Personal) <ExternalLink className="w-3 h-3" />
-          </Link>
+          isProcurementStandalone() ? (
+            <a href={`${MAIN_PORTAL_URL}/admin/anvandarkonton-personal`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#20c58f] hover:text-[#3ddba5]">
+              Användarkonton (Personal) <ExternalLink className="w-3 h-3" />
+            </a>
+          ) : (
+            <Link to="/admin/anvandarkonton-personal" className="inline-flex items-center gap-1 text-xs font-medium text-[#20c58f] hover:text-[#3ddba5]">
+              Användarkonton (Personal) <ExternalLink className="w-3 h-3" />
+            </Link>
+          )
         }
       >
         {loading ? (

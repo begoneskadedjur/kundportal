@@ -4,24 +4,20 @@
 // Flikarna följer planens avsnitt 9. Detaljsidan för en upphandling
 // (/admin/upphandlingar/:noticeId) visas utan aktiv flik.
 //
+// Sedan 2026-09-25 är upphandlingsportalen en fristående plattform på
+// upphandling.begone.se (src/pages/procurement/ProcurementApp.tsx). Den här
+// ramen finns kvar i adminportalen som reserv för utveckling.
+//
 // Plan: docs/upphandlingsportal-plan.md
 
 import { Suspense } from 'react'
 import { NavLink, Navigate, Outlet } from 'react-router-dom'
-import { Gavel } from 'lucide-react'
+import { ExternalLink, Gavel } from 'lucide-react'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import { useProcurementAccess } from '../../../hooks/useProcurementAccess'
 import { useProcurementBadge } from '../../../hooks/useProcurementBadge'
-
-const TABS: Array<{ to: string; label: string; end?: boolean }> = [
-  { to: '/admin/upphandlingar', label: 'Marknad', end: true },
-  { to: '/admin/upphandlingar/bevakning', label: 'Bevakning' },
-  { to: '/admin/upphandlingar/avtalsklocka', label: 'Avtalsklocka' },
-  { to: '/admin/upphandlingar/signaler', label: 'Signaler' },
-  { to: '/admin/upphandlingar/kopare', label: 'Köpare' },
-  { to: '/admin/upphandlingar/konkurrenter', label: 'Konkurrenter' },
-  { to: '/admin/upphandlingar/installningar', label: 'Inställningar' },
-]
+import { PROCUREMENT_PORTAL_URL, procurementPath } from '../../../lib/procurementPortal'
+import { PROCUREMENT_TABS } from '../../procurement/procurementTabs'
 
 export default function ProcurementLayout() {
   const { allowed, loading } = useProcurementAccess()
@@ -42,16 +38,25 @@ export default function ProcurementLayout() {
         <div className="flex items-center gap-2 mb-1">
           <Gavel className="w-4 h-4 text-[#20c58f]" />
           <h1 className="text-lg font-semibold text-slate-100">Upphandlingar</h1>
+          <a
+            href={PROCUREMENT_PORTAL_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto inline-flex items-center gap-1 text-[12px] text-slate-400 hover:text-[#20c58f]"
+          >
+            Öppna Upphandlingsbevakning
+            <ExternalLink className="w-3 h-3" />
+          </a>
         </div>
         <p className="text-xs text-slate-500 mb-5">
           Offentliga upphandlingar inom skadedjursbekämpning: bevakning, marknad, avtalsklocka och anbudsarbete.
         </p>
 
         <nav className="flex gap-5 border-b border-slate-800 mb-6 overflow-x-auto" aria-label="Upphandlingar">
-          {TABS.map((t) => (
+          {PROCUREMENT_TABS.map((t) => (
             <NavLink
-              key={t.to}
-              to={t.to}
+              key={t.sub}
+              to={procurementPath(t.sub)}
               end={t.end}
               className={({ isActive }) =>
                 `relative -mb-px pb-2.5 text-sm whitespace-nowrap transition-colors border-b-2 ${

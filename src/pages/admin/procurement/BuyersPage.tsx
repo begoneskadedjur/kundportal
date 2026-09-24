@@ -18,6 +18,7 @@ import { buildProcurements, matchesCounty, type CountyFilter } from '../../../co
 import { CountySelect, HistoryEmpty, SupplierName } from '../../../components/admin/procurement/market/shared'
 import { countyLabel } from '../../../components/admin/procurement/market/format'
 import { buyerSummaries } from '../../../components/admin/procurement/registry/registryStats'
+import { procurementPath } from '../../../lib/procurementPortal'
 
 type SortKey = 'count' | 'name' | 'end'
 
@@ -134,7 +135,7 @@ export default function BuyersPage() {
                   <tr key={b.id} className={tableCls.tr}>
                     <td className={tableCls.td}>
                       <div className="min-w-[180px]">
-                        <Link to={`/admin/upphandlingar/kopare/${b.id}`} className="text-slate-100 hover:text-[#20c58f] hover:underline">
+                        <Link to={procurementPath(`/kopare/${b.id}`)} className="text-slate-100 hover:text-[#20c58f] hover:underline">
                           {b.name}
                         </Link>
                         {b.org_number && <div className="text-[11px] text-slate-500">{formatOrgNumber(b.org_number)}</div>}

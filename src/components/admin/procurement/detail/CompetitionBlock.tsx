@@ -11,6 +11,7 @@ import { EmptyState } from '../ui'
 import { fmtKr, fmtKrShort, fmtPct, tableCls } from '../uiFormat'
 import { Block, SubHeading } from './fields'
 import { supplierKey, winnerKey, winnerName } from './helpers'
+import { procurementPath } from '../../../../lib/procurementPortal'
 
 interface Row {
   key: string
@@ -120,7 +121,7 @@ export default function CompetitionBlock({ notice, awards }: { notice: NoticeWit
                     <tr key={r.key} className={tableCls.tr}>
                       <td className={tableCls.td}>
                         {r.supplierId ? (
-                          <Link to={`/admin/upphandlingar/konkurrenter/${r.supplierId}`} className={`hover:text-[#20c58f] ${r.isBegone ? 'text-[#20c58f]' : 'text-slate-200'}`}>
+                          <Link to={procurementPath(`/konkurrenter/${r.supplierId}`)} className={`hover:text-[#20c58f] ${r.isBegone ? 'text-[#20c58f]' : 'text-slate-200'}`}>
                             {r.name}
                           </Link>
                         ) : (

@@ -45,6 +45,7 @@ import OutcomeBlock from '../../../components/admin/procurement/detail/OutcomeBl
 import ManagementBlock from '../../../components/admin/procurement/detail/ManagementBlock'
 import BidCalculator from '../../../components/admin/procurement/BidCalculator'
 import BidWorkshop from '../../../components/admin/procurement/workshop/BidWorkshop'
+import { procurementPath } from '../../../lib/procurementPortal'
 
 const NAV: Array<{ id: string; label: string }> = [
   { id: 'identitet', label: 'Identitet' },
@@ -288,7 +289,7 @@ export default function NoticeDetailPage() {
 
 function BackLink() {
   return (
-    <Link to="/admin/upphandlingar/bevakning" className="inline-flex items-center gap-1.5 text-[12px] text-slate-400 hover:text-[#20c58f]">
+    <Link to={procurementPath('/bevakning')} className="inline-flex items-center gap-1.5 text-[12px] text-slate-400 hover:text-[#20c58f]">
       <ArrowLeft className="w-3.5 h-3.5" />
       Bevakning
     </Link>

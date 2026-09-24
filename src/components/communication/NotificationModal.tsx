@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
 import { Notification } from '../../types/communication';
 import NotificationItem from './NotificationItem';
+import { procurementPortalUrl } from '../../lib/procurementPortal';
 import {
   X,
   Bell,
@@ -129,7 +130,7 @@ export default function NotificationModal({
       // kundkort under sin egen portal.
       // Upphandlingsnotis: detaljsidan, eller portalens startsida utan id
       if (notification.case_type === 'procurement') {
-        navigate(notification.case_id ? `/admin/upphandlingar/${notification.case_id}` : '/admin/upphandlingar');
+        window.location.href = procurementPortalUrl(notification.case_id ? `/${notification.case_id}` : '');
         return;
       }
 

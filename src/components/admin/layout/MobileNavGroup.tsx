@@ -1,6 +1,6 @@
 // src/components/admin/layout/MobileNavGroup.tsx
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { NavItemLink } from './NavItemLink'
 import { ChevronDown } from 'lucide-react'
 import type { NavGroup, NavItem } from './adminNavConfig'
 import { useIncidentBadge } from '../../../hooks/useIncidentBadge'
@@ -65,9 +65,9 @@ export function MobileNavGroup({ group: groupIn, currentPath, onNavigate }: Mobi
             const isActive = currentPath.startsWith(item.path)
             const badgeCount = badgeCountFor(item)
             return (
-              <Link
+              <NavItemLink
                 key={item.path}
-                to={item.path}
+                item={item}
                 onClick={onNavigate}
                 className={`
                   flex items-center gap-2.5 px-3 py-2.5 rounded-lg transition-all duration-200 text-sm
@@ -81,7 +81,7 @@ export function MobileNavGroup({ group: groupIn, currentPath, onNavigate }: Mobi
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 )}
-              </Link>
+              </NavItemLink>
             )
           })}
         </div>

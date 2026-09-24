@@ -6,6 +6,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { Notification } from '../../types/communication';
 import NotificationItem from './NotificationItem';
 import NotificationModal from './NotificationModal';
+import { procurementPortalUrl } from '../../lib/procurementPortal';
 import {
   Bell,
   CheckCheck,
@@ -72,7 +73,7 @@ export default function NotificationBell({
 
       // Upphandlingsnotis: detaljsidan, eller portalens startsida utan id
       if (notification.case_type === 'procurement') {
-        window.location.href = notification.case_id ? `/admin/upphandlingar/${notification.case_id}` : '/admin/upphandlingar';
+        window.location.href = procurementPortalUrl(notification.case_id ? `/${notification.case_id}` : '');
         return;
       }
 

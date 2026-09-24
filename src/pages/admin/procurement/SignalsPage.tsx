@@ -21,6 +21,7 @@ import {
 import { EmptyState, Section, StatusDot } from '../../../components/admin/procurement/ui'
 import { fmtDate, fmtNum, tableCls, type Tone } from '../../../components/admin/procurement/uiFormat'
 import { SignalSourcesSection } from '../../../components/admin/procurement/settings/SignalSourcesSection'
+import { procurementPath } from '../../../lib/procurementPortal'
 
 type SignalStatus = ProcurementSignal['status']
 
@@ -129,7 +130,7 @@ export default function SignalsPage() {
                     <td className={tableCls.td}>
                       <div className="min-w-[220px] max-w-[420px]">
                         {s.buyer_id ? (
-                          <Link to={`/admin/upphandlingar/kopare/${s.buyer_id}`} className="text-slate-200 hover:text-[#20c58f] hover:underline">
+                          <Link to={procurementPath(`/kopare/${s.buyer_id}`)} className="text-slate-200 hover:text-[#20c58f] hover:underline">
                             {s.buyer_name ?? 'Köpare'}
                           </Link>
                         ) : (
@@ -137,7 +138,7 @@ export default function SignalsPage() {
                         )}
                         <div className="text-[12px] text-slate-400 whitespace-pre-line line-clamp-3" title={s.text}>{s.text}</div>
                         {s.notice_id && (
-                          <Link to={`/admin/upphandlingar/${s.notice_id}`} className="text-[11px] text-[#20c58f] hover:underline">Öppna upphandlingen</Link>
+                          <Link to={procurementPath(`/${s.notice_id}`)} className="text-[11px] text-[#20c58f] hover:underline">Öppna upphandlingen</Link>
                         )}
                         <div className="text-[10.5px] text-slate-600 mt-0.5">Upptäckt {fmtDate(s.created_at)}</div>
                       </div>

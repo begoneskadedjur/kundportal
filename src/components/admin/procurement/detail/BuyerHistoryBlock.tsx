@@ -10,6 +10,7 @@ import { EmptyState, StatusDot } from '../ui'
 import { fmtDate, fmtKrShort, tableCls } from '../uiFormat'
 import { Block, SubHeading } from './fields'
 import { VALUE_KIND_LABEL, winnerKey, winnerName } from './helpers'
+import { procurementPath } from '../../../../lib/procurementPortal'
 
 function switchConclusion(awards: AwardWithRelations[]): string {
   const seq = [...awards]
@@ -83,7 +84,7 @@ export default function BuyerHistoryBlock({ notice, awards, buyerNotices }: Prop
                       <td className={`${tableCls.td} whitespace-nowrap`}>{a.award_date ? a.award_date.slice(0, 4) : '–'}</td>
                       <td className={`${tableCls.td} max-w-[260px]`}>
                         {a.supplier_id ? (
-                          <Link to={`/admin/upphandlingar/konkurrenter/${a.supplier_id}`} className={`hover:text-[#20c58f] ${a.supplier?.is_begone ? 'text-[#20c58f]' : 'text-slate-200'}`}>
+                          <Link to={procurementPath(`/konkurrenter/${a.supplier_id}`)} className={`hover:text-[#20c58f] ${a.supplier?.is_begone ? 'text-[#20c58f]' : 'text-slate-200'}`}>
                             {winnerName(a)}
                           </Link>
                         ) : (
@@ -118,7 +119,7 @@ export default function BuyerHistoryBlock({ notice, awards, buyerNotices }: Prop
               {others.slice(0, 20).map((n) => (
                 <li key={n.id} className="py-1.5 flex flex-wrap items-baseline gap-x-3 text-[12.5px]">
                   <span className="text-[11px] text-slate-500 tabular-nums w-20 shrink-0">{fmtDate(n.published_at)}</span>
-                  <Link to={`/admin/upphandlingar/${n.id}`} className="text-slate-200 hover:text-[#20c58f] flex-1 min-w-0">
+                  <Link to={procurementPath(`/${n.id}`)} className="text-slate-200 hover:text-[#20c58f] flex-1 min-w-0">
                     {n.title}
                   </Link>
                   <StatusDot dotClass={OUR_STATUS_DOT[n.our_status]}>{OUR_STATUS_LABEL[n.our_status]}</StatusDot>

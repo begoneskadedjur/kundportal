@@ -18,6 +18,7 @@ import { SUPPLIER_CLASS_COLOR, buildProcurements, classifyOrg, matchesCounty, ty
 import { CountySelect, HistoryEmpty } from '../../../components/admin/procurement/market/shared'
 import { countyLabel } from '../../../components/admin/procurement/market/format'
 import { supplierIdResolver, supplierStats } from '../../../components/admin/procurement/registry/registryStats'
+import { procurementPath } from '../../../lib/procurementPortal'
 
 type SortKey = 'contracted' | 'wins' | 'bids' | 'name'
 
@@ -136,7 +137,7 @@ export default function CompetitorsPage() {
                     <tr key={s.id} className={`${tableCls.tr} ${s.is_begone ? 'bg-[#20c58f]/5' : ''}`}>
                       <td className={tableCls.td}>
                         <div className="min-w-[180px]">
-                          <Link to={`/admin/upphandlingar/konkurrenter/${s.id}`} className="inline-flex items-center gap-1.5 hover:underline">
+                          <Link to={procurementPath(`/konkurrenter/${s.id}`)} className="inline-flex items-center gap-1.5 hover:underline">
                             {cls !== 'other' && <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: SUPPLIER_CLASS_COLOR[cls] }} />}
                             <span className={s.is_begone ? 'text-[#20c58f] font-medium' : 'text-slate-100'}>{s.name}</span>
                           </Link>

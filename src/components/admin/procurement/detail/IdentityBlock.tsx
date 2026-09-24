@@ -8,6 +8,7 @@ import { NOTICE_KIND_LABEL } from '../../../../types/procurement'
 import { SE_COUNTIES, formatOrgNumber } from '../../../../shared/procurementRules'
 import { StatusDot, LinkButton } from '../ui'
 import { Block, KV } from './fields'
+import { procurementPath } from '../../../../lib/procurementPortal'
 
 const RULE_LABEL: Record<string, string> = {
   cpv_hard: 'CPV-träff',
@@ -31,7 +32,7 @@ export default function IdentityBlock({ notice }: { notice: NoticeWithRelations 
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
           <KV label="Köpare">
             {notice.buyer_id ? (
-              <Link to={`/admin/upphandlingar/kopare/${notice.buyer_id}`} className="text-slate-100 hover:text-[#20c58f]">
+              <Link to={procurementPath(`/kopare/${notice.buyer_id}`)} className="text-slate-100 hover:text-[#20c58f]">
                 {buyerName}
               </Link>
             ) : (

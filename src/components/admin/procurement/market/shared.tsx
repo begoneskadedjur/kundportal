@@ -12,6 +12,7 @@ import type { ProcurementSourceHealth } from '../../../../types/procurement'
 import { EmptyState, StatusDot } from '../ui'
 import { fmtDateTime, fmtNum, tableCls } from '../uiFormat'
 import { SOURCE_LABEL, SUPPLIER_CLASS_COLOR, sourceHealthState, type CountyFilter, type GroupWinner } from './marketStats'
+import { procurementPath } from '../../../../lib/procurementPortal'
 
 // ---------------------------------------------------------------------------
 // Länväljare: BeGones län först
@@ -81,7 +82,7 @@ export function SupplierName({ w, link = true }: { w: Pick<GroupWinner, 'supplie
   )
   if (!link || !w.supplierId) return inner
   return (
-    <Link to={`/admin/upphandlingar/konkurrenter/${w.supplierId}`} className="hover:underline">
+    <Link to={procurementPath(`/konkurrenter/${w.supplierId}`)} className="hover:underline">
       {inner}
     </Link>
   )
@@ -90,7 +91,7 @@ export function SupplierName({ w, link = true }: { w: Pick<GroupWinner, 'supplie
 export function BuyerLink({ id, name }: { id: string | null; name: string | null }) {
   if (!id) return <span>{name ?? 'Okänd köpare'}</span>
   return (
-    <Link to={`/admin/upphandlingar/kopare/${id}`} className="text-slate-200 hover:text-[#20c58f] hover:underline">
+    <Link to={procurementPath(`/kopare/${id}`)} className="text-slate-200 hover:text-[#20c58f] hover:underline">
       {name ?? 'Okänd köpare'}
     </Link>
   )

@@ -34,6 +34,7 @@ import {
   BadgeCheck,
   Gavel,
 } from 'lucide-react'
+import { PROCUREMENT_PORTAL_URL } from '../../../lib/procurementPortal'
 
 export interface NavItem {
   label: string
@@ -43,6 +44,8 @@ export interface NavItem {
   badgeKey?: 'incidents' | 'intranet' | 'tickets' | 'addons' | 'procurement'
   /** Posten visas bara för den som har åtkomsten (se useProcurementAccess) */
   requires?: 'procurement'
+  /** Extern adress: posten öppnas i ny flik (upphandlingsportalen på egen subdomän) */
+  externalUrl?: string
 }
 
 export interface NavGroup {
@@ -79,7 +82,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Leadsstatistik', icon: BarChart3, path: '/admin/leadsstatistik' },
       { label: 'Dokumentsignering', icon: ClipboardList, path: '/admin/dokumentsignering' },
       { label: 'Kundresa', icon: GitBranch, path: '/admin/kundresa' },
-      { label: 'Upphandlingar', icon: Gavel, path: '/admin/upphandlingar', badgeKey: 'procurement', requires: 'procurement' },
+      { label: 'Upphandlingar', icon: Gavel, path: '/admin/upphandlingar', badgeKey: 'procurement', requires: 'procurement', externalUrl: PROCUREMENT_PORTAL_URL },
       { label: 'Avslutade ärenden', icon: Trash2, path: '/admin/avslutade-arenden' },
     ]
   },

@@ -5,6 +5,7 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { isProcurementStandalone } from '../lib/procurementPortal';
 
 // Typer (uppdaterade med koordinator-roll)
 export type Profile = {
@@ -97,6 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ✅ KRITISK: Sätt loading till false INNAN navigering så att
       // dashboard-komponenter har tillgång till user och profile direkt
       setLoading(false);
+
+      // Fristående upphandlingsportal: / är portalens startsida, bara /login
+      // skickas vidare dit. Skalet sköter åtkomstkontrollen.
+      if (isProcurementStandalone()) {
+        if (window.location.pathname === '/login') navigate('/', { replace: true });
+        return;
+      }
 
       const onAuthPage = ['/', '/login', '/set-password', '/forgot-password'].includes(location.pathname);
       if (onAuthPage) {

@@ -8,6 +8,7 @@ import Button from '../../../ui/Button'
 import { technicianManagementService, type Technician, type ExtraPortalRole } from '../../../../services/technicianManagementService'
 import { ALL_INCIDENT_TYPES, INCIDENT_TYPE_CONFIG, type IncidentType } from '../../../../types/caseIncidents'
 import { IncidentRecipientService } from '../../../../services/incidentRecipientService'
+import { PROCUREMENT_PORTAL_URL } from '../../../../lib/procurementPortal'
 
 // Primärrollen (technicians.role) mappad till portalvyn den redan ger
 const PRIMARY_ROLE_TO_PORTAL: Record<string, ExtraPortalRole | null> = {
@@ -587,7 +588,7 @@ export default function TechnicianCard({
         )}
       </div>
 
-      {/* Upphandlingsansvarig - togglas direkt på kortet, ger åtkomst till /admin/upphandlingar */}
+      {/* Upphandlingsansvarig - togglas direkt på kortet, ger åtkomst till upphandling.begone.se */}
       <div className="mt-4 pt-3 border-t border-slate-700">
         <div className="flex items-center gap-1.5 mb-2">
           <Gavel className="w-3.5 h-3.5 text-[#20c58f]" />
@@ -599,6 +600,10 @@ export default function TechnicianCard({
               {isProcurementManager
                 ? 'Bevakar upphandlingar, får träffar och dagligt sammandrag'
                 : 'Kan få åtkomst till upphandlingsportalen'}
+              {' '}
+              <a href={PROCUREMENT_PORTAL_URL} target="_blank" rel="noopener noreferrer" className="text-[#20c58f] hover:underline whitespace-nowrap">
+                {PROCUREMENT_PORTAL_URL.replace(/^https?:\/\//, '')}
+              </a>
             </p>
             <button
               type="button"

@@ -1,14 +1,14 @@
 // api/procurement/notify-manager.ts
 // Anropas från personkortet under Användarkonton (Personal) när reglaget
 // Upphandlingsansvarig slås på. Personen får en notis i portalen och ett
-// mejl med länk till /admin/upphandlingar. Bara admin och koordinator (samma
+// mejl med länk till upphandlingsportalen (PROCUREMENT_PORTAL_URL). Bara admin och koordinator (samma
 // som får ändra flaggan enligt guard_profile_privilege_columns).
 //
 // POST { userId }
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireAuth } from '../_lib/auth'
-import { PORTAL_URL, db, emailLayout, escapeHtml, insertNotifications, sendEmail } from '../_lib/procurement'
+import { PROCUREMENT_PORTAL_URL, db, emailLayout, escapeHtml, insertNotifications, sendEmail } from '../_lib/procurement'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Metoden stöds inte' })
@@ -30,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // användas för att skicka godtyckliga mejl.
   if (!profile.is_procurement_manager) return res.status(409).json({ error: 'Personen är inte upphandlingsansvarig' })
 
-  const link = `${PORTAL_URL}/admin/upphandlingar`
+  const link = PROCUREMENT_PORTAL_URL
   const name = profile.display_name || profile.email
 
   // Notisen och mejlet är oberoende: misslyckas det ena ska det andra ändå gå.

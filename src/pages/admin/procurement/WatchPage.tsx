@@ -28,6 +28,7 @@ import { daysUntil, fmtDate, fmtKrShort, fmtPct, fmtRelativeDays, tableCls } fro
 import { checkboxCls, inputCls, selectCls } from '../../../components/admin/procurement/detail/fields'
 import { errMsg, personName } from '../../../components/admin/procurement/detail/helpers'
 import UnsortedEmailSection from '../../../components/admin/procurement/watch/UnsortedEmailSection'
+import { procurementPath } from '../../../lib/procurementPortal'
 
 const ACTIVE_STATUSES: ProcurementOurStatus[] = ['new', 'watching', 'analyzing', 'bidding', 'submitted']
 const DIRECT_SCORE = 100
@@ -260,7 +261,7 @@ export default function WatchPage() {
                             {isUnread && <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" title="Oläst" />}
                             <div className="min-w-0">
                               <Link
-                                to={`/admin/upphandlingar/${n.id}`}
+                                to={procurementPath(`/${n.id}`)}
                                 className={`block leading-snug hover:text-[#20c58f] ${isUnread ? 'font-semibold text-slate-100' : 'text-slate-200'}`}
                               >
                                 {n.title}
@@ -310,7 +311,7 @@ export default function WatchPage() {
                     <div className="flex items-start gap-1.5">
                       {isUnread && <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" />}
                       <div className="min-w-0 flex-1">
-                        <Link to={`/admin/upphandlingar/${n.id}`} className={`block text-[13px] leading-snug ${isUnread ? 'font-semibold text-slate-100' : 'text-slate-200'}`}>
+                        <Link to={procurementPath(`/${n.id}`)} className={`block text-[13px] leading-snug ${isUnread ? 'font-semibold text-slate-100' : 'text-slate-200'}`}>
                           {n.title}
                         </Link>
                         <div className="text-[11px] text-slate-500 truncate">{n.buyer?.name ?? n.buyer_name ?? 'Okänd köpare'}</div>

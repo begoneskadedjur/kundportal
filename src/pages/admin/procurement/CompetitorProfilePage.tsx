@@ -20,6 +20,7 @@ import { VALUE_KIND_LABEL, buildProcurements, isContractedKind, type Procurement
 import { BuyerLink, HistoryEmpty, SupplierName } from '../../../components/admin/procurement/market/shared'
 import { countyLabel } from '../../../components/admin/procurement/market/format'
 import { headToHead, sortKey, supplierIdResolver, supplierStats } from '../../../components/admin/procurement/registry/registryStats'
+import { procurementPath } from '../../../lib/procurementPortal'
 
 export default function CompetitorProfilePage() {
   const { supplierId } = useParams<{ supplierId: string }>()
@@ -154,7 +155,7 @@ export default function CompetitorProfilePage() {
   if (!supplier) {
     return (
       <div className="space-y-4">
-        <Link to="/admin/upphandlingar/konkurrenter" className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200">
+        <Link to={procurementPath('/konkurrenter')} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200">
           <ArrowLeft className="w-3.5 h-3.5" /> Konkurrenter
         </Link>
         <EmptyState title="Leverantören finns inte" />
@@ -167,7 +168,7 @@ export default function CompetitorProfilePage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link to="/admin/upphandlingar/konkurrenter" className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 mb-2">
+        <Link to={procurementPath('/konkurrenter')} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 mb-2">
           <ArrowLeft className="w-3.5 h-3.5" /> Konkurrenter
         </Link>
         <h2 className={`text-lg font-semibold ${supplier.is_begone ? 'text-[#20c58f]' : 'text-slate-100'}`}>{supplier.name}</h2>

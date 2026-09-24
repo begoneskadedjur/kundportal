@@ -15,7 +15,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { requireCronSecret } from '../_lib/cronAuth'
 import { withCronLog } from '../_lib/cronLogger'
-import { PORTAL_URL, db, emailLayout, escapeHtml, getManagers, noticeLink, recordHealth, sendEmail, swedishHour, swedishWeekday } from '../_lib/procurement'
+import { PROCUREMENT_PORTAL_URL, db, emailLayout, escapeHtml, getManagers, noticeLink, recordHealth, sendEmail, swedishHour, swedishWeekday } from '../_lib/procurement'
 import { BEGONE_COUNTIES, addDaysIso, daysBetweenIso, swedishDate, todaySwedish } from '../../src/shared/procurementRules'
 
 export const config = { maxDuration: 120 }
@@ -110,7 +110,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const html = emailLayout(
         `Upphandlingar ${today}`,
-        `${sections.join('')}<p style="font-size:12px;color:#64748b">Stäng av sammandraget under <a href="${PORTAL_URL}/admin/upphandlingar/installningar" style="color:#0f766e">Upphandlingar, Inställningar</a>.</p>`
+        `${sections.join('')}<p style="font-size:12px;color:#64748b">Stäng av sammandraget under <a href="${PROCUREMENT_PORTAL_URL}/installningar" style="color:#0f766e">Upphandlingar, Inställningar</a>.</p>`
       )
       let sent = 0
       const errors: string[] = []

@@ -124,6 +124,8 @@ const ProcurementBuyerProfile = lazy(() => import('./pages/admin/procurement/Buy
 const ProcurementCompetitors = lazy(() => import('./pages/admin/procurement/CompetitorsPage'));
 const ProcurementCompetitorProfile = lazy(() => import('./pages/admin/procurement/CompetitorProfilePage'));
 const ProcurementSettings = lazy(() => import('./pages/admin/procurement/SettingsPage'));
+import ProcurementApp from './pages/procurement/ProcurementApp';
+import { isProcurementStandalone } from './lib/procurementPortal';
 
 // Tickets (shared page for internal communication)
 import InternAdministration from './pages/shared/InternAdministration';
@@ -143,6 +145,24 @@ function ImpersonatedCustomerRoute({ children }: { children: React.ReactNode }) 
 }
 
 function App() {
+  // Fristående upphandlingsportal på upphandling.begone.se: eget skal, inga
+  // andra portaldelar (src/lib/procurementPortal.ts)
+  if (isProcurementStandalone()) {
+    return (
+      <Router>
+        <AuthProvider>
+          <ThemeProvider>
+            <div className="min-h-screen bg-slate-950">
+              <ProcurementApp />
+              <ThemedToaster />
+              <UpdateWatcher />
+            </div>
+          </ThemeProvider>
+        </AuthProvider>
+      </Router>
+    )
+  }
+
   return (
     <Router>
       <AuthProvider>
