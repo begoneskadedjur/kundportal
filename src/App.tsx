@@ -124,6 +124,7 @@ const ProcurementBuyerProfile = lazy(() => import('./pages/admin/procurement/Buy
 const ProcurementCompetitors = lazy(() => import('./pages/admin/procurement/CompetitorsPage'));
 const ProcurementCompetitorProfile = lazy(() => import('./pages/admin/procurement/CompetitorProfilePage'));
 const ProcurementSettings = lazy(() => import('./pages/admin/procurement/SettingsPage'));
+const ProcurementAsk = lazy(() => import('./pages/admin/procurement/AskPage'));
 import ProcurementApp from './pages/procurement/ProcurementApp';
 import { isProcurementStandalone } from './lib/procurementPortal';
 
@@ -223,6 +224,7 @@ function App() {
                 <Route path="kopare/:buyerId" element={<ProcurementBuyerProfile />} />
                 <Route path="konkurrenter" element={<ProcurementCompetitors />} />
                 <Route path="konkurrenter/:supplierId" element={<ProcurementCompetitorProfile />} />
+                <Route path="fraga" element={<ProcurementAsk />} />
                 <Route path="installningar" element={<ProcurementSettings />} />
                 <Route path=":noticeId" element={<ProcurementNoticeDetail />} />
               </Route>

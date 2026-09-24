@@ -17,5 +17,6 @@ export const PROCUREMENT_TABS: ProcurementTab[] = [
   { sub: '/signaler', label: 'Signaler' },
   { sub: '/kopare', label: 'Köpare' },
   { sub: '/konkurrenter', label: 'Konkurrenter' },
+  { sub: '/fraga', label: 'Fråga' },
   { sub: '/installningar', label: 'Inställningar' },
 ]

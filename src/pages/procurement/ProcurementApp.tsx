@@ -25,6 +25,7 @@ const BuyerProfile = lazy(() => import('../admin/procurement/BuyerProfilePage'))
 const Competitors = lazy(() => import('../admin/procurement/CompetitorsPage'))
 const CompetitorProfile = lazy(() => import('../admin/procurement/CompetitorProfilePage'))
 const Settings = lazy(() => import('../admin/procurement/SettingsPage'))
+const Ask = lazy(() => import('../admin/procurement/AskPage'))
 const Account = lazy(() => import('./ProcurementAccountPage'))
 
 export default function ProcurementApp() {
@@ -44,6 +45,7 @@ export default function ProcurementApp() {
         <Route path="kopare/:buyerId" element={<BuyerProfile />} />
         <Route path="konkurrenter" element={<Competitors />} />
         <Route path="konkurrenter/:supplierId" element={<CompetitorProfile />} />
+        <Route path="fraga" element={<Ask />} />
         <Route path="installningar" element={<Settings />} />
         <Route path="mitt-konto" element={<Account />} />
         {/* Gamla länkar från mejl och notiser före subdomänen */}
