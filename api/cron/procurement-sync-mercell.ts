@@ -129,7 +129,7 @@ function toCandidate(it: MercellItem): NoticeCandidate {
   )
   const isTed = (it.sourceId ?? '').trim().toUpperCase() === 'TED'
   const tedRef = isTed ? normalizeTedNumber(it.sourceNoticeId) : null
-  const isKommers = /^kom/i.test((it.sourceId ?? '').trim())
+  const isKommers = /^kom/i.test((it.sourceId ?? '').trim())
   const kommersRef = isKommers && it.sourceNoticeId ? `kommers:${String(it.sourceNoticeId).trim()}` : null
   return {
     source: 'mercell',
