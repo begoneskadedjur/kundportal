@@ -1,6 +1,6 @@
 // src/components/admin/procurement/workshop/BidWorkshop.tsx
 // Anbudsverkstaden (planens avsnitt 5b) som ett block på detaljsidan:
-// kravlista, prisbilaga, frågor till köparen och inlämningskontroll.
+// kravlista, kvalitetssvar, prisbilaga, frågor till köparen och inlämningskontroll.
 // Portalen producerar underlag och filer; anbudet lämnas på köparens plattform.
 
 import type { NoticeWithRelations, ProcurementManagerProfile } from '../../../../services/procurementService'
@@ -18,6 +18,7 @@ import RequirementsList from './RequirementsList'
 import PriceAppendix from './PriceAppendix'
 import BuyerQuestions from './BuyerQuestions'
 import SubmissionCheck from './SubmissionCheck'
+import QualityAnswers from './QualityAnswers'
 
 interface Props {
   notice: NoticeWithRelations
@@ -44,6 +45,9 @@ export default function BidWorkshop(props: Props) {
       <div className="divide-y divide-slate-800">
         <div className="p-4">
           <RequirementsList noticeId={notice.id} requirements={requirements} documents={documents} managers={managers} onChanged={props.onRequirementsChanged} />
+        </div>
+        <div className="p-4">
+          <QualityAnswers notice={notice} requirements={requirements} onChanged={props.onRequirementsChanged} />
         </div>
         <div className="p-4">
           <PriceAppendix notice={notice} lines={priceLines} settings={settings} currentBid={currentBid} onChanged={props.onPriceLinesChanged} />

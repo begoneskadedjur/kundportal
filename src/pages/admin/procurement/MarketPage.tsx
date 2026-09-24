@@ -30,6 +30,7 @@ import {
 import { CountySelect, HistoryEmpty, SourceHealthTable, SourceHealthWarning } from '../../../components/admin/procurement/market/shared'
 import { MarketShareChart, MarketSizeCharts } from '../../../components/admin/procurement/market/MarketCharts'
 import { BidsTable, ChallengerTable, PipelineTable, QualityBuyersTable } from '../../../components/admin/procurement/market/MarketTables'
+import LessonsSection from '../../../components/admin/procurement/market/LessonsSection'
 
 export default function MarketPage() {
   const [loading, setLoading] = useState(true)
@@ -171,6 +172,9 @@ export default function MarketPage() {
       <Section title="Kvalitetsviktade köpare" hint="Köpare som utvärderar på pris och kvalitet, där rapportering, egenkontroll och stationskartor väger.">
         {noHistory ? <HistoryEmpty /> : <QualityBuyersTable rows={quality} />}
       </Section>
+
+      {/* Lärdomar vunnet mot förlorat (verktyg 12): våra egna anbud med utfall */}
+      <LessonsSection />
 
       <Section title="Källhälsa" hint="Varning när en källa varit tyst i över 24 timmar. TED och Kommers bär bevakningen om Mercell faller bort.">
         <SourceHealthTable health={health} />

@@ -15,6 +15,7 @@ import { SourceHealthTable } from '../../../components/admin/procurement/market/
 import { WatchRulesSection } from '../../../components/admin/procurement/settings/WatchRulesSection'
 import { SignalSourcesSection } from '../../../components/admin/procurement/settings/SignalSourcesSection'
 import { MAIN_PORTAL_URL, isProcurementStandalone } from '../../../lib/procurementPortal'
+import AnswerLibrary from '../../../components/admin/procurement/workshop/AnswerLibrary'
 
 function DigestToggle() {
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -98,6 +99,9 @@ export default function SettingsPage() {
       <WatchRulesSection />
 
       <SignalSourcesSection />
+
+      {/* Anbudsbibliotek: sparade kvalitetssvar per kriterietyp (etapp 4) */}
+      <AnswerLibrary />
 
       <Section title="Källhälsa" hint="Varning när en källa varit tyst i över 24 timmar, notis till admin efter tre fel i rad.">
         {loading ? <div className="py-8 flex justify-center"><LoadingSpinner /></div> : <SourceHealthTable health={health} />}
