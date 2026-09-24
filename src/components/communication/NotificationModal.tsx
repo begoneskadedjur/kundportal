@@ -127,6 +127,12 @@ export default function NotificationModal({
       // Kundnotis (tillägg att besluta): rakt in i kundkortets avtalskarta med
       // panelen öppen på Innehåll och utrustning. Koordinatorer har samma
       // kundkort under sin egen portal.
+      // Upphandlingsnotis: detaljsidan, eller portalens startsida utan id
+      if (notification.case_type === 'procurement') {
+        navigate(notification.case_id ? `/admin/upphandlingar/${notification.case_id}` : '/admin/upphandlingar');
+        return;
+      }
+
       if (notification.case_type === 'customer') {
         const base = pathname.includes('/koordinator') ? '/koordinator' : '/admin';
         navigate(`${base}/befintliga-kunder/${notification.case_id}?tab=avtalskarta&panel=innehall`);

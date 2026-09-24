@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.13.0',
+    date: '2026-09-24',
+    title: 'Upphandlingar: bevakning, marknad och anbudskalkyl',
+    items: [
+      { kind: 'nyhet', text: 'Upphandlingar under Försäljning samlar alla offentliga upphandlingar inom skadedjur i Sverige från Mercell och TED, med poäng för hur väl de passar oss, sista anbudsdag och länk till annonsen' },
+      { kind: 'nyhet', text: 'Varje upphandling har en egen sida med köparens historik, konkurrenterna, anbudskalkyl mot vår marginalmotor (golvpris, målpris och förväntat täckningsbidrag) och en anbudsverkstad med kravlista, prisbilaga och frågor till köparen' },
+      { kind: 'nyhet', text: 'Ladda upp förfrågningsunderlaget så läser AI:n ut volymer, kriterier med vikter, skallkrav och vad som avgör affären. Handlingar efter tilldelning kan begäras ut direkt från sidan' },
+      { kind: 'nyhet', text: 'Under Användarkonton (Personal) finns reglaget Upphandlingsansvarig. Den som slås på får åtkomst, notiser vid nya träffar och ett dagligt sammandrag på vardagsmorgnar' },
+    ],
+  },
+  {
     version: '3.12.0',
     date: '2026-09-24',
     title: 'Tilläggsstationer med plustecken, stationer som står tätt sprids ut',

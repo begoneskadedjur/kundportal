@@ -50,3 +50,13 @@ src/types/database.d.ts
 *.tsbuildinfo
 
 .vercel
+
+# Upphandlingsdata, stora rådatafiler
+scripts/data/procurement/mse.jsonl
+scripts/data/procurement/ua/lx/
+scripts/data/procurement/ua/ted_all.json
+scripts/data/procurement/ua/all_*.jsonl
+scripts/data/procurement/ua/*.sh
+scripts/data/procurement/ua/*.cjs
+scripts/data/procurement/ua/cat.json
+scripts/data/procurement/ua/m*.json

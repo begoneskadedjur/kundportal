@@ -1,5 +1,7 @@
 // src/types/database.ts - KOMPLETT UPPDATERAD med alla saknade exports och PestType integration + work_schedule
 
+import type * as P from './procurement'
+
 // 🆕 SCHEMA TYPER FÖR TEKNIKER-SCHEMA
 export type DaySchedule = {
   start: string; // "HH:MM"
@@ -443,9 +445,112 @@ export type Database = {
           can_approve_discounts: boolean
           // Faktureringsansvarig: får godkänna fakturor innan Fortnox
           can_approve_invoices: boolean
+          // Upphandlingsansvarig: åtkomst till /admin/upphandlingar, notiser och sammandrag
+          is_procurement_manager: boolean
         }
         Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>
+      }
+      // Upphandlingsportalen (supabase/migrations/20260924_upphandlingsportal.sql, radtyper i ./procurement)
+      procurement_buyers: {
+        Row: P.ProcurementBuyer
+        Insert: Partial<P.ProcurementBuyer>
+        Update: Partial<P.ProcurementBuyer>
+      }
+      procurement_suppliers: {
+        Row: P.ProcurementSupplier
+        Insert: Partial<P.ProcurementSupplier>
+        Update: Partial<P.ProcurementSupplier>
+      }
+      procurement_notices: {
+        Row: P.ProcurementNotice
+        Insert: Partial<P.ProcurementNotice>
+        Update: Partial<P.ProcurementNotice>
+      }
+      procurement_notice_sources: {
+        Row: P.ProcurementNoticeSource
+        Insert: Partial<P.ProcurementNoticeSource>
+        Update: Partial<P.ProcurementNoticeSource>
+      }
+      procurement_awards: {
+        Row: P.ProcurementAward
+        Insert: Partial<P.ProcurementAward>
+        Update: Partial<P.ProcurementAward>
+      }
+      procurement_bidders: {
+        Row: P.ProcurementBidder
+        Insert: Partial<P.ProcurementBidder>
+        Update: Partial<P.ProcurementBidder>
+      }
+      procurement_bids: {
+        Row: P.ProcurementBid
+        Insert: Partial<P.ProcurementBid>
+        Update: Partial<P.ProcurementBid>
+      }
+      procurement_document_requests: {
+        Row: P.ProcurementDocumentRequest
+        Insert: Partial<P.ProcurementDocumentRequest>
+        Update: Partial<P.ProcurementDocumentRequest>
+      }
+      procurement_inbound_emails: {
+        Row: P.ProcurementInboundEmail
+        Insert: Partial<P.ProcurementInboundEmail>
+        Update: Partial<P.ProcurementInboundEmail>
+      }
+      procurement_documents: {
+        Row: P.ProcurementDocument
+        Insert: Partial<P.ProcurementDocument>
+        Update: Partial<P.ProcurementDocument>
+      }
+      procurement_requirements: {
+        Row: P.ProcurementRequirement
+        Insert: Partial<P.ProcurementRequirement>
+        Update: Partial<P.ProcurementRequirement>
+      }
+      procurement_questions: {
+        Row: P.ProcurementQuestion
+        Insert: Partial<P.ProcurementQuestion>
+        Update: Partial<P.ProcurementQuestion>
+      }
+      procurement_price_lines: {
+        Row: P.ProcurementPriceLine
+        Insert: Partial<P.ProcurementPriceLine>
+        Update: Partial<P.ProcurementPriceLine>
+      }
+      procurement_signal_sources: {
+        Row: P.ProcurementSignalSource
+        Insert: Partial<P.ProcurementSignalSource>
+        Update: Partial<P.ProcurementSignalSource>
+      }
+      procurement_signals: {
+        Row: P.ProcurementSignal
+        Insert: Partial<P.ProcurementSignal>
+        Update: Partial<P.ProcurementSignal>
+      }
+      procurement_watch_rules: {
+        Row: P.ProcurementWatchRule
+        Insert: Partial<P.ProcurementWatchRule>
+        Update: Partial<P.ProcurementWatchRule>
+      }
+      procurement_events: {
+        Row: P.ProcurementEvent
+        Insert: Partial<P.ProcurementEvent>
+        Update: Partial<P.ProcurementEvent>
+      }
+      procurement_read_state: {
+        Row: P.ProcurementReadState
+        Insert: Partial<P.ProcurementReadState>
+        Update: Partial<P.ProcurementReadState>
+      }
+      procurement_source_health: {
+        Row: P.ProcurementSourceHealth
+        Insert: Partial<P.ProcurementSourceHealth>
+        Update: Partial<P.ProcurementSourceHealth>
+      }
+      procurement_user_settings: {
+        Row: P.ProcurementUserSettings
+        Insert: Partial<P.ProcurementUserSettings>
+        Update: Partial<P.ProcurementUserSettings>
       }
       // ✅ BILLING_AUDIT_LOG TABELL TILLAGD
       billing_audit_log: {

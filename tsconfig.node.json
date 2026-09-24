@@ -35,7 +35,12 @@
     "src/shared/contractPlanner.ts",
 
     // Delade kundnummerregler för Fortnox-spegeln och allokeringen
-    "src/shared/fortnoxCustomerNumbers.ts"
+    "src/shared/fortnoxCustomerNumbers.ts",
+
+    // Upphandlingsportalen: radtyper och rena regler (matchning, dedup,
+    // avtalsslut, län) som delas mellan synk-cronen och klienten
+    "src/types/procurement.ts",
+    "src/shared/procurementRules.ts"
 
     // OBS: vite.config.ts kan inte typkollas här — Vite är ESM-only och detta
     // projekt använder NodeNext utan "type": "module" i package.json.

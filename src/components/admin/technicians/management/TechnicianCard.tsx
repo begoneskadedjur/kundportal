@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react' // useEffect lades till för att hantera klick utanför
 import {
   User, Mail, Phone, MapPin, MoreVertical, Edit,
-  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle, BadgeCheck, Receipt
+  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle, BadgeCheck, Receipt, Gavel
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '../../../ui/Button'
@@ -35,6 +35,7 @@ type TechnicianCardProps = {
   onExtraRolesChange?: (technicianId: string, roles: ExtraPortalRole[]) => void
   onDiscountApproverChange?: (technicianId: string, canApprove: boolean) => void
   onInvoiceApproverChange?: (technicianId: string, canApprove: boolean) => void
+  onProcurementManagerChange?: (technicianId: string, isManager: boolean) => void
 }
 
 export default function TechnicianCard({
@@ -48,7 +49,8 @@ export default function TechnicianCard({
   onRecipientTypesChange,
   onExtraRolesChange,
   onDiscountApproverChange,
-  onInvoiceApproverChange
+  onInvoiceApproverChange,
+  onProcurementManagerChange
 }: TechnicianCardProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [recipientTypes, setRecipientTypes] = useState<Set<IncidentType>>(
@@ -64,6 +66,8 @@ export default function TechnicianCard({
   const [savingDiscountApprover, setSavingDiscountApprover] = useState(false)
   const [isInvoiceApprover, setIsInvoiceApprover] = useState(!!technician.can_approve_invoices)
   const [savingInvoiceApprover, setSavingInvoiceApprover] = useState(false)
+  const [isProcurementManager, setIsProcurementManager] = useState(!!technician.is_procurement_manager)
+  const [savingProcurementManager, setSavingProcurementManager] = useState(false)
 
   const handleSendNewPassword = async () => {
     if (!technician.user_id || sendingPassword) return
@@ -97,6 +101,30 @@ export default function TechnicianCard({
   useEffect(() => {
     setIsInvoiceApprover(!!technician.can_approve_invoices)
   }, [technician.can_approve_invoices])
+
+  useEffect(() => {
+    setIsProcurementManager(!!technician.is_procurement_manager)
+  }, [technician.is_procurement_manager])
+
+  const toggleProcurementManager = async () => {
+    if (!technician.user_id || savingProcurementManager) return
+    const previous = isProcurementManager
+    const next = !previous
+
+    setIsProcurementManager(next)
+    setSavingProcurementManager(true)
+    try {
+      await technicianManagementService.updateIsProcurementManager(technician.id, technician.user_id, next)
+      onProcurementManagerChange?.(technician.id, next)
+      toast.success(next
+        ? `${technician.name} är nu upphandlingsansvarig och har fått en notis`
+        : `${technician.name} är inte längre upphandlingsansvarig`)
+    } catch {
+      setIsProcurementManager(previous)
+    } finally {
+      setSavingProcurementManager(false)
+    }
+  }
 
   const toggleDiscountApprover = async () => {
     if (!technician.user_id || savingDiscountApprover) return
@@ -555,6 +583,48 @@ export default function TechnicianCard({
         ) : (
           <p className="text-xs text-slate-500">
             Kräver aktiverad inloggning - bara personer med konto kan vara faktureringsansvariga
+          </p>
+        )}
+      </div>
+
+      {/* Upphandlingsansvarig - togglas direkt på kortet, ger åtkomst till /admin/upphandlingar */}
+      <div className="mt-4 pt-3 border-t border-slate-700">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Gavel className="w-3.5 h-3.5 text-[#20c58f]" />
+          <span className="text-xs font-medium text-slate-400">Upphandlingsansvarig</span>
+        </div>
+        {technician.has_login && technician.user_id ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-slate-500">
+              {isProcurementManager
+                ? 'Bevakar upphandlingar, får träffar och dagligt sammandrag'
+                : 'Kan få åtkomst till upphandlingsportalen'}
+            </p>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isProcurementManager}
+              onClick={toggleProcurementManager}
+              disabled={savingProcurementManager}
+              title={isProcurementManager
+                ? 'Klicka för att ta bort upphandlingsansvaret'
+                : 'Klicka för att göra personen upphandlingsansvarig'}
+              className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${
+                isProcurementManager
+                  ? 'bg-[#20c58f] border-[#20c58f]'
+                  : 'bg-slate-700 border-slate-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-[#fff] transition-transform ${
+                  isProcurementManager ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">
+            Kräver aktiverad inloggning - bara personer med konto kan vara upphandlingsansvariga
           </p>
         )}
       </div>

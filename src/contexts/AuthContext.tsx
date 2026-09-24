@@ -14,6 +14,7 @@ export type Profile = {
   extra_roles?: string[] | null;
   can_approve_discounts?: boolean;
   can_approve_invoices?: boolean;
+  is_procurement_manager?: boolean;
   theme_preference?: 'dark' | 'light' | 'system' | null;
   technicians?: { name: string; role: string; email: string; } | null;
 };

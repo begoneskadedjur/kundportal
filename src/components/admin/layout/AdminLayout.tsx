@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../../contexts/AuthContext'
 import LoadingSpinner from '../../shared/LoadingSpinner'
+import { hasProcurementAccess } from '../../../hooks/useProcurementAccess'
 import { AdminSidebar } from './AdminSidebar'
 import { AdminTopHeader } from './AdminTopHeader'
 import { AdminMobileNav } from './AdminMobileNav'
@@ -23,7 +24,9 @@ export default function AdminLayout() {
 
   // Grundlaggande rollkontroll — belt-and-suspenders med ProtectedRoute pa varje child
   const hasAdminAccess = profile?.role === 'admin' || profile?.role === 'koordinator' || profile?.is_admin === true
-  if (!profile || !hasAdminAccess) {
+  // Upphandlingsansvariga utan adminroll släpps in, men bara till upphandlingsportalen
+  const procurementOnly = location.pathname.startsWith('/admin/upphandlingar') && hasProcurementAccess(profile)
+  if (!profile || (!hasAdminAccess && !procurementOnly)) {
     return <Navigate to="/login" replace />
   }
 

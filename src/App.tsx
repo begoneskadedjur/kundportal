@@ -1,5 +1,6 @@
 // src/App.tsx - SLUTGILTIG VERSION MED KORREKT FORMATERING OCH STRIKT BEHÖRIGHET
 
+import { lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -111,6 +112,19 @@ import AdminOrKoordinatorRoute from './components/shared/AdminOrKoordinatorRoute
 import MultisiteProtectedRoute from './components/shared/MultisiteProtectedRoute';
 import { AppLayout } from './components/shared/AppLayout';
 
+// Upphandlingsportalen: laddas separat, bara för admin och upphandlingsansvariga
+import ProcurementLayout from './pages/admin/procurement/ProcurementLayout';
+const ProcurementMarket = lazy(() => import('./pages/admin/procurement/MarketPage'));
+const ProcurementWatch = lazy(() => import('./pages/admin/procurement/WatchPage'));
+const ProcurementNoticeDetail = lazy(() => import('./pages/admin/procurement/NoticeDetailPage'));
+const ProcurementContractClock = lazy(() => import('./pages/admin/procurement/ContractClockPage'));
+const ProcurementSignals = lazy(() => import('./pages/admin/procurement/SignalsPage'));
+const ProcurementBuyers = lazy(() => import('./pages/admin/procurement/BuyersPage'));
+const ProcurementBuyerProfile = lazy(() => import('./pages/admin/procurement/BuyerProfilePage'));
+const ProcurementCompetitors = lazy(() => import('./pages/admin/procurement/CompetitorsPage'));
+const ProcurementCompetitorProfile = lazy(() => import('./pages/admin/procurement/CompetitorProfilePage'));
+const ProcurementSettings = lazy(() => import('./pages/admin/procurement/SettingsPage'));
+
 // Tickets (shared page for internal communication)
 import InternAdministration from './pages/shared/InternAdministration';
 
@@ -179,6 +193,19 @@ function App() {
               <Route path="offerthantering" element={<Navigate to="/admin/dokumentsignering" replace />} />
               <Route path="kundresa" element={<ProtectedRoute requiredRole="admin"><CustomerJourney /></ProtectedRoute>} />
               <Route path="avslutade-arenden" element={<ProtectedRoute requiredRole="admin"><ClosedCasesFunnel /></ProtectedRoute>} />
+              {/* Upphandlingar: inloggad (ProtectedRoute) plus åtkomstkontroll i ProcurementLayout (admin eller upphandlingsansvarig) */}
+              <Route path="upphandlingar" element={<ProtectedRoute><ProcurementLayout /></ProtectedRoute>}>
+                <Route index element={<ProcurementMarket />} />
+                <Route path="bevakning" element={<ProcurementWatch />} />
+                <Route path="avtalsklocka" element={<ProcurementContractClock />} />
+                <Route path="signaler" element={<ProcurementSignals />} />
+                <Route path="kopare" element={<ProcurementBuyers />} />
+                <Route path="kopare/:buyerId" element={<ProcurementBuyerProfile />} />
+                <Route path="konkurrenter" element={<ProcurementCompetitors />} />
+                <Route path="konkurrenter/:supplierId" element={<ProcurementCompetitorProfile />} />
+                <Route path="installningar" element={<ProcurementSettings />} />
+                <Route path=":noticeId" element={<ProcurementNoticeDetail />} />
+              </Route>
               <Route path="webhook-config" element={<ProtectedRoute requiredRole="admin"><WebhookConfig /></ProtectedRoute>} />
               <Route path="kundgrupper" element={<ProtectedRoute requiredRole="admin"><CustomerGroupsPage /></ProtectedRoute>} />
               <Route path="installningar/fortnox" element={<ProtectedRoute requiredRole="admin"><FortnoxPage /></ProtectedRoute>} />

@@ -50,6 +50,12 @@ export default function NotificationCenter({
       // Navigera till rätt sida baserat på användarens portal
       const pathname = window.location.pathname;
 
+      // Upphandlingsnotis: detaljsidan, eller portalens startsida utan id
+      if (notification.case_type === 'procurement') {
+        navigate(notification.case_id ? `/admin/upphandlingar/${notification.case_id}` : '/admin/upphandlingar');
+        return;
+      }
+
       if (pathname.includes('/technician')) {
         // Tekniker: gå till schema-sidan och öppna ärendet där
         navigate(`/technician/schedule?openCase=${notification.case_id}&caseType=${notification.case_type}`);

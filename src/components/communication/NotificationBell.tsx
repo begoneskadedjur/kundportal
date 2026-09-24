@@ -70,6 +70,12 @@ export default function NotificationBell({
       // Navigera till Tickets-sidan med ärendet öppet
       const pathname = window.location.pathname;
 
+      // Upphandlingsnotis: detaljsidan, eller portalens startsida utan id
+      if (notification.case_type === 'procurement') {
+        window.location.href = notification.case_id ? `/admin/upphandlingar/${notification.case_id}` : '/admin/upphandlingar';
+        return;
+      }
+
       // Kundnotis (tillägg att besluta): rakt in i kundkortets avtalskarta
       if (notification.case_type === 'customer') {
         const base = pathname.includes('/koordinator') ? '/koordinator' : '/admin';

@@ -7,6 +7,8 @@ import { useIncidentBadge } from '../../../hooks/useIncidentBadge'
 import { useIntranetBadge } from '../../../hooks/useIntranetBadge'
 import { useTicketsBadge } from '../../../hooks/useTicketsBadge'
 import { useAddonPendingBadge } from '../../../hooks/useAddonPending'
+import { useProcurementBadge } from '../../../hooks/useProcurementBadge'
+import { useProcurementAccess } from '../../../hooks/useProcurementAccess'
 
 interface SidebarNavGroupProps {
   group: NavGroup
@@ -23,7 +25,10 @@ function ItemBadge({ count }: { count: number }) {
   )
 }
 
-export function SidebarNavGroup({ group, collapsed, currentPath }: SidebarNavGroupProps) {
+export function SidebarNavGroup({ group: groupIn, collapsed, currentPath }: SidebarNavGroupProps) {
+  const { allowed: procurementAllowed } = useProcurementAccess()
+  // Poster med åtkomstkrav döljs för den som saknar åtkomsten
+  const group = { ...groupIn, items: groupIn.items.filter((i) => i.requires !== 'procurement' || procurementAllowed) }
   const isAnyActive = group.items.some(item => currentPath.startsWith(item.path))
   const [expanded, setExpanded] = useState(group.pinned || isAnyActive)
   const GroupIcon = group.icon
@@ -31,12 +36,14 @@ export function SidebarNavGroup({ group, collapsed, currentPath }: SidebarNavGro
   const intranetCount = useIntranetBadge()
   const ticketsCount = useTicketsBadge()
   const addonCount = useAddonPendingBadge()
+  const procurementCount = useProcurementBadge()
 
   const badgeCountFor = (item: NavItem) =>
     item.badgeKey === 'incidents' ? incidentCount
       : item.badgeKey === 'intranet' ? intranetCount
       : item.badgeKey === 'tickets' ? ticketsCount
       : item.badgeKey === 'addons' ? addonCount
+      : item.badgeKey === 'procurement' ? procurementCount
       : 0
   const groupBadgeCount = group.items.reduce((sum, item) => sum + badgeCountFor(item), 0)
 

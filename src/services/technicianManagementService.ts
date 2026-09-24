@@ -1,4 +1,5 @@
 import { supabase, getAuthHeaders } from '../lib/supabase'
+import { apiFetch } from '../lib/api'
 import toast from 'react-hot-toast'
 import type { IncidentType } from '../types/caseIncidents'
 
@@ -47,6 +48,7 @@ export type Technician = {
   incident_recipient_types?: IncidentType[]
   can_approve_discounts?: boolean
   can_approve_invoices?: boolean
+  is_procurement_manager?: boolean
 }
 
 export type TechnicianFormData = {
@@ -164,6 +166,39 @@ export const technicianManagementService = {
     }
   },
 
+  /**
+   * Sätter/tar bort upphandlingsansvar (profiles.is_procurement_manager).
+   * När flaggan slås på får personen en notis och ett mejl med länk till
+   * /admin/upphandlingar via api/procurement/notify-manager. Misslyckas
+   * mejlet står flaggan kvar; det meddelas med en varning.
+   */
+  async updateIsProcurementManager(technicianId: string, userId: string, isManager: boolean): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ is_procurement_manager: isManager })
+        .eq('technician_id', technicianId)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating procurement manager:', error)
+      toast.error('Kunde inte uppdatera upphandlingsansvar')
+      throw error
+    }
+
+    if (!isManager) return
+    try {
+      const res = await apiFetch('/api/procurement/notify-manager', {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      })
+      if (!res.ok) throw new Error(`notify-manager ${res.status}`)
+    } catch (error) {
+      console.warn('Kunde inte skicka notis om upphandlingsansvar:', error)
+      toast.error('Upphandlingsansvaret är sparat, men notisen eller mejlet gick inte iväg')
+    }
+  },
+
   async updateDisplayName(technicianId: string, displayName: string): Promise<void> {
     const { error } = await supabase
       .from('profiles')
@@ -222,7 +257,7 @@ export const technicianManagementService = {
     try {
       const [techniciansRes, profilesRes, recipientsRes] = await Promise.all([
         supabase.from('technicians').select('*').order('name', { ascending: true }),
-        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, extra_roles, can_approve_discounts, can_approve_invoices'),
+        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, extra_roles, can_approve_discounts, can_approve_invoices, is_procurement_manager'),
         supabase.from('incident_recipients').select('user_id, incident_type')
       ]);
       if (techniciansRes.error) throw techniciansRes.error;
@@ -253,6 +288,7 @@ export const technicianManagementService = {
           extra_roles: (profile?.extra_roles as ExtraPortalRole[] | null) || [],
           can_approve_discounts: profile?.can_approve_discounts || false,
           can_approve_invoices: profile?.can_approve_invoices || false,
+          is_procurement_manager: (profile as { is_procurement_manager?: boolean } | null)?.is_procurement_manager || false,
           incident_recipient_types: profile?.user_id
             ? (recipientTypesByUserId.get(profile.user_id) || [])
             : []
@@ -527,7 +563,7 @@ export const technicianManagementService = {
 
   async getTechnicianById(id: string): Promise<Technician> {
     try {
-      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, extra_roles, can_approve_discounts, can_approve_invoices)`).eq('id', id).single();
+      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, extra_roles, can_approve_discounts, can_approve_invoices, is_procurement_manager)`).eq('id', id).single();
       if (error) throw error;
 
       // FK-join hittar profiler direkt (alla roller har nu technician_id)
@@ -551,6 +587,7 @@ export const technicianManagementService = {
         extra_roles: (profile?.extra_roles as ExtraPortalRole[] | null) || [],
         can_approve_discounts: profile?.can_approve_discounts || false,
         can_approve_invoices: profile?.can_approve_invoices || false,
+        is_procurement_manager: (profile as { is_procurement_manager?: boolean } | null)?.is_procurement_manager || false,
         incident_recipient_types: incidentRecipientTypes
       };
     } catch (error: any) {

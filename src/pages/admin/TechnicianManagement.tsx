@@ -172,6 +172,13 @@ export default function TechnicianManagement() {
     ))
   }
 
+  // Uppdatera lokalt state när upphandlingsansvar togglas direkt på ett kort
+  const handleProcurementManagerChange = (technicianId: string, isManager: boolean) => {
+    setTechnicians(prev => prev.map(t =>
+      t.id === technicianId ? { ...t, is_procurement_manager: isManager } : t
+    ))
+  }
+
   const handleDeleteTechnician = async (id: string) => {
     try {
       await technicianManagementService.deleteTechnician(id)
@@ -412,6 +419,7 @@ export default function TechnicianManagement() {
               onExtraRolesChange={handleExtraRolesChange}
               onDiscountApproverChange={handleDiscountApproverChange}
               onInvoiceApproverChange={handleInvoiceApproverChange}
+              onProcurementManagerChange={handleProcurementManagerChange}
             />
           ))}
         </div>

@@ -55,6 +55,26 @@
     {
       "path": "/api/cron/sync-fortnox-customers-incremental",
       "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/procurement-sync-mercell",
+      "schedule": "0 4-20 * * 1-5"
+    },
+    {
+      "path": "/api/cron/procurement-sync-ted",
+      "schedule": "15 5 * * *"
+    },
+    {
+      "path": "/api/cron/procurement-deadlines",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/procurement-digest",
+      "schedule": "45 5,6 * * 1-5"
+    },
+    {
+      "path": "/api/cron/procurement-signals",
+      "schedule": "30 3 * * *"
     }
   ],
   "rewrites": [

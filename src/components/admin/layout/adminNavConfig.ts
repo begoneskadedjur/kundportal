@@ -32,6 +32,7 @@ import {
   Map,
   CalendarRange,
   BadgeCheck,
+  Gavel,
 } from 'lucide-react'
 
 export interface NavItem {
@@ -39,7 +40,9 @@ export interface NavItem {
   icon: React.ElementType
   path: string
   /** Nyckel för dynamisk räknarbadge i sidomenyn (t.ex. ohanterade incidenter) */
-  badgeKey?: 'incidents' | 'intranet' | 'tickets' | 'addons'
+  badgeKey?: 'incidents' | 'intranet' | 'tickets' | 'addons' | 'procurement'
+  /** Posten visas bara för den som har åtkomsten (se useProcurementAccess) */
+  requires?: 'procurement'
 }
 
 export interface NavGroup {
@@ -76,6 +79,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Leadsstatistik', icon: BarChart3, path: '/admin/leadsstatistik' },
       { label: 'Dokumentsignering', icon: ClipboardList, path: '/admin/dokumentsignering' },
       { label: 'Kundresa', icon: GitBranch, path: '/admin/kundresa' },
+      { label: 'Upphandlingar', icon: Gavel, path: '/admin/upphandlingar', badgeKey: 'procurement', requires: 'procurement' },
       { label: 'Avslutade ärenden', icon: Trash2, path: '/admin/avslutade-arenden' },
     ]
   },
@@ -170,6 +174,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/dokumentsignering': 'Dokumentsignering',
   '/admin/kundresa': 'Kundresa',
   '/admin/avslutade-arenden': 'Avslutade ärenden',
+  '/admin/upphandlingar': 'Upphandlingar',
 
   '/admin/ai-assistent': 'AI Assistent',
   '/admin/bildbank': 'Gemensam bildbank',
