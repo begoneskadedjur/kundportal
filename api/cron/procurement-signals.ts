@@ -12,6 +12,9 @@
 //      första gången hela texten) till extractSignals, och raderna upsertas i
 //      procurement_signals på signal_key plan:{källa}:{sha1 av normaliserad text}.
 //      Status på befintliga signaler rörs inte.
+//      Sedan 2026-09-25 sparas sha256 per PDF-adress i pdf_hashes. Bara PDF:er
+//      som är nya eller ändrade skickas till AI; en oförändrad plan-PDF läses
+//      inte om bara för att webbsidan runt den ändrats.
 //   4. Tidsbudget 250 s: jobbet avbryter snyggt och nästa körning börjar med de
 //      källor som inte hann hämtas (sortering på last_fetched_at, nulls first).
 //      Misslyckad AI-läsning sparar inte den nya hashen, så ändringen tas om.
@@ -59,6 +62,9 @@ interface SourceSummary {
   name: string
   status: 'unchanged' | 'changed' | 'first' | 'error' | 'timeout'
   signals?: number
+  /** PDF:er som skickades till AI respektive hoppades över (oförändrad hash) */
+  pdfsRead?: number
+  pdfsSkipped?: number
   error?: string
 }
 
@@ -182,9 +188,13 @@ async function processSource(source: ProcurementSignalSource, buyerName: string,
 
   const first = !source.content_hash
   const diffText = first ? text.slice(0, MAX_FIRST_TEXT) : newLines(source.last_text ?? '', text).slice(0, MAX_FIRST_TEXT)
-  // Tabellen sparar ingen hash per PDF, så vid en ändring skickas planens PDF:er
-  // med (högst två). Signalnyckeln på normaliserad text förhindrar dubbletter.
-  const pdfParts: AiPart[] = pdfs.flatMap((p) => [
+  // Hash per PDF: bara nya eller ändrade PDF:er går till AI. Signalnyckeln på
+  // normaliserad text förhindrar dubbletter om samma rad ändå kommer igen.
+  const oldPdfHashes: Record<string, string> = (source.pdf_hashes as Record<string, string> | undefined) ?? {}
+  const pdfHashes: Record<string, string> = {}
+  for (const p of pdfs) pdfHashes[p.url] = sha256(p.data)
+  const changedPdfs = pdfs.filter((p) => oldPdfHashes[p.url] !== pdfHashes[p.url])
+  const pdfParts: AiPart[] = changedPdfs.flatMap((p) => [
       { text: `<dokument namn="${p.url.replace(/["<>]/g, '')}" typ="pdf">` },
       { inlineData: { mimeType: 'application/pdf', data: p.data.toString('base64') } },
       { text: '</dokument>' },
@@ -224,7 +234,7 @@ async function processSource(source: ProcurementSignalSource, buyerName: string,
       url: finalUrl,
       expected_quarter: s.expected_quarter,
       reliability: s.reliability,
-      raw: { extracted_at: now(), first_fetch: first, pdfs: pdfs.map((p) => p.url) },
+      raw: { extracted_at: now(), first_fetch: first, pdfs: changedPdfs.map((p) => p.url), unchanged_pdfs: pdfs.length - changedPdfs.length },
     }))
     const { error } = await sb.from('procurement_signals').upsert(rows, { onConflict: 'signal_key' })
     if (error) throw new Error(`Signalerna kunde inte sparas: ${error.message}`)
@@ -235,6 +245,7 @@ async function processSource(source: ProcurementSignalSource, buyerName: string,
     .from('procurement_signal_sources')
     .update({
       content_hash: hash,
+      pdf_hashes: pdfHashes,
       last_text: text.slice(0, MAX_LAST_TEXT),
       last_fetched_at: ts,
       last_changed_at: ts,
@@ -243,7 +254,7 @@ async function processSource(source: ProcurementSignalSource, buyerName: string,
     })
     .eq('id', source.id)
 
-  return { id: source.id, name: source.name, status: first ? 'first' : 'changed', signals: signals.length }
+  return { id: source.id, name: source.name, status: first ? 'first' : 'changed', signals: signals.length, pdfsRead: changedPdfs.length, pdfsSkipped: pdfs.length - changedPdfs.length }
 }
 
 /** Rader i den nya texten som inte fanns i den gamla (jämförs normaliserat) */
