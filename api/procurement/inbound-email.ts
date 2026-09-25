@@ -458,8 +458,10 @@ function header(req: VercelRequest, name: string): string | undefined {
 }
 
 async function resendGet<T>(path: string): Promise<T> {
-  const key = process.env.RESEND_API_KEY
-  if (!key) throw new Error('RESEND_API_KEY saknas')
+  // Läsning av mottagna mejl kräver en nyckel med full åtkomst. Den vanliga
+  // RESEND_API_KEY är ofta begränsad till sändning, därför egen variabel först.
+  const key = process.env.RESEND_RECEIVING_API_KEY || process.env.RESEND_API_KEY
+  if (!key) throw new Error('RESEND_RECEIVING_API_KEY eller RESEND_API_KEY saknas')
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 20_000)
   try {

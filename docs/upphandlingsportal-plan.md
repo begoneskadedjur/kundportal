@@ -250,7 +250,8 @@ DNS och Vercel (görs av Christian eller huvudsessionen):
 | Variabel | Krävs | Vad |
 |---|---|---|
 | `CRON_SECRET` | finns | Alla procurement-cron kör `requireCronSecret` |
-| `RESEND_API_KEY` | finns | Utgående post, och läsning av inkommande post via Resends Receiving-API. Nyckeln måste ha rätt att läsa mottagen post |
+| `RESEND_API_KEY` | finns | Utgående post. Nyckeln i produktion är begränsad till sändning (upptäckt 2026-09-25) |
+| `RESEND_RECEIVING_API_KEY` | ny | Nyckel med Full access i Resend, används av `api/procurement/inbound-email` för att hämta mottagna mejl och bilagor. Utan den svarar Resend 401 restricted_api_key och mejlet fastnar |
 | `GOOGLE_AI_API_KEY` | finns | Gemini för underlagsextraktion, klassning av handlingar och signaler |
 | `RESEND_WEBHOOK_SECRET` | ny | Hemligheten (whsec_...) från webhooken i Resend, för signaturkontroll i `api/procurement/inbound-email` |
 | `PROCUREMENT_REPLY_DOMAIN` | ny | Domänen i svarsadressen `upphandling+bgu-{nr}@{domän}`. Sätt till mottagningssubdomänen, t.ex. `inbound.begone.se`. Standard är `begone.se`, då hamnar svaren i företagets vanliga inkorg och matchas inte automatiskt |
