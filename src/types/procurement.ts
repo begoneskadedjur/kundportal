@@ -235,6 +235,8 @@ export interface ProcurementBidder {
   is_begone: boolean
   source: 'ted' | 'ted_xml' | 'uhm' | 'email' | 'document' | 'manual'
   document_id: string | null
+  /** Inkommen e-post som raden lästes ut ur, följer med när mejlet flyttas */
+  inbound_email_id: string | null
   verified: boolean
   verified_by: string | null
   verified_at: string | null

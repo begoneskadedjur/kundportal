@@ -1,7 +1,7 @@
 // src/components/admin/procurement/detail/OutcomeBlock.tsx
 // Block 9: utfall och handlingar. Anbudsgivare på upphandlingen (importerade,
 // AI-utlästa ur handlingar eller manuella) med godkännande, begäran om
-// allmänna handlingar via e-post och vårt eget anbuds utfall.
+// allmänna handlingar via e-post, inkommen e-post och vårt eget anbuds utfall.
 
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
@@ -17,6 +17,7 @@ import {
   DOCUMENT_REQUEST_TYPES,
   REQUEST_STATUS_LABEL,
   type ProcurementBid,
+  type ProcurementDocument,
   type ProcurementDocumentRequest,
   type ProcurementRequestStatus,
 } from '../../../../types/procurement'
@@ -24,6 +25,7 @@ import { EmptyState, LinkButton, StatusDot } from '../ui'
 import { fmtDate, fmtKr, fmtNum, tableCls, type Tone } from '../uiFormat'
 import { BlurText, Block, Label, NumberField, SubHeading, checkboxCls, inputCls, selectCls } from './fields'
 import { errMsg } from './helpers'
+import InboundEmailSection from './InboundEmailSection'
 
 const BIDDER_SOURCE_LABEL: Record<string, string> = {
   ted: 'TED',
@@ -57,11 +59,14 @@ interface Props {
   notice: NoticeWithRelations
   noticeAwards: AwardWithRelations[]
   bids: ProcurementBid[]
+  documents: ProcurementDocument[]
   onBidsChanged: () => void
   onEventsChanged: () => void
+  /** Hämtar om dokument och händelser, t.ex. efter att ett mejl flyttats */
+  onDocumentsChanged: () => void
 }
 
-export default function OutcomeBlock({ notice, noticeAwards, bids, onBidsChanged, onEventsChanged }: Props) {
+export default function OutcomeBlock({ notice, noticeAwards, bids, documents, onBidsChanged, onEventsChanged, onDocumentsChanged }: Props) {
   const [bidders, setBidders] = useState<BidderWithSupplier[]>([])
   const [requests, setRequests] = useState<ProcurementDocumentRequest[]>([])
 
@@ -97,6 +102,14 @@ export default function OutcomeBlock({ notice, noticeAwards, bids, onBidsChanged
           onChanged={() => {
             void loadRequests()
             onEventsChanged()
+          }}
+        />
+        <InboundEmailSection
+          noticeId={notice.id}
+          documents={documents}
+          onMoved={() => {
+            void loadBidders()
+            onDocumentsChanged()
           }}
         />
         <OwnOutcome bids={bids} onChanged={onBidsChanged} />

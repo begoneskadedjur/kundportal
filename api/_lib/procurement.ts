@@ -641,6 +641,8 @@ export interface BidderCandidate {
   rank?: number | null
   isWinner: boolean
   documentId?: string | null
+  /** Inkommen e-post som handlingen kom med; utelämnas för att behålla befintligt värde */
+  inboundEmailId?: string | null
   raw?: unknown
 }
 
@@ -672,6 +674,7 @@ export async function upsertBidder(b: BidderCandidate): Promise<void> {
         is_begone: supplier?.isBegone ?? false,
         source: b.source,
         document_id: b.documentId ?? null,
+        ...(b.inboundEmailId ? { inbound_email_id: b.inboundEmailId } : {}),
         raw: b.raw ?? null,
       },
       { onConflict: 'bidder_key' }

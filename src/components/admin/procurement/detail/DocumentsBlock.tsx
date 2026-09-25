@@ -235,7 +235,7 @@ export default function DocumentsBlock({ notice, documents, onDocumentsChanged }
                   {documents.map((d) => {
                     const st = rerunning.has(d.id) ? AI_STATUS.running : AI_STATUS[d.ai_status]
                     return (
-                      <tr key={d.id} className={tableCls.tr}>
+                      <tr key={d.id} id={`dok-${d.id}`} className={`${tableCls.tr} scroll-mt-24 transition-colors`}>
                         <td className={`${tableCls.td} max-w-[260px]`}>
                           <button type="button" onClick={() => void open(d)} className="text-left text-slate-200 hover:text-[#20c58f] break-words">
                             {d.file_name}

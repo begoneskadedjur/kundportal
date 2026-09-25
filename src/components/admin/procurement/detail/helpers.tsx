@@ -91,9 +91,10 @@ export function personName(managers: Array<{ user_id: string; display_name: stri
  * och noden som ska renderas en gång i komponenten.
  */
 export function useConfirm() {
-  const [state, setState] = useState<{ title: string; message: string; run: () => Promise<void> } | null>(null)
+  const [state, setState] = useState<{ title: string; message: string; run: () => Promise<void>; confirmLabel?: string; variant?: 'danger' | 'warning' } | null>(null)
   const [busy, setBusy] = useState(false)
-  const confirm = (title: string, message: string, run: () => Promise<void>) => setState({ title, message, run })
+  const confirm = (title: string, message: string, run: () => Promise<void>, opts: { confirmLabel?: string; variant?: 'danger' | 'warning' } = {}) =>
+    setState({ title, message, run, ...opts })
   const node = (
     <ConfirmModal
       isOpen={!!state}
@@ -113,8 +114,8 @@ export function useConfirm() {
       }}
       title={state?.title ?? ''}
       message={state?.message ?? ''}
-      variant="danger"
-      confirmLabel="Ta bort"
+      variant={state?.variant ?? 'danger'}
+      confirmLabel={state?.confirmLabel ?? 'Ta bort'}
       loading={busy}
     />
   )

@@ -93,6 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           rank: b.rank,
           isWinner: b.is_winner === true,
           documentId,
+          inboundEmailId: (doc.inbound_email_id as string | null) ?? null,
           raw: b,
         })
       }

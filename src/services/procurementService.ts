@@ -549,17 +549,54 @@ export class ProcurementService {
     return rows<ProcurementInboundEmail>(data)
   }
 
-  /** Kopplar ett osorterat mejl (och dess bilagor) till en upphandling */
-  static async assignInboundEmail(emailId: string, noticeId: string | null, ignore = false): Promise<void> {
-    const { error } = await supabase
+  /** Mejl kopplade till en upphandling, nyast först */
+  static async listInboundEmailsForNotice(noticeId: string): Promise<ProcurementInboundEmail[]> {
+    const { data, error } = await supabase
       .from('procurement_inbound_emails')
-      .update({ notice_id: noticeId, match_method: noticeId ? 'manual' : null, status: ignore ? 'ignored' : noticeId ? 'matched' : 'unsorted' } as never)
-      .eq('id', emailId)
-    if (error) fail('Kunde inte koppla e-posten', error)
-    if (noticeId) {
-      await supabase.from('procurement_documents').update({ notice_id: noticeId } as never).eq('inbound_email_id', emailId)
-      await this.addEvent(noticeId, 'inbound_assigned', 'Inkommen e-post kopplad manuellt')
+      .select('id, message_id, from_email, from_domain, to_emails, subject, text_body, received_at, notice_id, request_id, match_method, status, ai_classification, created_at')
+      .eq('notice_id', noticeId)
+      .order('received_at', { ascending: false })
+      .limit(200)
+    if (error) fail('Kunde inte hämta inkommen e-post', error)
+    return rows<ProcurementInboundEmail>(data)
+  }
+
+  /**
+   * Kopplar ett mejl till en upphandling, lägger det i Osorterat (noticeId null)
+   * eller ignorerar det. Bilagorna följer med. Anbudsgivare som AI läst ut ur
+   * mejlet flyttas med, eller tas bort när mejlet inte längre hör till någon
+   * upphandling. Sker i RPC:n procurement_move_inbound_email eftersom
+   * användare saknar behörighet att flytta anbudsgivare direkt.
+   */
+  static async assignInboundEmail(
+    emailId: string,
+    noticeId: string | null,
+    ignore = false
+  ): Promise<{ status: string; documents: number; bidders_moved: number; bidders_removed: number }> {
+    const { data, error } = await supabase.rpc('procurement_move_inbound_email' as never, {
+      p_email_id: emailId,
+      p_notice_id: noticeId,
+      p_ignore: ignore,
+    } as never)
+    if (error) fail('Kunde inte flytta e-posten', error)
+    return data as unknown as { status: string; documents: number; bidders_moved: number; bidders_removed: number }
+  }
+
+  /** Sök upphandling att flytta till: BGU-nummer (bgu-12, 12) eller titel och köpare */
+  static async searchNoticesForMove(query: string, excludeId?: string): Promise<Array<Pick<ProcurementNotice, 'id' | 'bgu_number' | 'title' | 'buyer_name'>>> {
+    const q = query.trim()
+    if (!q) return []
+    const num = q.match(/^(?:bgu[-s]?)?(d+)$/i)
+    let req = supabase.from('procurement_notices').select('id, bgu_number, title, buyer_name')
+    if (num) req = req.eq('bgu_number', Number(num[1]))
+    else {
+      const s = q.replace(/[%,()]/g, ' ')
+      req = req.or(`title.ilike.%${s}%,buyer_name.ilike.%${s}%`)
     }
+    if (excludeId) req = req.neq('id', excludeId)
+    const { data, error } = await req.order('bgu_number', { ascending: false }).limit(20)
+    if (error) fail('Kunde inte söka upphandlingar', error)
+    return rows<Pick<ProcurementNotice, 'id' | 'bgu_number' | 'title' | 'buyer_name'>>(data)
   }
 
   // -------------------------------------------------------------------------

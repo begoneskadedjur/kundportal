@@ -281,7 +281,15 @@ export default function NoticeDetailPage() {
 
       <BuyerHistoryBlock notice={notice} awards={buyerAwards} buyerNotices={buyerNotices} />
       <CompetitionBlock notice={notice} awards={buyerAwards} />
-      <OutcomeBlock notice={notice} noticeAwards={noticeAwards} bids={bids} onBidsChanged={() => void loadBids()} onEventsChanged={() => void loadEvents()} />
+      <OutcomeBlock
+        notice={notice}
+        noticeAwards={noticeAwards}
+        bids={bids}
+        documents={documents}
+        onBidsChanged={() => void loadBids()}
+        onEventsChanged={() => void loadEvents()}
+        onDocumentsChanged={onDocumentsChanged}
+      />
       <ManagementBlock notice={notice} managers={managers} onSave={saveNotice} />
     </div>
   )

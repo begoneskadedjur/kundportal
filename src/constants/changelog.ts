@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.14.1',
+    date: '2026-09-25',
+    title: 'Inkommen e-post syns på upphandlingen',
+    items: [
+      {
+        kind: 'nyhet',
+        text: 'Under Utfall och handlingar på varje upphandling listas nu inkommen e-post med avsändare, bilagor, AI:ns sammanfattning och brödtext. Ett felkopplat mejl flyttas till rätt upphandling eller till Osorterat, och bilagor och utlästa anbudsgivare följer med.',
+      },
+    ],
+  },
+  {
     version: '3.14.0',
     date: '2026-09-25',
     title: 'Upphandlingsbevakning på egen adress, säkrare avtalsklocka och anbudsstöd',

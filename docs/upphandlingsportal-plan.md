@@ -222,6 +222,8 @@ Byggt 2026-09-24 (etapp 1 och delar av etapp 2 och 3). Migrationen `supabase/mig
 
 Byggt 2026-09-25 (version 3.14.0): fristående plattform på upphandling.begone.se, datakvalitet i avtalsklockan, Kommers, Fråga datan, kvalitetssvar, anbudsbibliotek och lärdomar. Migrationerna `20260925_upphandling_etapp3_4.sql` och `20260925_upphandling_uppfoljning_relevans.sql` är applicerade.
 
+Version 3.14.1 (2026-09-25): inkommen e-post listas på upphandlingen i block 9 och kan flyttas till en annan upphandling eller till Osorterat. Flytten sker i RPC:n `procurement_move_inbound_email`, som också flyttar bilagorna och anbudsgivare med `procurement_bidders.inbound_email_id`. Migrationen `20260925_bidders_inbound_email.sql` är applicerad.
+
 ### Fristående plattform: upphandling.begone.se
 
 Samma kodbas och Vercel-projekt (`kundportal`) som kundportalen. När appen körs på värdnamnet `upphandling.begone.se` renderas ett eget skal (`src/pages/procurement/ProcurementApp.tsx`) med egen inloggning, flikrad, notisklocka för upphandlingsnotiser, temaväxlare, Mitt konto och Logga ut. Routes ligger på roten: `/`, `/bevakning`, `/avtalsklocka`, `/signaler`, `/kopare`, `/konkurrenter`, `/fraga`, `/installningar`, `/mitt-konto` och `/{upphandlingens id}`. Inga andra portaldelar nås; okända adresser går till startsidan. Bara profiler med admin eller `is_procurement_manager` släpps in. Gamla länkar `/admin/upphandlingar/...` på subdomänen skickas vidare.

@@ -95,6 +95,7 @@ function bidder(p: Partial<BidderWithSupplier>): BidderWithSupplier {
     is_begone: false,
     source: 'uhm',
     document_id: null,
+    inbound_email_id: null,
     verified: false,
     verified_by: null,
     verified_at: null,
