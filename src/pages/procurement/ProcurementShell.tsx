@@ -4,7 +4,7 @@
 // Logga ut. Ingen admin-sidomeny och inga andra portaldelar. Släpper bara in
 // profiler med admin eller is_procurement_manager; övriga får ett vänligt nej.
 
-import { Suspense } from 'react'
+import { Suspense, useEffect } from 'react'
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { LogOut, UserRound } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -45,6 +45,13 @@ export default function ProcurementShell() {
   const { profile, user, loading, signOut } = useAuth()
   const unread = useProcurementBadge()
   const location = useLocation()
+
+  // Fristående skal: egen fliktitel, annars ärvs "BeGone Kundportal" från index.html
+  useEffect(() => {
+    const previous = document.title
+    document.title = 'Upphandlingsbevakning · BeGone'
+    return () => { document.title = previous }
+  }, [])
 
   if (loading) {
     return (
