@@ -345,6 +345,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const mode: 'daglig' | 'backfill' = backfill ? 'backfill' : 'daglig'
 
   const sb = sbClient()
+
+  // Klar backfill: svara direkt, utan Google-anrop och utan rad i cron_runs.
+  // Gör att det självgående backfill-jobbet kan ligga kvar i schemat.
+  if (backfill && !omstart) {
+    const { data: klarStatus } = await sb.from('gsc_synk_status').select('klar').eq('id', 'backfill').maybeSingle()
+    if (klarStatus?.klar) return res.status(200).json({ status: 'success', summary: { lage: 'backfill', klar: true } })
+  }
   const ctx: Ctx = { sb, siteUrl, startedAt: Date.now(), counts: {} }
   let googleFailed = false
 

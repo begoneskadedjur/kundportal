@@ -87,6 +87,10 @@
     {
       "path": "/api/cron/sync-search-console",
       "schedule": "15 4 * * *"
+    },
+    {
+      "path": "/api/cron/sync-search-console-backfill",
+      "schedule": "*/10 * * * *"
     }
   ],
   "rewrites": [

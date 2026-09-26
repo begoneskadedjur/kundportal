@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.14.5',
+    date: '2026-09-27',
+    title: 'Sökhistoriken hämtas in av sig själv',
+    items: [
+      { kind: 'andring', text: 'Historiken från Google Search Console hämtas nu in automatiskt i omgångar tills den är komplett, utan att någon behöver starta hämtningen' },
+    ],
+  },
+  {
     version: '3.14.4',
     date: '2026-09-26',
     title: 'Sökdata från Google hämtas varje natt',
