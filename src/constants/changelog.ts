@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.14.4',
+    date: '2026-09-26',
+    title: 'Sökdata från Google hämtas varje natt',
+    items: [
+      { kind: 'nyhet', text: 'Klick, visningar och placering i Googles sökresultat för begone.se hämtas automatiskt varje natt, per sida och per sökfråga, med historik 16 månader bakåt' },
+    ],
+  },
+  {
     version: '3.14.3',
     date: '2026-09-26',
     title: 'Google-omdömen hämtas varje natt',
