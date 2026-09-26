@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.14.3',
+    date: '2026-09-26',
+    title: 'Google-omdömen hämtas varje natt',
+    items: [
+      { kind: 'nyhet', text: 'Begones betyg och senaste omdömen på Google hämtas automatiskt varje natt, så att nya begone.se alltid kan visa aktuella omdömen' },
+    ],
+  },
+  {
     version: '3.14.1',
     date: '2026-09-25',
     title: 'Inkommen e-post syns på upphandlingen',

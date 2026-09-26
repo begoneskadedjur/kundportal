@@ -79,6 +79,10 @@
     {
       "path": "/api/cron/procurement-signals",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/sync-google-reviews",
+      "schedule": "45 3 * * *"
     }
   ],
   "rewrites": [
