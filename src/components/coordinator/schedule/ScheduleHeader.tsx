@@ -4,7 +4,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, ChevronDown, FileText, Calenda
 import { AnimatePresence } from 'framer-motion'
 import Button from '../../ui/Button'
 import { StatusLegend } from './StatusLegend'
-import { ScheduleSearch } from './ScheduleSearch'
+import { ScheduleSearch, type SearchCaseType } from './ScheduleSearch'
 import { getWeekNumber } from './scheduleUtils'
 import { FILTER_STATUSES } from './scheduleConstants'
 import { ScheduleFilterPopover } from './ScheduleFilterPopover'
@@ -32,7 +32,7 @@ interface ScheduleHeaderProps {
   isActionableOpen?: boolean
   onToggleActionable?: () => void
   // Sök
-  onSelectCase?: (caseId: string, caseType: 'private' | 'business') => void
+  onSelectCase?: (caseId: string, caseType: SearchCaseType) => void
 }
 
 export function ScheduleHeader({

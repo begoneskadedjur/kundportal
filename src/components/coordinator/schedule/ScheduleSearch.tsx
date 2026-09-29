@@ -14,11 +14,14 @@ interface SearchResult {
   adress: any
   personnummer?: string | null
   org_nr?: string | null
-  case_type: 'private' | 'business'
+  case_type: SearchCaseType
 }
 
+// 'contract' = avtalsärenden i cases-tabellen (inspektion, etablering, avtalsbesök m.fl.)
+export type SearchCaseType = 'private' | 'business' | 'contract'
+
 interface ScheduleSearchProps {
-  onSelectCase: (caseId: string, caseType: 'private' | 'business') => void
+  onSelectCase: (caseId: string, caseType: SearchCaseType) => void
 }
 
 const STATUS_DOT: Record<string, string> = {
@@ -94,16 +97,57 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
         .order('created_at', { ascending: false })
         .limit(10)
 
+      // Avtalsärenden saknar kundnamn på raden — slå upp matchande kunder först
+      const { data: customerHits } = await supabase
+        .from('customers')
+        .select('id')
+        .or(`company_name.ilike.${pattern},site_name.ilike.${pattern},organization_number.ilike.${pattern}`)
+        .limit(30)
+      const customerIds = (customerHits || []).map(c => c.id)
+      const contractFilter = [
+        `case_number.ilike.${pattern}`,
+        `title.ilike.${pattern}`,
+        `contact_person.ilike.${pattern}`,
+        `contact_email.ilike.${pattern}`,
+        `contact_phone.ilike.${pattern}`,
+        ...(customerIds.length > 0 ? [`customer_id.in.(${customerIds.join(',')})`] : []),
+      ].join(',')
+
+      let contractQuery = supabase
+        .from('cases')
+        .select('id, case_number, status, contact_person, pest_type, title, customer:customers(company_name, site_name, contact_address)')
+        .or(contractFilter)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
       if (!inclCompleted) {
+        contractQuery = contractQuery.not('status', 'in', '("Avslutat","Borttaget")')
         privateQuery = privateQuery.not('status', 'in', '("Avslutat","Borttaget")')
         businessQuery = businessQuery.not('status', 'in', '("Avslutat","Borttaget")')
       }
 
-      const [privateRes, businessRes] = await Promise.all([privateQuery, businessQuery])
+      const [privateRes, businessRes, contractRes] = await Promise.all([privateQuery, businessQuery, contractQuery])
 
       const combined: SearchResult[] = [
         ...(privateRes.data || []).map(r => ({ ...r, case_type: 'private' as const })),
         ...(businessRes.data || []).map(r => ({ ...r, case_type: 'business' as const })),
+        ...(contractRes.data || []).map(r => {
+          type CustomerHit = { company_name: string | null; site_name: string | null; contact_address: string | null }
+          const rawCustomer = r.customer as unknown as CustomerHit | CustomerHit[] | null
+          const customer = Array.isArray(rawCustomer) ? rawCustomer[0] : rawCustomer
+          return {
+            id: r.id,
+            case_number: r.case_number,
+            status: r.status,
+            kontaktperson: r.contact_person,
+            company_name: customer
+              ? [customer.company_name, customer.site_name].filter(Boolean).join(' · ')
+              : r.title,
+            skadedjur: r.pest_type,
+            adress: customer?.contact_address ?? null,
+            case_type: 'contract' as const,
+          }
+        }),
       ]
 
       // Sortera: exakt match först, sedan senaste
@@ -115,7 +159,7 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
         return 0
       })
 
-      setResults(combined.slice(0, 10))
+      setResults(combined.slice(0, 15))
       setSelectedIndex(-1)
       setIsOpen(true)
     } catch (err) {
@@ -171,7 +215,7 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
   }
 
   const getDisplayName = (r: SearchResult) => {
-    if (r.case_type === 'business') return r.company_name || r.bestallare || r.kontaktperson || '—'
+    if (r.case_type === 'business' || r.case_type === 'contract') return r.company_name || r.bestallare || r.kontaktperson || '—'
     return r.kontaktperson || '—'
   }
 
@@ -230,7 +274,9 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
                 >
                   {/* Ärendetyp-ikon */}
                   <div className="mt-0.5 shrink-0">
-                    {r.case_type === 'business' ? (
+                    {r.case_type === 'contract' ? (
+                      <FileCheck className="w-3.5 h-3.5 text-purple-400" />
+                    ) : r.case_type === 'business' ? (
                       <Building className="w-3.5 h-3.5 text-green-400" />
                     ) : (
                       <User className="w-3.5 h-3.5 text-blue-400" />

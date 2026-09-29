@@ -10,6 +10,7 @@ import toast from 'react-hot-toast'
 
 // Schema-komponenter
 import { ScheduleHeader, type ViewMode, type CaseType } from '../../components/coordinator/schedule/ScheduleHeader'
+import type { SearchCaseType } from '../../components/coordinator/schedule/ScheduleSearch'
 import { ScheduleGrid } from '../../components/coordinator/schedule/ScheduleGrid'
 import { ActionableCasesDrawer } from '../../components/coordinator/schedule/ActionableCasesDrawer'
 import { CasePipelineService } from '../../services/casePipelineService'
@@ -377,24 +378,26 @@ export default function CoordinatorSchedule() {
 
   // ─── Modal-hantering ───
 
+  // OBS: 'inspection' (avtalat servicebesök) går numera till EditContractCaseModal
+  // (fullfjädrad modal med "Gå till inspektion"-knapp) — InspectionCaseModal är utfasad
+  const openContractCase = useCallback((cc: Case) => {
+    if (cc.service_type === 'rondering_trafikkontoret') {
+      setSelectedRonderingCase(cc); setIsRonderingModalOpen(true)
+    } else if (cc.service_type === 'egenkontroll_trafikkontoret') {
+      setSelectedEgenkontrollCase(cc); setIsEgenkontrollModalOpen(true)
+    } else {
+      setSelectedContractCase(cc); setIsEditContractModalOpen(true)
+    }
+  }, [])
+
   const handleOpenCaseModal = useCallback((caseData: BeGoneCaseRow) => {
     if (caseData.case_type === 'contract' || caseData.case_type === 'establishment' || caseData.case_type === 'inspection' || (caseData as any).case_type === 'rondering' || (caseData as any).case_type === 'egenkontroll') {
       const cc = contractCases.find(c => c.id === caseData.id)
-      if (cc) {
-        // OBS: 'inspection' (avtalat servicebesök) går numera till EditContractCaseModal
-        // (fullfjädrad modal med "Gå till inspektion"-knapp) — InspectionCaseModal är utfasad
-        if (cc.service_type === 'rondering_trafikkontoret') {
-          setSelectedRonderingCase(cc); setIsRonderingModalOpen(true)
-        } else if (cc.service_type === 'egenkontroll_trafikkontoret') {
-          setSelectedEgenkontrollCase(cc); setIsEgenkontrollModalOpen(true)
-        } else {
-          setSelectedContractCase(cc); setIsEditContractModalOpen(true)
-        }
-      }
+      if (cc) openContractCase(cc)
     } else {
       setSelectedCase(caseData); setIsEditModalOpen(true)
     }
-  }, [contractCases])
+  }, [contractCases, openContractCase])
 
   const handleOpenHistory = useCallback((caseData: BeGoneCaseRow) => {
     setOpenCommunicationOnLoad(true)
@@ -540,8 +543,25 @@ export default function CoordinatorSchedule() {
     setSelectedAbsence(a); setIsAbsenceDetailsModalOpen(true)
   }, [])
 
-  const handleSearchSelectCase = useCallback(async (caseId: string, caseType: 'private' | 'business') => {
+  const handleSearchSelectCase = useCallback(async (caseId: string, caseType: SearchCaseType) => {
     try {
+      if (caseType === 'contract') {
+        // Redan inläst i schemat? Annars (t.ex. borttaget) hämtas raden med samma form
+        const loaded = contractCases.find(c => c.id === caseId)
+        if (loaded) { openContractCase(loaded); return }
+        const { data } = await supabase.from('cases').select(`
+          *, customer:customers(
+            company_name, contact_address, contact_person, contact_phone,
+            contact_email, billing_email, billing_address,
+            organization_number, parent_customer_id, site_name, is_multisite
+          ),
+          contract:contracts!cases_contract_id_fkey(
+            id, address_label, contact_address, oneflow_contract_id
+          )
+        `).eq('id', caseId).single()
+        if (data) openContractCase(data as Case)
+        return
+      }
       const table = caseType === 'private' ? 'private_cases' : 'business_cases'
       const { data } = await supabase.from(table).select('*').eq('id', caseId).single()
       if (data) {
@@ -552,7 +572,7 @@ export default function CoordinatorSchedule() {
     } catch (err) {
       console.error('Could not open case:', err)
     }
-  }, [])
+  }, [contractCases, openContractCase])
 
   // Async så CreateCaseModal kan await:a och vänta in färsk data innan
   // modalen stängs — annars renderar EditCaseModal stale state vid klick.

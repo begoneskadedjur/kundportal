@@ -50,6 +50,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Kontrollrapporten direkt i ärendet',
     items: [
       { kind: 'nyhet', text: 'Avslutade stationskontroller visar kontrollrapporten under Utförande i ärendet. Den laddas ned som PDF eller Excel och kan mejlas till kunden därifrån, utan att logga in som kunden' },
+      { kind: 'buggfix', text: 'Sökfältet i schemat hittar nu även avtalsärenden, som stationskontroller och avtalsbesök, på ärendenummer, kundnamn eller kontaktperson' },
     ],
   },
   {
