@@ -64,7 +64,7 @@ import { useAddonLedger } from '../../../../hooks/useAddonLedger'
 import CustomerContractPaper from '../../../shared/CustomerContractPaper'
 import ContractUnitsAppendix from './ContractUnitsAppendix'
 import ContractPriceListSection, { useAvropCatalog } from './ContractPriceListSection'
-import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from './ContractPremiumSection'
+import ContractPremiumSection, { premiumSummary, nextInvoicePeriodStart, type PremiumPlanEntry } from './ContractPremiumSection'
 import ContractReferencesSection from './ContractReferencesSection'
 import ContractTermSection from './ContractTermSection'
 import ContractEquipmentSection from './ContractEquipmentSection'
@@ -1693,14 +1693,35 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     }
   }
 
-  const indexAll = async (input: { effectiveFrom: string; percent: number; note: string | null; includeEquipment: boolean }) => {
+  /** Datum per papper när indexeringen ska gälla från nästa periodstart */
+  const indexPeriodStarts = useMemo(
+    () => papers.map((c) => ({ id: c.id, name: contractDisplayName(c), date: nextInvoicePeriodStart(c) })),
+    [papers]
+  )
+
+  const indexAll = async (input: { mode: 'date' | 'period'; effectiveFrom: string; percent: number; note: string | null; includeEquipment: boolean }) => {
     setBusy(true)
     try {
-      const r = await ContractScopeService.indexAllContracts(root.id, input)
+      // Alla papper på kartan, även enhetsavtal under huvudkontoret. Datum per
+      // avtal: nästa periodstart (olika ankarmånader) eller ett gemensamt datum.
+      const targets = papers.map((c) => ({
+        contractId: c.id,
+        effectiveFrom:
+          input.mode === 'period'
+            ? (indexPeriodStarts.find((p) => p.id === c.id)?.date ?? input.effectiveFrom)
+            : input.effectiveFrom,
+      }))
+      const r = await ContractScopeService.indexContracts(targets, input)
+      const already = r.skipped.filter((s) => s.reason === 'redan indexerat').length
+      const noPremium = r.skipped.length - already
+      const parts = [
+        already ? `${already} var redan indexerade` : '',
+        noPremium ? `${noPremium} utan premie` : '',
+      ].filter(Boolean)
       toast.success(
-        `${r.indexed} avtal indexerade med ${input.percent.toLocaleString('sv-SE')} % från ${formatDateSv(input.effectiveFrom)}${
-          r.skipped ? ` (${r.skipped} utan premie hoppades över)` : ''
-        }. Klicka "Planera fakturor" och uppdatera de planerade fakturorna, annars träder indexeringen inte i kraft på dem.`
+        `${r.indexed} avtal indexerade med ${input.percent.toLocaleString('sv-SE')} %${
+          input.mode === 'period' ? ' vid nästa periodstart' : ` från ${formatDateSv(input.effectiveFrom)}`
+        }${parts.length ? ` (${parts.join(', ')})` : ''}. Klicka "Planera fakturor" och uppdatera de planerade fakturorna, annars träder indexeringen inte i kraft på dem.`
       )
       setIndexAllOpen(false)
       await onChanged()
@@ -3371,6 +3392,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         <IndexAllModal
           count={papers.length}
           annualSum={annualSum}
+          periodStarts={indexPeriodStarts}
           busy={busy}
           onClose={() => setIndexAllOpen(false)}
           onConfirm={(input) => void indexAll(input)}
@@ -3937,41 +3959,86 @@ function VisitFrequencyModal({
 function IndexAllModal({
   count,
   annualSum,
+  periodStarts,
   busy,
   onClose,
   onConfirm,
 }: {
   count: number
   annualSum: number
+  /** Nästa periodstart per papper, null för avrop och avtal utan rytm */
+  periodStarts: Array<{ id: string; name: string; date: string | null }>
   busy: boolean
   onClose: () => void
-  onConfirm: (input: { effectiveFrom: string; percent: number; note: string | null; includeEquipment: boolean }) => void
+  onConfirm: (input: { mode: 'date' | 'period'; effectiveFrom: string; percent: number; note: string | null; includeEquipment: boolean }) => void
 }) {
   const nextYear = new Date()
   nextYear.setFullYear(nextYear.getFullYear() + 1)
+  const datedStarts = periodStarts.filter((p) => p.date)
+  // Nästa periodstart är rätt datum när avtalen har egna rytmer (Pelican: nio i
+  // april, ett i februari). Gemensamt datum för kunder som indexeras på årsskiftet.
+  const [mode, setMode] = useState<'date' | 'period'>(datedStarts.length > 0 ? 'period' : 'date')
   const [effectiveFrom, setEffectiveFrom] = useState(`${nextYear.getFullYear()}-01-01`)
   const [percent, setPercent] = useState('')
   const [note, setNote] = useState('AKI')
   const [includeEquipment, setIncludeEquipment] = useState(true)
   const pct = Number(percent.replace(',', '.'))
-  const valid = Number.isFinite(pct) && pct !== 0 && !!effectiveFrom
+  const valid = Number.isFinite(pct) && pct !== 0 && (mode === 'period' ? datedStarts.length > 0 : !!effectiveFrom)
   const preview = valid ? Math.round(annualSum * (1 + pct / 100)) : null
+  // Sammanfattning av periodstarterna: "9 avtal 2027-04-01, 1 avtal 2027-02-01"
+  const startSummary = Object.entries(
+    datedStarts.reduce<Record<string, number>>((acc, p) => {
+      acc[p.date as string] = (acc[p.date as string] ?? 0) + 1
+      return acc
+    }, {})
+  )
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, n]) => `${n} avtal ${formatDateSv(date)}`)
+    .join(', ')
+  const withoutStart = periodStarts.length - datedStarts.length
 
   return (
     <Modal isOpen onClose={onClose} title={`Indexera ${count} avtal`} size="sm">
       <div className="p-4 space-y-3">
         <p className="text-xs text-slate-400">
-          Ett steg i varje avtals premietrappa med samma procent och datum. Nuvarande summa {formatKr(annualSum)}/år
-          {preview != null ? `, blir ${formatKr(preview)}/år` : ''}. Indexeringen träder i kraft på fakturorna först när du sedan klickar "Planera fakturor" och uppdaterar de planerade fakturorna. Skickade fakturor rörs aldrig.
+          Ett steg i varje avtals premietrappa med samma procent. Nuvarande summa {formatKr(annualSum)}/år
+          {preview != null ? `, blir ${formatKr(preview)}/år` : ''}. Avtal som redan har en indexering på eller efter datumet hoppas över. Indexeringen träder i kraft på fakturorna först när du sedan klickar "Planera fakturor" och uppdaterar de planerade fakturorna. Skickade fakturor rörs aldrig.
         </p>
+        <div className="space-y-1.5">
+          <label className="flex items-start gap-2 text-xs text-slate-300 cursor-pointer select-none">
+            <input
+              type="radio"
+              name="index-mode"
+              checked={mode === 'period'}
+              onChange={() => setMode('period')}
+              disabled={datedStarts.length === 0}
+              className="mt-0.5 w-3.5 h-3.5 border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
+            />
+            <span>
+              Vid varje avtals nästa periodstart
+              {startSummary && <span className="block text-slate-500">{startSummary}{withoutStart ? `, ${withoutStart} utan rytm hoppas över` : ''}</span>}
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-xs text-slate-300 cursor-pointer select-none">
+            <input
+              type="radio"
+              name="index-mode"
+              checked={mode === 'date'}
+              onChange={() => setMode('date')}
+              className="mt-0.5 w-3.5 h-3.5 border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
+            />
+            <span>Samma datum för alla</span>
+          </label>
+        </div>
         <div className="grid grid-cols-2 gap-3">
-          <label className="text-xs text-slate-400">
+          <label className={`text-xs text-slate-400 ${mode === 'period' ? 'opacity-50' : ''}`}>
             Gäller från
             <DateField
               value={effectiveFrom}
               onChange={setEffectiveFrom}
+              disabled={mode === 'period'}
               aria-label="Gäller från"
-              className="mt-1 w-full pl-9 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none"
+              className="mt-1 w-full pl-9 pr-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-[#20c58f] focus:outline-none disabled:opacity-60"
             />
           </label>
           <label className="text-xs text-slate-400">
@@ -4009,7 +4076,7 @@ function IndexAllModal({
             Avbryt
           </button>
           <button
-            onClick={() => valid && onConfirm({ effectiveFrom, percent: pct, note: note.trim() || null, includeEquipment })}
+            onClick={() => valid && onConfirm({ mode, effectiveFrom, percent: pct, note: note.trim() || null, includeEquipment })}
             disabled={!valid || busy}
             className="bg-[#20c58f] text-[#fff] text-sm font-semibold rounded-xl px-4 py-2 hover:brightness-110 disabled:opacity-50"
           >

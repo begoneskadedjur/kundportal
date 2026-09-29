@@ -1998,24 +1998,48 @@ export class ContractScopeService {
    * procent och datum på alla; utrustningsrader "per styck och år" räknas
    * upp med samma procent när includeEquipment är satt.
    */
-  static async indexAllContracts(
-    customerId: string,
-    input: { effectiveFrom: string; percent: number; note?: string | null; includeEquipment?: boolean }
-  ): Promise<{ indexed: number; skipped: number }> {
+  /**
+   * Indexera flera avtal i ett svep. Anroparen anger avtalen och datumet per
+   * avtal (samma datum för alla, eller varje avtals nästa periodstart), så
+   * att enhetsavtal under ett huvudkontor följer med och avtal med olika
+   * ankarmånad får rätt datum. Basen är premien som gäller vid datumet, inte
+   * dagens: ett steg som redan ligger inlagt före datumet räknas med. Avtal
+   * som redan har en indexering på eller efter datumet hoppas över i stället
+   * för att krascha på unika indexet (contract_id, effective_from, event_type).
+   */
+  static async indexContracts(
+    targets: Array<{ contractId: string; effectiveFrom: string }>,
+    input: { percent: number; note?: string | null; includeEquipment?: boolean }
+  ): Promise<{ indexed: number; skipped: Array<{ contractId: string; reason: string }> }> {
     if (!Number.isFinite(input.percent) || input.percent === 0) throw new Error('Ange en procentsats')
-    const live = await this.liveContractsOnCustomer(customerId)
     let indexed = 0
-    let skipped = 0
-    for (const c of live) {
-      const current = Number(c.annual_value ?? 0)
+    const skipped: Array<{ contractId: string; reason: string }> = []
+    for (const t of targets) {
+      const c = { id: t.contractId }
+      const [{ data: row }, { data: events }] = await Promise.all([
+        supabase.from('contracts').select('annual_value').eq('id', c.id).maybeSingle(),
+        supabase
+          .from('contract_premium_events')
+          .select('effective_from, annual_value, event_type, created_at')
+          .eq('contract_id', c.id)
+          .order('effective_from', { ascending: false })
+          .order('created_at', { ascending: false }),
+      ])
+      const evs = (events ?? []) as Array<{ effective_from: string; annual_value: number; event_type: string; created_at: string }>
+      if (evs.some((e) => e.event_type === 'indexation' && e.effective_from >= t.effectiveFrom)) {
+        skipped.push({ contractId: c.id, reason: 'redan indexerat' })
+        continue
+      }
+      const base = evs.find((e) => e.effective_from <= t.effectiveFrom)
+      const current = Number(base?.annual_value ?? (row as { annual_value?: number | null } | null)?.annual_value ?? 0)
       if (!(current > 0)) {
-        skipped += 1
+        skipped.push({ contractId: c.id, reason: 'utan premie' })
         continue
       }
       const next = Math.round(current * (1 + input.percent / 100))
       await this.addPremiumEvent(c.id, {
         eventType: 'indexation',
-        effectiveFrom: input.effectiveFrom,
+        effectiveFrom: t.effectiveFrom,
         annualValue: next,
         note: `${input.note?.trim() ? `${input.note.trim()} ` : ''}${input.percent.toLocaleString('sv-SE')} %`.trim(),
       })
@@ -2039,6 +2063,19 @@ export class ContractScopeService {
       indexed += 1
     }
     return { indexed, skipped }
+  }
+
+  /** Bakåtkompatibelt: alla levande avtal på kundraden, samma datum */
+  static async indexAllContracts(
+    customerId: string,
+    input: { effectiveFrom: string; percent: number; note?: string | null; includeEquipment?: boolean }
+  ): Promise<{ indexed: number; skipped: number }> {
+    const live = await this.liveContractsOnCustomer(customerId)
+    const r = await this.indexContracts(
+      live.map((c) => ({ contractId: c.id, effectiveFrom: input.effectiveFrom })),
+      input
+    )
+    return { indexed: r.indexed, skipped: r.skipped.length }
   }
 
   /**

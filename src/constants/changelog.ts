@@ -52,6 +52,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'nyhet', text: 'Enheter läggs till, redigeras och avaktiveras direkt på kundkortets Enheter-flik. Användarkonton kund visar enheterna med en länk dit' },
       { kind: 'nyhet', text: 'Kundnumret hämtas från Fortnox på org.nr när en enhet eller ny kund läggs upp. Finns kunden inte i Fortnox skapas den där med nästa lediga nummer i kundgruppen, i stället för att numret skrivs in för hand' },
       { kind: 'andring', text: 'Enheter som är egna bolag visar sin Fortnox-status i kundlistan, och räknas med under Saknar Fortnox-nr när numret saknas' },
+      { kind: 'andring', text: 'Indexera alla på avtalskartan tar med enhetsavtalen, kan lägga steget vid varje avtals nästa periodstart, räknar på premien som gäller vid datumet och hoppar över avtal som redan är indexerade' },
+      { kind: 'andring', text: 'Enheternas kundnummer står i samma kolumn som huvudkontorets i kundlistan' },
+      { kind: 'buggfix', text: 'Nya Fortnox-kundkort får bolagets juridiska namn, inte enhetsnamnet' },
     ],
   },
   {
