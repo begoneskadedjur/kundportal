@@ -373,13 +373,36 @@ export default function CustomerListRow({
             const ownAnnual = ownContracts.reduce((sum, c) => sum + Number(c.annual_value ?? 0), 0)
               || Number(site.annual_value ?? 0)
             const unitFortnox = resolveUnitFortnoxInfo(org, site)
-            const viaHk = !unitFortnox && site.customer_number == null
             return (
               <li key={site.id} className="list-none">
                 <button
                   onClick={() => onOpenUnit(site.id)}
-                  className="w-full text-left pl-[52px] md:pl-24 pr-3 py-1.5 flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-0.5 hover:bg-slate-900/60 transition-colors group/unit"
+                  className="w-full text-left pl-3 md:pl-8 pr-3 py-1.5 flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-0.5 hover:bg-slate-900/60 transition-colors group/unit"
                 >
+                  {/* Kundnr i samma kolumn som huvudraden: eget bolag visar
+                      statuspunkt + nummer, enhet i HK:s bolag visar "via HK" */}
+                  <span className="flex items-center gap-1.5 w-20 shrink-0">
+                    {unitFortnox ? (
+                      <>
+                        <FortnoxDot number={unitFortnox.number} verified={unitFortnox.verified} />
+                        {unitFortnox.number != null ? (
+                          <span
+                            className="font-mono text-xs text-slate-400 tabular-nums"
+                            title={unitFortnox.sharedWith ? `Eget bolag, delar nummer med ${unitFortnox.sharedWith}` : 'Eget bolag, eget Fortnox-kundnummer'}
+                          >
+                            #{unitFortnox.number}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-red-400" title="Eget bolag utan Fortnox-kundnummer">saknar nr</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-slate-600" title={`Faktureras via huvudkontoret${number != null ? ` #${number}` : ''}`}>
+                        <CornerLeftUp className="w-3 h-3" />
+                        via HK
+                      </span>
+                    )}
+                  </span>
                   <span className="flex items-center gap-2 flex-1 min-w-0">
                     <span className="text-sm text-slate-300 truncate">{site.site_name || site.company_name}</span>
                     {site.region && <span className="text-xs text-slate-500 truncate shrink-0">{site.region}</span>}
@@ -391,25 +414,6 @@ export default function CustomerListRow({
                       </span>
                     ) : (
                       <span>omfattas av org-avtal</span>
-                    )}
-                    {unitFortnox && (
-                      <span
-                        className="flex items-center gap-1.5"
-                        title={unitFortnox.sharedWith ? `Eget bolag, delar nummer med ${unitFortnox.sharedWith}` : 'Eget bolag, eget Fortnox-kundnummer'}
-                      >
-                        <FortnoxDot number={unitFortnox.number} verified={unitFortnox.verified} />
-                        {unitFortnox.number != null ? (
-                          <span className="font-mono tabular-nums">#{unitFortnox.number}</span>
-                        ) : (
-                          <span className="text-red-400">saknar nr</span>
-                        )}
-                      </span>
-                    )}
-                    {viaHk && (
-                      <span className="flex items-center gap-1">
-                        <CornerLeftUp className="w-3 h-3" />
-                        via HK
-                      </span>
                     )}
                   </span>
                   <ChevronRight className="w-3.5 h-3.5 text-slate-600 opacity-0 group-hover/unit:opacity-100 transition-opacity shrink-0" />
