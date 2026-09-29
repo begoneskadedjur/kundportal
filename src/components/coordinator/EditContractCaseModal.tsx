@@ -36,6 +36,7 @@ import CaseServiceSelector from '../shared/CaseServiceSelector'
 import CustomerAcknowledgmentIndicator from '../shared/CustomerAcknowledgmentIndicator'
 import Input from '../ui/Input'
 import CaseModalSection from '../shared/CaseModalSection'
+import InspectionReportSection from '../shared/InspectionReportSection'
 import CaseStatusStepper from '../shared/CaseStatusStepper'
 
 // Fakturering - ad-hoc billing för avtalskunder vid ärendeavslut
@@ -2181,6 +2182,18 @@ export default function EditContractCaseModal({
               disabled={isCustomerView}
             />
           </CaseModalSection>
+
+          {/* Kontrollrapport — visas bara när ärendet har en avslutad inspektionssession.
+              Ligger i Utförande eftersom rapporten är resultatet av kontrollrundan;
+              kunden hämtar samma rapport själv under Kontrollrapporter i portalen. */}
+          {caseData?.id && !isCustomerView && (
+            <InspectionReportSection
+              caseId={caseData.id}
+              caseNumber={formData.case_number}
+              fallbackEmail={customerData?.contact_email || formData.contact_email}
+              fallbackContactName={customerData?.contact_person || formData.contact_person}
+            />
+          )}
 
           {/* Bilder sektion — inte för stationskontroll (foton tas per station i kontrollrundan) */}
           {caseData?.id && !isInspection && (

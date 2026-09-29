@@ -5,7 +5,12 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import { createClient } from '@supabase/supabase-js'
-import { requireAuthenticated } from './_lib/auth'
+import nodemailer from 'nodemailer'
+import { requireAuth, requireAuthenticated } from './_lib/auth'
+
+// Gräns för bifogad PDF vid e-postutskick. Resend tillåter 40 MB per mejl, men många
+// mottagande e-postservrar avvisar bilagor över ~10 MB, så vi stannar vid 8 MB.
+const MAX_EMAIL_ATTACHMENT_BYTES = 8 * 1024 * 1024
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || '',
@@ -799,13 +804,114 @@ async function generateInspectionReportHTML(data: {
   `
 }
 
+const escapeHtml = (value: string) =>
+  String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+// Mejlmall för kontrollrapport, samma formspråk som saneringsrapportens kundmejl (send-work-report)
+function getInspectionReportEmailHtml(p: {
+  recipientName: string
+  customerName: string
+  address: string
+  caseNumber: string
+  dateText: string
+  technicianName: string
+}): string {
+  const row = (label: string, value: string) => value ? `<tr>
+                  <td style="padding:6px 0;width:130px;color:#64748b;font-size:13px;vertical-align:top;">${label}</td>
+                  <td style="padding:6px 0;color:#1e293b;font-size:13px;">${escapeHtml(value)}</td>
+                </tr>` : ''
+  const greeting = p.recipientName ? `Hej ${escapeHtml(p.recipientName)},` : 'Hej,'
+  return `<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BeGone Kontrollrapport</title>
+</head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <tr><td style="background:#0f172a;border-radius:12px 12px 0 0;padding:32px 40px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="vertical-align:middle;text-align:left;">
+                <table cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="background:#20c58f;border-radius:8px;width:36px;height:36px;text-align:center;vertical-align:middle;">
+                      <span style="color:white;font-size:18px;font-weight:800;line-height:36px;">B</span>
+                    </td>
+                    <td style="padding-left:12px;color:white;font-size:20px;font-weight:700;">BeGone</td>
+                  </tr>
+                </table>
+              </td>
+              <td style="text-align:right;color:#94a3b8;font-size:12px;vertical-align:middle;">
+                KONTROLLRAPPORT${p.caseNumber ? `<br><span style="color:#20c58f;font-weight:600;">${escapeHtml(p.caseNumber)}</span>` : ''}
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+        <tr><td style="background:white;padding:40px;">
+          <p style="margin:0 0 8px 0;font-size:16px;color:#1e293b;">${greeting}</p>
+          <p style="margin:0 0 28px 0;color:#64748b;font-size:14px;line-height:1.6;">
+            Här kommer kontrollrapporten från vårt senaste servicebesök. Rapporten med stationernas status och våra iakttagelser finns bifogad som PDF.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin-bottom:24px;">
+            <tr><td style="padding:20px 24px;">
+              <p style="margin:0 0 16px 0;font-size:13px;font-weight:700;color:#1e293b;text-transform:uppercase;letter-spacing:0.5px;">Servicebesök</p>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                ${row('Kund', p.customerName)}
+                ${row('Adress', p.address)}
+                ${row('Datum', p.dateText)}
+                ${row('Ärende nr', p.caseNumber)}
+                ${row('Tekniker', p.technicianName)}
+              </table>
+            </td></tr>
+          </table>
+          <p style="margin:0 0 24px 0;color:#64748b;font-size:13px;line-height:1.6;">
+            Alla kontrollrapporter finns även i kundportalen under Kontrollrapporter.
+          </p>
+          <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-left:3px solid #20c58f;border-radius:0 6px 6px 0;">
+            <tr><td style="padding:14px 18px;">
+              <p style="margin:0 0 2px 0;font-size:13px;font-weight:600;color:#1e293b;">Har du frågor?</p>
+              <p style="margin:0;font-size:13px;color:#64748b;">Kontakta oss på <a href="mailto:info@begone.se" style="color:#20c58f;text-decoration:none;">info@begone.se</a> eller ring 010 280 44 10.</p>
+            </td></tr>
+          </table>
+        </td></tr>
+        <tr><td style="background:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;padding:24px 40px;text-align:center;">
+          <p style="margin:0 0 4px 0;font-size:13px;font-weight:600;color:#374151;">BeGone Skadedjur & Sanering AB</p>
+          <p style="margin:0 0 4px 0;font-size:12px;color:#9ca3af;">Telefon: 010 280 44 10 | E-post: info@begone.se | www.begone.se</p>
+          <p style="margin:0;font-size:12px;color:#9ca3af;">Org.nr: 559378-9208</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const auth = await requireAuthenticated(req, res)
+  // Med sendEmail skickas rapporten som bilaga till kunden i stället för att returneras.
+  // Utskick med företagets avsändare kräver intern roll; nedladdning räcker med inloggning.
+  const sendEmail = req.body?.sendEmail as { to?: string; recipientName?: string; caseNumber?: string } | undefined
+  const auth = sendEmail
+    ? await requireAuth(req, res, ['admin', 'koordinator', 'technician'])
+    : await requireAuthenticated(req, res)
   if (!auth) return
+
+  const emailTo = (sendEmail?.to || '').trim()
+  if (sendEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTo)) {
+      return res.status(400).json({ error: 'Ogiltig e-postadress' })
+    }
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(500).json({ error: 'E-posttjänsten är inte konfigurerad' })
+    }
+  }
 
   try {
     const { session, customer, technician, outdoorInspections, indoorInspections, summary, sessionPhotos } = req.body
@@ -870,6 +976,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
 
     await browser.close()
+
+    if (sendEmail) {
+      const pdfBuffer = Buffer.from(pdf)
+      if (pdfBuffer.length > MAX_EMAIL_ATTACHMENT_BYTES) {
+        const sizeMb = (pdfBuffer.length / (1024 * 1024)).toFixed(1).replace('.', ',')
+        return res.status(413).json({
+          error: `Rapporten är ${sizeMb} MB, för stor för att skickas som bilaga (max 8 MB). Ladda ned den och dela den på annat sätt.`
+        })
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: 'smtp.resend.com',
+        port: 465,
+        secure: true,
+        auth: { user: 'resend', pass: process.env.RESEND_API_KEY }
+      })
+
+      await transporter.sendMail({
+        from: 'BeGone Kontrollrapporter <noreply@begone.se>',
+        replyTo: 'info@begone.se',
+        to: emailTo,
+        subject: `Kontrollrapport ${customer?.company_name ? `för ${customer.company_name} ` : ''}(${dateStr})`,
+        html: getInspectionReportEmailHtml({
+          recipientName: sendEmail.recipientName || customer?.contact_person || '',
+          customerName: customer?.company_name || '',
+          address: customer?.contact_address || '',
+          caseNumber: sendEmail.caseNumber || '',
+          dateText: formatDate(sessionDate),
+          technicianName: technician?.name || ''
+        }),
+        attachments: [{ filename, content: pdfBuffer, contentType: 'application/pdf' }]
+      })
+
+      console.log('Inspection report emailed to:', emailTo, 'by user', auth.userId)
+      return res.status(200).json({ success: true, sentTo: emailTo })
+    }
 
     const pdfBase64 = Buffer.from(pdf).toString('base64')
 

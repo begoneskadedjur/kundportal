@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.16.0',
+    date: '2026-09-29',
+    title: 'Kontrollrapporten direkt i ärendet',
+    items: [
+      { kind: 'nyhet', text: 'Avslutade stationskontroller visar kontrollrapporten under Utförande i ärendet. Den laddas ned som PDF eller Excel och kan mejlas till kunden därifrån, utan att logga in som kunden' },
+    ],
+  },
+  {
     version: '3.15.0',
     date: '2026-09-29',
     title: 'Enheter hanteras på kundkortet',

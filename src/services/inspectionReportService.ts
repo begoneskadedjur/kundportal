@@ -2,7 +2,7 @@
 // Generering av kontrollrapporter (PDF via Puppeteer + Excel via ExcelJS) för kundportalen
 
 import ExcelJS from 'exceljs'
-import { getAuthHeaders } from '../lib/supabase'
+import { apiFetch } from '../lib/api'
 import {
   getInspectionSession,
   getOutdoorInspectionsForSession,
@@ -91,7 +91,9 @@ function downloadBlob(blob: Blob, filename: string) {
 // PDF GENERATION (via Puppeteer API endpoint)
 // ============================================
 
-export async function generateInspectionPDF(sessionId: string): Promise<void> {
+// Samlar sessionsdata och bygger request-kroppen till generate-inspection-report-pdf.
+// Används både för nedladdning och e-postutskick så att rapporten blir identisk.
+async function buildPdfRequestBody(sessionId: string): Promise<Record<string, unknown>> {
   const [data, sessionPhotos] = await Promise.all([
     getReportData(sessionId),
     getSessionPhotos(sessionId)
@@ -100,31 +102,36 @@ export async function generateInspectionPDF(sessionId: string): Promise<void> {
 
   const { session, outdoorInspections, indoorInspections, summary } = data
 
-  const response = await fetch('/api/generate-inspection-report-pdf', {
+  return {
+    session: {
+      id: session.id,
+      completed_at: session.completed_at || session.created_at,
+      notes: session.notes
+    },
+    customer: session.customer ? {
+      company_name: session.customer.company_name,
+      contact_address: session.customer.contact_address,
+      contact_person: session.customer.contact_person,
+      contact_phone: session.customer.contact_phone,
+      contact_email: session.customer.contact_email
+    } : null,
+    technician: session.technician ? {
+      name: session.technician.name,
+      email: session.technician.email
+    } : null,
+    outdoorInspections,
+    indoorInspections,
+    summary,
+    sessionPhotos: sessionPhotos.map(p => ({ url: p.url, caption: p.caption }))
+  }
+}
+
+export async function generateInspectionPDF(sessionId: string): Promise<void> {
+  const body = await buildPdfRequestBody(sessionId)
+
+  const response = await apiFetch('/api/generate-inspection-report-pdf', {
     method: 'POST',
-    headers: await getAuthHeaders(),
-    body: JSON.stringify({
-      session: {
-        id: session.id,
-        completed_at: session.completed_at || session.created_at,
-        notes: session.notes
-      },
-      customer: session.customer ? {
-        company_name: session.customer.company_name,
-        contact_address: session.customer.contact_address,
-        contact_person: session.customer.contact_person,
-        contact_phone: session.customer.contact_phone,
-        contact_email: session.customer.contact_email
-      } : null,
-      technician: session.technician ? {
-        name: session.technician.name,
-        email: session.technician.email
-      } : null,
-      outdoorInspections,
-      indoorInspections,
-      summary,
-      sessionPhotos: sessionPhotos.map(p => ({ url: p.url, caption: p.caption }))
-    })
+    body: JSON.stringify(body)
   })
 
   if (!response.ok) {
@@ -142,6 +149,41 @@ export async function generateInspectionPDF(sessionId: string): Promise<void> {
   const pdfBytes = Uint8Array.from(atob(result.pdf), c => c.charCodeAt(0))
   const blob = new Blob([pdfBytes], { type: 'application/pdf' })
   downloadBlob(blob, result.filename)
+}
+
+/**
+ * Skickar kontrollrapporten som PDF-bilaga till kunden. PDF:en genereras server-side
+ * i samma endpoint som nedladdningen och mejlas därifrån (Resend), så filen passerar
+ * aldrig klienten. Servern avvisar bilagor över 8 MB med ett tydligt felmeddelande.
+ * Kräver roll admin, koordinator eller technician.
+ */
+export async function sendInspectionReportEmail(
+  sessionId: string,
+  options: { to: string; recipientName?: string; caseNumber?: string }
+): Promise<{ sentTo: string }> {
+  const body = await buildPdfRequestBody(sessionId)
+
+  const response = await apiFetch('/api/generate-inspection-report-pdf', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...body,
+      sendEmail: {
+        to: options.to.trim(),
+        recipientName: options.recipientName || undefined,
+        caseNumber: options.caseNumber || undefined
+      }
+    })
+  })
+
+  const result = await response.json().catch(() => ({}))
+  if (!response.ok || !result.success) {
+    const message = result.error === 'Failed to generate PDF' && result.details
+      ? `Utskicket misslyckades: ${result.details}`
+      : result.error
+    throw new Error(message || `Utskicket misslyckades (${response.status})`)
+  }
+
+  return { sentTo: result.sentTo || options.to }
 }
 
 // ============================================
