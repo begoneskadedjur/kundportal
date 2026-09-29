@@ -598,10 +598,57 @@ export class InvoiceService {
   }
 
   /**
-   * Återställ makulerad faktura till "Redo att skicka"
+   * Återställ makulerad faktura.
+   *
+   * Makulering rör aldrig Fortnox: har fakturan ett Fortnox-nummer finns den
+   * kvar där oförändrad. Den återgår då till sin Fortnox-status med de
+   * ursprungliga tidsstämplarna. Att sätta den till "Redo" visade "Skapa
+   * utkast i Fortnox" igen och skapade en dubblett med nytt nummer.
+   * Utan Fortnox-nummer återgår den till "Redo" som förr.
+   *
+   * Makuleringen släppte ärendets rader (billed → pending); de som hör till
+   * den här fakturan knyts tillbaka så att de inte faktureras en gång till.
    */
   static async restoreInvoice(id: string): Promise<Invoice> {
-    return this.updateInvoiceStatus(id, 'ready')
+    const { data: current, error } = await supabase
+      .from('invoices')
+      .select('fortnox_document_number, booked_at, sent_at, paid_at')
+      .eq('id', id)
+      .single()
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+
+    let restored: Invoice
+    if (current?.fortnox_document_number) {
+      const status: InvoiceStatus = current.paid_at ? 'paid'
+        : current.sent_at ? 'sent'
+        : current.booked_at ? 'booked'
+        : 'draft'
+      restored = await this.updateInvoiceStatus(id, status, {
+        booked_at: current.booked_at,
+        sent_at: current.sent_at,
+        paid_at: current.paid_at
+      } as Partial<Invoice>)
+    } else {
+      restored = await this.updateInvoiceStatus(id, 'ready')
+    }
+
+    const { data: linked, error: linkedError } = await supabase
+      .from('invoice_items')
+      .select('case_billing_item_id')
+      .eq('invoice_id', id)
+      .not('case_billing_item_id', 'is', null)
+    if (linkedError) throw new Error(`Databasfel: ${linkedError.message}`)
+    const itemIds = (linked ?? []).map((r) => r.case_billing_item_id as string)
+    if (itemIds.length > 0) {
+      const { error: rebillError } = await supabase
+        .from('case_billing_items')
+        .update({ status: 'billed', updated_at: new Date().toISOString() })
+        .in('id', itemIds)
+        .eq('status', 'pending')
+      if (rebillError) throw new Error(`Databasfel: ${rebillError.message}`)
+    }
+
+    return restored
   }
 
   /**

@@ -754,6 +754,44 @@ export default function InvoiceDetailModal({
     }
   }
 
+  // Återställ makulerad faktura. Har den ett Fortnox-nummer återgår den till
+  // sin Fortnox-status i stället för "Redo" (se InvoiceService.restoreInvoice),
+  // annars skulle "Skapa utkast i Fortnox" skapa en dubblett.
+  const handleRestore = async () => {
+    if (!invoice) return
+
+    setUpdating(true)
+    try {
+      const restored = await InvoiceService.restoreInvoice(invoice.id)
+      const label = INVOICE_STATUS_CONFIG[restored.status as InvoiceStatus]?.label ?? restored.status
+
+      if (user && invoice.case_id) {
+        const authorName = profile?.display_name || profile?.technicians?.name || profile?.email || 'Okänd'
+        try {
+          await createSystemComment(
+            invoice.case_id,
+            effectiveCaseType,
+            'status_change',
+            `Faktura återställd till "${label}" (${invoice.invoice_number})`,
+            user.id,
+            authorName
+          )
+        } catch (err) {
+          console.warn('Kunde inte logga återställning:', err)
+        }
+      }
+
+      toast.success(`Återställd till "${label}"`)
+      await loadInvoice()
+      onStatusChange?.()
+    } catch (error) {
+      console.error('Kunde inte återställa fakturan:', error)
+      toast.error('Kunde inte återställa fakturan')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
   // Godkännande (faktureringsansvarig) — kvittering som låser upp Fortnox-knappen
   const handleApprove = async () => {
     if (!invoice || !user || !profile?.can_approve_invoices) return
@@ -858,6 +896,12 @@ export default function InvoiceDetailModal({
     forceNew?: boolean
   } = {}) => {
     if (!invoice) return
+    // Fakturan finns redan i Fortnox: ett nytt utkast blir en dubblett med
+    // nytt nummer. Rätt väg är Synka, eller makulera i Fortnox först.
+    if (invoice.fortnox_document_number) {
+      toast.error(`Fakturan finns redan i Fortnox (nr ${invoice.fortnox_document_number}). Använd Synka för att hämta dess status.`)
+      return
+    }
     setSendingToFortnox(true)
     try {
       // 1. Hitta kundraden och dess Fortnox-nummer. Primärt via fakturans
@@ -2316,7 +2360,7 @@ export default function InvoiceDetailModal({
               {invoice.status === 'cancelled' && (
                 <>
                   <button
-                    onClick={() => handleStatusChange('ready')}
+                    onClick={handleRestore}
                     disabled={updating}
                     className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-sm text-[#fff] rounded-lg transition-colors disabled:opacity-50"
                   >
