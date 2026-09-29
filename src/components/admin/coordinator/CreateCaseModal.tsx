@@ -84,6 +84,39 @@ function AddressInheritedHint() {
   );
 }
 
+type AssigneeFields = {
+  primary_assignee_name: string | null; primary_assignee_email: string | null;
+  secondary_assignee_name: string | null; secondary_assignee_email: string | null;
+  tertiary_assignee_name: string | null; tertiary_assignee_email: string | null;
+};
+
+/**
+ * Teknikernas namn och e-post härleds alltid från valt id när ärendet sparas.
+ * Väljs tekniker för hand sätts bara id:t i formuläret, och utan detta sparas
+ * ärendet utan namn: besöket och fakturan kan då inte visa vem som utförde
+ * arbetet, och Fortnox får ingen Vår referens. Tekniker som inte finns i
+ * listan (t.ex. inaktiverad) behåller sitt tidigare sparade namn.
+ */
+function resolveAssigneeFields(form: Record<string, string | null | undefined>, technicians: Technician[]): AssigneeFields {
+  const resolve = (slot: 'primary' | 'secondary' | 'tertiary') => {
+    const id = form[`${slot}_assignee_id`] || null;
+    if (!id) return { name: null, email: null };
+    const tech = technicians.find(t => t.id === id);
+    return {
+      name: tech?.name ?? form[`${slot}_assignee_name`] ?? null,
+      email: tech?.email ?? form[`${slot}_assignee_email`] ?? null,
+    };
+  };
+  const primary = resolve('primary');
+  const secondary = resolve('secondary');
+  const tertiary = resolve('tertiary');
+  return {
+    primary_assignee_name: primary.name, primary_assignee_email: primary.email,
+    secondary_assignee_name: secondary.name, secondary_assignee_email: secondary.email,
+    tertiary_assignee_name: tertiary.name, tertiary_assignee_email: tertiary.email,
+  };
+}
+
 export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
   const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | 'egenkontroll' | null>(null);
@@ -1040,6 +1073,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       const caseNumber = generatedCaseNumber || await CaseNumberService.generateUniqueCaseNumber();
       if (!generatedCaseNumber) setGeneratedCaseNumber(caseNumber);
 
+      const assigneeFields = resolveAssigneeFields(formData as Record<string, string | null | undefined>, technicians);
+
       // Multi-kontrakt-refaktor (Fas 8c): vilket kontrakt ärendet bokas mot.
       // Synth-rader (id 'synth-...') sparas inte till DB — null blir signalen
       // till runtime att fallbacka via customer_id.
@@ -1075,7 +1110,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           scheduled_start: formData.start_date,
           scheduled_end: formData.due_date,
           primary_technician_id: formData.primary_assignee_id,
-          primary_technician_name: formData.primary_assignee_name || null,
+          primary_technician_name: assigneeFields.primary_assignee_name,
           secondary_technician_id: formData.secondary_assignee_id || null,
           tertiary_technician_id: formData.tertiary_assignee_id || null,
           contact_person: formData.kontaktperson || contactFallback?.contact_person || null,
@@ -1175,7 +1210,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           scheduled_start: formData.start_date,
           scheduled_end: formData.due_date,
           primary_technician_id: formData.primary_assignee_id || null,
-          primary_technician_name: formData.primary_assignee_name || null,
+          primary_technician_name: assigneeFields.primary_assignee_name,
           secondary_technician_id: formData.secondary_assignee_id || null,
           tertiary_technician_id: formData.tertiary_assignee_id || null,
           contact_person: formData.kontaktperson || contactFallback?.contact_person || null,
@@ -1219,7 +1254,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           scheduled_start: formData.start_date,
           scheduled_end: formData.due_date,
           primary_technician_id: formData.primary_assignee_id || null,
-          primary_technician_name: formData.primary_assignee_name || null,
+          primary_technician_name: assigneeFields.primary_assignee_name,
           secondary_technician_id: formData.secondary_assignee_id || null,
           tertiary_technician_id: formData.tertiary_assignee_id || null,
           contact_person: formData.kontaktperson || customer?.contact_person || null,
@@ -1248,7 +1283,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           scheduled_start: formData.start_date,
           scheduled_end: formData.due_date,
           primary_technician_id: formData.primary_assignee_id || null,
-          primary_technician_name: formData.primary_assignee_name || null,
+          primary_technician_name: assigneeFields.primary_assignee_name,
           secondary_technician_id: formData.secondary_assignee_id || null,
           tertiary_technician_id: formData.tertiary_assignee_id || null,
           contact_person: formData.kontaktperson || customer?.contact_person || null,
@@ -1293,7 +1328,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           scheduled_start: formData.start_date,
           scheduled_end: formData.due_date,
           primary_technician_id: formData.primary_assignee_id,
-          primary_technician_name: formData.primary_assignee_name || null,
+          primary_technician_name: assigneeFields.primary_assignee_name,
           contact_person: formData.kontaktperson || contactFallback?.contact_person || null,
           contact_email: formData.e_post_kontaktperson || contactFallback?.contact_email || null,
           contact_phone: formData.telefon_kontaktperson || contactFallback?.contact_phone || null,
@@ -1355,6 +1390,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         if (initialCaseData && initialCaseData.case_type !== 'contract') {
           const { error } = await supabase.from(tableName).update({
             ...cleanFormData,
+            ...assigneeFields,
             title: caseNumber,
             service_id: serviceId || null,
             skadedjur: selectedService?.name || formData.skadedjur || null,
@@ -1365,6 +1401,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         } else {
           const { data, error } = await supabase.from(tableName).insert([{
             ...cleanFormData,
+            ...assigneeFields,
             title: caseNumber,
             case_number: caseNumber,
             status: 'Bokad',
