@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
+import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
+import Select from '../../ui/Select'
 import AddressAutocomplete from '../../ui/AddressAutocomplete'
 import type { GeocodeResult } from '../../../services/geocoding'
-import { X, Building2, Mail, Phone, MapPin, Copy, Loader2, User } from 'lucide-react'
+import { CustomerGroupService } from '../../../services/customerGroupService'
+import type { CustomerGroup } from '../../../types/customerGroups'
+import { orgDigits } from '../../../shared/fortnoxCustomerNumbers'
+import FortnoxNumberField, {
+  EMPTY_FORTNOX_RESOLUTION,
+  runFortnoxAllocation,
+  type FortnoxNumberResolution,
+} from '../customers/FortnoxNumberField'
+import { Building2, Mail, Copy, Loader2, User } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface SiteModalProps {
@@ -27,6 +37,9 @@ interface SiteModalProps {
     billing_email?: string
     billing_address?: string
     billing_reference?: string
+    /** Enhetens eget Fortnox-kundnummer (null = ärver/delar) */
+    customer_number?: number | null
+    customer_group_id?: string | null
   } | null
 }
 
@@ -40,7 +53,15 @@ interface ParentData {
   account_manager_email?: string
   sales_person?: string
   sales_person_email?: string
+  organization_number?: string | null
+  customer_number?: number | null
+  customer_group_id?: string | null
+  organization_id?: string | null
+  company_name?: string
 }
+
+const sectionClass = 'p-3 bg-slate-800/30 border border-slate-700 rounded-xl'
+const headerClass = 'text-sm font-semibold text-white mb-2 flex items-center gap-1.5'
 
 export default function SiteModal({
   isOpen,
@@ -53,18 +74,23 @@ export default function SiteModal({
 }: SiteModalProps) {
   const [loading, setLoading] = useState(false)
   const [parentData, setParentData] = useState<ParentData | null>(null)
-  
+  const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
+
   // Grundinformation
   const [siteName, setSiteName] = useState('')
   const [region, setRegion] = useState('')
   const [organizationNumber, setOrganizationNumber] = useState('')
-  
+
+  // Fortnox: kundnummer och kundgrupp (bara när enheten är ett eget bolag)
+  const [customerGroupId, setCustomerGroupId] = useState('')
+  const [fortnox, setFortnox] = useState<FortnoxNumberResolution>(EMPTY_FORTNOX_RESOLUTION)
+
   // Kontaktinformation
   const [contactPerson, setContactPerson] = useState('')
   const [contactEmail, setContactEmail] = useState('')
   const [contactPhone, setContactPhone] = useState('')
   const [contactAddress, setContactAddress] = useState('')
-  
+
   // Faktureringsuppgifter
   const [billingEmail, setBillingEmail] = useState('')
   const [billingAddress, setBillingAddress] = useState('')
@@ -79,7 +105,8 @@ export default function SiteModal({
   useEffect(() => {
     if (isOpen) {
       fetchParentData()
-      
+      CustomerGroupService.getActiveGroups().then(setCustomerGroups).catch(() => setCustomerGroups([]))
+
       if (existingSite) {
         // Fyll i fält från befintlig enhet
         setSiteName(existingSite.site_name || '')
@@ -92,6 +119,7 @@ export default function SiteModal({
         setBillingEmail(existingSite.billing_email || '')
         setBillingAddress(existingSite.billing_address || '')
         setBillingReference(existingSite.billing_reference || '')
+        setCustomerGroupId(existingSite.customer_group_id || '')
         // Sparad region räknas som användarens egen — aldrig som autofyll.
         autofilledRegionRef.current = null
       } else {
@@ -99,18 +127,22 @@ export default function SiteModal({
         resetForm()
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, existingSite, parentCustomerId])
 
   const fetchParentData = async () => {
     try {
       const { data, error } = await supabase
         .from('customers')
-        .select('billing_email, billing_address, billing_reference, is_regional, contract_type, assigned_account_manager, account_manager_email, sales_person, sales_person_email')
+        .select('billing_email, billing_address, billing_reference, is_regional, contract_type, assigned_account_manager, account_manager_email, sales_person, sales_person_email, organization_number, customer_number, customer_group_id, organization_id, company_name')
         .eq('id', parentCustomerId)
         .single()
 
       if (error) throw error
-      setParentData(data)
+      const parent = data as ParentData
+      setParentData(parent)
+      // Kundgrupp för ett eget bolag: enhetens egen, annars huvudkontorets som start
+      setCustomerGroupId(prev => prev || existingSite?.customer_group_id || parent.customer_group_id || '')
     } catch (error) {
       console.error('Error fetching parent data:', error)
     }
@@ -128,6 +160,8 @@ export default function SiteModal({
     setBillingAddress('')
     setBillingReference('')
     setUseSameBilling(false)
+    setCustomerGroupId('')
+    setFortnox(EMPTY_FORTNOX_RESOLUTION)
     autofilledRegionRef.current = null
   }
 
@@ -152,6 +186,10 @@ export default function SiteModal({
    */
   const regionFollowsCity = parentData !== null && !parentData.is_regional
 
+  // Enheten är ett eget bolag när den har ett org.nr skilt från huvudkontorets.
+  // Då äger den sitt Fortnox-nummer och sin kundgrupp; annars ärvs båda.
+  const ownCompany = !!orgDigits(organizationNumber) && orgDigits(organizationNumber) !== orgDigits(parentData?.organization_number)
+
   const handleAddressChange = (val: string | GeocodeResult) => {
     // Fri text: användaren skriver själv, ingen ort att hämta.
     if (typeof val === 'string') {
@@ -174,11 +212,19 @@ export default function SiteModal({
     })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault()
+
     if (!siteName || !region || !contactEmail) {
       toast.error('Vänligen fyll i alla obligatoriska fält')
+      return
+    }
+    if (fortnox.pending) {
+      toast('Kundnumret slås fortfarande upp i Fortnox. Försök igen om en sekund.', { icon: 'ℹ️' })
+      return
+    }
+    if (fortnox.allocate && !customerGroupId) {
+      toast.error('Välj kundgrupp innan enheten skapas i Fortnox')
       return
     }
 
@@ -190,7 +236,7 @@ export default function SiteModal({
       // modalen, och en osynlig skrivning är alltid fel. En enhet kan tillkomma
       // mitt i avtalsperioden eller teckna eget avtal — dess datum ska bevaras,
       // aldrig harmoniseras mot huvudkontoret.
-      const formValues = {
+      const formValues: Record<string, unknown> = {
         company_name: `${organizationName} - ${siteName}`,
         site_name: siteName,
         // Enhetens kod ÄR fakturamärkningen (billing_reference). Den gamla
@@ -204,14 +250,27 @@ export default function SiteModal({
         billing_email: billingEmail || null,
         billing_address: billingAddress || null,
         billing_reference: billingReference.trim() || null,
+        // Fortnox-numret kommer från uppslaget i FortnoxNumberField, aldrig fritt
+        // ifyllt. Verifieringsstämpeln räknas dessutom om av databasens trigger.
+        customer_number: fortnox.customerNumber,
+        ...(fortnox.customerNumber != null && fortnox.verified
+          ? { fortnox_verified_at: new Date().toISOString() }
+          : {}),
+        // Kundgruppen syns bara för ett eget bolag, och skrivs bara då
+        ...(ownCompany ? { customer_group_id: customerGroupId || null } : {}),
       }
 
       const describeError = (error: { code?: string; message?: string }) => {
         if (error.code === '23505') {
+          if (error.message?.includes('customer_number')) {
+            return new Error('Kundnumret sitter redan på en annan kundrad i portalen')
+          }
           return new Error('En enhet med samma uppgifter finns redan')
         }
         return error
       }
+
+      let savedId: string
 
       if (existingSite) {
         const { error } = await supabase
@@ -220,6 +279,7 @@ export default function SiteModal({
           .eq('id', existingSite.id)
 
         if (error) throw describeError(error)
+        savedId = existingSite.id
         toast.success('Enhet uppdaterad')
       } else {
         // Huvudkontorets uppgifter behövs bara när enheten skapas.
@@ -256,263 +316,260 @@ export default function SiteModal({
           })
         }
 
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('customers')
           .insert(insertData)
+          .select('id')
+          .single()
 
-        if (error) throw describeError(error)
+        if (error || !inserted) throw describeError(error ?? { message: 'Enheten kunde inte skapas' })
+        savedId = inserted.id
         toast.success('Ny enhet skapad')
+      }
+
+      // Ingen träff i Fortnox (eller val som kräver Fortnox): raden finns nu,
+      // så allocate-customer kan skapa/återaktivera kunden och skriva numret.
+      if (fortnox.allocate) {
+        await runFortnoxAllocation({
+          customerId: savedId,
+          groupId: customerGroupId || null,
+          request: fortnox.allocate,
+        })
       }
 
       onSuccess()
       onClose()
       resetForm()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving site:', error)
-      toast.error(error.message || 'Kunde inte spara enhet')
+      toast.error((error as { message?: string } | null)?.message || 'Kunde inte spara enhet')
     } finally {
       setLoading(false)
     }
   }
 
-  if (!isOpen) return null
+  const effectiveOrganizationId = parentData?.organization_id || organizationId || null
+
+  const footer = (
+    <div className="flex justify-end gap-3 px-4 py-2.5">
+      <Button onClick={onClose} variant="secondary" disabled={loading}>
+        Avbryt
+      </Button>
+      <Button
+        onClick={handleSubmit}
+        variant="primary"
+        disabled={loading}
+        className="flex items-center gap-2"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Sparar...
+          </>
+        ) : (
+          <>
+            <Building2 className="w-4 h-4" />
+            {existingSite ? 'Spara ändringar' : 'Lägg till enhet'}
+          </>
+        )}
+      </Button>
+    </div>
+  )
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
-        <div className="p-6 border-b border-slate-700">
-          <div className="flex items-center justify-between">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={existingSite ? 'Redigera enhet' : 'Lägg till ny enhet'}
+      subtitle={organizationName}
+      size="lg"
+      preventClose={loading}
+      footer={footer}
+    >
+      <form onSubmit={handleSubmit} className="p-4 space-y-3">
+        {/* Info: enhet = fullvärdig kund */}
+        {!existingSite && (
+          <p className="text-xs text-slate-400">
+            Enheten skapas som en fullvärdig kund i systemet. Ärenden, kontrollrundor,
+            utrustningsplaceringar och scheman kan hanteras direkt på enheten.
+          </p>
+        )}
+
+        {/* Grundinformation */}
+        <div className={sectionClass}>
+          <h3 className={headerClass}>
+            <Building2 className="w-4 h-4 text-slate-400" />
+            Grundinformation
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Enhetsnamn *"
+              type="text"
+              value={siteName}
+              onChange={(e) => setSiteName(e.target.value)}
+              placeholder="t.ex. Stockholm City"
+            />
             <div>
-              <h2 className="text-xl font-semibold text-white">
-                {existingSite ? 'Redigera enhet' : 'Lägg till ny enhet'}
-              </h2>
-              <p className="text-sm text-slate-400 mt-1">
-                {organizationName}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5 text-slate-400" />
-            </button>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto max-h-[calc(90vh-180px)]">
-          {/* Info-banner: enhet = fullvärdig kund */}
-          {!existingSite && (
-            <div className="p-3 bg-[#20c58f]/10 border border-[#20c58f]/20 rounded-xl flex items-start gap-2">
-              <Building2 className="w-4 h-4 text-[#20c58f] mt-0.5 shrink-0" />
-              <p className="text-xs text-slate-300">
-                Enheten skapas som en fullvärdig kund i systemet. Ärenden, kontrollrundor,
-                utrustningsplaceringar och scheman kan hanteras direkt på enheten.
-              </p>
-            </div>
-          )}
-
-          {/* Grundinformation */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-blue-400" />
-              Grundinformation
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Enhetsnamn *
-                </label>
-                <Input
-                  type="text"
-                  value={siteName}
-                  onChange={(e) => setSiteName(e.target.value)}
-                  placeholder="t.ex. Stockholm City"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Region *
-                </label>
-                <Input
-                  type="text"
-                  value={region}
-                  onChange={(e) => {
-                    // Egen redigering — sluta betrakta värdet som autofyllt.
-                    autofilledRegionRef.current = null
-                    setRegion(e.target.value)
-                  }}
-                  placeholder="t.ex. Stockholm"
-                  required
-                />
-                {regionFollowsCity && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    Fylls i automatiskt från adressen. Kan ändras.
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Organisationsnummer
-                </label>
-                <Input
-                  type="text"
-                  value={organizationNumber}
-                  onChange={(e) => setOrganizationNumber(e.target.value)}
-                  placeholder="XXXXXX-XXXX"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Kontaktinformation */}
-          <div>
-            <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
-              <User className="w-4 h-4 text-green-400" />
-              Kontaktinformation
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Kontaktperson
-                </label>
-                <Input
-                  type="text"
-                  value={contactPerson}
-                  onChange={(e) => setContactPerson(e.target.value)}
-                  placeholder="För- och efternamn"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Kontakt-email *
-                </label>
-                <Input
-                  type="email"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="kontakt@foretag.se"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Telefon
-                </label>
-                <Input
-                  type="tel"
-                  value={contactPhone}
-                  onChange={(e) => setContactPhone(e.target.value)}
-                  placeholder="07X-XXX XX XX"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Adress
-                </label>
-                <AddressAutocomplete
-                  value={contactAddress}
-                  onChange={handleAddressChange}
-                  placeholder="Sök adress..."
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Faktureringsuppgifter */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-purple-400" />
-                Faktureringsuppgifter
-              </h3>
-              {parentData && (
-                <Button
-                  type="button"
-                  onClick={handleCopyBilling}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <Copy className="w-3 h-3" />
-                  Kopiera från huvudkontor
-                </Button>
+              <Input
+                label="Region *"
+                type="text"
+                value={region}
+                onChange={(e) => {
+                  // Egen redigering — sluta betrakta värdet som autofyllt.
+                  autofilledRegionRef.current = null
+                  setRegion(e.target.value)
+                }}
+                placeholder="t.ex. Stockholm"
+              />
+              {regionFollowsCity && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Fylls i automatiskt från adressen. Kan ändras.
+                </p>
               )}
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Faktura-email
-                </label>
-                <Input
-                  type="email"
-                  value={billingEmail}
-                  onChange={(e) => setBillingEmail(e.target.value)}
-                  placeholder="faktura@foretag.se"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Faktureringsadress
-                </label>
-                <Input
-                  type="text"
-                  value={billingAddress}
-                  onChange={(e) => setBillingAddress(e.target.value)}
-                  placeholder="Fakturaadress eller referens"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Enhetskod (märkning faktura)
-                </label>
-                <Input
-                  type="text"
-                  value={billingReference}
-                  onChange={(e) => setBillingReference(e.target.value)}
-                  placeholder="t.ex. YX301, PO-nummer eller kostnadsställe"
-                />
-                <p className="text-xs text-slate-500 mt-1">
-                  Enhetens kod. Blir Er referens på fakturan och fylls i automatiskt när ärenden skapas mot enheten.
-                </p>
-              </div>
-            </div>
-            {useSameBilling && (
-              <p className="text-xs text-green-400 mt-2">
-                Använder samma faktureringsuppgifter som huvudkontoret
+            <div>
+              <Input
+                label="Organisationsnummer"
+                type="text"
+                value={organizationNumber}
+                onChange={(e) => setOrganizationNumber(e.target.value)}
+                placeholder="XXXXXX-XXXX"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Lämna tomt om enheten tillhör samma bolag som huvudkontoret.
               </p>
+            </div>
+            {ownCompany && (
+              <Select
+                label="Kundgrupp (Fortnox)"
+                value={customerGroupId}
+                onChange={setCustomerGroupId}
+                placeholder="Välj kundgrupp"
+                options={customerGroups.map(g => ({ value: g.id, label: `${g.name} (${g.series_start}-${g.series_end})` }))}
+              />
+            )}
+            <div className="md:col-span-2">
+              {parentData ? (
+                <FortnoxNumberField
+                  orgNr={organizationNumber}
+                  savedOrgNr={existingSite?.organization_number ?? null}
+                  parent={{
+                    orgNr: parentData.organization_number ?? null,
+                    customerNumber: parentData.customer_number ?? null,
+                    name: parentData.company_name ?? organizationName,
+                  }}
+                  organizationId={effectiveOrganizationId}
+                  customerId={existingSite?.id ?? null}
+                  customerGroupId={customerGroupId || null}
+                  initialNumber={existingSite?.customer_number ?? null}
+                  onChange={setFortnox}
+                />
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Hämtar huvudkontoret…
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Kontaktinformation */}
+        <div className={sectionClass}>
+          <h3 className={headerClass}>
+            <User className="w-4 h-4 text-slate-400" />
+            Kontaktinformation
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Kontaktperson"
+              type="text"
+              value={contactPerson}
+              onChange={(e) => setContactPerson(e.target.value)}
+              placeholder="För- och efternamn"
+            />
+            <Input
+              label="Kontakt-email *"
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              placeholder="kontakt@foretag.se"
+            />
+            <Input
+              label="Telefon"
+              type="tel"
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+              placeholder="07X-XXX XX XX"
+            />
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-1">
+                Adress
+              </label>
+              <AddressAutocomplete
+                value={contactAddress}
+                onChange={handleAddressChange}
+                placeholder="Sök adress..."
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Faktureringsuppgifter */}
+        <div className={sectionClass}>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+              <Mail className="w-4 h-4 text-slate-400" />
+              Faktureringsuppgifter
+            </h3>
+            {parentData && (
+              <Button
+                type="button"
+                onClick={handleCopyBilling}
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2"
+              >
+                <Copy className="w-3 h-3" />
+                Kopiera från huvudkontor
+              </Button>
             )}
           </div>
-        </form>
-
-        <div className="p-6 border-t border-slate-700 flex justify-end gap-3">
-          <Button
-            onClick={onClose}
-            variant="outline"
-            disabled={loading}
-          >
-            Avbryt
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            variant="primary"
-            disabled={loading}
-            className="flex items-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Sparar...
-              </>
-            ) : (
-              <>
-                <Building2 className="w-4 h-4" />
-                {existingSite ? 'Spara ändringar' : 'Lägg till enhet'}
-              </>
-            )}
-          </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Input
+              label="Faktura-email"
+              type="email"
+              value={billingEmail}
+              onChange={(e) => setBillingEmail(e.target.value)}
+              placeholder="faktura@foretag.se"
+            />
+            <Input
+              label="Faktureringsadress"
+              type="text"
+              value={billingAddress}
+              onChange={(e) => setBillingAddress(e.target.value)}
+              placeholder="Fakturaadress eller referens"
+            />
+            <div className="md:col-span-2">
+              <Input
+                label="Enhetskod (märkning faktura)"
+                type="text"
+                value={billingReference}
+                onChange={(e) => setBillingReference(e.target.value)}
+                placeholder="t.ex. YX301, PO-nummer eller kostnadsställe"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Enhetens kod. Blir Er referens på fakturan och fylls i automatiskt när ärenden skapas mot enheten.
+              </p>
+            </div>
+          </div>
+          {useSameBilling && (
+            <p className="text-xs text-[#20c58f] mt-2">
+              Använder samma faktureringsuppgifter som huvudkontoret
+            </p>
+          )}
         </div>
-      </div>
-    </div>
+      </form>
+    </Modal>
   )
 }

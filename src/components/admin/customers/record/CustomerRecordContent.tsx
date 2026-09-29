@@ -268,7 +268,9 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
     )
   }
 
-  const showUnitsTab = units.length > 0
+  // Enheter-fliken syns för multisite-huvudkontor även utan enheter, så att den
+  // första enheten kan läggas till härifrån.
+  const showUnitsTab = units.length > 0 || (!!onDataChanged && !!root.is_multisite && root.site_type === 'huvudkontor')
   const accessCount = countAccessPersons(access)
 
   const tabs: { id: TabId; label: string; visible: boolean }[] = [
@@ -443,6 +445,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
             caseCounts={caseCounts}
             basePath={basePath}
             currentCustomerId={customer.id}
+            onChanged={onDataChanged}
           />
         </div>
       )}

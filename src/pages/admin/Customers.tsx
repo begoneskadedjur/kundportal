@@ -24,7 +24,7 @@ import ImportCustomerByOrgnrModal from '../../components/admin/customers/ImportC
 import BillingSettingsModal from '../../components/admin/customers/BillingSettingsModal'
 import CustomerContactsModal from '../../components/admin/customers/CustomerContactsModal'
 import CustomerPeekPanel from '../../components/admin/customers/CustomerPeekPanel'
-import CustomerListRow, { resolveFortnoxInfo } from '../../components/admin/customers/CustomerListRow'
+import CustomerListRow, { resolveFortnoxInfo, unitsMissingFortnox } from '../../components/admin/customers/CustomerListRow'
 import Select from '../../components/ui/Select'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers, type ConsolidatedCustomer } from '../../hooks/useConsolidatedCustomers'
@@ -206,7 +206,8 @@ export default function Customers() {
 
     if (quickView === 'atgard') return result.filter((c) => requiresAction(c, addonFor(c)))
     if (quickView === 'fortnox') {
-      return result.filter(c => !c.isTerminated && resolveFortnoxInfo(c).number == null)
+      // Kunden saknar nummer, eller en enhet som är ett eget bolag saknar nummer
+      return result.filter(c => !c.isTerminated && (resolveFortnoxInfo(c).number == null || unitsMissingFortnox(c) > 0))
     }
     if (quickView === 'karta_saknas') return result.filter(c => !c.isTerminated && mapFor(c)?.status === 'none')
     if (quickView === 'karta_ofullstandig') return result.filter(c => !c.isTerminated && mapFor(c)?.status === 'incomplete')
@@ -264,7 +265,11 @@ export default function Customers() {
     const renewals = active.filter(c =>
       c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90
     ).length
-    const missingFortnox = active.filter(c => resolveFortnoxInfo(c).number == null).length
+    // Kunder utan nummer plus enheter som är egna bolag utan eget eller delat nummer
+    const missingFortnox = active.reduce(
+      (sum, c) => sum + (resolveFortnoxInfo(c).number == null ? 1 : 0) + unitsMissingFortnox(c),
+      0
+    )
     return { annualSum, contractCount, customerCount: active.length, renewals, missingFortnox }
   }, [consolidatedCustomers])
 

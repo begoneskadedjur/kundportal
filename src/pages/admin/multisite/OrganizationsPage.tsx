@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase, getAuthHeaders } from '../../../lib/supabase'
 import { apiFetch } from '../../../lib/api'
 import Button from '../../../components/ui/Button'
@@ -25,7 +25,6 @@ import {
 } from 'lucide-react'
 import OrganizationEditModal from '../../../components/admin/multisite/OrganizationEditModal'
 import UserModal from '../../../components/admin/multisite/UserModal'
-import SiteModal from '../../../components/admin/multisite/SiteModal'
 import CompactOrganizationTable from '../../../components/admin/multisite/CompactOrganizationTable'
 import MultisiteRegistrationWizard from '../../../components/admin/multisite/MultisiteRegistrationWizard'
 import CreatePortalAccountModal from '../../../components/admin/multisite/CreatePortalAccountModal'
@@ -111,6 +110,10 @@ interface OrganizationSite {
 
 export default function OrganizationsPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+  // Kundkortet under samma rollprefix (/admin, /koordinator …). Enheter
+  // hanteras där sedan 3.15.0; här visas de bara.
+  const recordBasePath = `/${location.pathname.split('/')[1] || 'admin'}/befintliga-kunder`
   const { user, profile } = useAuth()
   const { startImpersonation } = useImpersonation()
   const [organizations, setOrganizations] = useState<Organization[]>([])
@@ -124,8 +127,6 @@ export default function OrganizationsPage() {
   const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null)
   const [showUserModal, setShowUserModal] = useState(false)
   const [editingUser, setEditingUser] = useState<OrganizationUser | null>(null)
-  const [showSiteModal, setShowSiteModal] = useState(false)
-  const [editingSite, setEditingSite] = useState<OrganizationSite | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   // Dropdown-filter
   const [customerTypeFilter, setCustomerTypeFilter] = useState<'all' | 'multisite' | 'single'>('all')
@@ -852,55 +853,6 @@ export default function OrganizationsPage() {
     }
   }
 
-  const handleAddSite = (org: Organization) => {
-    setSelectedOrg(org)
-    setEditingSite(null)
-    setShowSiteModal(true)
-  }
-
-  const handleEditSite = (org: Organization, site: OrganizationSite) => {
-    setSelectedOrg(org)
-    setEditingSite(site)
-    setShowSiteModal(true)
-  }
-
-  const handleDeleteSite = (orgId: string, siteId: string) => {
-    setConfirmModal({
-      title: 'Ta bort enhet',
-      message: 'Är du säker på att du vill ta bort denna enhet?',
-      variant: 'danger',
-      confirmLabel: 'Ta bort',
-      onConfirm: async () => {
-        setConfirmLoading(true)
-        try {
-          const { error } = await supabase
-            .from('customers')
-            .delete()
-            .eq('id', siteId)
-
-          if (error) throw error
-
-          toast.success('Enhet borttagen')
-          setConfirmModal(null)
-          setOrganizationSites(prev => ({
-            ...prev,
-            [orgId]: prev[orgId].filter(s => s.id !== siteId)
-          }))
-          setOrganizations(prev => prev.map(org =>
-            org.id === orgId
-              ? { ...org, sites_count: (org.sites_count || 1) - 1 }
-              : org
-          ))
-        } catch (error) {
-          console.error('Error deleting site:', error)
-          toast.error('Kunde inte ta bort enhet')
-        } finally {
-          setConfirmLoading(false)
-        }
-      }
-    })
-  }
-
   const handleResetPassword = (email: string, userName: string) => {
     setConfirmModal({
       title: 'Återställ lösenord',
@@ -1278,9 +1230,7 @@ export default function OrganizationsPage() {
           onDeleteUser={handleDeleteUser}
           onResetPassword={handleResetPassword}
           onSendWelcome={handleSendWelcome}
-          onAddSite={handleAddSite}
-          onEditSite={handleEditSite}
-          onDeleteSite={handleDeleteSite}
+          recordBasePath={recordBasePath}
           expandedOrgId={expandedOrgId}
           onInviteToPortal={handleInviteToPortal}
           onCreatePortalAccount={handleCreatePortalAccount}
@@ -1334,30 +1284,6 @@ export default function OrganizationsPage() {
           organizationName={selectedOrg.name}
           existingUser={editingUser}
           is_regional={selectedOrg.is_regional}
-        />
-      )}
-
-      {/* Site Modal */}
-      {showSiteModal && selectedOrg && (
-        <SiteModal
-          isOpen={showSiteModal}
-          onClose={() => {
-            setShowSiteModal(false)
-            setEditingSite(null)
-          }}
-          onSuccess={() => {
-            setShowSiteModal(false)
-            setEditingSite(null)
-            if (selectedOrg.organization_id) {
-              fetchOrganizationSites(selectedOrg.id, selectedOrg.organization_id)
-            }
-            // Uppdatera sites_count
-            fetchOrganizations()
-          }}
-          organizationId={selectedOrg.organization_id || ''}
-          organizationName={selectedOrg.name}
-          parentCustomerId={selectedOrg.id}
-          existingSite={editingSite}
         />
       )}
 

@@ -21,6 +21,7 @@ import {
 import type { ConsolidatedCustomer, CustomerSite } from '../../../hooks/useConsolidatedCustomers'
 import type { AddonPendingSummary } from '../../../hooks/useAddonPending'
 import type { ContractMapStatus } from '../../../hooks/useContractMapStatus'
+import { unitFortnoxState } from '../../../shared/fortnoxCustomerNumbers'
 
 // ---------------------------------------------------------------------------
 // Delade hjälpare (används även av portföljraden i Customers.tsx)
@@ -34,6 +35,28 @@ export function resolveFortnoxInfo(org: ConsolidatedCustomer): { number: number 
   const number = primary?.customer_number ?? org.customer_number ?? null
   const verified = !!(primary?.fortnox_verified_at ?? org.fortnox_verified_at)
   return { number, verified }
+}
+
+/**
+ * Fortnox-läget för en enhetsrad i en multisite-organisation. null = enheten
+ * tillhör huvudkontorets bolag (faktureras via HK). Annars eget bolag med eget
+ * nummer, delat nummer (annan rad med samma org.nr) eller inget nummer alls.
+ */
+export function resolveUnitFortnoxInfo(org: ConsolidatedCustomer, site: CustomerSite) {
+  const hq = (org.headquarterCustomer as CustomerSite | null) ?? null
+  const hkOrgNr = hq?.organization_number ?? org.organization_number ?? null
+  const family = hq ? [hq, ...org.sites] : org.sites
+  return unitFortnoxState(site, hkOrgNr, family)
+}
+
+/** Aktiva enheter som är egna bolag men saknar Fortnox-nummer (även delat) */
+export function unitsMissingFortnox(org: ConsolidatedCustomer): number {
+  if (org.organizationType !== 'multisite') return 0
+  return org.sites.filter((site) => {
+    if (site.is_active === false) return false
+    const info = resolveUnitFortnoxInfo(org, site)
+    return !!info && info.number == null
+  }).length
 }
 
 const DAY_MS = 86_400_000
@@ -349,7 +372,8 @@ export default function CustomerListRow({
             const ownContracts = (site.contracts ?? []).filter((c) => !c.id.startsWith('synth-'))
             const ownAnnual = ownContracts.reduce((sum, c) => sum + Number(c.annual_value ?? 0), 0)
               || Number(site.annual_value ?? 0)
-            const viaHk = site.customer_number == null
+            const unitFortnox = resolveUnitFortnoxInfo(org, site)
+            const viaHk = !unitFortnox && site.customer_number == null
             return (
               <li key={site.id} className="list-none">
                 <button
@@ -367,6 +391,19 @@ export default function CustomerListRow({
                       </span>
                     ) : (
                       <span>omfattas av org-avtal</span>
+                    )}
+                    {unitFortnox && (
+                      <span
+                        className="flex items-center gap-1.5"
+                        title={unitFortnox.sharedWith ? `Eget bolag, delar nummer med ${unitFortnox.sharedWith}` : 'Eget bolag, eget Fortnox-kundnummer'}
+                      >
+                        <FortnoxDot number={unitFortnox.number} verified={unitFortnox.verified} />
+                        {unitFortnox.number != null ? (
+                          <span className="font-mono tabular-nums">#{unitFortnox.number}</span>
+                        ) : (
+                          <span className="text-red-400">saknar nr</span>
+                        )}
+                      </span>
                     )}
                     {viaHk && (
                       <span className="flex items-center gap-1">

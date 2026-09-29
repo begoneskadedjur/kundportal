@@ -4,7 +4,7 @@
 
 import { supabase } from '../lib/supabase'
 import { apiFetch } from '../lib/api'
-import type { FortnoxMirrorHit } from '../shared/fortnoxCustomerNumbers'
+import { orgDigits, type FortnoxMirrorHit } from '../shared/fortnoxCustomerNumbers'
 
 export interface CustomerGroupFortnoxStats {
   group_id: string
@@ -82,6 +82,33 @@ export const FortnoxMirrorService = {
       throw new Error(body?.error || `Synk misslyckades (${res.status})`)
     }
     return body as MirrorSyncResult
+  },
+
+  /**
+   * Fortnox-kunder med samma org-/personnummer (jämförs på siffror). Raderade
+   * (missing_since) följer med så att anroparen kan avgöra själv; använd
+   * decideCandidate för regeln om aldrig auto-val vid flera aktiva.
+   */
+  async findByOrgNr(orgNr: string | null | undefined): Promise<FortnoxMirrorHit[]> {
+    const digits = orgDigits(orgNr)
+    if (!digits) return []
+    const { data, error } = await supabase
+      .from('fortnox_customer_numbers')
+      .select('customer_number, numeric_value, name, organisation_number, active, missing_since')
+      .eq('org_digits', digits)
+    if (error) throw new Error(`Kunde inte läsa Fortnox-spegeln: ${error.message}`)
+    return (data ?? []) as FortnoxMirrorHit[]
+  },
+
+  /** En Fortnox-kund i spegeln på kundnummer, eller null om numret inte finns där. */
+  async findByCustomerNumber(customerNumber: string | number): Promise<(FortnoxMirrorHit & { org_digits: string | null }) | null> {
+    const { data, error } = await supabase
+      .from('fortnox_customer_numbers')
+      .select('customer_number, numeric_value, name, organisation_number, org_digits, active, missing_since')
+      .eq('customer_number', String(customerNumber).trim())
+      .maybeSingle()
+    if (error) throw new Error(`Kunde inte läsa Fortnox-spegeln: ${error.message}`)
+    return (data as (FortnoxMirrorHit & { org_digits: string | null }) | null) ?? null
   },
 
   async allocateCustomer(params: AllocateCustomerParams): Promise<AllocateCustomerResult> {

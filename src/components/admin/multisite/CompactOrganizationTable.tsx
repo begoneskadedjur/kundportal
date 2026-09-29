@@ -18,12 +18,13 @@ import {
   UserCheck,
   Shield,
   Building2,
-  Plus,
+  ExternalLink,
   CheckCircle,
   Clock,
   Send,
   Eye
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import Button from '../../ui/Button'
 import UnacknowledgedRecommendationsModal from './UnacknowledgedRecommendationsModal'
 import ConvertToMultisiteInline from './ConvertToMultisiteInline'
@@ -121,9 +122,11 @@ interface CompactOrganizationTableProps {
   onDeleteUser: (orgId: string, userId: string) => void
   onResetPassword: (email: string, userName: string) => void
   onSendWelcome?: (email: string, userName: string) => void
-  onAddSite: (org: Organization) => void
-  onEditSite: (org: Organization, site: Site) => void
-  onDeleteSite: (orgId: string, siteId: string) => void
+  /**
+   * Kundkortets bas, t.ex. "/admin/befintliga-kunder". Enheter skapas, ändras
+   * och avaktiveras på kundkortets Enheter-flik; här visas de bara.
+   */
+  recordBasePath?: string
   expandedOrgId: string | null
   onInviteToPortal?: (org: Organization) => void
   onCreatePortalAccount?: (org: Organization) => void
@@ -150,9 +153,7 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
   onDeleteUser,
   onResetPassword,
   onSendWelcome,
-  onAddSite,
-  onEditSite,
-  onDeleteSite,
+  recordBasePath = '/admin/befintliga-kunder',
   expandedOrgId,
   onInviteToPortal,
   onCreatePortalAccount,
@@ -343,15 +344,17 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                               <MapPin className="w-3 h-3 text-blue-400 flex-shrink-0" />
                               <span className="text-xs text-white truncate">{site.site_name}</span>
                             </div>
-                            <div className="flex items-center gap-1">
-                              <button onClick={() => onEditSite(org, site)} className="p-1.5 hover:bg-slate-700 rounded"><Edit2 className="w-3 h-3 text-slate-400" /></button>
-                              <button onClick={() => onDeleteSite(org.id, site.id)} className="p-1.5 hover:bg-red-500/20 rounded"><Trash2 className="w-3 h-3 text-red-400" /></button>
-                            </div>
                           </div>
                         ))}
                         {organizationSites[org.id].length > 3 && (
                           <p className="text-xs text-slate-500 text-center">+{organizationSites[org.id].length - 3} fler</p>
                         )}
+                        <Link
+                          to={`${recordBasePath}/${org.id}?tab=enheter`}
+                          className="block text-xs text-slate-400 underline decoration-dotted underline-offset-2 hover:text-[#20c58f]"
+                        >
+                          Hantera på kundkortet
+                        </Link>
                       </div>
                     </div>
                   )}
@@ -791,15 +794,14 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                           <Building2 className="w-4 h-4 text-blue-400" />
                           Enheter ({organizationSites[org.id]?.length || 0})
                         </h4>
-                        <Button
-                          onClick={() => onAddSite(org)}
-                          variant="primary"
-                          size="sm"
-                          className="flex items-center gap-2"
+                        {/* Enheter hanteras på kundkortet (skapa, redigera, avaktivera) */}
+                        <Link
+                          to={`${recordBasePath}/${org.id}?tab=enheter`}
+                          className="flex items-center gap-1 text-xs text-slate-400 underline decoration-dotted underline-offset-2 hover:text-[#20c58f]"
                         >
-                          <Plus className="w-3 h-3" />
-                          Lägg till enhet
-                        </Button>
+                          Hantera på kundkortet
+                          <ExternalLink className="w-3 h-3" />
+                        </Link>
                       </div>
 
                       {organizationSites[org.id] && organizationSites[org.id].length > 0 ? (
@@ -827,28 +829,15 @@ const CompactOrganizationTable: React.FC<CompactOrganizationTableProps> = ({
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => onEditSite(org, site)}
-                                  className="p-1 hover:bg-slate-700 rounded transition-colors"
-                                  title="Redigera"
-                                >
-                                  <Edit2 className="w-3 h-3 text-slate-400" />
-                                </button>
-                                <button
-                                  onClick={() => onDeleteSite(org.id, site.id)}
-                                  className="p-1 hover:bg-red-500/20 rounded transition-colors"
-                                  title="Ta bort"
-                                >
-                                  <Trash2 className="w-3 h-3 text-red-400" />
-                                </button>
-                              </div>
+                              {site.is_active === false && (
+                                <span className="text-xs text-slate-500 shrink-0">Avaktiverad</span>
+                              )}
                             </div>
                           ))}
                         </div>
                       ) : (
                         <p className="text-sm text-slate-500 text-center py-4">
-                          Inga enheter registrerade
+                          Inga enheter registrerade. Lägg till dem på kundkortet.
                         </p>
                       )}
                     </div>

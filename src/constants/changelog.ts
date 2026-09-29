@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.15.0',
+    date: '2026-09-29',
+    title: 'Enheter hanteras på kundkortet',
+    items: [
+      { kind: 'nyhet', text: 'Enheter läggs till, redigeras och avaktiveras direkt på kundkortets Enheter-flik. Användarkonton kund visar enheterna med en länk dit' },
+      { kind: 'nyhet', text: 'Kundnumret hämtas från Fortnox på org.nr när en enhet eller ny kund läggs upp. Finns kunden inte i Fortnox skapas den där med nästa lediga nummer i kundgruppen, i stället för att numret skrivs in för hand' },
+      { kind: 'andring', text: 'Enheter som är egna bolag visar sin Fortnox-status i kundlistan, och räknas med under Saknar Fortnox-nr när numret saknas' },
+    ],
+  },
+  {
     version: '3.14.5',
     date: '2026-09-27',
     title: 'Sökhistoriken hämtas in av sig själv',
@@ -66,6 +76,15 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Google-omdömen hämtas varje natt',
     items: [
       { kind: 'nyhet', text: 'Begones betyg och senaste omdömen på Google hämtas automatiskt varje natt, så att nya begone.se alltid kan visa aktuella omdömen' },
+    ],
+  },
+  {
+    version: '3.14.2',
+    date: '2026-09-25',
+    title: 'Teknikern syns på fakturan och Återställ skapar inga dubbletter',
+    items: [
+      { kind: 'buggfix', text: 'Ärenden där teknikern valdes för hand i Nytt ärende sparades utan teknikerns namn, så fakturan visade inte vem som utfört arbetet. Namnet sparas nu alltid, och de ärenden som saknade det är ifyllda' },
+      { kind: 'buggfix', text: 'Återställ på en makulerad faktura som redan finns i Fortnox ger den tillbaka sin Fortnox-status och sitt nummer, i stället för att skapa ett nytt utkast med nytt nummer' },
     ],
   },
   {

@@ -13,6 +13,17 @@
 //  3. Rad inom samma organisation med samma org.nr som bär ett customer_number
 //  4. Valfri kundrad med samma org.nr som bär ett customer_number (äldst först)
 import { supabase } from '../lib/supabase'
+import { formatOrgNrForFortnox, orgDigits } from '../shared/fortnoxCustomerNumbers'
+
+/** Samma org.nr skrivet med och utan bindestreck (kundkortet och Fortnox skriver olika) */
+function orgNrVariants(orgNr: string): string[] {
+  const variants = new Set<string>([orgNr])
+  const digits = orgDigits(orgNr)
+  if (digits) variants.add(digits)
+  const formatted = formatOrgNrForFortnox(orgNr)
+  if (formatted) variants.add(formatted)
+  return [...variants]
+}
 
 export async function resolveFortnoxCustomerNumber(customerId: string): Promise<number | null> {
   const { data: cust } = await supabase
@@ -37,13 +48,14 @@ export async function resolveFortnoxCustomerNumber(customerId: string): Promise<
   }
 
   if (!orgNr) return null
+  const variants = orgNrVariants(orgNr)
 
   // Föredra bärar-raden inom samma organisation
   if (cust.organization_id) {
     const { data: inOrg } = await supabase
       .from('customers')
       .select('customer_number')
-      .eq('organization_number', orgNr)
+      .in('organization_number', variants)
       .eq('organization_id', cust.organization_id)
       .not('customer_number', 'is', null)
       .order('created_at', { ascending: true })
@@ -55,7 +67,7 @@ export async function resolveFortnoxCustomerNumber(customerId: string): Promise<
   const { data: anyRow } = await supabase
     .from('customers')
     .select('customer_number')
-    .eq('organization_number', orgNr)
+    .in('organization_number', variants)
     .not('customer_number', 'is', null)
     .order('created_at', { ascending: true })
     .limit(1)

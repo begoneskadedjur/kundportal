@@ -490,9 +490,6 @@ export default function OrganizationManagement() {
             onEditUser={(org, user) => console.log('Edit user:', user.id)}
             onDeleteUser={(orgId, userId) => console.log('Delete user:', userId)}
             onResetPassword={handleResetPassword}
-            onAddSite={(org) => console.log('Add site:', org.id)}
-            onEditSite={(org, site) => console.log('Edit site:', site.id)}
-            onDeleteSite={(orgId, siteId) => console.log('Delete site:', siteId)}
             expandedOrgId={expandedOrg}
             getDaysUntilContractEnd={(endDate) => {
               if (!endDate) return null

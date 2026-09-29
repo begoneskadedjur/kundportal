@@ -241,3 +241,42 @@ export function decideCandidate(
   if (active.length > 1) return { kind: 'multiple', candidates: sorted }
   return { kind: 'inactive-only', candidates: sorted }
 }
+
+export interface FortnoxUnitRow {
+  id: string
+  organization_number?: string | null
+  customer_number?: number | null
+  fortnox_verified_at?: string | null
+  site_name?: string | null
+  company_name?: string | null
+}
+
+/**
+ * Fortnox-läget för en enhet under ett huvudkontor, samma regel som
+ * src/utils/fortnoxCustomerResolver.ts. null = enheten saknar eget org.nr
+ * eller har huvudkontorets, dvs. samma bolag, och faktureras via HK.
+ * Annars är enheten ett eget bolag: eget nummer, delat nummer (en annan rad i
+ * familjen med samma org.nr bär det) eller saknas.
+ */
+export function unitFortnoxState(
+  unit: FortnoxUnitRow,
+  hkOrgNr: string | null | undefined,
+  family: FortnoxUnitRow[]
+): { number: number | null; verified: boolean; sharedWith: string | null } | null {
+  const digits = orgDigits(unit.organization_number)
+  if (!digits || digits === orgDigits(hkOrgNr)) return null
+  if (unit.customer_number != null) {
+    return { number: unit.customer_number, verified: !!unit.fortnox_verified_at, sharedWith: null }
+  }
+  const holder = family.find(
+    r => r.id !== unit.id && r.customer_number != null && orgDigits(r.organization_number) === digits
+  )
+  if (holder) {
+    return {
+      number: holder.customer_number ?? null,
+      verified: !!holder.fortnox_verified_at,
+      sharedWith: holder.site_name || holder.company_name || null,
+    }
+  }
+  return { number: null, verified: false, sharedWith: null }
+}

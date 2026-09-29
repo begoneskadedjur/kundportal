@@ -15,6 +15,11 @@ import { supabase } from '../../../lib/supabase'
 import { CustomerGroupService } from '../../../services/customerGroupService'
 import { CustomerGroup } from '../../../types/customerGroups'
 import { useContractTypeOptions } from '../../../hooks/useContractTypeOptions'
+import FortnoxNumberField, {
+  EMPTY_FORTNOX_RESOLUTION,
+  runFortnoxAllocation,
+  type FortnoxNumberResolution,
+} from './FortnoxNumberField'
 import toast from 'react-hot-toast'
 
 registerLocale('sv', sv)
@@ -45,7 +50,6 @@ const INITIAL_FORM = {
   contact_phone: '',
   contact_address: '',
   customer_group_id: '',
-  customer_number: '',
   assigned_account_manager: '',
   account_manager_email: '',
   sales_person: '',
@@ -83,6 +87,8 @@ export default function CreateCustomerManuallyModal({
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
+  // Fortnox-numret kommer från uppslaget i FortnoxNumberField, aldrig fritext
+  const [fortnox, setFortnox] = useState<FortnoxNumberResolution>(EMPTY_FORTNOX_RESOLUTION)
   const { options: contractTypeOptions } = useContractTypeOptions()
 
   useEffect(() => {
@@ -94,6 +100,7 @@ export default function CreateCustomerManuallyModal({
     setStep(1)
     setForm(INITIAL_FORM)
     setErrors({})
+    setFortnox(EMPTY_FORTNOX_RESOLUTION)
     onClose()
   }
 
@@ -146,6 +153,15 @@ export default function CreateCustomerManuallyModal({
 
   const handleSubmit = async () => {
     if (!validateStep(step)) return
+    if (fortnox.pending) {
+      toast('Kundnumret slås fortfarande upp i Fortnox. Försök igen om en sekund.', { icon: 'ℹ️' })
+      return
+    }
+    if (fortnox.allocate && !form.customer_group_id) {
+      setStep(1)
+      toast.error('Välj kundgrupp innan kunden skapas i Fortnox')
+      return
+    }
     setIsSubmitting(true)
     try {
       const payload = {
@@ -159,7 +175,10 @@ export default function CreateCustomerManuallyModal({
         contact_phone: form.contact_phone.trim() || null,
         contact_address: form.contact_address.trim() || null,
         customer_group_id: form.customer_group_id || null,
-        customer_number: form.customer_number ? parseInt(form.customer_number, 10) : null,
+        customer_number: fortnox.customerNumber,
+        ...(fortnox.customerNumber != null && fortnox.verified
+          ? { fortnox_verified_at: new Date().toISOString() }
+          : {}),
         assigned_account_manager: form.assigned_account_manager.trim() || null,
         account_manager_email: form.account_manager_email.trim() || null,
         sales_person: form.sales_person.trim() || null,
@@ -185,14 +204,31 @@ export default function CreateCustomerManuallyModal({
         is_active: true,
       }
 
-      const { error } = await supabase.from('customers').insert(payload)
-      if (error) throw error
+      const { data: inserted, error } = await supabase.from('customers').insert(payload).select('id').single()
+      if (error || !inserted) {
+        if (error?.code === '23505' && error.message?.includes('customer_number')) {
+          throw new Error('kundnumret sitter redan på en annan kundrad i portalen')
+        }
+        throw error ?? new Error('Kunden kunde inte skapas')
+      }
 
-      toast.success('Kund skapad!')
+      // Ingen träff i Fortnox: kunden finns nu i portalen, så allocate-customer
+      // kan skapa den i Fortnox med nästa lediga nummer i kundgruppen. Går det
+      // inte blir kunden kvar utan nummer (röd punkt i kundlistan).
+      let assigned = fortnox.customerNumber
+      if (fortnox.allocate) {
+        assigned = await runFortnoxAllocation({
+          customerId: inserted.id,
+          groupId: form.customer_group_id || null,
+          request: fortnox.allocate,
+        })
+      }
+
+      toast.success(assigned != null ? `Kund skapad med kundnummer ${assigned}` : 'Kund skapad')
       onCustomerCreated()
       handleClose()
-    } catch (err: any) {
-      toast.error('Kunde inte skapa kund: ' + (err.message ?? 'Okänt fel'))
+    } catch (err: unknown) {
+      toast.error('Kunde inte skapa kund: ' + ((err as { message?: string } | null)?.message ?? 'Okänt fel'))
     } finally {
       setIsSubmitting(false)
     }
@@ -229,7 +265,7 @@ export default function CreateCustomerManuallyModal({
     </div>
   )
 
-  const groupOptions = customerGroups.map(g => ({ value: g.id, label: g.name }))
+  const groupOptions = customerGroups.map(g => ({ value: g.id, label: `${g.name} (${g.series_start}-${g.series_end})` }))
 
   return (
     <Modal
@@ -272,8 +308,8 @@ export default function CreateCustomerManuallyModal({
 
       <div className="p-4 space-y-4">
         {/* ── STEG 1: Företag & Kontakt ── */}
-        {step === 1 && (
-          <>
+        {/* Steg 1 hålls monterat (hidden) så att Fortnox-uppslaget och valet i det överlever stegbyten */}
+        <div hidden={step !== 1} className="space-y-4">
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
               <h3 className="text-sm font-semibold text-white mb-2 flex items-center gap-1.5">
                 <Building2 className="w-4 h-4 text-slate-400" />
@@ -292,6 +328,25 @@ export default function CreateCustomerManuallyModal({
                   onChange={e => set('organization_number', e.target.value)}
                   placeholder="XXXXXX-XXXX"
                 />
+                <div>
+                  <label className="block text-xs font-medium text-slate-400 mb-1">Kundgrupp</label>
+                  <Select
+                    value={form.customer_group_id}
+                    onChange={v => set('customer_group_id', v)}
+                    placeholder="Välj grupp"
+                    options={groupOptions}
+                  />
+                </div>
+                <div className="col-span-2">
+                  <FortnoxNumberField
+                    orgNr={form.organization_number}
+                    organizationId={null}
+                    customerId={null}
+                    customerGroupId={form.customer_group_id || null}
+                    initialNumber={null}
+                    onChange={setFortnox}
+                  />
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Företagstyp</label>
                   <Select
@@ -325,22 +380,6 @@ export default function CreateCustomerManuallyModal({
                     ]}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1">Kundgrupp</label>
-                  <Select
-                    value={form.customer_group_id}
-                    onChange={v => set('customer_group_id', v)}
-                    placeholder="Välj grupp"
-                    options={groupOptions}
-                  />
-                </div>
-                <Input
-                  label="Kundnummer"
-                  type="number"
-                  value={form.customer_number}
-                  onChange={e => set('customer_number', e.target.value)}
-                  placeholder="T.ex. 1042"
-                />
               </div>
             </div>
 
@@ -408,8 +447,7 @@ export default function CreateCustomerManuallyModal({
                 />
               </div>
             </div>
-          </>
-        )}
+        </div>
 
         {/* ── STEG 2: Avtal & Ekonomi ── */}
         {step === 2 && (
