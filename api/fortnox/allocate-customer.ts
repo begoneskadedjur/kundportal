@@ -67,6 +67,20 @@ interface CustomerRow {
   contact_phone: string | null
   customer_group_id: string | null
   parent_customer_id: string | null
+  site_name: string | null
+}
+
+/**
+ * Namnet på Fortnox-kortet är bolagets juridiska namn (beslut 2026-09-29).
+ * Enheter heter "<Bolag> - <Plats>" i portalen; platsdelen är portalens
+ * beskrivning och ska inte till Fortnox. Kundnumret pekar på bolaget, och
+ * platsen skiljs åt med enhetskoden (Er referens) på fakturan.
+ */
+function fortnoxLegalName(customer: Pick<CustomerRow, 'company_name' | 'site_name' | 'parent_customer_id'>): string {
+  const name = customer.company_name.trim()
+  if (!customer.parent_customer_id || !customer.site_name) return name
+  const suffix = ` - ${customer.site_name.trim()}`
+  return name.endsWith(suffix) ? name.slice(0, -suffix.length).trim() || name : name
 }
 
 interface GroupRow {
@@ -188,7 +202,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data: customerData, error: customerError } = await supabase
     .from('customers')
-    .select('id, customer_number, company_name, organization_number, billing_email, contact_email, billing_address, contact_address, contact_phone, customer_group_id, parent_customer_id')
+    .select('id, customer_number, company_name, organization_number, billing_email, contact_email, billing_address, contact_address, contact_phone, customer_group_id, parent_customer_id, site_name')
     .eq('id', customerId)
     .maybeSingle()
   if (customerError || !customerData) {
@@ -317,7 +331,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   ]
 
   const { card, orgNrSkipped } = buildFortnoxCustomerCard({
-    name: customer.company_name,
+    name: fortnoxLegalName(customer),
     organization_number: customer.organization_number,
     billing_email: customer.billing_email || customer.contact_email || null,
     billing_address: customer.billing_address || customer.contact_address || null,
@@ -378,7 +392,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   return res.status(200).json({
     status: wb.conflict ? 'conflict-adopted' : 'created',
     customerNumber: created.CustomerNumber,
-    fortnoxName: created.Name ?? customer.company_name,
+    fortnoxName: created.Name ?? fortnoxLegalName(customer),
     holderCustomerId: wb.holderCustomerId,
     groupName: group.name,
     warnings,
