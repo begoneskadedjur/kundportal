@@ -33,7 +33,7 @@ const SETTINGS: Array<{
   {
     key: 'notify_on_booking',
     label: 'Ny bokning',
-    description: 'Mail när teknikern bokas in på ett ärende (som primär, sekundär eller tertiär). Ärenden från återkommande scheman samlas i ett mail.',
+    description: 'Mail när teknikern bokas in på ett ärende (som primär, sekundär eller tertiär). Ett återkommande schema ger ett sammanfattande mail per schema, inte ett per tillfälle.',
     icon: Bell
   },
   {
@@ -124,7 +124,7 @@ export default function TechnicianNotificationModal({
       <div className="p-4 space-y-3">
         <p className="text-xs text-slate-400">
           Mail skickas till <span className="text-slate-300">{technician?.email}</span> inom ~5 minuter
-          efter händelsen. Flera bokningar i samma svep (t.ex. ett återkommande schema) samlas i ett mail.
+          efter händelsen. Engångsärenden får ett mail per bokning. Ett återkommande schema ger ett mail med kund, frekvens, dag och antal tillfällen.
         </p>
 
         {loading ? (

@@ -5,15 +5,20 @@
 // Kön (technician_booking_notifications) fylls av DB-triggers på
 // cases/private_cases/business_cases/station_inspection_sessions — alla
 // bokningsvägar fångas oavsett var i systemet bokningen görs.
-// Grupperingen per tekniker gör att batchar (t.ex. 30-100 ärenden från ett
-// återkommande schema) automatiskt blir ETT samlingsmail.
-// "Settling"-fönstret (2 min) hindrar att en pågående batch splittras i två mail.
+// Ärenden som hör till ett återkommande schema (via stationskontrollens
+// recurring_schedule_id) listas aldrig ett och ett: varje schema blir ETT
+// sammanfattande mail med kund, frekvens, dag, klockslag och antal tillfällen.
+// Engångsärenden får ett mail per ärende.
+// "Settling"-fönstret (2 min) hindrar att en pågående batch splittras i två mail;
+// för ett schema räknas fönstret från gruppens SENASTE rad.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireCronSecret } from '../_lib/cronAuth'
 import { withCronLog } from '../_lib/cronLogger'
 import { baseTemplate } from '../email-templates'
+import { FREQUENCY_CONFIG, DAY_PATTERN_CONFIG } from '../../src/types/recurringSchedule'
+import type { RecurringFrequency, RecurringDayPattern, CustomFrequencyConfig } from '../../src/types/recurringSchedule'
 
 export const config = { maxDuration: 300 }
 
@@ -42,6 +47,19 @@ type QueueRow = {
   scheduled_end: string | null
   address: string | null
   attempts: number
+  created_at: string
+}
+
+type ScheduleInfo = {
+  id: string
+  customer_id: string
+  frequency: RecurringFrequency
+  day_pattern: RecurringDayPattern
+  preferred_day_of_month: number | null
+  preferred_time: string
+  estimated_duration_minutes: number
+  custom_frequency_config: CustomFrequencyConfig | null
+  created_at: string
 }
 
 const EVENT_SECTIONS: Array<{ event: QueueRow['event_type']; heading: string; color: string }> = [
@@ -141,6 +159,110 @@ function buildEmail(technicianName: string, rows: QueueRow[]): { subject: string
   return { subject, html: baseTemplate(content, subject) }
 }
 
+const PERIOD_LABEL: Record<CustomFrequencyConfig['period_type'], string> = {
+  week: 'vecka', month: 'månad', quarter: 'kvartal', year: 'år',
+}
+
+function frequencyLabel(s: ScheduleInfo): string {
+  if (s.frequency === 'custom' && s.custom_frequency_config) {
+    const c = s.custom_frequency_config
+    return `${c.visits_per_period} besök per ${PERIOD_LABEL[c.period_type] ?? c.period_type}`
+  }
+  return FREQUENCY_CONFIG[s.frequency]?.label ?? s.frequency
+}
+
+function dayPatternLabel(s: ScheduleInfo): string {
+  if (s.day_pattern === 'specific_day' && s.preferred_day_of_month) {
+    return `Den ${s.preferred_day_of_month}:e i månaden`
+  }
+  return DAY_PATTERN_CONFIG[s.day_pattern]?.label ?? s.day_pattern
+}
+
+function formatDate(iso: string | null): string {
+  if (!iso) return 'datum ej satt'
+  return new Date(iso).toLocaleDateString('sv-SE', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Stockholm'
+  })
+}
+
+function factRow(label: string, value: string): string {
+  return `
+    <tr>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b; width: 140px;">${label}</td>
+      <td style="padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #1e293b;">${value}</td>
+    </tr>`
+}
+
+/** Ett mail per återkommande schema: sammanfattning i stället för en rad per tillfälle. */
+function buildScheduleEmail(
+  technicianName: string,
+  schedule: ScheduleInfo,
+  rows: QueueRow[]
+): { subject: string; html: string } {
+  const customer = rows.find(r => r.customer_name)?.customer_name || 'kunden'
+  const address = rows.find(r => r.address)?.address || null
+  const byEvent = (e: QueueRow['event_type']) => rows
+    .filter(r => r.event_type === e)
+    .sort((a, b) => (a.scheduled_start || '').localeCompare(b.scheduled_start || ''))
+  const assigned = byEvent('assigned')
+  const rescheduled = byEvent('rescheduled')
+  const unassigned = byEvent('unassigned')
+
+  // Nytt schema om schemat skapades samma dygn som tillfällena köades,
+  // annars är det en förlängning eller ett teknikerbyte på ett befintligt schema.
+  const oldestRow = rows.reduce((min, r) => (r.created_at < min ? r.created_at : min), rows[0].created_at)
+  const isNewSchedule = Math.abs(new Date(oldestRow).getTime() - new Date(schedule.created_at).getTime()) < 24 * 3600 * 1000
+
+  let subject: string
+  let intro: string
+  if (assigned.length > 0 && rescheduled.length === 0 && unassigned.length === 0) {
+    subject = isNewSchedule
+      ? `Nytt återkommande schema: ${customer}`
+      : `Fler kontroller i schemat: ${customer}`
+    intro = isNewSchedule
+      ? `Ett återkommande schema med stationskontroller hos <strong>${customer}</strong> har lagts upp för dig.`
+      : `Schemat för stationskontroller hos <strong>${customer}</strong> har fått nya tillfällen.`
+  } else if (unassigned.length > 0 && assigned.length === 0 && rescheduled.length === 0) {
+    subject = `Borttagen från schemat: ${customer}`
+    intro = `Du har tagits bort från kontrolltillfällen i det återkommande schemat hos <strong>${customer}</strong>.`
+  } else {
+    subject = `Ändringar i återkommande schema: ${customer}`
+    intro = `Det återkommande schemat för stationskontroller hos <strong>${customer}</strong> har ändrats.`
+  }
+
+  const span = (list: QueueRow[]) => list.length === 1
+    ? formatDate(list[0].scheduled_start)
+    : `${formatDate(list[0].scheduled_start)} till ${formatDate(list[list.length - 1].scheduled_start)}`
+
+  const facts = [
+    factRow('Kund', customer),
+    address ? factRow('Adress', address) : '',
+    factRow('Frekvens', frequencyLabel(schedule)),
+    factRow('Dag', dayPatternLabel(schedule)),
+    factRow('Klockslag', `${schedule.preferred_time.slice(0, 5)}, ${schedule.estimated_duration_minutes} min per besök`),
+    assigned.length > 0 ? factRow(isNewSchedule ? 'Tillfällen' : 'Nya tillfällen', `${assigned.length} st, ${span(assigned)}`) : '',
+    rescheduled.length > 0 ? factRow('Ombokade', `${rescheduled.length} st, ${span(rescheduled)}`) : '',
+    unassigned.length > 0 ? factRow('Borttagna', `${unassigned.length} st, ${span(unassigned)}`) : '',
+  ].join('')
+
+  const link = `${APP_URL}/technician/equipment/customer/${schedule.customer_id}`
+  const content = `
+    <h2 style="margin: 0 0 8px; font-size: 18px; color: #1e293b;">Hej ${technicianName}!</h2>
+    <p style="margin: 0 0 16px; font-size: 14px; color: #475569;">${intro}</p>
+    <table style="width: 100%; border-collapse: collapse; background: #f8fafc; border-radius: 8px; overflow: hidden;">
+      ${facts}
+    </table>
+    <p style="margin: 16px 0 0; font-size: 14px;">
+      <a href="${link}" style="color: #0f766e; text-decoration: underline;">Öppna kunden i portalen</a>
+    </p>
+    <p style="margin: 24px 0 0; font-size: 13px; color: #64748b;">
+      Alla tillfällen finns i ditt schema. Detta mail skickas enligt dina
+      notisinställningar — kontakta koordinatorn om du vill ändra dem.
+    </p>`
+
+  return { subject, html: baseTemplate(content, subject) }
+}
+
 async function sendEmail(to: string, subject: string, html: string): Promise<void> {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -161,6 +283,52 @@ async function sendEmail(to: string, subject: string, html: string): Promise<voi
   }
 }
 
+/** Kopplar köraderna till sitt återkommande schema via stationskontrollen. */
+async function resolveScheduleLinks(rows: QueueRow[]): Promise<Map<string, string>> {
+  const chunks = <T>(list: T[], size = 150): T[][] =>
+    Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, (i + 1) * size))
+
+  // Schemats ärenden: cases-raden skapas först, sessionen pekar på den via case_id
+  const caseIds = [...new Set(rows.filter(r => r.case_table === 'cases' && r.case_id).map(r => r.case_id!))]
+  const scheduleByCase = new Map<string, string>()
+  for (const ids of chunks(caseIds)) {
+    const { data } = await supabase
+      .from('station_inspection_sessions')
+      .select('case_id, recurring_schedule_id')
+      .in('case_id', ids)
+      .not('recurring_schedule_id', 'is', null)
+    for (const s of data ?? []) {
+      if (s.case_id && s.recurring_schedule_id) scheduleByCase.set(s.case_id, s.recurring_schedule_id)
+    }
+  }
+
+  // Sessioner utan ärende: case_id i kön ÄR sessionens id
+  const sessionIds = [...new Set(rows.filter(r => r.case_table === 'station_inspection_sessions' && r.case_id).map(r => r.case_id!))]
+  const scheduleBySession = new Map<string, string>()
+  for (const ids of chunks(sessionIds)) {
+    const { data } = await supabase
+      .from('station_inspection_sessions')
+      .select('id, recurring_schedule_id')
+      .in('id', ids)
+      .not('recurring_schedule_id', 'is', null)
+    for (const s of data ?? []) {
+      if (s.recurring_schedule_id) scheduleBySession.set(s.id, s.recurring_schedule_id)
+    }
+  }
+
+  const scheduleByRow = new Map<string, string>()
+  for (const r of rows) {
+    if (!r.case_id) continue
+    const scheduleId = r.case_table === 'cases'
+      ? scheduleByCase.get(r.case_id)
+      : r.case_table === 'station_inspection_sessions'
+        ? scheduleBySession.get(r.case_id)
+        : undefined
+    if (scheduleId) scheduleByRow.set(r.id, scheduleId)
+  }
+  return scheduleByRow
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!requireCronSecret(req, res)) return
 
@@ -169,37 +337,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const settledBefore = new Date(Date.now() - SETTLING_MINUTES * 60 * 1000).toISOString()
 
+    // Hämta även färska rader: ett schema skickas först när dess SENASTE rad
+    // passerat settling-fönstret, så att en pågående batch inte delas upp.
     const { data: pending, error } = await supabase
       .from('technician_booking_notifications')
-      .select('id, technician_id, event_type, role, case_table, case_id, case_number, case_title, customer_name, scheduled_start, scheduled_end, address, attempts')
+      .select('id, technician_id, event_type, role, case_table, case_id, case_number, case_title, customer_name, scheduled_start, scheduled_end, address, attempts, created_at')
       .eq('status', 'pending')
-      .lt('created_at', settledBefore)
       .order('created_at', { ascending: true })
       .limit(BATCH_LIMIT)
 
     if (error) throw new Error(error.message)
 
-    const rows = (pending ?? []) as QueueRow[]
-    if (rows.length === 0) {
-      return {
-        status: 'success' as const,
-        summary: {
-          emails_sent: 0,
-          notifications_processed: 0,
-          technicians_with_errors: [] as Array<{ technician_id: string; message: string }>,
-        },
-      }
+    const emptyResult = {
+      status: 'success' as const,
+      summary: {
+        emails_sent: 0,
+        notifications_processed: 0,
+        technicians_with_errors: [] as Array<{ technician_id: string; message: string }>,
+      },
+    }
+    const allRows = (pending ?? []) as QueueRow[]
+    if (allRows.length === 0) return emptyResult
+
+    const scheduleByRow = await resolveScheduleLinks(allRows)
+
+    const scheduleIds = [...new Set(scheduleByRow.values())]
+    const scheduleById = new Map<string, ScheduleInfo>()
+    if (scheduleIds.length > 0) {
+      const { data: schedules } = await supabase
+        .from('recurring_schedules')
+        .select('id, customer_id, frequency, day_pattern, preferred_day_of_month, preferred_time, estimated_duration_minutes, custom_frequency_config, created_at')
+        .in('id', scheduleIds)
+      for (const s of (schedules ?? []) as ScheduleInfo[]) scheduleById.set(s.id, s)
     }
 
-    // Gruppera per tekniker → ett mail per tekniker och körning
-    const byTechnician = new Map<string, QueueRow[]>()
-    for (const row of rows) {
-      const arr = byTechnician.get(row.technician_id) ?? []
-      arr.push(row)
-      byTechnician.set(row.technician_id, arr)
+    // Grupper: varje schema per tekniker blir ett eget sammanfattande mail,
+    // varje engångsärende ett eget mail (bokning + ombokning av samma ärende
+    // i samma körning hamnar i samma mail).
+    type Group = { technicianId: string; schedule: ScheduleInfo | null; rows: QueueRow[] }
+    const groups = new Map<string, Group>()
+    for (const row of allRows) {
+      const scheduleId = scheduleByRow.get(row.id)
+      const schedule = scheduleId ? scheduleById.get(scheduleId) ?? null : null
+      // Engångsärenden väntar ut settling-fönstret rad för rad
+      if (!schedule && row.created_at >= settledBefore) continue
+      const key = schedule
+        ? `${row.technician_id}|schema:${schedule.id}`
+        : `${row.technician_id}|arende:${row.case_table}:${row.case_id ?? row.id}`
+      const group = groups.get(key) ?? { technicianId: row.technician_id, schedule, rows: [] }
+      group.rows.push(row)
+      groups.set(key, group)
     }
+    for (const [key, group] of groups) {
+      if (group.schedule && group.rows.some(r => r.created_at >= settledBefore)) groups.delete(key)
+    }
+    if (groups.size === 0) return emptyResult
 
-    const technicianIds = [...byTechnician.keys()]
+    const technicianIds = [...new Set([...groups.values()].map(g => g.technicianId))]
     const { data: technicians } = await supabase
       .from('technicians')
       .select('id, name, email')
@@ -210,7 +404,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let processed = 0
     const errors: Array<{ technician_id: string; message: string }> = []
 
-    for (const [technicianId, techRows] of byTechnician.entries()) {
+    for (const { technicianId, schedule, rows: techRows } of groups.values()) {
       const tech = techById.get(technicianId)
       const ids = techRows.map(r => r.id)
 
@@ -224,7 +418,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       try {
-        const { subject, html } = buildEmail(tech.name, techRows)
+        const { subject, html } = schedule
+          ? buildScheduleEmail(tech.name, schedule, techRows)
+          : buildEmail(tech.name, techRows)
         await sendEmail(tech.email, subject, html)
         await supabase
           .from('technician_booking_notifications')
@@ -232,7 +428,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .in('id', ids)
         emailsSent++
         processed += ids.length
-      } catch (err: any) {
+      } catch (e) {
+        const err = { message: e instanceof Error ? e.message : String(e) }
         console.error(`[send-booking-notifications] Fel för tekniker ${technicianId}:`, err.message)
         // Låt raderna ligga kvar för retry; ge upp efter MAX_ATTEMPTS
         const maxedOut = techRows.filter(r => r.attempts + 1 >= MAX_ATTEMPTS).map(r => r.id)
