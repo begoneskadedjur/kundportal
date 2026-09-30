@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.17.2',
+    date: '2026-09-30',
+    title: 'Återkommande kontroller ger datum igen',
+    items: [
+      { kind: 'buggfix', text: 'Återkommande kontroller gav 0 tillfällen med Varje vecka och Andra veckans dag. Nu läggs kontrollen på veckodagen i stället, och ett startdatum efter avtalsperiodens slut går inte längre att välja' },
+    ],
+  },
+  {
     version: '3.17.0',
     date: '2026-09-30',
     title: 'Tillägg bredvid avtalet',

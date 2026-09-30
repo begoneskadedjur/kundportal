@@ -8,7 +8,7 @@ import {
   X, ChevronLeft, ChevronRight, Clock, Check,
   AlertTriangle, Loader2, CalendarDays, Repeat, Settings, MapPin, FileText
 } from 'lucide-react'
-import { format, addMonths, addMinutes } from 'date-fns'
+import { format, addMonths, addMinutes, subDays } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import DatePicker from 'react-datepicker'
 import '../../styles/DatePickerDarkTheme.css'
@@ -196,12 +196,21 @@ export function RecurringScheduleWizard({
   // Starta aldrig i det förflutna: avtalsstart används bara om den ligger
   // framåt i tiden (nytecknat avtal), annars idag — man lägger scheman i
   // efterhand för löpande avtal och ska inte behöva bläddra fram flera år.
-  const [startDate, setStartDate] = useState<Date>(() => {
+  const initialStartDate = () => {
     const today = new Date()
     if (!contractStartDate) return today
     const start = new Date(contractStartDate)
     return start > today ? start : today
-  })
+  }
+  const [startDate, setStartDate] = useState<Date>(initialStartDate)
+
+  // Sista möjliga startdag: dagen före horisonten. Ett startdatum på eller
+  // efter horisonten ger inga perioder alls och därmed 0 kontrolltillfällen.
+  const lastStartDate = useMemo(
+    () => (resolvedEndDate ? subDays(new Date(resolvedEndDate), 1) : null),
+    [resolvedEndDate]
+  )
+  const startAfterHorizon = !!lastStartDate && startDate > lastStartDate
 
   // Step 2: Duration (single-unit mode)
   const [durationMinutes, setDurationMinutes] = useState(60)
@@ -361,7 +370,7 @@ export function RecurringScheduleWizard({
   useEffect(() => {
     if (!isOpen) {
       setStep(1)
-      setStartDate(contractStartDate ? new Date(contractStartDate) : new Date())
+      setStartDate(initialStartDate())
       setDurationMinutes(60)
       setUnitDurations({})
       userTouchedFrequency.current = false
@@ -580,7 +589,7 @@ export function RecurringScheduleWizard({
       // Flera gällande avtal: ett måste väljas innan schemat kan byggas.
       case 1:
         if (!isBatch && contractCandidates.length > 1 && !selectedContractId) return false
-        return !!startDate
+        return !!startDate && !startAfterHorizon
       case 2:
         if (isBatch) {
           return effectiveUnits.every(u => (unitDurations[u.customerId] ?? 0) > 0)
@@ -722,11 +731,17 @@ export function RecurringScheduleWizard({
                         locale={sv}
                         inline
                         minDate={new Date()}
+                        maxDate={lastStartDate ?? undefined}
                       />
                     </div>
                     <p className="text-xs text-slate-500 text-center">
                       Första kontroll: {format(startDate, 'EEEE d MMMM yyyy', { locale: sv })}
                     </p>
+                    {startAfterHorizon && resolvedEndDate && (
+                      <p className="text-xs text-amber-400 text-center">
+                        Avtalsperioden slutar {format(new Date(resolvedEndDate), 'd MMM yyyy', { locale: sv })}. Välj ett startdatum före det.
+                      </p>
+                    )}
                     {horizonRolled && resolvedEndDate && (
                       <p className="text-xs text-slate-500 text-center">
                         Fortlöpande avtal — kontroller planeras till nästa periodskifte{' '}
@@ -1317,8 +1332,14 @@ export function RecurringScheduleWizard({
                         </div>
 
                         {previewDates.length === 0 && (
-                          <div className="text-center py-6 text-slate-500 text-sm">
-                            Inga datum kunde genereras för vald period
+                          <div className="text-center py-6 text-slate-500 text-sm space-y-1">
+                            <p>Inga datum kunde genereras för vald period</p>
+                            {resolvedEndDate && (
+                              <p className="text-xs">
+                                Perioden är {format(startDate, 'd MMM yyyy', { locale: sv })} till {format(new Date(resolvedEndDate), 'd MMM yyyy', { locale: sv })}.
+                                Gå tillbaka och prova ett annat startdatum eller en annan dag i perioden.
+                              </p>
+                            )}
                           </div>
                         )}
                       </>

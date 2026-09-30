@@ -275,8 +275,10 @@ function findIdealDate(
   let date = new Date(start)
   for (let i = 0; i < 14; i++) {
     if (getDay(date) === targetDayOfWeek) {
-      if (isSecondWeek) {
-        // Advance to second week occurrence
+      // Andra veckans förekomst, men bara om den ryms i fönstret. En
+      // veckoperiod (och slutet av en klippt period) har ingen andra vecka —
+      // då används första förekomsten i stället för att hoppa över perioden.
+      if (isSecondWeek && addDays(date, 7) <= end) {
         date = addDays(date, 7)
       }
       // If it's a holiday, advance to next occurrence of same weekday
