@@ -32,6 +32,10 @@ import DokumentsigneringDemo from './intranet/interactive/DokumentsigneringDemo'
 import FaktureringDemo from './intranet/interactive/FaktureringDemo'
 import ArendetyperDemo from './intranet/interactive/ArendetyperDemo'
 import SchemaDemo from './intranet/interactive/SchemaDemo'
+import TillaggKedja from './intranet/interactive/tillagg/TillaggKedja'
+import TillaggRoller from './intranet/interactive/tillagg/TillaggRoller'
+import TillaggRakneexempel from './intranet/interactive/tillagg/TillaggRakneexempel'
+import TillaggJamforelse from './intranet/interactive/tillagg/TillaggJamforelse'
 import AudienceModal from './intranet/AudienceModal'
 import { describeAudience } from '../../types/intranet'
 import { Eye } from 'lucide-react'
@@ -44,6 +48,10 @@ const INTERACTIVE_COMPONENTS: Record<string, ComponentType> = {
   'fakturering-demo': FaktureringDemo,
   'arendetyper-demo': ArendetyperDemo,
   'schema-demo': SchemaDemo,
+  'tillagg-roller': TillaggRoller,
+  'tillagg-kedja': TillaggKedja,
+  'tillagg-rakneexempel': TillaggRakneexempel,
+  'tillagg-jamforelse': TillaggJamforelse,
 }
 
 // ─── Blockrendering ────────────────────────────────

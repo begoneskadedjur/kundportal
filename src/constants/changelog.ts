@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.19.0',
+    date: '2026-09-30',
+    title: 'Ny guide om tilläggsstationer',
+    items: [
+      { kind: 'nyhet', text: 'Handboken har en ny guide om tilläggsstationer: vem gör vad, hela kedjan steg för steg med bilder på skärmarna, ett räkneexempel där du kan byta datum och timmar, och svar på vanliga frågor' },
+    ],
+  },
+  {
     version: '3.18.1',
     date: '2026-09-30',
     title: 'Renare Ekonomi-flik för tillägg',
