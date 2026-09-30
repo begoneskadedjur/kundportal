@@ -53,6 +53,17 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: '3.17.1',
+    date: '2026-09-30',
+    title: 'Arbetstiden i tilläggets resultat',
+    items: [
+      {
+        kind: 'buggfix',
+        text: 'Tilläggets resultat över tid i avtalskartan räknar nu med arbetstiden för att hantera tilläggen - intäkt och intern kostnad per år från beslutet, så hittills, till avtalsslutet och brytpunkten stämmer',
+      },
+    ],
+  },
+  {
     version: '3.17.0',
     date: '2026-09-30',
     title: 'Tillägg bredvid avtalet',

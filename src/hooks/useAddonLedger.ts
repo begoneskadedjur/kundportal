@@ -1,6 +1,7 @@
 // src/hooks/useAddonLedger.ts
-// Tilläggsstationernas resultat över tid för ett avtal. Läser stationerna
-// (även borttagna) via contract_addon_ledger() och räknar med addonLedger.
+// Tilläggens resultat över tid för ett avtal. Läser stationerna (även
+// borttagna) och arbetstiden för att hantera tilläggen via
+// contract_addon_ledger() och räknar med addonLedger.
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
@@ -24,7 +25,8 @@ export function useAddonLedger(
     let cancelled = false
     setLoading(true)
     ;(async () => {
-      const { data, error } = await supabase.rpc('contract_addon_ledger', { p_contract_id: contractId })
+      // p_include_labour: arbetstiden för att hantera tilläggen, en rad per enhet
+      const { data, error } = await supabase.rpc('contract_addon_ledger', { p_contract_id: contractId, p_include_labour: true })
       if (cancelled) return
       if (error) {
         console.warn('[useAddonLedger]', error.message)

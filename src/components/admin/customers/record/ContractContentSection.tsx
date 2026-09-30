@@ -23,6 +23,7 @@ import type { PricingSettings } from '../../../../types/pricingSettings'
 import { formatKr } from '../../../../hooks/useCustomerRecord'
 import { formatPayback, summarizeBillingLines } from '../../../../shared/marginEngine'
 import { formatMonthYearSv, type AddonLedger } from '../../../../shared/addonLedger'
+import { formatHours } from '../../../../shared/addonEconomics'
 import { resolvePremiumShares } from '../../../../shared/premiumShares'
 import { PAPER_GEAR_CLASS } from './paperInk'
 
@@ -560,7 +561,7 @@ export default function ContractContentSection({
             <div className={row}>
               <span className="w-6 text-[11px] text-[#8a9099] tabular-nums shrink-0">{nextNo()}</span>
               <span className="font-semibold text-[#262e38] truncate">
-                Tilläggsstationer
+                {lt?.labour ? 'Tilläggsstationer och arbetstid' : 'Tilläggsstationer'}
                 <span className="font-normal font-sans text-[11.5px] ml-1.5 text-[#5d6672]">
                   {!hasAddons
                     ? 'inga'
@@ -585,6 +586,9 @@ export default function ContractContentSection({
             </div>
             {lt && (
               <div className="pl-[2.1rem] py-0.5 font-sans text-[11px] text-[#5d6672] tabular-nums">
+                {lt.labour
+                  ? `arbetstid ${formatHours(lt.labour.hours)} h · ${formatKr(lt.labour.annualRevenue)} mot ${formatKr(lt.labour.annualCost)}/år · `
+                  : ''}
                 hittills {lt.resultToDate >= 0 ? '+' : '−'}{formatKr(Math.abs(lt.resultToDate))} · brytpunkt {formatMonthYearSv(lt.breakEvenAt)}
                 {lt.resultToOption != null && ledger?.horizon.optionEnd ? ` · med option +${formatKr(Math.max(0, lt.resultToOption))}` : ''}
                 {lt.priceMissing > 0 ? ` · ${lt.priceMissing} utan pris` : ''}

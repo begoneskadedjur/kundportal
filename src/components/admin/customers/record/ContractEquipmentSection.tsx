@@ -25,7 +25,7 @@ import { formatDateSv, formatKr } from '../../../../hooks/useCustomerRecord'
 import { PAPER_GEAR_CLASS, type PaperInk } from './paperInk'
 import type { AddonBrick } from '../../../../types/addonStations'
 import { formatMonthYearSv, ledgerRowKey, type AddonLedger } from '../../../../shared/addonLedger'
-import { computeAddonCalc, daysBetweenIso, formatHours, YEAR_DAYS } from '../../../../shared/addonEconomics'
+import { computeAddonCalc, daysBetweenIso, formatHours, formatMonthYearLongSv, YEAR_DAYS } from '../../../../shared/addonEconomics'
 import { FoldLink, FoldSummary, foldBodyClass, usePaperFold, useSeenRows } from './paperFold'
 
 /** Lokal ÅÅÅÅ-MM-DD ur en tidpunkt (aldrig toISOString, den ger UTC-dagen) */
@@ -237,7 +237,27 @@ export default function ContractEquipmentSection({
       startDate: rowStart ?? from,
       today: from,
     })
-    return { products, costHours, labourCost, calc, show: stationRows.length > 0 || labourRows.length > 0 }
+    // Resultat över tid och återbetalning ur ledgern (stationer och arbetstid)
+    // när den finns, så kalkylen, § 5-raderna och pulsen säger samma sak.
+    // Utan ledger (inga stationer ännu) gäller kalkylens prognos.
+    const lt = ledger && ledger.stations.length > 0 ? ledger.totals : null
+    const sign = (v: number) => `${v >= 0 ? '+' : '−'}${formatKr(Math.abs(v))}`
+    const over = lt
+      ? {
+          toDate: lt.resultToDate,
+          toEnd: lt.resultToEnd,
+          endTxt: ledger?.horizon.contractEnd ? new Date(ledger.horizon.contractEnd - 1).toISOString().slice(0, 10) : null,
+          sign,
+        }
+      : null
+    const payback = lt
+      ? lt.cost <= 0
+        ? { never: false, label: 'direkt' }
+        : lt.breakEvenAt == null
+          ? { never: true, label: 'aldrig' }
+          : { never: false, label: formatMonthYearLongSv(localIso(lt.breakEvenAt)) }
+      : { never: calc.paybackNever, label: calc.paybackLabel }
+    return { products, costHours, labourCost, calc, over, payback, show: stationRows.length > 0 || labourRows.length > 0 }
   })()
 
   const rowStyle = { borderColor: ink.rule }
@@ -275,6 +295,31 @@ export default function ContractEquipmentSection({
             <span style={{ color: ink.muted }}>/år</span>
           </span>
         </div>
+        {(() => {
+          // Arbetstidens resultat över tid: löpande intäkt mot löpande intern kostnad
+          const site = siteOf(s)
+          const ll = site && ledger ? ledger.labourByUnit.get(site) : null
+          if (!ll) return null
+          const endTxt = ledger?.horizon.contractEnd ? new Date(ledger.horizon.contractEnd - 1).toISOString().slice(0, 10) : null
+          const sign = (v: number) => `${v >= 0 ? '+' : '−'}${formatKr(Math.abs(v))}`
+          return (
+            <div className="print:hidden flex items-baseline gap-2 pl-[2.1rem] py-0.5 font-sans text-[11px] tabular-nums" style={{ color: ink.muted }} data-internal-note>
+              <span className="truncate">
+                från {formatDateSv(localIso(ll.startAt))} · intern kostnad {formatKr(ll.annualCost)}/år · netto {sign(ll.annualNet)}/år
+              </span>
+              <span className="flex-1" />
+              <span className="shrink-0 whitespace-nowrap">
+                hittills {sign(ll.resultToDate)}
+                {endTxt && (
+                  <>
+                    {' · '}
+                    <span style={{ color: ll.resultToEnd < 0 ? '#9b3535' : ink.positive }}>{sign(ll.resultToEnd)} till {endTxt}</span>
+                  </>
+                )}
+              </span>
+            </div>
+          )
+        })()}
       </div>
     )
   }
@@ -533,9 +578,24 @@ export default function ContractEquipmentSection({
                     {pr.name} · {pr.count.toLocaleString('sv-SE')} st · en gång
                   </span>
                   <span className="flex-1" />
-                  <span className="shrink-0">{formatKr(pr.cost)}</span>
+                  <span className="shrink-0">−{formatKr(pr.cost)}</span>
                 </div>
               ))}
+              {/* Arbetstid för att hantera tilläggen: löpande intäkt och löpande kostnad per år */}
+              {labourRows.map((lr) => {
+                const h = labourHoursOf(lr)
+                const site = siteOf(lr)
+                return (
+                  <div key={lr.id} className="flex items-baseline gap-2 pl-[2.1rem] py-0.5 tabular-nums" style={{ color: ink.secondary }}>
+                    <span className="truncate">
+                      Arbetstid för att hantera tilläggen · {formatHours(h)} h × {formatKr(h > 0 ? annualOf(lr) / h : 0)} · per år
+                      {showSiteHeaders && site && unitNameOf ? ` · ${unitNameOf(site)}` : ''}
+                    </span>
+                    <span className="flex-1" />
+                    <span className="shrink-0">+{formatKr(annualOf(lr))}</span>
+                  </div>
+                )
+              })}
               {labourCostRows.map((lc) => {
                 const h = labourHoursOf(lc)
                 const site = siteOf(lc)
@@ -546,7 +606,7 @@ export default function ContractEquipmentSection({
                       {showSiteHeaders && site && unitNameOf ? ` · ${unitNameOf(site)}` : ''}
                     </span>
                     <span className="flex-1" />
-                    <span className="shrink-0">{formatKr(Number(lc.total_price))}</span>
+                    <span className="shrink-0">−{formatKr(Number(lc.total_price))}</span>
                   </div>
                 )
               })}
@@ -555,16 +615,28 @@ export default function ContractEquipmentSection({
                 <span className="flex-1" />
                 <span className="shrink-0">{formatKr(kalkyl.calc.annualContribution)}</span>
               </div>
+              {kalkyl.over && (
+                <div className="flex items-baseline gap-2 pl-[2.1rem] py-0.5 tabular-nums" style={{ color: ink.secondary }}>
+                  <span className="truncate">
+                    Resultat över tid, stationer och arbetstid · hittills {kalkyl.over.sign(kalkyl.over.toDate)}
+                  </span>
+                  <span className="flex-1" />
+                  <span className="shrink-0 font-bold" style={{ color: kalkyl.over.toEnd < 0 ? '#9b3535' : ink.positive }}>
+                    {kalkyl.over.sign(kalkyl.over.toEnd)}
+                    {kalkyl.over.endTxt ? ` till ${kalkyl.over.endTxt}` : ''}
+                  </span>
+                </div>
+              )}
               <div
                 className="pl-[2.1rem] py-0.5"
-                style={{ color: kalkyl.calc.paybackNever ? ink.warn : ink.positive }}
+                style={{ color: kalkyl.payback.never ? ink.warn : ink.positive }}
               >
                 <span aria-hidden>● </span>
-                {kalkyl.calc.paybackNever
+                {kalkyl.payback.never
                   ? 'Betalar inte tillbaka utrustningen med dagens priser'
-                  : kalkyl.calc.paybackLabel === 'direkt'
+                  : kalkyl.payback.label === 'direkt'
                     ? 'Betalt tillbaka direkt'
-                    : `Betalt tillbaka cirka ${kalkyl.calc.paybackLabel}`}
+                    : `Betalt tillbaka cirka ${kalkyl.payback.label}`}
               </div>
             </div>
           )}

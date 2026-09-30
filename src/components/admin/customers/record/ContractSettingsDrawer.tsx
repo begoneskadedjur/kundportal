@@ -27,6 +27,7 @@ import type { CaseBillingItemWithRelations } from '../../../../types/caseBilling
 import type { AddonBrick } from '../../../../types/addonStations'
 import { formatPayback, marginTone, paybackTone, toneTextClass, type MarginBreakdown } from '../../../../shared/marginEngine'
 import { formatMonthYearSv, type LedgerTotals } from '../../../../shared/addonLedger'
+import { formatHours } from '../../../../shared/addonEconomics'
 import { useAddonLedger } from '../../../../hooks/useAddonLedger'
 import { useContractFinancials } from '../../../../hooks/useContractFinancials'
 import ScheduleFromFollowupPanel from './ScheduleFromFollowupPanel'
@@ -1006,6 +1007,16 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                           <dd className="font-mono tabular-nums text-slate-200 text-right">{formatKr(lt.annualRunRate)}</dd>
                           <dt className="text-slate-500">Fällor, engångs</dt>
                           <dd className="font-mono tabular-nums text-slate-200 text-right">−{formatKr(lt.cost)}</dd>
+                          {lt.labour && (
+                            <>
+                              <dt className="text-slate-500">Arbetstid för att hantera tilläggen</dt>
+                              <dd className="font-mono tabular-nums text-slate-200 text-right">{formatHours(lt.labour.hours)} h/år</dd>
+                              <dt className="text-slate-500 pl-2">Intäkt per år</dt>
+                              <dd className="font-mono tabular-nums text-slate-200 text-right">+{formatKr(lt.labour.annualRevenue)}</dd>
+                              <dt className="text-slate-500 pl-2">Intern kostnad per år</dt>
+                              <dd className="font-mono tabular-nums text-slate-200 text-right">−{formatKr(lt.labour.annualCost)}</dd>
+                            </>
+                          )}
                           <dt className="text-slate-500">Hittills</dt>
                           <dd className={`font-mono tabular-nums text-right ${resultCls(lt.resultToDate)}`}>{signed(lt.resultToDate)}</dd>
                           <dt className="text-slate-500">Brytpunkt</dt>
@@ -1099,6 +1110,23 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                           <td className="py-1 text-right font-mono text-slate-300">{formatMonthYearSv(g.totals.breakEvenAt)}</td>
                         </tr>
                       ))}
+                      {ledger.totals.labour && (
+                        <tr className="border-t border-slate-800">
+                          <td className="py-1 text-slate-300">
+                            Arbetstid för att hantera tilläggen
+                            <span className="text-slate-500"> {formatHours(ledger.totals.labour.hours)} h/år</span>
+                          </td>
+                          <td className={`py-1 text-right font-mono ${resultCls(ledger.totals.labour.resultToDate)}`}>{signed(ledger.totals.labour.resultToDate)}</td>
+                          <td className={`py-1 text-right font-mono ${resultCls(ledger.totals.labour.resultToEnd)}`}>{signed(ledger.totals.labour.resultToEnd)}</td>
+                          <td className="py-1 text-right font-mono text-slate-500">löpande</td>
+                        </tr>
+                      )}
+                      <tr className="border-t border-slate-700">
+                        <td className="py-1 text-slate-200 font-semibold">Tilläggen totalt</td>
+                        <td className={`py-1 text-right font-mono ${resultCls(ledger.totals.resultToDate)}`}>{signed(ledger.totals.resultToDate)}</td>
+                        <td className={`py-1 text-right font-mono ${resultCls(ledger.totals.resultToEnd)}`}>{signed(ledger.totals.resultToEnd)}</td>
+                        <td className="py-1 text-right font-mono text-slate-300">{formatMonthYearSv(ledger.totals.breakEvenAt)}</td>
+                      </tr>
                     </tbody>
                   </table>
                 </Kpi>
