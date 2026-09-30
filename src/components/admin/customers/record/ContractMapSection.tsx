@@ -66,7 +66,7 @@ import ContractUnitsAppendix from './ContractUnitsAppendix'
 import ContractPriceListSection, { useAvropCatalog } from './ContractPriceListSection'
 import ContractPremiumSection, { premiumSummary, nextInvoicePeriodStart, type PremiumPlanEntry } from './ContractPremiumSection'
 import ContractReferencesSection from './ContractReferencesSection'
-import ContractTermSection from './ContractTermSection'
+import ContractTermSection, { termWatch } from './ContractTermSection'
 import ContractEquipmentSection from './ContractEquipmentSection'
 import { AgreementObjectText, SignatureLine, AccountManagerLine } from './PaperSignatures'
 import ContractSettingsDrawer, { type SettingsTab } from './ContractSettingsDrawer'
@@ -85,7 +85,7 @@ const PARA_FLASH_CLASSES = ['shadow-[inset_3px_0_0_#20c58f]', 'bg-[#20c58f]/[.04
 import { PAPER_GEAR_CLASS } from './paperInk'
 import { FOLD_THRESHOLD, FoldLink, FoldSummary, foldBodyClass, usePaperFold } from './paperFold'
 import LinkFortnoxInvoiceModal, { type LinkFortnoxTarget } from './LinkFortnoxInvoiceModal'
-import AddonDropPrompt, { type AddonDropPromptState, type AddonPromptBrick } from './AddonDropPrompt'
+import AddonDropPrompt, { type AddonDecisionMode, type AddonDropPromptState, type AddonPromptBrick } from './AddonDropPrompt'
 import { useAddonPending } from '../../../../hooks/useAddonPending'
 import type { AddonBrick } from '../../../../types/addonStations'
 import BillingPlanPreviewModal from '../BillingPlanPreviewModal'
@@ -638,9 +638,9 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       return null
     }
     if (payload.type === 'addon_stations') {
-      if (target.kind !== 'paper') return 'Släpp på § 6 (baka in i premien) eller § 5 (tillägg utöver avtalet)'
+      if (target.kind !== 'paper') return 'Släpp på § 5 eller § 6 för att besluta tillägget'
       if (isTerminatedButRunning(target.contract)) return 'Avtalet är uppsagt'
-      if (target.zone !== 'premium' && target.zone !== 'equipment') return 'Släpp på § 6 för att baka in i premien, eller på § 5 för tillägg utöver avtalet'
+      if (target.zone !== 'premium' && target.zone !== 'equipment') return 'Släpp på § 5 (tillägg utöver avtalet) eller § 6 (lägg till i avtalet)'
       if (!contractCoversUnit(target.contract, payload.unitId)) return 'Enheten står inte i avtalets omfattning'
       return null
     }
@@ -772,6 +772,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           state: {
             x: e.clientX,
             y: e.clientY,
+            contractId: target.contract.id,
             contractLabel: contractDisplayName(target.contract),
             bricks: [{ brick: payload, unitName: unit ? customerRowName(unit) : 'enhet' }],
             zone: target.zone,
@@ -1438,6 +1439,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       state: {
         x,
         y,
+        contractId: c.id,
         contractLabel: contractDisplayName(c),
         bricks: bricks.map((brick) => {
           const unit = customerById.get(brick.unitId)
@@ -1449,12 +1451,12 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     })
   }
 
-  /** Ett beslut per bricka: baka in (§ 6) eller tillägg (§ 5). Kastar vid fel. */
-  const confirmAddonBrick = async (item: AddonPromptBrick, input: { effectiveFrom: string; unitPriceAnnual: number }) => {
+  /** Ett beslut per bricka: lägg till i avtalet (premien) eller tillägg utöver avtalet. Kastar vid fel. */
+  const confirmAddonBrick = async (item: AddonPromptBrick, input: { effectiveFrom: string; unitPriceAnnual: number; mode: AddonDecisionMode }) => {
     if (!addonPrompt) return
-    const { contract, state } = addonPrompt
+    const { contract } = addonPrompt
     const b = item.brick
-    if (state.zone === 'premium') {
+    if (input.mode === 'included') {
       await ContractScopeService.addAddonStationsToPremium(contract.id, {
         unitId: b.unitId,
         unitName: item.unitName,
@@ -1488,15 +1490,30 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     }))
   }
 
-  /** Alla brickor i popovern beslutade: en toast, en omladdning */
-  const addonPromptDone = async (summary: { bricks: number; stations: number; annualKr: number }) => {
+  /** Arbetstiden för att hantera tilläggen, per enhet, efter stationsbesluten. Kastar vid fel. */
+  const confirmAddonLabour = async (
+    unit: { unitId: string; unitName: string },
+    input: { hours: number; mode: AddonDecisionMode; effectiveFrom: string }
+  ) => {
     if (!addonPrompt) return
-    const { contract, state } = addonPrompt
+    await ContractScopeService.decideAddonLabour(addonPrompt.contract.id, {
+      unitId: unit.unitId,
+      unitName: unit.unitName,
+      hours: input.hours,
+      mode: input.mode,
+      effectiveFrom: input.effectiveFrom,
+    })
+  }
+
+  /** Allt i beslutsdialogen klart: en toast, en omladdning */
+  const addonPromptDone = async (summary: { bricks: number; stations: number; annualKr: number; mode: AddonDecisionMode }) => {
+    if (!addonPrompt) return
+    const { contract } = addonPrompt
     const name = contractDisplayName(contract)
-    if (state.zone === 'premium') {
-      toast.success(`${summary.stations} st tilläggsstationer inbakade i ${name}: premien höjs med ${formatKr(summary.annualKr)}/år.`)
+    if (summary.mode === 'included') {
+      toast.success(`${summary.stations} st tilläggsstationer tillagda i ${name}: årspremien höjs med ${formatKr(summary.annualKr)} per år.`)
     } else {
-      toast.success(`${summary.stations} st tilläggsstationer ligger nu som tillägg utöver ${name} (§ 5), ${formatKr(summary.annualKr)}/år.`)
+      toast.success(`${summary.stations} st tilläggsstationer ligger nu som tillägg utöver ${name}, ${formatKr(summary.annualKr)} per år på egen faktura.`)
     }
     setBusy(true)
     try {
@@ -1504,20 +1521,6 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       setContentReloadKey((k) => k + 1)
       setBillingPlansKey((k) => k + 1)
       await onChanged()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const changeEquipmentInvoiceMode = async (contract: RecordContract, mode: 'with_premium' | 'separate') => {
-    setBusy(true)
-    try {
-      await ContractScopeService.setEquipmentInvoiceMode(contract.id, mode)
-      toast.success(mode === 'separate' ? 'Utrustning i § 5 faktureras nu på egna fakturor.' : 'Utrustning i § 5 ligger nu på premiefakturan.')
-      setBillingPlansKey((k) => k + 1)
-      await onChanged()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Kunde inte ändra faktureringsläge')
     } finally {
       setBusy(false)
     }
@@ -2887,12 +2890,6 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               addonBricks={bricksFor(c)}
               onBrickDrag={(e, brick) => startDrag(e, { type: 'addon_stations', ...brick })}
               unitNameOf={(id) => customerRowName(customerById.get(id) ?? ({ company_name: 'Enhet' } as RecordCustomer))}
-              onChangeEquipmentInvoiceMode={(mode) => changeEquipmentInvoiceMode(c, mode)}
-              equipmentInvoiceMode={
-                customerById.get(c.customer_id ?? '')?.addon_invoice_mode === 'separate_per_contract'
-                  ? 'separate'
-                  : 'with_premium'
-              }
               // Uppsagt-men-löpande avtal ligger kvar bland de aktiva (de
               // fungerar till slutdatumet) och ska kunna ångras direkt — inte
               // först när uppsägningstiden hunnit löpa ut.
@@ -3263,10 +3260,6 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               onDecideBrick={(brick, zone, x, y) => openAddonPrompt(c, [brick], zone, x, y)}
               onDecideBricks={(bricks, zone, x, y) => openAddonPrompt(c, bricks, zone, x, y)}
               unitNameOf={(id) => customerRowName(customerById.get(id) ?? ({ company_name: 'Enhet' } as RecordCustomer))}
-              equipmentInvoiceMode={
-                customerById.get(c.customer_id ?? '')?.addon_invoice_mode === 'separate_per_contract' ? 'separate' : 'with_premium'
-              }
-              onChangeEquipmentInvoiceMode={(mode) => changeEquipmentInvoiceMode(c, mode)}
               premiumEvents={events}
               annualInForce={contractEffectiveAnnualValue(c, events)}
               invoiceMode={papers.length > 1 ? invoiceMode : 'per_contract'}
@@ -3345,7 +3338,13 @@ export default function ContractMapSection({ data, onChanged }: Props) {
 
       {/* Datum-popover */}
       {addonPrompt && (
-        <AddonDropPrompt prompt={addonPrompt.state} onClose={() => setAddonPrompt(null)} onConfirmBrick={confirmAddonBrick} onAllDone={addonPromptDone} />
+        <AddonDropPrompt
+          prompt={addonPrompt.state}
+          onClose={() => setAddonPrompt(null)}
+          onConfirmBrick={confirmAddonBrick}
+          onConfirmLabour={confirmAddonLabour}
+          onAllDone={addonPromptDone}
+        />
       )}
       {datePrompt && (
         <DatePromptPopover prompt={datePrompt} onClose={() => setDatePrompt(null)} />
@@ -4395,9 +4394,6 @@ interface PaperProps {
   addonBricks?: AddonBrick[]
   onBrickDrag?: (e: React.PointerEvent, brick: AddonBrick) => void
   unitNameOf?: (unitId: string) => string
-  onChangeEquipmentInvoiceMode?: (mode: 'with_premium' | 'separate') => Promise<void>
-  /** Kundens läge för § 5 (bor på kunden, inte avtalet) */
-  equipmentInvoiceMode?: 'with_premium' | 'separate'
   /** Öppna väljaren för signeringsdatum */
   onEditSignedAt?: () => void
   /** Spara avtalets säljare (den som skrivit under för BeGone) */
@@ -4491,7 +4487,6 @@ function PaperContract({
   addonBricks,
   onBrickDrag,
   unitNameOf,
-  equipmentInvoiceMode = 'with_premium',
   onOpenSettings,
   settingsOpen,
 }: PaperProps) {
@@ -5163,7 +5158,8 @@ function PaperContract({
           bricks={addonBricks}
           onBrickPointerDown={onBrickDrag}
           unitNameOf={unitNameOf}
-          equipmentInvoiceMode={equipmentInvoiceMode}
+          contractEndDate={termWatch(contract).endNow ?? contract.contract_end_date ?? null}
+          extendable={termWatch(contract).mode !== 'fixed'}
           nextEquipmentInvoice={
             nextEquipment ? { periodStart: nextEquipment.periodStart, subtotal: nextEquipment.subtotal, monthly: nextEquipment.kind === 'equipment_monthly' } : null
           }
@@ -5191,7 +5187,6 @@ function PaperContract({
           planEntries={planEntries}
           onLinkFortnox={onLinkFortnox}
           onOpenSettings={onOpenSettings ? () => onOpenSettings('fakturering') : undefined}
-          equipmentInvoiceMode={equipmentInvoiceMode}
         />
       </div>
 

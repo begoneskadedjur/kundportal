@@ -1431,6 +1431,68 @@ export class ContractScopeService {
   }
 
   /**
+   * Ett steg 'addition' i premietrappan från ett datum: samma dag och typ
+   * summeras och texten byggs på, senare steg bär vidare höjningen.
+   * contracts.annual_value sätts av triggern på trappan.
+   */
+  private static async addAdditionStep(
+    contractId: string,
+    add: number,
+    note: string,
+    effectiveFrom: string
+  ): Promise<{ newAnnual: number; customerId: string | null }> {
+    const { data: contract, error: cErr } = await supabase
+      .from('contracts')
+      .select('customer_id, annual_value')
+      .eq('id', contractId)
+      .single()
+    if (cErr || !contract) throw new Error(`Kunde inte läsa avtalet: ${cErr?.message ?? 'okänt fel'}`)
+    const { data: steps } = await supabase
+      .from('contract_premium_events')
+      .select('id, effective_from, annual_value, event_type, note')
+      .eq('contract_id', contractId)
+    type Step = { id: string; effective_from: string; annual_value: number | string; event_type: string; note: string | null }
+    const all = ((steps ?? []) as Step[]).sort((a, b) => a.effective_from.localeCompare(b.effective_from))
+    // Årsvärdet som gäller vid datumet (trappan, annars avtalets annual_value)
+    const applicable = all.filter((s) => s.effective_from <= effectiveFrom)
+    const inForce = applicable.length > 0
+      ? Number(applicable[applicable.length - 1].annual_value)
+      : all.length > 0
+        ? Number(all[0].annual_value)
+        : Number(contract.annual_value ?? 0)
+
+    const same = all.find((s) => s.effective_from === effectiveFrom && s.event_type === 'addition')
+    let newAnnual: number
+    if (same) {
+      newAnnual = Math.round((Number(same.annual_value) + add) * 100) / 100
+      const { error } = await supabase
+        .from('contract_premium_events')
+        .update({ annual_value: newAnnual, note: `${same.note ?? ''}${same.note ? ' · ' : ''}${note}` })
+        .eq('id', same.id)
+      if (error) throw new Error(`Kunde inte uppdatera steget: ${error.message}`)
+    } else {
+      newAnnual = Math.round((inForce + add) * 100) / 100
+      const { error } = await supabase.from('contract_premium_events').insert({
+        contract_id: contractId,
+        effective_from: effectiveFrom,
+        annual_value: newAnnual,
+        event_type: 'addition',
+        source: 'tillagg',
+        note,
+      })
+      if (error) throw new Error(`Kunde inte spara steget: ${error.message}`)
+    }
+    // Senare steg i trappan bär vidare höjningen
+    for (const later of all.filter((s) => s.effective_from > effectiveFrom)) {
+      await supabase
+        .from('contract_premium_events')
+        .update({ annual_value: Math.round((Number(later.annual_value) + add) * 100) / 100 })
+        .eq('id', later.id)
+    }
+    return { newAnnual, customerId: contract.customer_id ?? null }
+  }
+
+  /**
    * Tilläggsstationer inbakade i årspremien (släpp av brickan på § 6):
    * ett steg i premietrappan från valt datum med text om antal och datum,
    * stationerna märks included, eventuell § 5-rad för dem avslutas.
@@ -1453,55 +1515,8 @@ export class ContractScopeService {
   ): Promise<{ newAnnual: number; note: string }> {
     const add = Math.round(input.unitPriceAnnual * input.count * 100) / 100
     if (!(add > 0)) throw new Error('Årspriset måste vara större än noll')
-    const { data: contract, error: cErr } = await supabase
-      .from('contracts')
-      .select('customer_id, annual_value')
-      .eq('id', contractId)
-      .single()
-    if (cErr || !contract) throw new Error(`Kunde inte läsa avtalet: ${cErr?.message ?? 'okänt fel'}`)
-    const { data: steps } = await supabase
-      .from('contract_premium_events')
-      .select('id, effective_from, annual_value, event_type, note')
-      .eq('contract_id', contractId)
-    type Step = { id: string; effective_from: string; annual_value: number | string; event_type: string; note: string | null }
-    const all = ((steps ?? []) as Step[]).sort((a, b) => a.effective_from.localeCompare(b.effective_from))
-    // Årsvärdet som gäller vid datumet (trappan, annars avtalets annual_value)
-    const applicable = all.filter((s) => s.effective_from <= input.effectiveFrom)
-    const inForce = applicable.length > 0
-      ? Number(applicable[applicable.length - 1].annual_value)
-      : all.length > 0
-        ? Number(all[0].annual_value)
-        : Number(contract.annual_value ?? 0)
     const note = `Tilläggsstationer adderade till avtalet, ${input.count} st ${input.stationTypeName} på ${input.unitName}, ${input.effectiveFrom}`
-
-    const same = all.find((s) => s.effective_from === input.effectiveFrom && s.event_type === 'addition')
-    let newAnnual: number
-    if (same) {
-      newAnnual = Math.round((Number(same.annual_value) + add) * 100) / 100
-      const { error } = await supabase
-        .from('contract_premium_events')
-        .update({ annual_value: newAnnual, note: `${same.note ?? ''}${same.note ? ' · ' : ''}${note}` })
-        .eq('id', same.id)
-      if (error) throw new Error(`Kunde inte uppdatera steget: ${error.message}`)
-    } else {
-      newAnnual = Math.round((inForce + add) * 100) / 100
-      const { error } = await supabase.from('contract_premium_events').insert({
-        contract_id: contractId,
-        effective_from: input.effectiveFrom,
-        annual_value: newAnnual,
-        event_type: 'addition',
-        source: 'tillagg',
-        note,
-      })
-      if (error) throw new Error(`Kunde inte spara steget: ${error.message}`)
-    }
-    // Senare steg i trappan bär vidare höjningen
-    for (const later of all.filter((s) => s.effective_from > input.effectiveFrom)) {
-      await supabase
-        .from('contract_premium_events')
-        .update({ annual_value: Math.round((Number(later.annual_value) + add) * 100) / 100 })
-        .eq('id', later.id)
-    }
+    const { newAnnual, customerId } = await this.addAdditionStep(contractId, add, note, input.effectiveFrom)
     // contracts.annual_value sätts av triggern på trappan
 
     // Stationerna: inbakade, kopplade till avtalet
@@ -1519,6 +1534,8 @@ export class ContractScopeService {
       .eq('site_customer_id', input.unitId)
       .eq('billing_model', input.model)
       .eq('status', 'pending')
+      // Arbetstidsraden (station_type_id null) följer beslutet om arbetstiden, inte stationerna
+      .eq('is_addon_labour_line', false)
     q = input.stationTypeId ? q.eq('station_type_id', input.stationTypeId) : q.is('station_type_id', null)
     await q
 
@@ -1527,7 +1544,7 @@ export class ContractScopeService {
       title: `Tilläggsstationer inbakade i premien från ${input.effectiveFrom}`,
       detail: `${note} · +${add.toLocaleString('sv-SE')} kr/år → ${newAnnual.toLocaleString('sv-SE')} kr/år`,
     })
-    if (contract.customer_id) await this.mirrorSharedFields(contract.customer_id)
+    if (customerId) await this.mirrorSharedFields(customerId)
     return { newAnnual, note }
   }
 
@@ -1569,6 +1586,62 @@ export class ContractScopeService {
   }
 
   /**
+   * Kontorets beslut om "Arbetstid för att hantera tilläggen" för en enhet.
+   * Körs EFTER stationsbesluten (addAddonStationsSeparate/-ToPremium).
+   *
+   * - separate (Tillägg utöver avtalet): § 6-raden = timmar × kundens timpris
+   *   (tjänst 135, låst vid första beslutet), intern kostnad timmar × Arbetstid
+   *   Företag i tilläggets kalkyl. 0 timmar nollar raden.
+   * - included (Lägg till i avtalet): ökningen mot dagens § 6-timmar läggs som
+   *   intern kostnad i § 4 och premien höjs med ökningen × timpriset i
+   *   premietrappan från effectiveFrom, samma väg som stationerna.
+   * Öppna ärendens förslag följer beslutet (RPC:n räknar om deras pro rata).
+   */
+  static async decideAddonLabour(
+    contractId: string,
+    input: { unitId: string; unitName: string; hours: number; mode: 'separate' | 'included'; effectiveFrom?: string | null }
+  ): Promise<{ annualTotal: number; annualAdd: number; newAnnual?: number }> {
+    const { data, error } = await supabase.rpc('decide_addon_labour', {
+      p_contract_id: contractId,
+      p_unit_id: input.unitId,
+      p_hours: input.hours,
+      p_mode: input.mode,
+    })
+    if (error) throw new Error(`Kunde inte spara arbetstiden: ${error.message}`)
+    const d = data as { ok: boolean; reason?: string; annual_add?: number; annual_total?: number; added_hours?: number } | null
+    if (!d?.ok) {
+      throw new Error(
+        d?.reason === 'price_missing'
+          ? 'Timpris saknas i kundens prislista (tjänst 135). Lägg in det innan arbetstiden beslutas.'
+          : 'Kunde inte spara arbetstiden'
+      )
+    }
+    const annualAdd = Number(d.annual_add ?? 0)
+    const annualTotal = Number(d.annual_total ?? 0)
+    let newAnnual: number | undefined
+    if (input.mode === 'included' && annualAdd > 0) {
+      const from = input.effectiveFrom ?? todayKey()
+      const addedHours = Number(d.added_hours ?? 0).toLocaleString('sv-SE')
+      const note = `Arbetstid för att hantera tilläggen adderad till avtalet, ${addedHours} h per år på ${input.unitName}, ${from}`
+      const step = await this.addAdditionStep(contractId, annualAdd, note, from)
+      newAnnual = step.newAnnual
+      await this.logEvent(contractId, {
+        event_type: 'billing',
+        title: `Arbetstid för tilläggen inbakad i premien från ${from}`,
+        detail: `${note} · +${annualAdd.toLocaleString('sv-SE')} kr/år → ${newAnnual.toLocaleString('sv-SE')} kr/år`,
+      })
+      if (step.customerId) await this.mirrorSharedFields(step.customerId)
+    } else if (input.mode === 'separate') {
+      await this.logEvent(contractId, {
+        event_type: 'billing',
+        title: `Arbetstid för att hantera tilläggen: ${input.hours.toLocaleString('sv-SE')} h per år på ${input.unitName}`,
+        detail: `${annualTotal.toLocaleString('sv-SE')} kr/år · kundens timpris · egen faktura i samband med årsfakturan`,
+      })
+    }
+    return { annualTotal, annualAdd, newAnnual }
+  }
+
+  /**
    * § 5: var per år-rader faktureras, på premiefakturan eller på egna fakturor.
    *
    * Läget bor på KUNDEN sedan 2026-09-04: en kund med flera avtal ska inte
@@ -1576,6 +1649,7 @@ export class ContractScopeService {
    * hälften på egna fakturor. `contracts.equipment_invoice_mode` är
    * deprecated och skrivs inte längre.
    */
+  /** @deprecated Sedan 2026-09-30 faktureras tillägg alltid på egna fakturor; läget läses inte längre. */
   static async setEquipmentInvoiceMode(contractId: string, mode: 'with_premium' | 'separate'): Promise<void> {
     const { data: contract, error: readError } = await supabase
       .from('contracts')

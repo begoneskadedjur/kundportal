@@ -231,6 +231,9 @@ export interface RecordWorkItem {
   created_at: string
   /** Artikelrader: flaggan som skiljer varaktig utrustning från löpande kostnad */
   article?: { is_durable: boolean | null; category: string | null } | null
+  /** Tilläggsrad bredvid avtalet (pro rata per stationstyp eller arbetstid) */
+  is_addon_prorata_line?: boolean | null
+  is_addon_labour_line?: boolean | null
   /**
    * Vem intäkten tillhör.
    *
@@ -604,7 +607,8 @@ export function useCustomerRecord(customerId: string | undefined) {
         .select(
           'id, customer_id, case_id, case_type, item_type, service_id, service_name, ' +
             'article_id, article_name, mapped_service_id, quantity, unit_price, ' +
-            'total_price, status, discount_percent, created_at, article:articles(is_durable, category)'
+            'total_price, status, discount_percent, created_at, is_addon_prorata_line, is_addon_labour_line, ' +
+            'article:articles(is_durable, category)'
         )
         .in('customer_id', familyIds)
         .order('created_at', { ascending: false }),

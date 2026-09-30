@@ -45,6 +45,9 @@ import type { PreparationUnit } from '../../types/casePreparations'
 import { CaseBillingService } from '../../services/caseBillingService'
 import { AddonStationBillingService } from '../../services/addonStationBillingService'
 import type { AddonBillingModel, AddonPrices } from '../../types/addonStations'
+import { hasNewAddons } from '../../types/addonStations'
+import { useAddonLabourStep } from '../../hooks/useAddonLabourStep'
+import AddonLabourStep from '../../components/technician/AddonLabourStep'
 import { PriceListService } from '../../services/priceListService'
 import { toLocalISOStringWithOffset } from '../../utils/dateHelpers'
 
@@ -56,7 +59,7 @@ interface EstablishmentSummaryState {
   caseId: string
   customerId: string
   customerName: string
-  serviceItems: { id: string; name: string; quantity: number; unitPrice: number }[]
+  serviceItems: { id: string; name: string; quantity: number; unitPrice: number; isAddonLabour?: boolean }[]
   addonItemId: string | null
   addonCount: number
   quantityDraft: number
@@ -211,6 +214,12 @@ export default function TechnicianEquipment() {
   // Faktureringssammanfattning vid "Färdig med etablering"
   const [establishmentSummary, setEstablishmentSummary] = useState<EstablishmentSummaryState | null>(null)
   const [finishingEstablishment, setFinishingEstablishment] = useState(false)
+  // Arbetstid för att hantera tilläggen (bara vid nya per år/per månad-tillägg).
+  // Pro rata-raderna synkas i finishEstablishment innan dialogen öppnas.
+  const addonLabourStep = useAddonLabourStep({
+    caseId: establishmentSummary?.caseId ?? null,
+    enabled: !!establishmentSummary,
+  })
 
   // Borttagningsdialog
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -817,7 +826,9 @@ export default function TechnicianEquipment() {
         id: i.id,
         name: i.service_name || i.article_name || 'Tjänst',
         quantity: i.quantity,
-        unitPrice: i.discounted_price ?? i.unit_price
+        unitPrice: i.discounted_price ?? i.unit_price,
+        // Arbetstiden för tilläggen räknas av avslutssteget när det visas
+        isAddonLabour: i.is_addon_labour_line === true
       }))
       // Tilläggsraden identifieras via markören — ALDRIG via namn
       // (namnmatchning träffar t.ex. "Avetablering avtal")
@@ -845,7 +856,16 @@ export default function TechnicianEquipment() {
         ? `, varav ${addonCount} tilläggsstation${addonCount === 1 ? '' : 'er'} utöver avtal enligt överenskommelse med kund.`
         : '.')
 
+    // Nya tillägg per år/per månad (t.ex. befintliga stationer markerade som
+    // tillägg under ärendet) ska alltid få frågan om arbetstid
+    let newAddons = false
     if (total <= 0 && addonCount === 0) {
+      try {
+        newAddons = hasNewAddons(await AddonStationBillingService.getCompletionSummary(openCase.id))
+      } catch { /* underlaget får aldrig blockera avslutet */ }
+    }
+
+    if (total <= 0 && addonCount === 0 && !newAddons) {
       // Vanlig avtalsetablering utan tillägg: stäng som tidigare, ingen faktureringsinfo
       await closeEstablishmentCase(openCase.id, workReport)
       refreshData()
@@ -872,8 +892,26 @@ export default function TechnicianEquipment() {
   const confirmFinishEstablishment = async () => {
     if (!establishmentSummary) return
     const s = establishmentSummary
+    // Arbetstid för tilläggen: fel i valet stoppar här så teknikern kan rätta
+    if (addonLabourStep.visible) {
+      const labourError = addonLabourStep.validate()
+      if (labourError) {
+        toast.error(labourError)
+        return
+      }
+    }
     setFinishingEstablishment(true)
     try {
+      // Teknikerns timmar sparas som förslag FÖRE faktureringen så att
+      // arbetstiden för resten av avtalets år kommer med på etableringsfakturan.
+      // Fel här blockerar aldrig avslutet.
+      if (addonLabourStep.visible) {
+        const labour = await addonLabourStep.save()
+        if (!labour.saved && labour.message) {
+          toast.error(labour.message, { duration: 10000 })
+        }
+      }
+
       // Säkerställ att tilläggsraden finns (bakgrundssynk kan ha fallerat i fält)
       let addonItemId = s.addonItemId
       if (!addonItemId && s.quantityDraft > 0) {
@@ -1315,8 +1353,13 @@ export default function TechnicianEquipment() {
         <AnimatePresence>
           {establishmentSummary && (() => {
             const s = establishmentSummary
-            const total = s.serviceItems.reduce((sum, i) =>
+            // När avslutssteget visas räknas arbetstiden för tilläggen där
+            // (teknikerns val), inte ur en eventuell gammal förslagsrad
+            const labourInStep = addonLabourStep.visible && !!addonLabourStep.economics
+            const listedItems = labourInStep ? s.serviceItems.filter(i => !i.isAddonLabour) : s.serviceItems
+            const total = listedItems.reduce((sum, i) =>
               sum + (i.id === s.addonItemId ? s.priceDraft * s.quantityDraft : i.unitPrice * i.quantity), 0)
+              + (labourInStep ? Math.round(addonLabourStep.economics?.labourNow ?? 0) : 0)
             return (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -1328,7 +1371,7 @@ export default function TechnicianEquipment() {
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.95, opacity: 0 }}
-                  className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-md p-4"
+                  className={`bg-slate-900 rounded-2xl border border-slate-700 w-full ${addonLabourStep.visible ? 'max-w-lg' : 'max-w-md'} max-h-[90vh] overflow-y-auto p-4`}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <h3 className="text-lg font-semibold text-white mb-1">
@@ -1344,7 +1387,7 @@ export default function TechnicianEquipment() {
                   )}
 
                   <div className="space-y-2 mb-3">
-                    {s.serviceItems.map(item => {
+                    {listedItems.map(item => {
                       const isEtablering = item.id === s.addonItemId
                       const qty = isEtablering ? s.quantityDraft : item.quantity
                       const price = isEtablering ? s.priceDraft : item.unitPrice
@@ -1394,10 +1437,21 @@ export default function TechnicianEquipment() {
                         </div>
                       )
                     })}
-                    {s.serviceItems.length === 0 && (
+                    {listedItems.length === 0 && (
                       <p className="text-sm text-slate-400 px-1">Inga tjänsterader på ärendet.</p>
                     )}
                   </div>
+
+                  {/* Arbetstid för att hantera tilläggen (nya per år/per månad) */}
+                  <AddonLabourStep step={addonLabourStep} className="mb-3" />
+                  {labourInStep && (addonLabourStep.economics?.labourNow ?? 0) > 0 && (
+                    <div className="flex items-center justify-between px-1 mb-2 text-sm">
+                      <span className="text-slate-300">Arbetstid för att hantera tilläggen</span>
+                      <span className="text-slate-200 tabular-nums">
+                        {Math.round(addonLabourStep.economics?.labourNow ?? 0).toLocaleString('sv-SE')} kr
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between px-1 pb-3 border-b border-slate-700/50 mb-3">
                     <span className="text-sm font-medium text-slate-300">Totalt (exkl. moms)</span>
@@ -1429,7 +1483,7 @@ export default function TechnicianEquipment() {
                     </button>
                     <button
                       onClick={confirmFinishEstablishment}
-                      disabled={finishingEstablishment}
+                      disabled={finishingEstablishment || addonLabourStep.loading}
                       className="flex-1 px-4 py-3 rounded-xl bg-[#20c58f] hover:bg-[#1ab07f] text-[#fff] font-medium transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
                     >
                       {finishingEstablishment && <Loader2 className="w-4 h-4 animate-spin" />}

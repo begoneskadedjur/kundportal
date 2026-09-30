@@ -56,6 +56,21 @@ export interface CaseBillingItem {
   billing_start_date?: string | null
   /** Pro rata-rad för per år/månad-stationer på etableringsärendet */
   is_addon_prorata_line?: boolean | null
+  /**
+   * "Arbetstid för att hantera tilläggen": § 6-rad på avtalet (per_year),
+   * pro rata-rad på ärendet (med is_addon_prorata_line) eller intern kostnad.
+   */
+  is_addon_labour_line?: boolean | null
+  /** Timmar per år (§ 6: beslutat, ärendet: teknikerns förslag totalt, intern kostnad: timmarna bakom beloppet) */
+  addon_labour_hours?: number | null
+  /** Timmar per år som redan debiterades när förslaget gjordes. Bara ökningen faktureras pro rata. */
+  addon_labour_hours_before?: number | null
+  /** Årspris per enhet (per station, per timme). Tidslinjen ritas ur unit_price / detta. */
+  addon_annual_unit_price?: number | null
+  /** per_year | per_month för pro rata-rader per stationstyp */
+  addon_model?: 'per_year' | 'per_month' | null
+  /** Stationstypen raden avser (§ 6 och pro rata per typ) */
+  station_type_id?: string | null
   /** Raden täcks av kundens avtal (§ 4) och faktureras inte som merförsäljning */
   covered_by_contract?: boolean | null
   /** § 4: bärande rad (avtalstypens tjänst). Beloppet är härlett ur § 6, aldrig lagrat. */

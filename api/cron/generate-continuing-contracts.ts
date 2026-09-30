@@ -128,8 +128,7 @@ async function loadSources(contractId: string): Promise<Sources> {
   } catch (err) {
     console.warn('Antalssynk av tilläggsstationer misslyckades:', err)
   }
-  const [{ data: contractRow }, { data: steps }, { data: items }] = await Promise.all([
-    supabase.from('contracts').select('customer_id, customers!contracts_customer_id_fkey(addon_invoice_mode)').eq('id', contractId).maybeSingle(),
+  const [{ data: steps }, { data: items }] = await Promise.all([
     supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
     supabase
       .from('case_billing_items')
@@ -156,13 +155,10 @@ async function loadSources(contractId: string): Promise<Sources> {
   type StepRow = { effective_from: string; annual_value: number | string; event_type?: string | null; note?: string | null }
   const rows = (items ?? []) as Item[]
   return {
-    // Läget bor på kunden sedan 2026-09-04 (contracts.equipment_invoice_mode
-    // är deprecated och läses inte längre).
-    equipmentInvoiceMode:
-      (contractRow as { customers?: { addon_invoice_mode?: string | null } | null } | null)?.customers
-        ?.addon_invoice_mode === 'separate_per_contract'
-        ? 'separate'
-        : 'with_premium',
+    // Tillägg ligger bredvid avtalet och faktureras ALLTID på en egen faktura
+    // i samband med årsfakturan (beslut 2026-09-30). customers.addon_invoice_mode
+    // läses inte längre, kolumnen finns kvar som historik.
+    equipmentInvoiceMode: 'separate',
     additionNotes: ((steps ?? []) as StepRow[])
       .filter((s) => s.event_type === 'addition' && !!s.note)
       .map((s) => ({ effective_from: s.effective_from, note: s.note as string })),

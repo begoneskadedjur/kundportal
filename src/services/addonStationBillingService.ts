@@ -23,8 +23,10 @@ import type { Service, ServiceDefaultArticle } from '../types/services'
 import type { CaseBillingItemWithRelations } from '../types/caseBilling'
 import type {
   AddonBillingModel,
+  AddonCompletionSummary,
   AddonPriceMissing,
   AddonPrices,
+  AddonUnitDecisionInfo,
   StationTypeArticle,
 } from '../types/addonStations'
 
@@ -191,7 +193,8 @@ export class AddonStationBillingService {
   static async syncAddonProrataLine(
     customerId: string,
     technicianId?: string | null,
-    technicianName?: string | null
+    technicianName?: string | null,
+    caseId?: string | null
   ): Promise<{ found: boolean; count?: number; total?: number; row_id?: string | null; covered_by_open_invoice?: string | null; no_contract?: boolean } | null> {
     try {
       // p_annual_price lämnas null: RPC:n slår upp priset per stationstyp
@@ -202,6 +205,8 @@ export class AddonStationBillingService {
         p_annual_price: null,
         p_technician_id: technicianId ?? null,
         p_technician_name: technicianName ?? null,
+        // Kontrollrundan när stationerna sätts ut där; annars öppet etableringsärende
+        p_case_id: caseId ?? null,
       })
       if (error) {
         console.warn('[AddonStationBilling] sync_addon_prorata_line fel:', error)
@@ -211,6 +216,79 @@ export class AddonStationBillingService {
     } catch (err) {
       console.warn('[AddonStationBilling] Pro rata-synk misslyckades:', err)
       return null
+    }
+  }
+
+  /**
+   * Underlag för avslutssteget "Arbetstid för att hantera tilläggen" och
+   * Ekonomi-flikens kalkyl: stationer innan/nya per typ, timmar i dag,
+   * teknikerns förslag, kundens timpris och nästa periodstart.
+   * SECURITY DEFINER-RPC: fungerar för tekniker. Null vid fel.
+   */
+  static async getCompletionSummary(caseId: string): Promise<AddonCompletionSummary | null> {
+    const { data, error } = await supabase.rpc('addon_completion_summary', { p_case_id: caseId })
+    if (error) {
+      console.warn('[AddonStationBilling] addon_completion_summary fel:', error)
+      return null
+    }
+    const d = data as AddonCompletionSummary | null
+    if (!d || !d.ok) return d ?? null
+    return {
+      ...d,
+      hourly_price: d.hourly_price != null ? Number(d.hourly_price) : null,
+      hourly_cost: d.hourly_cost != null ? Number(d.hourly_cost) : null,
+      labour_hours_before: Number(d.labour_hours_before ?? 0),
+      proposal_hours: d.proposal_hours != null ? Number(d.proposal_hours) : null,
+      proposal_hours_before: d.proposal_hours_before != null ? Number(d.proposal_hours_before) : null,
+      proposal_total: d.proposal_total != null ? Number(d.proposal_total) : null,
+      new_equipment_cost: Number(d.new_equipment_cost ?? 0),
+      new_articles: (d.new_articles ?? []).map((a) => ({ ...a, quantity: Number(a.quantity), cost: Number(a.cost) })),
+      types: (d.types ?? []).map((t) => ({
+        ...t,
+        before: Number(t.before),
+        before_pending: Number(t.before_pending),
+        new: Number(t.new),
+        included: Number(t.included),
+        new_cost: Number(t.new_cost ?? 0),
+        annual_price: t.annual_price != null ? Number(t.annual_price) : null,
+      })),
+    }
+  }
+
+  /**
+   * Teknikerns förslag: timmar per år (nytt totalt) för att hantera
+   * tilläggen på enheten. Sparas på ärendets arbetstidsrad tills kontoret
+   * beslutar; bara ökningen mot i dag faktureras fram till nästa periodstart.
+   * Kastar vid fel (anroparen visar toast).
+   */
+  static async setLabourProposal(
+    caseId: string,
+    hours: number
+  ): Promise<{ ok: boolean; reason?: string; total?: number; priceMissing?: boolean }> {
+    const { data, error } = await supabase.rpc('set_addon_labour_proposal', { p_case_id: caseId, p_hours: hours })
+    if (error) throw new Error(`Kunde inte spara arbetstiden: ${error.message}`)
+    const d = data as { ok: boolean; reason?: string; total?: number; price_missing?: boolean } | null
+    return { ok: !!d?.ok, reason: d?.reason, total: d?.total != null ? Number(d.total) : undefined, priceMissing: !!d?.price_missing }
+  }
+
+  /** Underlag för kontorets beslut per enhet på ett avtal. Null vid fel. */
+  static async getUnitDecisionInfo(unitId: string, contractId: string): Promise<AddonUnitDecisionInfo | null> {
+    const { data, error } = await supabase.rpc('addon_unit_decision_info', { p_unit_id: unitId, p_contract_id: contractId })
+    if (error) {
+      console.warn('[AddonStationBilling] addon_unit_decision_info fel:', error)
+      return null
+    }
+    const d = data as AddonUnitDecisionInfo | null
+    if (!d) return null
+    return {
+      ...d,
+      hourly_price: d.hourly_price != null ? Number(d.hourly_price) : null,
+      hourly_cost: d.hourly_cost != null ? Number(d.hourly_cost) : null,
+      labour_hours_now: Number(d.labour_hours_now ?? 0),
+      proposal_hours: d.proposal_hours != null ? Number(d.proposal_hours) : null,
+      proposal_hours_before: d.proposal_hours_before != null ? Number(d.proposal_hours_before) : null,
+      pending_equipment_cost: Number(d.pending_equipment_cost ?? 0),
+      pending_articles: (d.pending_articles ?? []).map((a) => ({ ...a, quantity: Number(a.quantity), cost: Number(a.cost) })),
     }
   }
 

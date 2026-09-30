@@ -700,7 +700,7 @@ export class ContractInvoiceGenerator {
       console.warn('[ContractInvoiceGenerator] Antalssynk av tilläggsstationer misslyckades:', err)
     }
     const [{ data: contract }, { data: steps }, { data: items }, { data: ledgerRows }] = await Promise.all([
-      supabase.from('contracts').select('label, contract_type, display_name, invoice_reference, diary_number, customer_id, customers!contracts_customer_id_fkey(addon_invoice_mode)').eq('id', contractId).maybeSingle(),
+      supabase.from('contracts').select('label, contract_type, display_name, invoice_reference, diary_number, customer_id').eq('id', contractId).maybeSingle(),
       supabase.from('contract_premium_events').select('effective_from, annual_value, event_type, note').eq('contract_id', contractId),
       supabase
         .from('case_billing_items')
@@ -781,7 +781,6 @@ export class ContractInvoiceGenerator {
       display_name?: string | null
       invoice_reference?: string | null
       diary_number?: string | null
-      customers?: { addon_invoice_mode?: string | null } | null
     } | null
     type StepRow = { effective_from: string; annual_value: number | string; event_type?: string | null; note?: string | null }
     return {
@@ -791,10 +790,10 @@ export class ContractInvoiceGenerator {
         .map((s) => ({ effective_from: s.effective_from, note: s.note as string })),
       premiumItems,
       equipment,
-      // Faktureringsläget för tilläggsstationer bor på KUNDEN sedan 2026-09-04
-      // (contracts.equipment_invoice_mode är deprecated och läses inte).
-      equipmentInvoiceMode:
-        c?.customers?.addon_invoice_mode === 'separate_per_contract' ? 'separate' : 'with_premium',
+      // Tillägg ligger bredvid avtalet och faktureras ALLTID på en egen faktura
+      // i samband med årsfakturan (beslut 2026-09-30). customers.addon_invoice_mode
+      // ('with_contract') läses inte längre, kolumnen finns kvar som historik.
+      equipmentInvoiceMode: 'separate',
       // Avtalets namn på fakturaraden: användarsatt namn → label → typ
       label: (c?.display_name && c.display_name.trim()) || c?.label || c?.contract_type || null,
       invoiceReference: c?.invoice_reference ?? null,

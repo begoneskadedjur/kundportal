@@ -383,7 +383,12 @@ export class ContractBillingService {
     // fakturarader. Samma filtrering som privat/företag (invoiceService.createInvoiceFromCase).
     // Fallback: gamla ärenden utan tjänsterader faktureras på sina artikelrader (bakåtkompat).
     // Rader som täcks av avtalet (§ 4, covered_by_contract) faktureras aldrig som merförsäljning.
-    const serviceItems = allCaseBillingItems.filter(i => i.item_type === 'service' && !i.covered_by_contract)
+    // Tilläggsrader (pro rata per stationstyp, arbetstid) på 0 kr är underlag,
+    // t.ex. teknikerns arbetstidsförslag utan ökning: de blir aldrig fakturarader.
+    const serviceItems = allCaseBillingItems.filter(i =>
+      i.item_type === 'service' && !i.covered_by_contract &&
+      !((i.is_addon_prorata_line || i.is_addon_labour_line) && !(Number(i.total_price) > 0))
+    )
     const caseBillingItems = serviceItems.length > 0
       ? serviceItems
       : allCaseBillingItems.filter(i => i.item_type === 'article' || !i.item_type)

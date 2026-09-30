@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatPayback, marginTone, paybackTone, summarizeBillingLines, type MarginLine } from './marginEngine'
+import { formatPayback, marginTone, paybackTone, splitContractLines, summarizeBillingLines, type ContractSplitLine, type MarginLine } from './marginEngine'
 
 const svc = (price: number): MarginLine => ({ item_type: 'service', total_price: price })
 const art = (price: number, qty: number, extra?: Partial<MarginLine>): MarginLine => ({
@@ -119,5 +119,47 @@ describe('toner och format', () => {
     expect(formatPayback(0.5)).toBe('6 mån')
     expect(formatPayback(1.42)).toBe('1,4 år')
     expect(formatPayback(null)).toBe('')
+  })
+})
+
+describe('arbetstid för tilläggen', () => {
+  it('timmarna läses ur addon_labour_hours när raden är 1 × belopp', () => {
+    const line: MarginLine = {
+      item_type: 'article', total_price: 2032, quantity: 1, addon_labour_hours: 2,
+      article_name: 'Arbetstid Företag', article: { is_durable: false, category: 'Arbetstid' },
+    }
+    const b = summarizeBillingLines([svc(1064), line], { context: 'contract' })
+    expect(b.labour_hours).toBe(2)
+    expect(b.labour_cost).toBe(2032)
+  })
+})
+
+describe('splitContractLines: arbetstiden för tilläggen', () => {
+  // WBAB Bylandet: premie 48 000, 4 Aurotrap à 2 348 som tillägg, 2 h × 532 per år,
+  // intern kostnad 2 h × 1 016 (Arbetstid Företag), plus premiens egen arbetstid.
+  const lines: ContractSplitLine[] = [
+    { id: 'carrier', item_type: 'service', total_price: 0, billing_model: 'premium' },
+    { id: 'premie-tid', item_type: 'article', total_price: 10160, quantity: 10, mapped_service_id: 'carrier', article_name: 'Arbetstid Företag', article: { is_durable: false, category: 'Arbetstid' } },
+    { id: 'aurotrap', item_type: 'service', total_price: 9392, quantity: 4, billing_model: 'per_year' },
+    { id: 'tid', item_type: 'service', total_price: 1064, quantity: 1, billing_model: 'per_year', is_addon_labour_line: true, addon_labour_hours: 2 },
+    { id: 'tid-kostnad', item_type: 'article', total_price: 2032, quantity: 1, mapped_service_id: 'tid', is_addon_labour_line: true, addon_labour_hours: 2, article_name: 'Arbetstid Företag', article: { is_durable: false, category: 'Arbetstid' } },
+  ]
+
+  it('arbetstidsraden och dess kostnad hamnar i tilläggsdelen, aldrig i premien', () => {
+    const parts = splitContractLines(lines, { annualValue: 48000, visitsPerYear: 4 })
+    expect(parts.addon_revenue).toBe(10456)
+    expect(parts.addons?.labour_hours).toBe(2)
+    expect(parts.addons?.labour_cost).toBe(2032)
+    expect(parts.premium.labour_hours).toBe(10)
+    expect(parts.premium.labour_cost).toBe(10160)
+    expect(parts.unallocated_cost).toBe(0)
+  })
+
+  it('kostnadsraden utan mappning räknas ändå som tillägg', () => {
+    const unmapped = lines.map((l) => (l.id === 'tid-kostnad' ? { ...l, mapped_service_id: null } : l))
+    const parts = splitContractLines(unmapped, { annualValue: 48000, visitsPerYear: 4 })
+    expect(parts.addons?.labour_cost).toBe(2032)
+    expect(parts.premium.labour_cost).toBe(10160)
+    expect(parts.unallocated_cost).toBe(0)
   })
 })

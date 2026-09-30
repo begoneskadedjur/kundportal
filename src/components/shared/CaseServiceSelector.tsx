@@ -46,6 +46,19 @@ import {
 } from '../../types/caseBilling'
 import { getEffectiveRotPercent, getEffectiveRutPercent, calculateRotRutSummary } from '../../utils/rotRutConstants'
 import ContractAdditionModal from './ContractAdditionModal'
+import AddonBillingTimeline from './AddonBillingTimeline'
+import { AddonStationBillingService } from '../../services/addonStationBillingService'
+import type { AddonCompletionSummary } from '../../types/addonStations'
+import {
+  computeAddonCalc,
+  formatDateShortSv,
+  formatHours,
+  formatKr,
+  isAddonCaseLine,
+  splitCaseLines,
+  timelineExplanation,
+  timelineFromRow,
+} from '../../shared/addonEconomics'
 import type { ServiceWithGroup } from '../../types/services'
 import { ARTICLE_CATEGORIES, calculatePricePerDosageUnit, getDosageDisplayUnit, resolveTieredPrice, formatTierSummary } from '../../types/articles'
 import type { ArticleCategory, QuantityTier } from '../../types/articles'
@@ -157,6 +170,10 @@ export default function CaseServiceSelector({
   const [saving, setSaving] = useState(false)
   // Avtalstillägg-modal (tjänsterad som höjer kundens årspremie)
   const [additionModalItemId, setAdditionModalItemId] = useState<string | null>(null)
+  // Ärendets typ (cases.service_type) för avtalskundärenden, t.ex. 'establishment'
+  const [caseServiceType, setCaseServiceType] = useState<string | null>(null)
+  // Underlag för "Tilläggets kalkyl" (hämtas bara när ärendet har tilläggsrader)
+  const [addonSummary, setAddonSummary] = useState<AddonCompletionSummary | null>(null)
 
   // Prisguide-state som överlever öppna/stäng-cykler
   const [priceAssignments, setPriceAssignments] = useState<Record<string, string>>(
@@ -247,14 +264,18 @@ export default function CaseServiceSelector({
         // Ärendets avtal styr prislistan när kunden har flera avtal på samma
         // enhet. Bara avtalskundernas ärenden (tabellen cases) bär contract_id.
         let caseContractId: string | null = null
+        let serviceType: string | null = null
         if (caseId && caseType === 'contract') {
           const { data: caseRow } = await supabase
             .from('cases')
-            .select('contract_id')
+            .select('contract_id, service_type')
             .eq('id', caseId)
             .maybeSingle()
-          caseContractId = (caseRow as { contract_id?: string | null } | null)?.contract_id ?? null
+          const row = caseRow as { contract_id?: string | null; service_type?: string | null } | null
+          caseContractId = row?.contract_id ?? null
+          serviceType = row?.service_type ?? null
         }
+        setCaseServiceType(serviceType)
         // "Ingår i avtalet": tjänster i avtalets § 4 skapas med pris 0 och
         // faktureras aldrig som merförsäljning.
         const coverageData =
@@ -377,6 +398,32 @@ export default function CaseServiceSelector({
   const serviceItems = allItems.filter(i => i.item_type === 'service')
   const articleItems = allItems.filter(i => i.item_type === 'article')
 
+  // Tillägg bredvid avtalet: tilläggsraderna (pro rata per stationstyp +
+  // arbetstid) och artiklar mappade mot dem hör till tilläggets kalkyl.
+  // Ärendets egna rader styr ärendets marginal, redigering och prisguiden.
+  const { addonLines } = splitCaseLines(allItems)
+  const addonLineIds = new Set(addonLines.map(l => l.id))
+  const addonServiceLines = addonLines.filter(l => l.item_type === 'service' && isAddonCaseLine(l))
+  const addonStationLines = addonServiceLines.filter(l => !l.is_addon_labour_line)
+  const addonLabourLine = addonServiceLines.find(l => l.is_addon_labour_line) ?? null
+  const ownServiceItems = serviceItems.filter(i => !addonLineIds.has(i.id))
+  const ownArticleItems = articleItems.filter(i => !addonLineIds.has(i.id))
+  const hasAddonLines = addonServiceLines.length > 0
+  const isEstablishment = caseServiceType === 'establishment'
+
+  // Tilläggets kalkyl: underlaget hämtas bara när ärendet har tilläggsrader
+  useEffect(() => {
+    if (!caseId || draftMode || !hasAddonLines) {
+      setAddonSummary(null)
+      return
+    }
+    let cancelled = false
+    AddonStationBillingService.getCompletionSummary(caseId).then(s => {
+      if (!cancelled) setAddonSummary(s && s.ok ? s : null)
+    })
+    return () => { cancelled = true }
+  }, [caseId, draftMode, hasAddonLines])
+
   // Privat = pris inkl. moms i UI. Företag/avtal = exkl. moms.
   const VAT_RATE = 0.25
   const isPrivate = caseType === 'private'
@@ -390,12 +437,13 @@ export default function CaseServiceSelector({
 
   // Marginalberäkning — räknas ALLTID på exkl.-basen (momsen är aldrig bolagets intäkt).
   // serviceCost = summa av item.total_price som redan är exkl. i DB, så samma formel funkar för privat + företag.
-  const serviceCost = serviceItems.reduce((s, i) => s + i.total_price, 0)
-  const purchaseCost = articleItems.reduce((s, i) => s + i.total_price, 0)
+  const serviceCost = ownServiceItems.reduce((s, i) => s + i.total_price, 0)
+  const purchaseCost = ownArticleItems.reduce((s, i) => s + i.total_price, 0)
   // Genom motorn (src/shared/marginEngine.ts). Ärenden är engångsjobb: fakturan
   // betalar för fällan, så år 1 förblir huvudtalet. Uppdelningen används bara
   // för att visa hur mycket av kostnaden som är varaktig utrustning.
-  const marginBreakdown = summarizeBillingLines([...serviceItems, ...articleItems], {
+  // Bara ärendets egna rader: tilläggen har sin egen kalkyl nedan.
+  const marginBreakdown = summarizeBillingLines([...ownServiceItems, ...ownArticleItems], {
     context: 'case',
     settings: pricingSettings,
   })
@@ -407,7 +455,7 @@ export default function CaseServiceSelector({
   // kundpris × antal och påslag bara på övriga artiklar. Fast tjänstepris i
   // prislistan har företräde och hanteras av hasFixedPrice.
   const derivedLockedServiceIds = new Set(
-    serviceItems
+    ownServiceItems
       .filter(si => !(si.service_id && customerServicePrices[si.service_id] !== undefined))
       .filter(si => articleItems.some(a =>
         a.customer_unit_price != null && (a.mapped_service_id || priceAssignments[a.id] || null) === si.id
@@ -1061,6 +1109,8 @@ export default function CaseServiceSelector({
     const filteredPrices: Record<string, number> = {}
     Object.entries(prices).forEach(([itemId, price]) => {
       const it = allItems.find(i => i.id === itemId)
+      // Tilläggsrader styrs av stationerna och RPC:n, aldrig av prisguiden
+      if (addonLineIds.has(itemId)) return
       if (it?.service_id && customerServicePrices[it.service_id] !== undefined) return
       filteredPrices[itemId] = price
     })
@@ -1074,7 +1124,7 @@ export default function CaseServiceSelector({
 
     // ROT/RUT-val per tjänsterad: applicera på alla tjänsterader, inte bara de som fick ny prissättning.
     // Anledning: användaren kan ändra avdrag utan att flytta sliders, och vi vill att valet sparas ändå.
-    const serviceItemIds = allItems.filter(i => i.item_type === 'service').map(i => i.id)
+    const serviceItemIds = allItems.filter(i => i.item_type === 'service' && !addonLineIds.has(i.id)).map(i => i.id)
 
     if (draftMode && !caseId) {
       let updated = [...allItems]
@@ -1195,6 +1245,26 @@ export default function CaseServiceSelector({
       || s.code.toLowerCase().includes(search)
   })
 
+  // ── Tillägg utöver avtalet: all matte i src/shared/addonEconomics.ts ──
+  const addonStationRows = addonStationLines.map(row => ({ row, timeline: timelineFromRow(row) }))
+  const addonLabourTimeline = addonLabourLine ? timelineFromRow(addonLabourLine) : null
+  const addonStartDate = addonServiceLines.find(l => l.billing_start_date)?.billing_start_date ?? null
+  const addonNewStations = addonStationLines.reduce((s, l) => s + Number(l.quantity || 0), 0)
+  const addonNowTotal = addonServiceLines.reduce((s, l) => s + Number(l.total_price || 0), 0)
+  const addonCalc = addonSummary
+    ? computeAddonCalc({
+        equipmentCost: addonSummary.new_equipment_cost,
+        annualStationRevenue: addonStationRows.reduce((s, r) => s + (r.timeline?.totalAnnual ?? 0), 0),
+        labourHours: Number(addonLabourLine?.addon_labour_hours ?? addonSummary.proposal_hours ?? 0),
+        labourRate: addonSummary.hourly_price,
+        labourCostPerHour: addonSummary.hourly_cost,
+        firstPeriodRevenue: addonNowTotal,
+        firstPeriodFraction: addonStationRows.find(r => r.timeline)?.timeline?.fraction ?? addonLabourTimeline?.fraction ?? 0,
+        startDate: addonStartDate,
+      })
+    : null
+  const krNumber = (n: number) => Math.round(n).toLocaleString('sv-SE')
+
   if (loading) {
     return (
       <div className={`flex items-center justify-center py-8 ${className}`}>
@@ -1211,7 +1281,9 @@ export default function CaseServiceSelector({
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
             <ShoppingCart className="w-4 h-4 text-[#20c58f]" />
-            <span className="text-sm font-semibold text-white">Tjänster & fakturarader</span>
+            <span className="text-sm font-semibold text-white">
+              {isEstablishment && hasAddonLines ? 'Etableringen' : 'Tjänster & fakturarader'}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             {/* Marginalindikator */}
@@ -1238,11 +1310,11 @@ export default function CaseServiceSelector({
         </div>
 
         {/* Befintliga tjänsterader */}
-        {serviceItems.length === 0 ? (
+        {ownServiceItems.length === 0 ? (
           <p className="text-xs text-slate-500 py-2 text-center">Inga tjänster tillagda än</p>
         ) : (
           <div className="space-y-2 mb-2">
-            {serviceItems.map(item => {
+            {ownServiceItems.map(item => {
               const isEditing = editingPrice[item.id] !== undefined
               const displayUnitPrice = isPrivate ? Math.round(item.unit_price * priceMultiplier) : item.unit_price
               const displayPrice = isEditing ? editingPrice[item.id] : String(displayUnitPrice)
@@ -1270,6 +1342,8 @@ export default function CaseServiceSelector({
               const rutPct = getEffectiveRutPercent(svc)
               const hasFixedPrice = !!item.service_id && customerServicePrices[item.service_id] !== undefined
               const isDerivedLocked = !hasFixedPrice && derivedLockedServiceIds.has(item.id)
+              // Etableringskostnad på 0 kr: ingår i avtalet, inget "Fast pris"-märke
+              const isIncludedEstablishmentRow = isEstablishment && Number(item.total_price) === 0
               return (
                 <div key={item.id} className="p-2 bg-slate-800/40 border border-slate-700/50 rounded-lg">
                   {/* Namn – alltid full bredd */}
@@ -1280,7 +1354,12 @@ export default function CaseServiceSelector({
                       )}
                       {item.service_name || item.article_name}
                     </span>
-                    {hasFixedPrice && (
+                    {isIncludedEstablishmentRow && !item.covered_by_contract && (
+                      <span className="text-xs text-slate-400" title="Etableringen ingår i avtalet och faktureras inte">
+                        <span className="mr-1">●</span>Ingår i avtalet
+                      </span>
+                    )}
+                    {hasFixedPrice && !isIncludedEstablishmentRow && (
                       <span
                         className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium"
                         title="Fast pris från kundens prislista"
@@ -1307,7 +1386,9 @@ export default function CaseServiceSelector({
                         Ingår i avtalet
                       </span>
                     )}
-                    {/* Avtalstillägg: endast avtalskundärenden med sparade rader */}
+                    {/* Avtalstillägg: endast avtalskundärenden med sparade rader.
+                        Aldrig "Lägg till i avtalet" på etableringar (tilläggen
+                        ligger bredvid avtalet), en redan markerad rad visas ändå. */}
                     {caseType === 'contract' && customerId && caseId && !draftMode && !isDerivedLocked && (
                       item.contract_addition_annual != null ? (
                         <button
@@ -1319,7 +1400,7 @@ export default function CaseServiceSelector({
                           <Repeat className="w-3 h-3" />
                           Avtalstillägg +{Number(item.contract_addition_annual).toLocaleString('sv-SE')} kr/år
                         </button>
-                      ) : !readOnly ? (
+                      ) : !readOnly && !isEstablishment ? (
                         <button
                           type="button"
                           onClick={() => setAdditionModalItemId(item.id)}
@@ -1644,8 +1725,8 @@ export default function CaseServiceSelector({
         )}
 
         {/* Summa tjänster */}
-        {serviceItems.length > 0 && (() => {
-          const rotRut = isPrivate ? calculateRotRutSummary(serviceItems) : null
+        {ownServiceItems.length > 0 && (() => {
+          const rotRut = isPrivate ? calculateRotRutSummary(ownServiceItems) : null
           const totalInkl = serviceCost * priceMultiplier
           const showDeduction = isPrivate && rotRut && rotRut.totalDeduction > 0
           const customerAmount = showDeduction ? totalInkl - rotRut!.totalDeduction : totalInkl
@@ -1682,6 +1763,138 @@ export default function CaseServiceSelector({
         })()}
       </div>
 
+      {/* ── TILLÄGG UTÖVER AVTALET (styrs av stationerna, ej redigerbart) ── */}
+      {hasAddonLines && (
+        <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-sm font-semibold text-white">Tillägg utöver avtalet</span>
+            {addonNewStations > 0 && (
+              <span className="text-xs font-medium text-[#c084fc] whitespace-nowrap">
+                <span className="mr-1">●</span>
+                {addonNewStations} {addonNewStations === 1 ? 'ny station' : 'nya stationer'}
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {addonStationRows.map(({ row, timeline }) => {
+              const name = (row.service_name || 'Tilläggsstation').replace(/\s*\(tilläggsstation\)\s*$/i, '')
+              const annualUnit = Number(row.addon_annual_unit_price ?? 0)
+              const perMonth = row.addon_model === 'per_month'
+              return (
+                <div key={row.id} className="pb-3 border-b border-slate-700/50 last:border-0 last:pb-0">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white">
+                        {name} · {krNumber(Number(row.quantity || 0))} st
+                      </p>
+                      {annualUnit > 0 && (
+                        <p className="text-xs text-slate-400">
+                          Fast pris {formatKr(perMonth ? annualUnit / 12 : annualUnit)}{' '}
+                          {perMonth ? 'per station och månad' : 'per station och år'}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold text-white tabular-nums whitespace-nowrap">
+                      {formatKr(Number(row.total_price || 0))}
+                    </span>
+                  </div>
+                  {timeline && <AddonBillingTimeline timeline={timeline} />}
+                </div>
+              )
+            })}
+
+            {addonLabourLine && (() => {
+              const hours = Number(addonLabourLine.addon_labour_hours ?? 0)
+              const rate = Number(addonLabourLine.addon_annual_unit_price ?? 0)
+              const nowTotal = Number(addonLabourLine.total_price || 0)
+              return (
+                <div className="pb-3 border-b border-slate-700/50 last:border-0 last:pb-0">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white">
+                        Arbetstid för att hantera tilläggen · {formatHours(hours)} h per år
+                      </p>
+                      {rate > 0 && (
+                        <p className="text-xs text-slate-400">Kundens timpris {formatKr(rate)}</p>
+                      )}
+                    </div>
+                    <span className="text-sm font-semibold text-white tabular-nums whitespace-nowrap">
+                      {formatKr(nowTotal)}
+                    </span>
+                  </div>
+                  {nowTotal > 0 && addonLabourTimeline ? (
+                    <AddonBillingTimeline timeline={addonLabourTimeline} />
+                  ) : (
+                    <p className="text-xs text-slate-400">
+                      Inget faktureras nu, timmarna ökar inte.
+                      {addonStartDate
+                        ? ` Från ${formatDateShortSv(addonStartDate)} gäller ${formatHours(hours)} h per år.`
+                        : ` Från nästa periodstart gäller ${formatHours(hours)} h per år.`}
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
+          </div>
+
+          <div className="mt-3 p-2.5 bg-slate-800/40 border border-slate-700/50 rounded-lg">
+            <p className="text-xs text-slate-400 leading-relaxed">{timelineExplanation(addonStartDate)}</p>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-slate-700/50 mt-3 pt-2 text-sm">
+            <span className="text-slate-400">Faktureras nu, exkl. moms</span>
+            <span className="font-semibold text-white tabular-nums">{formatKr(addonNowTotal + serviceCost)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── TILLÄGGETS KALKYL (bara personal, aldrig kund) ── */}
+      {hasAddonLines && addonCalc && addonSummary && (
+        <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <span className="text-sm font-semibold text-white">Tilläggets kalkyl</span>
+            {addonCalc.paybackNever ? (
+              <span className="text-xs font-medium text-amber-400 whitespace-nowrap">
+                <span className="mr-1">●</span>Betalas aldrig tillbaka
+              </span>
+            ) : (
+              <span className="text-xs font-medium text-[#20c58f] whitespace-nowrap">
+                <span className="mr-1">●</span>
+                {addonCalc.paybackLabel === 'direkt'
+                  ? 'Betalt tillbaka direkt'
+                  : `Betalt tillbaka cirka ${addonCalc.paybackLabel}`}
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <p className="text-xs text-slate-400">Utrustning, en gång</p>
+              <p className="text-sm font-semibold text-white tabular-nums">{formatKr(addonCalc.equipmentCost)}</p>
+              {addonSummary.new_articles.length > 0 && (
+                <p className="text-xs text-slate-500">
+                  {addonSummary.new_articles.map(a => `${krNumber(a.quantity)} ${a.name}`).join(', ')}
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Intäkt per år</p>
+              <p className="text-sm font-semibold text-white tabular-nums">{formatKr(addonCalc.annualRevenue)}</p>
+              <p className="text-xs text-slate-500">
+                Stationer {krNumber(addonCalc.annualStationRevenue)} · arbetstid {krNumber(addonCalc.annualLabourRevenue)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400">Arbetstid, intern kostnad</p>
+              <p className="text-sm font-semibold text-white tabular-nums">{formatKr(addonCalc.annualLabourCost)}</p>
+              <p className="text-xs text-slate-500">
+                {formatHours(Number(addonLabourLine?.addon_labour_hours ?? addonSummary.proposal_hours ?? 0))} h × {formatKr(addonSummary.hourly_cost)} per år
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── B: ARTIKEL-KALKYLATOR (intern) ── */}
       <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
         <button
@@ -1691,7 +1904,9 @@ export default function CaseServiceSelector({
         >
           <div className="flex items-center gap-1.5">
             <Package className="w-4 h-4 text-slate-400" />
-            <span className="text-sm font-semibold text-slate-300">Interna kostnader</span>
+            <span className="text-sm font-semibold text-slate-300">
+              {hasAddonLines && isEstablishment ? 'Etableringens interna kostnader' : 'Interna kostnader'}
+            </span>
             {articleItems.length > 0 && (
               <span className="px-1.5 py-0.5 text-xs bg-slate-700 text-slate-300 rounded-full">
                 {articleItems.length}
@@ -1746,6 +1961,14 @@ export default function CaseServiceSelector({
                           title="Avtalat kundpris från prislistan: låser priset på den tjänst artikeln mappas mot och skrivs som specifikation på fakturaraden"
                         >
                           kundpris {formatPrice(item.customer_unit_price)}/{isDosage ? dosageUnit : 'st'}
+                        </span>
+                      )}
+                      {addonLineIds.has(item.id) && (
+                        <span
+                          className="text-[10px] font-medium text-[#c084fc]"
+                          title="Mappad mot en tilläggsrad: räknas i tilläggets kalkyl, inte i ärendets marginal"
+                        >
+                          <span className="mr-0.5">●</span>hör till tillägget
                         </span>
                       )}
                       {item.customer_unit_price != null && !item.mapped_service_id && !priceAssignments[item.id] && (
@@ -1837,7 +2060,7 @@ export default function CaseServiceSelector({
                   )
                 })}
                 <div className="flex justify-between text-xs text-slate-400 px-1">
-                  <span>Total inköpskostnad</span>
+                  <span>{ownArticleItems.length !== articleItems.length ? 'Ärendets inköpskostnad' : 'Total inköpskostnad'}</span>
                   <span className="font-medium text-slate-300">{formatPrice(purchaseCost)}</span>
                 </div>
                 {marginBreakdown.cost_durable > 0 && (
@@ -1982,7 +2205,7 @@ export default function CaseServiceSelector({
         isOpen={showCalculatorPanel}
         onClose={() => setShowCalculatorPanel(false)}
         caseType={caseType}
-        articleItems={articleItems.map(i => ({
+        articleItems={ownArticleItems.map(i => ({
           id: i.id,
           article_id: i.article_id,
           article_name: i.article_name,
@@ -1996,7 +2219,7 @@ export default function CaseServiceSelector({
           rut_eligible: !!i.article?.rut_eligible,
         }))}
         customerArticlePrices={customerArticlePrices}
-        serviceItems={serviceItems.map(i => {
+        serviceItems={ownServiceItems.map(i => {
           const svc = i.service ?? addonServices.find(s => s.id === i.service_id) ?? null
           return {
             id: i.id,
@@ -2012,7 +2235,7 @@ export default function CaseServiceSelector({
           }
         })}
         fixedPricedItemIds={new Set(
-          serviceItems
+          ownServiceItems
             .filter(i => !!i.service_id && customerServicePrices[i.service_id] !== undefined)
             .map(i => i.id)
         )}

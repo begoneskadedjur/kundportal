@@ -16,6 +16,7 @@
 // id, inte på services.id).
 
 import { summarizeBillingLines, type MarginLine } from '../../../../shared/marginEngine'
+import { splitCaseLines } from '../../../../shared/addonEconomics'
 import { useId, useMemo, useState } from 'react'
 import { ChevronDown, Layers } from 'lucide-react'
 import { formatKr, type RecordWorkItem } from '../../../../hooks/useCustomerRecord'
@@ -175,7 +176,10 @@ export default function WorkChainSection({
       })
       const revenue = groups.reduce((s, g) => s + g.revenue, 0)
       const cost = groups.reduce((s, g) => s + g.cost, 0)
-      const caseLines = [...services, ...services.flatMap((s) => articlesByService.get(s.id) ?? [])] as unknown as MarginLine[]
+      const allLines = [...services, ...services.flatMap((s) => articlesByService.get(s.id) ?? [])]
+      // Ärenden: marginalen bara på ärendets egna rader. Tilläggsrader och
+      // artiklar mappade mot dem har tilläggets egen kalkyl.
+      const caseLines = (context === 'case' ? splitCaseLines(allLines).caseLines : allLines) as unknown as MarginLine[]
       const caseBreakdown = summarizeBillingLines(caseLines, { context })
       if (context === 'contract') durableOnContracts += caseBreakdown.cost_durable
       // Ett ärendenummer betyder utfört arbete; saknas det är raden avtalets

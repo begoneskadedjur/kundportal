@@ -37,7 +37,7 @@ import ContractPremiumSection, { premiumSummary, type PremiumPlanEntry } from '.
 import ContractReferencesSection from './ContractReferencesSection'
 import ContractTermSection, { termWatch } from './ContractTermSection'
 import ContractPriceListSection from './ContractPriceListSection'
-import { billingModelOf, MODEL_LABEL, siteOf, type BillingModel } from './ContractEquipmentSection'
+import { billingModelOf, isAddonLabourLine, MODEL_LABEL, siteOf, type BillingModel } from './ContractEquipmentSection'
 import { useContractContent } from './ContractContentSection'
 import { useAvropCatalog } from './ContractPriceListSection'
 import type { HistoryTab } from './ContractHistoryModal'
@@ -125,8 +125,6 @@ export interface ContractSettingsDrawerProps {
   nextBricks?: { contractId: string; label: string; count: number } | null
   onGoNext?: () => void
   unitNameOf: (unitId: string) => string
-  equipmentInvoiceMode: 'with_premium' | 'separate'
-  onChangeEquipmentInvoiceMode?: (mode: 'with_premium' | 'separate') => Promise<void>
   // Fakturering
   premiumEvents: CustomerRecordData['premiumEvents']
   annualInForce: number | null
@@ -271,7 +269,9 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
 
   const services = content.services
   const articles = content.articles
-  const addonServices = services.filter((s) => billingModelOf(s) !== 'premium' && !(siteOf(s) && Number(s.quantity) === 0))
+  const addonServices = services.filter(
+    (s) => billingModelOf(s) !== 'premium' && !(siteOf(s) && Number(s.quantity) === 0) && !(isAddonLabourLine(s) && !(Number(s.addon_labour_hours ?? 0) > 0))
+  )
   const premiumServices = services.filter((s) => billingModelOf(s) === 'premium')
 
   const renderGroup = () => {
@@ -629,7 +629,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                     {p.onDecideBrick && !archived && (
                       <div className="flex gap-2">
                         <button type="button" onClick={(e) => p.onDecideBrick?.(br, 'premium', e.clientX, e.clientY)} className="text-[12px] px-2.5 py-1 rounded-md border border-slate-600 text-slate-200 hover:border-[#20c58f]">
-                          Baka in i premien
+                          Lägg till i avtalet
                         </button>
                         <button type="button" onClick={(e) => p.onDecideBrick?.(br, 'equipment', e.clientX, e.clientY)} className="text-[12px] px-2.5 py-1 rounded-md bg-[#20c58f] text-[#0b1220] font-semibold hover:brightness-110">
                           Tillägg utöver avtalet
@@ -652,7 +652,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                         onClick={(e) => p.onDecideBricks?.(chosen, 'premium', e.clientX, e.clientY)}
                         className="text-[12px] px-2.5 py-1 rounded-md border border-slate-600 text-slate-200 hover:border-[#20c58f]"
                       >
-                        Baka in i premien
+                        Lägg till i avtalet
                       </button>
                       <button
                         type="button"
@@ -685,10 +685,12 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                       const site = siteOf(s)
                       const isCarrier = !!s.is_premium_carrier
                       const isPremiumRow = model === 'premium'
+                      // Arbetstiden för tilläggen beslutas i "Besluta tillägg", inte här
+                      const isLabour = isAddonLabourLine(s)
                       return (
                         <tr key={s.id}>
                           <td className="py-1.5 border-b border-slate-700 text-white">
-                            {s.service_name ?? s.article_name}
+                            {isLabour ? `Arbetstid för att hantera tilläggen · ${Number(s.addon_labour_hours ?? 0).toLocaleString('sv-SE')} h` : s.service_name ?? s.article_name}
                             {isCarrier && <span className="text-slate-500"> · avtalstypen</span>}
                             {site && <span className="text-slate-500"> · {p.unitNameOf(site)}</span>}
                           </td>
@@ -728,6 +730,8 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
                           <td className="py-1.5 pl-3 border-b border-slate-700">
                             {isCarrier ? (
                               <span className="text-slate-500 text-[11px]">Ingår i premien</span>
+                            ) : isLabour ? (
+                              <span className="text-slate-400 text-[11.5px]">per år</span>
                             ) : p.onChangeLineModel && !archived ? (
                               <select
                                 value={model}
@@ -786,22 +790,7 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
             )}
             <div className="mt-4 pt-3 border-t border-slate-700">
               <H5>Tilläggen faktureras</H5>
-              <div className="space-y-1.5 text-[12.5px] text-slate-200">
-                {(['with_premium', 'separate'] as const).map((m) => (
-                  <label key={m} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name={`eq-mode-${contract.id}`}
-                      checked={p.equipmentInvoiceMode === m}
-                      disabled={!p.onChangeEquipmentInvoiceMode || archived}
-                      onChange={() => void p.onChangeEquipmentInvoiceMode?.(m)}
-                      className="text-[#20c58f] focus:ring-[#20c58f]"
-                    />
-                    {m === 'with_premium' ? 'På premiefakturan' : 'Egna fakturor, en per avtal'}
-                  </label>
-                ))}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1.5">Läget sitter på kunden och gäller alla kundens avtal.</p>
+              <p className="text-[12px] text-slate-300">Egen faktura i samband med avtalets årsfaktura. Tilläggen löper med avtalet och slutar när avtalet slutar.</p>
             </div>
           </div>
         )
@@ -821,7 +810,6 @@ export default function ContractSettingsDrawer(p: ContractSettingsDrawerProps) {
               onLinkFortnox={p.onLinkFortnox}
               onSavePremium={p.onSavePremium}
               onAddPremiumEvent={p.onAddPremiumEvent}
-              equipmentInvoiceMode={p.equipmentInvoiceMode}
             />
             <div className="mt-4 pt-3 border-t border-slate-700 text-[12px] text-slate-400">
               Faktureras {p.invoiceMode === 'consolidated' ? 'på kundens samlingsfaktura, som egen rad' : 'på egen faktura'}. Samlingsfakturan styrs av gemet ovanför pappren.

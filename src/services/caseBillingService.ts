@@ -2,6 +2,7 @@
 // Service för hantering av ärendebaserad fakturering (artiklar/tjänster tekniker väljer per ärende)
 
 import { summarizeBillingLines, splitContractLines, type MarginContext, type MarginSettings } from '../shared/marginEngine'
+import { splitCaseLines } from '../shared/addonEconomics'
 import { supabase } from '../lib/supabase'
 import type { Article } from '../types/articles'
 import type {
@@ -552,6 +553,8 @@ export class CaseBillingService {
         mapped_service_id: i.mapped_service_id ?? null,
         billing_model: (i as unknown as { billing_model?: string | null }).billing_model ?? null,
         addon_contract_mode: null,
+        is_addon_labour_line: i.is_addon_labour_line ?? null,
+        addon_labour_hours: i.addon_labour_hours ?? null,
       })),
       { annualValue: annual, visitsPerYear: visits, settings: settings ?? null }
     )
@@ -578,8 +581,12 @@ export class CaseBillingService {
 
     // All marginal går genom motorn. margin_percent förblir år 1 (mot hela
     // inköpet) tills alla vyer läser breakdown; margin_ok bedömer huvudtalet.
-    const breakdown = summarizeBillingLines(items, {
-      context: opts.context ?? 'case',
+    // Ärenden: marginalen räknas bara på ärendets egna rader. Tilläggsrader
+    // (bredvid avtalet) och artiklar mappade mot dem har tilläggets kalkyl.
+    const context = opts.context ?? 'case'
+    const marginItems = context === 'contract' ? items : splitCaseLines(items).caseLines
+    const breakdown = summarizeBillingLines(marginItems, {
+      context,
       revenueOverride: opts.revenueOverride ?? null,
       visitsPerYear: opts.visitsPerYear ?? null,
       settings: opts.settings ?? null,

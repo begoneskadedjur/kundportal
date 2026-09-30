@@ -139,8 +139,6 @@ interface Props {
   mode?: SectionMode
   /** Kugghjulet i rubriken: öppna panelen på Fakturering */
   onOpenSettings?: () => void
-  /** Var tilläggsraderna faktureras (kundens läge) */
-  equipmentInvoiceMode?: 'with_premium' | 'separate' | null
 }
 
 /** Nästa faktura, tillägg och luckor ur fakturaplanen. Delas av § 6 och pulsen. */
@@ -195,7 +193,6 @@ export default function ContractPremiumSection({
   onLinkFortnox,
   mode = 'paper',
   onOpenSettings,
-  equipmentInvoiceMode,
 }: Props) {
   const settings = mode === 'settings'
   const inputClass = settings ? PANEL_INPUT_CLASS : PAPER_INPUT_CLASS
@@ -313,7 +310,6 @@ export default function ContractPremiumSection({
                 ? `${frequencyLabel.toLowerCase()}${anchor ? ` · ${MONTHS[anchor - 1]}` : ''}`
                 : 'villkor saknas'}
               {frequencyLabel ? (invoiceMode === 'consolidated' ? ' · på kundens samlingsfaktura' : ' · egen faktura') : ''}
-              {equipmentInvoiceMode === 'separate' ? ' · tillägg på egna fakturor' : ''}
             </span>
           </div>
           {/* Nästa faktura står på pappret: fel syns på skärmen, inte hos

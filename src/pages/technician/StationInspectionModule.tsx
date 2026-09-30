@@ -78,6 +78,8 @@ import {
 import { PreparationService } from '../../services/preparationService'
 import type { Preparation } from '../../types/preparations'
 import { AddonStationBillingService } from '../../services/addonStationBillingService'
+import { useAddonLabourStep } from '../../hooks/useAddonLabourStep'
+import AddonLabourStep from '../../components/technician/AddonLabourStep'
 import { EquipmentService } from '../../services/equipmentService'
 import { IndoorStationService } from '../../services/indoorStationService'
 
@@ -254,6 +256,23 @@ export default function StationInspectionModule() {
 
   // Bekräftelsedialog för att avsluta inspektion
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
+
+  // Arbetstid för att hantera tilläggen: frågas när tilläggsstationer per
+  // år/per månad satts ut i rundan. Pro rata för de nya stationerna synkas
+  // till kontrollärendet FÖRE underlaget laddas (ärendet måste vara öppet).
+  const labourCaseId = session?.case_id ?? null
+  const labourCustomerId = session?.customer_id ?? null
+  const labourTechId = session?.technician_id ?? null
+  const labourTechName = session?.technician?.name ?? null
+  const prepareAddonLabour = useCallback(async () => {
+    if (!labourCaseId || !labourCustomerId) return
+    await AddonStationBillingService.syncAddonProrataLine(labourCustomerId, labourTechId, labourTechName, labourCaseId)
+  }, [labourCaseId, labourCustomerId, labourTechId, labourTechName])
+  const addonLabourStep = useAddonLabourStep({
+    caseId: labourCaseId,
+    enabled: showCompleteConfirm && !!labourCaseId,
+    prepare: prepareAddonLabour,
+  })
 
   // Auto-dismiss för återupptagande-banner
   const [showResumeNotice, setShowResumeNotice] = useState(true)
@@ -1363,6 +1382,16 @@ export default function StationInspectionModule() {
               toast(`Pris saknas i prislistan för tilläggsstationer — raden skapades med 0 kr och ingen faktura genereras. Meddela kontoret.`, { duration: 10000, icon: '⚠️' })
             }
 
+            // Arbetstid för att hantera tilläggen: sparas som förslag före
+            // faktureringen så att arbetstiden för resten av avtalets år
+            // kommer med på kontrollärendets faktura
+            if (addonLabourStep.visible) {
+              const labour = await addonLabourStep.save()
+              if (!labour.saved && labour.message) {
+                toast.error(labour.message, { duration: 10000 })
+              }
+            }
+
             const billing = await AddonStationBillingService.completeContractCaseBilling({
               caseId: session.case_id,
               customerId: session.customer_id,
@@ -2420,7 +2449,7 @@ export default function StationInspectionModule() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-slate-800 rounded-xl p-5 max-w-sm w-full shadow-xl border border-slate-700"
+              className={`bg-slate-800 rounded-xl p-5 ${addonLabourStep.visible ? 'max-w-lg' : 'max-w-sm'} w-full max-h-[90vh] overflow-y-auto shadow-xl border border-slate-700`}
               onClick={e => e.stopPropagation()}
             >
               <div className="flex items-center gap-3 mb-4">
@@ -2473,6 +2502,9 @@ export default function StationInspectionModule() {
                 </div>
               )}
 
+              {/* Arbetstid för att hantera tilläggen (nya per år/per månad i rundan) */}
+              <AddonLabourStep step={addonLabourStep} className="mb-4" />
+
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowCompleteConfirm(false)}
@@ -2482,10 +2514,18 @@ export default function StationInspectionModule() {
                 </button>
                 <button
                   onClick={() => {
+                    // Fel i arbetstidsvalet stoppar här så teknikern kan rätta
+                    if (addonLabourStep.visible) {
+                      const labourError = addonLabourStep.validate()
+                      if (labourError) {
+                        toast.error(labourError)
+                        return
+                      }
+                    }
                     setShowCompleteConfirm(false)
                     handleCompleteInspection()
                   }}
-                  disabled={!progress || progress.inspectedStations < progress.totalStations}
+                  disabled={!progress || progress.inspectedStations < progress.totalStations || addonLabourStep.loading}
                   className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-500 text-[#fff] rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Ja, klarmarkera

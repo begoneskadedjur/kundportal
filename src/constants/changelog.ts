@@ -45,6 +45,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.17.0',
+    date: '2026-09-30',
+    title: 'Tillägg bredvid avtalet',
+    items: [
+      { kind: 'nyhet', text: 'Tilläggsstationer i Ekonomi-fliken visar en tidslinje: vad kunden betalar nu för månaderna kvar till avtalets år och vad som gäller sedan, med pris per station på båda sidor' },
+      { kind: 'nyhet', text: 'Arbetstid för att hantera tilläggen: teknikern anger timmar per år när nya tillägg sätts ut, priset kommer alltid från kundens timpris i prislistan' },
+      { kind: 'nyhet', text: 'Besluta tillägg i avtalskartan visar vad teknikern satte ut, arbetstiden, tilläggets kalkyl och när det är betalt tillbaka. Välj Tillägg utöver avtalet eller Lägg till i avtalet' },
+      { kind: 'andring', text: 'Tillägg faktureras alltid på en egen faktura i samband med årsfakturan, en rad per stationstyp, och slutar när avtalet slutar' },
+      { kind: 'buggfix', text: 'Ärendets marginal räknas bara på ärendets egna rader, tilläggens utrustning drar inte längre ned den' },
+    ],
+  },
+  {
     version: '3.16.0',
     date: '2026-09-29',
     title: 'Kontrollrapporten direkt i ärendet',

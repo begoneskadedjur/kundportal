@@ -22,6 +22,11 @@ export interface MarginLine {
   article_name?: string | null
   status?: string | null
   article?: { is_durable?: boolean | null; category?: string | null } | null
+  /**
+   * Timmar bakom en arbetstidsrad när antalet inte kan bära dem
+   * (quantity är heltal): tilläggens arbetstid lagras som 1 × belopp.
+   */
+  addon_labour_hours?: number | string | null
 }
 
 export interface MarginSettings {
@@ -137,7 +142,7 @@ export function summarizeBillingLines(lines: MarginLine[], opts: SummarizeOption
   const cost_ongoing = cost_total - cost_durable
   const labour = articles.filter(isLabourLine)
   const labour_cost = labour.reduce((s, l) => s + num(l.total_price), 0)
-  const labour_hours = labour.reduce((s, l) => s + num(l.quantity), 0)
+  const labour_hours = labour.reduce((s, l) => s + (l.addon_labour_hours != null ? num(l.addon_labour_hours) : num(l.quantity)), 0)
   const consumable_cost = cost_ongoing - labour_cost
 
   const contribution_ongoing = revenue - cost_ongoing
@@ -254,6 +259,12 @@ export interface ContractSplitLine extends MarginLine {
   mapped_service_id?: string | null
   billing_model?: string | null
   addon_contract_mode?: string | null
+  /**
+   * "Arbetstid för att hantera tilläggen" (§ 6-raden per år och dess interna
+   * kostnad). Hör alltid till tilläggen, aldrig till premien, även om
+   * kostnadsraden skulle sakna mapped_service_id.
+   */
+  is_addon_labour_line?: boolean | null
 }
 
 export function splitContractLines(
@@ -266,7 +277,7 @@ export function splitContractLines(
   for (const s of services) {
     const model = s.billing_model ?? 'premium'
     const included = s.addon_contract_mode === 'included'
-    partOf.set(s.id, model === 'premium' || included ? 'premium' : 'addons')
+    partOf.set(s.id, s.is_addon_labour_line ? 'addons' : model === 'premium' || included ? 'premium' : 'addons')
   }
   const premiumLines: ContractSplitLine[] = []
   const addonLines: ContractSplitLine[] = []
@@ -276,7 +287,7 @@ export function splitContractLines(
       ;(partOf.get(l.id) === 'addons' ? addonLines : premiumLines).push(l)
       continue
     }
-    const part = l.mapped_service_id ? partOf.get(l.mapped_service_id) : undefined
+    const part = l.is_addon_labour_line ? 'addons' : l.mapped_service_id ? partOf.get(l.mapped_service_id) : undefined
     if (part === 'addons') addonLines.push(l)
     else {
       premiumLines.push(l)

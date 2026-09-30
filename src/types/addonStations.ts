@@ -19,7 +19,7 @@ export const ADDON_BILLING_MODEL_LABEL: Record<AddonBillingModel, string> = {
 }
 
 export const ADDON_BILLING_MODEL_HELP: Record<AddonBillingModel, string> = {
-  per_year: 'Faktureras fram till nästa årspremie, därefter årsvis tillsammans med avtalet. Ingen etableringsavgift.',
+  per_year: 'Betalas för månaderna kvar till avtalets nästa år, sedan på en egen faktura i samband med årsfakturan. Slutar när avtalet slutar. Ingen etableringsavgift.',
   per_month: 'Faktureras månadsvis, årspriset delat med tolv. Ingen etableringsavgift.',
   per_round: 'Debiteras etablering och varje kontrollrunda stationen kontrolleras i.',
 }
@@ -86,4 +86,80 @@ export interface AddonBrick {
   count: number
   outdoorIds: string[]
   indoorIds: string[]
+}
+
+/** En stationstyp i teknikerns avslutssteg (RPC addon_completion_summary). */
+export interface AddonSummaryType {
+  station_type_id: string | null
+  station_type_name: string
+  model: 'per_year' | 'per_month'
+  /** Aktiva tilläggsstationer markerade före ärendet (ej inbakade) */
+  before: number
+  /** Varav obeslutade ("väntar på beslut") */
+  before_pending: number
+  /** Nya under ärendet (ej inbakade) */
+  new: number
+  /** Inbakade i avtalet ("Ingår i avtalet"), påverkar inte arbetstidsfrågan */
+  included: number
+  /** Utrustningskostnad för de nya (intern) */
+  new_cost: number
+  /** Årspris per station ur kundens prislista */
+  annual_price: number | null
+}
+
+/** Underlag för "Färdig med etablering"/kontrollrundans avslut och Ekonomi-fliken. */
+export interface AddonCompletionSummary {
+  ok: boolean
+  reason?: string
+  case_id: string
+  case_number: string | null
+  case_created_at: string
+  unit_id: string
+  unit_name: string | null
+  contract_id: string | null
+  contract_name: string | null
+  contract_end_date: string | null
+  today: string
+  next_period_start: string | null
+  /** Kundens fasta timpris (tjänst 135 ur prislistan) */
+  hourly_price: number | null
+  /** Intern timkostnad (Arbetstid Företag) */
+  hourly_cost: number | null
+  /** Timmar per år som enheten debiteras i dag (§ 6) */
+  labour_hours_before: number
+  /** Teknikerns förslag (nytt totalt), null = inget förslag */
+  proposal_hours: number | null
+  proposal_hours_before: number | null
+  proposal_status: string | null
+  proposal_total: number | null
+  new_equipment_cost: number
+  new_articles: Array<{ name: string; quantity: number; cost: number }>
+  types: AddonSummaryType[]
+}
+
+/** Underlag för kontorets beslut per enhet (RPC addon_unit_decision_info). */
+export interface AddonUnitDecisionInfo {
+  unit_id: string
+  unit_name: string | null
+  contract_id: string
+  today: string
+  next_period_start: string | null
+  contract_end_date: string | null
+  hourly_price: number | null
+  hourly_cost: number | null
+  /** Timmar per år som debiteras i dag på avtalet */
+  labour_hours_now: number
+  proposal_case_id: string | null
+  proposal_case_number: string | null
+  proposal_hours: number | null
+  proposal_hours_before: number | null
+  proposal_status: string | null
+  /** Utrustningskostnad för obeslutade stationer (intern) */
+  pending_equipment_cost: number
+  pending_articles: Array<{ station_type_id: string | null; name: string; quantity: number; cost: number }>
+}
+
+/** Stationstyper med nya tillägg per år/per månad = avslutssteget ska visas. */
+export function hasNewAddons(summary: AddonCompletionSummary | null | undefined): boolean {
+  return !!summary?.ok && !!summary.contract_id && summary.types.some((t) => t.new > 0)
 }
