@@ -68,6 +68,8 @@ const nf = (n: number) => Math.round(n).toLocaleString('sv-SE')
 export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onConfirmLabour, onAllDone }: Props) {
   const [mode, setMode] = useState<AddonDecisionMode>(prompt.zone === 'premium' ? 'included' : 'separate')
   const [date, setDate] = useState(todayKey())
+  // Användaren har själv valt datum: skriv inte över med nästa periodstart
+  const [dateTouched, setDateTouched] = useState(false)
   const [priceByKey, setPriceByKey] = useState<Record<string, string>>({})
   const [missingByKey, setMissingByKey] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
@@ -185,6 +187,13 @@ export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onCon
   const firstInfo = labour.find((l) => l.info)?.info ?? null
   const nextStart = firstInfo?.next_period_start ?? null
   const today = todayIso()
+
+  // Lägg till i avtalet gäller från nästa periodstart som förval: tiden fram
+  // till dess är redan betald via pro rata på ärendet, annars betalar kunden
+  // samma tid två gånger
+  useEffect(() => {
+    if (nextStart && !dateTouched) setDate(nextStart)
+  }, [nextStart, dateTouched])
 
   // Det som faktureras nu, pro rata till nästa periodstart (samma formel som RPC:n)
   const firstPeriod = useMemo(() => {
@@ -490,7 +499,7 @@ export default function AddonDropPrompt({ prompt, onClose, onConfirmBrick, onCon
               <span className="block text-xs font-medium text-slate-400 mb-1">Gäller från</span>
               <DateField
                 value={date}
-                onChange={setDate}
+                onChange={(v) => { setDateTouched(true); setDate(v) }}
                 aria-label="Gäller från"
                 className="w-full pl-9 pr-3 py-1.5 bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
               />
