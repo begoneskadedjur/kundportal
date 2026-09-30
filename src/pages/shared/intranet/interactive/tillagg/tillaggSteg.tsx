@@ -214,14 +214,14 @@ export const STEG: Steg[] = [
           ]}
         />
         <p className="text-sm leading-relaxed text-slate-300 mt-3">
-          <B>Tekniker kan ta bort tilläggsstationer ute hos kunden</B>, till exempel med status Borttagen, med Kontrollera + hämta upp i kontrollrundan eller med Ta bort-knappen. Är stationen redan betald framåt kommer ett förtydligande först:
+          <B>Tekniker kan ta bort tilläggsstationer ute hos kunden</B>, till exempel med status Borttagen, med rutan Hämta upp stationen efter kontrollen i kontrollrundan eller med Ta bort-knappen. Är stationen redan betald framåt kommer ett förtydligande först:
         </p>
         <Punkter
           items={[
             <>Du ser att stationen är <B>betald till och med</B> ett datum, oftast dagen före avtalets nästa periodstart.</>,
             'Kunden får ingen återbetalning om den tas bort nu, och den faktureras inte längre från nästa period.',
             'Låt den stå kvar om kunden inte uttryckligen vill ta bort den. Kunden har redan betalat för den.',
-            <>Vill kunden ändå ta bort den trycker du en gång till. Knappen heter då <B>Klicka igen för att ta bort</B>.</>,
+            <>Vill kunden ändå ta bort den trycker du en gång till. I kontrollrundan heter knappen då <B>Ta bort ändå</B>, i stationsformuläret <B>Klicka igen för att ta bort</B>.</>,
             'Är stationen inte fakturerad än står det Inte fakturerad än. Tas den bort räknas den inte med.',
           ]}
         />

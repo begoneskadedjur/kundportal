@@ -395,7 +395,7 @@ export function SkarmBorttagVarning() {
   return (
     <MiniScreen
       where="Utrustning › Redigera station › Status Borttagen"
-      caption="Samma förtydligande kommer vid Kontrollera + hämta upp och vid Ta bort-knappen."
+      caption="Samma förtydligande kommer när du kryssar i Hämta upp stationen efter kontrollen i kontrollrundan. Där heter knappen Spara och ta bort, och efter första trycket Ta bort ändå."
     >
       <div className="space-y-2.5 text-xs">
         <div>
