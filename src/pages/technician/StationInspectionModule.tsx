@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Play,
   Check,
+  Loader2,
   X,
   ChevronRight,
   ChevronLeft,
@@ -2611,45 +2612,25 @@ export default function StationInspectionModule() {
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
             >
-              {/* Sticky Header med actions */}
-              <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur border-b border-slate-700 p-4 flex items-center justify-between">
-                <div>
-                  <h2 className="text-lg font-bold text-white">
+              {/* Rubrik: bara namn och stäng. Knapparna ligger i foten, i full bredd på mobil */}
+              <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur border-b border-slate-700 px-4 py-3 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-bold text-white truncate">
                     Station {outdoorNumberMap[selectedStation.id] || indoorNumberMap[selectedStation.id] || '?'}
                   </h2>
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-slate-400 truncate">
                     {selectedStation.station_type_data?.name || selectedStation.equipment_type || selectedStation.station_type}
+                    {selectedStation.is_addon === true && <span className="text-violet-400"> · tillägg</span>}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {session?.status !== 'completed' && (
-                    <button
-                      onClick={() => {
-                        setRelocatingStation(selectedStation)
-                        setSelectedStation(null)
-                      }}
-                      className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
-                    >
-                      Flytta station
-                    </button>
-                  )}
-                  <button
-                    onClick={() => setSelectedStation(null)}
-                    className="px-3 py-1.5 text-sm text-slate-400 hover:text-white transition-colors"
-                  >
-                    Stäng
-                  </button>
-                  {session?.status !== 'completed' && (
-                    <Button
-                      size="sm"
-                      onClick={handleSaveInspection}
-                      loading={isSubmitting}
-                    >
-                      <Check className="w-4 h-4 mr-1" />
-                      {pickupGuard.label('Spara')}
-                    </Button>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStation(null)}
+                  aria-label="Stäng"
+                  className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
               {/* Scrollbart innehåll */}
@@ -2948,6 +2929,48 @@ export default function StationInspectionModule() {
               {pickUpAfterSave && <AddonRemovalNotice guard={pickupGuard} className="mt-3" />}
 
               </div>{/* Slut på scrollbart innehåll */}
+
+              {/* Fot: Flytta + Spara i full bredd. Med "Hämta upp" ikryssat heter
+                  knappen Spara och ta bort; är stationen betald framåt krävs ett
+                  andra tryck (Ta bort ändå) */}
+              {session?.status !== 'completed' && (
+                <div className="border-t border-slate-700 bg-slate-900 px-4 pt-3 pb-4 flex flex-col gap-2.5">
+                  {pickupGuard.armed && (
+                    <p className="text-sm text-amber-400 text-center">
+                      Tryck en gång till för att spara och ta bort stationen
+                    </p>
+                  )}
+                  <div className="flex gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRelocatingStation(selectedStation)
+                        setSelectedStation(null)
+                      }}
+                      className="h-12 px-4 flex-shrink-0 rounded-xl border border-slate-600 text-sm font-medium text-slate-200 hover:bg-slate-800 transition-colors"
+                    >
+                      Flytta
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveInspection}
+                      disabled={isSubmitting}
+                      className={`h-12 flex-1 rounded-xl text-[15px] font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-60 ${
+                        pickupGuard.armed
+                          ? 'bg-amber-500 hover:bg-amber-400 text-[#1c1003]'
+                          : 'bg-[#20c58f] hover:bg-[#1bb07f] text-[#04140d]'
+                      }`}
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
+                      {pickupGuard.armed ? 'Ta bort ändå' : pickUpAfterSave ? 'Spara och ta bort' : 'Spara'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}

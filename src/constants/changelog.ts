@@ -54,6 +54,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'andring', text: 'Guiden Tilläggsstationer beskriver varningen vid borttag, har en ny fråga om varför fakturan skapas innan tilläggen är beslutade och en luftigare tabell över vem som gör vad.' },
       { kind: 'buggfix', text: 'Lägg till i avtalet i Besluta tillägg gäller nu från avtalets nästa periodstart som förval, inte från idag. Tiden fram till dess betalas redan på ärendet, så kunden betalar inte samma tid två gånger.' },
       { kind: 'andring', text: 'Guiden Tilläggsstationer skriver ut vad som faktureras när ärendet stängs: tiden fram till avtalets nästa periodstart.' },
+      { kind: 'andring', text: 'Kontrollformuläret i kontrollrundan har Flytta och Spara längst ned i full bredd och ett kryss för att stänga uppe till höger, så inget trycks ihop på mobilen. Med Hämta upp ikryssat heter knappen Spara och ta bort.' },
     ],
   },
   {
