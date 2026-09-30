@@ -45,6 +45,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.18.1',
+    date: '2026-09-30',
+    title: 'Renare Ekonomi-flik för tillägg',
+    items: [
+      { kind: 'andring', text: 'Tilläggets kalkyl visas inte längre i ärendets Ekonomi-flik. Den finns kvar när tillägget beslutas i avtalskartan och på avtalet' },
+    ],
+  },
+  {
+    version: '3.18.0',
+    date: '2026-09-30',
+    title: 'Ett mail per återkommande schema',
+    items: [
+      { kind: 'andring', text: 'När ett återkommande schema läggs upp får teknikern ett enda mail med kund, adress, frekvens, dag, klockslag och antal tillfällen, i stället för en lista med varje tillfälle. Samma sak när schemat förlängs eller byter tekniker' },
+      { kind: 'andring', text: 'Engångsärenden ger ett mail per ärende, även när flera bokas inom samma minuter' },
+    ],
+  },
+  {
     version: '3.17.2',
     date: '2026-09-30',
     title: 'Återkommande kontroller ger datum igen',

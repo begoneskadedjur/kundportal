@@ -47,10 +47,7 @@ import {
 import { getEffectiveRotPercent, getEffectiveRutPercent, calculateRotRutSummary } from '../../utils/rotRutConstants'
 import ContractAdditionModal from './ContractAdditionModal'
 import AddonBillingTimeline from './AddonBillingTimeline'
-import { AddonStationBillingService } from '../../services/addonStationBillingService'
-import type { AddonCompletionSummary } from '../../types/addonStations'
 import {
-  computeAddonCalc,
   formatDateShortSv,
   formatHours,
   formatKr,
@@ -172,8 +169,6 @@ export default function CaseServiceSelector({
   const [additionModalItemId, setAdditionModalItemId] = useState<string | null>(null)
   // Ärendets typ (cases.service_type) för avtalskundärenden, t.ex. 'establishment'
   const [caseServiceType, setCaseServiceType] = useState<string | null>(null)
-  // Underlag för "Tilläggets kalkyl" (hämtas bara när ärendet har tilläggsrader)
-  const [addonSummary, setAddonSummary] = useState<AddonCompletionSummary | null>(null)
 
   // Prisguide-state som överlever öppna/stäng-cykler
   const [priceAssignments, setPriceAssignments] = useState<Record<string, string>>(
@@ -410,19 +405,6 @@ export default function CaseServiceSelector({
   const ownArticleItems = articleItems.filter(i => !addonLineIds.has(i.id))
   const hasAddonLines = addonServiceLines.length > 0
   const isEstablishment = caseServiceType === 'establishment'
-
-  // Tilläggets kalkyl: underlaget hämtas bara när ärendet har tilläggsrader
-  useEffect(() => {
-    if (!caseId || draftMode || !hasAddonLines) {
-      setAddonSummary(null)
-      return
-    }
-    let cancelled = false
-    AddonStationBillingService.getCompletionSummary(caseId).then(s => {
-      if (!cancelled) setAddonSummary(s && s.ok ? s : null)
-    })
-    return () => { cancelled = true }
-  }, [caseId, draftMode, hasAddonLines])
 
   // Privat = pris inkl. moms i UI. Företag/avtal = exkl. moms.
   const VAT_RATE = 0.25
@@ -1251,18 +1233,6 @@ export default function CaseServiceSelector({
   const addonStartDate = addonServiceLines.find(l => l.billing_start_date)?.billing_start_date ?? null
   const addonNewStations = addonStationLines.reduce((s, l) => s + Number(l.quantity || 0), 0)
   const addonNowTotal = addonServiceLines.reduce((s, l) => s + Number(l.total_price || 0), 0)
-  const addonCalc = addonSummary
-    ? computeAddonCalc({
-        equipmentCost: addonSummary.new_equipment_cost,
-        annualStationRevenue: addonStationRows.reduce((s, r) => s + (r.timeline?.totalAnnual ?? 0), 0),
-        labourHours: Number(addonLabourLine?.addon_labour_hours ?? addonSummary.proposal_hours ?? 0),
-        labourRate: addonSummary.hourly_price,
-        labourCostPerHour: addonSummary.hourly_cost,
-        firstPeriodRevenue: addonNowTotal,
-        firstPeriodFraction: addonStationRows.find(r => r.timeline)?.timeline?.fraction ?? addonLabourTimeline?.fraction ?? 0,
-        startDate: addonStartDate,
-      })
-    : null
   const krNumber = (n: number) => Math.round(n).toLocaleString('sv-SE')
 
   if (loading) {
@@ -1845,52 +1815,6 @@ export default function CaseServiceSelector({
           <div className="flex items-center justify-between border-t border-slate-700/50 mt-3 pt-2 text-sm">
             <span className="text-slate-400">Faktureras nu, exkl. moms</span>
             <span className="font-semibold text-white tabular-nums">{formatKr(addonNowTotal + serviceCost)}</span>
-          </div>
-        </div>
-      )}
-
-      {/* ── TILLÄGGETS KALKYL (bara personal, aldrig kund) ── */}
-      {hasAddonLines && addonCalc && addonSummary && (
-        <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <span className="text-sm font-semibold text-white">Tilläggets kalkyl</span>
-            {addonCalc.paybackNever ? (
-              <span className="text-xs font-medium text-amber-400 whitespace-nowrap">
-                <span className="mr-1">●</span>Betalas aldrig tillbaka
-              </span>
-            ) : (
-              <span className="text-xs font-medium text-[#20c58f] whitespace-nowrap">
-                <span className="mr-1">●</span>
-                {addonCalc.paybackLabel === 'direkt'
-                  ? 'Betalt tillbaka direkt'
-                  : `Betalt tillbaka cirka ${addonCalc.paybackLabel}`}
-              </span>
-            )}
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <p className="text-xs text-slate-400">Utrustning, en gång</p>
-              <p className="text-sm font-semibold text-white tabular-nums">{formatKr(addonCalc.equipmentCost)}</p>
-              {addonSummary.new_articles.length > 0 && (
-                <p className="text-xs text-slate-500">
-                  {addonSummary.new_articles.map(a => `${krNumber(a.quantity)} ${a.name}`).join(', ')}
-                </p>
-              )}
-            </div>
-            <div>
-              <p className="text-xs text-slate-400">Intäkt per år</p>
-              <p className="text-sm font-semibold text-white tabular-nums">{formatKr(addonCalc.annualRevenue)}</p>
-              <p className="text-xs text-slate-500">
-                Stationer {krNumber(addonCalc.annualStationRevenue)} · arbetstid {krNumber(addonCalc.annualLabourRevenue)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-slate-400">Arbetstid, intern kostnad</p>
-              <p className="text-sm font-semibold text-white tabular-nums">{formatKr(addonCalc.annualLabourCost)}</p>
-              <p className="text-xs text-slate-500">
-                {formatHours(Number(addonLabourLine?.addon_labour_hours ?? addonSummary.proposal_hours ?? 0))} h × {formatKr(addonSummary.hourly_cost)} per år
-              </p>
-            </div>
           </div>
         </div>
       )}
