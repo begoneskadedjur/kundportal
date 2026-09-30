@@ -10,6 +10,7 @@ import {
   SkarmArbetstidNy,
   SkarmBeslutaTillagg,
   SkarmBokaEtablering,
+  SkarmBorttagVarning,
   SkarmEkonomiFlik,
   SkarmMarkeraTillagg,
   SkarmMerforsaljning,
@@ -200,17 +201,32 @@ export const STEG: Steg[] = [
   },
   {
     title: 'Varje avtalsår tills avtalet slutar',
-    roles: ['systemet', 'fakturering'],
+    roles: ['systemet', 'fakturering', 'tekniker'],
     when: 'Löpande',
     body: (
-      <Punkter
-        items={[
-          'Tillägget faktureras varje avtalsår i samband med årsfakturan, på sin egen faktura, så länge avtalet löper.',
-          'Tas stationer bort blir raden mindre vid nästa fakturering. Tas den sista tilläggsstationen på enheten bort går arbetstiden till 0.',
-          'Det blir inga krediteringar. Det som redan är fakturerat står kvar.',
-          'När avtalet har slutat avslutas tilläggets rader och inga fler tilläggsfakturor planeras. Tillägget slutar samtidigt som avtalet.',
-        ]}
-      />
+      <>
+        <Punkter
+          items={[
+            'Tillägget faktureras varje avtalsår i samband med årsfakturan, på sin egen faktura, så länge avtalet löper.',
+            'Tas stationer bort blir raden mindre vid nästa fakturering. Tas den sista tilläggsstationen på enheten bort går arbetstiden till 0.',
+            'Det blir inga krediteringar. Det som redan är fakturerat står kvar.',
+            'När avtalet har slutat avslutas tilläggets rader och inga fler tilläggsfakturor planeras. Tillägget slutar samtidigt som avtalet.',
+          ]}
+        />
+        <p className="text-sm leading-relaxed text-slate-300 mt-3">
+          <B>Tekniker kan ta bort tilläggsstationer ute hos kunden</B>, till exempel med status Borttagen, med Kontrollera + hämta upp i kontrollrundan eller med Ta bort-knappen. Är stationen redan betald framåt kommer ett förtydligande först:
+        </p>
+        <Punkter
+          items={[
+            <>Du ser att stationen är <B>betald till och med</B> ett datum, oftast dagen före avtalets nästa periodstart.</>,
+            'Kunden får ingen återbetalning om den tas bort nu, och den faktureras inte längre från nästa period.',
+            'Låt den stå kvar om kunden inte uttryckligen vill ta bort den. Kunden har redan betalat för den.',
+            <>Vill kunden ändå ta bort den trycker du en gång till. Knappen heter då <B>Klicka igen för att ta bort</B>.</>,
+            'Är stationen inte fakturerad än står det Inte fakturerad än. Tas den bort räknas den inte med.',
+          ]}
+        />
+      </>
     ),
+    screens: <SkarmBorttagVarning />,
   },
 ]

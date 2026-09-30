@@ -37,6 +37,7 @@ import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { FloorPlanUploadForm } from '../shared/indoor/FloorPlanUploadForm'
 import { IndoorStationForm, StationTypeSelector } from '../shared/indoor/IndoorStationForm'
+import { isGuardedAddonStation } from '../../hooks/useAddonRemovalGuard'
 import { EquipmentPlacementForm, type FormData as EquipmentFormData } from '../shared/equipment/EquipmentPlacementForm'
 import { StationLegend } from '../shared/indoor/IndoorStationMarker'
 import { EquipmentPlacementWithRelations, EQUIPMENT_TYPE_CONFIG, EQUIPMENT_STATUS_CONFIG } from '../../types/database'
@@ -1039,7 +1040,7 @@ export function CustomerStationsModal({
                                 toast.error('Stationen ingår i avtalet och kan inte tas bort. Kontakta kontoret.')
                                 return
                               }
-                              if (!confirm('Är du säker på att du vill ta bort denna station?')) return
+                              if (!isGuardedAddonStation(selectedIndoorStation) && !confirm('Är du säker på att du vill ta bort denna station?')) return
                               try {
                                 await IndoorStationService.deleteStation(selectedIndoorStation.id)
                                 toast.success('Station borttagen')
@@ -1067,7 +1068,7 @@ export function CustomerStationsModal({
                               toast.error('Stationen ingår i avtalet och kan inte tas bort. Kontakta kontoret.')
                               return
                             }
-                            if (!confirm('Är du säker på att du vill ta bort denna station?')) return
+                            if (!isGuardedAddonStation(selectedIndoorStation) && !confirm('Är du säker på att du vill ta bort denna station?')) return
                             try {
                               await IndoorStationService.deleteStation(selectedIndoorStation.id)
                               toast.success('Station borttagen')

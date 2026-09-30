@@ -18,6 +18,7 @@ const ROLLKORT: Record<TillaggRole, { vem: string; gor: string[] }> = {
       'Väljer per år, per månad eller per kontroll, och vilken produkt som sattes ut.',
       'Svarar på frågan om arbetstid i timmar per år när ärendet avslutas.',
       'Stänger ärendet med Färdig med etablering.',
+      'Kan ta bort tilläggsstationer hos kunden. Är stationen redan betald framåt kommer en varning först.',
     ],
   },
   fakturering: {
@@ -84,15 +85,15 @@ export default function TillaggRoller() {
                   const idx = s.roles.indexOf(r)
                   return (
                     <td key={r} className="py-2 px-2 text-center">
-                      {idx >= 0 ? (
-                        <span
-                          className={`inline-block rounded-full ${ROLE_CONFIG[r].dot} ${idx === 0 ? 'w-3 h-3' : 'w-2 h-2 opacity-60'}`}
-                          title={idx === 0 ? 'Gör steget' : 'Är med'}
-                        />
-                      ) : (
-                        <span className="text-slate-700" aria-hidden>·</span>
+                      {idx >= 0 && (
+                        <>
+                          <span
+                            className={`inline-block rounded-full ${ROLE_CONFIG[r].dot} ${idx === 0 ? 'w-3 h-3' : 'w-2 h-2 opacity-60'}`}
+                            title={idx === 0 ? 'Gör steget' : 'Är med'}
+                          />
+                          <span className="sr-only">{idx === 0 ? 'Gör steget' : 'Är med'}</span>
+                        </>
                       )}
-                      <span className="sr-only">{idx === 0 ? 'Gör steget' : idx > 0 ? 'Är med' : 'Inte med'}</span>
                     </td>
                   )
                 })}

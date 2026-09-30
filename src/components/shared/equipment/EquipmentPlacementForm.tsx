@@ -12,6 +12,8 @@ import {
   requiresSerialNumber
 } from '../../../types/database'
 import { useGpsLocation } from '../../../hooks/useGpsLocation'
+import { useAddonRemovalGuard } from '../../../hooks/useAddonRemovalGuard'
+import AddonRemovalNotice from './AddonRemovalNotice'
 import { MapLocationPicker, type ExistingStation } from './MapLocationPicker'
 import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
@@ -440,10 +442,16 @@ export function EquipmentPlacementForm({
     return Object.keys(newErrors).length === 0
   }
 
+  // Varning när en tilläggsstation som redan är betald framåt sätts till Borttagen
+  const removalGuard = useAddonRemovalGuard(
+    existingEquipment ? { ...existingEquipment, indoor: false } : null,
+    isEditing && formData.status === 'removed' && existingEquipment?.status !== 'removed'
+  )
+
   // Hantera formulärsubmit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (validateForm()) {
+    if (validateForm() && removalGuard.confirm()) {
       onSubmit(formData)
     }
   }
@@ -1052,6 +1060,7 @@ export function EquipmentPlacementForm({
               }
             )}
           </div>
+          <AddonRemovalNotice guard={removalGuard} className="mt-3" />
         </div>
       )}
 
@@ -1155,7 +1164,7 @@ export function EquipmentPlacementForm({
           ) : (
             <>
               <Check className="w-5 h-5" />
-              {isEditing ? 'Spara ändringar' : 'Skapa placering'}
+              {removalGuard.label(isEditing ? 'Spara ändringar' : 'Skapa placering')}
             </>
           )}
         </motion.button>

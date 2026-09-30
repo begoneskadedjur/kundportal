@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.20.0',
+    date: '2026-09-30',
+    title: 'Varning när en betald tilläggsstation tas bort',
+    items: [
+      { kind: 'nyhet', text: 'Tar du bort en tilläggsstation som kunden redan har betalat för visas vilket datum den är betald till och med, att kunden inte får något tillbaka och att den inte faktureras från nästa period. Klicka igen för att ta bort den ändå.' },
+      { kind: 'nyhet', text: 'Är tilläggsstationen inte fakturerad än står det i stället att den inte räknas med om den tas bort.' },
+      { kind: 'andring', text: 'Guiden Tilläggsstationer beskriver varningen vid borttag, har en ny fråga om varför fakturan skapas innan tilläggen är beslutade och en luftigare tabell över vem som gör vad.' },
+    ],
+  },
+  {
     version: '3.19.0',
     date: '2026-09-30',
     title: 'Ny guide om tilläggsstationer',

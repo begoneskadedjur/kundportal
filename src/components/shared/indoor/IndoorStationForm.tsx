@@ -9,6 +9,8 @@ import {
   type StationTypeArticle,
 } from '../../../types/addonStations'
 import { AddonStationBillingService } from '../../../services/addonStationBillingService'
+import { useAddonRemovalGuard } from '../../../hooks/useAddonRemovalGuard'
+import AddonRemovalNotice from '../equipment/AddonRemovalNotice'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn, FlaskConical, Check } from 'lucide-react'
 import ImageLightbox from '../ImageLightbox'
@@ -98,6 +100,14 @@ export function IndoorStationForm({
   const [locationDescription, setLocationDescription] = useState(existingStation?.location_description || '')
   const [status, setStatus] = useState<IndoorStationStatus>(existingStation?.status || 'active')
   const [comment, setComment] = useState(existingStation?.comment || '')
+  // Tilläggsstation som redan är betald framåt: förtydligande och två klick,
+  // både när status sätts till Borttagen och vid Ta bort-knappen
+  const guardStation = existingStation ? { ...existingStation, indoor: true } : null
+  const removalGuard = useAddonRemovalGuard(
+    guardStation,
+    status === 'removed' && existingStation?.status !== 'removed'
+  )
+  const deleteGuard = useAddonRemovalGuard(guardStation)
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(existingStation?.photo_url || null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -284,6 +294,8 @@ export function IndoorStationForm({
       setError(`Serienummer krävs för ${config.label}`)
       return
     }
+
+    if (!removalGuard.confirm()) return
 
     try {
       if (isEditing) {
@@ -555,6 +567,7 @@ export function IndoorStationForm({
               }
             )}
           </div>
+          <AddonRemovalNotice guard={removalGuard} className="mt-3" />
         </div>
       )}
 
@@ -719,16 +732,23 @@ export function IndoorStationForm({
         </div>
       )}
 
+      {/* Förtydligande vid Ta bort-knappen */}
+      {onDelete && isEditing && <AddonRemovalNotice guard={deleteGuard} />}
+
       {/* Actions */}
       <div className="flex gap-3 pt-2">
         {onDelete && isEditing && (
           <button
             type="button"
-            onClick={onDelete}
+            onClick={() => {
+              if (!deleteGuard.confirm()) return
+              onDelete()
+            }}
             disabled={isSubmitting}
-            className="py-2.5 px-4 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors disabled:opacity-50"
+            className="py-2.5 px-4 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
           >
             <Trash2 className="w-4 h-4" />
+            {deleteGuard.armed && <span>{deleteGuard.label('')}</span>}
           </button>
         )}
         <button
@@ -750,7 +770,7 @@ export function IndoorStationForm({
               Sparar...
             </>
           ) : (
-            isEditing ? 'Spara ändringar' : 'Lägg till station'
+            removalGuard.label(isEditing ? 'Spara ändringar' : 'Lägg till station')
           )}
         </button>
       </div>

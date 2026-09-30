@@ -163,3 +163,23 @@ export interface AddonUnitDecisionInfo {
 export function hasNewAddons(summary: AddonCompletionSummary | null | undefined): boolean {
   return !!summary?.ok && !!summary.contract_id && summary.types.some((t) => t.new > 0)
 }
+
+/**
+ * Hur långt fram en tilläggsstation redan är fakturerad (RPC
+ * addon_station_paid_through). Används av varningen vid borttag.
+ * applies = false för per kontroll, stationer inbakade i premien och
+ * stationer som inte är tillägg.
+ */
+export interface AddonPaidThrough {
+  applies: boolean
+  model: string | null
+  /** ÅÅÅÅ-MM-DD, sista dagen som redan är fakturerad */
+  paid_through?: string | null
+  /** ÅÅÅÅ-MM-DD, dagen då stationen annars hade fakturerats igen */
+  next_billing_from?: string | null
+  source?: 'prorata' | 'invoice' | null
+  /** Ärendenummer eller fakturanummer som täcker perioden */
+  reference?: string | null
+  /** Pro rata-raden väntar fortfarande på ett öppet ärende */
+  not_billed_yet?: boolean
+}

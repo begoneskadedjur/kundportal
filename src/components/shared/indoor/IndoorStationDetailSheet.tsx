@@ -2,6 +2,8 @@
 // Bottom-sheet med stationsdetaljer och åtgärder
 
 import { useState, useEffect } from 'react'
+import { useAddonRemovalGuard } from '../../../hooks/useAddonRemovalGuard'
+import AddonRemovalNotice from '../equipment/AddonRemovalNotice'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import {
@@ -58,6 +60,8 @@ export function IndoorStationDetailSheet({
   onDelete,
   onRegisterInspection
 }: IndoorStationDetailSheetProps) {
+  // Tilläggsstation som redan är betald framåt: två klick och ett förtydligande
+  const removalGuard = useAddonRemovalGuard({ ...station, indoor: true })
   const [showAllInspections, setShowAllInspections] = useState(false)
   const [showLightbox, setShowLightbox] = useState(false)
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
@@ -269,13 +273,18 @@ export function IndoorStationDetailSheet({
           )}
           {onDelete && (
             <button
-              onClick={onDelete}
-              className="py-2.5 px-4 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-xl transition-colors"
+              onClick={() => {
+                if (!removalGuard.confirm()) return
+                onDelete()
+              }}
+              className="py-2.5 px-4 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
             >
               <Trash2 className="w-4 h-4" />
+              {removalGuard.armed && <span>{removalGuard.label('')}</span>}
             </button>
           )}
         </div>
+        {onDelete && <AddonRemovalNotice guard={removalGuard} />}
       </div>
     </div>
     {photoUrl && (

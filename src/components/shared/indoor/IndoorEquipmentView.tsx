@@ -11,6 +11,7 @@ import { FloorPlanUploadForm } from './FloorPlanUploadForm'
 import { IndoorStationForm, StationTypeSelector } from './IndoorStationForm'
 import { AddonStationBillingService } from '../../../services/addonStationBillingService'
 import type { AddonPrices } from '../../../types/addonStations'
+import { isGuardedAddonStation } from '../../../hooks/useAddonRemovalGuard'
 import { IndoorStationDetailSheet, IndoorStationCard } from './IndoorStationDetailSheet'
 import { StationLegend } from './IndoorStationMarker'
 
@@ -236,7 +237,7 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
   const handleDeleteStation = async () => {
     if (!selectedStation) return
 
-    if (!confirm('Är du säker på att du vill ta bort denna station?')) return
+    if (!isGuardedAddonStation(selectedStation) && !confirm('Är du säker på att du vill ta bort denna station?')) return
 
     setIsSubmitting(true)
     try {

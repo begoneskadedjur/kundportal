@@ -24,6 +24,7 @@ import type { CaseBillingItemWithRelations } from '../types/caseBilling'
 import type {
   AddonBillingModel,
   AddonCompletionSummary,
+  AddonPaidThrough,
   AddonPriceMissing,
   AddonPrices,
   AddonUnitDecisionInfo,
@@ -290,6 +291,23 @@ export class AddonStationBillingService {
       pending_equipment_cost: Number(d.pending_equipment_cost ?? 0),
       pending_articles: (d.pending_articles ?? []).map((a) => ({ ...a, quantity: Number(a.quantity), cost: Number(a.cost) })),
     }
+  }
+
+  /**
+   * Hur långt fram en tilläggsstation redan är fakturerad. Används av
+   * varningen vid borttag. SECURITY DEFINER-RPC: fungerar för tekniker.
+   * Null vid fel (varningen visas då inte, borttaget blockeras aldrig).
+   */
+  static async getPaidThrough(stationId: string, indoor: boolean): Promise<AddonPaidThrough | null> {
+    const { data, error } = await supabase.rpc('addon_station_paid_through', {
+      p_station_id: stationId,
+      p_indoor: indoor,
+    })
+    if (error) {
+      console.warn('[AddonStationBilling] addon_station_paid_through fel:', error)
+      return null
+    }
+    return (data as AddonPaidThrough | null) ?? null
   }
 
   /** Synk efter utsättning/borttag beroende på stationens modell. */

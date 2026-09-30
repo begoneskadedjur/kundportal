@@ -380,3 +380,52 @@ export function SkarmPlaneradeFakturor() {
     </MiniScreen>
   )
 }
+
+/** Dagen före ett ÅÅÅÅ-MM-DD-datum, i lokal tid */
+function dagenFore(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`)
+  d.setDate(d.getDate() - 1)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+/** Steg 8: varningen när en betald tilläggsstation tas bort */
+export function SkarmBorttagVarning() {
+  const betaldTill = dagenFore(EXEMPEL.periodStart)
+  return (
+    <MiniScreen
+      where="Utrustning › Redigera station › Status Borttagen"
+      caption="Samma förtydligande kommer vid Kontrollera + hämta upp och vid Ta bort-knappen."
+    >
+      <div className="space-y-2.5 text-xs">
+        <div>
+          <p className="font-medium text-slate-300 mb-1">Status</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {['Aktiv', 'Borttagen', 'Försvunnen'].map((s) => (
+              <span
+                key={s}
+                className={`px-2 py-1.5 rounded-lg border text-center ${s === 'Borttagen' ? 'border-slate-400 bg-slate-500/10 text-white font-medium' : 'border-slate-700 text-slate-400'}`}
+              >
+                {s}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="mt-1 w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" aria-hidden />
+          <div className="min-w-0 leading-relaxed">
+            <p className="font-medium text-amber-400">Betald till och med {betaldTill}</p>
+            <p className="text-slate-300 mt-0.5">
+              Kunden får ingen återbetalning om den tas bort nu, och den faktureras inte längre från {EXEMPEL.periodStart}. Behåll den om kunden inte uttryckligen vill ta bort den.
+            </p>
+            <p className="text-slate-400 mt-1">Klicka igen för att ta bort ändå.</p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <span className="px-3 py-1 rounded-lg text-slate-300">Avbryt</span>
+          <span className="px-3 py-1 rounded-lg bg-[#20c58f] text-[#fff] font-semibold">Klicka igen för att ta bort</span>
+        </div>
+      </div>
+    </MiniScreen>
+  )
+}

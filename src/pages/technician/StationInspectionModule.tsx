@@ -93,6 +93,8 @@ import type { InspectionStatus } from '../../types/indoor'
 import { INSPECTION_STATUS_CONFIG, calculateInspectionStatus } from '../../types/indoor'
 import type { EquipmentPlacementWithRelations } from '../../types/database'
 import type { IndoorStationWithRelations } from '../../types/indoor'
+import { useAddonRemovalGuard } from '../../hooks/useAddonRemovalGuard'
+import AddonRemovalNotice from '../../components/shared/equipment/AddonRemovalNotice'
 
 // Hjälpfunktion för att bestämma färg baserat på mätvärde och tröskelvärden
 // direction: 'above' = värden över tröskel är dåliga (standard för förbrukning)
@@ -206,6 +208,14 @@ export default function StationInspectionModule() {
   useEffect(() => {
     setPickUpAfterSave(false)
   }, [selectedStationId])
+  // Tilläggsstation per år/månad som redan är betald framåt: förtydligande
+  // under kryssrutan och två klick på Spara när den ska hämtas upp
+  const pickupGuard = useAddonRemovalGuard(
+    selectedStation
+      ? { ...selectedStation, indoor: !outdoorStations.some(s => s.id === selectedStation.id) }
+      : null,
+    pickUpAfterSave
+  )
   // Upphämtade tilläggsstationer i denna runda (för auto-arbetsrapporten)
   const [pickedUpCount, setPickedUpCount] = useState(0)
   // Senast använda preparat i rundan — fallback-förval för nästa station
@@ -1064,6 +1074,7 @@ export default function StationInspectionModule() {
   const handleSaveInspection = async () => {
     if (!session || !selectedStation) return
     if (session.status === 'completed') return
+    if (!pickupGuard.confirm()) return
 
     try {
       setIsSubmitting(true)
@@ -2635,7 +2646,7 @@ export default function StationInspectionModule() {
                       loading={isSubmitting}
                     >
                       <Check className="w-4 h-4 mr-1" />
-                      Spara
+                      {pickupGuard.label('Spara')}
                     </Button>
                   )}
                 </div>
@@ -2934,6 +2945,7 @@ export default function StationInspectionModule() {
                   </span>
                 </label>
               )}
+              {pickUpAfterSave && <AddonRemovalNotice guard={pickupGuard} className="mt-3" />}
 
               </div>{/* Slut på scrollbart innehåll */}
             </motion.div>

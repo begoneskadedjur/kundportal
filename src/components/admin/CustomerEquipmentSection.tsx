@@ -11,6 +11,8 @@ import {
 } from '../../types/database'
 import { EquipmentService } from '../../services/equipmentService'
 import { EquipmentMap, EquipmentList } from '../shared/equipment'
+import AddonRemovalNotice from '../shared/equipment/AddonRemovalNotice'
+import { useAddonRemovalGuard } from '../../hooks/useAddonRemovalGuard'
 import {
   MapPin,
   List,
@@ -71,6 +73,10 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
     }
   }, [customerId])
 
+  // Tilläggsstation som redan är betald framåt: förtydligande och två klick
+  const deleteTarget = deleteConfirm ? equipment.find((e) => e.id === deleteConfirm) : undefined
+  const removalGuard = useAddonRemovalGuard(deleteTarget ? { ...deleteTarget, indoor: false } : null, !!deleteConfirm)
+
   // Ta bort utrustning
   const handleDeleteEquipment = async (equipment: EquipmentPlacementWithRelations) => {
     setDeleteConfirm(equipment.id)
@@ -78,6 +84,7 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return
+    if (!removalGuard.confirm()) return
 
     try {
       const result = await EquipmentService.deleteEquipment(deleteConfirm)
@@ -288,6 +295,8 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
                 </div>
               </div>
 
+              <AddonRemovalNotice guard={removalGuard} className="mb-4" />
+
               <div className="flex gap-3">
                 <button
                   onClick={() => setDeleteConfirm(null)}
@@ -299,7 +308,7 @@ export function CustomerEquipmentSection({ customerId, customerName }: CustomerE
                   onClick={confirmDelete}
                   className="flex-1 px-4 py-3 bg-red-500 rounded-lg text-[#fff] font-medium hover:bg-red-600 transition-colors"
                 >
-                  Ta bort
+                  {removalGuard.label('Ta bort')}
                 </button>
               </div>
             </motion.div>

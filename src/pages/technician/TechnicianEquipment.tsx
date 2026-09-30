@@ -48,6 +48,8 @@ import type { AddonBillingModel, AddonPrices } from '../../types/addonStations'
 import { hasNewAddons } from '../../types/addonStations'
 import { useAddonLabourStep } from '../../hooks/useAddonLabourStep'
 import AddonLabourStep from '../../components/technician/AddonLabourStep'
+import AddonRemovalNotice from '../../components/shared/equipment/AddonRemovalNotice'
+import { useAddonRemovalGuard } from '../../hooks/useAddonRemovalGuard'
 import { PriceListService } from '../../services/priceListService'
 import { toLocalISOStringWithOffset } from '../../utils/dateHelpers'
 
@@ -227,6 +229,11 @@ export default function TechnicianEquipment() {
     equipment: EquipmentPlacementWithRelations
   } | null>(null)
   const [deleteType, setDeleteType] = useState<'removed' | 'missing' | 'damaged' | 'permanent'>('removed')
+  // Varning när en tilläggsstation som redan är betald framåt tas bort
+  const removalGuard = useAddonRemovalGuard(
+    deleteConfirm ? { ...deleteConfirm.equipment, indoor: false } : null,
+    deleteType === 'removed' || deleteType === 'permanent'
+  )
 
   const customerParamHandled = useRef(false)
 
@@ -620,6 +627,7 @@ export default function TechnicianEquipment() {
 
   const confirmDelete = async () => {
     if (!deleteConfirm) return
+    if (!removalGuard.confirm()) return
 
     try {
       if (deleteType === 'permanent') {
@@ -1643,6 +1651,8 @@ export default function TechnicianEquipment() {
                   )}
                 </div>
 
+                <AddonRemovalNotice guard={removalGuard} className="mb-4" />
+
                 <div className="flex gap-3">
                   <button
                     onClick={() => setDeleteConfirm(null)}
@@ -1662,7 +1672,7 @@ export default function TechnicianEquipment() {
                             : 'bg-slate-500 hover:bg-slate-600'
                     }`}
                   >
-                    {deleteType === 'permanent' ? 'Radera' : 'Bekräfta'}
+                    {removalGuard.label(deleteType === 'permanent' ? 'Radera' : 'Bekräfta')}
                   </button>
                 </div>
               </motion.div>
