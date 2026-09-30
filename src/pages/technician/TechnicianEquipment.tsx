@@ -8,8 +8,7 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   EquipmentPlacementWithRelations,
-  EquipmentType,
-  getEquipmentTypeLabel
+  EquipmentType
 } from '../../types/database'
 import { EquipmentService, CustomerStationSummary } from '../../services/equipmentService'
 import type { StationScope } from '../../services/equipmentService'
@@ -24,7 +23,6 @@ import {
   Loader2,
   RefreshCw,
   X,
-  AlertCircle,
   Check,
   Wrench,
   Home
@@ -48,8 +46,6 @@ import type { AddonBillingModel, AddonPrices } from '../../types/addonStations'
 import { hasNewAddons } from '../../types/addonStations'
 import { useAddonLabourStep } from '../../hooks/useAddonLabourStep'
 import AddonLabourStep from '../../components/technician/AddonLabourStep'
-import AddonRemovalNotice from '../../components/shared/equipment/AddonRemovalNotice'
-import { useAddonRemovalGuard } from '../../hooks/useAddonRemovalGuard'
 import { PriceListService } from '../../services/priceListService'
 import { toLocalISOStringWithOffset } from '../../utils/dateHelpers'
 
@@ -222,18 +218,6 @@ export default function TechnicianEquipment() {
     caseId: establishmentSummary?.caseId ?? null,
     enabled: !!establishmentSummary,
   })
-
-  // Borttagningsdialog
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    id: string
-    equipment: EquipmentPlacementWithRelations
-  } | null>(null)
-  const [deleteType, setDeleteType] = useState<'removed' | 'missing' | 'damaged' | 'permanent'>('removed')
-  // Varning när en tilläggsstation som redan är betald framåt tas bort
-  const removalGuard = useAddonRemovalGuard(
-    deleteConfirm ? { ...deleteConfirm.equipment, indoor: false } : null,
-    deleteType === 'removed' || deleteType === 'permanent'
-  )
 
   const customerParamHandled = useRef(false)
 
@@ -613,63 +597,6 @@ export default function TechnicianEquipment() {
       toast.error(error instanceof Error ? error.message : 'Kunde inte spara utrustning')
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  // Hantera borttagning. Borttagsregler: avtalsstationer (is_addon=false) kan
-  // tekniker bara flytta eller markera försvunnen/skadad — "Borttagen" och
-  // permanent radering är förbehållet tilläggsstationer (admin har full rätt
-  // via sina egna vyer). Kontakta kontoret vid avtalsförändringar.
-  const handleDeleteEquipment = (equipment: EquipmentPlacementWithRelations) => {
-    setDeleteConfirm({ id: equipment.id, equipment })
-    setDeleteType(equipment.is_addon ? 'removed' : 'missing')
-  }
-
-  const confirmDelete = async () => {
-    if (!deleteConfirm) return
-    if (!removalGuard.confirm()) return
-
-    try {
-      if (deleteType === 'permanent') {
-        const result = await EquipmentService.deleteEquipment(deleteConfirm.id)
-        if (!result.success) {
-          throw new Error(result.error)
-        }
-        toast.success('Utrustning permanent raderad')
-      } else {
-        const statusLabels = {
-          removed: 'borttagen',
-          missing: 'försvunnen',
-          damaged: 'skadad'
-        }
-        const result = await EquipmentService.updateEquipmentStatus(
-          deleteConfirm.id,
-          deleteType,
-          technicianId
-        )
-        if (!result.success) {
-          throw new Error(result.error)
-        }
-        toast.success(`Utrustning markerad som ${statusLabels[deleteType]}`)
-      }
-
-      // Synka NER tilläggsraden på öppet etableringsärende när en
-      // tilläggsstation tas bort under pågående etablering
-      if (deleteConfirm.equipment.is_addon) {
-        await AddonStationBillingService.syncAfterStationChange(
-          deleteConfirm.equipment.customer_id,
-          deleteConfirm.equipment.addon_billing_model ?? 'per_round',
-          technicianId || null,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (profile as any)?.full_name || profile?.email || null
-        )
-      }
-
-      setDeleteConfirm(null)
-      await refreshData()
-    } catch (error) {
-      console.error('Fel vid borttagning:', error)
-      toast.error('Kunde inte uppdatera utrustning')
     }
   }
 
@@ -1502,182 +1429,6 @@ export default function TechnicianEquipment() {
               </motion.div>
             )
           })()}
-        </AnimatePresence>
-
-        {/* Bekräftelse-dialog för borttagning */}
-        <AnimatePresence>
-          {deleteConfirm && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-              onClick={() => setDeleteConfirm(null)}
-            >
-              <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.95, opacity: 0 }}
-                className="bg-slate-900 rounded-2xl border border-slate-700 w-full max-w-md p-6"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
-                    <AlertCircle className="w-6 h-6 text-red-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">
-                      Ta bort utrustning
-                    </h3>
-                    <p className="text-slate-400 text-sm">
-                      {deleteConfirm.equipment.serial_number
-                        ? `Serienr: ${deleteConfirm.equipment.serial_number}`
-                        : getEquipmentTypeLabel(deleteConfirm.equipment.equipment_type)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Val mellan statusar */}
-                <div className="space-y-2 mb-6">
-                  {/* Avtalsstationer kan inte tas bort av tekniker */}
-                  {!deleteConfirm.equipment.is_addon && (
-                    <p className="text-xs text-slate-400 px-1 pb-1">
-                      Stationen ingår i avtalet och kan bara flyttas eller markeras
-                      försvunnen/skadad. Kontakta kontoret om den ska tas bort.
-                    </p>
-                  )}
-                  {/* Borttagen — endast tilläggsstationer */}
-                  {deleteConfirm.equipment.is_addon && (
-                  <button
-                    onClick={() => setDeleteType('removed')}
-                    className={`w-full p-3 rounded-xl border text-left transition-all ${
-                      deleteType === 'removed'
-                        ? 'border-slate-400 bg-slate-500/10'
-                        : 'border-slate-700 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        deleteType === 'removed' ? 'border-slate-400' : 'border-slate-600'
-                      }`}>
-                        {deleteType === 'removed' && (
-                          <div className="w-2 h-2 rounded-full bg-slate-400" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-white text-sm">Borttagen</p>
-                        <p className="text-xs text-slate-400">Utrustning har plockats bort</p>
-                      </div>
-                    </div>
-                  </button>
-                  )}
-
-                  {/* Försvunnen */}
-                  <button
-                    onClick={() => setDeleteType('missing')}
-                    className={`w-full p-3 rounded-xl border text-left transition-all ${
-                      deleteType === 'missing'
-                        ? 'border-amber-500 bg-amber-500/10'
-                        : 'border-slate-700 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        deleteType === 'missing' ? 'border-amber-500' : 'border-slate-600'
-                      }`}>
-                        {deleteType === 'missing' && (
-                          <div className="w-2 h-2 rounded-full bg-amber-500" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-white text-sm">Försvunnen</p>
-                        <p className="text-xs text-slate-400">Kunde inte hittas på platsen</p>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Skadad */}
-                  <button
-                    onClick={() => setDeleteType('damaged')}
-                    className={`w-full p-3 rounded-xl border text-left transition-all ${
-                      deleteType === 'damaged'
-                        ? 'border-red-500 bg-red-500/10'
-                        : 'border-slate-700 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        deleteType === 'damaged' ? 'border-red-500' : 'border-slate-600'
-                      }`}>
-                        {deleteType === 'damaged' && (
-                          <div className="w-2 h-2 rounded-full bg-red-500" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-white text-sm">Skadad & ur funktion</p>
-                        <p className="text-xs text-slate-400">Trasig, behöver bytas</p>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Separator + permanent radering — endast tilläggsstationer */}
-                  {deleteConfirm.equipment.is_addon && (
-                  <>
-                  <div className="border-t border-slate-700 my-3" />
-
-                  <button
-                    onClick={() => setDeleteType('permanent')}
-                    className={`w-full p-3 rounded-xl border text-left transition-all ${
-                      deleteType === 'permanent'
-                        ? 'border-red-600 bg-red-600/10'
-                        : 'border-slate-700 hover:border-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        deleteType === 'permanent' ? 'border-red-600' : 'border-slate-600'
-                      }`}>
-                        {deleteType === 'permanent' && (
-                          <div className="w-2 h-2 rounded-full bg-red-600" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-red-400 text-sm">Radera permanent</p>
-                        <p className="text-xs text-slate-400">Tas bort helt, kan ej återställas</p>
-                      </div>
-                    </div>
-                  </button>
-                  </>
-                  )}
-                </div>
-
-                <AddonRemovalNotice guard={removalGuard} className="mb-4" />
-
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setDeleteConfirm(null)}
-                    className="flex-1 px-4 py-3 border border-slate-700 rounded-xl text-slate-300 hover:bg-slate-800 transition-colors"
-                  >
-                    Avbryt
-                  </button>
-                  <button
-                    onClick={confirmDelete}
-                    className={`flex-1 px-4 py-3 rounded-xl text-white font-medium transition-colors ${
-                      deleteType === 'permanent'
-                        ? 'bg-red-600 hover:bg-red-700'
-                        : deleteType === 'damaged'
-                          ? 'bg-red-500 hover:bg-red-600'
-                          : deleteType === 'missing'
-                            ? 'bg-amber-500 hover:bg-amber-600'
-                            : 'bg-slate-500 hover:bg-slate-600'
-                    }`}
-                  >
-                    {removalGuard.label(deleteType === 'permanent' ? 'Radera' : 'Bekräfta')}
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
         </AnimatePresence>
 
         {/* Lightbox för fullskärmsvisning av foto */}
