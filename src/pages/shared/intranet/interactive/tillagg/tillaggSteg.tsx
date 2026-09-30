@@ -128,13 +128,13 @@ export const STEG: Steg[] = [
     ),
   },
   {
-    title: 'Ärendet stängs och fakturan för Betalas nu skapas',
+    title: 'Ärendet stängs och de första månaderna faktureras',
     roles: ['systemet', 'fakturering'],
     when: 'Samtidigt som ärendet stängs',
     body: (
       <>
         <p className="text-sm leading-relaxed text-slate-300">
-          När ärendet stängs blir Betalas nu-delen fakturarader under <B>Fakturering › Merförsäljning Avtal</B>: stationerna och arbetstiden. En merförsäljningsfaktura skapas direkt, eller läggs på månadens samlingsfaktura om kunden är inställd så.
+          När ärendet stängs faktureras tiden fram till avtalets nästa periodstart, alltså det som står under Betalas nu i Ekonomi-fliken. Stationerna och arbetstiden blir fakturarader under <B>Fakturering › Merförsäljning Avtal</B>. En merförsäljningsfaktura skapas direkt, eller läggs på månadens samlingsfaktura om kunden är inställd så.
         </p>
         <Punkter
           items={[
@@ -170,7 +170,7 @@ export const STEG: Steg[] = [
             <><B>Lägg till i avtalet</B>: årspremien höjs från det datum du väljer och tillägget faktureras med avtalet. Stationerna och arbetstiden blir en del av avtalets innehåll och kostnaden läggs i § 4.</>,
           ]}
         />
-        <Obs>Utan beslut blir det aldrig någon årsdebitering. Kunden betalar då bara Betalas nu-delen, och tillägget följer inte med till nästa avtalsår.</Obs>
+        <Obs>Utan beslut blir det aldrig någon årsdebitering. Kunden betalar då bara för tiden fram till avtalets nästa periodstart, och tillägget följer inte med till nästa avtalsår.</Obs>
       </>
     ),
     screens: (
