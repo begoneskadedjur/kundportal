@@ -1,5 +1,6 @@
 // src/components/shared/equipment/EquipmentPlacementForm.tsx - Formulär för att skapa/redigera utrustning
 import { AddonModelPicker } from './AddonModelPicker'
+import { getStationIconComponent } from '../stationIcons'
 import { defaultAddonBillingModel, type AddonBillingModel, type AddonPrices } from '../../../types/addonStations'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -33,8 +34,6 @@ import {
   Crosshair,
   Box,
   Target,
-  Package,
-  Circle,
   Camera,
   Loader2,
   AlertCircle,
@@ -50,15 +49,6 @@ import {
   FlaskConical
 } from 'lucide-react'
 import ImageLightbox from '../ImageLightbox'
-
-// Ikon-mappning för dynamiska stationstyper
-const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
-  crosshair: Crosshair,
-  box: Box,
-  target: Target,
-  package: Package,
-  circle: Circle
-}
 
 // Typ för kund i dropdown
 interface CustomerOption {
@@ -621,7 +611,7 @@ export function EquipmentPlacementForm({
           // Visa dynamiska stationstyper från databasen
           <div className={`grid gap-3 ${dynamicStationTypes.length <= 3 ? 'grid-cols-3' : 'grid-cols-2'}`}>
             {dynamicStationTypes.map((stationType) => {
-              const Icon = STATION_TYPE_ICONS[stationType.icon] || LEGACY_EQUIPMENT_TYPE_ICONS[stationType.code] || Box
+              const Icon = stationType.icon ? getStationIconComponent(stationType.icon) : (LEGACY_EQUIPMENT_TYPE_ICONS[stationType.code] || Box)
               const isSelected = formData.equipment_type === stationType.code
 
               return (

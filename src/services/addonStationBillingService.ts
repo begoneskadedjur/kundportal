@@ -124,7 +124,7 @@ export class AddonStationBillingService {
   static async getStationTypeArticles(stationTypeId: string): Promise<StationTypeArticle[]> {
     const { data, error } = await supabase
       .from('station_type_articles')
-      .select('article_id, is_default, sort_order, article:articles(id, code, name, default_price)')
+      .select('article_id, is_default, sort_order, article:articles(id, code, name, default_price, icon)')
       .eq('station_type_id', stationTypeId)
       .order('sort_order')
     if (error) {
@@ -134,7 +134,7 @@ export class AddonStationBillingService {
     type Row = {
       article_id: string
       is_default: boolean
-      article: { code: string | null; name: string; default_price: number | null } | null
+      article: { code: string | null; name: string; default_price: number | null; icon: string | null } | null
     }
     return ((data ?? []) as unknown as Row[])
       .filter((r) => r.article)
@@ -144,7 +144,14 @@ export class AddonStationBillingService {
         name: r.article?.name ?? 'Produkt',
         cost: r.article?.default_price != null ? Number(r.article.default_price) : null,
         isDefault: r.is_default === true,
+        icon: r.article?.icon ?? null,
       }))
+  }
+
+  /** Produktens egen ikon (articles.icon). null = stationstypens ikon. */
+  static async setArticleIcon(articleId: string, icon: string | null): Promise<void> {
+    const { error } = await supabase.from('articles').update({ icon }).eq('id', articleId)
+    if (error) throw new Error(`Kunde inte spara produktens ikon: ${error.message}`)
   }
 
   /**

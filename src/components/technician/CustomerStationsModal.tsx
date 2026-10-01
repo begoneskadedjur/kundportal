@@ -3,6 +3,7 @@
 // Med inline inomhusplacering för att lägga till stationer direkt på planritningar
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { getStationIconComponent, resolveStationIcon } from '../shared/stationIcons'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
@@ -103,7 +104,7 @@ function getStationTypeInfo(station: any) {
     return {
       label: station.station_type_data.name,
       color: station.station_type_data.color,
-      icon: INDOOR_TYPE_ICONS[station.station_type_data.icon] || Box
+      icon: getStationIconComponent(resolveStationIcon(station.article?.icon, station.station_type_data.icon))
     }
   }
   // Fallback till legacy

@@ -2,16 +2,12 @@
 // Kort för visning av en stationstyp i admin
 
 import { useState } from 'react'
+import { getStationIconComponent } from '../../shared/stationIcons'
 import {
   Edit2,
   Trash2,
   ToggleLeft,
   ToggleRight,
-  Target,
-  Box,
-  Package,
-  Crosshair,
-  Circle,
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
@@ -26,15 +22,6 @@ import {
   CALCULATED_STATUS_CONFIG,
   generateThresholdPreview
 } from '../../../types/stationTypes'
-
-// Ikon-mappning från Lucide
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
-  target: Target,
-  box: Box,
-  package: Package,
-  crosshair: Crosshair,
-  circle: Circle
-}
 
 interface StationTypeCardProps {
   stationType: StationType
@@ -54,7 +41,7 @@ export function StationTypeCard({
   const [showThresholds, setShowThresholds] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  const Icon = ICON_MAP[stationType.icon] || Box
+  const Icon = getStationIconComponent(stationType.icon)
   const unitConfig = MEASUREMENT_UNIT_CONFIG[stationType.measurement_unit]
   const hasThresholds = stationType.threshold_warning !== null || stationType.threshold_critical !== null
   const thresholdPreview = hasThresholds ? generateThresholdPreview(stationType) : []

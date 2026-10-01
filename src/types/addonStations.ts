@@ -62,6 +62,8 @@ export interface StationTypeArticle {
   /** Inköpspris, visas bara internt */
   cost: number | null
   isDefault: boolean
+  /** Produktens egen ikon (articles.icon). null = stationstypens ikon */
+  icon?: string | null
 }
 
 export function addonBillingModelLabel(model: AddonBillingModel | null | undefined): string {

@@ -2,6 +2,7 @@
 // Expanderbar kundrad med stationsdetaljer
 
 import { useState, useEffect } from 'react'
+import { getStationIconComponent, resolveStationIcon } from '../shared/stationIcons'
 import { motion, AnimatePresence } from 'framer-motion'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -56,7 +57,7 @@ function getStationTypeInfo(station: any) {
     return {
       label: station.station_type_data.name,
       color: station.station_type_data.color,
-      icon: INDOOR_TYPE_ICONS[station.station_type_data.icon] || Box
+      icon: getStationIconComponent(resolveStationIcon(station.article?.icon, station.station_type_data.icon))
     }
   }
   // Fallback till legacy

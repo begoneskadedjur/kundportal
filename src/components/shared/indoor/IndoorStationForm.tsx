@@ -2,6 +2,7 @@
 // Formulär för att skapa/redigera inomhusstationer
 
 import { AddonModelPicker } from '../equipment/AddonModelPicker'
+import { getStationIconComponent } from '../stationIcons'
 import {
   defaultAddonBillingModel,
   type AddonBillingModel,
@@ -12,7 +13,7 @@ import { AddonStationBillingService } from '../../../services/addonStationBillin
 import { useAddonRemovalGuard, useAddonPaidLock } from '../../../hooks/useAddonRemovalGuard'
 import AddonRemovalNotice, { AddonPaidLockNotice } from '../equipment/AddonRemovalNotice'
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn, FlaskConical, Check } from 'lucide-react'
+import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn, FlaskConical, Check } from 'lucide-react'
 import ImageLightbox from '../ImageLightbox'
 import { format } from 'date-fns'
 import { sv } from 'date-fns/locale'
@@ -37,15 +38,6 @@ import { CasePreparationService } from '../../../services/casePreparationService
 import type { Preparation } from '../../../types/preparations'
 import type { PreparationUnit } from '../../../types/casePreparations'
 import { PREPARATION_UNIT_CONFIG } from '../../../types/casePreparations'
-
-// Ikon-mappning för stationstyper från DB
-const STATION_TYPE_ICONS: Record<string, React.ElementType> = {
-  target: Target,
-  box: Box,
-  package: Package,
-  crosshair: Crosshair,
-  circle: Circle
-}
 
 interface IndoorStationFormProps {
   floorPlanId: string
@@ -419,7 +411,7 @@ export function IndoorStationForm({
                 const typeName = 'name' in typeItem ? typeItem.name : typeItem
                 const typeColor = 'color' in typeItem ? typeItem.color : '#6b7280'
                 const typeIcon = 'icon' in typeItem ? typeItem.icon : 'box'
-                const Icon = STATION_TYPE_ICONS[typeIcon] || Box
+                const Icon = getStationIconComponent(typeIcon)
 
                 return (
                   <button
@@ -895,7 +887,7 @@ export function StationTypeSelector({
       <p className="text-sm text-slate-400">Välj vilken typ av station du vill placera</p>
       <div className="flex flex-col gap-2 pt-2">
         {typesToShow.map((stationType) => {
-          const Icon = STATION_TYPE_ICONS[stationType.icon] || Box
+          const Icon = getStationIconComponent(stationType.icon)
           const isSelected = selectedType === stationType.code
 
           return (

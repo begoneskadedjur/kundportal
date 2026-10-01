@@ -262,6 +262,8 @@ export interface IndoorStationWithRelations extends IndoorStation {
     id: string;
     name: string;
   };
+  /** Produktens ikon (articles.icon), går före stationstypens */
+  article?: { icon: string | null } | null;
   station_type_data?: {
     id: string;
     code: string;

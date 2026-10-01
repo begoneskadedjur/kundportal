@@ -34,6 +34,7 @@ export class IndoorStationService {
         .select(`
           *,
           technician:technicians!placed_by_technician_id(id, name),
+          article:articles!article_id(icon),
           station_type_data:station_types!station_type_id(
             id,
             code,
@@ -164,6 +165,7 @@ export class IndoorStationService {
           *,
           floor_plan:floor_plans!floor_plan_id(*),
           technician:technicians!placed_by_technician_id(id, name),
+          article:articles!article_id(icon),
           station_type_data:station_types!station_type_id(
             id,
             code,

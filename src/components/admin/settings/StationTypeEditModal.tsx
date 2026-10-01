@@ -6,11 +6,6 @@ import { motion } from 'framer-motion'
 import {
   X,
   Save,
-  Target,
-  Box,
-  Package,
-  Crosshair,
-  Circle,
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
@@ -27,6 +22,7 @@ import { AddonStationBillingService } from '../../../services/addonStationBillin
 import { ArticleService } from '../../../services/articleService'
 import type { Article } from '../../../types/articles'
 import type { StationTypeArticle } from '../../../types/addonStations'
+import { StationIconPicker, ProductIconPicker } from '../../shared/StationIconPicker'
 import {
   StationType,
   CreateStationTypeInput,
@@ -60,14 +56,6 @@ const COLOR_OPTIONS = [
   { value: '#06b6d4', label: 'Cyan' }
 ]
 
-// Tillgängliga ikoner
-const ICON_OPTIONS = [
-  { value: 'target', label: 'Måltavla', icon: Target },
-  { value: 'box', label: 'Låda', icon: Box },
-  { value: 'package', label: 'Paket', icon: Package },
-  { value: 'crosshair', label: 'Sikte', icon: Crosshair },
-  { value: 'circle', label: 'Cirkel', icon: Circle }
-]
 
 interface StationTypeEditModalProps {
   stationType: StationType | null
@@ -106,6 +94,8 @@ export function StationTypeEditModal({
   const [articlesLoading, setArticlesLoading] = useState(false)
   const [allArticles, setAllArticles] = useState<Article[]>([])
   const [articleSearch, setArticleSearch] = useState('')
+  // Ändrade produktikoner (articles.icon), sparas tillsammans med typen
+  const [iconChanges, setIconChanges] = useState<Record<string, string | null>>({})
 
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -115,6 +105,7 @@ export function StationTypeEditModal({
     let cancelled = false
     setArticleSearch('')
     setArticlesDirty(false)
+    setIconChanges({})
     setTypeArticles([])
     ArticleService.getActiveArticles()
       .then(list => { if (!cancelled) setAllArticles(list) })
@@ -141,9 +132,14 @@ export function StationTypeEditModal({
     if (typeArticles.some(a => a.articleId === article.id)) return
     updateTypeArticles([
       ...typeArticles,
-      { articleId: article.id, code: article.code, name: article.name, cost: article.default_price, isDefault: false }
+      { articleId: article.id, code: article.code, name: article.name, cost: article.default_price, isDefault: false, icon: article.icon ?? null }
     ])
     setArticleSearch('')
+  }
+
+  const changeArticleIcon = (articleId: string, next: string | null) => {
+    setTypeArticles(prev => prev.map(a => (a.articleId === articleId ? { ...a, icon: next } : a)))
+    setIconChanges(prev => ({ ...prev, [articleId]: next }))
   }
 
   const removeArticle = (articleId: string) => {
@@ -306,6 +302,10 @@ export function StationTypeEditModal({
 
       if (articlesDirty) {
         await AddonStationBillingService.setStationTypeArticles(stationTypeId, typeArticles)
+      }
+      const inList = new Set(typeArticles.map(a => a.articleId))
+      for (const [articleId, articleIcon] of Object.entries(iconChanges)) {
+        if (inList.has(articleId)) await AddonStationBillingService.setArticleIcon(articleId, articleIcon)
       }
 
       toast.success(isEditing ? 'Stationstyp uppdaterad' : 'Stationstyp skapad')
@@ -486,22 +486,7 @@ export function StationTypeEditModal({
                   Ikon
                   <FieldTooltip content="Ikonen som visas för stationstypen i gränssnittet. Välj en ikon som representerar stationstypen visuellt." />
                 </label>
-                <div className="flex flex-wrap gap-2">
-                  {ICON_OPTIONS.map((i) => (
-                    <button
-                      key={i.value}
-                      onClick={() => setIcon(i.value)}
-                      className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
-                        icon === i.value
-                          ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400'
-                          : 'bg-slate-700 border border-slate-600 text-slate-400 hover:border-slate-500'
-                      }`}
-                      title={i.label}
-                    >
-                      <i.icon className="w-5 h-5" />
-                    </button>
-                  ))}
-                </div>
+                <StationIconPicker value={icon} onChange={setIcon} />
               </div>
             </div>
 
@@ -535,6 +520,7 @@ export function StationTypeEditModal({
                   <p className="font-medium mb-1">Produkter vid utplacering</p>
                   <p>Artiklarna teknikern väljer mellan när en station av den här typen placeras ut. Förvalet väljs automatiskt.</p>
                   <p className="mt-2 text-slate-400">Artiklarna hämtas från artikelregistret. Inköpspriset blir utrustningskostnaden i marginalen.</p>
+                  <p className="mt-2 text-slate-400">Ikonknappen på raden ger produkten en egen ikon. Den gäller produkten överallt och visas i stället för stationstypens ikon på stationer med produkten.</p>
                 </div>
               } />
             </div>
@@ -568,6 +554,11 @@ export function StationTypeEditModal({
                       </span>
                     </label>
                     <div className="flex items-center gap-1 shrink-0">
+                      <ProductIconPicker
+                        value={a.icon ?? null}
+                        typeIcon={icon}
+                        onChange={(next) => changeArticleIcon(a.articleId, next)}
+                      />
                       <button
                         type="button"
                         onClick={() => moveArticle(i, -1)}

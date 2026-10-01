@@ -80,6 +80,8 @@ export interface Article {
   is_dosage_product: boolean
   /** Står kvar hos kunden i flera år (fällor, stationer): engångskostnad i marginalen, inte löpande */
   is_durable: boolean
+  /** Ikon för stationer med produkten (stationIcons.tsx). null = stationstypens ikon */
+  icon?: string | null
   dosage_unit: DosageUnit | null
   total_content: number | null
   created_at: string
