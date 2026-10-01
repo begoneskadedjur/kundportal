@@ -6,7 +6,8 @@
 // Datat kommer från useInvoiceAddons, matten från src/shared/addonEconomics.
 // Ingen marginal i procent för pro rata. Punkt och text, aldrig piller.
 
-import { FileText, Layers, Wallet } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, FileText, Layers, Wallet } from 'lucide-react'
 import CaseModalSection from '../../shared/CaseModalSection'
 import AddonBillingTimeline from '../../shared/AddonBillingTimeline'
 import { formatHours, formatKr } from '../../../shared/addonEconomics'
@@ -28,6 +29,14 @@ function formula(line: InvoiceAddonLine): string {
 export function InvoiceAddonBlock({ addons, priceOk }: { addons: InvoiceAddons; priceOk: boolean }) {
   const stations = addons.lines.filter((l) => l.kind === 'station')
   const labour = addons.lines.find((l) => l.kind === 'labour') ?? null
+  // Hopfällt som standard: en rad räcker för den som fakturerar, uträkningen
+  // fälls ut vid behov
+  const [open, setOpen] = useState(false)
+  const summary = [
+    ...stations.map((l) => `${addonTypeName(l.row.service_name || l.row.article_name)} ${formatHours(l.timeline.quantityNow)} st`),
+    ...(labour ? [`arbetstid ${formatHours(Number(labour.row.addon_labour_hours ?? 0))} h per år`] : []),
+  ].join(', ')
+  const firstTimeline = (stations[0] ?? labour)?.timeline ?? null
   return (
     <CaseModalSection
       icon={Layers}
@@ -39,7 +48,25 @@ export function InvoiceAddonBlock({ addons, priceOk }: { addons: InvoiceAddons; 
         </span>
       ) : undefined}
     >
-      <div className="space-y-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-3 text-left text-sm text-slate-300 hover:text-white transition-colors"
+      >
+        <span className="min-w-0">
+          {summary}
+          {firstTimeline && (
+            <span className="text-slate-400"> · {firstTimeline.days} av 365 dagar, fram till {addons.period?.nextStart ? `nästa årspremie ${addons.period.nextStart}` : 'nästa årspremie'}</span>
+          )}
+        </span>
+        <span className="flex items-center gap-1 text-xs text-slate-400 flex-shrink-0">
+          {open ? 'Dölj uträkning' : 'Visa uträkning'}
+          <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        </span>
+      </button>
+      {open && (
+      <div className="space-y-3 mt-3 pt-3 border-t border-slate-700/50">
         {stations.map((line) => {
           const t = line.timeline
           const perMonth = t.model === 'per_month'
@@ -88,6 +115,7 @@ export function InvoiceAddonBlock({ addons, priceOk }: { addons: InvoiceAddons; 
           <p className="text-xs text-slate-300 leading-relaxed">{addonInvoiceExplanation(addons.period?.nextStart ?? null)}</p>
         </div>
       </div>
+      )}
     </CaseModalSection>
   )
 }

@@ -55,6 +55,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'andring', text: 'Tilläggsraderna har perioden under namnet och arbetstiden faktureras i timmar, till exempel 2 h à 400,82 kr. Kundens faktura i Fortnox får samma period och en rad om när tilläggen faktureras nästa gång.' },
       { kind: 'andring', text: 'Sidokortet på tilläggsfakturan visar period, nästa tilläggsfaktura, avtalet och hur många stationer som väntar på beslut i avtalskartan.' },
       { kind: 'buggfix', text: 'Teknikerns namn hämtas nu alltid från teknikerregistret när en etablering stängs. Tidigare kunde e-postadressen hamna som namn på besöket och raderna, och andrateknikern kom inte med på besöket.' },
+      { kind: 'andring', text: 'Blocket Tillägg utöver avtalet på fakturan är hopfällt och visar en sammanfattning på en rad. Tryck på Visa uträkning för tidslinjen och uträkningen per station och timme.' },
     ],
   },
   {
