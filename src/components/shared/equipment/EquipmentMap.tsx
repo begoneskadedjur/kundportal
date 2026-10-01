@@ -19,6 +19,7 @@ import type { StationType } from '../../../types/stationTypes'
 import { Navigation } from 'lucide-react'
 import { EquipmentDetailSheet } from './EquipmentDetailSheet'
 import { buildStationMarkerIcon, stationMarkerSvg } from './stationMarkerIcon'
+import { stationIconPaths } from '../stationIcons'
 import { createFanOut, type FanOutEntry, type FanOutHandle } from './markerFanOut'
 
 interface EquipmentMapProps {
@@ -54,6 +55,11 @@ interface EquipmentMapProps {
   }>
   onRegionClick?: (id: string, bounds: google.maps.LatLngBounds) => void
   defaultMapType?: 'roadmap' | 'satellite' | 'hybrid'
+  /**
+   * Personalvyer: rita produktens interna ikon i cirkeln och numret i en
+   * bricka under. Av som standard, så kundvyerna ser ut som förut.
+   */
+  showProductIcons?: boolean
 }
 
 // CSS för pulsering av highlighted marker
@@ -94,6 +100,7 @@ export function EquipmentMap({
   onRegionClick,
   enableClustering = false,
   defaultMapType = 'satellite',
+  showProductIcons = false,
 }: EquipmentMapProps) {
   const { isLoaded, error: mapError } = useGoogleMaps({ libraries: ['marker', 'drawing', 'places'] })
 
@@ -397,6 +404,14 @@ export function EquipmentMap({
       // saknas eller är skadad. Fyllningen bär typ, kanten bär status.
       const showAddon = item.is_addon === true && item.status !== 'removed' && !isDimmed && !isRelocating
 
+      // Produktens interna ikon (bara personalvyer). Statussymboler går före,
+      // numret flyttar till en bricka under cirkeln.
+      const isStatusLabel = labelText !== '' && labelText !== number?.toString()
+      const productIcon = showProductIcons && !isDimmed && !isRelocating && !isStatusLabel
+        ? stationIconPaths(item.article?.icon)
+        : null
+      const markerLabelText = productIcon ? '' : labelText
+
       const marker = new google.maps.Marker({
         position: { lat: item.latitude, lng: item.longitude },
         map: enableClustering ? null : map,
@@ -407,9 +422,11 @@ export function EquipmentMap({
           stroke: isRelocating ? '#ffffff' : isDimmed ? '#cbd5e1' : strokeColor,
           strokeWeight: isRelocating ? 3 : isDimmed ? 1 : strokeWeight,
           addon: showAddon,
+          iconPaths: productIcon,
+          badge: productIcon && number !== undefined ? number.toString() : null,
         }),
-        label: isDimmed ? undefined : labelText ? {
-          text: isRelocating ? '✥' : labelText,
+        label: isDimmed ? undefined : markerLabelText ? {
+          text: isRelocating ? '✥' : markerLabelText,
           color: '#ffffff',
           fontSize: number && number >= 100 ? '9px' : isHighlighted ? '13px' : '11px',
           fontWeight: 'bold'
@@ -487,7 +504,7 @@ export function EquipmentMap({
       map.setCenter({ lat: focusItems[0].latitude, lng: focusItems[0].longitude })
       map.setZoom(DETAIL_ZOOM)
     }
-  }, [equipment, isLoaded, getEquipmentColor, inspectedStationIds, highlightedStationId, equipmentNumberMap, handleMarkerClick, relocatingStationId, enableClustering, dimmedStationIds])
+  }, [equipment, isLoaded, getEquipmentColor, inspectedStationIds, highlightedStationId, equipmentNumberMap, handleMarkerClick, relocatingStationId, enableClustering, dimmedStationIds, showProductIcons])
 
   // Panorera till highlighted station (wizard-läge)
   useEffect(() => {

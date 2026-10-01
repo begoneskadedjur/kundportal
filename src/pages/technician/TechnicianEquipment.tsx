@@ -268,7 +268,8 @@ export default function TechnicianEquipment() {
       longitude: e.longitude,
       number: i + 1,
       equipment_type: e.equipment_type,
-      color: e.station_type_data?.color || undefined
+      color: e.station_type_data?.color || undefined,
+      icon: e.article?.icon ?? null
     }))
   }, [fetchedEquipment, wizardCustomerId])
 

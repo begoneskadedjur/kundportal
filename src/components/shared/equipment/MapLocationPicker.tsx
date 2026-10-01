@@ -4,6 +4,8 @@ import { MapPin, Navigation, Search, Check, X, Crosshair, Loader2, Eye, EyeOff }
 import { motion } from 'framer-motion'
 import { searchAddresses, type GeocodeResult } from '../../../services/geocoding'
 import { useGoogleMaps } from '../../../hooks/useGoogleMaps'
+import { buildStationMarkerIcon } from './stationMarkerIcon'
+import { stationIconPaths } from '../stationIcons'
 import {
   OTHER_CUSTOMERS_MAX_MARKERS,
   distanceMeters,
@@ -24,6 +26,8 @@ export interface ExistingStation {
   equipment_type: string
   color?: string
   customerName?: string
+  /** Produktens interna ikon (articles.icon). Kartväljaren används bara av personal. */
+  icon?: string | null
 }
 
 interface MapViewport {
@@ -212,6 +216,28 @@ export function MapLocationPicker({
     existingMarkersRef.current = []
 
     existingStations.forEach(station => {
+      // Produktens ikon i cirkeln och numret i en bricka under, som på kartan
+      const iconPaths = stationIconPaths(station.icon)
+      if (iconPaths) {
+        existingMarkersRef.current.push(new google.maps.Marker({
+          position: { lat: station.latitude, lng: station.longitude },
+          map: mapRef.current!,
+          draggable: false,
+          clickable: false,
+          icon: buildStationMarkerIcon({
+            fill: station.color || '#6b7280',
+            fillOpacity: 0.9,
+            stroke: '#ffffff',
+            strokeWeight: 2,
+            radius: 14,
+            addon: false,
+            iconPaths,
+            badge: String(station.number),
+          }),
+          zIndex: 1
+        }))
+        return
+      }
       const marker = new google.maps.Marker({
         position: { lat: station.latitude, lng: station.longitude },
         map: mapRef.current!,

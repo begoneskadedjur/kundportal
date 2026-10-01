@@ -61,7 +61,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'buggfix', text: 'Byts produkten på en tilläggsstation räknas den interna kostnaden om till den nya produktens inköpspris. Tidigare låg det gamla priset kvar.' },
       { kind: 'andring', text: 'Guiden Tilläggsstationer är uppdelad per roll. Överst väljer du Tekniker, Koordinator, Faktureringsansvarig eller Admin och hamnar direkt i ditt avsnitt, med nya delar om produktval och låsta stationer.' },
       { kind: 'nyhet', text: 'Nya stationsikoner ritade efter produkterna ni använder, till exempel Rat Box, plåtstation på vägg, Chameleon, Aurotrap, A24 och avloppsfälla. Välj under Ikon i Stationer & Fällor: dagens fem knappar finns kvar och Alla ikoner fäller ned hela listan.' },
-      { kind: 'nyhet', text: 'En produkt kan få en egen ikon med ikonknappen på produktraden. Stationer med produkten visar då produktens ikon i stället för stationstypens, till exempel på planritningen.' },
+      { kind: 'nyhet', text: 'En produkt kan få en egen intern ikon med ikonknappen på produktraden. Personalen ser den i alla kartvyer, både utomhuskartan och planritningen, med stationsnumret i en liten bricka under. Kunderna ser allt som förut.' },
       { kind: 'nyhet', text: 'Handbokens guider har en innehållsförteckning även på mobilen och en knapp Innehåll som tar dig tillbaka när du har scrollat ned.' },
     ],
   },

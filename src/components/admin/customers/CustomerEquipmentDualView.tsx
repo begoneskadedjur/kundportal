@@ -233,6 +233,7 @@ export default function CustomerEquipmentDualView({
           {/* Kart-container med korrekt border-radius och overflow för att fylla hela boxen */}
           <div className="h-[300px] lg:h-[400px] overflow-hidden">
             <EquipmentMap
+              showProductIcons
               equipment={equipment}
               height="100%"
               readOnly={true}

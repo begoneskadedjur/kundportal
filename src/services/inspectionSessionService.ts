@@ -1020,6 +1020,7 @@ export async function getOutdoorStationsForCustomer(
     .select(`
       *,
       technician:technicians!equipment_placements_placed_by_technician_id_fkey(id, name),
+      article:articles!article_id(icon),
       station_type_data:station_types(*)
     `)
     .eq('customer_id', customerId)
@@ -1082,6 +1083,7 @@ export async function getIndoorStationsForCustomer(
       *,
       floor_plan:floor_plans(id, name, building_name, image_path, customer_id),
       technician:technicians(id, name),
+      article:articles!article_id(icon),
       station_type_data:station_types(*)
     `)
     .in('floor_plan_id', floorPlanIds)

@@ -342,6 +342,7 @@ export function CollapsibleMapSection({
           {filteredEquipment.length > 0 ? (
             <>
               <EquipmentMap
+                showProductIcons
                 equipment={filteredEquipment}
                 dimmedStationIds={dimmedStationIds}
                 onEquipmentClick={onEquipmentClick}
@@ -442,6 +443,7 @@ export function CollapsibleMapSection({
                 {filteredEquipment.length > 0 ? (
                   <>
                     <EquipmentMap
+                      showProductIcons
                       equipment={filteredEquipment}
                       dimmedStationIds={dimmedStationIds}
                       onEquipmentClick={onEquipmentClick}

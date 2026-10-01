@@ -33,6 +33,7 @@ export class EquipmentService {
         .select(`
           *,
           technician:technicians!placed_by_technician_id(id, name),
+          article:articles!article_id(icon),
           station_type_data:station_types!station_type_id(
             id, code, name, color, icon, prefix,
             measurement_unit, measurement_label,
@@ -103,6 +104,7 @@ export class EquipmentService {
           *,
           customer:customers!customer_id(id, company_name, contact_address),
           technician:technicians!placed_by_technician_id(id, name),
+          article:articles!article_id(icon),
           station_type_data:station_types!station_type_id(
             id, code, name, color, icon, prefix,
             measurement_unit, measurement_label,
@@ -141,6 +143,7 @@ export class EquipmentService {
           *,
           customer:customers!customer_id(id, company_name, contact_address),
           technician:technicians!placed_by_technician_id(id, name),
+          article:articles!article_id(icon),
           station_type_data:station_types!station_type_id(
             id, code, name, color, icon, prefix,
             measurement_unit, measurement_label,
@@ -173,6 +176,7 @@ export class EquipmentService {
           *,
           customer:customers!customer_id(id, company_name, contact_address),
           technician:technicians!placed_by_technician_id(id, name),
+          article:articles!article_id(icon),
           station_type_data:station_types!station_type_id(
             id, code, name, color, icon, prefix,
             measurement_unit, measurement_label,
@@ -803,6 +807,7 @@ export class EquipmentService {
         .select(`
           *,
           technician:technicians!placed_by_technician_id(id, name),
+          article:articles!article_id(icon),
           station_type_data:station_types!station_type_id(
             id, code, name, color, icon, prefix,
             measurement_unit, measurement_label,
@@ -836,7 +841,8 @@ export class EquipmentService {
             *,
             technician:technicians!placed_by_technician_id(id, name),
             floor_plan:floor_plans!floor_plan_id(id, name, customer_id),
-            station_type_data:station_types!station_type_id(
+            article:articles!article_id(icon),
+          station_type_data:station_types!station_type_id(
               id, code, name, color, icon, prefix,
               measurement_unit, measurement_label,
               threshold_warning, threshold_critical, threshold_direction

@@ -2007,6 +2007,8 @@ export interface EquipmentPlacementWithRelations extends EquipmentPlacement {
     contact_address: string | null
     oneflow_contract_id: string
   } | null
+  /** Produktens interna ikon (articles.icon). Kunder kan inte läsa artiklar, så den är null för dem. */
+  article?: { icon: string | null } | null
   // Dynamisk stationstypdata från station_types-tabellen
   station_type_data?: {
     id: string

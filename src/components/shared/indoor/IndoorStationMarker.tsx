@@ -1,7 +1,7 @@
 // src/components/shared/indoor/IndoorStationMarker.tsx
 // Markör-komponent för stationer på planritning
 
-import { StationIcon, resolveStationIcon } from '../stationIcons'
+import { StationIcon } from '../stationIcons'
 import type {
   IndoorStationWithRelations,
   IndoorStationType,
@@ -27,6 +27,8 @@ interface IndoorStationMarkerProps {
   onPointerDown?: (e: React.PointerEvent) => void
   onPointerMove?: (e: React.PointerEvent) => void
   onPointerUp?: (e: React.PointerEvent) => void
+  /** Personalvyer: produktens interna ikon i cirkeln, numret i en bricka under */
+  showProductIcon?: boolean
 }
 
 // Hämta typ-konfiguration - prioritera dynamisk data från DB
@@ -72,9 +74,12 @@ export function IndoorStationMarker({
   overridePosition = null,
   onPointerDown,
   onPointerMove,
-  onPointerUp
+  onPointerUp,
+  showProductIcon = false
 }: IndoorStationMarkerProps) {
   const typeConfig = getTypeConfig(station)
+  // Produktens interna ikon visas bara i personalvyer; kunder ser typens ikon som förut
+  const productIcon = showProductIcon ? station.article?.icon || null : null
   const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status]
 
   // Om inspekterad: grön bakgrund istället för typfärg
@@ -190,15 +195,24 @@ export function IndoorStationMarker({
           <span className={`text-white font-bold ${iconSize[actualSize]}`}>
             {statusSymbol}
           </span>
+        ) : productIcon ? (
+          <StationIcon name={productIcon} className={actualSize === 'small' ? 'w-3.5 h-3.5 text-white' : actualSize === 'large' ? 'w-6 h-6 text-white' : 'w-5 h-5 text-white'} />
         ) : displayNumber !== undefined ? (
           // Visa nummer om det finns (aktiv station med displayNumber)
           <span className={`text-white font-bold ${displayNumber >= 100 ? 'text-[8px]' : iconSize[actualSize]}`}>
             {displayNumber}
           </span>
         ) : (
-          <StationIcon name={resolveStationIcon(station.article?.icon, typeConfig.icon)} className={`w-3 h-3 text-white ${iconSize[actualSize]}`} />
+          <StationIcon name={typeConfig.icon} className={`w-3 h-3 text-white ${iconSize[actualSize]}`} />
         )}
       </div>
+
+      {/* Numret i en bricka under cirkeln när produktikonen tar cirkelns plats */}
+      {productIcon && !isInspected && !statusSymbol && displayNumber !== undefined && (
+        <div className="absolute left-1/2 -translate-x-1/2 -bottom-3 min-w-[14px] px-1 h-3.5 rounded-full bg-slate-900/90 border border-white text-[8px] leading-[12px] font-bold text-white text-center pointer-events-none">
+          {displayNumber}
+        </div>
+      )}
 
       {/* Tilläggsstation (utöver avtal): vit plusbricka uppe till vänster,
           samma märke som utomhuskartans markör */}

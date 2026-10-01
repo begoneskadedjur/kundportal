@@ -877,6 +877,7 @@ export function AddStationWizard({
                       <div className="flex-1 min-h-0 relative">
                         {selectedFloorPlan?.image_url ? (
                           <FloorPlanViewer
+                            showProductIcons
                             imageUrl={selectedFloorPlan.image_url}
                             imageWidth={selectedFloorPlan.image_width}
                             imageHeight={selectedFloorPlan.image_height}

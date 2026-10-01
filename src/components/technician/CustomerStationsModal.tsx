@@ -602,6 +602,7 @@ export function CustomerStationsModal({
                             {/* Karta - fixad höjd */}
                             <div className="h-[250px] md:h-[350px] flex-shrink-0" style={{ visibility: selectedOutdoorStation ? 'hidden' : 'visible' }}>
                               <EquipmentMap
+                                showProductIcons
                                 equipment={outdoorStations}
                                 onEquipmentClick={(eq) => handleOutdoorStationClick(eq)}
                                 height="100%"
@@ -686,6 +687,7 @@ export function CustomerStationsModal({
                             <div className="flex-1 min-h-0 relative">
                               {selectedFloorPlan?.image_url ? (
                                 <FloorPlanViewer
+                                  showProductIcons
                                   imageUrl={selectedFloorPlan.image_url}
                                   imageWidth={selectedFloorPlan.image_width}
                                   imageHeight={selectedFloorPlan.image_height}

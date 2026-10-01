@@ -284,6 +284,7 @@ function UnitDetail({ data }: { data: UnitEquipment }) {
           <div className="rounded-lg overflow-hidden border border-slate-700">
             <Suspense fallback={<div className="h-[340px] grid place-items-center text-xs text-slate-500">Laddar karta…</div>}>
               <EquipmentMap
+                showProductIcons
                 equipment={data.outdoor as never}
                 height="340px"
                 readOnly

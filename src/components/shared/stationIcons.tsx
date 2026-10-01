@@ -100,6 +100,14 @@ export function stationIconLabel(name: string | null | undefined): string {
   return STATION_ICONS.find((i) => i.key === name)?.label ?? 'Låda'
 }
 
+/**
+ * SVG-innehållet för en egen ikon, för kartmarkörer som ritas som SVG-sträng.
+ * null för de enkla formerna (Lucide), som inte ritas i kartans cirklar.
+ */
+export function stationIconPaths(name: string | null | undefined): string | null {
+  return (name && PATHS[name]) || null
+}
+
 /** Produktens ikon gäller före stationstypens. */
 export function resolveStationIcon(
   articleIcon: string | null | undefined,

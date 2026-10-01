@@ -2053,6 +2053,7 @@ export default function StationInspectionModule() {
                   {/* Karta */}
                   <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
                     <EquipmentMap
+                      showProductIcons
                       equipment={outdoorEquipment}
                       height="min(55vh, 450px)"
                       readOnly
@@ -2285,6 +2286,7 @@ export default function StationInspectionModule() {
                 // Floor plan viewer - ökad höjd för bättre mobil UX
                 <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
                   <FloorPlanViewer
+                    showProductIcons
                     imageUrl={floorPlanImageUrl}
                     stations={indoorStationsForViewer}
                     selectedStationId={null}

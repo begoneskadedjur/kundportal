@@ -460,6 +460,7 @@ export function IndoorEquipmentView({ customerId, customerName }: IndoorEquipmen
       {/* Main viewer */}
       {selectedFloorPlan?.image_url ? (
         <FloorPlanViewer
+          showProductIcons
           imageUrl={selectedFloorPlan.image_url}
           imageWidth={selectedFloorPlan.image_width}
           imageHeight={selectedFloorPlan.image_height}

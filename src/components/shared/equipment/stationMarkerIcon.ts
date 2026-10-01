@@ -22,6 +22,10 @@ export interface StationMarkerSpec {
   radius: number
   /** Tillägg utöver avtal: plusbricka i kanten */
   addon: boolean
+  /** Produktens ikon (SVG-innehåll ur stationIcons), ritas vit i cirkeln. Bara personalvyer. */
+  iconPaths?: string | null
+  /** Stationsnumret i en bricka under cirkeln, när ikonen tar cirkelns plats */
+  badge?: string | null
 }
 
 /** Plusbrickans färger: vit med mörk kontur, lånar ingen typ- eller statusfärg */
@@ -38,14 +42,18 @@ function badgeRadius(radius: number): number {
  * SVG-strängen för en markör. Exporterad så att legenden kan rita samma
  * symbol som kartan visar.
  */
-export function stationMarkerSvg(spec: StationMarkerSpec): { svg: string; size: number; center: number } {
-  const { fill, fillOpacity, stroke, strokeWeight, radius, addon } = spec
+export function stationMarkerSvg(spec: StationMarkerSpec): { svg: string; size: number; height: number; center: number } {
+  const { fill, fillOpacity, stroke, strokeWeight, radius, addon, iconPaths, badge } = spec
   const br = badgeRadius(radius)
   const offset = radius * 0.72
   // Halva kanvasen: cirkeln med kant, eller plusbrickan som sticker ut i hörnet
   const half = Math.ceil(Math.max(radius + strokeWeight / 2 + 1, addon ? offset + br + 1.5 : 0))
   const size = half * 2
   const c = half
+  // Nummerbrickan under cirkeln gör kanvasen högre nedåt, ankaret står kvar i mitten
+  const pillH = 12
+  const pillTop = c + radius + strokeWeight / 2 + 1
+  const height = badge ? Math.max(size, Math.ceil(pillTop + pillH + 1)) : size
 
   let body = `<circle cx="${c}" cy="${c}" r="${radius}" fill="${fill}" fill-opacity="${fillOpacity}" stroke="${stroke}" stroke-width="${strokeWeight}"/>`
   if (addon) {
@@ -56,20 +64,30 @@ export function stationMarkerSvg(spec: StationMarkerSpec): { svg: string; size: 
       `<circle cx="${bx}" cy="${by}" r="${br}" fill="${ADDON_BADGE_FILL}" stroke="${ADDON_BADGE_INK}" stroke-width="1.3"/>` +
       `<path d="M${bx - arm} ${by}h${arm * 2}M${bx} ${by - arm}v${arm * 2}" stroke="${ADDON_BADGE_INK}" stroke-width="${Math.max(1.6, br * 0.3)}" stroke-linecap="round"/>`
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${body}</svg>`
-  return { svg, size, center: c }
+  if (iconPaths) {
+    const sc = (radius * 1.25) / 24
+    body += `<g transform="translate(${c - 12 * sc} ${c - 12 * sc}) scale(${sc})" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconPaths}</g>`
+  }
+  if (badge) {
+    const w = Math.max(pillH, 6 + badge.length * 6)
+    body +=
+      `<rect x="${c - w / 2}" y="${pillTop}" width="${w}" height="${pillH}" rx="${pillH / 2}" fill="#0f172a" fill-opacity="0.9" stroke="#ffffff" stroke-width="1"/>` +
+      `<text x="${c}" y="${pillTop + pillH / 2 + 3.2}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="9" font-weight="700" fill="#ffffff">${badge}</text>`
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${height}" viewBox="0 0 ${size} ${height}">${body}</svg>`
+  return { svg, size, height, center: c }
 }
 
 /** Ikon för google.maps.Marker, cachad. */
 export function buildStationMarkerIcon(spec: StationMarkerSpec): google.maps.Icon {
-  const key = [spec.fill, spec.fillOpacity, spec.stroke, spec.strokeWeight, spec.radius, spec.addon ? 1 : 0].join('|')
+  const key = [spec.fill, spec.fillOpacity, spec.stroke, spec.strokeWeight, spec.radius, spec.addon ? 1 : 0, spec.iconPaths ?? '', spec.badge ?? ''].join('|')
   const hit = cache.get(key)
   if (hit) return hit
 
-  const { svg, size, center } = stationMarkerSvg(spec)
+  const { svg, size, height, center } = stationMarkerSvg(spec)
   const icon: google.maps.Icon = {
     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`,
-    scaledSize: new google.maps.Size(size, size),
+    scaledSize: new google.maps.Size(size, height),
     anchor: new google.maps.Point(center, center),
     labelOrigin: new google.maps.Point(center, center),
   }
