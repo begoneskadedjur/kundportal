@@ -225,6 +225,9 @@ export const STEG: Steg[] = [
             'Är stationen inte fakturerad än står det Inte fakturerad än. Tas den bort räknas den inte med.',
           ]}
         />
+        <p className="text-sm leading-relaxed text-slate-300 mt-3">
+          <B>En betald station är låst.</B> I Redigera station går stationstyp, Tillägg utöver avtal och betalningen inte att ändra så länge stationen är betald framåt. Produkt, position och övriga fält går att ändra som vanligt. Ska typen eller betalningen ändras tar du bort stationen och placerar en ny.
+        </p>
       </>
     ),
     screens: <SkarmBorttagVarning />,

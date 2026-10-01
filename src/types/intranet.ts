@@ -10,9 +10,19 @@ import {
 
 // ─── Innehållsblock (jsonb i intranet_documents.content) ───
 
+/** Länkkort i ett hopp-block. target = id på en rubrik i samma dokument */
+export interface IntranetJumpItem {
+  label: string
+  description?: string
+  target: string
+}
+
 export type IntranetBlock =
-  | { type: 'h2'; text: string }
-  | { type: 'h3'; text: string }
+  /** id = stabilt ankare (#id) för länkar och hopp-block; annars avsnitt-<index> */
+  | { type: 'h2'; text: string; id?: string }
+  | { type: 'h3'; text: string; id?: string }
+  /** Kort som hoppar till rubriker i dokumentet, t.ex. ett per roll */
+  | { type: 'jump'; title?: string; items: IntranetJumpItem[] }
   | { type: 'p'; text: string }
   | { type: 'list'; items: string[] }
   /** Numrerade steg med visuell stegmarkering - för gör så här-instruktioner */
@@ -194,6 +204,7 @@ export function estimateReadingMinutes(content: IntranetBlock[]): number {
     if ('text' in block && block.text) words += block.text.split(/\s+/).length
     if (block.type === 'list' || block.type === 'steps') words += block.items.join(' ').split(/\s+/).length
     if (block.type === 'chain') words += block.steps.length * 2
+    if (block.type === 'jump') words += block.items.length * 4
   }
   return Math.max(1, Math.round(words / 180))
 }

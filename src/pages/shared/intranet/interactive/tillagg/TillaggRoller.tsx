@@ -19,6 +19,7 @@ const ROLLKORT: Record<TillaggRole, { vem: string; gor: string[] }> = {
       'Svarar på frågan om arbetstid i timmar per år när ärendet avslutas.',
       'Stänger ärendet med Färdig med etablering.',
       'Kan ta bort tilläggsstationer hos kunden. Är stationen redan betald framåt kommer en varning först.',
+      'Kan inte byta stationstyp eller betalning på en station som kunden redan har betalat.',
     ],
   },
   fakturering: {

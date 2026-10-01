@@ -61,7 +61,30 @@ function BlockRenderer({ block, anchorId }: { block: IntranetBlock; anchorId?: s
     case 'h2':
       return <h2 id={anchorId} className="text-lg font-semibold text-white mt-8 mb-3 first:mt-0 scroll-mt-24">{block.text}</h2>
     case 'h3':
-      return <h3 className="text-base font-semibold text-slate-200 mt-6 mb-2">{block.text}</h3>
+      return <h3 id={anchorId} className="text-base font-semibold text-slate-200 mt-6 mb-2 scroll-mt-24">{block.text}</h3>
+    case 'jump':
+      return (
+        <nav className="my-5" aria-label={block.title || 'Hoppa till'}>
+          {block.title && (
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{block.title}</p>
+          )}
+          <div className="grid gap-2 sm:grid-cols-2">
+            {block.items.map((item, i) => (
+              <a
+                key={i}
+                href={`#${item.target}`}
+                className="group flex items-center gap-3 p-3 rounded-xl bg-slate-800/40 border border-slate-700 hover:border-[#20c58f]/50 hover:bg-slate-800/60 transition-all"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white group-hover:text-[#20c58f] transition-colors">{item.label}</p>
+                  {item.description && <p className="text-xs text-slate-400 mt-0.5 leading-snug">{item.description}</p>}
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-[#20c58f] rotate-90 flex-shrink-0" />
+              </a>
+            ))}
+          </div>
+        </nav>
+      )
     case 'p':
       return <p className="text-[15px] leading-relaxed text-slate-300 mb-3">{block.text}</p>
     case 'list':
@@ -172,6 +195,12 @@ function DocLinkBlock({ slug, label, description }: { slug: string; label: strin
   )
 }
 
+/** Ankare för en rubrik: blockets eget id, annars avsnitt-<index> */
+function anchorFor(block: IntranetBlock, index: number): string | undefined {
+  if (block.type !== 'h2' && block.type !== 'h3') return undefined
+  return block.id || `avsnitt-${index}`
+}
+
 // ─── Sida ──────────────────────────────────────────
 
 export default function IntranetDocumentPage() {
@@ -204,7 +233,7 @@ export default function IntranetDocumentPage() {
       (doc?.content || [])
         .map((block, i) => ({ block, i }))
         .filter(({ block }) => block.type === 'h2')
-        .map(({ block, i }) => ({ id: `avsnitt-${i}`, text: (block as { text: string }).text })),
+        .map(({ block, i }) => ({ id: anchorFor(block, i) as string, text: (block as { text: string }).text })),
     [doc?.content]
   )
 
@@ -212,6 +241,15 @@ export default function IntranetDocumentPage() {
     if (slug && user?.id) fetchDocument(slug, user.id)
     window.scrollTo(0, 0)
   }, [slug, user?.id])
+
+  // Länk med ankare (…/guide-x#tekniker): hoppa dit när innehållet finns
+  const loadedDocId = doc?.id
+  useEffect(() => {
+    if (!loadedDocId) return
+    const hash = decodeURIComponent(window.location.hash.slice(1))
+    if (!hash) return
+    requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView())
+  }, [loadedDocId])
 
   const fetchDocument = async (documentSlug: string, userId: string) => {
     try {
@@ -368,12 +406,49 @@ export default function IntranetDocumentPage() {
         </div>
       </header>
 
+      {/* Innehållsförteckning (smal skärm), hopfälld */}
+      {toc.length > 1 && (
+        <details id="innehall" className="xl:hidden mb-6 bg-slate-800/30 border border-slate-700 rounded-xl scroll-mt-24 group">
+          <summary className="flex items-center justify-between gap-2 px-4 py-3 cursor-pointer list-none text-sm font-medium text-white">
+            <span>Innehåll <span className="text-slate-500 font-normal">· {toc.length} avsnitt</span></span>
+            <ChevronRight className="w-4 h-4 text-slate-500 group-open:rotate-90 transition-transform" />
+          </summary>
+          <ul className="px-2 pb-3 space-y-0.5">
+            {toc.map(item => (
+              <li key={item.id}>
+                <a
+                  href={`#${item.id}`}
+                  className="block px-2 py-1.5 text-sm text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors leading-snug"
+                >
+                  {item.text}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
       {/* Innehåll */}
       <article>
         {doc.content.map((block, i) => (
-          <BlockRenderer key={i} block={block} anchorId={block.type === 'h2' ? `avsnitt-${i}` : undefined} />
+          <BlockRenderer key={i} block={block} anchorId={anchorFor(block, i)} />
         ))}
       </article>
+
+      {/* Tillbaka till innehållet (smal skärm), ovanför mobilmenyn */}
+      {toc.length > 1 && readProgress > 8 && (
+        <a
+          href="#innehall"
+          onClick={() => {
+            const el = document.getElementById('innehall') as HTMLDetailsElement | null
+            if (el) el.open = true
+          }}
+          className="xl:hidden fixed right-4 bottom-20 lg:bottom-6 z-30 flex items-center gap-1.5 px-3 py-2 bg-slate-800/95 backdrop-blur border border-slate-700 rounded-full text-xs font-medium text-slate-200 shadow-lg hover:text-white"
+        >
+          <ChevronRight className="w-3.5 h-3.5 -rotate-90" />
+          Innehåll
+        </a>
+      )}
 
       {/* Markera som läst (guider utan kvittenskrav) */}
       {!doc.requires_acknowledgement && (

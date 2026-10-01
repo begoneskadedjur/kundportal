@@ -59,6 +59,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'nyhet', text: 'Under Stationer & Fällor har varje stationstyp en sektion Produkter. Där väljer du vilka artiklar teknikern kan välja mellan vid utplacering, vilken som är förval och i vilken ordning de visas.' },
       { kind: 'andring', text: 'En tilläggsstation per år eller per månad som kunden redan har betalat kan inte byta stationstyp, tilläggsläge eller betalning. Formuläret visar vilket datum den är betald till. Produkt, position och övriga fält går att ändra som vanligt.' },
       { kind: 'buggfix', text: 'Byts produkten på en tilläggsstation räknas den interna kostnaden om till den nya produktens inköpspris. Tidigare låg det gamla priset kvar.' },
+      { kind: 'andring', text: 'Guiden Tilläggsstationer är uppdelad per roll. Överst väljer du Tekniker, Koordinator, Faktureringsansvarig eller Admin och hamnar direkt i ditt avsnitt, med nya delar om produktval och låsta stationer.' },
+      { kind: 'nyhet', text: 'Handbokens guider har en innehållsförteckning även på mobilen och en knapp Innehåll som tar dig tillbaka när du har scrollat ned.' },
     ],
   },
   {
