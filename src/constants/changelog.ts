@@ -57,6 +57,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'buggfix', text: 'Teknikerns namn hämtas nu alltid från teknikerregistret när en etablering stängs. Tidigare kunde e-postadressen hamna som namn på besöket och raderna, och andrateknikern kom inte med på besöket.' },
       { kind: 'andring', text: 'Blocket Tillägg utöver avtalet på fakturan är hopfällt och visar en sammanfattning på en rad. Tryck på Visa uträkning för tidslinjen och uträkningen per station och timme.' },
       { kind: 'nyhet', text: 'Under Stationer & Fällor har varje stationstyp en sektion Produkter. Där väljer du vilka artiklar teknikern kan välja mellan vid utplacering, vilken som är förval och i vilken ordning de visas.' },
+      { kind: 'andring', text: 'En tilläggsstation per år eller per månad som kunden redan har betalat kan inte byta stationstyp, tilläggsläge eller betalning. Formuläret visar vilket datum den är betald till. Produkt, position och övriga fält går att ändra som vanligt.' },
+      { kind: 'buggfix', text: 'Byts produkten på en tilläggsstation räknas den interna kostnaden om till den nya produktens inköpspris. Tidigare låg det gamla priset kvar.' },
     ],
   },
   {

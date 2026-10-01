@@ -55,3 +55,22 @@ export default function AddonRemovalNotice({ guard, className = '' }: Props) {
 
   return null
 }
+
+/**
+ * Förklaringen när stationstyp och betalning är låsta på en betald
+ * tilläggsstation (useAddonPaidLock). Samma platta stil som ovan.
+ */
+export function AddonPaidLockNotice({ paidThrough, className = '' }: { paidThrough: string | null; className?: string }) {
+  if (!paidThrough) return null
+  return (
+    <div className={`flex items-start gap-2 ${className}`} role="note">
+      <span className="mt-1.5 w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" aria-hidden />
+      <div className="min-w-0 text-sm leading-relaxed">
+        <p className="font-medium text-amber-400">Betald till och med {paidThrough}</p>
+        <p className="text-slate-300 mt-0.5">
+          Stationstyp och betalning kan inte ändras medan kunden har betalat för stationen. Ta bort den och placera en ny om något av det ska ändras.
+        </p>
+      </div>
+    </div>
+  )
+}

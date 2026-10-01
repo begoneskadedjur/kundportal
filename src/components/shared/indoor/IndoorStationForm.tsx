@@ -9,8 +9,8 @@ import {
   type StationTypeArticle,
 } from '../../../types/addonStations'
 import { AddonStationBillingService } from '../../../services/addonStationBillingService'
-import { useAddonRemovalGuard } from '../../../hooks/useAddonRemovalGuard'
-import AddonRemovalNotice from '../equipment/AddonRemovalNotice'
+import { useAddonRemovalGuard, useAddonPaidLock } from '../../../hooks/useAddonRemovalGuard'
+import AddonRemovalNotice, { AddonPaidLockNotice } from '../equipment/AddonRemovalNotice'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { X, Camera, MapPin, FileText, Hash, Tag, Crosshair, Box, Target, Circle, Package, Loader2, Trash2, ClipboardList, ChevronDown, ChevronUp, ZoomIn, FlaskConical, Check } from 'lucide-react'
 import ImageLightbox from '../ImageLightbox'
@@ -108,6 +108,8 @@ export function IndoorStationForm({
     status === 'removed' && existingStation?.status !== 'removed'
   )
   const deleteGuard = useAddonRemovalGuard(guardStation)
+  // Betald tilläggsstation: typ, tilläggsläge och modell är låsta
+  const paidLock = useAddonPaidLock(guardStation)
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(existingStation?.photo_url || null)
   const [lightboxOpen, setLightboxOpen] = useState(false)
@@ -242,6 +244,7 @@ export function IndoorStationForm({
 
   // Auto-generera stationsnummer när typ ändras (bara för nya stationer)
   const handleTypeChange = (type: IndoorStationType) => {
+    if (paidLock.locked) return
     setStationType(type)
     setPreparationId(null)
     setPreparationQuantity(null)
@@ -423,12 +426,14 @@ export function IndoorStationForm({
                     key={typeCode}
                     type="button"
                     onClick={() => handleTypeChange(typeCode)}
+                    disabled={paidLock.locked && stationType !== typeCode}
                     className={`
                       p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 min-h-[80px]
                       ${stationType === typeCode
                         ? 'border-[#20c58f] bg-[#20c58f]/10'
                         : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
                       }
+                      ${paidLock.locked && stationType !== typeCode ? 'opacity-40 cursor-not-allowed' : ''}
                     `}
                   >
                     <div
@@ -446,6 +451,8 @@ export function IndoorStationForm({
             </div>
           )}
         </div>
+
+      <AddonPaidLockNotice paidThrough={paidLock.paidThrough} />
 
       {/* Kopierat från föregående station */}
       {showCopiedHint && (
@@ -492,10 +499,11 @@ export function IndoorStationForm({
       )}
 
       {/* Tillägg utöver avtal */}
-      <label className="flex items-start gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl cursor-pointer">
+      <label className={`flex items-start gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl ${paidLock.locked ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
         <input
           type="checkbox"
           checked={isAddon}
+          disabled={paidLock.locked}
           onChange={(e) => {
             setIsAddon(e.target.checked)
             setAddonBillingModel(e.target.checked ? (addonBillingModel ?? defaultAddonBillingModel(addonPrices)) : null)
@@ -513,6 +521,7 @@ export function IndoorStationForm({
               onChange={setAddonBillingModel}
               prices={addonPrices}
               loading={addonPricesLoading}
+              disabled={paidLock.locked}
             />
           )}
         </span>

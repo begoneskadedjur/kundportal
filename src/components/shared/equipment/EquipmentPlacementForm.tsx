@@ -12,8 +12,8 @@ import {
   requiresSerialNumber
 } from '../../../types/database'
 import { useGpsLocation } from '../../../hooks/useGpsLocation'
-import { useAddonRemovalGuard } from '../../../hooks/useAddonRemovalGuard'
-import AddonRemovalNotice from './AddonRemovalNotice'
+import { useAddonRemovalGuard, useAddonPaidLock } from '../../../hooks/useAddonRemovalGuard'
+import AddonRemovalNotice, { AddonPaidLockNotice } from './AddonRemovalNotice'
 import { MapLocationPicker, type ExistingStation } from './MapLocationPicker'
 import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
@@ -276,10 +276,14 @@ export function EquipmentPlacementForm({
     !existingEquipment && (!!initialPreparation || initialIsAddon)
   )
 
+  // Betald tilläggsstation: typ, tilläggsläge och modell är låsta
+  const paidLock = useAddonPaidLock(existingEquipment ? { ...existingEquipment, indoor: false } : null)
+
   // Typbyte nollställer alltid preparatet — dels bryter det kopieringen,
   // dels låg gammalt preparation_id annars kvar i state vid byte mellan
   // två preparatbärande typer (latent bugg, selecten visade tomt men värdet skickades)
   const handleTypeSelect = (code: EquipmentType) => {
+    if (paidLock.locked) return
     setFormData(prev => {
       if (prev.equipment_type === code) return prev
       return { ...prev, equipment_type: code, preparation_id: null, preparation_quantity: null, article_id: null }
@@ -627,11 +631,12 @@ export function EquipmentPlacementForm({
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => handleTypeSelect(stationType.code as EquipmentType)}
+                  disabled={paidLock.locked && !isSelected}
                   className={`p-4 rounded-xl border-2 transition-all ${
                     isSelected
                       ? 'border-[#20c58f] bg-[#20c58f]/10'
                       : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                  }`}
+                  } ${paidLock.locked && !isSelected ? 'opacity-40 cursor-not-allowed' : ''}`}
                 >
                   <div
                     className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
@@ -661,11 +666,12 @@ export function EquipmentPlacementForm({
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => handleTypeSelect(type)}
+                    disabled={paidLock.locked && !isSelected}
                     className={`p-4 rounded-xl border-2 transition-all ${
                       isSelected
                         ? 'border-[#20c58f] bg-[#20c58f]/10'
                         : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                    }`}
+                    } ${paidLock.locked && !isSelected ? 'opacity-40 cursor-not-allowed' : ''}`}
                   >
                     <div
                       className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center"
@@ -683,6 +689,8 @@ export function EquipmentPlacementForm({
           </div>
         )}
       </div>
+
+      <AddonPaidLockNotice paidThrough={paidLock.paidThrough} />
 
       {/* Kopierat från föregående station */}
       {showCopiedHint && (
@@ -726,10 +734,11 @@ export function EquipmentPlacementForm({
       )}
 
       {/* Tillägg utöver avtal */}
-      <label className="flex items-start gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl cursor-pointer">
+      <label className={`flex items-start gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl ${paidLock.locked ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
         <input
           type="checkbox"
           checked={formData.is_addon}
+          disabled={paidLock.locked}
           onChange={(e) =>
             setFormData(prev => ({
               ...prev,
@@ -750,6 +759,7 @@ export function EquipmentPlacementForm({
               onChange={(m) => setFormData(prev => ({ ...prev, addon_billing_model: m }))}
               prices={addonPrices}
               loading={addonPricesLoading}
+              disabled={paidLock.locked}
             />
           )}
         </span>

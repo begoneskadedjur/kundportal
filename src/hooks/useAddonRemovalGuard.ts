@@ -127,3 +127,32 @@ export function useAddonRemovalGuard(
     reset,
   }
 }
+
+/**
+ * Spärr i redigeringsformulären: en tilläggsstation per år/per månad som är
+ * betald framåt får inte byta stationstyp, tilläggsläge eller betalningsmodell.
+ * Kunden har betalat för just det. Ska något av det ändras tas stationen bort
+ * och en ny placeras (då går det via borttagsvarningen ovan). Produkt,
+ * position och övriga fält är fortfarande öppna.
+ */
+export function useAddonPaidLock(
+  station: AddonGuardStation | null | undefined
+): { locked: boolean; paidThrough: string | null } {
+  const stationId = station && isGuardedAddonStation(station) ? station.id : null
+  const indoor = station?.indoor ?? false
+  const [paidThrough, setPaidThrough] = useState<string | null>(null)
+
+  useEffect(() => {
+    setPaidThrough(null)
+    if (!stationId) return
+    let cancelled = false
+    AddonStationBillingService.getPaidThrough(stationId, indoor).then((res) => {
+      if (!cancelled) setPaidThrough(res?.applies && res.paid_through ? res.paid_through : null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [stationId, indoor])
+
+  return { locked: !!paidThrough, paidThrough }
+}
