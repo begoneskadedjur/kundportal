@@ -447,6 +447,9 @@ export class ContractBillingService {
         // fakturan sin besökskoppling och provisionen frigörs ärendetäckande igen.
         visit_id: item.visit_id ?? null,
         visit_number: item.visit_number ?? null,
+        // Ärenderaden raden kommer från: bär tilläggsradens årspris och
+        // periodstart till fakturan (fakturamodalen, generatorns period)
+        case_billing_item_id: item.id,
         notes: item.notes || `Från ärende ${caseId}`
       }
     })

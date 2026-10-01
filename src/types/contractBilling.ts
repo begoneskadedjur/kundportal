@@ -63,6 +63,9 @@ export interface ContractBillingItem {
   visit_id: string | null
   // Besökets nummer i ärendet (1, 2, 3 ...). Null när visit_id är null.
   visit_number: number | null
+  // Ärenderaden (case_billing_items) raden kopierades från vid avslut. Bär
+  // tilläggsradens årspris och periodstart till fakturan. Null för äldre rader.
+  case_billing_item_id?: string | null
 }
 
 export interface ContractBillingItemWithRelations extends ContractBillingItem {

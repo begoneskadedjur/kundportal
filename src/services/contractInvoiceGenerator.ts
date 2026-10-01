@@ -27,6 +27,7 @@ import { InvoiceService } from './invoiceService'
 import { ContractService, isSyntheticContract } from './contractService'
 import { resolveOrganizationNumber } from '../utils/multisiteHelpers'
 import { resolvePremiumShares, allocateByShares } from '../shared/premiumShares'
+import { addonInvoicePeriod, matchInvoiceAddonLines, type AddonCaseRow } from '../shared/invoiceAddonLines'
 import type { ContractWithBilling } from '../types/database'
 import {
   computePlannedEquipmentPeriods,
@@ -1365,7 +1366,7 @@ export class ContractInvoiceGenerator {
 
     let q = supabase
       .from('contract_billing_items')
-      .select('id, total_price, article_name, article_code, quantity, unit_price, vat_rate, discount_percent, case_id, billing_period_start, visit_id, visit_number')
+      .select('id, total_price, article_name, article_code, quantity, unit_price, vat_rate, discount_percent, case_id, billing_period_start, visit_id, visit_number, case_billing_item_id')
       .eq('customer_id', customerId)
       .eq('item_type', 'ad_hoc')
       .is('invoice_id', null)
@@ -1408,6 +1409,15 @@ export class ContractInvoiceGenerator {
     // Besökskoppling: bara vid per_case OCH när samtliga rader hör till samma besök.
     const invoiceVisitId = grouping === 'per_case' ? InvoiceService.resolveSharedVisitId(items) : null
 
+    // Tilläggsfaktura (per ärende): perioden är pro rata-perioden, från första
+    // dagen som betalas till dagen före avtalets nästa periodstart, inte
+    // avslutsmånaden. Månadsbatchen behåller månaden (den identifierar batchen).
+    let invoicePeriod = { start: monthStart, end: monthEnd }
+    if (grouping === 'per_case') {
+      const addonPeriod = await this.addonPeriodForBillingItems(items)
+      if (addonPeriod) invoicePeriod = { start: addonPeriod.start, end: addonPeriod.end }
+    }
+
     let invoiceId: string
     if (existingInvoiceId) {
       invoiceId = existingInvoiceId
@@ -1437,8 +1447,8 @@ export class ContractInvoiceGenerator {
           total_amount: Math.round(total),
           status: 'pending_approval',
           requires_approval: true,
-          billing_period_start: monthStart,
-          billing_period_end: monthEnd,
+          billing_period_start: invoicePeriod.start,
+          billing_period_end: invoicePeriod.end,
           due_date: toLocalIsoDate(due),
           invoice_marking: invoiceMarking,
         })
@@ -1449,12 +1459,40 @@ export class ContractInvoiceGenerator {
       await this.addItemsToAdhocInvoice(invoiceId, items)
     }
 
+    // Raderna får fakturans period när den är tilläggsperioden, så att
+    // kundkortets dubblettkontroll (kund + periodstart) matchar fakturan
+    const periodUpdate = invoicePeriod.start !== monthStart
+      ? { billing_period_start: invoicePeriod.start, billing_period_end: invoicePeriod.end }
+      : {}
     await supabase
       .from('contract_billing_items')
-      .update({ invoice_id: invoiceId, status: 'invoiced' })
+      .update({ invoice_id: invoiceId, status: 'invoiced', ...periodUpdate })
       .in('id', items.map((i) => i.id))
 
     return invoiceId
+  }
+
+  /**
+   * Pro rata-perioden för merförsäljningsrader som kommer från ärendets
+   * tilläggsrader (case_billing_items.is_addon_prorata_line). Null när inga
+   * rader är tillägg. Matten är tidslinjens (addonEconomics).
+   */
+  private static async addonPeriodForBillingItems(
+    items: Array<{ id: string; case_id: string | null; article_code: string | null; case_billing_item_id?: string | null }>
+  ): Promise<{ start: string; end: string; nextStart: string } | null> {
+    const rowIds = items.map((i) => i.case_billing_item_id).filter((x): x is string => !!x)
+    if (rowIds.length === 0) return null
+    const { data: rows } = await supabase
+      .from('case_billing_items')
+      .select('id, case_id, item_type, status, service_code, article_code, quantity, unit_price, total_price, addon_annual_unit_price, billing_start_date, addon_model, is_addon_prorata_line, is_addon_labour_line, addon_labour_hours, addon_labour_hours_before')
+      .in('id', rowIds)
+    if (!rows || rows.length === 0) return null
+    const lines = matchInvoiceAddonLines(
+      items.map((i) => ({ id: i.id, article_code: i.article_code, contract_billing_item_id: i.id })),
+      items.map((i) => ({ id: i.id, case_id: i.case_id, case_billing_item_id: i.case_billing_item_id ?? null, article_code: i.article_code })),
+      rows as unknown as AddonCaseRow[]
+    )
+    return addonInvoicePeriod(lines)
   }
 
   private static async addItemsToAdhocInvoice(

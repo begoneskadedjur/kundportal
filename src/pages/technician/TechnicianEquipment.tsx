@@ -111,6 +111,9 @@ export default function TechnicianEquipment() {
   const [fetchedEquipment, setFetchedEquipment] = useState<EquipmentPlacementWithRelations[]>([])
   const [fetchedCustomers, setFetchedCustomers] = useState<CustomerStationSummary[]>([])
   const technicianId = profile?.technician_id || ''
+  // Teknikerns namn ur technicians-tabellen (profilens koppling), aldrig
+  // e-postadressen: namnet skrivs till ärendets rader och besöket
+  const technicianName = profile?.technicians?.name?.trim() || null
   const [stationScope, setStationScope] = useState<StationScope>(() => {
     try {
       return localStorage.getItem(STATION_SCOPE_STORAGE_KEY) === 'own' ? 'own' : 'all'
@@ -443,8 +446,7 @@ export default function TechnicianEquipment() {
             customerId,
             formData.is_addon ? formData.addon_billing_model : editingEquipment.addon_billing_model,
             technicianId || null,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (profile as any)?.full_name || profile?.email || null
+            technicianName
           )
           const warning = AddonStationBillingService.priceMissingMessage(missing)
           if (warning) toast.error(warning, { duration: 8000 })
@@ -530,7 +532,7 @@ export default function TechnicianEquipment() {
                   quantity: formData.preparation_quantity,
                   unit: formData.preparation_unit || 'g',
                   applied_by_technician_id: profile?.technician_id || undefined,
-                  applied_by_technician_name: profile?.full_name || profile?.email || undefined
+                  applied_by_technician_name: technicianName ?? undefined
                 })
               }
             } else if (formData.preparation_id && formData.preparation_quantity) {
@@ -550,8 +552,7 @@ export default function TechnicianEquipment() {
             customerId,
             formData.addon_billing_model,
             technicianId || null,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (profile as any)?.full_name || profile?.email || null
+            technicianName
           )
           const warning = AddonStationBillingService.priceMissingMessage(missing)
           if (warning) toast.error(warning, { duration: 8000 })
@@ -730,16 +731,14 @@ export default function TechnicianEquipment() {
       const sync = await AddonStationBillingService.syncAddonEstablishmentLine(
         customerId,
         technicianId || null,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (profile as any)?.full_name || profile?.email || null
+        technicianName
       )
       // Per år/månad: § 5-rader på avtalet + pro rata-rad på ärendet
       await AddonStationBillingService.syncAddonPeriodLines(customerId)
       await AddonStationBillingService.syncAddonProrataLine(
         customerId,
         technicianId || null,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (profile as any)?.full_name || profile?.email || null
+        technicianName
       )
       if (sync?.open_count && sync.open_count > 1) {
         toast('Obs: kunden har flera öppna etableringsärenden — kontrollera att rätt ärende stängs', { icon: '⚠️', duration: 8000 })
@@ -853,8 +852,7 @@ export default function TechnicianEquipment() {
         const sync = await AddonStationBillingService.syncAddonEstablishmentLine(
           s.customerId,
           technicianId || null,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (profile as any)?.full_name || profile?.email || null
+          technicianName
         )
         addonItemId = sync?.row_id ?? null
       }
@@ -900,8 +898,7 @@ export default function TechnicianEquipment() {
             caseId: s.caseId,
             customerId: s.customerId,
             technicianId: technicianId || null,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            technicianName: (profile as any)?.full_name || profile?.email || null,
+            technicianName: technicianName,
             workPerformed: s.workReport
           })
           if (billing.invoiceError) {

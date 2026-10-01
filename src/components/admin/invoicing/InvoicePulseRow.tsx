@@ -56,9 +56,11 @@ interface InvoicePulseRowProps {
   caseContext: CaseContext | null
   /** Prisavstämning mot kundens avtalsprislista (adhoc) — null = ej tillämpligt */
   priceCheck?: PriceListCheck | null
+  /** Fakturan har tilläggsrader (pro rata): ingen marginal i procent */
+  hasAddonLines?: boolean
 }
 
-export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, caseContext, priceCheck }: InvoicePulseRowProps) {
+export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, caseContext, priceCheck, hasAddonLines = false }: InvoicePulseRowProps) {
   const invoiceType = invoice.invoice_type as string
   const isContract = invoiceType === 'contract'
   const todayKey = localDateKey()
@@ -162,6 +164,19 @@ export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, case
               </div>
             </>
           )}
+        </PulseCell>
+      ) : hasAddonLines && priceCheck?.mode === 'agreement' ? (
+        /* Tilläggsrader: avtalspris räknat till nästa årspremie, ingen marginal i procent */
+        <PulseCell label="Pris">
+          <div className="text-sm font-bold text-[#20c58f] tabular-nums">
+            <span className="mr-1">●</span>Stämmer
+          </div>
+          <div className="text-[11px] text-slate-500 truncate">avtalspris, räknat till nästa årspremie</div>
+        </PulseCell>
+      ) : hasAddonLines && priceCheck?.mode !== 'deviation' ? (
+        <PulseCell label="Pris">
+          <div className="text-sm font-bold text-slate-100 tabular-nums">–</div>
+          <div className="text-[11px] text-slate-500 truncate">tillägg utöver avtalet</div>
         </PulseCell>
       ) : priceCheck?.mode === 'agreement' ? (
         /* Priset stämmer mot kundens avtalsprislista — marginalen visas men larmar inte */

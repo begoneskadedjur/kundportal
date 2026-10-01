@@ -45,6 +45,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.21.0',
+    date: '2026-10-01',
+    title: 'Tilläggsfakturan förklarar sig själv',
+    items: [
+      { kind: 'nyhet', text: 'Fakturor med tilläggsstationer visar ett block Tillägg utöver avtalet med samma tidslinje som ärendets Ekonomi-flik: vilken period fakturan gäller, hur många dagar av året och uträkningen per station och per timme.' },
+      { kind: 'nyhet', text: 'Kostnaderna på tilläggsfakturan visar utrustningen som en engångskostnad, den interna arbetstiden per år och ungefär när tillägget är betalt tillbaka, i stället för en negativ marginal.' },
+      { kind: 'andring', text: 'Priskontrollen räknar tilläggsrader mot avtalspriset för just de dagar fakturan gäller. Stämmer det står det Stämmer mot avtalspriset och fakturan larmar inte längre rött.' },
+      { kind: 'andring', text: 'Tilläggsraderna har perioden under namnet och arbetstiden faktureras i timmar, till exempel 2 h à 400,82 kr. Kundens faktura i Fortnox får samma period och en rad om när tilläggen faktureras nästa gång.' },
+      { kind: 'andring', text: 'Sidokortet på tilläggsfakturan visar period, nästa tilläggsfaktura, avtalet och hur många stationer som väntar på beslut i avtalskartan.' },
+      { kind: 'buggfix', text: 'Teknikerns namn hämtas nu alltid från teknikerregistret när en etablering stängs. Tidigare kunde e-postadressen hamna som namn på besöket och raderna, och andrateknikern kom inte med på besöket.' },
+    ],
+  },
+  {
     version: '3.20.0',
     date: '2026-09-30',
     title: 'Varning när en betald tilläggsstation tas bort',

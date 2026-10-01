@@ -20,6 +20,10 @@ interface AddonBillingTimelineProps {
   nowTitle?: string
   /** Visa beloppen per enhet (default true) */
   showPerUnit?: boolean
+  /** "275 av 365 dagar" i stället för "9 av 12 månader" (fakturan) */
+  showDays?: boolean
+  /** Ersätter vänstersidans pris per enhet, t.ex. uträkningen på fakturan */
+  nowDetail?: string
   className?: string
 }
 
@@ -38,6 +42,8 @@ export default function AddonBillingTimeline({
   showDates = true,
   nowTitle = 'Betalas nu',
   showPerUnit = true,
+  showDays = false,
+  nowDetail,
   className = '',
 }: AddonBillingTimelineProps) {
   const perMonth = t.model === 'per_month'
@@ -64,9 +70,11 @@ export default function AddonBillingTimeline({
             {showDates && t.fromDate && t.toDate && !perMonth
               ? `${formatDateShortSv(t.fromDate)} till ${formatDateShortSv(t.toDate)} · `
               : ''}
-            {perMonth ? `${t.days} dagar` : monthsLabel(t.months)}
+            {perMonth ? `${t.days} dagar` : showDays ? `${t.days} av 365 dagar` : monthsLabel(t.months)}
           </span>
-          {showPerUnit && (
+          {nowDetail ? (
+            <span className="text-xs text-slate-300 tabular-nums">{nowDetail}</span>
+          ) : showPerUnit && (
             <span className="text-xs text-slate-300">
               {formatKr(t.perUnitNow)} {t.unit === 'timme' ? 'per timme' : 'per station'}
             </span>

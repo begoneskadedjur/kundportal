@@ -19,6 +19,14 @@ import { CaseBillingService } from './caseBillingService'
 import { ContractBillingService } from './contractBillingService'
 import { PriceListService } from './priceListService'
 import { VisitService } from './visitService'
+import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
+
+/** Ett teknikernamn att skriva till besök och ärenden: aldrig en e-postadress. */
+export function cleanTechnicianName(name: string | null | undefined): string | null {
+  const t = typeof name === 'string' ? name.trim() : ''
+  if (!t || t.includes('@')) return null
+  return t
+}
 import type { Service, ServiceDefaultArticle } from '../types/services'
 import type { CaseBillingItemWithRelations } from '../types/caseBilling'
 import type {
@@ -685,6 +693,58 @@ export class AddonStationBillingService {
    * att kunna LÄSA tillbaka contract_billing_items (technician_owns_case).
    * Sätter teknikern som sekundär/tertiär om hen inte redan är tilldelad.
    */
+  /** Teknikerns namn i technicians-tabellen, null om det saknas. */
+  static async technicianNameById(technicianId: string | null | undefined): Promise<string | null> {
+    if (!technicianId) return null
+    const { data } = await supabase.from('technicians').select('name').eq('id', technicianId).maybeSingle()
+    return cleanTechnicianName((data as { name?: string | null } | null)?.name)
+  }
+
+  /**
+   * Besökets tekniker i rollordning: ärendets primär-, sekundär- och
+   * tertiärtekniker med namn ur technicians-tabellen (ärendets namnfält som
+   * reserv). Den som stänger ärendet läggs till om hen inte står på ärendet
+   * (vikarie som RLS hindrade från att tilldelas). E-postadresser blir
+   * aldrig namn.
+   */
+  static async resolveVisitTechnicians(
+    caseId: string,
+    performerId: string | null,
+    performerName: string | null
+  ): Promise<Array<{ id: string | null; name: string; role: 'primary' | 'secondary' | 'tertiary' }>> {
+    const { data: c } = await supabase
+      .from('cases')
+      .select('primary_technician_id, primary_technician_name, secondary_technician_id, secondary_technician_name, tertiary_technician_id, tertiary_technician_name')
+      .eq('id', caseId)
+      .maybeSingle()
+    const row = (c ?? {}) as Record<string, string | null>
+    const slots: Array<{ id: string | null; name: string | null }> = [
+      { id: row.primary_technician_id ?? null, name: row.primary_technician_name ?? null },
+      { id: row.secondary_technician_id ?? null, name: row.secondary_technician_name ?? null },
+      { id: row.tertiary_technician_id ?? null, name: row.tertiary_technician_name ?? null },
+    ].filter((s) => s.id || cleanTechnicianName(s.name))
+    if (performerId && !slots.some((s) => s.id === performerId)) {
+      slots.push({ id: performerId, name: performerName })
+    }
+    const ids = [...new Set(slots.map((s) => s.id).filter((x): x is string => !!x))]
+    const names = new Map<string, string>()
+    if (ids.length > 0) {
+      const { data: techs } = await supabase.from('technicians').select('id, name').in('id', ids)
+      for (const t of (techs ?? []) as Array<{ id: string; name: string | null }>) {
+        const n = cleanTechnicianName(t.name)
+        if (n) names.set(t.id, n)
+      }
+    }
+    const roles = ['primary', 'secondary', 'tertiary'] as const
+    const team: Array<{ id: string | null; name: string; role: 'primary' | 'secondary' | 'tertiary' }> = []
+    for (const s of slots) {
+      const name = (s.id ? names.get(s.id) : null) ?? cleanTechnicianName(s.name)
+      if (!name || team.some((t) => (s.id && t.id === s.id) || t.name === name)) continue
+      team.push({ id: s.id, name, role: roles[Math.min(team.length, 2)] })
+    }
+    return team
+  }
+
   static async ensureTechnicianOnCase(
     caseId: string,
     technicianId: string,
@@ -705,6 +765,9 @@ export class AddonStationBillingService {
     ].filter(Boolean)
 
     if (assigned.includes(technicianId)) return
+
+    // Namnet ur technicians-tabellen, aldrig ett e-postnamn från profilen
+    technicianName = (await this.technicianNameById(technicianId)) ?? cleanTechnicianName(technicianName)
 
     const update: Record<string, unknown> = {}
     if (!caseRow.secondary_technician_id) {
@@ -766,6 +829,11 @@ export class AddonStationBillingService {
       return { itemsCreated: 0, totalAmount: 0, skippedZeroTotal: billableTotal <= 0 && serviceItems.length > 0 }
     }
 
+    // Besökets tekniker: namnen ur technicians-tabellen (eller ärendets
+    // namnfält), aldrig anroparens profilnamn som kan vara en e-postadress.
+    // Andra- och tredjeteknikern på ärendet följer med i snapshoten.
+    const team = await this.resolveVisitTechnicians(caseId, technicianId ?? null, technicianName ?? null)
+
     // Besökssnapshot måste finnas INNAN fakturering (stämplar visit_id på raderna).
     // RPC:n är idempotent (ett slutbesök per ärende).
     const visit = await VisitService.createVisitSnapshot({
@@ -774,12 +842,10 @@ export class AddonStationBillingService {
       source: 'completion',
       isFinal: true,
       customerId,
-      visitDate: new Date().toISOString(),
-      technicianId: technicianId ?? null,
-      technicianName: technicianName ?? undefined,
-      technicians: technicianId || technicianName
-        ? [{ id: technicianId ?? null, name: technicianName || '', role: 'primary' as const }]
-        : undefined,
+      visitDate: toLocalISOStringWithOffset(new Date()),
+      technicianId: team[0]?.id ?? technicianId ?? null,
+      technicianName: team[0]?.name ?? undefined,
+      technicians: team.length > 0 ? team : undefined,
       workPerformed: workPerformed ?? undefined
     })
     if (!visit) {

@@ -379,7 +379,7 @@ export function AddStationWizard({
                 quantity: input.preparation_quantity,
                 unit: input.preparation_unit || 'g',
                 applied_by_technician_id: profile?.technician_id || undefined,
-                applied_by_technician_name: profile?.full_name || profile?.email || undefined
+                applied_by_technician_name: profile?.technicians?.name?.trim() || undefined
               })
             }
           } else if (input.preparation_id && input.preparation_quantity) {
@@ -397,8 +397,7 @@ export function AddStationWizard({
             selectedCustomerId,
             input.addon_billing_model ?? 'per_round',
             technicianId || profile?.technician_id || null,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (profile as any)?.full_name || profile?.email || null
+            profile?.technicians?.name?.trim() || null
           )
         }
       }

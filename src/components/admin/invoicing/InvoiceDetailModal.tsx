@@ -47,7 +47,7 @@ import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerReso
 import { isPersonnummer } from '../../../services/fortnoxService'
 import { FortnoxMirrorService } from '../../../services/fortnoxMirrorService'
 import { CaseCustomerService } from '../../../services/caseCustomerService'
-import { orgDigits, toVatInclusivePrice, type FortnoxMirrorHit } from '../../../shared/fortnoxCustomerNumbers'
+import { orgDigits, type FortnoxMirrorHit } from '../../../shared/fortnoxCustomerNumbers'
 import { PaymentTermsService, type BillingCategory } from '../../../services/paymentTermsService'
 import type { InvoiceWithItems, InvoiceStatus, InvoiceItem } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
@@ -70,6 +70,10 @@ import { useInvoicePulse, usePriceListCheck } from '../../../hooks/useInvoicePul
 import { useInvoiceMarking } from '../../../hooks/useInvoiceMarking'
 import { useInvoiceCaseChain } from '../../../hooks/useInvoiceCaseChain'
 import { useInvoiceVisit, type VisitSnapshot } from '../../../hooks/useInvoiceVisit'
+import { useInvoiceAddons } from '../../../hooks/useInvoiceAddons'
+import { InvoiceAddonBlock, InvoiceAddonCosts, InvoiceAddonSideCard } from './InvoiceAddonSection'
+import { addonLineName, addonPeriodText, buildFortnoxInvoiceRows, type InvoiceItemLike } from '../../../shared/invoiceAddonLines'
+import { splitCaseLines, formatHours } from '../../../shared/addonEconomics'
 import { formatVisitTechnicians } from '../../../services/visitService'
 import CommentSection from '../../communication/CommentSection'
 import CaseContextImagePreview from '../../communication/CaseContextImagePreview'
@@ -1124,31 +1128,21 @@ export default function InvoiceDetailModal({
       // HouseWorkType) — det är så Fortnox API:t fungerar; fakturanivåns
       // TaxReductionType sätts i steg 4. HouseWorkType-kategorierna är
       // Skatteverkets: ROT → CONSTRUCTION, RUT → CLEANING som standard.
-      const houseWorkTypeFor = (rotRut: string | null | undefined) =>
-        rotRut?.toUpperCase() === 'ROT' ? 'CONSTRUCTION'
-        : rotRut?.toUpperCase() === 'RUT' ? 'CLEANING'
-        : undefined
       // Momsläge sätts ALLTID uttryckligen. Utelämnas VATIncluded tar Fortnox
       // kundkortets standard, och privatkundkort har "priser inkl. moms":
       // då tolkas radens Price som inklusive moms och en 1 000 kr-rad blir
       // 1 000 kr inkl. moms (utkast 890, 2026-09-03). Privatpersoner får
       // därför inkl-priser + VATIncluded=true, företag exkl-priser + false.
       const vatIncluded = isPrivatePerson
-      // Textrader (line_kind index_note, 0 kr) skickas som ren textrad: bara
-      // Description, så Fortnox inte bokför en 0-rad med artikel och moms.
-      const invoiceRows = itemsForSend.map(item => (item as { line_kind?: string | null }).line_kind === 'index_note'
-        ? { Description: item.article_name.slice(0, 200) }
-        : ({
-        ArticleNumber: item.article_code || undefined,
-        Description: item.article_name.slice(0, 200),
-        DeliveredQuantity: item.quantity,
-        Price: vatIncluded ? toVatInclusivePrice(item.unit_price, item.vat_rate) : item.unit_price,
-        VAT: item.vat_rate,
-        ...(item.discount_percent > 0 ? { Discount: item.discount_percent, DiscountType: 'PERCENT' } : {}),
-        ...((item as any).rot_rut_type && invoice.fastighetsbeteckning
-          ? { HouseWork: true, HouseWorkType: houseWorkTypeFor((item as any).rot_rut_type) }
-          : {}),
-      }))
+      // Raderna byggs i src/shared/invoiceAddonLines.ts (enhetstestad):
+      // textrader (index_note) som ren Description, ROT/RUT per rad.
+      // Tilläggsrader får perioden som textrad under raden, arbetstiden
+      // går som timmar och en förklaring om nästa tilläggsfaktura läggs sist.
+      const invoiceRows = buildFortnoxInvoiceRows(itemsForSend as unknown as InvoiceItemLike[], {
+        vatIncluded,
+        fastighetsbeteckning: invoice.fastighetsbeteckning,
+        addonLines: invoice.invoice_type === 'adhoc' ? addons.lines : [],
+      })
 
       // 4. Skapa faktura i Fortnox
       // Betalningsvillkoret gäller FRÅN sändningen till Fortnox: förfallodatum
@@ -1313,7 +1307,11 @@ export default function InvoiceDetailModal({
   const chain = useInvoiceCaseChain(isOpen ? invoice : null, effectiveCaseType)
   // Prisavstämning mot kundens avtalsprislista (adhoc) — negativ marginal på
   // avtalat fast pris ska inte larma rött
-  const priceCheck = usePriceListCheck(isOpen ? invoice : null, caseBillingItems)
+  // Tilläggsrader (pro rata från etableringen): tidslinje, period, kalkyl
+  const addons = useInvoiceAddons(isOpen ? invoice : null)
+  const hasAddonLines = addons.lines.length > 0
+  const addonByItemId = new Map(addons.lines.map(l => [l.invoiceItemId, l]))
+  const priceCheck = usePriceListCheck(isOpen ? invoice : null, caseBillingItems, addons.lines)
 
   if (!isOpen) return null
 
@@ -1466,6 +1464,7 @@ export default function InvoiceDetailModal({
             caseBillingItems={caseBillingItems}
             caseContext={caseContext}
             priceCheck={priceCheck}
+            hasAddonLines={hasAddonLines}
           />
         )}
 
@@ -1769,17 +1768,24 @@ export default function InvoiceDetailModal({
                       <tbody className="divide-y divide-slate-700/50">
                         {invoice.items.map(item => {
                           const itemVisitNumber = visitNumberForItem(item)
+                          const addonLine = addonByItemId.get(item.id)
+                          const addonPeriod = addonLine ? addonPeriodText(addonLine.timeline) : null
                           return (
                           <tr key={item.id}>
                             <td className="px-3 py-2">
                               <div className="text-sm text-white">
-                                {item.article_name}
+                                {addonLine ? addonLineName(item.article_name, addonLine.kind) : item.article_name}
                                 {itemVisitNumber != null && (
                                   <span className="ml-2 text-xs text-slate-500 tabular-nums">
                                     Besök {itemVisitNumber}
                                   </span>
                                 )}
                               </div>
+                              {addonPeriod && (
+                                <div className="text-xs text-slate-400 tabular-nums">
+                                  {addonPeriod}, fram till nästa årspremie
+                                </div>
+                              )}
                               {item.article_code && (
                                 <div className="text-xs text-slate-500">{item.article_code}</div>
                               )}
@@ -1796,7 +1802,11 @@ export default function InvoiceDetailModal({
                                 </div>
                               )}
                             </td>
-                            <td className="px-3 py-2 text-right text-sm text-slate-300">{item.quantity}</td>
+                            <td className="px-3 py-2 text-right text-sm text-slate-300 tabular-nums whitespace-nowrap">
+                              {addonLine
+                                ? `${formatHours(Number(item.quantity))} ${addonLine.kind === 'labour' ? 'h' : 'st'}`
+                                : item.quantity}
+                            </td>
                             <td className="px-3 py-2 text-right text-sm text-slate-300">
                               {formatInvoiceAmount(isPrivate ? item.unit_price * (1 + item.vat_rate / 100) : item.unit_price)}
                             </td>
@@ -1820,6 +1830,11 @@ export default function InvoiceDetailModal({
                     </table>
                   </div>
                 </div>
+
+                {/* Tillägg utöver avtalet — samma tidslinje som ärendets Ekonomi-flik */}
+                {hasAddonLines && (
+                  <InvoiceAddonBlock addons={addons} priceOk={priceCheck.mode === 'agreement'} />
+                )}
 
                 {/* Rader utanför fakturan — pending tjänsterader som inte kom med */}
                 <UnbilledRowsNotice chain={chain} />
@@ -1907,8 +1922,11 @@ export default function InvoiceDetailModal({
                   // Ad-hoc/avtal: fakturaraderna länkar via contract_billing_item_id, så vi bygger istället
                   // tjänsteraderna direkt från case_billing_items (vars id är det mapped_service_id pekar på).
                   const isContractOrAdhoc = invoice.invoice_type === 'adhoc' || invoice.invoice_type === 'contract'
+                  // Tilläggsrader och artiklarna mappade mot dem räknas i
+                  // tilläggets kostnader nedan, aldrig som marginal i procent
+                  const costItems = hasAddonLines ? splitCaseLines(caseBillingItems).caseLines : caseBillingItems
                   const serviceRows = isContractOrAdhoc
-                    ? caseBillingItems
+                    ? costItems
                         .filter(i => i.item_type === 'service')
                         .map(i => ({
                           id: i.id,
@@ -1930,6 +1948,25 @@ export default function InvoiceDetailModal({
                   const allAdditionRows =
                     serviceRows.length > 0 &&
                     serviceRows.every(r => additionRowIds.includes(r.serviceItemId))
+                  if (hasAddonLines) {
+                    const ownArticles = costItems.filter(i => i.item_type === 'article')
+                    const ownRevenue = serviceRows.reduce((s, r) => s + Number(r.revenue || 0), 0)
+                    return (
+                      <>
+                        <InvoiceAddonCosts addons={addons} />
+                        {(ownRevenue > 0 || ownArticles.length > 0) && (
+                          <ServiceCostBreakdown
+                            serviceRows={serviceRows}
+                            articleItems={ownArticles}
+                            totalRevenue={ownRevenue}
+                            formatAmount={formatInvoiceAmount}
+                            defaultCollapsed={false}
+                            neutralMargin={allAdditionRows}
+                          />
+                        )}
+                      </>
+                    )
+                  }
                   return (
                     <ServiceCostBreakdown
                       serviceRows={serviceRows}
@@ -1945,7 +1982,7 @@ export default function InvoiceDetailModal({
                 {/* Prisavstämning mot kundens avtalsprislista (adhoc):
                     grön förklaring när negativ marginal är ett avtalat fast pris,
                     röd per-rad-differens när priset avviker */}
-                {priceCheck.mode === 'agreement' && (() => {
+                {priceCheck.mode === 'agreement' && !hasAddonLines && (() => {
                   const articleCost = caseBillingItems
                     .filter(i => i.item_type === 'article')
                     .reduce((s, i) => s + Number(i.total_price || 0), 0)
@@ -2106,7 +2143,8 @@ export default function InvoiceDetailModal({
                   </CaseModalSection>
 
                   {/* Avtal — period/frekvens/årspremie */}
-                  {(invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc') && contractCustomer && (
+                  {hasAddonLines && <InvoiceAddonSideCard addons={addons} />}
+                  {(invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc') && contractCustomer && !hasAddonLines && (
                     <CaseModalSection
                       icon={FileText}
                       iconClassName="text-[#20c58f]"
@@ -2229,7 +2267,7 @@ export default function InvoiceDetailModal({
                     {(invoice.invoice_type === 'contract' || invoice.invoice_type === 'adhoc') && (
                       <div className="bg-slate-900/50 rounded-lg p-2.5 border border-slate-700/50">
                         <p className="text-xs text-slate-400">
-                          {invoice.invoice_type === 'contract' ? 'Avtalsfakturering' : 'Merförsäljning'}
+                          {invoice.invoice_type === 'contract' ? 'Avtalsfakturering' : hasAddonLines ? 'Tillägg utöver avtalet' : 'Merförsäljning'}
                         </p>
                         {invoice.billing_period_start && invoice.billing_period_end && (
                           <p className="text-xs text-slate-300 mt-1">

@@ -11,6 +11,7 @@ import { resolveFortnoxCustomerNumber } from '../utils/fortnoxCustomerResolver'
 import type { InvoiceWithItems } from '../types/invoice'
 import { formatInvoiceAmount } from '../types/invoice'
 import type { CaseBillingItem } from '../types/caseBilling'
+import { addonExpectedTotal, type InvoiceAddonLine } from '../shared/invoiceAddonLines'
 
 // Marginaltrösklar för ekonomisignalen: < BAD röd, BAD–WARN amber, > WARN grön
 export const MARGIN_BAD_BELOW = 0
@@ -319,23 +320,40 @@ export interface PriceListCheck {
   diffTotal: number
   /** Vid avvikelse: de avvikande raderna. Vid enligt avtal: alla matchade rader. */
   rows: PriceCheckRow[]
+  /** Fakturan har tilläggsrader: de jämförs mot avtalspris × dagar / 365 */
+  addon?: boolean
 }
 
 const EMPTY_PRICE_CHECK: PriceListCheck = { loading: false, mode: 'none', diffTotal: 0, rows: [] }
 
+/**
+ * Prisavstämning mot kundens avtalsprislista (adhoc). Tilläggsrader (pro rata
+ * fram till avtalets nästa periodstart) jämförs mot avtalspriset räknat på
+ * samma dagar (addonExpectedTotal, tidslinjens formel), inte mot helårspriset.
+ * Saknas tjänsten i prislistan gäller årspriset raden skapades med
+ * (addon_annual_unit_price, löst ur prislistan av RPC:n). 0-kronorsrader som
+ * inte är tillägg (t.ex. etablering som ingår i avtalet) räknas inte när
+ * fakturan har tillägg.
+ */
 export function usePriceListCheck(
   invoice: InvoiceWithItems | null,
-  caseBillingItems: CaseBillingItem[]
+  caseBillingItems: CaseBillingItem[],
+  addonLines: InvoiceAddonLine[] = []
 ): PriceListCheck {
   const [check, setCheck] = useState<PriceListCheck>(EMPTY_PRICE_CHECK)
 
+  const addonByRow = new Map(addonLines.map(l => [l.row.id, l]))
+  const hasAddon = addonByRow.size > 0
   const serviceRows =
     invoice?.invoice_type === 'adhoc'
-      ? caseBillingItems.filter(i => i.item_type === 'service')
+      ? caseBillingItems.filter(i =>
+          i.item_type === 'service' &&
+          !(hasAddon && !addonByRow.has(i.id) && !(Number(i.total_price) > 0))
+        )
       : []
   // Stabil nyckel så effekten bara körs om när tjänsteraderna faktiskt ändras
   const rowsKey = serviceRows
-    .map(r => `${r.id}:${r.service_id}:${r.total_price}:${r.quantity}`)
+    .map(r => `${r.id}:${r.service_id}:${r.total_price}:${r.quantity}:${addonByRow.has(r.id) ? 'a' : ''}`)
     .join('|')
 
   useEffect(() => {
@@ -347,7 +365,7 @@ export function usePriceListCheck(
     const customerId = invoice.customer_id
 
     const load = async () => {
-      setCheck({ ...EMPTY_PRICE_CHECK, loading: true })
+      setCheck({ ...EMPTY_PRICE_CHECK, loading: true, addon: hasAddon })
       let prices: Record<string, number>
       try {
         prices = await PriceListService.getServicePricesForCase(customerId)
@@ -357,14 +375,26 @@ export function usePriceListCheck(
       }
       if (cancelled) return
 
-      const withList = serviceRows.filter(r => r.service_id && prices[r.service_id] != null)
+      // Årspris per rad: prislistan, för tillägg annars radens eget årspris
+      const listPriceFor = (r: CaseBillingItem): number | null => {
+        const fromList = r.service_id ? prices[r.service_id] : undefined
+        if (fromList != null) return Number(fromList)
+        const addon = addonByRow.get(r.id)
+        const annual = addon ? Number(addon.row.addon_annual_unit_price ?? 0) : 0
+        return annual > 0 ? annual : null
+      }
+      const withList = serviceRows.filter(r => listPriceFor(r) != null)
       if (withList.length === 0) {
         setCheck(EMPTY_PRICE_CHECK)
         return
       }
 
       const rows: PriceCheckRow[] = withList.map(r => {
-        const listTotal = prices[r.service_id as string] * (Number(r.quantity) || 1)
+        const listPrice = listPriceFor(r) as number
+        const addon = addonByRow.get(r.id)
+        const listTotal = addon
+          ? addonExpectedTotal(addon, listPrice)
+          : listPrice * (Number(r.quantity) || 1)
         const invoiceTotal = Number(r.total_price || 0)
         return {
           id: r.id,
@@ -382,10 +412,11 @@ export function usePriceListCheck(
           mode: 'deviation',
           diffTotal: deviating.reduce((s, r) => s + Math.abs(r.diff), 0),
           rows: deviating,
+          addon: hasAddon,
         })
       } else if (withList.length === serviceRows.length) {
         // Alla tjänsterader har avtalat pris och matchar
-        setCheck({ loading: false, mode: 'agreement', diffTotal: 0, rows })
+        setCheck({ loading: false, mode: 'agreement', diffTotal: 0, rows, addon: hasAddon })
       } else {
         // Delvis täckning utan avvikelse → inget läge, dagens beteende
         setCheck(EMPTY_PRICE_CHECK)
