@@ -15,9 +15,18 @@ import {
   AlertTriangle,
   AlertCircle,
   Loader2,
-  HelpCircle
+  HelpCircle,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  Search,
+  Plus
 } from 'lucide-react'
 import { StationTypeService } from '../../../services/stationTypeService'
+import { AddonStationBillingService } from '../../../services/addonStationBillingService'
+import { ArticleService } from '../../../services/articleService'
+import type { Article } from '../../../types/articles'
+import type { StationTypeArticle } from '../../../types/addonStations'
 import {
   StationType,
   CreateStationTypeInput,
@@ -91,8 +100,77 @@ export function StationTypeEditModal({
   const [thresholdSource, setThresholdSource] = useState<'station' | 'preparation'>('station')
   const [isActive, setIsActive] = useState(true)
 
+  // Produkterna teknikern väljer mellan vid utplacering (station_type_articles)
+  const [typeArticles, setTypeArticles] = useState<StationTypeArticle[]>([])
+  const [articlesDirty, setArticlesDirty] = useState(false)
+  const [articlesLoading, setArticlesLoading] = useState(false)
+  const [allArticles, setAllArticles] = useState<Article[]>([])
+  const [articleSearch, setArticleSearch] = useState('')
+
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    setArticleSearch('')
+    setArticlesDirty(false)
+    setTypeArticles([])
+    ArticleService.getActiveArticles()
+      .then(list => { if (!cancelled) setAllArticles(list) })
+      .catch(() => { if (!cancelled) setAllArticles([]) })
+    if (stationType) {
+      setArticlesLoading(true)
+      AddonStationBillingService.getStationTypeArticles(stationType.id)
+        .then(list => { if (!cancelled) setTypeArticles(list) })
+        .finally(() => { if (!cancelled) setArticlesLoading(false) })
+    }
+    return () => { cancelled = true }
+  }, [stationType, isOpen])
+
+  const updateTypeArticles = (next: StationTypeArticle[]) => {
+    // Exakt ett förval när listan inte är tom
+    if (next.length > 0 && !next.some(a => a.isDefault)) {
+      next = next.map((a, i) => ({ ...a, isDefault: i === 0 }))
+    }
+    setTypeArticles(next)
+    setArticlesDirty(true)
+  }
+
+  const addArticle = (article: Article) => {
+    if (typeArticles.some(a => a.articleId === article.id)) return
+    updateTypeArticles([
+      ...typeArticles,
+      { articleId: article.id, code: article.code, name: article.name, cost: article.default_price, isDefault: false }
+    ])
+    setArticleSearch('')
+  }
+
+  const removeArticle = (articleId: string) => {
+    updateTypeArticles(typeArticles.filter(a => a.articleId !== articleId))
+  }
+
+  const moveArticle = (index: number, delta: -1 | 1) => {
+    const target = index + delta
+    if (target < 0 || target >= typeArticles.length) return
+    const next = [...typeArticles]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    updateTypeArticles(next)
+  }
+
+  const setDefaultArticle = (articleId: string) => {
+    updateTypeArticles(typeArticles.map(a => ({ ...a, isDefault: a.articleId === articleId })))
+  }
+
+  const articleMatches = (() => {
+    const q = articleSearch.trim().toLowerCase()
+    if (!q) return []
+    const chosen = new Set(typeArticles.map(a => a.articleId))
+    return allArticles
+      .filter(a => !chosen.has(a.id))
+      .filter(a => a.name.toLowerCase().includes(q) || (a.code || '').toLowerCase().includes(q))
+      .slice(0, 8)
+  })()
 
   // Fyll i formulär vid redigering
   useEffect(() => {
@@ -217,13 +295,20 @@ export function StationTypeEditModal({
         is_active: isActive
       }
 
+      let stationTypeId: string
       if (isEditing && stationType) {
         await StationTypeService.updateStationType(stationType.id, input)
-        toast.success('Stationstyp uppdaterad')
+        stationTypeId = stationType.id
       } else {
-        await StationTypeService.createStationType(input)
-        toast.success('Stationstyp skapad')
+        const created = await StationTypeService.createStationType(input)
+        stationTypeId = created.id
       }
+
+      if (articlesDirty) {
+        await AddonStationBillingService.setStationTypeArticles(stationTypeId, typeArticles)
+      }
+
+      toast.success(isEditing ? 'Stationstyp uppdaterad' : 'Stationstyp skapad')
 
       onSave()
     } catch (error) {
@@ -437,6 +522,114 @@ export function StationTypeEditModal({
                 </div>
               } />
             </label>
+          </div>
+
+          {/* Produkter */}
+          <div className="space-y-4 pt-4 border-t border-slate-700">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-medium text-slate-400 uppercase tracking-wider">
+                Produkter
+              </h3>
+              <FieldTooltip content={
+                <div>
+                  <p className="font-medium mb-1">Produkter vid utplacering</p>
+                  <p>Artiklarna teknikern väljer mellan när en station av den här typen placeras ut. Förvalet väljs automatiskt.</p>
+                  <p className="mt-2 text-slate-400">Artiklarna hämtas från artikelregistret. Inköpspriset blir utrustningskostnaden i marginalen.</p>
+                </div>
+              } />
+            </div>
+
+            {articlesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-slate-400">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Hämtar produkter
+              </div>
+            ) : typeArticles.length === 0 ? (
+              <p className="text-sm text-slate-500">Inga produkter kopplade. Teknikern får inget produktval för den här typen.</p>
+            ) : (
+              <div className="divide-y divide-slate-700/60 border border-slate-700 rounded-lg">
+                {typeArticles.map((a, i) => (
+                  <div key={a.articleId} className="flex items-center gap-3 px-3 py-2">
+                    <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0" title="Förval">
+                      <input
+                        type="radio"
+                        name="defaultArticle"
+                        checked={a.isDefault}
+                        onChange={() => setDefaultArticle(a.articleId)}
+                        className="w-4 h-4 bg-slate-900 border-slate-600 text-emerald-500 focus:ring-emerald-500 shrink-0"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm text-white truncate">{a.name}</span>
+                        <span className="block text-xs text-slate-500">
+                          {a.code ? `Art.nr ${a.code}` : 'Utan artikelnummer'}
+                          {a.cost != null ? ` · inköp ${a.cost.toLocaleString('sv-SE')} kr` : ''}
+                          {a.isDefault ? ' · förval' : ''}
+                        </span>
+                      </span>
+                    </label>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => moveArticle(i, -1)}
+                        disabled={i === 0}
+                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-30 disabled:hover:bg-transparent"
+                        title="Flytta upp"
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveArticle(i, 1)}
+                        disabled={i === typeArticles.length - 1}
+                        className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded disabled:opacity-30 disabled:hover:bg-transparent"
+                        title="Flytta ned"
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeArticle(a.articleId)}
+                        className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded"
+                        title="Ta bort"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                value={articleSearch}
+                onChange={(e) => setArticleSearch(e.target.value)}
+                placeholder="Sök artikel att lägga till (namn eller art.nr)"
+                className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              {articleSearch.trim() && (
+                <div className="mt-1 border border-slate-700 rounded-lg bg-slate-900 divide-y divide-slate-700/60">
+                  {articleMatches.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-slate-500">Ingen aktiv artikel matchar</p>
+                  ) : articleMatches.map(article => (
+                    <button
+                      key={article.id}
+                      type="button"
+                      onClick={() => addArticle(article)}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-slate-800 transition-colors"
+                    >
+                      <Plus className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm text-white truncate">{article.name}</span>
+                        <span className="block text-xs text-slate-500">Art.nr {article.code}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Tröskelvärden */}

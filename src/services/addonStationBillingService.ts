@@ -148,6 +148,26 @@ export class AddonStationBillingService {
   }
 
   /**
+   * Byter stationstypens produktlista atomärt (RPC set_station_type_articles,
+   * kräver admin). Ordningen i listan blir sort_order.
+   */
+  static async setStationTypeArticles(
+    stationTypeId: string,
+    articles: Array<{ articleId: string; isDefault: boolean }>
+  ): Promise<void> {
+    const payload = articles.map((a, i) => ({
+      article_id: a.articleId,
+      is_default: a.isDefault,
+      sort_order: i,
+    }))
+    const { error } = await supabase.rpc('set_station_type_articles', {
+      p_station_type_id: stationTypeId,
+      p_articles: payload,
+    })
+    if (error) throw new Error(`Kunde inte spara produkterna: ${error.message}`)
+  }
+
+  /**
    * § 5-rader för per år/per månad-stationer: antal synkas från enhetens
    * aktiva stationer (SECURITY DEFINER-RPC, vikarie-säker). Sväljer fel.
    */
