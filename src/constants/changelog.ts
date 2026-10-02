@@ -54,6 +54,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'nyhet', text: 'Så läser du kartan: en förklaring av färg, ikon, plusbricka, nummerbricka och kantfärgerna för status. Finns under filtren och vid utplacering.' },
       { kind: 'nyhet', text: 'Markörerna i personalens kartor visar produktens eller stationstypens ikon, och grupperna har en ring i typernas färger. Kartan går att filtrera på Saknas, Skadade och Bara tillägg.' },
       { kind: 'nyhet', text: 'Vid utplacering visas den nya stationen som den kommer att se ut, och GPS-positionen får en cirkel och en text som till exempel GPS ± 6 m. Över 15 m visas en uppmaning att dra nålen till rätt plats.' },
+      { kind: 'nyhet', text: 'Kunderna får samma tydliga karta under Fällor & stationer, i både kundportalen och organisationsportalen: stationstypens ikon i markören, numret under, typerna som knappar ovanför kartan och Så läser du kartan. Kunderna ser aldrig produkternas ikoner.' },
+      { kind: 'buggfix', text: 'Numret i kundens stationslista är nu samma som på kartan. Tidigare räknade listan från den nyaste stationen och kartan från den äldsta.' },
     ],
   },
   {

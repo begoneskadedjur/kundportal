@@ -30,6 +30,8 @@ interface FloorPlanViewerProps {
   relocatingStationName?: string | null
   /** Personalvyer: visa produktens interna ikon. Av som standard (kundvyer). */
   showProductIcons?: boolean
+  /** Kundvyer: stationstypens ikon i markören, numret i en bricka under */
+  showTypeIcons?: boolean
 }
 
 // Hämta typkonfiguration - prioriterar dynamisk data
@@ -72,7 +74,8 @@ export function FloorPlanViewer({
   highlightedStationId,
   relocatingStationId,
   relocatingStationName,
-  showProductIcons = false
+  showProductIcons = false,
+  showTypeIcons = false
 }: FloorPlanViewerProps) {
   const transformRef = useRef<ReactZoomPanPinchRef>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -477,6 +480,7 @@ export function FloorPlanViewer({
                   onPointerMove={isBeingRelocated ? handleRelocatePointerMove : undefined}
                   onPointerUp={isBeingRelocated ? handleRelocatePointerUp : undefined}
                   showProductIcon={showProductIcons}
+                  showTypeIcon={showTypeIcons}
                 />
               )
             })}

@@ -91,12 +91,77 @@ export function MarkerGuide({
   exampleColor = '#3b82f6',
   exampleIcon = 'aurotrap',
   showClusters = true,
+  audience = 'staff',
 }: {
   open?: boolean
   exampleColor?: string
   exampleIcon?: string
   showClusters?: boolean
+  /** customer: inget om produkter eller kontrollrundan */
+  audience?: 'staff' | 'customer'
 }) {
+  if (audience === 'customer') {
+    return (
+      <details open={open} className="group rounded-xl border border-slate-700/60 bg-slate-900/30">
+        <summary className="flex items-center gap-2 px-3 py-2.5 cursor-pointer list-none text-sm text-slate-300 hover:text-white">
+          <HelpCircle className="w-4 h-4 text-slate-400" />
+          <span className="flex-1">Så läser du kartan</span>
+          <span className="text-slate-500 text-xs group-open:hidden">Visa</span>
+          <span className="text-slate-500 text-xs hidden group-open:inline">Dölj</span>
+        </summary>
+        <div className="px-3 pb-3 grid gap-3 sm:grid-cols-2">
+          <Row
+            symbol={<MarkerSymbol color={exampleColor} icon={exampleIcon} />}
+            title="Färgen och ikonen visar typen"
+            text="Samma som knapparna ovanför kartan."
+          />
+          <Row
+            symbol={<MarkerSymbol color={exampleColor} icon={exampleIcon} badge="12" />}
+            title="Numret under är stationens nummer"
+            text="Samma nummer som i listan."
+          />
+          <Row
+            symbol={<MarkerSymbol color={exampleColor} icon={exampleIcon} addon />}
+            title="Plusbrickan betyder tillägg"
+            text="Stationen ligger utöver avtalet."
+          />
+          {showClusters && (
+            <Row
+              symbol={
+                <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true">
+                  <circle cx="13" cy="13" r="12" fill="#0f172a" stroke="#fff" strokeWidth="1.2" />
+                  <path d="M13 3.5 A9.5 9.5 0 0 1 22.5 13" fill="none" stroke="#6b7280" strokeWidth="4" />
+                  <path d="M22.5 13 A9.5 9.5 0 0 1 6 19.7" fill="none" stroke="#3b82f6" strokeWidth="4" />
+                  <path d="M6 19.7 A9.5 9.5 0 0 1 13 3.5" fill="none" stroke="#06b6d4" strokeWidth="4" />
+                  <text x="13" y="16.5" textAnchor="middle" fontSize="9" fontWeight="700" fill="#fff">18</text>
+                </svg>
+              }
+              title="Ringen runt en grupp visar typerna i den"
+              text="Zooma in för att se de enskilda stationerna."
+            />
+          )}
+        </div>
+        <div className="px-3 pb-3">
+          <p className="text-xs font-medium text-slate-400 mb-1.5">Kanten och tecknet visar status</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+            {STATUS.filter(s => s.text !== 'Kontrollerad i rundan' && s.text !== 'Markerad').map((s) => (
+              <div key={s.text} className="flex items-center gap-2 text-xs text-slate-300">
+                <MarkerSymbol
+                  color={s.fill ?? '#475569'}
+                  stroke={s.stroke}
+                  strokeWeight={s.stroke === '#ffffff' ? 2 : 2.5}
+                  label={s.label}
+                  opacity={s.opacity ?? 1}
+                  radius={8}
+                />
+                {s.text}
+              </div>
+            ))}
+          </div>
+        </div>
+      </details>
+    )
+  }
   return (
     <details open={open} className="group rounded-xl border border-slate-700/60 bg-slate-900/30">
       <summary className="flex items-center gap-2 px-3 py-2.5 cursor-pointer list-none text-sm text-slate-300 hover:text-white">

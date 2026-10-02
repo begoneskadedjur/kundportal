@@ -166,6 +166,7 @@ export function CustomerEquipmentMap({ customerId, customerName }: CustomerEquip
       {viewMode === 'map' ? (
         <div className="bg-slate-800/50 rounded-xl border border-slate-700/50 overflow-hidden">
           <EquipmentMap
+            showTypeIcons
             equipment={activeEquipment}
             height="400px"
             readOnly

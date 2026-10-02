@@ -29,6 +29,8 @@ interface IndoorStationMarkerProps {
   onPointerUp?: (e: React.PointerEvent) => void
   /** Personalvyer: produktens interna ikon i cirkeln, numret i en bricka under */
   showProductIcon?: boolean
+  /** Kundvyer: stationstypens ikon i cirkeln, numret i en bricka under. Aldrig produktens. */
+  showTypeIcon?: boolean
 }
 
 // Hämta typ-konfiguration - prioritera dynamisk data från DB
@@ -75,11 +77,14 @@ export function IndoorStationMarker({
   onPointerDown,
   onPointerMove,
   onPointerUp,
-  showProductIcon = false
+  showProductIcon = false,
+  showTypeIcon = false
 }: IndoorStationMarkerProps) {
   const typeConfig = getTypeConfig(station)
   // Produktens interna ikon visas bara i personalvyer; kunder ser typens ikon som förut
-  const productIcon = showProductIcon ? station.article?.icon || null : null
+  // Ikonen i cirkeln: produktens (bara personal), annars typens när ikoner är på
+  const productIcon = (showProductIcon ? station.article?.icon || null : null)
+    || (showProductIcon || showTypeIcon ? typeConfig.icon || null : null)
   const statusConfig = INDOOR_STATION_STATUS_CONFIG[station.status]
 
   // Om inspekterad: grön bakgrund istället för typfärg

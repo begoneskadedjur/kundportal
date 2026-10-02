@@ -62,6 +62,13 @@ interface EquipmentMapProps {
   showProductIcons?: boolean
   /** Teckenförklaringen nere till vänster på kartan. Av där sidan visar en egen. */
   showLegend?: boolean
+  /**
+   * Kundvyer: stationstypens ikon i cirkeln och numret i en bricka under,
+   * aldrig produktens ikon. showProductIcons går före om båda är på.
+   */
+  showTypeIcons?: boolean
+  /** Färdiga stationsnummer (t.ex. samma som en lista bredvid). Går före showNumbers egen numrering. */
+  stationNumbers?: Map<string, number>
 }
 
 // CSS för pulsering av highlighted marker
@@ -104,7 +111,11 @@ export function EquipmentMap({
   defaultMapType = 'satellite',
   showProductIcons = false,
   showLegend = true,
+  showTypeIcons = false,
+  stationNumbers,
 }: EquipmentMapProps) {
+  // Ikoner i markörerna och typring på grupperna (personal eller kund)
+  const markerIcons = showProductIcons || showTypeIcons
   const { isLoaded, error: mapError } = useGoogleMaps({ libraries: ['marker', 'drawing', 'places'] })
 
   // Refs
@@ -158,6 +169,7 @@ export function EquipmentMap({
 
   // Nummermappning (sorterat på placed_at)
   const equipmentNumberMap = useMemo(() => {
+    if (stationNumbers) return stationNumbers
     if (!showNumbers) return new Map<string, number>()
     // Nedtonade grannar tar inga nummer
     const sorted = equipment.filter(item => !dimmedStationIds?.has(item.id)).sort((a, b) => {
@@ -170,7 +182,7 @@ export function EquipmentMap({
       map.set(item.id, index + 1)
     })
     return map
-  }, [equipment, showNumbers, dimmedStationIds])
+  }, [equipment, showNumbers, dimmedStationIds, stationNumbers])
 
   // Hantera klick på markör
   const handleMarkerClick = useCallback((item: EquipmentPlacementWithRelations) => {
@@ -412,8 +424,8 @@ export function EquipmentMap({
       const isStatusLabel = labelText !== '' && labelText !== number?.toString()
       const typeIcon = item.station_type_data?.icon
         || (typeColorMap.get(item.equipment_type) || typeColorMap.get((item.equipment_type || '').toLowerCase()))?.icon
-      const productIcon = showProductIcons && !isDimmed && !isRelocating && !isStatusLabel
-        ? stationIconPaths(item.article?.icon) || stationIconPaths(typeIcon)
+      const productIcon = markerIcons && !isDimmed && !isRelocating && !isStatusLabel
+        ? (showProductIcons ? stationIconPaths(item.article?.icon) : null) || stationIconPaths(typeIcon)
         : null
       const markerLabelText = productIcon ? '' : labelText
 
@@ -479,7 +491,7 @@ export function EquipmentMap({
         map,
         markers: newMarkers,
         renderer: {
-          render: ({ count, position, markers }) => showProductIcons
+          render: ({ count, position, markers }) => markerIcons
             ? new google.maps.Marker({
                 position,
                 icon: buildClusterIcon(
@@ -519,7 +531,7 @@ export function EquipmentMap({
       map.setCenter({ lat: focusItems[0].latitude, lng: focusItems[0].longitude })
       map.setZoom(DETAIL_ZOOM)
     }
-  }, [equipment, isLoaded, getEquipmentColor, inspectedStationIds, highlightedStationId, equipmentNumberMap, handleMarkerClick, relocatingStationId, enableClustering, dimmedStationIds, showProductIcons])
+  }, [equipment, isLoaded, getEquipmentColor, inspectedStationIds, highlightedStationId, equipmentNumberMap, handleMarkerClick, relocatingStationId, enableClustering, dimmedStationIds, showProductIcons, markerIcons])
 
   // Panorera till highlighted station (wizard-läge)
   useEffect(() => {

@@ -1353,6 +1353,7 @@ export default function CaseDetailsModal({
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">Tillagda stationer utomhus</p>
                         <div className="rounded-lg overflow-hidden border border-slate-700/40">
                           <EquipmentMap
+                            showTypeIcons
                             equipment={equipmentFull}
                             height="220px"
                             readOnly
@@ -1372,6 +1373,7 @@ export default function CaseDetailsModal({
                         </p>
                         <div className="rounded-lg overflow-hidden border border-slate-700/40">
                           <FloorPlanViewer
+                            showTypeIcons
                             imageUrl={fp.image_url ?? ''}
                             imageWidth={fp.image_width}
                             imageHeight={fp.image_height}

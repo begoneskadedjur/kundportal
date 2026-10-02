@@ -301,6 +301,7 @@ export function CustomerIndoorEquipmentView({
       {selectedFloorPlan?.image_url ? (
         <div className="bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 overflow-hidden">
           <FloorPlanViewer
+            showTypeIcons
             imageUrl={selectedFloorPlan.image_url}
             imageWidth={selectedFloorPlan.image_width}
             imageHeight={selectedFloorPlan.image_height}

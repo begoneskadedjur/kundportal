@@ -28,6 +28,7 @@ import type { OutdoorInspectionWithRelations } from '../../types/inspectionSessi
 import type { IndoorStationWithRelations, IndoorStationInspectionWithRelations } from '../../types/indoor'
 import type { FloorPlanWithRelations } from '../../services/floorPlanService'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
+import { MarkerGuide, MarkerSymbol } from '../shared/equipment/MarkerGuide'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
 import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailSheet'
@@ -160,7 +161,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
 
   // Räkna stationstyper dynamiskt (använd station_type_data)
   const typeStats = useMemo(() => {
-    const stats = new Map<string, { label: string; color: string; count: number }>()
+    const stats = new Map<string, { label: string; color: string; icon: string | null; count: number }>()
 
     equipment.forEach(item => {
       const typeName = item.station_type_data?.name || item.equipment_type || 'Okänd'
@@ -169,7 +170,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
       if (stats.has(typeName)) {
         stats.get(typeName)!.count++
       } else {
-        stats.set(typeName, { label: typeName, color: typeColor, count: 1 })
+        stats.set(typeName, { label: typeName, color: typeColor, icon: item.station_type_data?.icon ?? null, count: 1 })
       }
     })
 
@@ -185,6 +186,13 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
   const outdoorTypes = useMemo(() => {
     const types = new Set(equipment.map(e => e.station_type_data?.name || e.equipment_type || 'Okänd'))
     return Array.from(types).sort()
+  }, [equipment])
+
+  // Stationsnummer som på kartan (äldst först), så att listan och kartan visar
+  // samma nummer och ett nummer står kvar på stationen när listan filtreras
+  const outdoorNumbers = useMemo(() => {
+    const sorted = [...equipment].sort((a, b) => new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime())
+    return new Map(sorted.map((e, i) => [e.id, i + 1]))
   }, [equipment])
 
   // Filtrade utomhusstationer
@@ -204,8 +212,16 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
     if (outdoorTypeFilter !== 'all') {
       result = result.filter(e => (e.station_type_data?.name || e.equipment_type || 'Okänd') === outdoorTypeFilter)
     }
-    return result
-  }, [equipment, outdoorSearch, outdoorStatusFilter, outdoorTypeFilter])
+    return [...result].sort((a, b) => (outdoorNumbers.get(a.id) ?? 0) - (outdoorNumbers.get(b.id) ?? 0))
+  }, [equipment, outdoorSearch, outdoorStatusFilter, outdoorTypeFilter, outdoorNumbers])
+
+  // Kartan visar samma typer som filtret
+  const mapOutdoor = useMemo(
+    () => outdoorTypeFilter === 'all'
+      ? equipment
+      : equipment.filter(e => (e.station_type_data?.name || e.equipment_type || 'Okänd') === outdoorTypeFilter),
+    [equipment, outdoorTypeFilter]
+  )
 
   // Hantera klick på utomhusstation (från tabell eller karta)
   const handleOutdoorStationClick = async (item: EquipmentPlacementWithRelations) => {
@@ -341,28 +357,62 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                 Utomhus
                 <span className="text-sm font-normal text-slate-400">({equipment.length} stationer)</span>
               </h2>
-              {/* Typräkning */}
-              <div className="flex items-center gap-3">
-                {Array.from(typeStats.entries()).map(([typeName, data]) => (
-                  <div key={typeName} className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.color }} />
-                    <span>{data.label}: {data.count}</span>
-                  </div>
-                ))}
-              </div>
+            </div>
+
+            {/* Typerna som knappar med samma markör som kartan: tryck för att visa bara den typen */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              {Array.from(typeStats.entries()).map(([typeName, data]) => {
+                const on = outdoorTypeFilter === 'all' || outdoorTypeFilter === typeName
+                return (
+                  <button
+                    key={typeName}
+                    type="button"
+                    onClick={() => setOutdoorTypeFilter(outdoorTypeFilter === typeName ? 'all' : typeName)}
+                    aria-pressed={outdoorTypeFilter === typeName}
+                    title={outdoorTypeFilter === typeName ? 'Visa alla typer' : `Visa bara ${data.label}`}
+                    className={`flex items-center gap-2 pl-1.5 pr-3 py-1 rounded-lg border text-sm transition-colors ${
+                      outdoorTypeFilter === typeName
+                        ? 'border-[#20c58f] bg-[#20c58f]/10 text-white'
+                        : on
+                          ? 'border-slate-700 bg-slate-800/60 text-slate-200 hover:border-slate-600'
+                          : 'border-slate-700/60 bg-slate-800/30 text-slate-500'
+                    }`}
+                  >
+                    <MarkerSymbol color={data.color} icon={data.icon} radius={9} opacity={on ? 1 : 0.4} />
+                    {data.label}
+                    <span className="text-slate-500 tabular-nums">{data.count}</span>
+                  </button>
+                )
+              })}
             </div>
 
             {/* Karta */}
             <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 overflow-hidden mb-4">
               <EquipmentMap
-                equipment={equipment}
+                equipment={mapOutdoor}
+                stationNumbers={outdoorNumbers}
+                showTypeIcons
+                showLegend={false}
                 onEquipmentClick={handleOutdoorStationClick}
-                height="350px"
+                height="460px"
                 showControls={true}
                 readOnly={true}
                 enableClustering={equipment.length >= 10}
                 showNumbers={true}
                 highlightedStationId={highlightedOutdoorStationId}
+              />
+              <div className="border-t border-slate-700/50 px-4 py-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-400">
+                <span><span className="text-slate-200">Färgen och ikonen</span> visar typ av station</span>
+                <span><span className="text-slate-200">Numret</span> är samma som i listan nedan</span>
+                <span>Tryck på en station för detaljer</span>
+              </div>
+            </div>
+
+            <div className="mb-4">
+              <MarkerGuide
+                audience="customer"
+                exampleColor={Array.from(typeStats.values())[0]?.color}
+                exampleIcon={Array.from(typeStats.values())[0]?.icon ?? 'box'}
               />
             </div>
 
@@ -423,14 +473,14 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/40">
-                      {(outdoorShowAll ? filteredOutdoor : filteredOutdoor.slice(0, SECTION_PAGE_SIZE)).map((item, index) => {
+                      {(outdoorShowAll ? filteredOutdoor : filteredOutdoor.slice(0, SECTION_PAGE_SIZE)).map((item) => {
                         const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status] || { bgColor: 'bg-slate-500/20', color: 'slate-400' }
                         return (
                           <tr key={item.id} className="hover:bg-slate-700/20 transition-colors cursor-pointer" onClick={() => handleOutdoorStationClick(item)}>
-                            <td className="px-4 py-2 text-white font-medium text-sm">{index + 1}</td>
+                            <td className="px-4 py-2 text-white font-medium text-sm tabular-nums">{outdoorNumbers.get(item.id)}</td>
                             <td className="px-4 py-2">
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: item.station_type_data?.color || '#6b7280' }} />
+                              <div className="flex items-center gap-2">
+                                <MarkerSymbol color={item.station_type_data?.color || '#6b7280'} icon={item.station_type_data?.icon} radius={8} />
                                 <span className="text-slate-300 text-sm">{item.station_type_data?.name || item.equipment_type || 'Okänd'}</span>
                               </div>
                             </td>
@@ -522,6 +572,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
               {plan.image_url && (
                 <div className="bg-slate-800/50 backdrop-blur rounded-xl border border-slate-700/50 overflow-hidden mb-4">
                   <FloorPlanViewer
+                    showTypeIcons
                     imageUrl={plan.image_url}
                     imageWidth={plan.image_width}
                     imageHeight={plan.image_height}

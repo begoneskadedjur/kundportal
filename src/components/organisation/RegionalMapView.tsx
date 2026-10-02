@@ -349,6 +349,7 @@ export default function RegionalMapView({
             </div>
           ) : (
             <EquipmentMap
+              showTypeIcons
               equipment={visibleStations}
               regionPolygons={regionPolygons}
               height="600px"
