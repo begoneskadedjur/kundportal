@@ -50,6 +50,10 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Tydligare stationskarta',
     items: [
       { kind: 'buggfix', text: 'Utrustningskartan visar nu alla utomhusstationer. Tidigare stannade den vid 1 000, så 154 stationer syntes inte på kartan och räknades inte i siffrorna.' },
+      { kind: 'andring', text: 'Kartan under Utrustning fyller hela höjden. Teckenförklaringen ligger inte längre över kartan utan i listan till vänster, där varje stationstyp visas med samma markör som på kartan.' },
+      { kind: 'nyhet', text: 'Så läser du kartan: en förklaring av färg, ikon, plusbricka, nummerbricka och kantfärgerna för status. Finns under filtren och vid utplacering.' },
+      { kind: 'nyhet', text: 'Markörerna i personalens kartor visar produktens eller stationstypens ikon, och grupperna har en ring i typernas färger. Kartan går att filtrera på Saknas, Skadade och Bara tillägg.' },
+      { kind: 'nyhet', text: 'Vid utplacering visas den nya stationen som den kommer att se ut, och GPS-positionen får en cirkel och en text som till exempel GPS ± 6 m. Över 15 m visas en uppmaning att dra nålen till rätt plats.' },
     ],
   },
   {

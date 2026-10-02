@@ -6,6 +6,7 @@ import { searchAddresses, type GeocodeResult } from '../../../services/geocoding
 import { useGoogleMaps } from '../../../hooks/useGoogleMaps'
 import { buildStationMarkerIcon } from './stationMarkerIcon'
 import { stationIconPaths } from '../stationIcons'
+import { MarkerSymbol } from './MarkerGuide'
 import {
   OTHER_CUSTOMERS_MAX_MARKERS,
   distanceMeters,
@@ -49,6 +50,26 @@ interface MapLocationPickerProps {
   // Andra kunders stationer: ritas nedtonade som kontext, bara de som ligger i
   // kartvyn just nu. Kan döljas med knappen på kartan (valet sparas).
   otherCustomerStations?: ExistingStation[]
+  /** Den nya stationen ritas som den kommer att se ut: typens färg, produktens eller typens ikon */
+  newStationColor?: string | null
+  newStationIcon?: string | null
+}
+
+/** Över så här många meter visas en uppmaning att flytta nålen för hand */
+const GPS_WARN_M = 15
+
+/** Den nya stationens markör: typens färg och ikon i en streckad ring */
+function newStationMarkerIcon(color: string, icon: string | null | undefined): google.maps.Icon {
+  return buildStationMarkerIcon({
+    fill: color,
+    fillOpacity: 1,
+    stroke: '#ffffff',
+    strokeWeight: 2,
+    radius: 13,
+    addon: false,
+    iconPaths: stationIconPaths(icon),
+    ring: true,
+  })
 }
 
 export function MapLocationPicker({
@@ -58,7 +79,9 @@ export function MapLocationPicker({
   onCancel,
   height = '400px',
   existingStations,
-  otherCustomerStations
+  otherCustomerStations,
+  newStationColor = null,
+  newStationIcon = null
 }: MapLocationPickerProps) {
   const { isLoaded } = useGoogleMaps({ libraries: ['marker'] })
 
@@ -68,6 +91,9 @@ export function MapLocationPicker({
       : [SWEDEN_CENTER.lat, SWEDEN_CENTER.lng]
   )
   const [isLocating, setIsLocating] = useState(false)
+  // GPS-noggrannhet i meter för senaste positionen; null när nålen flyttats för hand
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null)
+  const accuracyCircleRef = useRef<google.maps.Circle | null>(null)
   const [searchQuery, setSearchQuery] = useState(initialAddress || '')
   const [isSearching, setIsSearching] = useState(false)
   const [hasAutoSearched, setHasAutoSearched] = useState(false)
@@ -176,6 +202,7 @@ export function MapLocationPicker({
         const lat = e.latLng.lat()
         const lng = e.latLng.lng()
         setMarkerPosition([lat, lng])
+        setGpsAccuracy(null)
         if (markerRef.current) {
           markerRef.current.setPosition({ lat, lng })
         }
@@ -187,13 +214,16 @@ export function MapLocationPicker({
       position: center,
       map,
       draggable: true,
-      title: 'Dra till rätt position'
+      title: 'Dra till rätt position',
+      zIndex: 3000,
+      ...(newStationColor ? { icon: newStationMarkerIcon(newStationColor, newStationIcon) } : {})
     })
 
     marker.addListener('dragend', () => {
       const pos = marker.getPosition()
       if (pos) {
         setMarkerPosition([pos.lat(), pos.lng()])
+        setGpsAccuracy(null)
       }
     })
 
@@ -378,6 +408,7 @@ export function MapLocationPicker({
         const lng = position.coords.longitude
         updateMarkerPosition(lat, lng)
         panTo(lat, lng, DETAIL_ZOOM)
+        setGpsAccuracy(Math.round(position.coords.accuracy))
         setIsLocating(false)
       },
       (error) => {
@@ -392,6 +423,34 @@ export function MapLocationPicker({
       }
     )
   }, [updateMarkerPosition, panTo])
+
+  // Ny station: byt utseende när typ eller produkt ändras i formuläret
+  useEffect(() => {
+    if (!markerRef.current || !isLoaded) return
+    markerRef.current.setIcon(newStationColor ? newStationMarkerIcon(newStationColor, newStationIcon) : null)
+  }, [newStationColor, newStationIcon, isLoaded])
+
+  // GPS-osäkerheten som en blå cirkel runt nålen
+  useEffect(() => {
+    accuracyCircleRef.current?.setMap(null)
+    accuracyCircleRef.current = null
+    if (!mapRef.current || gpsAccuracy == null) return
+    accuracyCircleRef.current = new google.maps.Circle({
+      map: mapRef.current,
+      center: { lat: markerPosition[0], lng: markerPosition[1] },
+      radius: gpsAccuracy,
+      fillColor: '#3b82f6',
+      fillOpacity: 0.12,
+      strokeColor: '#3b82f6',
+      strokeOpacity: 0.6,
+      strokeWeight: 1,
+      clickable: false,
+    })
+    return () => {
+      accuracyCircleRef.current?.setMap(null)
+      accuracyCircleRef.current = null
+    }
+  }, [gpsAccuracy, markerPosition])
 
   // Sök efter adress - wrapper för användaren
   const searchAddress = useCallback(async () => {
@@ -524,7 +583,34 @@ export function MapLocationPicker({
           <p className="text-white font-mono text-sm">
             {markerPosition[0].toFixed(6)}, {markerPosition[1].toFixed(6)}
           </p>
+          {gpsAccuracy != null && (
+            <p className={`text-xs mt-0.5 ${gpsAccuracy > GPS_WARN_M ? 'text-amber-400' : 'text-blue-300'}`}>
+              GPS ± {gpsAccuracy} m{gpsAccuracy > GPS_WARN_M ? '. Osäkert, dra nålen till rätt plats.' : ''}
+            </p>
+          )}
         </div>
+      </div>
+
+      {/* Förklaring under kartan */}
+      <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-slate-400">
+        {newStationColor && (
+          <span className="flex items-center gap-2">
+            <MarkerSymbol color={newStationColor} icon={newStationIcon} ring radius={7} />
+            Ny station, inte sparad än
+          </span>
+        )}
+        {!!existingStations?.length && (
+          <span className="flex items-center gap-2">
+            <MarkerSymbol color={existingStations[0].color || '#6b7280'} icon={existingStations[0].icon} radius={8} />
+            Kundens stationer
+          </span>
+        )}
+        {!!otherCustomerStations?.length && showOthers && (
+          <span className="flex items-center gap-2">
+            <MarkerSymbol color="#64748b" stroke="#cbd5e1" strokeWeight={1} opacity={0.35} radius={6} />
+            Andra kunders stationer, bara för orientering
+          </span>
+        )}
       </div>
 
       {/* Knappar */}

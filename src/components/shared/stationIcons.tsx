@@ -105,7 +105,19 @@ export function stationIconLabel(name: string | null | undefined): string {
  * null för de enkla formerna (Lucide), som inte ritas i kartans cirklar.
  */
 export function stationIconPaths(name: string | null | undefined): string | null {
-  return (name && PATHS[name]) || null
+  return (name && (PATHS[name] || FORM_PATHS[name])) || null
+}
+
+/** De enkla formerna ritade som linjer, så att även de syns i kartans cirklar. */
+const FORM_PATHS: Record<string, string> = {
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
+  box: '<rect x="4" y="4" width="16" height="16" rx="2"/>',
+  package: '<path d="M20 7.5 12 3.5 4 7.5v9l8 4 8-4z"/><path d="M4 7.5l8 4 8-4M12 11.5v9"/>',
+  crosshair: '<circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>',
+  circle: '<circle cx="12" cy="12" r="7"/>',
+  mechanical_trap: '<circle cx="12" cy="12" r="9"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>',
+  concrete_station: '<rect x="4" y="4" width="16" height="16" rx="2"/>',
+  bait_station: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
 }
 
 /** Produktens ikon gäller före stationstypens. */

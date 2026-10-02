@@ -5,6 +5,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Map as MapIcon, ChevronDown, MapPin, Home, Building2, CheckCircle2, AlertTriangle, AlertCircle, SlidersHorizontal, Eye, EyeOff } from 'lucide-react'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
+import { MarkerGuide, MarkerSymbol } from '../shared/equipment/MarkerGuide'
 import Select from '../ui/Select'
 import {
   OTHER_CUSTOMERS_RADIUS_M,
@@ -22,26 +23,34 @@ import type { StationType } from '../../types/stationTypes'
 // så samma typ inte dyker upp flera gånger i filtret.
 function resolveTypeInfo(
   e: EquipmentPlacementWithRelations,
-  lookup: Map<string, { label: string; color: string }>
-): { key: string; label: string; color: string } {
+  lookup: Map<string, { label: string; color: string; icon: string | null }>
+): { key: string; label: string; color: string; icon: string | null } {
   if (e.station_type_data) {
     return {
       key: e.station_type_data.name.toLowerCase(),
       label: e.station_type_data.name,
-      color: e.station_type_data.color
+      color: e.station_type_data.color,
+      icon: e.station_type_data.icon ?? null
     }
   }
   const raw = (e.equipment_type || '').toLowerCase()
   const matched = lookup.get(raw)
   if (matched) {
-    return { key: matched.label.toLowerCase(), label: matched.label, color: matched.color }
+    return { key: matched.label.toLowerCase(), label: matched.label, color: matched.color, icon: matched.icon }
   }
   const legacy = EQUIPMENT_TYPE_CONFIG[e.equipment_type as keyof typeof EQUIPMENT_TYPE_CONFIG]
   if (legacy) {
-    return { key: legacy.label.toLowerCase(), label: legacy.label, color: legacy.color }
+    return { key: legacy.label.toLowerCase(), label: legacy.label, color: legacy.color, icon: null }
   }
-  return { key: raw || 'okänd', label: e.equipment_type || 'Okänd typ', color: '#6b7280' }
+  return { key: raw || 'okänd', label: e.equipment_type || 'Okänd typ', color: '#6b7280', icon: null }
 }
+
+// Statusfilter: tomt = alla statusar
+type StatusFilter = 'missing' | 'damaged'
+const STATUS_CHIPS: Array<{ key: StatusFilter; label: string }> = [
+  { key: 'missing', label: 'Saknas' },
+  { key: 'damaged', label: 'Skadade' },
+]
 
 interface CollapsibleMapSectionProps {
   equipment: EquipmentPlacementWithRelations[]
@@ -75,6 +84,8 @@ export function CollapsibleMapSection({
   const [showMobileFilter, setShowMobileFilter] = useState(false)
   const [stationTypes, setStationTypes] = useState<StationType[]>([])
   const [hiddenTypeKeys, setHiddenTypeKeys] = useState<Set<string>>(new Set())
+  const [statusFilter, setStatusFilter] = useState<Set<StatusFilter>>(new Set())
+  const [onlyAddons, setOnlyAddons] = useState(false)
   const [localFocusId, setLocalFocusId] = useState<string | null>(null)
   const focusCustomerId = focusCustomerIdProp !== undefined ? focusCustomerIdProp : localFocusId
   const setFocusCustomer = (id: string | null) => {
@@ -101,17 +112,17 @@ export function CollapsibleMapSection({
   }, [])
 
   const typeLookup = useMemo(() => {
-    const map = new Map<string, { label: string; color: string }>()
+    const map = new Map<string, { label: string; color: string; icon: string | null }>()
     stationTypes.forEach(t => {
-      map.set(t.code.toLowerCase(), { label: t.name, color: t.color })
-      map.set(t.name.toLowerCase(), { label: t.name, color: t.color })
+      map.set(t.code.toLowerCase(), { label: t.name, color: t.color, icon: t.icon })
+      map.set(t.name.toLowerCase(), { label: t.name, color: t.color, icon: t.icon })
     })
     return map
   }, [stationTypes])
 
   // Typer som förekommer bland placeringarna, normaliserade och med antal
   const typeOptions = useMemo(() => {
-    const map = new Map<string, { key: string; label: string; color: string; count: number }>()
+    const map = new Map<string, { key: string; label: string; color: string; icon: string | null; count: number }>()
     equipment.forEach(e => {
       const info = resolveTypeInfo(e, typeLookup)
       const existing = map.get(info.key)
@@ -143,7 +154,11 @@ export function CollapsibleMapSection({
   // Utan fokuskund: allt som passerar typfiltret. Med fokuskund: kundens egna
   // stationer, plus grannar inom OTHER_CUSTOMERS_RADIUS_M nedtonade om de är på.
   const { filteredEquipment, dimmedStationIds, neighbourCount } = useMemo(() => {
-    const byType = equipment.filter(e => !hiddenTypeKeys.has(resolveTypeInfo(e, typeLookup).key))
+    const byType = equipment.filter(e =>
+      !hiddenTypeKeys.has(resolveTypeInfo(e, typeLookup).key) &&
+      (statusFilter.size === 0 || statusFilter.has(e.status as StatusFilter)) &&
+      (!onlyAddons || e.is_addon === true)
+    )
     if (!effectiveFocusId) {
       return { filteredEquipment: byType, dimmedStationIds: undefined, neighbourCount: 0 }
     }
@@ -165,7 +180,7 @@ export function CollapsibleMapSection({
       dimmedStationIds: new Set(neighbours.map(e => e.id)),
       neighbourCount: neighbours.length
     }
-  }, [equipment, typeLookup, hiddenTypeKeys, effectiveFocusId, showOthers])
+  }, [equipment, typeLookup, hiddenTypeKeys, statusFilter, onlyAddons, effectiveFocusId, showOthers])
 
   const toggleInSet = (set: Set<string>, value: string): Set<string> => {
     const next = new Set(set)
@@ -174,7 +189,8 @@ export function CollapsibleMapSection({
     return next
   }
 
-  const hasActiveFilter = hiddenTypeKeys.size > 0 || !!effectiveFocusId
+  const hasActiveFilter = hiddenTypeKeys.size > 0 || statusFilter.size > 0 || onlyAddons || !!effectiveFocusId
+  const hasAddons = useMemo(() => equipment.some(e => e.is_addon === true), [equipment])
   const emptyText = effectiveFocusId
     ? 'Kunden har inga utomhusstationer att visa'
     : 'Inga utomhusstationer att visa'
@@ -191,7 +207,7 @@ export function CollapsibleMapSection({
         </p>
         {hasActiveFilter && (
           <button
-            onClick={() => { setHiddenTypeKeys(new Set()); setFocusCustomer(null) }}
+            onClick={() => { setHiddenTypeKeys(new Set()); setStatusFilter(new Set()); setOnlyAddons(false); setFocusCustomer(null) }}
             className="text-xs text-[#20c58f] hover:text-[#1ab07f] transition-colors"
           >
             Visa allt
@@ -212,7 +228,7 @@ export function CollapsibleMapSection({
                 onChange={() => setHiddenTypeKeys(prev => toggleInSet(prev, t.key))}
                 className="w-3.5 h-3.5 rounded border-slate-600 bg-slate-900 text-[#20c58f] focus:ring-[#20c58f] focus:ring-offset-0"
               />
-              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color }} />
+              <MarkerSymbol color={t.color} icon={t.icon} radius={9} />
               <span className={`text-sm flex-1 min-w-0 truncate ${hiddenTypeKeys.has(t.key) ? 'text-slate-500' : 'text-slate-300'}`}>
                 {t.label}
               </span>
@@ -221,6 +237,37 @@ export function CollapsibleMapSection({
           ))}
         </div>
       )}
+
+      <div className="flex flex-wrap gap-1.5">
+        {STATUS_CHIPS.map(c => {
+          const on = statusFilter.has(c.key)
+          return (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => setStatusFilter(prev => toggleInSet(prev, c.key) as Set<StatusFilter>)}
+              aria-pressed={on}
+              className={`px-2.5 py-1 rounded-lg border text-xs transition-colors ${on
+                ? 'border-[#20c58f] bg-[#20c58f]/10 text-white'
+                : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
+            >
+              {c.label}
+            </button>
+          )
+        })}
+        {hasAddons && (
+          <button
+            type="button"
+            onClick={() => setOnlyAddons(v => !v)}
+            aria-pressed={onlyAddons}
+            className={`px-2.5 py-1 rounded-lg border text-xs transition-colors ${onlyAddons
+                ? 'border-[#20c58f] bg-[#20c58f]/10 text-white'
+                : 'border-slate-700 text-slate-400 hover:text-slate-200'}`}
+          >
+            Bara tillägg
+          </button>
+        )}
+      </div>
 
       {customerOptions.length > 1 && (
         <div>
@@ -242,6 +289,8 @@ export function CollapsibleMapSection({
           )}
         </div>
       )}
+
+      <MarkerGuide />
     </div>
   )
 
@@ -263,10 +312,19 @@ export function CollapsibleMapSection({
     </button>
   ) : null
 
+  // Rad under kartan som förklarar zoomnivåerna
+  const mapHint = (
+    <div className="border-t border-slate-700/50 px-4 py-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-400">
+      <span>Inzoomat: <span className="text-slate-200">ikonen är produkten</span>, färgen är typen</span>
+      {!effectiveFocusId && <span>Utzoomat: <span className="text-slate-200">ringen runt en grupp</span> visar typerna i den</span>}
+      <span>Tryck på en station för detaljer</span>
+    </div>
+  )
+
   return (
     <div className={`bg-slate-800/50 backdrop-blur rounded-2xl border border-slate-700/50 overflow-hidden ${className}`}>
       {/* Desktop: Split layout (50/50) */}
-      <div className="hidden md:grid md:grid-cols-2 gap-0">
+      <div className="hidden md:grid md:grid-cols-[minmax(300px,360px)_1fr] gap-0">
         {/* Vänster: Statistik */}
         <div className="p-5 border-r border-slate-700/50">
           <div className="flex items-center gap-2 mb-4">
@@ -337,24 +395,30 @@ export function CollapsibleMapSection({
           )}
         </div>
 
-        {/* Höger: Karta */}
-        <div className="relative">
+        {/* Höger: Karta, fyller hela höjden */}
+        <div className="relative flex flex-col min-h-[600px]">
           {filteredEquipment.length > 0 ? (
             <>
-              <EquipmentMap
-                showProductIcons
-                equipment={filteredEquipment}
-                dimmedStationIds={dimmedStationIds}
-                onEquipmentClick={onEquipmentClick}
-                height="300px"
-                showControls={true}
-                readOnly={true}
-                enableClustering={!effectiveFocusId}
-              />
-              {othersToggle}
+              <div className="relative flex-1">
+                <div className="absolute inset-0">
+                  <EquipmentMap
+                    showProductIcons
+                    showLegend={false}
+                    equipment={filteredEquipment}
+                    dimmedStationIds={dimmedStationIds}
+                    onEquipmentClick={onEquipmentClick}
+                    height="100%"
+                    showControls={true}
+                    readOnly={true}
+                    enableClustering={!effectiveFocusId}
+                  />
+                </div>
+                {othersToggle}
+              </div>
+              {mapHint}
             </>
           ) : (
-            <div className="h-[300px] flex items-center justify-center bg-slate-900/30">
+            <div className="flex-1 flex items-center justify-center bg-slate-900/30">
               <div className="text-center">
                 <MapIcon className="w-12 h-12 text-slate-600 mx-auto mb-2" />
                 <p className="text-slate-500 text-sm">{emptyText}</p>
@@ -444,18 +508,20 @@ export function CollapsibleMapSection({
                   <>
                     <EquipmentMap
                       showProductIcons
+                      showLegend={false}
                       equipment={filteredEquipment}
                       dimmedStationIds={dimmedStationIds}
                       onEquipmentClick={onEquipmentClick}
-                      height="200px"
+                      height="360px"
                       showControls={false}
                       readOnly={true}
                       enableClustering={!effectiveFocusId}
                     />
                     {othersToggle}
+                    {mapHint}
                   </>
                 ) : (
-                  <div className="h-[200px] flex items-center justify-center bg-slate-900/30">
+                  <div className="h-[360px] flex items-center justify-center bg-slate-900/30">
                     <div className="text-center">
                       <MapIcon className="w-10 h-10 text-slate-600 mx-auto mb-2" />
                       <p className="text-slate-500 text-sm">{emptyText}</p>

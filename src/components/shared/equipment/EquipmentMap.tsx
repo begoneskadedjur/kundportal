@@ -18,7 +18,7 @@ import { StationTypeService } from '../../../services/stationTypeService'
 import type { StationType } from '../../../types/stationTypes'
 import { Navigation } from 'lucide-react'
 import { EquipmentDetailSheet } from './EquipmentDetailSheet'
-import { buildStationMarkerIcon, stationMarkerSvg } from './stationMarkerIcon'
+import { buildStationMarkerIcon, buildClusterIcon, stationMarkerSvg } from './stationMarkerIcon'
 import { stationIconPaths } from '../stationIcons'
 import { createFanOut, type FanOutEntry, type FanOutHandle } from './markerFanOut'
 
@@ -60,6 +60,8 @@ interface EquipmentMapProps {
    * bricka under. Av som standard, så kundvyerna ser ut som förut.
    */
   showProductIcons?: boolean
+  /** Teckenförklaringen nere till vänster på kartan. Av där sidan visar en egen. */
+  showLegend?: boolean
 }
 
 // CSS för pulsering av highlighted marker
@@ -101,6 +103,7 @@ export function EquipmentMap({
   enableClustering = false,
   defaultMapType = 'satellite',
   showProductIcons = false,
+  showLegend = true,
 }: EquipmentMapProps) {
   const { isLoaded, error: mapError } = useGoogleMaps({ libraries: ['marker', 'drawing', 'places'] })
 
@@ -136,9 +139,9 @@ export function EquipmentMap({
 
   // Mappning equipment_type code → färg/namn
   const typeColorMap = useMemo(() => {
-    const map = new Map<string, { color: string; name: string }>()
+    const map = new Map<string, { color: string; name: string; icon: string }>()
     stationTypes.forEach(type => {
-      map.set(type.code, { color: type.color, name: type.name })
+      map.set(type.code, { color: type.color, name: type.name, icon: type.icon })
     })
     return map
   }, [stationTypes])
@@ -404,11 +407,13 @@ export function EquipmentMap({
       // saknas eller är skadad. Fyllningen bär typ, kanten bär status.
       const showAddon = item.is_addon === true && item.status !== 'removed' && !isDimmed && !isRelocating
 
-      // Produktens interna ikon (bara personalvyer). Statussymboler går före,
-      // numret flyttar till en bricka under cirkeln.
+      // Personalvyer: produktens interna ikon, annars typens ikon. Statussymboler
+      // går före, numret flyttar till en bricka under cirkeln.
       const isStatusLabel = labelText !== '' && labelText !== number?.toString()
+      const typeIcon = item.station_type_data?.icon
+        || (typeColorMap.get(item.equipment_type) || typeColorMap.get((item.equipment_type || '').toLowerCase()))?.icon
       const productIcon = showProductIcons && !isDimmed && !isRelocating && !isStatusLabel
-        ? stationIconPaths(item.article?.icon)
+        ? stationIconPaths(item.article?.icon) || stationIconPaths(typeIcon)
         : null
       const markerLabelText = productIcon ? '' : labelText
 
@@ -450,6 +455,8 @@ export function EquipmentMap({
       } else {
         marker.addListener('click', () => handleMarkerClick(item))
       }
+      // Typens färg följer med till klustret (ringen i typernas färger)
+      marker.set('typeColor', color)
       newMarkers.push(marker)
       fanOutEntries.push({
         marker,
@@ -472,8 +479,16 @@ export function EquipmentMap({
         map,
         markers: newMarkers,
         renderer: {
-          render: ({ count, position }) =>
-            new google.maps.Marker({
+          render: ({ count, position, markers }) => showProductIcons
+            ? new google.maps.Marker({
+                position,
+                icon: buildClusterIcon(
+                  (markers ?? []).map(m => String((m as google.maps.Marker).get('typeColor') ?? '#64748b')),
+                  count
+                ),
+                zIndex: 1000 + count,
+              })
+            : new google.maps.Marker({
               position,
               label: { text: String(count), color: '#fff', fontSize: '12px', fontWeight: 'bold' },
               icon: {
@@ -846,6 +861,7 @@ export function EquipmentMap({
       )}
 
       {/* Legend */}
+      {showLegend && (
       <div className="absolute bottom-3 left-3 z-40 bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-3">
         <p className="text-xs font-semibold text-slate-700 mb-2">Utrustningstyper</p>
         <div className="flex flex-col gap-1">
@@ -883,6 +899,7 @@ export function EquipmentMap({
           )}
         </div>
       </div>
+      )}
 
       {/* Equipment Detail Sheet */}
       <EquipmentDetailSheet

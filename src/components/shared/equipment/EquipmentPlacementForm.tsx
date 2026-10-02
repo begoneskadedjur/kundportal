@@ -399,6 +399,12 @@ export function EquipmentPlacementForm({
   }, [gpsLat, gpsLng, onLocationCapture])
 
   // Hjälpfunktion för att kontrollera om aktuell typ kräver serienummer
+  // Vald typ, för den nya stationens utseende i kartväljaren
+  const currentTypeData = useMemo(
+    () => dynamicStationTypes.find(t => t.code === formData.equipment_type) ?? null,
+    [dynamicStationTypes, formData.equipment_type]
+  )
+
   const currentTypeRequiresSerial = useMemo(() => {
     // Kolla dynamiska typer först
     const dynamicType = dynamicStationTypes.find(t => t.code === formData.equipment_type)
@@ -875,6 +881,8 @@ export function EquipmentPlacementForm({
                 height="350px"
                 existingStations={existingStations}
                 otherCustomerStations={otherCustomerStations}
+                newStationColor={currentTypeData?.color ?? null}
+                newStationIcon={typeArticles.find(a => a.articleId === formData.article_id)?.icon || currentTypeData?.icon || null}
               />
             </motion.div>
           )}

@@ -53,7 +53,13 @@ const COLOR_OPTIONS = [
   { value: '#ef4444', label: 'Röd' },
   { value: '#f59e0b', label: 'Orange' },
   { value: '#8b5cf6', label: 'Lila' },
-  { value: '#06b6d4', label: 'Cyan' }
+  { value: '#06b6d4', label: 'Cyan' },
+  { value: '#ec4899', label: 'Rosa' },
+  { value: '#84cc16', label: 'Lime' },
+  { value: '#14b8a6', label: 'Turkos' },
+  { value: '#f97316', label: 'Brandgul' },
+  { value: '#eab308', label: 'Gul' },
+  { value: '#92400e', label: 'Brun' }
 ]
 
 
