@@ -5,6 +5,7 @@
 // Ren mall utan databasanrop så att den kan testas lokalt.
 
 import { BEGONE_LOGO_DATA_URI } from './begoneLogo'
+import { reportLegendRows, reportMarkerSvg } from '../../src/shared/reportStationMarkers'
 
 const BRAND = '#20c58f'
 
@@ -24,6 +25,7 @@ export interface MapCustomerInfo {
 export interface MapStationType {
   name: string
   color: string
+  icon?: string | null   // station_types.icon, aldrig produktens ikon
   prefix?: string | null
   description?: string | null
 }
@@ -33,6 +35,8 @@ export interface MapStation {
   code: string | null    // KF-001, serienummer eller null
   type: string
   color: string
+  icon?: string | null   // stationstypens ikon
+  addon?: boolean        // tillägg utöver avtal
   location: string | null
   status: string
   placed_at: string | null
@@ -166,14 +170,12 @@ function baseStyles(): string {
   .map { position:relative; display:inline-block; border:1px solid #e5e7eb; border-radius:4px; overflow:hidden; background:#fff; }
   .map img { display:block; height:143mm; width:auto; max-width:100%; }
   .map img.sat { height:140mm; }
-  .marker {
-    position:absolute; width: 22px; height: 22px; margin-left:-11px; margin-top:-11px;
-    border-radius:50%; color:#fff; font-weight:700; font-size:10pt; line-height:20px; text-align:center;
-    border: 2px solid #fff; box-shadow: 0 0 0 1.5px rgba(15,23,42,.45), 0 1px 3px rgba(0,0,0,.35);
-  }
-  .legendbar { display:flex; gap:22px; align-items:center; margin-top: 8px; font-size: 9.5pt; padding: 6px 10px; border:1px solid #e5e7eb; border-radius:4px; background:#fafafa; }
+  .marker { position:absolute; line-height:0; filter: drop-shadow(0 0 1px rgba(15,23,42,.55)) drop-shadow(0 1px 2px rgba(0,0,0,.35)); }
+  .marker svg, .tm svg { display:block; }
+  .tm { display:inline-block; vertical-align:middle; margin-right:6px; line-height:0; }
+  .legendbar { display:flex; flex-wrap:wrap; gap:4px 22px; align-items:center; margin-top: 8px; font-size: 9.5pt; padding: 6px 10px; border:1px solid #e5e7eb; border-radius:4px; background:#fafafa; }
   .legendbar .lgt { font-weight:600; color:#0f172a; margin-right: 4px; }
-  .lg { white-space:nowrap; }
+  .lg { white-space:nowrap; display:inline-flex; align-items:center; }
   .cols { display:flex; gap: 24px; }
   .cols > div { flex:1; }
   .nomap { height:120mm; display:flex; align-items:center; justify-content:center; border:1px dashed #cbd5e1; border-radius:4px; color:#6b7280; font-size:10pt; }
@@ -187,12 +189,18 @@ function footer(docLabel: string, name: string, date: string): string {
   </div>`
 }
 
+// Stationstypens markör utan nummer, för tabeller
+function typeMarker(color: string, icon: string | null | undefined, radius = 7): string {
+  return `<span class="tm">${reportMarkerSvg({ color, icon, radius }).svg}</span>`
+}
+
+// Teckenförklaring: bara typerna på kartan (i typlistans ordning), sedan
+// tillägg och de statusar som förekommer, med samma symbol som kartan
 function legendFor(types: MapStationType[], stations: MapStation[]): string {
-  const counts = new Map<string, number>()
-  for (const s of stations) counts.set(s.type, (counts.get(s.type) || 0) + 1)
-  return types
-    .filter(t => counts.has(t.name))
-    .map(t => `<div class="lg"><span class="dot" style="background:${escapeHtml(t.color)}"></span>${escapeHtml(t.name)} <span class="muted">(${counts.get(t.name)} st)</span></div>`)
+  const order = new Map(types.map((t, i) => [t.name, i]))
+  const sorted = [...stations].sort((a, b) => (order.get(a.type) ?? 999) - (order.get(b.type) ?? 999))
+  return reportLegendRows(sorted.map(s => ({ typeName: s.type, color: s.color, icon: s.icon, status: s.status, addon: s.addon })))
+    .map(r => `<div class="lg"><span class="tm">${r.marker.svg}</span>${escapeHtml(r.label)}&nbsp;<span class="muted">(${r.count} st)</span></div>`)
     .join('')
 }
 
@@ -250,8 +258,11 @@ export function buildStationMapHtml(data: StationMapData): string {
   const mapPages = sections.map(section => {
     let mapBlock: string
     if (section.kind === 'indoor') {
-      const markers = section.stations.map(s =>
-        `<div class="marker" style="left:${s.x}%; top:${s.y}%; background:${escapeHtml(s.color)}">${s.idx}</div>`).join('')
+      // Cirkelns mitt på stationens punkt, numret i brickan under
+      const markers = section.stations.map(s => {
+        const m = reportMarkerSvg({ color: s.color, icon: s.icon, status: s.status, addon: s.addon, number: s.idx, radius: 12 })
+        return `<div class="marker" style="left:${s.x}%; top:${s.y}%; margin-left:-${m.center}px; margin-top:-${m.center}px">${m.svg}</div>`
+      }).join('')
       mapBlock = section.imageDataUri
         ? `<div class="mapwrap"><div class="map"><img src="${section.imageDataUri}" alt="Planritning">${markers}</div></div>`
         : `<div class="nomap">Planritningen kunde inte l&auml;sas in.</div>`
@@ -273,7 +284,7 @@ export function buildStationMapHtml(data: StationMapData): string {
   <div class="legendbar">
     <span class="lgt">Teckenf&ouml;rklaring</span>
     ${legendFor(types, section.stations)}
-    <span class="muted" style="margin-left:auto">Siffran i mark&ouml;ren h&auml;nvisar till stationslistan.</span>
+    <span class="muted" style="margin-left:auto">Numret under mark&ouml;ren h&auml;nvisar till stationslistan.</span>
   </div>
   ${footer('Stationskarta', displayName, documentDate)}
 </section>`
@@ -292,7 +303,7 @@ export function buildStationMapHtml(data: StationMapData): string {
       listRows.push(`<tr>
         <td class="c"><span class="mini" style="background:${escapeHtml(s.color)}">${s.idx}</span></td>
         <td class="mono">${s.code ? escapeHtml(s.code) : '<span class="muted">&ndash;</span>'}</td>
-        <td class="nw"><span class="dot" style="background:${escapeHtml(s.color)}"></span>${escapeHtml(s.type)}</td>
+        <td class="nw">${typeMarker(s.color, s.icon)}${escapeHtml(s.type)}${s.addon ? ' <span class="muted">(till&auml;gg)</span>' : ''}</td>
         <td>${escapeHtml(section.title)}</td>
         <td>${where}</td>
         <td class="nw">${escapeHtml(statusLabel(s.status))}</td>
@@ -318,7 +329,7 @@ export function buildStationMapHtml(data: StationMapData): string {
       <table>
         <tr><th>Typ</th><th style="width:16%">Kod</th><th>Beskrivning</th><th class="c" style="width:14%">Antal</th></tr>
         ${typeCounts.map(({ t, n }) => `<tr>
-          <td><span class="dot" style="background:${escapeHtml(t.color)}"></span>${escapeHtml(t.name)}</td>
+          <td>${typeMarker(t.color, t.icon)}${escapeHtml(t.name)}</td>
           <td class="mono">${escapeHtml(t.prefix || '')}</td>
           <td>${escapeHtml(t.description || '')}</td>
           <td class="c">${n}</td>
@@ -424,7 +435,7 @@ export function buildStationOverviewHtml(data: StationOverviewData): string {
   const ROWS_PER_PAGE = 22
   const head = `<tr>
     <th style="width:26%">Region</th>
-    ${usedTypes.map(t => `<th class="c"><span class="dot" style="background:${escapeHtml(t.color)}"></span>${escapeHtml(t.name)}</th>`).join('')}
+    ${usedTypes.map(t => `<th class="c">${typeMarker(t.color, t.icon)}${escapeHtml(t.name)}</th>`).join('')}
     <th class="c" style="width:10%">Totalt</th>
   </tr>`
   const rows = regions.map(r => `<tr>

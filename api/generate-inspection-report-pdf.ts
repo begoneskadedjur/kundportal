@@ -7,6 +7,8 @@ import chromium from '@sparticuz/chromium'
 import { createClient } from '@supabase/supabase-js'
 import nodemailer from 'nodemailer'
 import { requireAuth, requireAuthenticated } from './_lib/auth'
+import { canonicalTypeCode } from '../src/utils/stationTaxonomy'
+import { reportLegendHtml, reportMarkerSvg, svgDataUri, type LegendStation } from '../src/shared/reportStationMarkers'
 
 // Gräns för bifogad PDF vid e-postutskick. Resend tillåter 40 MB per mejl, men många
 // mottagande e-postservrar avvisar bilagor över ~10 MB, så vi stannar vid 8 MB.
@@ -79,25 +81,57 @@ const getStatusLabel = (status: string, dynamicLabels?: Record<string, string>) 
   return labels[status] || status || '-'
 }
 
+// ------------------------------------------------------------------
+// Stationstyp per station: färg, ikon och namn ur station_types (samma
+// regel som stationskartan: station_type_id först, sedan fritextkoden).
+// Rapporten visar aldrig produktens ikon, bara stationstypens.
+// ------------------------------------------------------------------
+
+interface ReportTypeRow { id: string; code: string; name: string; color: string | null; icon: string | null }
+
+async function loadReportStationTypes(): Promise<ReportTypeRow[]> {
+  const { data } = await supabase.from('station_types').select('id, code, name, color, icon')
+  return (data as ReportTypeRow[] | null) || []
+}
+
+interface ResolvedStation extends LegendStation {
+  number: number
+}
+
+function resolveReportStation(insp: any, number: number, types: ReportTypeRow[]): ResolvedStation {
+  const st = insp.station || {}
+  const legacy: string | null = st.equipment_type || st.station_type || null
+  const typeId: string | null = st.station_type_id || st.station_type_data?.id || null
+  const row = (typeId ? types.find(t => t.id === typeId) : undefined)
+    || (legacy ? types.find(t => canonicalTypeCode(t.code) === canonicalTypeCode(legacy)) : undefined)
+  return {
+    number,
+    typeName: st.station_type_data?.name || row?.name || legacy || 'Okänd typ',
+    color: st.station_type_data?.color || row?.color || null,
+    icon: row?.icon || st.station_type_data?.icon || null,
+    status: st.status || null,
+    addon: st.is_addon === true,
+  }
+}
+
+function markerFor(s: ResolvedStation) {
+  return reportMarkerSvg({ color: s.color, icon: s.icon, status: s.status, addon: s.addon, number: s.number, radius: 11 })
+}
+
 // Rendera Google Maps satellitbild via Puppeteer + JavaScript API (Static API blockerar satellit i EU/EEA)
-async function renderSatelliteMapScreenshot(browser: any, inspections: any[]): Promise<string | null> {
+async function renderSatelliteMapScreenshot(
+  browser: any,
+  stations: Array<ResolvedStation & { lat: number; lng: number }>
+): Promise<string | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
   if (!apiKey) return null
-
-  const stations = inspections
-    .filter((i: any) => i.station?.latitude && i.station?.longitude)
-    .sort((a: any, b: any) =>
-      new Date(a.station.placed_at).getTime() - new Date(b.station.placed_at).getTime()
-    )
-
   if (stations.length === 0) return null
 
-  const markersJSON = JSON.stringify(stations.map((s: any, i: number) => ({
-    lat: parseFloat(s.station.latitude),
-    lng: parseFloat(s.station.longitude),
-    label: String(i + 1),
-    color: s.status === 'ok' ? '#22C55E' : s.status === 'activity' ? '#F59E0B' : s.status === 'needs_service' ? '#EF4444' : '#3B82F6'
-  })))
+  // Markören som SVG-ikon (samma som kunden ser i appen), ankrad i cirkelns mitt
+  const markersJSON = JSON.stringify(stations.map(s => {
+    const m = markerFor(s)
+    return { lat: s.lat, lng: s.lng, url: svgDataUri(m.svg), w: m.size, h: m.height, c: m.center }
+  }))
 
   const mapHtml = `<!DOCTYPE html>
 <html><head>
@@ -119,14 +153,10 @@ async function renderSatelliteMapScreenshot(browser: any, inspections: any[]): P
         new google.maps.Marker({
           position: pos,
           map: map,
-          label: { text: m.label, color: 'white', fontWeight: 'bold', fontSize: '9px' },
           icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            fillColor: m.color,
-            fillOpacity: 1,
-            strokeColor: 'white',
-            strokeWeight: 1.5,
-            scale: 10
+            url: m.url,
+            scaledSize: new google.maps.Size(m.w, m.h),
+            anchor: new google.maps.Point(m.c, m.c)
           }
         });
       });
@@ -159,17 +189,16 @@ async function renderSatelliteMapScreenshot(browser: any, inspections: any[]): P
 async function renderFloorPlanScreenshot(
   browser: any,
   imageBase64: string,
-  stations: Array<{ x: number; y: number; label: string; color: string }>
+  stations: Array<ResolvedStation & { x: number; y: number }>
 ): Promise<string | null> {
-  const markerHtml = stations.map(s => `
+  // Samma markör som på satellitkartan, cirkelns mitt på stationens punkt
+  const markerHtml = stations.map(s => {
+    const m = markerFor(s)
+    return `
     <div style="position:absolute;left:${s.x}%;top:${s.y}%;
-      transform:translate(-50%,-50%);width:22px;height:22px;
-      border-radius:50%;background:${s.color};color:white;
-      font-size:10px;font-weight:700;display:flex;
-      align-items:center;justify-content:center;
-      border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,.4);">
-      ${s.label}
-    </div>`).join('')
+      margin-left:-${m.center}px;margin-top:-${m.center}px;line-height:0;
+      filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));">${m.svg}</div>`
+  }).join('')
 
   const html = `<!DOCTYPE html><html><head>
     <style>*{margin:0;padding:0;}
@@ -286,11 +315,21 @@ async function generateInspectionReportHTML(data: {
     }
   }
 
-  // Rendera Google Maps satellitbild via Puppeteer
-  const mapBase64 = await renderSatelliteMapScreenshot(browser, sortedOutdoor)
+  const stationTypes = await loadReportStationTypes()
+
+  // Rendera Google Maps satellitbild via Puppeteer. Numret är samma som i
+  // tabellen (placed_at-ordning över alla utomhusstationer).
+  const outdoorOnMap = sortedOutdoor
+    .map((insp: any, i: number) => ({ insp, s: resolveReportStation(insp, i + 1, stationTypes) }))
+    .filter(({ insp }) => insp.station?.latitude && insp.station?.longitude)
+    .map(({ insp, s }) => ({ ...s, lat: parseFloat(insp.station.latitude), lng: parseFloat(insp.station.longitude) }))
+  const mapBase64 = await renderSatelliteMapScreenshot(browser, outdoorOnMap)
   const mapImageHtml = mapBase64 ? `
-    <div style="margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border};">
-      <img src="${mapBase64}" style="width: 100%; height: auto; display: block;" alt="Stationskarta" />
+    <div style="margin-bottom: 12px;">
+      <div style="border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border};">
+        <img src="${mapBase64}" style="width: 100%; height: auto; display: block;" alt="Stationskarta" />
+      </div>
+      ${reportLegendHtml(outdoorOnMap)}
     </div>
   ` : ''
 
@@ -356,19 +395,23 @@ async function generateInspectionReportHTML(data: {
     if (group.imagePath) {
       const imageBase64 = await fetchFloorPlanBase64(group.imagePath)
       if (imageBase64) {
+        // Numret är stationens rad i gruppens tabell (placed_at-ordning)
         const stationMarkers = sortedInGroup
-          .filter((insp: any) => insp.station?.position_x_percent && insp.station?.position_y_percent)
-          .map((insp: any, idx: number) => ({
+          .map((insp: any, idx: number) => ({ insp, s: resolveReportStation(insp, idx + 1, stationTypes) }))
+          .filter(({ insp }) => insp.station?.position_x_percent && insp.station?.position_y_percent)
+          .map(({ insp, s }) => ({
+            ...s,
             x: insp.station.position_x_percent,
             y: insp.station.position_y_percent,
-            label: String(idx + 1),
-            color: getStatusColor(insp.status, dynamicColors)
           }))
         const compositeBase64 = await renderFloorPlanScreenshot(browser, imageBase64, stationMarkers)
         if (compositeBase64) {
           floorPlanHtml = `
-            <div style="margin-bottom: 12px; border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border};">
-              <img src="${compositeBase64}" style="width: 100%; height: auto; max-height: 170mm; display: block;" alt="${group.name}" />
+            <div style="margin-bottom: 12px;">
+              <div style="border-radius: 8px; overflow: hidden; border: 1px solid ${beGoneColors.border};">
+                <img src="${compositeBase64}" style="width: 100%; height: auto; max-height: 170mm; display: block;" alt="${group.name}" />
+              </div>
+              ${reportLegendHtml(stationMarkers)}
             </div>
           `
         }

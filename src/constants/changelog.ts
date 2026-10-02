@@ -56,6 +56,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'nyhet', text: 'Vid utplacering visas den nya stationen som den kommer att se ut, och GPS-positionen får en cirkel och en text som till exempel GPS ± 6 m. Över 15 m visas en uppmaning att dra nålen till rätt plats.' },
       { kind: 'nyhet', text: 'Kunderna får samma tydliga karta under Fällor & stationer, i både kundportalen och organisationsportalen: stationstypens ikon i markören, numret under, typerna som knappar ovanför kartan och Så läser du kartan. Kunderna ser aldrig produkternas ikoner.' },
       { kind: 'buggfix', text: 'Numret i kundens stationslista är nu samma som på kartan. Tidigare räknade listan från den nyaste stationen och kartan från den äldsta.' },
+      { kind: 'nyhet', text: 'Kontrollrapporten och stationskartan som PDF visar samma markörer som portalen: typens färg och ikon, numret under och status i kanten, med en teckenförklaring under varje karta. Utrustningsrapporten har markören i listorna.' },
+      { kind: 'buggfix', text: 'Kontrollrapporten skriver nu ut Tillägg utöver avtal för tilläggsstationer. Uppgiften hämtades aldrig tidigare, så raden var alltid tom.' },
     ],
   },
   {

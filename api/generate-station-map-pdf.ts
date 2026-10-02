@@ -12,6 +12,7 @@ import chromium from '@sparticuz/chromium'
 import { createClient } from '@supabase/supabase-js'
 import { requireAuthenticated } from './_lib/auth'
 import { canonicalTypeCode } from '../src/utils/stationTaxonomy'
+import { reportMarkerSvg, svgDataUri } from '../src/shared/reportStationMarkers'
 import {
   buildStationMapHtml,
   buildStationOverviewHtml,
@@ -101,6 +102,7 @@ interface StationTypeRow {
   name: string
   prefix: string | null
   color: string | null
+  icon: string | null
   description: string | null
   sort_order: number | null
 }
@@ -108,7 +110,7 @@ interface StationTypeRow {
 async function loadStationTypes(): Promise<StationTypeRow[]> {
   const { data } = await supabase
     .from('station_types')
-    .select('id, code, name, prefix, color, description, sort_order')
+    .select('id, code, name, prefix, color, icon, description, sort_order')
     .order('sort_order', { ascending: true })
   return (data as StationTypeRow[]) || []
 }
@@ -117,20 +119,20 @@ function resolveType(
   types: StationTypeRow[],
   stationTypeId: string | null,
   legacyText: string | null
-): { name: string; color: string; prefix: string | null } {
+): { name: string; color: string; prefix: string | null; icon: string | null } {
   const byId = stationTypeId ? types.find(t => t.id === stationTypeId) : undefined
   const byCode = !byId && legacyText
     ? types.find(t => canonicalTypeCode(t.code) === canonicalTypeCode(legacyText))
     : undefined
   const t = byId || byCode
-  if (t) return { name: t.name, color: t.color || FALLBACK_COLOR, prefix: t.prefix }
-  return { name: legacyText || 'Okänd typ', color: FALLBACK_COLOR, prefix: null }
+  if (t) return { name: t.name, color: t.color || FALLBACK_COLOR, prefix: t.prefix, icon: t.icon }
+  return { name: legacyText || 'Okänd typ', color: FALLBACK_COLOR, prefix: null, icon: null }
 }
 
 function toMapTypes(types: StationTypeRow[], usedNames: Set<string>): MapStationType[] {
   const out: MapStationType[] = types
     .filter(t => usedNames.has(t.name))
-    .map(t => ({ name: t.name, color: t.color || FALLBACK_COLOR, prefix: t.prefix, description: t.description }))
+    .map(t => ({ name: t.name, color: t.color || FALLBACK_COLOR, icon: t.icon, prefix: t.prefix, description: t.description }))
   // Typer som bara finns som fritext (ingen station_types-rad)
   for (const name of usedNames) {
     if (!out.some(t => t.name === name)) out.push({ name, color: FALLBACK_COLOR, prefix: null, description: null })
@@ -201,7 +203,8 @@ async function fetchFloorPlanBase64(imagePath: string): Promise<string | null> {
   }
 }
 
-interface MapMarker { lat: number; lng: number; label: string; color: string }
+// Markören är stationstypens SVG-markör (samma som kunden ser i appen) som data-URI
+interface MapMarker { lat: number; lng: number; url: string; w: number; h: number; c: number }
 interface MapPolygon { path: Array<{ lat: number; lng: number }>; color: string; label: string }
 
 // Satellitkarta med numrerade markörer och/eller regionpolygoner med antal.
@@ -237,8 +240,7 @@ async function renderSatelliteMap(browser: Browser, markers: MapMarker[], polygo
       bounds.extend(pos);
       new google.maps.Marker({
         position: pos, map: map,
-        label: { text: m.label, color: 'white', fontWeight: 'bold', fontSize: '10px' },
-        icon: { path: google.maps.SymbolPath.CIRCLE, fillColor: m.color, fillOpacity: 1, strokeColor: 'white', strokeWeight: 1.5, scale: 11 }
+        icon: { url: m.url, scaledSize: new google.maps.Size(m.w, m.h), anchor: new google.maps.Point(m.c, m.c) }
       });
     });
     map.fitBounds(bounds, 40);
@@ -296,7 +298,7 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
       .order('sort_order', { ascending: true }),
     supabase
       .from('equipment_placements')
-      .select('id, serial_number, equipment_type, station_type_id, latitude, longitude, comment, status, placed_at')
+      .select('id, serial_number, equipment_type, station_type_id, latitude, longitude, comment, status, placed_at, is_addon')
       .eq('customer_id', customer.id)
       .eq('status', 'active')
       .order('placed_at', { ascending: true }),
@@ -317,6 +319,8 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
         code: r.serial_number || null,
         type: t.name,
         color: t.color,
+        icon: t.icon,
+        addon: r.is_addon === true,
         location: r.comment || null,
         status: r.status,
         placed_at: r.placed_at,
@@ -326,7 +330,10 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
     })
     const mapDataUri = await renderSatelliteMap(
       browser,
-      stations.map(s => ({ lat: s.lat, lng: s.lng, label: String(s.idx), color: s.color })),
+      stations.map(s => {
+        const m = reportMarkerSvg({ color: s.color, icon: s.icon, status: s.status, addon: s.addon, number: s.idx, radius: 12 })
+        return { lat: s.lat, lng: s.lng, url: svgDataUri(m.svg), w: m.size, h: m.height, c: m.center }
+      }),
       []
     )
     sections.push({ kind: 'outdoor', title: 'Utomhus', mapDataUri, stations })
@@ -335,7 +342,7 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
   for (const plan of plans || []) {
     const { data: rows } = await supabase
       .from('indoor_stations')
-      .select('id, station_number, station_type, station_type_id, position_x_percent, position_y_percent, location_description, status, placed_at')
+      .select('id, station_number, station_type, station_type_id, position_x_percent, position_y_percent, location_description, status, placed_at, is_addon')
       .eq('floor_plan_id', plan.id)
       .neq('status', 'removed')
       .order('station_number', { ascending: true })
@@ -347,6 +354,8 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
         code: r.station_number || null,
         type: t.name,
         color: t.color,
+        icon: t.icon,
+        addon: r.is_addon === true,
         location: r.location_description || null,
         status: r.status,
         placed_at: r.placed_at,

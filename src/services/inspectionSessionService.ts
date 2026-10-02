@@ -653,7 +653,9 @@ export async function getOutdoorInspectionsForSession(
         equipment_type,
         placed_at,
         latitude,
-        longitude
+        longitude,
+        status,
+        is_addon
       ),
       technician:technicians(id, name),
       preparation:preparations!preparation_id(id, name, registration_number, threshold_warning, threshold_critical, threshold_direction, measurement_unit, measurement_label)
@@ -673,7 +675,7 @@ export async function getOutdoorInspectionsForSession(
   // Hämta alla station_types för att matcha equipment_type → code (inkl tröskelvärden)
   const { data: stationTypes } = await supabase
     .from('station_types')
-    .select('id, code, name, color, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
+    .select('id, code, name, color, icon, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
     .eq('is_active', true)
 
   // Skapa map för snabb lookup på code
@@ -886,6 +888,8 @@ export async function getIndoorInspectionsForSession(
         position_x_percent,
         position_y_percent,
         location_description,
+        status,
+        is_addon,
         floor_plan:floor_plans(id, name, building_name, image_path)
       ),
       preparation:preparations!preparation_id(id, name, registration_number, threshold_warning, threshold_critical, threshold_direction, measurement_unit, measurement_label)
@@ -905,7 +909,7 @@ export async function getIndoorInspectionsForSession(
   // Hämta alla station_types för att matcha station_type → code (inkl tröskelvärden)
   const { data: stationTypes } = await supabase
     .from('station_types')
-    .select('id, code, name, color, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
+    .select('id, code, name, color, icon, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
     .eq('is_active', true)
 
   // Skapa map för snabb lookup på code

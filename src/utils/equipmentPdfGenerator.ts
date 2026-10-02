@@ -6,6 +6,7 @@ import {
   EQUIPMENT_STATUS_CONFIG,
   getEquipmentStatusLabel
 } from '../types/database'
+import { reportMarkerSvg, svgDataUri } from '../shared/reportStationMarkers'
 
 interface EquipmentPdfOptions {
   customerName: string
@@ -25,6 +26,79 @@ const resolveTypeDisplay = (item: EquipmentPlacementWithRelations): { label: str
     return { label: legacy.label, color: legacy.color }
   }
   return { label: item.equipment_type || 'Okänd typ', color: '#6b7280' }
+}
+
+// Stationsmarkören (samma som kunden ser i appen: typens färg, typens ikon,
+// plusbricka för tillägg, status som kant + symbol) som PNG för jsPDF.
+// Aldrig produktens ikon. Rasteriseras via canvas och cachas per utseende.
+interface MarkerImage { dataUrl: string; size: number; height: number; center: number }
+const MARKER_RADIUS_PX = 7
+const markerImageCache = new Map<string, Promise<MarkerImage | null>>()
+
+const markerImageFor = (item: EquipmentPlacementWithRelations): Promise<MarkerImage | null> => {
+  const color = resolveTypeDisplay(item).color
+  const icon = item.station_type_data?.icon || null
+  const addon = (item as { is_addon?: boolean }).is_addon === true
+  const key = `${color}|${icon}|${item.status}|${addon}`
+  const cached = markerImageCache.get(key)
+  if (cached) return cached
+  const promise = new Promise<MarkerImage | null>(resolve => {
+    try {
+      const marker = reportMarkerSvg({ color, icon, status: item.status, addon, radius: MARKER_RADIUS_PX })
+      const scale = 6
+      const img = new Image()
+      const timeout = setTimeout(() => resolve(null), 3000)
+      img.onload = () => {
+        clearTimeout(timeout)
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = marker.size * scale
+          canvas.height = marker.height * scale
+          const ctx = canvas.getContext('2d')
+          if (!ctx) return resolve(null)
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+          resolve({ dataUrl: canvas.toDataURL('image/png'), size: marker.size, height: marker.height, center: marker.center })
+        } catch {
+          resolve(null)
+        }
+      }
+      img.onerror = () => {
+        clearTimeout(timeout)
+        resolve(null)
+      }
+      img.src = svgDataUri(marker.svg)
+    } catch {
+      resolve(null)
+    }
+  })
+  markerImageCache.set(key, promise)
+  return promise
+}
+
+// Ritar markören centrerad på (cx, cy) med cirkelradien r (mm). Faller
+// tillbaka på en fylld cirkel i typens färg om rasteriseringen misslyckades.
+const drawStationMarker = (
+  pdf: jsPDF,
+  marker: MarkerImage | null,
+  fallbackRgb: [number, number, number],
+  cx: number,
+  cy: number,
+  r: number
+) => {
+  if (marker) {
+    const mmPerPx = r / MARKER_RADIUS_PX
+    pdf.addImage(
+      marker.dataUrl,
+      'PNG',
+      cx - marker.center * mmPerPx,
+      cy - marker.center * mmPerPx,
+      marker.size * mmPerPx,
+      marker.height * mmPerPx
+    )
+    return
+  }
+  pdf.setFillColor(...fallbackRgb)
+  pdf.circle(cx, cy, r, 'F')
 }
 
 // BeGone Professional Color Palette (samma som pdfReportGenerator)
@@ -341,6 +415,9 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
 
       yPosition += tableHeaderHeight
 
+      // Markörerna rasteriseras innan raderna ritas (canvas är asynkront)
+      const rowMarkers = await Promise.all(equipment.map(markerImageFor))
+
       // Rita tabellrader
       equipment.forEach((item, index) => {
         // Kontrollera sidbrytning
@@ -383,7 +460,7 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
 
         colX = margins.left + spacing.xs
 
-        // Typ med färgad prick
+        // Typ med stationsmarkör
         const typeDisplay = resolveTypeDisplay(item)
         const hexToRgb = (hex: string): [number, number, number] => {
           const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
@@ -392,8 +469,7 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
             : [107, 114, 128]
         }
         const typeRgb = hexToRgb(typeDisplay.color)
-        pdf.setFillColor(...typeRgb)
-        pdf.circle(colX + 3, yPosition + 7, 2.5, 'F')
+        drawStationMarker(pdf, rowMarkers[index], typeRgb, colX + 3, yPosition + 7, 2.5)
         pdf.text(
           typeDisplay.label + ((item as any).is_addon === true ? ' (Tillägg)' : ''),
           colX + 8,
@@ -465,8 +541,7 @@ export const generateEquipmentPdf = async (options: EquipmentPdfOptions): Promis
         }
         const typeRgb = hexToRgb(typeDisplay.color)
 
-        pdf.setFillColor(...typeRgb)
-        pdf.circle(infoX + 4, yPosition + 12, 4, 'F')
+        drawStationMarker(pdf, await markerImageFor(item), typeRgb, infoX + 4, yPosition + 12, 4)
 
         pdf.setTextColor(...beGoneColors.darkGray)
         pdf.setFontSize(typography.subheader.size)
