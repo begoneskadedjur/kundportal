@@ -6,6 +6,7 @@
 // Body: { customerId }      → Stationskarta: planritningar + satellitkarta + stationslista
 //       { organizationId }  → Stationsöversikt: antal stationer per region (aldrig enskilda)
 
+import { numberStations } from '../src/shared/stationNumbering'
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import puppeteer, { type Browser, type Page } from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
@@ -306,7 +307,9 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
 
   const usedNames = new Set<string>()
   const sections: Array<IndoorSection | OutdoorSection> = []
-  let idx = 0
+  // Nummer som i kundportalen: utomhus en serie, varje planritning en egen
+  // serie från 1 (src/shared/stationNumbering.ts)
+  const outdoorNumbers = numberStations(outdoor || [])
 
   // Utomhus först (så numreringen följer portalens ordning: karta, sedan planritningar)
   const outdoorRows = (outdoor || []).filter(r => r.latitude != null && r.longitude != null)
@@ -315,7 +318,7 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
       const t = resolveType(types, r.station_type_id, r.equipment_type)
       usedNames.add(t.name)
       return {
-        idx: ++idx,
+        idx: outdoorNumbers.get(r.id) ?? 0,
         code: r.serial_number || null,
         type: t.name,
         color: t.color,
@@ -345,12 +348,14 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
       .select('id, station_number, station_type, station_type_id, position_x_percent, position_y_percent, location_description, status, placed_at, is_addon')
       .eq('floor_plan_id', plan.id)
       .neq('status', 'removed')
-      .order('station_number', { ascending: true })
+      .order('placed_at', { ascending: true })
+      .order('id', { ascending: true })
+    const planNumbers = numberStations(rows || [])
     const stations = (rows || []).map(r => {
       const t = resolveType(types, r.station_type_id, r.station_type)
       usedNames.add(t.name)
       return {
-        idx: ++idx,
+        idx: planNumbers.get(r.id) ?? 0,
         code: r.station_number || null,
         type: t.name,
         color: t.color,

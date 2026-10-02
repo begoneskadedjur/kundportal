@@ -20,6 +20,7 @@ import { Navigation } from 'lucide-react'
 import { EquipmentDetailSheet } from './EquipmentDetailSheet'
 import { buildStationMarkerIcon, buildClusterIcon, stationMarkerSvg } from './stationMarkerIcon'
 import { stationIconPaths } from '../stationIcons'
+import { numberStations } from '../../../shared/stationNumbering'
 import { createFanOut, type FanOutEntry, type FanOutHandle } from './markerFanOut'
 
 interface EquipmentMapProps {
@@ -171,17 +172,9 @@ export function EquipmentMap({
   const equipmentNumberMap = useMemo(() => {
     if (stationNumbers) return stationNumbers
     if (!showNumbers) return new Map<string, number>()
-    // Nedtonade grannar tar inga nummer
-    const sorted = equipment.filter(item => !dimmedStationIds?.has(item.id)).sort((a, b) => {
-      const dateA = new Date(a.placed_at).getTime()
-      const dateB = new Date(b.placed_at).getTime()
-      return dateA - dateB
-    })
-    const map = new Map<string, number>()
-    sorted.forEach((item, index) => {
-      map.set(item.id, index + 1)
-    })
-    return map
+    // Nedtonade grannar tar inga nummer. Samma regel som rapporterna:
+    // aktiva stationer från 1, äldst först (src/shared/stationNumbering.ts)
+    return numberStations(equipment.filter(item => !dimmedStationIds?.has(item.id)))
   }, [equipment, showNumbers, dimmedStationIds, stationNumbers])
 
   // Hantera klick på markör

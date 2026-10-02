@@ -44,7 +44,7 @@
 
     // Stationsmarkörer (typens färg och ikon, tillägg, status) i kundrapporterna
     "src/shared/stationMarkers.ts",
-    "src/shared/reportStationMarkers.ts"
+    "src/shared/reportStationMarkers.ts", "src/shared/stationNumbering.ts"
 
     // OBS: vite.config.ts kan inte typkollas här — Vite är ESM-only och detta
     // projekt använder NodeNext utan "type": "module" i package.json.

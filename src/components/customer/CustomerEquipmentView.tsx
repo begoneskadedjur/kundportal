@@ -29,6 +29,7 @@ import type { IndoorStationWithRelations, IndoorStationInspectionWithRelations }
 import type { FloorPlanWithRelations } from '../../services/floorPlanService'
 import { EquipmentMap } from '../shared/equipment/EquipmentMap'
 import { MarkerGuide, MarkerSymbol } from '../shared/equipment/MarkerGuide'
+import { numberStations } from '../../shared/stationNumbering'
 import { FloorPlanViewer } from '../shared/indoor/FloorPlanViewer'
 import { CustomerOutdoorStationDetailSheet } from './CustomerOutdoorStationDetailSheet'
 import { CustomerIndoorStationDetailSheet } from './CustomerIndoorStationDetailSheet'
@@ -190,10 +191,14 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
 
   // Stationsnummer som på kartan (äldst först), så att listan och kartan visar
   // samma nummer och ett nummer står kvar på stationen när listan filtreras
-  const outdoorNumbers = useMemo(() => {
-    const sorted = [...equipment].sort((a, b) => new Date(a.placed_at).getTime() - new Date(b.placed_at).getTime())
-    return new Map(sorted.map((e, i) => [e.id, i + 1]))
-  }, [equipment])
+  const outdoorNumbers = useMemo(() => numberStations(equipment), [equipment])
+
+  // Inomhus: en egen serie per planritning, samma som planritningen visar
+  const indoorNumbers = useMemo(() => {
+    const map = new Map<string, number>()
+    Object.values(indoorStationsByPlan).forEach(list => numberStations(list).forEach((n, id) => map.set(id, n)))
+    return map
+  }, [indoorStationsByPlan])
 
   // Filtrade utomhusstationer
   const filteredOutdoor = useMemo(() => {
@@ -212,7 +217,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
     if (outdoorTypeFilter !== 'all') {
       result = result.filter(e => (e.station_type_data?.name || e.equipment_type || 'Okänd') === outdoorTypeFilter)
     }
-    return [...result].sort((a, b) => (outdoorNumbers.get(a.id) ?? 0) - (outdoorNumbers.get(b.id) ?? 0))
+    return [...result].sort((a, b) => (outdoorNumbers.get(a.id) ?? 1e9) - (outdoorNumbers.get(b.id) ?? 1e9))
   }, [equipment, outdoorSearch, outdoorStatusFilter, outdoorTypeFilter, outdoorNumbers])
 
   // Kartan visar samma typer som filtret
@@ -477,7 +482,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                         const statusConfig = EQUIPMENT_STATUS_CONFIG[item.status] || { bgColor: 'bg-slate-500/20', color: 'slate-400' }
                         return (
                           <tr key={item.id} className="hover:bg-slate-700/20 transition-colors cursor-pointer" onClick={() => handleOutdoorStationClick(item)}>
-                            <td className="px-4 py-2 text-white font-medium text-sm tabular-nums">{outdoorNumbers.get(item.id)}</td>
+                            <td className="px-4 py-2 text-white font-medium text-sm tabular-nums">{outdoorNumbers.get(item.id) ?? '—'}</td>
                             <td className="px-4 py-2">
                               <div className="flex items-center gap-2">
                                 <MarkerSymbol color={item.station_type_data?.color || '#6b7280'} icon={item.station_type_data?.icon} radius={8} />
@@ -606,7 +611,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                   }
                   if (planStatusFilter !== 'all' && s.status !== planStatusFilter) return false
                   return true
-                })
+                }).sort((a, b) => (indoorNumbers.get(a.id) ?? 1e9) - (indoorNumbers.get(b.id) ?? 1e9))
                 const visibleStations = showAll ? filteredStations : filteredStations.slice(0, SECTION_PAGE_SIZE)
 
                 return (
@@ -663,7 +668,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                                 }[station.status] || { bgColor: 'bg-slate-500/20', color: '#6b7280', label: station.status }
                                 return (
                                   <tr key={station.id} className="hover:bg-slate-700/20 transition-colors cursor-pointer" onClick={() => handleIndoorStationClick(station)}>
-                                    <td className="px-4 py-2 text-white font-medium text-sm">{station.station_number || '—'}</td>
+                                    <td className="px-4 py-2 text-white font-medium text-sm tabular-nums">{indoorNumbers.get(station.id) ?? '—'}</td>
                                     <td className="px-4 py-2">
                                       <div className="flex items-center gap-1.5">
                                         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: station.station_type_data?.color || '#6b7280' }} />

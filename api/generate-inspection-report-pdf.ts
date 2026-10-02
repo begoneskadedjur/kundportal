@@ -5,6 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import puppeteer from 'puppeteer-core'
 import chromium from '@sparticuz/chromium'
 import { createClient } from '@supabase/supabase-js'
+import { numberStations } from '../src/shared/stationNumbering'
 import nodemailer from 'nodemailer'
 import { requireAuth, requireAuthenticated } from './_lib/auth'
 import { canonicalTypeCode } from '../src/utils/stationTaxonomy'
@@ -269,6 +270,48 @@ async function fetchImageAsBase64(url: string): Promise<string | null> {
   }
 }
 
+/**
+ * Stationsnummer som i kundportalen: kundens alla aktiva utomhusstationer i en
+ * serie, varje planritning i en egen serie (src/shared/stationNumbering.ts).
+ * Så stämmer numret även när en station inte kontrollerades i rundan.
+ */
+async function loadPortalNumbers(customerId: string | null | undefined, floorPlanIds: string[]): Promise<{
+  outdoor: Map<string, number>
+  indoor: Map<string, number>
+}> {
+  const outdoor = new Map<string, number>()
+  const indoor = new Map<string, number>()
+  try {
+    if (customerId) {
+      const { data } = await supabase
+        .from('equipment_placements')
+        .select('id, placed_at, status')
+        .eq('customer_id', customerId)
+        .neq('status', 'removed')
+        .range(0, 9999)
+      numberStations(data || []).forEach((n, id) => outdoor.set(id, n))
+    }
+    if (floorPlanIds.length > 0) {
+      const { data } = await supabase
+        .from('indoor_stations')
+        .select('id, placed_at, status, floor_plan_id')
+        .in('floor_plan_id', floorPlanIds)
+        .neq('status', 'removed')
+        .range(0, 9999)
+      const byPlan = new Map<string, Array<{ id: string; placed_at: string | null; status: string | null }>>()
+      for (const r of data || []) {
+        const list = byPlan.get(r.floor_plan_id) || []
+        list.push(r)
+        byPlan.set(r.floor_plan_id, list)
+      }
+      byPlan.forEach((list) => numberStations(list).forEach((n, id) => indoor.set(id, n)))
+    }
+  } catch (err) {
+    console.warn('[Kontrollrapport] Kunde inte läsa portalens stationsnummer, använder radordning:', err)
+  }
+  return { outdoor, indoor }
+}
+
 async function generateInspectionReportHTML(data: {
   session: any
   customer: any
@@ -282,10 +325,18 @@ async function generateInspectionReportHTML(data: {
 }, browser: any) {
   const { session, customer, technician, outdoorInspections, indoorInspections, dynamicLabels, dynamicColors, sessionPhotos } = data
 
-  // Sortera utomhusinspektioner efter placed_at för korrekt numrering (samma som kundportalen)
+  // Numren är samma som i kundportalen (se loadPortalNumbers)
+  type StationRef = { station?: { id?: string; floor_plan?: { id?: string } | null } | null }
+  const floorPlanIds = [...new Set((indoorInspections as StationRef[]).map((i) => i.station?.floor_plan?.id).filter(Boolean))] as string[]
+  const portalNumbers = await loadPortalNumbers(customer?.id, floorPlanIds)
+
+  // Sortera utomhusinspektioner efter portalens nummer, annars placed_at
   const sortedOutdoor = [...outdoorInspections].sort((a, b) =>
+    (portalNumbers.outdoor.get(a.station?.id) ?? 1e9) - (portalNumbers.outdoor.get(b.station?.id) ?? 1e9) ||
     new Date(a.station?.placed_at || 0).getTime() - new Date(b.station?.placed_at || 0).getTime()
   )
+  const outdoorNo = (insp: StationRef, i: number) => portalNumbers.outdoor.get(insp.station?.id ?? '') ?? i + 1
+  const indoorNo = (insp: StationRef, i: number) => portalNumbers.indoor.get(insp.station?.id ?? '') ?? i + 1
 
   // Hämta sessionsbilder som base64
   let sessionPhotosHtml = ''
@@ -320,7 +371,7 @@ async function generateInspectionReportHTML(data: {
   // Rendera Google Maps satellitbild via Puppeteer. Numret är samma som i
   // tabellen (placed_at-ordning över alla utomhusstationer).
   const outdoorOnMap = sortedOutdoor
-    .map((insp: any, i: number) => ({ insp, s: resolveReportStation(insp, i + 1, stationTypes) }))
+    .map((insp: any, i: number) => ({ insp, s: resolveReportStation(insp, outdoorNo(insp, i), stationTypes) }))
     .filter(({ insp }) => insp.station?.latitude && insp.station?.longitude)
     .map(({ insp, s }) => ({ ...s, lat: parseFloat(insp.station.latitude), lng: parseFloat(insp.station.longitude) }))
   const mapBase64 = await renderSatelliteMapScreenshot(browser, outdoorOnMap)
@@ -344,7 +395,7 @@ async function generateInspectionReportHTML(data: {
   // Bygg nummermappning för utomhus (1, 2, 3... baserat på placed_at-order)
   const outdoorTableRows = sortedOutdoor.map((insp: any, index: number) => {
     const statusColor = getStatusColor(insp.status, dynamicColors)
-    const stationNumber = index + 1
+    const stationNumber = outdoorNo(insp, index)
     return `
       <tr>
         <td><strong>${stationNumber}</strong></td>
@@ -385,8 +436,9 @@ async function generateInspectionReportHTML(data: {
       ? `${group.name} (${group.building}) — ${group.inspections.length} st`
       : `${group.name} — ${group.inspections.length} st`
 
-    // Sortera efter placed_at inom gruppen
+    // Sortera efter portalens nummer inom planritningen, annars placed_at
     const sortedInGroup = [...group.inspections].sort((a: any, b: any) =>
+      (portalNumbers.indoor.get(a.station?.id) ?? 1e9) - (portalNumbers.indoor.get(b.station?.id) ?? 1e9) ||
       new Date(a.station?.placed_at || 0).getTime() - new Date(b.station?.placed_at || 0).getTime()
     )
 
@@ -397,7 +449,7 @@ async function generateInspectionReportHTML(data: {
       if (imageBase64) {
         // Numret är stationens rad i gruppens tabell (placed_at-ordning)
         const stationMarkers = sortedInGroup
-          .map((insp: any, idx: number) => ({ insp, s: resolveReportStation(insp, idx + 1, stationTypes) }))
+          .map((insp: any, idx: number) => ({ insp, s: resolveReportStation(insp, indoorNo(insp, idx), stationTypes) }))
           .filter(({ insp }) => insp.station?.position_x_percent && insp.station?.position_y_percent)
           .map(({ insp, s }) => ({
             ...s,
@@ -420,7 +472,7 @@ async function generateInspectionReportHTML(data: {
 
     const rows = sortedInGroup.map((insp: any, index: number) => {
       const statusColor = getStatusColor(insp.status, dynamicColors)
-      const stationNumber = index + 1
+      const stationNumber = indoorNo(insp, index)
       return `
         <tr>
           <td><strong>${stationNumber}</strong></td>

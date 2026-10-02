@@ -7,6 +7,7 @@ import { ZoomIn, ZoomOut, Maximize, Move, Plus, X, Check, Navigation } from 'luc
 import type { IndoorStationWithRelations, PlacementMode, IndoorStationType } from '../../../types/indoor'
 import { INDOOR_STATION_TYPE_CONFIG } from '../../../types/indoor'
 import { IndoorStationMarker } from './IndoorStationMarker'
+import { numberStations } from '../../../shared/stationNumbering'
 import type { StationType } from '../../../types/stationTypes'
 
 interface FloorPlanViewerProps {
@@ -97,22 +98,11 @@ export function FloorPlanViewer({
 
   // Skapa mappning från station ID till nummer (1, 2, 3...)
   // Baserat på placed_at i stigande ordning (äldsta placering = nummer 1)
+  // Samma regel som kundens lista och rapporterna: aktiva stationer från 1,
+  // äldst först, en egen serie per planritning (src/shared/stationNumbering.ts)
   const stationNumberMap = useMemo(() => {
     if (!showNumbers) return new Map<string, number>()
-
-    // Sortera efter placed_at ascending (äldsta först)
-    const sorted = [...stations].sort((a, b) => {
-      const dateA = new Date(a.placed_at).getTime()
-      const dateB = new Date(b.placed_at).getTime()
-      return dateA - dateB
-    })
-
-    // Skapa mappning: ID → nummer
-    const map = new Map<string, number>()
-    sorted.forEach((station, index) => {
-      map.set(station.id, index + 1)
-    })
-    return map
+    return numberStations(stations)
   }, [stations, showNumbers])
 
   // Hantera bildladdning och beräkna cover-dimensioner för att fylla containern
