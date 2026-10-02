@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.22.0',
+    date: '2026-10-02',
+    title: 'Tydligare stationskarta',
+    items: [
+      { kind: 'buggfix', text: 'Utrustningskartan visar nu alla utomhusstationer. Tidigare stannade den vid 1 000, så 154 stationer syntes inte på kartan och räknades inte i siffrorna.' },
+    ],
+  },
+  {
     version: '3.21.0',
     date: '2026-10-01',
     title: 'Tilläggsfakturan förklarar sig själv',

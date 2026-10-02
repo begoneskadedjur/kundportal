@@ -1,5 +1,6 @@
 // src/services/equipmentService.ts - Service för utrustningsplacering
 import { supabase } from '../lib/supabase'
+import { fetchAllRows } from '../lib/fetchAllRows'
 import { compressToWebP } from '../utils/imageUtils'
 import { canonicalTypeCode } from '../utils/stationTaxonomy'
 import {
@@ -98,33 +99,36 @@ export class EquipmentService {
       // 2026-09-18: scope 'all' är standard. Tekniker som varvar hos samma kund
       // (Hans/Liam-fallet) såg tidigare bara sina egna stationer på kartan och i
       // kundlistan, och placerade därför ovanpå varandra. 'own' finns kvar som filter.
-      let query = supabase
-        .from('equipment_placements')
-        .select(`
-          *,
-          customer:customers!customer_id(id, company_name, contact_address),
-          technician:technicians!placed_by_technician_id(id, name),
-          article:articles!article_id(icon),
-          station_type_data:station_types!station_type_id(
-            id, code, name, color, icon, prefix,
-            measurement_unit, measurement_label,
-            threshold_warning, threshold_critical, threshold_direction
-          )
-        `)
-        .order('placed_at', { ascending: false })
+      // Alla rader, i block om 1 000 (annars kapas kartan vid PostgREST:s max_rows)
+      const build = (from: number, to: number) => {
+        let query = supabase
+          .from('equipment_placements')
+          .select(`
+            *,
+            customer:customers!customer_id(id, company_name, contact_address),
+            technician:technicians!placed_by_technician_id(id, name),
+            article:articles!article_id(icon),
+            station_type_data:station_types!station_type_id(
+              id, code, name, color, icon, prefix,
+              measurement_unit, measurement_label,
+              threshold_warning, threshold_critical, threshold_direction
+            )
+          `)
+          .order('placed_at', { ascending: false })
+          .order('id', { ascending: true })
 
-      if (scope === 'own') {
-        query = query.eq('placed_by_technician_id', technicianId)
+        if (scope === 'own') {
+          query = query.eq('placed_by_technician_id', technicianId)
+        }
+        return query.range(from, to)
       }
 
-      const { data, error } = await query
-
-      if (error) {
+      try {
+        return await fetchAllRows<EquipmentPlacementWithRelations>(build)
+      } catch (error) {
         console.error('Fel vid hämtning av teknikers utrustning:', error)
-        throw new Error(`Databasfel: ${error.message}`)
+        throw new Error(`Databasfel: ${error instanceof Error ? error.message : (error as { message?: string })?.message}`)
       }
-
-      return data || []
 
     } catch (error) {
       console.error('EquipmentService.getEquipmentByTechnician fel:', error)
@@ -137,27 +141,29 @@ export class EquipmentService {
    */
   static async getAllEquipment(): Promise<EquipmentPlacementWithRelations[]> {
     try {
-      const { data, error } = await supabase
-        .from('equipment_placements')
-        .select(`
-          *,
-          customer:customers!customer_id(id, company_name, contact_address),
-          technician:technicians!placed_by_technician_id(id, name),
-          article:articles!article_id(icon),
-          station_type_data:station_types!station_type_id(
-            id, code, name, color, icon, prefix,
-            measurement_unit, measurement_label,
-            threshold_warning, threshold_critical, threshold_direction
-          )
-        `)
-        .order('placed_at', { ascending: false })
-
-      if (error) {
+      try {
+        return await fetchAllRows<EquipmentPlacementWithRelations>((from, to) =>
+          supabase
+            .from('equipment_placements')
+            .select(`
+              *,
+              customer:customers!customer_id(id, company_name, contact_address),
+              technician:technicians!placed_by_technician_id(id, name),
+              article:articles!article_id(icon),
+              station_type_data:station_types!station_type_id(
+                id, code, name, color, icon, prefix,
+                measurement_unit, measurement_label,
+                threshold_warning, threshold_critical, threshold_direction
+              )
+            `)
+            .order('placed_at', { ascending: false })
+            .order('id', { ascending: true })
+            .range(from, to)
+        )
+      } catch (error) {
         console.error('Fel vid hämtning av all utrustning:', error)
-        throw new Error(`Databasfel: ${error.message}`)
+        throw new Error(`Databasfel: ${error instanceof Error ? error.message : (error as { message?: string })?.message}`)
       }
-
-      return data || []
 
     } catch (error) {
       console.error('EquipmentService.getAllEquipment fel:', error)
@@ -608,9 +614,11 @@ export class EquipmentService {
       // own_*_count + technician_names gör det synligt vem som placerat vad.
 
       // Hämta utomhusstationer grupperat per kund
+      const buildOutdoor = (from: number, to: number) => {
       let outdoorQuery = supabase
         .from('equipment_placements')
         .select(`
+          id,
           customer_id,
           status,
           placed_at,
@@ -619,14 +627,18 @@ export class EquipmentService {
           customer:customers!customer_id(id, company_name, contact_address, organization_number, organization_id, parent_customer_id, is_multisite, site_type, site_name, contract_start_date, contract_end_date)
         `)
       if (scope === 'own') outdoorQuery = outdoorQuery.eq('placed_by_technician_id', technicianId)
-      const { data: outdoorData, error: outdoorError } = await outdoorQuery
-
-      if (outdoorError) {
+      return outdoorQuery.order('id', { ascending: true }).range(from, to)
+      }
+      let outdoorData
+      try {
+        outdoorData = await fetchAllRows(buildOutdoor)
+      } catch (outdoorError) {
         console.error('Fel vid hämtning av utomhusstationer:', outdoorError)
         throw outdoorError
       }
 
       // Hämta inomhusstationer via floor_plans
+      const buildIndoor = (from: number, to: number) => {
       let indoorQuery = supabase
         .from('indoor_stations')
         .select(`
@@ -641,9 +653,12 @@ export class EquipmentService {
           )
         `)
       if (scope === 'own') indoorQuery = indoorQuery.eq('placed_by_technician_id', technicianId)
-      const { data: indoorData, error: indoorError } = await indoorQuery
-
-      if (indoorError) {
+      return indoorQuery.order('id', { ascending: true }).range(from, to)
+      }
+      let indoorData
+      try {
+        indoorData = await fetchAllRows(buildIndoor)
+      } catch (indoorError) {
         console.error('Fel vid hämtning av inomhusstationer:', indoorError)
         throw indoorError
       }
@@ -883,20 +898,24 @@ export class EquipmentService {
   }> {
     try {
       // Hämta utomhusstationer
-      const { data: outdoorData, error: outdoorError } = await supabase
-        .from('equipment_placements')
-        .select('status, customer_id')
-        .eq('placed_by_technician_id', technicianId)
-
-      if (outdoorError) throw outdoorError
+      const outdoorData = await fetchAllRows((from, to) =>
+        supabase
+          .from('equipment_placements')
+          .select('id, status, customer_id')
+          .eq('placed_by_technician_id', technicianId)
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
 
       // Hämta inomhusstationer
-      const { data: indoorData, error: indoorError } = await supabase
-        .from('indoor_stations')
-        .select('status, floor_plan:floor_plans!floor_plan_id(customer_id)')
-        .eq('placed_by_technician_id', technicianId)
-
-      if (indoorError) throw indoorError
+      const indoorData = await fetchAllRows((from, to) =>
+        supabase
+          .from('indoor_stations')
+          .select('id, status, floor_plan:floor_plans!floor_plan_id(customer_id)')
+          .eq('placed_by_technician_id', technicianId)
+          .order('id', { ascending: true })
+          .range(from, to)
+      )
 
       // Räkna statusar
       const byStatus: Record<string, number> = {
