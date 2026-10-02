@@ -655,7 +655,8 @@ export async function getOutdoorInspectionsForSession(
         latitude,
         longitude,
         status,
-        is_addon
+        is_addon,
+        product_icon
       ),
       technician:technicians(id, name),
       preparation:preparations!preparation_id(id, name, registration_number, threshold_warning, threshold_critical, threshold_direction, measurement_unit, measurement_label)
@@ -890,6 +891,7 @@ export async function getIndoorInspectionsForSession(
         location_description,
         status,
         is_addon,
+        product_icon,
         floor_plan:floor_plans(id, name, building_name, image_path)
       ),
       preparation:preparations!preparation_id(id, name, registration_number, threshold_warning, threshold_critical, threshold_direction, measurement_unit, measurement_label)

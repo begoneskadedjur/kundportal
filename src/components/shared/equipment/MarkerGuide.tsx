@@ -112,8 +112,8 @@ export function MarkerGuide({
         <div className="px-3 pb-3 grid gap-3 sm:grid-cols-2">
           <Row
             symbol={<MarkerSymbol color={exampleColor} icon={exampleIcon} />}
-            title="Färgen och ikonen visar typen"
-            text="Samma som knapparna ovanför kartan."
+            title="Färgen visar typen, ikonen hur stationen ser ut"
+            text="Samma färg som knapparna ovanför kartan."
           />
           <Row
             symbol={<MarkerSymbol color={exampleColor} icon={exampleIcon} badge="12" />}

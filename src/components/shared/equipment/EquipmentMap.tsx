@@ -64,8 +64,8 @@ interface EquipmentMapProps {
   /** Teckenförklaringen nere till vänster på kartan. Av där sidan visar en egen. */
   showLegend?: boolean
   /**
-   * Kundvyer: stationstypens ikon i cirkeln och numret i en bricka under,
-   * aldrig produktens ikon. showProductIcons går före om båda är på.
+   * Kundvyer: produktens ikon (stationens product_icon) eller typens ikon i
+   * cirkeln och numret i en bricka under. Texter visar alltid typen.
    */
   showTypeIcons?: boolean
   /** Färdiga stationsnummer (t.ex. samma som en lista bredvid). Går före showNumbers egen numrering. */
@@ -418,7 +418,9 @@ export function EquipmentMap({
       const typeIcon = item.station_type_data?.icon
         || (typeColorMap.get(item.equipment_type) || typeColorMap.get((item.equipment_type || '').toLowerCase()))?.icon
       const productIcon = markerIcons && !isDimmed && !isRelocating && !isStatusLabel
-        ? (showProductIcons ? stationIconPaths(item.article?.icon) : null) || stationIconPaths(typeIcon)
+        ? stationIconPaths(showProductIcons ? item.article?.icon : null)
+          || stationIconPaths(item.product_icon)
+          || stationIconPaths(typeIcon)
         : null
       const markerLabelText = productIcon ? '' : labelText
 

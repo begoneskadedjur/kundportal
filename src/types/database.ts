@@ -2009,6 +2009,8 @@ export interface EquipmentPlacementWithRelations extends EquipmentPlacement {
   } | null
   /** Produktens interna ikon (articles.icon). Kunder kan inte läsa artiklar, så den är null för dem. */
   article?: { icon: string | null } | null
+  /** Kopia av produktens ikon på stationen, läsbar för kunder. Aldrig produktnamn. */
+  product_icon?: string | null
   // Dynamisk stationstypdata från station_types-tabellen
   station_type_data?: {
     id: string

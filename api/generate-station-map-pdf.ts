@@ -299,7 +299,7 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
       .order('sort_order', { ascending: true }),
     supabase
       .from('equipment_placements')
-      .select('id, serial_number, equipment_type, station_type_id, latitude, longitude, comment, status, placed_at, is_addon')
+      .select('id, serial_number, equipment_type, station_type_id, latitude, longitude, comment, status, placed_at, is_addon, product_icon')
       .eq('customer_id', customer.id)
       .eq('status', 'active')
       .order('placed_at', { ascending: true }),
@@ -322,7 +322,7 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
         code: r.serial_number || null,
         type: t.name,
         color: t.color,
-        icon: t.icon,
+        icon: r.product_icon || t.icon,
         addon: r.is_addon === true,
         location: r.comment || null,
         status: r.status,
@@ -345,7 +345,7 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
   for (const plan of plans || []) {
     const { data: rows } = await supabase
       .from('indoor_stations')
-      .select('id, station_number, station_type, station_type_id, position_x_percent, position_y_percent, location_description, status, placed_at, is_addon')
+      .select('id, station_number, station_type, station_type_id, position_x_percent, position_y_percent, location_description, status, placed_at, is_addon, product_icon')
       .eq('floor_plan_id', plan.id)
       .neq('status', 'removed')
       .order('placed_at', { ascending: true })
@@ -359,7 +359,7 @@ export async function buildStationMap(browser: Browser, customer: CustomerRow, d
         code: r.station_number || null,
         type: t.name,
         color: t.color,
-        icon: t.icon,
+        icon: r.product_icon || t.icon,
         addon: r.is_addon === true,
         location: r.location_description || null,
         status: r.status,

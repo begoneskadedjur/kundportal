@@ -485,7 +485,7 @@ const CustomerEquipmentView: React.FC<CustomerEquipmentViewProps> = ({
                             <td className="px-4 py-2 text-white font-medium text-sm tabular-nums">{outdoorNumbers.get(item.id) ?? '—'}</td>
                             <td className="px-4 py-2">
                               <div className="flex items-center gap-2">
-                                <MarkerSymbol color={item.station_type_data?.color || '#6b7280'} icon={item.station_type_data?.icon} radius={8} />
+                                <MarkerSymbol color={item.station_type_data?.color || '#6b7280'} icon={item.product_icon || item.station_type_data?.icon} radius={8} />
                                 <span className="text-slate-300 text-sm">{item.station_type_data?.name || item.equipment_type || 'Okänd'}</span>
                               </div>
                             </td>

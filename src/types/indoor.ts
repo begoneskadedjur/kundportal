@@ -264,6 +264,8 @@ export interface IndoorStationWithRelations extends IndoorStation {
   };
   /** Produktens ikon (articles.icon), går före stationstypens */
   article?: { icon: string | null } | null;
+  /** Kopia av produktens ikon på stationen, läsbar för kunder. Aldrig produktnamn. */
+  product_icon?: string | null;
   station_type_data?: {
     id: string;
     code: string;

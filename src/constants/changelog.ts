@@ -59,6 +59,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'nyhet', text: 'Kontrollrapporten och stationskartan som PDF visar samma markörer som portalen: typens färg och ikon, numret under och status i kanten, med en teckenförklaring under varje karta. Utrustningsrapporten har markören i listorna.' },
       { kind: 'buggfix', text: 'Kontrollrapporten skriver nu ut Tillägg utöver avtal för tilläggsstationer. Uppgiften hämtades aldrig tidigare, så raden var alltid tom.' },
       { kind: 'buggfix', text: 'Stationsnumren är nu desamma i kundportalen, stationskartan och kontrollrapporten. Utomhus numreras för sig och varje planritning börjar om på 1, äldst först. Borttagna stationer får inget nummer. Tidigare visade kundens inomhuslista teknikerns beteckning och PDF:en räknade inomhus vidare efter utomhus.' },
+      { kind: 'andring', text: 'Kunderna ser nu produktens ikon i markören när stationen har en produkt med ikon, i portalen och i rapporterna. Texten säger fortfarande stationstypen, till exempel Betesstation, aldrig produktens namn.' },
     ],
   },
   {

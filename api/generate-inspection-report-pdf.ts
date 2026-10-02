@@ -109,7 +109,8 @@ function resolveReportStation(insp: any, number: number, types: ReportTypeRow[])
     number,
     typeName: st.station_type_data?.name || row?.name || legacy || 'Okänd typ',
     color: st.station_type_data?.color || row?.color || null,
-    icon: row?.icon || st.station_type_data?.icon || null,
+    // Produktens ikon får synas för kunden, namnet är alltid typens
+    icon: st.product_icon || row?.icon || st.station_type_data?.icon || null,
     status: st.status || null,
     addon: st.is_addon === true,
   }
