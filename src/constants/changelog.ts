@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.23.0',
+    date: '2026-10-04',
+    title: 'Artanalysen på nya begone.se',
+    items: [
+      { kind: 'nyhet', text: 'Portalen tar emot bildrutor från artanalysen på nya begone.se och föreslår en art bland 24 vanliga skadedjur. Inga bilder sparas, och en besökare kan bara göra ett fåtal analyser per dygn. Analysen har inga nummer och syns inte bland ärendena.' },
+    ],
+  },
+  {
     version: '3.22.0',
     date: '2026-10-02',
     title: 'Tydligare stationskarta',
