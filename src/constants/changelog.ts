@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.26.0',
+    date: '2026-10-05',
+    title: 'Leads (Webb): offert, bokad tjänst och ärendenummer',
+    items: [
+      { kind: 'nyhet', text: 'Skapa offert i förfrågan öppnar offertguiden med kundens uppgifter ifyllda. När offerten skickats får förfrågan status Offert och en rad i historiken med länk till offerten.' },
+      { kind: 'andring', text: 'Status Offert kan inte längre sättas för hand. Den sätts bara när en offert faktiskt skickats från förfrågan.' },
+      { kind: 'nyhet', text: 'När ett ärende skapas från förfrågan sparas ärendenumret och den bokade tjänsten. Båda syns i förfrågan och i listan, och kundens eget val står kvar.' },
+      { kind: 'nyhet', text: 'Statistiken visar kundens val mot bokad tjänst, till exempel hur ofta Vet inte blev möss.' },
+    ],
+  },
+  {
     version: '3.25.1',
     date: '2026-10-05',
     title: 'Leads (Webb): rättningar efter granskning',

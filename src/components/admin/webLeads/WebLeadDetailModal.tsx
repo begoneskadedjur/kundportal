@@ -1,11 +1,12 @@
 // src/components/admin/webLeads/WebLeadDetailModal.tsx
 // Detaljvy för en webbförfrågan i Leads (Webb): kontaktuppgifter, formulärets svar, bilder, källa,
-// statusflöde, tilldelning, anteckningar med historik och konvertering till B2B-lead.
+// statusflöde, tilldelning, anteckningar med historik och konvertering till ärende, offert (Oneflow-
+// guiden, kopplas när offerten skickats) och B2B-lead.
 // Modalstandard: inget Card, sektioner p-3 bg-slate-800/30, status som text med statuspunkt.
 
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { Phone, Mail, MapPin, MessageSquare, Image as ImageIcon, Globe, History, UserPlus, Target, Send, X, ClipboardPlus, ExternalLink } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Phone, Mail, MapPin, MessageSquare, Image as ImageIcon, Globe, History, UserPlus, Target, Send, X, ClipboardPlus, ExternalLink, FileSignature } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
@@ -33,6 +34,8 @@ import { formatSvTid, svDatum } from './format'
 interface Props {
   inquiry: WebInquiry | null
   staff: StaffProfile[]
+  /** Rollens bas: /admin, /koordinator eller /saljare. */
+  basePath: string
   leadsBasePath: string
   /** Sidan där ärenden öppnas (sök ärenden). null när rollen inte skapar ärenden, t.ex. säljare. */
   arendeSokPath: string | null
@@ -62,6 +65,37 @@ function formularSvar(inquiry: WebInquiry): Svar[] {
   return svar
 }
 
+const OSPECIFICERAD = ['annat', 'vetinte', 'foretag']
+
+/** Offertens innehållstext i guiden: djuret när kunden angett ett, annars en allmän formulering. */
+function offertText(inquiry: WebInquiry): string {
+  const p = inquiry.pest_type
+  if (p && !OSPECIFICERAD.includes(p) && tjanstLabel(p) !== p) {
+    return `Bekämpning av ${tjanstLabel(p).toLowerCase()}.`
+  }
+  return 'Inspektion och åtgärd mot skadedjur enligt överenskommelse.'
+}
+
+/** Oneflow-guidens förifyllning som offert, i samma format som guidens övriga ingångar. */
+function offertFalt(inquiry: WebInquiry, returnPath: string) {
+  const foretag = inquiry.kundgrupp !== 'privat'
+  return {
+    documentType: 'offer',
+    partyType: foretag ? 'company' : 'individual',
+    Kontaktperson: inquiry.name || '',
+    'e-post-kontaktperson': inquiry.email || '',
+    'telefonnummer-kontaktperson': inquiry.phone || '',
+    'utforande-adress': [inquiry.address, [inquiry.postal_code, inquiry.city].filter(Boolean).join(' ')].filter(Boolean).join(', '),
+    foretag: foretag ? inquiry.company_name || '' : '',
+    'org-nr': foretag ? inquiry.organization_number || '' : '',
+    agreementText: offertText(inquiry),
+    // Mallen väljs i guiden; offertmallens kategori styr sedan företag eller privatperson
+    targetStep: 2,
+    webInquiryId: inquiry.id,
+    returnPath,
+  }
+}
+
 /** Ärendemodalens fält förifyllda från förfrågan. Det som saknas lämnas tomt. */
 function arendeFalt(inquiry: WebInquiry, typ: 'private' | 'business'): Partial<PrivateCasesInsert & BusinessCasesInsert> {
   const adress = [inquiry.address, [inquiry.postal_code, inquiry.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
@@ -89,8 +123,9 @@ function arendeFalt(inquiry: WebInquiry, typ: 'private' | 'business'): Partial<P
   return falt
 }
 
-export default function WebLeadDetailModal({ inquiry, staff, leadsBasePath, arendeSokPath, onClose, onChanged }: Props) {
+export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBasePath, arendeSokPath, onClose, onChanged }: Props) {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const [events, setEvents] = useState<WebInquiryEvent[]>([])
   const [bilder, setBilder] = useState<{ path: string; url: string }[]>([])
   const [storBild, setStorBild] = useState<string | null>(null)
@@ -225,6 +260,26 @@ export default function WebLeadDetailModal({ inquiry, staff, leadsBasePath, aren
     }
   }
 
+  // Skapa offert: Oneflow-guiden öppnas förifylld. Förfrågan kopplas först när offerten skickats.
+  const oppnaSkapaOffert = async () => {
+    setForbereder(true)
+    try {
+      const farsk = await WebInquiryService.get(inquiry.id)
+      if (farsk?.arende_id) {
+        onChanged(farsk)
+        toast.error('Förfrågan har redan ett ärende')
+        return
+      }
+      const guide = basePath === '/admin' ? '/admin/skapa-avtal' : `${basePath}/oneflow-contract-creator`
+      sessionStorage.setItem('prefill_customer_data', JSON.stringify(offertFalt(inquiry, `${basePath}/leads-webb?id=${inquiry.id}`)))
+      navigate(`${guide}?prefill=offer`)
+    } catch {
+      toast.error('Offertguiden kunde inte öppnas')
+    } finally {
+      setForbereder(false)
+    }
+  }
+
   const efterArende = async (caseId: string, caseType: 'private' | 'business' | 'contract') => {
     try {
       const uppdaterad = await WebInquiryService.linkCase(
@@ -292,7 +347,8 @@ export default function WebLeadDetailModal({ inquiry, staff, leadsBasePath, aren
               <div className="text-sm">
                 <p className="text-xs font-medium text-slate-400 mb-1">Utfall</p>
                 <p className="text-slate-300">
-                  {inquiry.bokad_at ? `Ärende skapat ${formatSvTid(inquiry.bokad_at)}. ` : 'Ärende skapat. '}
+                  {inquiry.arende_nummer ? `Ärende ${inquiry.arende_nummer} skapat` : 'Ärende skapat'}
+                  {inquiry.bokad_at ? ` ${formatSvTid(inquiry.bokad_at)}. ` : '. '}
                   {inquiry.status === 'bokad' && fristDatum && (
                     <>Räknas som vunnen om ärendet faktureras senast {fristDatum} ({fristDagar} dagar{inquiry.haft_offert ? ' eftersom offert har skickats' : ''}), annars som förlorad. Sätts automatiskt en gång per dygn.</>
                   )}
@@ -324,7 +380,12 @@ export default function WebLeadDetailModal({ inquiry, staff, leadsBasePath, aren
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-slate-500 mt-1">Bokad sätts när ett ärende skapas. Vunnen sätts automatiskt när ärendet fakturerats.</p>
+              <p className="text-xs text-slate-500 mt-1">
+                Offert sätts när en offert skickas med Skapa offert. Bokad sätts när ett ärende skapas. Vunnen sätts automatiskt när ärendet fakturerats.
+              </p>
+              {inquiry.offert_skickad_at && (
+                <p className="text-xs text-slate-400 mt-1">Offert skickad {formatSvTid(inquiry.offert_skickad_at)}. Bokas ett ärende gäller 90 dagars frist.</p>
+              )}
             </div>
             )}
             <div className="flex flex-wrap items-end gap-3">
@@ -355,13 +416,32 @@ export default function WebLeadDetailModal({ inquiry, staff, leadsBasePath, aren
                   {forbereder ? 'Förbereder...' : 'Skapa ärende'}
                 </Button>
               )}
+              {!bokad && inquiry.status !== 'skrap' && (
+                <Button variant="secondary" size="sm" disabled={forbereder || sparar} onClick={oppnaSkapaOffert}>
+                  <FileSignature className="w-4 h-4 mr-1.5" />
+                  {inquiry.offert_oneflow_id ? 'Skapa ny offert' : 'Skapa offert'}
+                </Button>
+              )}
               {arendeLank && (
                 <Link to={arendeLank} className="inline-flex items-center gap-1.5 text-sm text-[#20c58f] hover:underline">
                   <ExternalLink className="w-4 h-4" />
-                  Öppna ärendet
+                  {inquiry.arende_nummer ? `Öppna ärende ${inquiry.arende_nummer}` : 'Öppna ärendet'}
                 </Link>
               )}
-              {bokad && !arendeLank && <span className="text-sm text-slate-400">Ärende skapat</span>}
+              {bokad && !arendeLank && (
+                <span className="text-sm text-slate-400">{inquiry.arende_nummer ? `Ärende ${inquiry.arende_nummer}` : 'Ärende skapat'}</span>
+              )}
+              {inquiry.offert_oneflow_id && (
+                <a
+                  href={`https://app.oneflow.com/contracts/${inquiry.offert_oneflow_id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm text-[#20c58f] hover:underline"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Öppna offerten i Oneflow
+                </a>
+              )}
               {arForetag && !inquiry.lead_id && (
                 <Button variant="primary" size="sm" onClick={() => setVisaSkapaLead(true)}>
                   <Target className="w-4 h-4 mr-1.5" />
@@ -427,7 +507,13 @@ export default function WebLeadDetailModal({ inquiry, staff, leadsBasePath, aren
                 <MessageSquare className="w-4 h-4 text-[#20c58f]" /> Förfrågan
               </h3>
               <dl className="space-y-1.5 text-sm">
-                <div><dt className="text-xs text-slate-400">Tjänst</dt><dd className="text-white">{tjanstLabel(inquiry.pest_type)}</dd></div>
+                <div>
+                  <dt className="text-xs text-slate-400">{inquiry.bokad_tjanst ? 'Tjänst enligt kunden' : 'Tjänst'}</dt>
+                  <dd className="text-white">{tjanstLabel(inquiry.pest_type)}</dd>
+                </div>
+                {inquiry.bokad_tjanst && (
+                  <div><dt className="text-xs text-slate-400">Bokad tjänst</dt><dd className="text-white">{inquiry.bokad_tjanst}</dd></div>
+                )}
                 {svar.map((s) => (
                   <div key={s.etikett}><dt className="text-xs text-slate-400">{s.etikett}</dt><dd className="text-white">{s.varde}</dd></div>
                 ))}
@@ -515,7 +601,7 @@ export default function WebLeadDetailModal({ inquiry, staff, leadsBasePath, aren
                     </div>
                     <p className="text-white whitespace-pre-wrap">
                       {handelseText(e, namnFor)}
-                      {e.typ === 'konvertering' && arendeSokPath && e.till_varde?.includes(':') && (
+                      {e.typ === 'konvertering' && arendeSokPath && e.till_varde && /^(private|business)_cases:/.test(e.till_varde) && (
                         <>
                           {' '}
                           <Link
@@ -523,6 +609,23 @@ export default function WebLeadDetailModal({ inquiry, staff, leadsBasePath, aren
                             className="text-[#20c58f] hover:underline"
                           >
                             Öppna ärendet
+                          </Link>
+                        </>
+                      )}
+                      {e.typ === 'konvertering' && e.till_varde?.startsWith('offert:') && (
+                        <>
+                          {' '}
+                          <a
+                            href={`https://app.oneflow.com/contracts/${e.till_varde.slice(7)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#20c58f] hover:underline"
+                          >
+                            Öppna offerten
+                          </a>
+                          {', '}
+                          <Link to={`${basePath}/dokumentsignering`} className="text-[#20c58f] hover:underline">
+                            Dokumentsignering
                           </Link>
                         </>
                       )}

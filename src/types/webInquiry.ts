@@ -66,6 +66,14 @@ export interface WebInquiry {
   haft_offert: boolean
   /** När det kopplade ärendet fakturerades (sätts av dygnsjobbet). */
   fakturerad_at: string | null
+  /** Oneflow-id för offerten som skickades från förfrågan (sätts av guiden, ger status Offert). */
+  offert_oneflow_id: string | null
+  offert_contract_id: string | null
+  offert_skickad_at: string | null
+  /** Tjänsten koordinatorn valde i ärendet. Kundens eget val står kvar i pest_type. */
+  bokad_tjanst: string | null
+  /** Ärendenumret kunden fick (case_number). Har inget med förfrågans referens att göra. */
+  arende_nummer: string | null
 }
 
 export interface WebInquiryEvent {
@@ -89,10 +97,11 @@ export interface StaffProfile {
 export const STATUS_ORDNING: WebInquiryStatus[] = ['ny', 'kontaktad', 'offert', 'bokad', 'vunnen', 'forlorad', 'skrap']
 
 /**
- * Statusar som personalen kan sätta för hand på en förfrågan som inte bokats. Bokad sätts när ett
- * ärende skapas från förfrågan och Vunnen bara av dygnsjobbet; databasens trigger spärrar resten.
+ * Statusar som personalen kan sätta för hand på en förfrågan som inte bokats. Offert sätts när en
+ * offert skickats från förfrågan, Bokad när ett ärende skapas och Vunnen bara av dygnsjobbet;
+ * databasens trigger spärrar resten.
  */
-export const MANUELLA_STATUSAR: WebInquiryStatus[] = ['ny', 'kontaktad', 'offert', 'forlorad', 'skrap']
+export const MANUELLA_STATUSAR: WebInquiryStatus[] = ['ny', 'kontaktad', 'forlorad', 'skrap']
 
 /** Dagar från bokningen som ärendet har på sig att faktureras för att räknas som vunnet. */
 export const FRIST_DAGAR = 30

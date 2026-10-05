@@ -256,6 +256,7 @@ export default function WebLeads() {
                     <th className="px-3 py-2 font-medium">Kundgrupp</th>
                     <th className="px-3 py-2 font-medium">Källa</th>
                     <th className="px-3 py-2 font-medium">Status</th>
+                    <th className="px-3 py-2 font-medium whitespace-nowrap">Ärende</th>
                     <th className="px-3 py-2 font-medium">Tilldelad</th>
                   </tr>
                 </thead>
@@ -283,6 +284,9 @@ export default function WebLeads() {
                         <td className="px-3 py-2 text-slate-300">
                           {tjanstLabel(i.pest_type)}
                           {i.bilder.some((b) => b.uppladdad) && <span className="text-xs text-slate-500"> · bild</span>}
+                          {i.bokad_tjanst && i.bokad_tjanst !== tjanstLabel(i.pest_type) && (
+                            <span className="block text-xs text-slate-400">Bokad: {i.bokad_tjanst}</span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-slate-300">{i.city || i.postal_code}</td>
                         <td className="px-3 py-2 text-slate-300">{KUNDGRUPP_LABEL[i.kundgrupp]}</td>
@@ -299,6 +303,7 @@ export default function WebLeads() {
                             </span>
                           )}
                         </td>
+                        <td className="px-3 py-2 text-slate-300 font-mono text-xs whitespace-nowrap">{i.arende_nummer ?? ''}</td>
                         <td className="px-3 py-2 text-slate-400">{namnFor(i.tilldelad_till)}</td>
                       </tr>
                     )
@@ -313,6 +318,7 @@ export default function WebLeads() {
       <WebLeadDetailModal
         inquiry={vald}
         staff={staff}
+        basePath={base}
         leadsBasePath={`${base}/leads`}
         arendeSokPath={base === '/saljare' ? null : '/koordinator/sok-arenden'}
         onClose={stang}

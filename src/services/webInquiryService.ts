@@ -74,6 +74,16 @@ export class WebInquiryService {
     return data as WebInquiry
   }
 
+  /**
+   * Kopplar en offert som just skickats från Oneflow-guiden till förfrågan. Databasens trigger
+   * kontrollerar att offerten finns och är skickad, sätter status Offert och 90 dagars frist och
+   * skriver historikraden "Offert skickad". Anropas bara när offerten faktiskt skickats.
+   */
+  static async linkOffer(id: string, oneflowContractId: string): Promise<void> {
+    const { error } = await db.from('web_inquiries').update({ offert_oneflow_id: oneflowContractId }).eq('id', id)
+    if (error) throw error
+  }
+
   /** Aktiva tekniker för ärendemodalens bokning. */
   static async listTechnicians(): Promise<Technician[]> {
     const { data, error } = await supabase.from('technicians').select('*').eq('is_active', true).order('name')

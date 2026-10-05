@@ -22,6 +22,7 @@ import { mapBillingItemsToPrefillServices, mapBillingItemsToSelectedArticles } f
 import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES, type OneflowTemplate } from '../../constants/oneflowTemplates'
 import { OneflowTemplateService } from '../../services/oneflowTemplateService'
+import { WebInquiryService } from '../../services/webInquiryService'
 import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
 import { supabase, getAuthHeaders } from '../../lib/supabase'
@@ -104,6 +105,11 @@ interface WizardData {
 
   // Kundgrupp (bara vid avtal)
   customer_group_id: string | null
+
+  /** Leads (Webb): förfrågan som offerten skapas från. Kopplas när offerten faktiskt skickats. */
+  web_inquiry_id?: string
+  /** Leads (Webb): sidan guiden går tillbaka till efter en skickad offert. */
+  returnPath?: string
 }
 
 const OFFER_STEPS = [
@@ -310,6 +316,9 @@ export default function OneflowContractCreator() {
             noticePeriodMonths: customerData.noticePeriodMonths || prev.noticePeriodMonths,
             billingFrequency: customerData.billingFrequency || prev.billingFrequency,
             renewalOfContractId: customerData.renewalOfContractId || undefined,
+            // Leads (Webb): offert från en webbförfrågan
+            web_inquiry_id: customerData.webInquiryId || undefined,
+            returnPath: customerData.returnPath || undefined,
           }))
           
           // Debug-logging för att spåra prefill-processen
@@ -584,6 +593,19 @@ export default function OneflowContractCreator() {
   const availableTemplates = wizardData.documentType === 'offer' ? offerTemplates : contractTemplates
   const selectedTemplate = availableTemplates.find(t => t.id === wizardData.selectedTemplate)
 
+  // Leads (Webb): kopplar en skickad offert till webbförfrågan som guiden öppnades från.
+  // Utkast (inte skickade för signering) och avtal kopplas aldrig.
+  const kopplaOffertTillForfragan = async (oneflowId: unknown) => {
+    if (!wizardData.web_inquiry_id || wizardData.documentType !== 'offer' || !wizardData.sendForSigning) return
+    if (oneflowId === null || oneflowId === undefined || oneflowId === '') return
+    try {
+      await WebInquiryService.linkOffer(wizardData.web_inquiry_id, String(oneflowId))
+      toast.success('Offerten är kopplad till webbförfrågan')
+    } catch {
+      toast.error('Offerten skickades men kunde inte kopplas till webbförfrågan')
+    }
+  }
+
   const handleSubmit = async () => {
     // Konvertera tjänster → SelectedProduct-format för API:et (aldrig inköpsartiklar!)
     const partyType = wizardData.partyType as CustomerType
@@ -738,6 +760,10 @@ export default function OneflowContractCreator() {
       if (!response.ok) {
         const error = await response.json()
         console.error('[wizard] API-fel:', error)
+        // Leads (Webb): offerten kan ha skickats fast metadata inte kunde sparas efteråt
+        if (response.status === 502 && error?.contract?.id) {
+          await kopplaOffertTillForfragan(error.contract.id)
+        }
         const thrown: any = new Error(error.detail || error.message || 'Ett okänt serverfel inträffade')
         // Bifoga OneFlow-felobjektet (inkl. parameter_problems) för fält-specifik felhantering
         thrown.oneflowError = error.oneflow_error || error
@@ -748,6 +774,10 @@ export default function OneflowContractCreator() {
       const result = await response.json()
       
       setCreationStep('Slutför...')
+      // Leads (Webb): bara en offert som faktiskt skickats kopplas till förfrågan
+      if (!result.warning) {
+        await kopplaOffertTillForfragan(result.contract?.id)
+      }
       setCreatedContract(result.contract)
       setShowConfetti(true)
       
@@ -783,7 +813,11 @@ export default function OneflowContractCreator() {
 
       // Redirecta till offertuppföljning efter kort paus så success-cardet hinner registreras
       setTimeout(() => {
-        navigate(getFollowUpRoute())
+        navigate(
+          wizardData.web_inquiry_id && wizardData.returnPath && !result.warning
+            ? wizardData.returnPath
+            : getFollowUpRoute()
+        )
       }, 2500)
       
     } catch (err: any) {

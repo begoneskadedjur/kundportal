@@ -1,13 +1,14 @@
 // src/components/admin/webLeads/WebLeadsStats.tsx
 // Fliken Statistik i Leads (Webb): efterfrågan per ISO-vecka (staplat per kundgrupp), kedjan
 // förfrågan, bokad, vunnen, förlorad efter bokning och förlorad utan bokning per tjänst, källa,
-// kundgrupp, vecka, kampanj och sökord, per sida och andel med kontakt samma dag. Aggregeras i
+// kundgrupp, vecka, kampanj och sökord, kundens val mot bokad tjänst, per sida och andel med kontakt samma dag. Aggregeras i
 // klienten på periodens rader (cirka 70 till 80 förfrågningar i månaden).
 
 import { useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { KUNDGRUPP_LABEL, type WebInquiry, type WebInquiryKundgrupp } from '../../../types/webInquiry'
 import WebLeadsKedja from './WebLeadsKedja'
+import WebLeadsTjanstUtfall from './WebLeadsTjanstUtfall'
 import { isoVecka, svDatum } from './format'
 
 const PERIODER = [
@@ -160,6 +161,8 @@ export default function WebLeadsStats({ inquiries }: { inquiries: WebInquiry[] }
       </div>
 
       <WebLeadsKedja urval={urval} />
+
+      <WebLeadsTjanstUtfall urval={urval} />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Topplista titel="Per sida" rader={perSida} />
