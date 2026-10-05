@@ -1,11 +1,11 @@
 // api/_lib/begoneSeCors.ts
 // CORS för publika endpoints som anropas från nya begone.se (artanalysen och förfrågningarna).
-// Tillåtet: begone.se, www.begone.se, förhandsvisningar för Vercel-projektet begone-se och
+// Tillåtet: begone.se, www.begone.se, produktionsadressen begone-se.vercel.app (projektets egen, före DNS-bytet), förhandsvisningar för Vercel-projektet begone-se och
 // den lokala Astro-servern på port 4321. Anrop med annan eller saknad Origin nekas av anroparen (403).
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
-const TILLATNA = new Set(['https://begone.se', 'https://www.begone.se', 'http://localhost:4321', 'http://127.0.0.1:4321'])
+const TILLATNA = new Set(['https://begone.se', 'https://www.begone.se', 'https://begone-se.vercel.app', 'http://localhost:4321', 'http://127.0.0.1:4321'])
 // Vercel-projektet begone-se i teamet begone-skadedjur: begone-se-<hash>-begone-skadedjur.vercel.app,
 // begone-se-git-<gren>-begone-skadedjur.vercel.app och begone-se-begone-skadedjur.vercel.app. Teamets suffix
 // krävs: utan det kunde vem som helst skapa ett eget Vercel-projekt som heter begone-se-något och passera.

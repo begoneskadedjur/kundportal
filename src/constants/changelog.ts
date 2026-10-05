@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.24.1',
+    date: '2026-10-05',
+    title: 'Notis om nya webbförfrågningar',
+    items: [
+      { kind: 'nyhet', text: 'Koordinatorerna får en notis under klockan när en ny förfrågan kommer in från begone.se.' },
+      { kind: 'buggfix', text: 'Formulären på den nya sajten kan nu skicka förfrågningar även från testadressen innan begone.se har flyttats.' },
+    ],
+  },
+  {
     version: '3.24.0',
     date: '2026-10-05',
     title: 'Leads (Webb): förfrågningar från begone.se',

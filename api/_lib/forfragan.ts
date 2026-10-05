@@ -296,15 +296,14 @@ export async function skickaKvittens(params: {
 // ---------------------------------------------------------------------------
 // Notis till koordinatorerna (planen avsnitt 7).
 //
-// CHECK-villkoret notifications_case_type_check tillåter ännu inte 'web_inquiry' (väntar på Christians
-// beslut). Tills det är bytt syns nya förfrågningar via räknaren på Leads (Webb) i sidomenyn (realtid).
-// När villkoret är bytt sätts FORFRAGAN_NOTIS=1 i Vercel, så skrivs notisen här.
+// CHECK-villkoret notifications_case_type_check tillåter 'web_inquiry' sedan 2026-10-05 (migrationen
+// 20261005_notiser_webbforfragan, godkänd av Christian). FORFRAGAN_NOTIS=0 i Vercel stänger av notisen.
 
 export async function notifieraKoordinatorer(
   db: SupabaseClient,
   forfragan: { id: string; pest: string | null; city: string | null; akut: boolean; kundgrupp: Kundgrupp; kalla: string; fran: string | null },
 ): Promise<number> {
-  if (process.env.FORFRAGAN_NOTIS !== '1') return 0
+  if (process.env.FORFRAGAN_NOTIS === '0') return 0
   const { data, error } = await db
     .from('profiles')
     .select('id')
