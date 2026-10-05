@@ -51,6 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       { kind: 'nyhet', text: 'Skapa offert i förfrågan öppnar offertguiden med kundens uppgifter ifyllda. När offerten skickats får förfrågan status Offert och en rad i historiken med länk till offerten.' },
       { kind: 'andring', text: 'Status Offert kan inte längre sättas för hand. Den sätts bara när en offert faktiskt skickats från förfrågan.' },
+      { kind: 'andring', text: 'En offert kan bara kopplas till förfrågan av den som skapade den, och en offert hör alltid till en enda förfrågan.' },
       { kind: 'nyhet', text: 'När ett ärende skapas från förfrågan sparas ärendenumret och den bokade tjänsten. Båda syns i förfrågan och i listan, och kundens eget val står kvar.' },
       { kind: 'nyhet', text: 'Statistiken visar kundens val mot bokad tjänst, till exempel hur ofta Vet inte blev möss.' },
     ],
