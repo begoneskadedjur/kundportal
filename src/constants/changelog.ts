@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.24.0',
+    date: '2026-10-05',
+    title: 'Leads (Webb): förfrågningar från begone.se',
+    items: [
+      { kind: 'andring', text: 'Leads heter nu Leads (B2B) i menyn och på sidan. Inget annat är ändrat.' },
+      { kind: 'nyhet', text: 'Leads (Webb) under Försäljning samlar förfrågningarna från formulären på nya begone.se, med bilder, svaren från formuläret och varifrån på sajten de kom. Räknaren i menyn visar hur många som är nya.' },
+      { kind: 'nyhet', text: 'Varje förfrågan har status från Ny till Vunnen, Förlorad eller Skräp, kan tilldelas en kollega och får anteckningar med historik. Företag och BRF:er blir en B2B-lead med ett klick, förifylld.' },
+      { kind: 'nyhet', text: 'Fliken Statistik visar efterfrågan per vecka, tjänst, kundgrupp och sida, och hur många som fick kontakt samma dag.' },
+    ],
+  },
+  {
     version: '3.23.0',
     date: '2026-10-04',
     title: 'Artanalysen på nya begone.se',

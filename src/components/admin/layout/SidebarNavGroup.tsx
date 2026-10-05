@@ -8,6 +8,7 @@ import { useIntranetBadge } from '../../../hooks/useIntranetBadge'
 import { useTicketsBadge } from '../../../hooks/useTicketsBadge'
 import { useAddonPendingBadge } from '../../../hooks/useAddonPending'
 import { useProcurementBadge } from '../../../hooks/useProcurementBadge'
+import { useWebLeadsBadge } from '../../../hooks/useWebLeadsBadge'
 import { useProcurementAccess } from '../../../hooks/useProcurementAccess'
 
 interface SidebarNavGroupProps {
@@ -37,6 +38,7 @@ export function SidebarNavGroup({ group: groupIn, collapsed, currentPath }: Side
   const ticketsCount = useTicketsBadge()
   const addonCount = useAddonPendingBadge()
   const procurementCount = useProcurementBadge()
+  const webLeadsCount = useWebLeadsBadge()
 
   const badgeCountFor = (item: NavItem) =>
     item.badgeKey === 'incidents' ? incidentCount
@@ -44,6 +46,7 @@ export function SidebarNavGroup({ group: groupIn, collapsed, currentPath }: Side
       : item.badgeKey === 'tickets' ? ticketsCount
       : item.badgeKey === 'addons' ? addonCount
       : item.badgeKey === 'procurement' ? procurementCount
+      : item.badgeKey === 'webLeads' ? webLeadsCount
       : 0
   const groupBadgeCount = group.items.reduce((sum, item) => sum + badgeCountFor(item), 0)
 
@@ -73,7 +76,7 @@ export function SidebarNavGroup({ group: groupIn, collapsed, currentPath }: Side
             </p>
             {group.items.map(item => {
               const Icon = item.icon
-              const isActive = currentPath.startsWith(item.path)
+              const isActive = currentPath === item.path || currentPath.startsWith(item.path + '/')
               return (
                 <NavItemLink
                   key={item.path}
@@ -124,7 +127,7 @@ export function SidebarNavGroup({ group: groupIn, collapsed, currentPath }: Side
         <div className="ml-2 pl-3 border-l border-slate-700/50 space-y-1 mt-1">
           {group.items.map(item => {
             const Icon = item.icon
-            const isActive = currentPath.startsWith(item.path)
+            const isActive = currentPath === item.path || currentPath.startsWith(item.path + '/')
             return (
               <NavItemLink
                 key={item.path}

@@ -29,9 +29,13 @@ interface CreateLeadModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  /** Förifyllda fält när modalen öppnas, t.ex. från en webbförfrågan i Leads (Webb) */
+  initialData?: Partial<LeadInsert>
+  /** Anropas med det nya leadets id efter att det sparats */
+  onCreated?: (leadId: string) => void
 }
 
-export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLeadModalProps) {
+export default function CreateLeadModal({ isOpen, onClose, onSuccess, initialData, onCreated }: CreateLeadModalProps) {
   const { user, profile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -75,6 +79,14 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
     needs_confirmed: false,
     tags: []
   })
+
+  // Förifyllning: läggs på varje gång modalen öppnas med initialData
+  useEffect(() => {
+    if (isOpen && initialData) {
+      setFormData(prev => ({ ...prev, ...initialData }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   const handleInputChange = (field: keyof LeadInsert, value: any) => {
     setFormData(prev => ({
@@ -223,6 +235,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess }: CreateLe
       }
 
       toast.success('Lead skapad framgångsrikt')
+      if (insertedLead && onCreated) onCreated(insertedLead.id)
       onSuccess()
       onClose()
       

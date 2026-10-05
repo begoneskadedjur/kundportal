@@ -128,6 +128,13 @@ export default function NotificationModal({
       // Kundnotis (tillägg att besluta): rakt in i kundkortets avtalskarta med
       // panelen öppen på Innehåll och utrustning. Koordinatorer har samma
       // kundkort under sin egen portal.
+      // Webbförfrågan (Leads (Webb)): sidan med förfrågan öppen
+      if (notification.case_type === 'web_inquiry') {
+        const base = window.location.pathname.includes('/koordinator') ? '/koordinator' : window.location.pathname.includes('/saljare') ? '/saljare' : '/admin';
+        navigate(`${base}/leads-webb?id=${notification.case_id}`);
+        return;
+      }
+
       // Upphandlingsnotis: detaljsidan, eller portalens startsida utan id
       if (notification.case_type === 'procurement') {
         window.location.href = procurementPortalUrl(notification.case_id ? `/${notification.case_id}` : '');

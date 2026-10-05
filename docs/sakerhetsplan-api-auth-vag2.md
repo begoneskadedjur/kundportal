@@ -111,6 +111,8 @@ RESTPUNKTER: (1) Fortnox-återanslutningsflödet livetestas vid nästa planerade
 ### Förblir publika (härdas i etapp 6, får ej kräva inloggning)
 `reset-password` (anropas även av admin utan header, `OrganizationsPage.tsx:909`; enumeration-säker design), `verify-reset-token`, `fortnox/callback`, alla webhooks (signaturskydd), `fortnox/auth` (görs om till admin-skyddad JSON-endpoint i etapp 6 — se §4). `api/cron/*` (cron-secret) och redan guardade endpoints rörs inte. `multisite-users` är inline-skyddad — refaktor till `getManagerContext` i etapp 6.
 
+Publika för nya begone.se (2026-10): `artanalys` och `forfragan` (formulären, Leads (Webb)). Ingen JWT; skyddas av CORS-vitlistan i `api/_lib/begoneSeCors.ts` (annan eller saknad Origin ger 403), storleksgräns, honungsfält, minsta tid, `withinRateLimit` per IP-hash och telefon, och validering. `forfragan` skriver bara med service role till `web_inquiries` och loggar inga personuppgifter.
+
 **Regel för alla rollistor:** `'admin'` ska alltid ingå — frontendens `ProtectedRoute` ger admin full åtkomst till alla sidor, och backendens `requireAuth` har ingen automatisk admin-bypass utöver `is_admin` → effektiv roll `'admin'`.
 
 ---

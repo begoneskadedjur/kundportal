@@ -33,6 +33,7 @@ import {
   CalendarRange,
   BadgeCheck,
   Gavel,
+  Inbox,
 } from 'lucide-react'
 import { PROCUREMENT_PORTAL_URL } from '../../../lib/procurementPortal'
 
@@ -41,7 +42,7 @@ export interface NavItem {
   icon: React.ElementType
   path: string
   /** Nyckel för dynamisk räknarbadge i sidomenyn (t.ex. ohanterade incidenter) */
-  badgeKey?: 'incidents' | 'intranet' | 'tickets' | 'addons' | 'procurement'
+  badgeKey?: 'incidents' | 'intranet' | 'tickets' | 'addons' | 'procurement' | 'webLeads'
   /** Posten visas bara för den som har åtkomsten (se useProcurementAccess) */
   requires?: 'procurement'
   /** Extern adress: posten öppnas i ny flik (upphandlingsportalen på egen subdomän) */
@@ -78,7 +79,8 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Försäljningspipeline', icon: Receipt, path: '/admin/forsaljningspipeline' },
       { label: 'Försäljningsmöjligheter', icon: TrendingUp, path: '/admin/forsaljningsmojligheter' },
-      { label: 'Leads', icon: Target, path: '/admin/leads' },
+      { label: 'Leads (B2B)', icon: Target, path: '/admin/leads' },
+      { label: 'Leads (Webb)', icon: Inbox, path: '/admin/leads-webb', badgeKey: 'webLeads' },
       { label: 'Leadsstatistik', icon: BarChart3, path: '/admin/leadsstatistik' },
       { label: 'Dokumentsignering', icon: ClipboardList, path: '/admin/dokumentsignering' },
       { label: 'Kundresa', icon: GitBranch, path: '/admin/kundresa' },
@@ -151,7 +153,7 @@ export const favoriteItems: NavItem[] = [
 export const mobileBottomItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/admin/dashboard' },
   { label: 'Befintliga kunder', icon: Users, path: '/admin/befintliga-kunder', badgeKey: 'addons' },
-  { label: 'Leads', icon: Target, path: '/admin/leads' },
+  { label: 'Leads (B2B)', icon: Target, path: '/admin/leads' },
   { label: 'Ekonomi', icon: DollarSign, path: '/admin/ekonomi' },
 ]
 
@@ -161,7 +163,8 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/befintliga-kunder': 'Befintliga kunder',
   '/admin/egenkontroll': 'Egenkontroller',
   '/admin/rondering-schema': 'Rondering & Schema',
-  '/admin/leads': 'Leads',
+  '/admin/leads': 'Leads (B2B)',
+  '/admin/leads-webb': 'Leads (Webb)',
   '/admin/ekonomi': 'Ekonomisk översikt',
   '/admin/fakturering': 'Fakturering',
   '/admin/godkannanden': 'Godkännanden',

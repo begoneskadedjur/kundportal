@@ -22,6 +22,7 @@ import {
   FilePen,
   ClipboardList,
   AlertTriangle,
+  Inbox,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
@@ -60,7 +61,8 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Försäljningspipeline', icon: Receipt, path: '/koordinator/forsaljningspipeline' },
       { label: 'Försäljningsmöjligheter', icon: TrendingUp, path: '/koordinator/forsaljningsmojligheter' },
-      { label: 'Leads', icon: Target, path: '/koordinator/leads' },
+      { label: 'Leads (B2B)', icon: Target, path: '/koordinator/leads' },
+      { label: 'Leads (Webb)', icon: Inbox, path: '/koordinator/leads-webb', badgeKey: 'webLeads' },
       { label: 'Leadsstatistik', icon: BarChart3, path: '/koordinator/leadsstatistik' },
       { label: 'Dokumentsignering', icon: FileSignature, path: '/koordinator/dokumentsignering' },
     ],
@@ -92,7 +94,7 @@ export const navGroups: NavGroup[] = [
 export const mobileBottomItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/koordinator/dashboard' },
   { label: 'Kunder', icon: Users, path: '/koordinator/befintliga-kunder' },
-  { label: 'Leads', icon: Target, path: '/koordinator/leads' },
+  { label: 'Leads (B2B)', icon: Target, path: '/koordinator/leads' },
   { label: 'Ärenden', icon: FileSearch, path: '/koordinator/sok-arenden' },
 ]
 
@@ -110,7 +112,8 @@ export const breadcrumbMap: Record<string, string> = {
   // Försäljning
   '/koordinator/forsaljningspipeline': 'Försäljningspipeline',
   '/koordinator/forsaljningsmojligheter': 'Försäljningsmöjligheter',
-  '/koordinator/leads': 'Leads',
+  '/koordinator/leads': 'Leads (B2B)',
+  '/koordinator/leads-webb': 'Leads (Webb)',
   '/koordinator/leadsstatistik': 'Leadsstatistik',
   // Fakturering
   '/koordinator/fakturering': 'Fakturering',

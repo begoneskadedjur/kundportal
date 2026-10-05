@@ -71,6 +71,13 @@ export default function NotificationBell({
       // Navigera till Tickets-sidan med ärendet öppet
       const pathname = window.location.pathname;
 
+      // Webbförfrågan (Leads (Webb)): sidan med förfrågan öppen
+      if (notification.case_type === 'web_inquiry') {
+        const base = window.location.pathname.includes('/koordinator') ? '/koordinator' : window.location.pathname.includes('/saljare') ? '/saljare' : '/admin';
+        window.location.href = `${base}/leads-webb?id=${notification.case_id}`;
+        return;
+      }
+
       // Upphandlingsnotis: detaljsidan, eller portalens startsida utan id
       if (notification.case_type === 'procurement') {
         window.location.href = procurementPortalUrl(notification.case_id ? `/${notification.case_id}` : '');

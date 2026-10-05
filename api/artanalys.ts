@@ -29,6 +29,7 @@ import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createHmac } from 'node:crypto'
 import { ARTANALYS_ARTER, ARTANALYS_IDS, ARTANALYS_VERSION } from './_lib/artanalysArter'
+import { satsBegoneSeCors, tillatenOrigin } from './_lib/begoneSeCors'
 
 export const config = { maxDuration: 60 }
 
@@ -47,28 +48,10 @@ const TAK_IP_10MIN = tal(process.env.ARTANALYS_TAK_IP_10MIN, 4)
 const TAK_TOTALT_DYGN = tal(process.env.ARTANALYS_TAK_TOTALT_DYGN, 400)
 
 // ---------------------------------------------------------------------------
-// CORS
+// CORS: gemensam vitlista med api/forfragan.ts i api/_lib/begoneSeCors.ts
 
-const TILLATNA = new Set(['https://begone.se', 'https://www.begone.se', 'http://localhost:4321', 'http://127.0.0.1:4321'])
-// Vercel-projektet begone-se: begone-se-<hash>-<team>.vercel.app, begone-se-git-<gren>-<team>.vercel.app
-// och begone-se-<team>.vercel.app.
-const VERCEL_PREVIEW = /^https:\/\/begone-se(-[a-z0-9-]+)?\.vercel\.app$/
-
-export function tillatenOrigin(origin: string | undefined): boolean {
-  if (!origin) return false
-  return TILLATNA.has(origin) || VERCEL_PREVIEW.test(origin)
-}
-
-function satsCors(req: VercelRequest, res: VercelResponse): boolean {
-  const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined
-  res.setHeader('Vary', 'Origin')
-  if (!tillatenOrigin(origin)) return false
-  res.setHeader('Access-Control-Allow-Origin', origin!)
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-  res.setHeader('Access-Control-Max-Age', '600')
-  return true
-}
+export { tillatenOrigin }
+const satsCors = satsBegoneSeCors
 
 // ---------------------------------------------------------------------------
 // Tak per besökare och totalt

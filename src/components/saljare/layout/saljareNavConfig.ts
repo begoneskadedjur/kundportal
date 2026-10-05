@@ -16,6 +16,7 @@ import {
   Sparkles,
   FilePen,
   FileSignature,
+  Inbox,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
@@ -44,7 +45,8 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Försäljningspipeline', icon: Receipt, path: '/saljare/forsaljningspipeline' },
       { label: 'Försäljningsmöjligheter', icon: TrendingUp, path: '/saljare/forsaljningsmojligheter' },
-      { label: 'Leads', icon: Target, path: '/saljare/leads' },
+      { label: 'Leads (B2B)', icon: Target, path: '/saljare/leads' },
+      { label: 'Leads (Webb)', icon: Inbox, path: '/saljare/leads-webb', badgeKey: 'webLeads' },
       { label: 'Leadsstatistik', icon: BarChart3, path: '/saljare/leadsstatistik' },
       { label: 'Kundresa', icon: GitBranch, path: '/saljare/kundresa' },
       { label: 'Avslutade ärenden', icon: Trash2, path: '/saljare/avslutade-arenden' },
@@ -61,7 +63,7 @@ export const navGroups: NavGroup[] = [
 
 export const mobileBottomItems: NavItem[] = [
   { label: 'Översikt', icon: Home, path: '/saljare/dashboard' },
-  { label: 'Leads', icon: Target, path: '/saljare/leads' },
+  { label: 'Leads (B2B)', icon: Target, path: '/saljare/leads' },
   { label: 'Kunder', icon: Users, path: '/saljare/befintliga-kunder' },
   { label: 'Försäljning', icon: TrendingUp, path: '/saljare/forsaljningspipeline' },
 ]
@@ -80,7 +82,8 @@ export const breadcrumbMap: Record<string, string> = {
   // Försäljning
   '/saljare/forsaljningspipeline': 'Försäljningspipeline',
   '/saljare/forsaljningsmojligheter': 'Försäljningsmöjligheter',
-  '/saljare/leads': 'Leads',
+  '/saljare/leads': 'Leads (B2B)',
+  '/saljare/leads-webb': 'Leads (Webb)',
   '/saljare/leadsstatistik': 'Leadsstatistik',
   '/saljare/dokumentsignering': 'Dokumentsignering',
   '/saljare/kundresa': 'Kundresa',

@@ -1,0 +1,108 @@
+// src/services/webInquiryService.ts
+// Leads (Webb): läsning och hantering av förfrågningar från begone.se. Raderna skapas bara av
+// api/forfragan.ts (service role); här läser och ändrar admin, koordinator och säljare via RLS.
+// Historik för status, tilldelning och konvertering skrivs av databasens trigger.
+
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { supabase } from '../lib/supabase'
+import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
+import type { StaffProfile, WebInquiry, WebInquiryEvent, WebInquiryStatus } from '../types/webInquiry'
+
+// Tabellerna finns inte i de genererade typerna; otypad klient för just dessa anrop
+const db = supabase as unknown as SupabaseClient
+
+const BUCKET = 'web-inquiry-images'
+
+export class WebInquiryService {
+  /** Förfrågningar från och med ett datum (ÅÅÅÅ-MM-DD), nyast först. */
+  static async list(fran?: string): Promise<WebInquiry[]> {
+    let q = db.from('web_inquiries').select('*').order('created_at', { ascending: false }).limit(2000)
+    if (fran) q = q.gte('created_at', `${fran}T00:00:00${offsetFor(fran)}`)
+    const { data, error } = await q
+    if (error) throw error
+    return (data ?? []) as WebInquiry[]
+  }
+
+  static async get(id: string): Promise<WebInquiry | null> {
+    const { data, error } = await db.from('web_inquiries').select('*').eq('id', id).maybeSingle()
+    if (error) throw error
+    return (data as WebInquiry) ?? null
+  }
+
+  static async getNewCount(): Promise<number> {
+    const { data, error } = await db.rpc('web_inquiries_new_count')
+    if (error) throw error
+    return typeof data === 'number' ? data : 0
+  }
+
+  static async setStatus(id: string, status: WebInquiryStatus): Promise<void> {
+    const { error } = await db.from('web_inquiries').update({ status }).eq('id', id)
+    if (error) throw error
+  }
+
+  static async assign(id: string, profileId: string | null): Promise<void> {
+    const { error } = await db.from('web_inquiries').update({ tilldelad_till: profileId }).eq('id', id)
+    if (error) throw error
+  }
+
+  static async linkLead(id: string, leadId: string): Promise<void> {
+    const { error } = await db.from('web_inquiries').update({ lead_id: leadId }).eq('id', id)
+    if (error) throw error
+  }
+
+  static async listEvents(id: string): Promise<WebInquiryEvent[]> {
+    const { data, error } = await db
+      .from('web_inquiry_events')
+      .select('*')
+      .eq('inquiry_id', id)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data ?? []) as WebInquiryEvent[]
+  }
+
+  static async addNote(id: string, profileId: string, text: string): Promise<void> {
+    const { error } = await db.from('web_inquiry_events').insert({
+      inquiry_id: id,
+      typ: 'anteckning',
+      text: text.trim().slice(0, 4000),
+      profile_id: profileId,
+      created_at: toLocalISOStringWithOffset(),
+    })
+    if (error) throw error
+  }
+
+  /** Personal som kan tilldelas: admin, koordinator och säljare (huvudroll eller extra roll). */
+  static async listStaff(): Promise<StaffProfile[]> {
+    const { data, error } = await db
+      .from('profiles')
+      .select('id, display_name, email, role, extra_roles, is_active')
+      .eq('is_active', true)
+    if (error) throw error
+    const roller = ['admin', 'koordinator', 'säljare']
+    return ((data ?? []) as (StaffProfile & { extra_roles: string[] | null })[])
+      .filter((p) => roller.includes(p.role ?? '') || (p.extra_roles ?? []).some((r) => roller.includes(r)))
+      .map(({ id, display_name, email, role }) => ({ id, display_name, email, role }))
+      .sort((a, b) => (a.display_name || a.email).localeCompare(b.display_name || b.email, 'sv'))
+  }
+
+  /** Bilderna som finns i bucketen, med signerade visnings-URL:er (1 timme). */
+  static async imageUrls(id: string): Promise<{ path: string; url: string }[]> {
+    const lista = await db.storage.from(BUCKET).list(id, { limit: 20 })
+    if (lista.error || !lista.data?.length) return []
+    const paths = lista.data.filter((f) => f.name && !f.name.startsWith('.')).map((f) => `${id}/${f.name}`)
+    if (!paths.length) return []
+    const { data, error } = await db.storage.from(BUCKET).createSignedUrls(paths, 3600)
+    if (error || !data) return []
+    return data
+      .filter((d) => d.signedUrl)
+      .map((d) => ({ path: d.path ?? '', url: d.signedUrl }))
+      .sort((a, b) => a.path.localeCompare(b.path))
+  }
+}
+
+/** Svensk offset (+01:00 eller +02:00) för ett datum, så att dagsgränsen blir svensk midnatt. */
+function offsetFor(datum: string): string {
+  const d = new Date(`${datum}T12:00:00`)
+  const iso = toLocalISOStringWithOffset(d)
+  return iso.slice(-6)
+}
