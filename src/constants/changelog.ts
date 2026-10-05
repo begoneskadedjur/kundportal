@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.25.1',
+    date: '2026-10-05',
+    title: 'Leads (Webb): rättningar efter granskning',
+    items: [
+      { kind: 'buggfix', text: 'Escape i ärendemodalen stänger inte längre förfrågan bakom, så att ett påbörjat ärende inte försvinner.' },
+      { kind: 'buggfix', text: 'En förfrågan kan bara kopplas till ärendet som skapades från den, inte till ett äldre ärende som redan fakturerats.' },
+    ],
+  },
+  {
     version: '3.25.0',
     date: '2026-10-05',
     title: 'Leads (Webb): från förfrågan till ärende',

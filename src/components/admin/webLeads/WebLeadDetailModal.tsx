@@ -258,6 +258,8 @@ export default function WebLeadDetailModal({ inquiry, staff, leadsBasePath, aren
       <Modal
         isOpen={!!inquiry}
         onClose={onClose}
+        // Ärendemodalen ligger ovanpå: Escape ska inte stänga förfrågan och kasta det ifyllda ärendet
+        preventClose={!!arendeUnderlag}
         size="xl"
         title={
           <span className="flex items-center gap-3">
