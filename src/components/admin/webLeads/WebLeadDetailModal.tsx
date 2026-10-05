@@ -4,6 +4,7 @@
 // Modalstandard: inget Card, sektioner p-3 bg-slate-800/30, status som text med statuspunkt.
 
 import { useCallback, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Phone, Mail, MapPin, MessageSquare, Image as ImageIcon, Globe, History, UserPlus, Target, Send, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Modal from '../../ui/Modal'
@@ -237,9 +238,9 @@ export default function WebLeadDetailModal({ inquiry, staff, leadsBasePath, onCl
                 </Button>
               )}
               {inquiry.lead_id && (
-                <a href={leadsBasePath} className="text-sm text-[#20c58f] hover:underline">
+                <Link to={leadsBasePath} className="text-sm text-[#20c58f] hover:underline">
                   B2B-lead skapad, öppna Leads (B2B)
-                </a>
+                </Link>
               )}
             </div>
           </div>

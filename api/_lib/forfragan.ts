@@ -71,6 +71,12 @@ export function normalTelefon(v: unknown): string {
   return s
 }
 
+/** Sidan där formuläret skickades (body.sida, en sökväg). Saknas den: landningssidans sökväg. */
+function sidaFran(sida: unknown, landing: string | null): string | null {
+  if (typeof sida === 'string' && /^\/\S{0,299}$/.test(sida)) return sida
+  return sokvag(landing)
+}
+
 function sokvag(landing: string | null): string | null {
   if (!landing) return null
   try {
@@ -156,7 +162,7 @@ export function validera(body: Record<string, unknown>): ValideradForfragan {
   const rad: Record<string, unknown> = {
     kalla,
     fran,
-    sida: sokvag(landing),
+    sida: sidaFran(body.sida, landing),
     landing_url: landing,
     referrer: text(body.referrer, 1000),
     utm_source: text(body.utm_source, 200),

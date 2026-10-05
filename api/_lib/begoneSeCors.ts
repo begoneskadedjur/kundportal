@@ -6,9 +6,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 
 const TILLATNA = new Set(['https://begone.se', 'https://www.begone.se', 'http://localhost:4321', 'http://127.0.0.1:4321'])
-// Vercel-projektet begone-se: begone-se-<hash>-<team>.vercel.app, begone-se-git-<gren>-<team>.vercel.app
-// och begone-se-<team>.vercel.app.
-const VERCEL_PREVIEW = /^https:\/\/begone-se(-[a-z0-9-]+)?\.vercel\.app$/
+// Vercel-projektet begone-se i teamet begone-skadedjur: begone-se-<hash>-begone-skadedjur.vercel.app,
+// begone-se-git-<gren>-begone-skadedjur.vercel.app och begone-se-begone-skadedjur.vercel.app. Teamets suffix
+// krävs: utan det kunde vem som helst skapa ett eget Vercel-projekt som heter begone-se-något och passera.
+const VERCEL_PREVIEW = /^https:\/\/begone-se(-[a-z0-9-]+)?-begone-skadedjur\.vercel\.app$/
 
 export function tillatenOrigin(origin: string | undefined): boolean {
   if (!origin) return false

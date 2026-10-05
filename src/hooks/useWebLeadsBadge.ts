@@ -74,7 +74,9 @@ export function useWebLeadsBadge(): number {
   const { user, profile } = useAuth()
   const behorig =
     !!profile &&
-    (ROLLER.includes(profile.role ?? '') || (profile.extra_roles ?? []).some((r) => ROLLER.includes(r)))
+    (ROLLER.includes(profile.role ?? '') ||
+      profile.is_admin === true ||
+      (profile.extra_roles ?? []).some((r) => ROLLER.includes(r)))
   const [count, setCount] = useState(store.count)
 
   useEffect(() => {

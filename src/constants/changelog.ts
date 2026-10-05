@@ -53,6 +53,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'nyhet', text: 'Leads (Webb) under Försäljning samlar förfrågningarna från formulären på nya begone.se, med bilder, svaren från formuläret och varifrån på sajten de kom. Räknaren i menyn visar hur många som är nya.' },
       { kind: 'nyhet', text: 'Varje förfrågan har status från Ny till Vunnen, Förlorad eller Skräp, kan tilldelas en kollega och får anteckningar med historik. Företag och BRF:er blir en B2B-lead med ett klick, förifylld.' },
       { kind: 'nyhet', text: 'Fliken Statistik visar efterfrågan per vecka, tjänst, kundgrupp och sida, och hur många som fick kontakt samma dag.' },
+      { kind: 'buggfix', text: 'Sidan på en förfrågan är nu sidan där formuläret skickades, inte sidan besökaren landade på först.' },
     ],
   },
   {
