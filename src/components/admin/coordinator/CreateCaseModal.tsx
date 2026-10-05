@@ -68,6 +68,15 @@ interface CreateCaseModalProps {
   isOpen: boolean; onClose: () => void; onSuccess: () => void;
   technicians: Technician[]; initialCaseData?: BeGoneCaseRow | null;
   initialCaseType?: 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | 'egenkontroll' | null;
+  /**
+   * Förifyllda formulärfält för ett NYTT ärende (används ihop med initialCaseType, t.ex. från en
+   * webbförfrågan i Leads (Webb)). Till skillnad från initialCaseData skapas alltid ett nytt ärende.
+   */
+  initialFormData?: Partial<PrivateCasesInsert & BusinessCasesInsert> | null;
+  /** Bilder som ska följa med in som valda bilder och laddas upp till ärendet när det sparas. */
+  initialImages?: File[] | null;
+  /** Anropas när ett nytt ärende skapats, innan modalen stängs. */
+  onCaseCreated?: (caseId: string, caseType: 'private' | 'business' | 'contract') => void | Promise<void>;
 }
 
 /**
@@ -117,7 +126,7 @@ function resolveAssigneeFields(form: Record<string, string | null | undefined>, 
   };
 }
 
-export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType }: CreateCaseModalProps) {
+export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType, initialFormData, initialImages, onCaseCreated }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
   const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | 'egenkontroll' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
@@ -376,11 +385,21 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       // Dropdown-val: hoppa direkt till formuläret med vald typ
       handleReset();
       setCaseType(initialCaseType);
+      if (initialFormData) {
+        setFormData({ ...initialFormData });
+      }
+      if (initialImages && initialImages.length > 0) {
+        setSelectedImages(initialImages.slice(0, 10).map(file => ({
+          file,
+          preview: URL.createObjectURL(file),
+          category: 'general' as const,
+        })));
+      }
       setStep('form');
     } else if (isOpen) {
       handleReset();
     }
-  }, [isOpen, initialCaseData, initialCaseType, handleReset]);
+  }, [isOpen, initialCaseData, initialCaseType, initialFormData, initialImages, handleReset]);
 
   // Default-expandera Tjänster & fakturarader vid bokning av befintligt ärende.
   // useState ovan räcker inte eftersom modalen kan monteras med initialCaseData=null
@@ -1425,6 +1444,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         }
         finalCaseId = createdClickUpCaseId;
         finalCaseType = caseType === 'business' ? 'business' : 'private';
+      }
+
+      // Den som öppnade modalen (t.ex. Leads (Webb)) får veta vilket nytt ärende som skapades
+      if (onCaseCreated && finalCaseId && !initialCaseData?.id) {
+        try {
+          await onCaseCreated(finalCaseId, finalCaseType);
+        } catch (callbackError) {
+          console.error('onCaseCreated misslyckades:', callbackError);
+        }
       }
 
       // Spara draft-items för nya ärenden (ej befintliga ärenden – deras items är redan sparade live)

@@ -2,7 +2,8 @@
 // Leads (Webb): förfrågningar från formulären på begone.se (tabellerna web_inquiries och
 // web_inquiry_events). Skilt från B2B-leadsen i tabellen leads.
 
-export type WebInquiryStatus = 'ny' | 'kontaktad' | 'offert' | 'vunnen' | 'forlorad' | 'skrap'
+export type WebInquiryStatus = 'ny' | 'kontaktad' | 'offert' | 'bokad' | 'vunnen' | 'forlorad' | 'skrap'
+export type WebInquiryArendeTabell = 'private_cases' | 'business_cases'
 export type WebInquiryKundgrupp = 'privat' | 'brf_fastighet' | 'verksamhet'
 export type WebInquiryKalla = 'offertflode' | 'artanalys'
 export type WebInquiryEventTyp = 'anteckning' | 'status' | 'tilldelning' | 'konvertering' | 'bilder'
@@ -57,6 +58,14 @@ export interface WebInquiry {
   lead_id: string | null
   customer_id: string | null
   kvittens_skickad_at: string | null
+  /** Ärendet som skapades från förfrågan (sätts en gång och ger status Bokad). */
+  arende_tabell: WebInquiryArendeTabell | null
+  arende_id: string | null
+  bokad_at: string | null
+  /** Sant om förfrågan någon gång haft status Offert: 90 dagars frist i stället för 30. */
+  haft_offert: boolean
+  /** När det kopplade ärendet fakturerades (sätts av dygnsjobbet). */
+  fakturerad_at: string | null
 }
 
 export interface WebInquiryEvent {
@@ -77,12 +86,23 @@ export interface StaffProfile {
   role: string | null
 }
 
-export const STATUS_ORDNING: WebInquiryStatus[] = ['ny', 'kontaktad', 'offert', 'vunnen', 'forlorad', 'skrap']
+export const STATUS_ORDNING: WebInquiryStatus[] = ['ny', 'kontaktad', 'offert', 'bokad', 'vunnen', 'forlorad', 'skrap']
+
+/**
+ * Statusar som personalen kan sätta för hand på en förfrågan som inte bokats. Bokad sätts när ett
+ * ärende skapas från förfrågan och Vunnen bara av dygnsjobbet; databasens trigger spärrar resten.
+ */
+export const MANUELLA_STATUSAR: WebInquiryStatus[] = ['ny', 'kontaktad', 'offert', 'forlorad', 'skrap']
+
+/** Dagar från bokningen som ärendet har på sig att faktureras för att räknas som vunnet. */
+export const FRIST_DAGAR = 30
+export const FRIST_DAGAR_OFFERT = 90
 
 export const STATUS_CONFIG: Record<WebInquiryStatus, { label: string; text: string; dot: string }> = {
   ny: { label: 'Ny', text: 'text-amber-400', dot: 'bg-amber-400' },
   kontaktad: { label: 'Kontaktad', text: 'text-sky-400', dot: 'bg-sky-400' },
   offert: { label: 'Offert', text: 'text-violet-400', dot: 'bg-violet-400' },
+  bokad: { label: 'Bokad', text: 'text-teal-300', dot: 'bg-teal-300' },
   vunnen: { label: 'Vunnen', text: 'text-[#20c58f]', dot: 'bg-[#20c58f]' },
   forlorad: { label: 'Förlorad', text: 'text-slate-400', dot: 'bg-slate-500' },
   skrap: { label: 'Skräp', text: 'text-slate-500', dot: 'bg-slate-600' },

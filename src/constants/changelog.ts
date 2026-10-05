@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.25.0',
+    date: '2026-10-05',
+    title: 'Leads (Webb): från förfrågan till ärende',
+    items: [
+      { kind: 'nyhet', text: 'Knappen Skapa ärende i en webbförfrågan öppnar ärendemodalen förifylld med kundens namn, telefon, e-post, adress, tjänst, svar och meddelande. Bilderna följer med till ärendet.' },
+      { kind: 'nyhet', text: 'Förfrågan får status Bokad när ärendet skapas, och knappen blir Öppna ärendet så att samma förfrågan inte blir två ärenden.' },
+      { kind: 'nyhet', text: 'Vunnen och Förlorad sätts automatiskt varje natt: vunnen om ärendet fakturerats inom 30 dagar från bokningen, 90 dagar om en offert skickats. Förlorad och Skräp kan fortfarande sättas för hand på förfrågningar som inte bokats.' },
+      { kind: 'nyhet', text: 'Statistiken visar kedjan från förfrågan till bokad och vunnen, och hur många som förlorats efter respektive utan bokning, per tjänst, källa, kundgrupp, vecka, kampanj och sökord.' },
+    ],
+  },
+  {
     version: '3.24.1',
     date: '2026-10-05',
     title: 'Notis om nya webbförfrågningar',

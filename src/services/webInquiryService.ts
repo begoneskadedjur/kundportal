@@ -6,7 +6,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
-import type { StaffProfile, WebInquiry, WebInquiryEvent, WebInquiryStatus } from '../types/webInquiry'
+import type { Technician } from '../types/database'
+import type {
+  StaffProfile,
+  WebInquiry,
+  WebInquiryArendeTabell,
+  WebInquiryEvent,
+  WebInquiryStatus,
+} from '../types/webInquiry'
 
 // Tabellerna finns inte i de genererade typerna; otypad klient för just dessa anrop
 const db = supabase as unknown as SupabaseClient
@@ -48,6 +55,52 @@ export class WebInquiryService {
   static async linkLead(id: string, leadId: string): Promise<void> {
     const { error } = await db.from('web_inquiries').update({ lead_id: leadId }).eq('id', id)
     if (error) throw error
+  }
+
+  /**
+   * Kopplar förfrågan till ärendet som skapades från den. Databasens trigger sätter status Bokad,
+   * stämplar bokad_at och skriver historikraden "Ärende skapat". Kopplingen kan bara sättas en gång.
+   */
+  static async linkCase(id: string, tabell: WebInquiryArendeTabell, caseId: string): Promise<WebInquiry> {
+    const { data, error } = await db
+      .from('web_inquiries')
+      .update({ arende_tabell: tabell, arende_id: caseId })
+      .eq('id', id)
+      .is('arende_id', null)
+      .select('*')
+      .maybeSingle()
+    if (error) throw error
+    if (!data) throw new Error('Förfrågan har redan ett ärende')
+    return data as WebInquiry
+  }
+
+  /** Aktiva tekniker för ärendemodalens bokning. */
+  static async listTechnicians(): Promise<Technician[]> {
+    const { data, error } = await supabase.from('technicians').select('*').eq('is_active', true).order('name')
+    if (error) throw error
+    return (data ?? []) as Technician[]
+  }
+
+  /**
+   * Förfrågans bilder som filer, för att följa med in i ärendemodalen. Där laddas de upp till
+   * ärendet som vanliga ärendebilder (bucketen case-images och tabellen case_images).
+   */
+  static async imageFiles(id: string, max = 10): Promise<File[]> {
+    const lista = await db.storage.from(BUCKET).list(id, { limit: 20 })
+    if (lista.error || !lista.data?.length) return []
+    const namn = lista.data
+      .filter((f) => f.name && !f.name.startsWith('.'))
+      .map((f) => f.name)
+      .sort()
+      .slice(0, max)
+    const filer = await Promise.all(
+      namn.map(async (n) => {
+        const { data, error } = await db.storage.from(BUCKET).download(`${id}/${n}`)
+        if (error || !data) return null
+        return new File([data], n, { type: data.type || mimeFor(n) })
+      }),
+    )
+    return filer.filter((f): f is File => !!f)
   }
 
   static async listEvents(id: string): Promise<WebInquiryEvent[]> {
@@ -98,6 +151,15 @@ export class WebInquiryService {
       .map((d) => ({ path: d.path ?? '', url: d.signedUrl }))
       .sort((a, b) => a.path.localeCompare(b.path))
   }
+}
+
+function mimeFor(namn: string): string {
+  const ext = namn.split('.').pop()?.toLowerCase()
+  if (ext === 'png') return 'image/png'
+  if (ext === 'webp') return 'image/webp'
+  if (ext === 'heic') return 'image/heic'
+  if (ext === 'heif') return 'image/heif'
+  return 'image/jpeg'
 }
 
 /** Svensk offset (+01:00 eller +02:00) för ett datum, så att dagsgränsen blir svensk midnatt. */

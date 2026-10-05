@@ -314,6 +314,7 @@ export default function WebLeads() {
         inquiry={vald}
         staff={staff}
         leadsBasePath={`${base}/leads`}
+        arendeSokPath={base === '/saljare' ? null : '/koordinator/sok-arenden'}
         onClose={stang}
         onChanged={(upd) => setInquiries((prev) => prev.map((i) => (i.id === upd.id ? { ...i, ...upd } : i)))}
       />
