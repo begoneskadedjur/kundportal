@@ -267,7 +267,6 @@ export default function OneflowContractCreator() {
       if (savedData) {
         try {
           const customerData = JSON.parse(savedData)
-          console.log('Prefilling customer data:', customerData)
           
           setWizardData(prev => ({
             ...prev,

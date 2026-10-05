@@ -74,6 +74,25 @@ export interface WebInquiry {
   bokad_tjanst: string | null
   /** Ärendenumret kunden fick (case_number). Har inget med förfrågans referens att göra. */
   arende_nummer: string | null
+  /**
+   * Kompletteringar efter samtalet. Kundens originalsvar ovan står kvar oförändrade.
+   * id_nummer: personnummer (ÅÅÅÅMMDD-XXXX) eller org.nr (XXXXXX-XXXX). Logga aldrig värdet.
+   */
+  id_nummer: string | null
+  id_nummer_typ: 'personnummer' | 'orgnr' | null
+  rattad_adress: string | null
+  rattad_postnummer: string | null
+  rattad_ort: string | null
+  kompletterad_at: string | null
+  kompletterad_av: string | null
+}
+
+export interface WebInquiryKomplettering {
+  id_nummer: string | null
+  id_nummer_typ: 'personnummer' | 'orgnr' | null
+  rattad_adress: string | null
+  rattad_postnummer: string | null
+  rattad_ort: string | null
 }
 
 export interface WebInquiryEvent {

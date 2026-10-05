@@ -13,6 +13,7 @@ import { refreshWebLeadsBadge } from '../../hooks/useWebLeadsBadge'
 import WebLeadDetailModal from '../../components/admin/webLeads/WebLeadDetailModal'
 import WebLeadsStats from '../../components/admin/webLeads/WebLeadsStats'
 import { formatSvTid, svDatum } from '../../components/admin/webLeads/format'
+import { adressDelar, formatPostnummer } from '../../shared/webLeadUppgifter'
 import {
   KUNDGRUPP_LABEL,
   STATUS_CONFIG,
@@ -288,7 +289,7 @@ export default function WebLeads() {
                             <span className="block text-xs text-slate-400">Bokad: {i.bokad_tjanst}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-slate-300">{i.city || i.postal_code}</td>
+                        <td className="px-3 py-2 text-slate-300">{adressDelar(i).ort || formatPostnummer(i.postal_code)}</td>
                         <td className="px-3 py-2 text-slate-300">{KUNDGRUPP_LABEL[i.kundgrupp]}</td>
                         <td className="px-3 py-2 text-slate-400">{kallaLabel(i)}</td>
                         <td className="px-3 py-2 whitespace-nowrap">

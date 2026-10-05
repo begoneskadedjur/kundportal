@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.27.0',
+    date: '2026-10-05',
+    title: 'Leads (Webb): rätt adress och personnummer eller org.nr',
+    items: [
+      { kind: 'buggfix', text: 'Adressen i förfrågan, listan, ärendet och offerten skrivs nu utan dubbletter, med kundens egen ort, postnummer som 196 31 och stor bokstav i gata och ort.' },
+      { kind: 'nyhet', text: 'Under Uppgifter efter samtalet i förfrågan fyller du i personnummer eller org.nr och rättar adressen medan du pratar med kunden. Kundens egna svar står kvar.' },
+      { kind: 'nyhet', text: 'Numret kontrolleras med kontrollsiffran och personnumret visas dolt tills du klickar på Visa. Uppgifterna följer med till Skapa ärende och Skapa offert.' },
+    ],
+  },
+  {
     version: '3.26.0',
     date: '2026-10-05',
     title: 'Leads (Webb): offert, bokad tjänst och ärendenummer',

@@ -477,7 +477,17 @@ export default async function handler(
 
     if (!createResponse.ok) {
       console.error('Fel vid skapande av kontrakt:', JSON.stringify(createdContract, null, 2))
-      console.error('Payload som skickades till OneFlow:', JSON.stringify(createPayload, null, 2))
+      // Personnummer och org.nr loggas aldrig: fältet org-nr och partens identifikationsnummer döljs
+      const loggbarPayload = {
+        ...createPayload,
+        data_fields: (createPayload.data_fields ?? []).map((f: { custom_id: string; value?: unknown }) =>
+          f.custom_id === 'org-nr' && f.value ? { ...f, value: '[dolt]' } : f
+        ),
+        parties: (createPayload.parties ?? []).map((p: Record<string, unknown>) =>
+          p.identification_number ? { ...p, identification_number: '[dolt]' } : p
+        ),
+      }
+      console.error('Payload som skickades till OneFlow:', JSON.stringify(loggbarPayload, null, 2))
       return res.status(createResponse.status).json({
         message:
           createdContract.message ||

@@ -12,6 +12,7 @@ import type {
   WebInquiry,
   WebInquiryArendeTabell,
   WebInquiryEvent,
+  WebInquiryKomplettering,
   WebInquiryStatus,
 } from '../types/webInquiry'
 
@@ -82,6 +83,17 @@ export class WebInquiryService {
   static async linkOffer(id: string, oneflowContractId: string): Promise<void> {
     const { error } = await db.from('web_inquiries').update({ offert_oneflow_id: oneflowContractId }).eq('id', id)
     if (error) throw error
+  }
+
+  /**
+   * Sparar personnummer eller org.nr och rättad adress efter samtalet. Databasens trigger stämplar
+   * vem och när och skriver historikraden "Uppgifter kompletterade" utan själva numret.
+   * Felet som kastas innehåller aldrig numret (felets detaljer kastas bort).
+   */
+  static async saveKomplettering(id: string, k: WebInquiryKomplettering): Promise<WebInquiry> {
+    const { data, error } = await db.from('web_inquiries').update(k).eq('id', id).select('*').maybeSingle()
+    if (error || !data) throw new Error('Uppgifterna kunde inte sparas')
+    return data as WebInquiry
   }
 
   /** Aktiva tekniker för ärendemodalens bokning. */

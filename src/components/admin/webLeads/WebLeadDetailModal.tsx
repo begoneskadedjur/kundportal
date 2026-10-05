@@ -30,6 +30,8 @@ import {
 } from '../../../types/webInquiry'
 import type { BusinessCasesInsert, LeadInsert, PrivateCasesInsert, Technician } from '../../../types/database'
 import { formatSvTid, svDatum } from './format'
+import WebLeadUppgifter from './WebLeadUppgifter'
+import { adressDelar, effektivtIdNummer, sattIhopAdress } from '../../../shared/webLeadUppgifter'
 
 interface Props {
   inquiry: WebInquiry | null
@@ -85,9 +87,10 @@ function offertFalt(inquiry: WebInquiry, returnPath: string) {
     Kontaktperson: inquiry.name || '',
     'e-post-kontaktperson': inquiry.email || '',
     'telefonnummer-kontaktperson': inquiry.phone || '',
-    'utforande-adress': [inquiry.address, [inquiry.postal_code, inquiry.city].filter(Boolean).join(' ')].filter(Boolean).join(', '),
+    'utforande-adress': sattIhopAdress(inquiry),
     foretag: foretag ? inquiry.company_name || '' : '',
-    'org-nr': foretag ? inquiry.organization_number || '' : '',
+    // Guiden har ett fält: Organisationsnummer för företag, Personnummer för privatperson
+    'org-nr': idForArende(inquiry, foretag),
     agreementText: offertText(inquiry),
     // Mallen väljs i guiden; offertmallens kategori styr sedan företag eller privatperson
     targetStep: 2,
@@ -96,9 +99,20 @@ function offertFalt(inquiry: WebInquiry, returnPath: string) {
   }
 }
 
+/**
+ * Personnummer eller org.nr för offertguiden och ärendet. Företag får org.nr (eller personnumret
+ * om det är det som angetts, som för enskild firma); privatperson får bara ett personnummer.
+ */
+function idForArende(inquiry: WebInquiry, foretag: boolean): string {
+  const id = effektivtIdNummer(inquiry)
+  if (!id) return ''
+  if (foretag) return id.varde
+  return id.typ === 'personnummer' ? id.varde : ''
+}
+
 /** Ärendemodalens fält förifyllda från förfrågan. Det som saknas lämnas tomt. */
 function arendeFalt(inquiry: WebInquiry, typ: 'private' | 'business'): Partial<PrivateCasesInsert & BusinessCasesInsert> {
-  const adress = [inquiry.address, [inquiry.postal_code, inquiry.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+  const adress = sattIhopAdress(inquiry)
   const tjanst = inquiry.pest_type ? tjanstLabel(inquiry.pest_type) : ''
   const beskrivning = [
     `Webbförfrågan ${inquiry.referens} (${formatSvTid(inquiry.created_at)})`,
@@ -118,7 +132,9 @@ function arendeFalt(inquiry: WebInquiry, typ: 'private' | 'business'): Partial<P
   }
   if (typ === 'business') {
     falt.company_name = inquiry.company_name || ''
-    falt.org_nr = inquiry.organization_number || ''
+    falt.org_nr = idForArende(inquiry, true)
+  } else {
+    falt.personnummer = idForArende(inquiry, false)
   }
   return falt
 }
@@ -216,8 +232,8 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
     contact_person: inquiry.name,
     phone_number: inquiry.phone,
     email: inquiry.email || '',
-    organization_number: inquiry.organization_number || '',
-    address: [inquiry.address, [inquiry.postal_code, inquiry.city].filter(Boolean).join(' ')].filter(Boolean).join(', '),
+    organization_number: effektivtIdNummer(inquiry)?.typ === 'orgnr' ? inquiry.id_nummer || inquiry.organization_number || '' : '',
+    address: sattIhopAdress(inquiry),
     problem_type: tjanstLabel(inquiry.pest_type),
     business_type: typeof inquiry.details.svar === 'string' && inquiry.customer_kind === 'foretag' ? inquiry.details.svar : '',
     source: 'Webbförfrågan',
@@ -296,6 +312,7 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
   }
 
   const svar = formularSvar(inquiry)
+  const ort = adressDelar(inquiry).ort
 
   const status = STATUS_CONFIG[inquiry.status]
   const arForetag = inquiry.kundgrupp !== 'privat'
@@ -322,7 +339,7 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
             <span className="font-mono text-sm text-slate-400">{inquiry.referens}</span>
           </span>
         }
-        subtitle={`${tjanstLabel(inquiry.pest_type)}${inquiry.city ? `, ${inquiry.city}` : ''} · inkom ${formatSvTid(inquiry.created_at)}`}
+        subtitle={`${tjanstLabel(inquiry.pest_type)}${ort ? `, ${ort}` : ''} · inkom ${formatSvTid(inquiry.created_at)}`}
       >
         <div className="p-4 space-y-3">
           {/* Status och tilldelning */}
@@ -488,7 +505,7 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
                   <dd className="text-white flex items-start gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-slate-500 mt-0.5 flex-shrink-0" />
                     <span>
-                      {[inquiry.address, [inquiry.postal_code, inquiry.city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || 'Saknas'}
+                      {sattIhopAdress(inquiry) || 'Saknas'}
                       {!inquiry.omrade_tackt && <span className="block text-xs text-amber-400">Postnumret ligger utanför sajtens område</span>}
                     </span>
                   </dd>
@@ -524,6 +541,15 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
               </dl>
             </div>
           </div>
+
+          <WebLeadUppgifter
+            inquiry={inquiry}
+            namnFor={namnFor}
+            onSaved={(upd) => {
+              onChanged(upd)
+              void laddaHistorik()
+            }}
+          />
 
           {/* Bilder */}
           <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
