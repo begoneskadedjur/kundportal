@@ -123,7 +123,7 @@ export default function WebLeadUppgifter({ inquiry, onSaved, namnFor }: Props) {
   }
 
   const visatId = id ? (visa ? id.varde : maskeraIdNummer(id.varde, id.typ)) : null
-  const kontrollFel = id ? !tolkaIdNummer(id.varde).kontrollsiffraOk : false
+  const idTolkning = id ? tolkaIdNummer(id.varde) : null
 
   return (
     <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
@@ -162,7 +162,8 @@ export default function WebLeadUppgifter({ inquiry, onSaved, namnFor }: Props) {
                 <span className="text-slate-500">Saknas</span>
               )}
               {id && !inquiry.id_nummer && <span className="block text-xs text-slate-500">Från formuläret</span>}
-              {kontrollFel && <span className="block text-xs text-amber-400">Kontrollsiffran stämmer inte</span>}
+              {idTolkning && !idTolkning.tolkat && <span className="block text-xs text-amber-400">Formatet känns inte igen</span>}
+              {idTolkning?.tolkat && !idTolkning.kontrollsiffraOk && <span className="block text-xs text-amber-400">Kontrollsiffran stämmer inte</span>}
             </dd>
           </div>
           <div>

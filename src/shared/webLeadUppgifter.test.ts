@@ -28,6 +28,27 @@ describe('sattIhopAdress', () => {
     expect(adressDelar(k)).toEqual({ gata: 'Rätt väg 2', postnummer: '196 32', ort: 'Kungsängen' })
   })
 
+  it('granskningens varianter', () => {
+    const kb = { postal_code: '19631', city: 'Kungsängen och Bro' }
+    expect(sattIhopAdress({ ...kb, address: 'rankhusvägen 32 196 31 KUNGSÄNGEN' })).toBe('Rankhusvägen 32, 196 31 Kungsängen')
+    expect(sattIhopAdress({ ...kb, address: 'rankhusvägen 32 kungsängen' })).toBe('Rankhusvägen 32, 196 31 Kungsängen')
+    expect(sattIhopAdress({ ...kb, address: 'Rankhusvägen 32, 196 31 Kungsängen, Sverige' })).toBe('Rankhusvägen 32, 196 31 Kungsängen')
+    expect(sattIhopAdress({ ...kb, address: 'Storgatan 105 19631 Kungsängen' })).toBe('Storgatan 105, 196 31 Kungsängen')
+    // Ett sammansatt område är ingen ort
+    expect(sattIhopAdress({ ...kb, address: 'rankhusvägen 32, 196 31' })).toBe('Rankhusvägen 32, 196 31')
+    expect(sattIhopAdress({ ...kb, address: null })).toBe('196 31')
+    expect(sattIhopAdress({ address: 'storgatan 5 Bålsta', postal_code: '74631', city: 'Bålsta' })).toBe('Storgatan 5, 746 31 Bålsta')
+    expect(sattIhopAdress({ address: 'storgatan 1', postal_code: '111 22', city: 'stockholm' })).toBe('Storgatan 1, 111 22 Stockholm')
+    expect(sattIhopAdress({ address: 'Kungsgatan 3, upplands väsby', postal_code: '19430', city: 'Upplands Väsby' })).toBe('Kungsgatan 3, 194 30 Upplands Väsby')
+    expect(sattIhopAdress({ address: 'Sveavägen 12 lgh 1102, 113 50 Stockholm', postal_code: '11350', city: 'Stockholm' })).toBe('Sveavägen 12 lgh 1102, 113 50 Stockholm')
+    expect(sattIhopAdress({ address: '', postal_code: '', city: '' })).toBe('')
+  })
+
+  it('bara rättad gata behåller kundens egen ort', () => {
+    expect(sattIhopAdress({ address: 'fel 1, kungsängen', postal_code: '19631', city: 'Kungsängen och Bro', rattad_adress: 'Rankhusvägen 32' }))
+      .toBe('Rankhusvägen 32, 196 31 Kungsängen')
+  })
+
   it('tomt utan adress', () => {
     expect(sattIhopAdress({ address: null, postal_code: null, city: null })).toBe('')
   })

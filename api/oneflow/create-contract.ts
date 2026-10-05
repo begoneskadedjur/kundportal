@@ -579,7 +579,8 @@ export default async function handler(
       })
 
     if (upsertError) {
-      console.error('Kunde inte spara kontrakt-metadata:', upsertError)
+      // Bara kod och meddelande: felets detaljer kan innehålla raden med personnummer eller org.nr
+      console.error('Kunde inte spara kontrakt-metadata:', upsertError.code, upsertError.message)
     } else {
       console.log(`✅ Kontrakt-metadata sparad för ${createdContract.id} (source_id: ${caseId || 'ingen'})`)
     }

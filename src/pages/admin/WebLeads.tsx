@@ -289,7 +289,7 @@ export default function WebLeads() {
                             <span className="block text-xs text-slate-400">Bokad: {i.bokad_tjanst}</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-slate-300">{adressDelar(i).ort || formatPostnummer(i.postal_code)}</td>
+                        <td className="px-3 py-2 text-slate-300">{adressDelar(i).ort || i.city || formatPostnummer(i.postal_code)}</td>
                         <td className="px-3 py-2 text-slate-300">{KUNDGRUPP_LABEL[i.kundgrupp]}</td>
                         <td className="px-3 py-2 text-slate-400">{kallaLabel(i)}</td>
                         <td className="px-3 py-2 whitespace-nowrap">

@@ -32,17 +32,34 @@ function rensa(s: string | null | undefined): string {
   return (s ?? '').replace(/\s+/g, ' ').trim()
 }
 
-/** Stor bokstav först, resten orört. */
+/** Texten är skriven med bara versaler ("KUNGSÄNGEN", "RANKHUSVÄGEN 32"). */
+function baraVersaler(t: string): boolean {
+  const bokstaver = t.replace(/[^\p{L}]/gu, '')
+  return bokstaver.length > 1 && bokstaver === bokstaver.toLocaleUpperCase('sv-SE')
+}
+
+/** Stor bokstav först, resten orört. Text med bara versaler skrivs om med gemener först. */
 export function versalForst(s: string): string {
-  const t = rensa(s)
+  let t = rensa(s)
+  if (baraVersaler(t)) t = t.toLocaleLowerCase('sv-SE')
   return t ? t.charAt(0).toLocaleUpperCase('sv-SE') + t.slice(1) : ''
 }
 
-/** Ortnamn med stor bokstav i varje ord utom småord som "och" ("upplands väsby" blir "Upplands Väsby"). */
+/**
+ * Ortnamn med stor bokstav i varje ord och efter bindestreck, utom småord som "och"
+ * ("upplands väsby" blir "Upplands Väsby", "upplands-bro" blir "Upplands-Bro", "KUNGSÄNGEN" blir "Kungsängen").
+ */
 export function ortMedVersal(s: string): string {
-  const ord = rensa(s).split(' ').filter(Boolean)
-  return ord
-    .map((o, i) => (i > 0 && SMA_ORD.has(o.toLocaleLowerCase('sv-SE')) ? o : versalForst(o)))
+  let t = rensa(s)
+  if (baraVersaler(t)) t = t.toLocaleLowerCase('sv-SE')
+  return t
+    .split(' ')
+    .filter(Boolean)
+    .map((o, i) =>
+      i > 0 && SMA_ORD.has(o.toLocaleLowerCase('sv-SE'))
+        ? o.toLocaleLowerCase('sv-SE')
+        : o.split('-').map(versalForst).join('-')
+    )
     .join(' ')
 }
 
@@ -64,12 +81,24 @@ function omradetsOrter(omrade: string): string[] {
 }
 
 /**
+ * Täckningsområdets namn om det är en ort. Sammansatta områden ("Kungsängen och Bro", "Sigtuna och
+ * Märsta"), län och landskap ("Uppsala län", "Dalarna") är inga orter och ger tom ort.
+ */
+export function omradeSomOrt(omrade: string | null | undefined): string {
+  const t = rensa(omrade)
+  if (!t) return ''
+  if (/\s+och\s+|,|\/|\s+län$/i.test(t) || /^(dalarna|gävleborg)$/i.test(t)) return ''
+  return t
+}
+
+/**
  * Delar upp det kunden skrev i gatufältet. Ett postnummer (med eller utan mellanslag) och det som
  * står efter det plockas ut som postnummer och ort. Står orten (eller en ort i täckningsområdet)
  * sist efter ett kommatecken plockas den också ut.
  */
 export function delaGatufalt(gatufalt: string | null | undefined, kandaOrter: string[] = []): AdressDelar {
-  let gata = rensa(gatufalt)
+  // Landet sist ("..., Sverige") hör inte till adressen
+  let gata = rensa(gatufalt).replace(/,?\s*(sverige|sweden)\s*$/i, '')
   let postnummer = ''
   let ort = ''
 
@@ -89,37 +118,58 @@ export function delaGatufalt(gatufalt: string | null | undefined, kandaOrter: st
     }
   }
 
+  // Känd ort sist utan kommatecken, efter husnumret: "rankhusvägen 32 kungsängen"
+  if (!ort && !gata.includes(',')) {
+    const lower = gata.toLocaleLowerCase('sv-SE')
+    const traff = kandaOrter
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length)
+      .find((k) => {
+        if (!lower.endsWith(' ' + k.toLocaleLowerCase('sv-SE'))) return false
+        return /\d\s*\p{L}?$/u.test(gata.slice(0, gata.length - k.length).trim())
+      })
+    if (traff) {
+      ort = gata.slice(gata.length - traff.length)
+      gata = rensa(gata.slice(0, gata.length - traff.length))
+    }
+  }
+
   return { gata, postnummer, ort }
 }
 
 /**
- * Gata, postnummer och ort för förfrågan. Rättad adress går först, sedan kundens egen ort ur
- * gatufältet och sist täckningsområdets namn (som inte alltid är en ort).
+ * Gata, postnummer och ort för förfrågan. Rättade fält går först, sedan kundens egen ort ur
+ * gatufältet och sist täckningsområdets namn, bara när området är en ort (inte "Kungsängen och Bro").
  */
 export function adressDelar(k: AdressKalla): AdressDelar {
   const omrade = rensa(k.city)
   const orter = omradetsOrter(omrade)
-  const harRattad = !!(rensa(k.rattad_adress) || rensa(k.rattad_postnummer) || rensa(k.rattad_ort))
 
-  if (harRattad) {
-    const d = delaGatufalt(k.rattad_adress, [...orter, rensa(k.rattad_ort)].filter(Boolean))
-    const postnummer = rensa(k.rattad_postnummer) || d.postnummer || rensa(k.postal_code)
-    const ort = rensa(k.rattad_ort) || d.ort || (rensa(k.rattad_postnummer) ? '' : omrade)
-    return {
-      gata: versalForst(d.gata),
-      postnummer: formatPostnummer(postnummer),
-      ort: ortMedVersal(ort),
-    }
-  }
-
+  // Kundens svar: ort ur gatufältet före täckningsområdet, som bara används när det är en ort
   const d = delaGatufalt(k.address, orter)
   // Formulärets postnummer är kontrollerat och går före det som stod i gatufältet
-  const postnummer = rensa(k.postal_code) || d.postnummer
-  const ort = d.ort || omrade
+  const delar: AdressDelar = {
+    gata: d.gata,
+    postnummer: rensa(k.postal_code) || d.postnummer,
+    ort: d.ort || omradeSomOrt(omrade),
+  }
+
+  const rattadPostnummer = rensa(k.rattad_postnummer)
+  const rattadOrt = rensa(k.rattad_ort)
+  if (rensa(k.rattad_adress) || rattadPostnummer || rattadOrt) {
+    // Rättade fält går före, det som inte rättats tas från kundens svar
+    const r = delaGatufalt(k.rattad_adress, [...orter, rattadOrt, delar.ort].filter(Boolean))
+    const postnummer = rattadPostnummer || r.postnummer || delar.postnummer
+    const sammaPostnummer = postnummer.replace(/\s/g, '') === delar.postnummer.replace(/\s/g, '')
+    delar.gata = r.gata || delar.gata
+    delar.ort = rattadOrt || r.ort || (sammaPostnummer ? delar.ort : '')
+    delar.postnummer = postnummer
+  }
+
   return {
-    gata: versalForst(d.gata),
-    postnummer: formatPostnummer(postnummer),
-    ort: ortMedVersal(ort),
+    gata: versalForst(delar.gata),
+    postnummer: formatPostnummer(delar.postnummer),
+    ort: ortMedVersal(delar.ort),
   }
 }
 

@@ -312,7 +312,7 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
   }
 
   const svar = formularSvar(inquiry)
-  const ort = adressDelar(inquiry).ort
+  const ort = adressDelar(inquiry).ort || inquiry.city || ''
 
   const status = STATUS_CONFIG[inquiry.status]
   const arForetag = inquiry.kundgrupp !== 'privat'
