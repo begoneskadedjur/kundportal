@@ -73,7 +73,7 @@ Grenen forfragningar är inte pushad och inte ihopslagen. Huvudsessionen slår i
 
 ## Deploy
 
-DEPLOYSTATUS
+Produktionsdeployen `dpl_36FojM4jtfbsdX9CSiXiET79JAv4` för `31dc24db` är READY (2026-10-05). OPTIONS mot `https://kundportal.vercel.app/api/forfragan` med Origin `https://begone.se` gav 204 med `Access-Control-Allow-Origin: https://begone.se`, `Access-Control-Allow-Methods: POST, OPTIONS`, `Access-Control-Allow-Headers: Content-Type`, `Access-Control-Max-Age: 600` och `Vary: Origin`. `https://www.begone.se` gav också 204, en främmande Origin gav 403. Ingen riktig förfrågan skickades.
 
 ## Kvarstående risker
 
