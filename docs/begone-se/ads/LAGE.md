@@ -25,6 +25,12 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 - Förslagsfiler `andringar/2026-10-06_konto_1-matning.json` (10 op), `_2-fas1-bygg.json` (445), `_3-fas2-bygg.json` (390, listornas id fylls i med `node --env-file=.env.local gen-ads-kontoplan.mjs --json` efter steg 2), `_4-start-fas1.json`, `_5-start-fas2.json`. **EJ PROVKÖRDA**: provkörning med mutate.mjs nekades av behörighetsspärren i agentsessionen 2026-10-06. Provkör i huvudsessionen innan Christian godkänner.
 - Öppna frågor till Christian: vidarekopplingsnummer, offline-import och integritetstext, värde per förfrågan (1 400 kr i åtgärden, taggen skickar 1 kr enligt säljchefen), inga konkurrentnamn, PMax Fåglar kvar till vecka 8, kostnadsfri inspektion för möss?, fågelspillning offert eller fast pris?, fast pris per telefon för värmebehandling?, företagsnamnet under annonsörsverifiering.
 
+## Offline-import och samtal (2026-10-06)
+
+- Nattjobb `api/cron/google-ads-konverteringar.ts` (05:45 UTC) PUSHAT dfe848c7. Google Ads API uploadClickConversions är stängt för kontot (CUSTOMER_NOT_ALLOWLISTED_FOR_THIS_FEATURE); jobbet använder Data Manager API (`datamanager.googleapis.com/v1/events:ingest`), kräver OAuth-scopet datamanager. Idempotens i tabellen google_ads_konverteringar. Torrkörning `?torr=1`.
+- Återstår: aktivera Data Manager API i Cloud-projektet, kör om oauth.mjs (båda scopen), lägg GOOGLE_ADS_*-variablerna i kundportalens Vercel, skapa konverteringsåtgärderna (konto_1-matning.json), torrkör i produktion.
+- begone-se gren `samtal-och-utfall` (7fb7f03, ej main): webbplatssamtal via phone_conversion_number bara med samtycke (aktiveras när PUBLIC_GOOGLE_ADS_ETIKETT_SAMTAL sätts), policy och bannertext om samtal och utfall, CONSENT_VERSION 2. Rutin: begäran om att stoppa delning via info@begone.se = sätt details.samtycke_marknadsforing false.
+
 ## Kampanjer
 
 ### BrightBid_High Priority_Råttbekämpning (sök, 19729967497)
