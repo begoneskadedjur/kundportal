@@ -1,6 +1,214 @@
 {
-  "beskrivning": "FÖRSLAG: koppla delade negativa listan Neg | Konkurrenter till hela kontot (gäller även PMax). Körs efter steg 2; sharedSet-id fylls i efter att listan skapats.",
+  "beskrivning": "Konkurrentnamn som negativa sökord på hela kontot (gäller även Performance Max), via en kontolista av typen ACCOUNT_LEVEL_NEGATIVE_KEYWORDS.",
+  "godkand_av": "Christian 2026-10-06 (del av fas 1, godkänt i chatten)",
   "operationer": [
+    {
+      "sharedSetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/sharedSets/-1",
+          "name": "Konto | Konkurrenter",
+          "type": "ACCOUNT_LEVEL_NEGATIVE_KEYWORDS"
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "no more",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "rentokil",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "rent o kill",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "rentokill",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "nomus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "nomor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "nomore",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "anticimex",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "rent to kill",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "insecta",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "antisimex",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "skadedjursbutiken",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "skadedjursexperten",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "lf skadedjur",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "mitt skadedjur",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "svensk skadedjurskontroll",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "anricimex",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "anticimx",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
     {
       "customerNegativeCriterionOperation": {
         "create": {

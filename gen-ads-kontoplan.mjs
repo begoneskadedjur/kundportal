@@ -132,7 +132,7 @@ async function skrivJson() {
     listOps.push({ sharedSetOperation: { create: { resourceName: rn, name: l.namn, type: 'NEGATIVE_KEYWORDS' } } });
     for (const text of l.ord) listOps.push({ sharedCriterionOperation: { create: { sharedSet: rn, keyword: { text, matchType: 'PHRASE' } } } });
   }
-  listOps.push({ customerNegativeCriterionOperation: { create: { negativeKeywordList: { sharedSet: listor['Neg | Konkurrenter'] } } } });
+  // Kontonivå görs i ett eget steg (2b) med en lista av typen ACCOUNT_LEVEL_NEGATIVE_KEYWORDS; vanliga NEGATIVE_KEYWORDS-listor kan inte kopplas till kontot.
   const fas1 = [...listOps];
   for (const k of kampanjer.filter((x) => ['ratt', 'fagel', 'varumarke'].includes(x.kort))) {
     const ops = byggKampanj(k, tmp, listor);
