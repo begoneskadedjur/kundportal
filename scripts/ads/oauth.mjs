@@ -23,7 +23,8 @@ const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchP
   client_id: clientId,
   redirect_uri: redirectUri,
   response_type: 'code',
-  scope: 'https://www.googleapis.com/auth/adwords',
+  // adwords: läsa och ändra kontot. datamanager: offline-konverteringar (api/cron/google-ads-konverteringar).
+  scope: 'https://www.googleapis.com/auth/adwords https://www.googleapis.com/auth/datamanager',
   access_type: 'offline',
   prompt: 'consent',
 })
