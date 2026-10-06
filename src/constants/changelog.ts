@@ -53,6 +53,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'nyhet', text: 'Skapa ärende öppnar då ärendemodalen för avtalskunder med kunden vald, och du väljer extrabesök, stationskontroll eller etablering. Är det fel kund väljer du bort matchningen och skapar ärendet som vanligt.' },
       { kind: 'nyhet', text: 'Koppla befintligt ärende: har ärendet redan skapats på annat sätt söker du fram det på ärendenumret och kopplar det till förfrågan.' },
       { kind: 'nyhet', text: 'Ny status Befintlig kund. Avtalskundernas ärenden räknas inte som vunna eller förlorade, och statistiken visar dem för sig med hur många ärenden som genomförts.' },
+      { kind: 'buggfix', text: 'Allmänna e-posttjänster känns igen även med utländsk ändelse, till exempel hotmail.co.uk, och fler svenska leverantörer som Comhem och Tele2, så att de aldrig matchar en kund.' },
     ],
   },
   {

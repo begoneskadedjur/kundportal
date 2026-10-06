@@ -392,13 +392,19 @@ function domaner(falt: string | null | undefined): string[] {
 }
 
 /** Allmänna e-posttjänster och vår egen domän: säger inget om vilket företag det är. */
-const ALLMANNA_DOMANER = new Set(['gmail', 'googlemail', 'hotmail', 'outlook', 'live', 'icloud', 'yahoo', 'telia', 'spray', 'bredband', 'msn', 'me', 'protonmail', 'proton'])
+const ALLMANNA_DOMANER = new Set([
+  'gmail', 'googlemail', 'hotmail', 'outlook', 'live', 'icloud', 'mac', 'yahoo', 'ymail', 'telia', 'spray',
+  'bredband', 'bredband2', 'comhem', 'tele2', 'bahnhof', 'msn', 'me', 'aol', 'gmx', 'protonmail', 'proton',
+])
 
+/**
+ * Sant för allmänna e-posttjänster och vår egen domän. Varje del utom toppdomänen prövas, så att
+ * även hotmail.co.uk och yahoo.com.au räknas som allmänna.
+ */
 function arAllmanDoman(doman: string): boolean {
   if (doman === 'begone.se' || doman.endsWith('.begone.se')) return true
   const delar = doman.split('.')
-  const namn = delar.length >= 2 ? delar[delar.length - 2] : doman
-  return ALLMANNA_DOMANER.has(namn)
+  return delar.slice(0, -1).some((d) => ALLMANNA_DOMANER.has(d))
 }
 
 function mimeFor(namn: string): string {
