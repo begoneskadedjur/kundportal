@@ -31,6 +31,15 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 - Återstår: aktivera Data Manager API i Cloud-projektet, kör om oauth.mjs (båda scopen), lägg GOOGLE_ADS_*-variablerna i kundportalens Vercel, skapa konverteringsåtgärderna (konto_1-matning.json), torrkör i produktion.
 - begone-se gren `samtal-och-utfall` (7fb7f03, ej main): webbplatssamtal via phone_conversion_number bara med samtycke (aktiveras när PUBLIC_GOOGLE_ADS_ETIKETT_SAMTAL sätts), policy och bannertext om samtal och utfall, CONSENT_VERSION 2. Rutin: begäran om att stoppa delning via info@begone.se = sätt details.samtycke_marknadsforing false.
 
+## Annonsbilder (2026-10-06)
+
+- Flöde: `scripts/ads/generera-annonsbilder.mjs` (Gemini gemini-3.1-flash-image-preview, stilrad ur BILDNORM, högst 3 försök), manifest `docs/begone-se/ads/bilder/manifest.json` (id, kampanj, motiv, format, prompt, status, kommentar, historik), original i `bilder/original/` (i .gitignore), färdiga JPG i `bilder/klara/` (1200x628, 1200x1200, 960x1200). sharp lånas från begone-se:s node_modules.
+- Fas 1: 18 bilder, 24 genereringar. Skadedjursexperten godkände 17 (tre omgångar). Struken: fagel-vajer-nock-l (Gemini ger inget trovärdigt vajersystem; ta riktigt foto från ett uppdrag). Rensbrunnen är svag som annons (låg vikt), spillningsbilden bara i fågelsöket, inte PMax.
+- Kontaktark `Ads_Bilder_2026-10-06.pdf` (skript `gen-ads-bilder.mjs`). Förslagsfil `andringar/2026-10-06_bilder-fas1.json` byggs med `scripts/ads/bygg-bildforslag.mjs`: 17 bildtillgångar + 22 kopplingar (AD_IMAGE på Claude | Sök | Råttor, Fåglar, Varumärke; MARKETING/SQUARE/PORTRAIT_MARKETING_IMAGE i PMax Fåglar, grupp 6516988320). PROVKÖRD OK 2026-10-06 (39 op). EJ GENOMFÖRD, väntar på Christian.
+- Kontoplanens motiv med tekniker bakifrån gjordes om till bilder av utfört arbete (BILDNORM: inga personer eller händer).
+- PMax Fåglar har 12 gamla bilder (flera stockbilder från 2025); med de 6 nya blir det 18 av 20 tillåtna. Föreslå borttagning av de gamla i eget steg när de nya är godkända av Google.
+- Fas 2 (ej påbörjad): vägglöss och värmetält, silverfisk, pälsänger, mjölbaggar, möss (husmus inomhus).
+
 ## Kampanjer
 
 ### BrightBid_High Priority_Råttbekämpning (sök, 19729967497)
@@ -70,3 +79,4 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 2. Efter ja: genomför stegen, kontrollera policystatus 2026-10-08, kör 1B när nya annonser är godkända. Avstämning 2026-10-20, utvärdering och fas 2 2026-11-03.
 3. Nästa rapporter: BrightBid_High Priority_Råttbekämpning_PMax (konkurrentnamn, varumärke, mål-CPA 300 mot sökets 800), därefter fågel. Möss-rapporten tar dubbla annonsgrupper och fel slutadress (/moss-i-huset-och-vaggarna/ i stället för /tjanster/moss/).
 4. Kontoövergripande: rensa primära konverteringar (click_phone, click_akut), varumärkeskampanj.
+5. Annonsbilder: Christian läser `Ads_Bilder_2026-10-06.pdf`; efter ja körs `2026-10-06_bilder-fas1.json` med --genomfor (bygg om filen med bygg-bildforslag.mjs om manifestet ändrats), policystatus dagen efter. Därefter fas 2 av bilderna.

@@ -1,0 +1,203 @@
+[
+  {
+    "id": "ratt-station-husgrund-l",
+    "kampanj": "Claude | Sök | Råttor",
+    "motiv": "Låst grå betesstation tätt mot husgrunden vid ett soprum, stängda sopkärl i bakgrunden",
+    "format": "1.91:1",
+    "prompt": "Wide shot at ground level of one locked, plain dark grey plastic rodent bait station placed tight against the grey concrete foundation of a Swedish house, along the wall next to a small wooden bin shed. The station is a low rectangular box about 30 cm long and 20 cm high with a closed, locked lid and a small entrance hole at each end; the contents are not visible. Behind it, slightly out of focus, closed green wheeled waste bins. Clean gravel and a strip of grass, early autumn. The station is completely plain: no labels, no stickers, no logo, no writing. No rat, no animals, no people.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Låst station med lock och hänglåsöra står stadigt mot grunden vid soprummet, trovärdigt svensk miljö. Ingångarna sitter på långsidan ut från väggen i stället för längs väggen, vilket en tekniker ser men som inte fäller bilden."
+  },
+  {
+    "id": "ratt-station-husgrund-k",
+    "kampanj": "Claude | Sök | Råttor",
+    "motiv": "Låst grå betesstation längs husgrunden på en villatomt",
+    "format": "1:1",
+    "prompt": "Close, slightly elevated view of one locked, plain dark grey plastic rodent bait station standing tight against the rendered concrete foundation of a red-painted Swedish wooden villa, along the wall where a rat would run. The station is a low rectangular box about 30 cm long with a closed, locked lid and small entrance holes at the ends; contents not visible. Gravel, a few fallen autumn leaves. The station is completely plain: no labels, no stickers, no logo, no writing. No rat, no animals, no people.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Prydlig låst station med ingången på kortsidan längs grunden, alltså där råttan springer. Rätt placerat och professionellt."
+  },
+  {
+    "id": "ratt-betongstation-innergard-k",
+    "kampanj": "Claude | Sök | Råttor",
+    "motiv": "Betongstation på en innergård med gatsten",
+    "format": "1:1",
+    "prompt": "A square grey cast-concrete rodent bait station block, about 35 by 35 cm and 25 cm high, with a heavy flat concrete lid and one small round entrance hole at ground level, standing against the yellow rendered wall of a 1920s Swedish apartment building courtyard paved with grey granite cobblestones. Tidy courtyard, a bicycle rack and a tree softly out of focus in the background, overcast autumn daylight. No labels, no writing, no logo. No rat, no animals, no people.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Trovärdig betongstation med tungt lock och lågt sittande ingångshål mot fasaden, på en svensk innergård med gatsten. Locket är grovt, men så ser betongstationer ut."
+  },
+  {
+    "id": "ratt-nat-grundventil-s",
+    "kampanj": "Claude | Sök | Råttor",
+    "motiv": "Finmaskigt rostfritt nät monterat över en grundventil på en villagrund",
+    "format": "4:5",
+    "prompt": "Close-up of a rectangular ventilation opening in the rendered concrete foundation (plinth) of a Swedish villa, about 20 by 10 cm, covered by a neatly fitted fine-mesh stainless steel wire mesh with small square openings about 6 mm, fastened with small stainless screws all around the edges, tight against the wall with no gaps. Grass and gravel at the foot of the wall, painted wooden facade visible at the top of the frame. No foam, no silicone, no sealant, no tape. No tools, no hands, no people, no animals.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Rostfritt finmaskigt nät skruvat med brickor, går väl utanför öppningen, utan fogskum. Ser ut som riktigt utfört arbete."
+  },
+  {
+    "id": "ratt-nat-grundventil-k",
+    "kampanj": "Claude | Sök | Råttor",
+    "motiv": "Finmaskigt rostfritt nät monterat över en grundventil, kvadrat",
+    "format": "1:1",
+    "prompt": "Close-up of a rectangular ventilation opening in the grey concrete foundation of a Swedish house, covered by a neatly fitted fine-mesh stainless steel wire mesh with small square openings about 6 mm, fastened with small stainless screws all around the edges, tight against the wall with no gaps. Gravel at the foot of the wall. No foam, no silicone, no sealant, no tape. No tools, no hands, no people, no animals.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Rent och välgjort, jämnt fördelade skruvar, nätet täcker hela öppningen och ingen fogmassa. Den bästa av tätningsbilderna."
+  },
+  {
+    "id": "ratt-brunratta-husgrund-l",
+    "kampanj": "Claude | Sök | Råttor",
+    "motiv": "Levande brunråtta vid en husgrund i skymning",
+    "format": "1.91:1",
+    "prompt": "One live wild brown rat (Rattus norvegicus) running along the base of a concrete house foundation in Sweden at dusk, seen from the side at ground level. Anatomy: heavy, thickset body about 22 cm long, coarse greyish-brown fur on the back, paler grey belly, blunt rounded snout, small furry rounded ears that sit close to the head, small dark eyes, four legs, thick scaly pinkish-grey tail clearly shorter than the head and body. Not a black rat, not a pet or fancy rat, no white or patched fur. Gravel and fallen leaves, soft dusk light with some daylight left. Only one rat. No people.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Brunråtta med korrekt anatomi: kraftig kropp, trubbig nos, små öron och svans kortare än kroppen. Pälsen drar åt grått men ligger inom vad brunråttor har."
+  },
+  {
+    "id": "ratt-brunratta-kallare-k",
+    "kampanj": "Claude | Sök | Råttor",
+    "motiv": "Levande brunråtta längs väggen i ett källarförråd",
+    "format": "1:1",
+    "prompt": "One live wild brown rat (Rattus norvegicus) moving along the base of a clean, light grey painted concrete wall in a tidy, modern storage basement of a Swedish apartment building; behind it a neat row of storage compartments with galvanised steel wire mesh doors, evenly lit by ceiling lights, swept painted floor. The rat must look clearly wild: dense coarse greyish-brown fur with darker guard hairs, slightly dull and unkempt, paler grey-brown belly, heavy thickset body, blunt rounded snout, small furry ears close to the head, small dark eyes, four legs with greyish-pink feet that are not bright pink, thick scaly dark-greyish tail clearly shorter than the head and body. Not a pet or fancy rat, not white, not clean and glossy. The basement is well maintained, not dirty, not run down, no peeling paint. Only one rat. No numbers or signs on the doors. No people.",
+    "forsok": 2,
+    "status": "godkand",
+    "historik": [
+      "Försök 1 underkänt: förfallen miljö med flagnande väggar och skeva dörrar, råttan för ren och rosa (drar åt tamråtta), och en råtta i ett flerbostadshus säger smutsig fastighet."
+    ],
+    "kommentar": "Rätt brunråtta: kraftig kropp, trubbig nos, små öron och svans kortare än kroppen. Källarförrådet med nätväggar är modernt och välskött, så bilden säger att det kan hända även i en välskött fastighet. Brandskåpets symbol är ett piktogram, ingen text."
+  },
+  {
+    "id": "ratt-rensbrunn-k",
+    "kampanj": "Claude | Sök | Råttor",
+    "motiv": "Öppen rensbrunn av plast på en villatomt (avlopp)",
+    "format": "1:1",
+    "prompt": "A round black plastic sewer inspection chamber (tillsynsbrunn) about 40 cm in diameter set flush with the ground in a gravel bed next to the grey concrete foundation of a Swedish villa. The round black ribbed lid sits closed and level in its frame, at ground level, neat and well maintained, a lawn edge and the house wall around it. Seen from above at an angle, autumn daylight. No writing or symbols on the lid, no rat, no animals, no tools, no hands, no people.",
+    "forsok": 2,
+    "status": "godkand",
+    "historik": [
+      "Försök 1 underkänt: brunnen såg ut som en plastbalja på gräsmattan utan schakt, och en öppen brunn utan någon på plats signalerar slarv och olycksrisk."
+    ],
+    "kommentar": "Locket ligger på i marknivå i gruset vid grunden, inget fel i sak och ingen olycksrisk. Svagt som annonsmotiv eftersom ett svart lock inte säger råttor utan sammanhang, så ge det låg vikt."
+  },
+  {
+    "id": "fagel-nat-balkong-l",
+    "kampanj": "Claude | Sök | Fåglar, BrightBid PMax - Fågelsäkring",
+    "motiv": "Fågelnät sträckt utan glipor över en balkong på ett flerbostadshus",
+    "format": "1.91:1",
+    "prompt": "A single continuous photograph, not a collage, not split panels, no borders. Exterior view from slightly below of one balcony on a 1960s Swedish apartment building with light brick facade. The open front of this balcony is closed by a taut black bird net (mesh about 50 mm), clearly visible as a fine dark grid, stretched flat in one vertical plane from the underside of the balcony slab above down to the top of the balcony railing, with a tensioned stainless steel border wire running around all four edges and fixed to the facade. The net is flat and even, no folds, no sagging, no gaps. No birds. Clear blue sky, daylight. No people, no signs, no text.",
+    "forsok": 3,
+    "status": "godkand",
+    "historik": [
+      "Försök 1 underkänt: nätet hängde löst och veckat utanpå balkongfronten och buktade ut, som en hemmagjord lösning.",
+      "Försök 2 underkänt: bilden blev ett kollage av tre paneler med vita skarvar, och nätet syntes knappt."
+    ],
+    "kommentar": "En enda bild med nätet spänt i ett plan från balkongtaket ner till räcket, med kantvajer runt om och utan veck eller glipor. Trovärdig svensk tegelfastighet, prydlig och professionell."
+  },
+  {
+    "id": "fagel-nat-balkong-s",
+    "kampanj": "BrightBid PMax - Fågelsäkring",
+    "motiv": "Fågelnät över en balkong, stående",
+    "format": "4:5",
+    "prompt": "Exterior view from below of a stack of balconies on a Swedish apartment building with light rendered facade. The balconies are completely closed off by taut, fine black bird nets (mesh about 50 mm) mounted on thin stainless steel wires along the balcony edges, neat with no gaps and no sagging. No birds in or on the nets. Blue sky with a few clouds. No people, no signs, no text.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Genomgående nät över hela balkongstapeln, nästan osynligt och prydligt, ett vanligt och professionellt utförande. Vänsterkanten är lite vågig men fäller inte bilden."
+  },
+  {
+    "id": "fagel-duvor-piggar-k",
+    "kampanj": "Claude | Sök | Fåglar, BrightBid PMax - Fågelsäkring",
+    "motiv": "Tamduvor på takfoten ovanför ett fönsterbleck täckt med piggar",
+    "format": "1:1",
+    "prompt": "Close view of a long sheet-metal window ledge on the facade of an old Swedish rendered city building, the entire width and depth of the ledge evenly covered with rows of stainless steel bird spikes on clear polycarbonate strips, edge to edge, so that there is no free surface to land on. No pigeons on the ledge or anywhere on this building. In the soft-focus background, two feral pigeons (Columba livia domestica) are in flight away from the building against the sky: blue-grey with two dark wing bars, iridescent neck, pink-red feet. Daylight. No people, no text.",
+    "forsok": 2,
+    "status": "godkand",
+    "historik": [
+      "Försök 1 underkänt: duvorna satt på den oskyddade stenlisten ovanför piggarna och piggarna täckte bara ytterkanten, alltså visade bilden att åtgärden inte fungerar."
+    ],
+    "kommentar": "Piggarna står i flera rader och täcker hela blecket, och duvorna flyger i bakgrunden i stället för att sitta på den behandlade ytan. Fasaden är sliten men trovärdig för en äldre stadsmiljö."
+  },
+  {
+    "id": "fagel-solpaneler-nat-l",
+    "kampanj": "Claude | Sök | Fåglar, BrightBid PMax - Fågelsäkring",
+    "motiv": "Solpaneler med svart nät längs underkanten, fäst med clips i ramen",
+    "format": "1.91:1",
+    "prompt": "A rectangular field of six black solar panels mounted on the dark grey concrete tile roof of a Swedish villa, seen from the side at roof height. Along the entire perimeter of the panel field, the gap between the panel edges and the roof tiles is closed by a continuous strip of black welded wire mesh, about 15 cm high, attached to the underside of the aluminium panel frames with small black clips and bent down so its lower edge rests tight against the roof tiles. The mesh is straight and even all the way round, no cage shape above the panels, no folds, no loose rails or brackets. No birds, no nests. Clear autumn daylight. No people, no text, no brand names.",
+    "forsok": 2,
+    "status": "godkand",
+    "historik": [
+      "Försök 1 underkänt: en svart skena stack ut i luften (AI-artefakt), nätet stod som en bur ovanför panelkanten och nedre hörnet var veckat."
+    ],
+    "kommentar": "Nätet sitter tätt runt panelfältet, fäst med clips i ramen och nedvikt mot takpannorna, utan lösa skenor eller burform."
+  },
+  {
+    "id": "fagel-trutar-tak-k",
+    "kampanj": "Claude | Sök | Fåglar, BrightBid PMax - Fågelsäkring",
+    "motiv": "Gråtrutar på ett tegeltak",
+    "format": "1:1",
+    "prompt": "Two adult European herring gulls (Larus argentatus) standing on the ridge of a red clay tile roof in a Swedish coastal town. Each gull: large, white head and body, pale silver-grey back and wings, black wingtips with small white spots, stout yellow bill with a red spot near the tip of the lower mandible, pale yellow eye, pink legs and webbed feet. No nest, no eggs, no chicks. Blue sky. No people, no text.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Rätt gråtrut: ljusgrå rygg, skära ben, gul näbb med röd fläck, svarta vingspetsar med vita fläckar. Trovärdig svensk kustmiljö."
+  },
+  {
+    "id": "fagel-trutar-tak-s",
+    "kampanj": "BrightBid PMax - Fågelsäkring",
+    "motiv": "Gråtrut på taknocken, stående",
+    "format": "4:5",
+    "prompt": "One adult European herring gull (Larus argentatus) standing on the ridge of a red clay tile roof with a chimney, Swedish coastal town. The gull: large, white head and body, pale silver-grey back and wings, black wingtips with small white spots, stout yellow bill with a red spot near the tip of the lower mandible, pale yellow eye, pink legs and webbed feet. No nest, no eggs, no chicks. Blue sky. No people, no text.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Korrekt gråtrut på taknocken vid en skorsten med plåtbeslag, trovärdig västkustmiljö. Inget anatomiskt fel."
+  },
+  {
+    "id": "fagel-spillning-balkong-l",
+    "kampanj": "Claude | Sök | Fåglar, BrightBid PMax - Fågelsäkring",
+    "motiv": "Duvspillning på en balkong som inte används",
+    "format": "1.91:1",
+    "prompt": "Accumulated feral pigeon droppings, white and grey-green patches and crusts, with a few loose grey feathers, on the concrete floor and along the base of the railing of an unused balcony of a Swedish apartment building. An empty planter box in the corner. Daylight. No birds, no dead birds, no nests, no people, no cleaning equipment, no text.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Spillningen ligger i tjocka lager längs räcket med utspridda fjädrar, så som en duvbalkong ser ut. Inga döda fåglar. Grövre än övriga, använd sparsamt och inte som varumärkesbild."
+  },
+  {
+    "id": "fagel-vajer-nock-l",
+    "kampanj": "Claude | Sök | Fåglar, BrightBid PMax - Fågelsäkring",
+    "motiv": "Vajer på låga stolpar några centimeter över taknocken",
+    "format": "1.91:1",
+    "prompt": "Close view along the ridge of a red clay tile roof of a Swedish house towards the gable end: a single thin stainless steel bird deterrent wire stretched taut on very low stainless steel posts, each post only about 10 cm high and fixed with a small clamp to the ridge tile, standing in one straight row exactly along the centre of the ridge at even spacing. The single wire runs straight along the ridge a few centimetres above it and ends at an end post at the gable. Only one wire, no second wire, no stays, no wires leading away from the roof, no railing. Blue sky, daylight. No birds, no people, no text.",
+    "forsok": 3,
+    "status": "underkand",
+    "historik": [
+      "Försök 1 underkänt: stolparna satt fast med böjda trådöglor runt nockpannorna, improviserat och hemmagjort.",
+      "Försök 2 underkänt: stolparna var för höga med två vajrar på olika höjd, så det såg ut som ett skyddsräcke, och två vajrar löpte snett ut ur bilden som stag.",
+      "Försök 3 underkänt: närmaste vajern gick snett ut till en stolpe utanför nocklinjen, nocken löpte in i en gavel med märklig takgeometri och stolparna var fortfarande för höga."
+    ],
+    "kommentar": "Struken efter tre försök. Gemini ger inte ett trovärdigt vajersystem på låga stolpar längs nocken; en kunnig betraktare ser inte ett riktigt utfört arbete. Motivet tas med riktigt foto från ett uppdrag i stället."
+  },
+  {
+    "id": "allm-innergard-station-l",
+    "kampanj": "Claude | Sök | Varumärke",
+    "motiv": "Välskött innergård vid ett flerbostadshus med en diskret låst station vid soprummet",
+    "format": "1.91:1",
+    "prompt": "A tidy courtyard of a 1930s Swedish apartment building with yellow rendered facade in early autumn: a small lawn, a birch tree with yellow leaves, a wooden bin shed. Against the wall next to the bin shed stands one discreet, locked, plain dark grey plastic rodent bait station, low and rectangular, lid closed. Calm, well kept, soft daylight. No labels, no logos, no writing. No animals, no people.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Diskret station mot sockeln vid soprummet på en välskött svensk innergård. Rätt signal: ordning och kontroll."
+  },
+  {
+    "id": "allm-villa-station-k",
+    "kampanj": "Claude | Sök | Varumärke",
+    "motiv": "Svensk villa med en diskret låst station vid husgrunden",
+    "format": "1:1",
+    "prompt": "A white-painted Swedish wooden villa with a neat garden in early autumn, seen from the corner of the house. At the foot of the grey concrete foundation, close to the corner, stands one discreet, locked, plain dark grey plastic rodent bait station, low and rectangular, lid closed. Soft daylight, apple tree, gravel path. No labels, no logos, no writing. No animals, no people.",
+    "forsok": 1,
+    "status": "godkand",
+    "kommentar": "Låst station mot villagrunden vid stupröret i en prydlig trädgård. Trovärdig, diskret och premium."
+  }
+]
