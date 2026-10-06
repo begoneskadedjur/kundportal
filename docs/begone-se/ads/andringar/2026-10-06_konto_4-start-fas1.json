@@ -1,0 +1,52 @@
+{
+  "status": "FÖRSLAG, ej godkänt. EJ PROVKÖRD: provkörningen nekades av behörighetsspärren i sessionen 2026-10-06, kör mutate.mjs utan --genomfor först.",
+  "framtagen": "2026-10-06",
+  "beskrivning": "Kontoplan steg 5 (körs samma dag som de nya kampanjerna startas i gränssnittet eller med status ENABLED): pausa gamla råttsöket, Råttbekämpning_PMax, den generella PMax-kampanjen och gamla fågelsöket. PMax Fåglar döps om och får budget 200 kr. Nya kampanjers id fylls i efter steg 2.",
+  "operationer": [
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/19729967497",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/20818570318",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/17655089896",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/17434641058",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/21697769249",
+          "name": "PMax | Fåglar (övergång)"
+        },
+        "updateMask": "name"
+      }
+    }
+  ]
+}

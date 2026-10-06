@@ -13,6 +13,18 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 - Känt: förbjudna löften i annonstexter (garanti, 24/7, akut, inom 24 h, 10/10), underkända webbplatslänkar och prisruta (gamla WordPress-adresser, JOUR, garanti), en underkänd porträttbild i generell PMax, myrannonsen underkänd (sidan fungerar nu), primära konverteringar räknar telefonklick. Företagsnamnet BeGone Skadedjur är underkänt som tillgång (kontrollera annonsörsverifiering).
 - Delade negativa listan Konkurrenter är bara kopplad till råttsöket. Ingen varumärkeskampanj finns; begone och be gone köps i råttsöket och båda PMax.
 
+## Kontoplan från noll (2026-10-06)
+
+- PDF `Ads_Kontoplan_2026-10-06.pdf`, skript `gen-ads-kontoplan.mjs`, data (kampanjer, sökord, annonser, tillägg, negativa listor) i `docs/begone-se/ads/kontoplan-data.mjs`. Väntar på Christians beslut (avsnitt 8 i PDF:en).
+- Historik: kontot 940-760-4856 har data från 2022-06 (2,37 mkr). Gamla kontot 773-630-6196 går INTE att läsa via API (CUSTOMER_NOT_ENABLED, även via MCC).
+- Lärdomar: råttornas PMax "billiga" formulär kom mest från konkurrentsökningar (75 % av synlig kostnad, anticimex kontakt 19 920 kr); misstänkt skräp september 2024 (139 PMax-formulär på en månad). Råttsöket 771 till 1 398 kr per formulär varje år. Fras/exakt billigare än bred. Formulär dygnet runt, samtal bara vardagar 08 till 17 (1 av 111 samtal kvällar/helger var 60 s+). 28 118 kr har gått till Västmanland och Örebro (platsalternativ intresse).
+- Struktur: Sök | Råttor 1 550, Sök | Fåglar 800, PMax | Fåglar (övergång, befintlig) 200, Sök | Vägglöss 600, Sök | Insekter i hemmet 450, Sök | Möss 450, Sök | Varumärke 180, Sök | Företag och avtal 200, Getingar och Myror pausade till säsong. Summa 4 430 kr. 23 annonsgrupper, fras + exakt, nio delade negativa listor (Konkurrenter även på kontonivå), bara närvaro i sex län, annonser dygnet runt, samtal vardagar 08 till 17. Ingen ny PMax vid start; generell och råttornas PMax pausas.
+- Budstrategi: Maximera konverteringar utan mål-CPA vecka 1 till 4, sedan mål-CPA; Bokat uppdrag primärt vid 15 till 20 bokade/månad; värde (mål-ROAS) vid 30 genomförda/månad.
+- Mätning: telefonklick och GA4 generate_lead sekundära, Calls from ads primär (60 s, en per klick), ny Samtal från webbplatsen (kräver beslut om vidarekopplingsnummer), Bokat uppdrag och Genomfört uppdrag för offline-import från web_inquiries (cron i kundportalen, ej byggt).
+- Texterna: skadedjursexperten GODKÄND efter två omgångar (Takrunda struken, "Ofta på plats redan samma dag" för råttor och möss, ROT och Kostnadsfri inspektion per annonsgrupp, inte avlopp/BRF/företag). Säljchefen: åtta sidändringar (råttsidan formular_forst först), se PDF 5.
+- Förslagsfiler `andringar/2026-10-06_konto_1-matning.json` (10 op), `_2-fas1-bygg.json` (445), `_3-fas2-bygg.json` (390, listornas id fylls i med `node --env-file=.env.local gen-ads-kontoplan.mjs --json` efter steg 2), `_4-start-fas1.json`, `_5-start-fas2.json`. **EJ PROVKÖRDA**: provkörning med mutate.mjs nekades av behörighetsspärren i agentsessionen 2026-10-06. Provkör i huvudsessionen innan Christian godkänner.
+- Öppna frågor till Christian: vidarekopplingsnummer, offline-import och integritetstext, värde per förfrågan (1 400 kr i åtgärden, taggen skickar 1 kr enligt säljchefen), inga konkurrentnamn, PMax Fåglar kvar till vecka 8, kostnadsfri inspektion för möss?, fågelspillning offert eller fast pris?, fast pris per telefon för värmebehandling?, företagsnamnet under annonsörsverifiering.
+
 ## Kampanjer
 
 ### BrightBid_High Priority_Råttbekämpning (sök, 19729967497)
@@ -41,6 +53,7 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 
 ## Nästa steg
 
+0. (2026-10-06, kontoplanen) Provkör de fem konto-filerna, Christian läser `Ads_Kontoplan_2026-10-06.pdf` och svarar på avsnitt 8. Ordning: mätning, råttsidan formular_forst, fas 1 pausad, granskning, start fas 1 + paus gamla samma dag, fas 2 vecka 2, utvärdering vecka 4 och 8. Kontoplanen ersätter fas 2 i råttrapporten och de planerade separata rapporterna för PMax, fågel och möss.
 1. Christian läser råttrapporten och svarar per steg (1A, 1B, 2, 3, 4, 5) samt på frågorna om ISO, "ofta redan samma dag" och stoppet 2026-09-24 till 2026-10-04.
 2. Efter ja: genomför stegen, kontrollera policystatus 2026-10-08, kör 1B när nya annonser är godkända. Avstämning 2026-10-20, utvärdering och fas 2 2026-11-03.
 3. Nästa rapporter: BrightBid_High Priority_Råttbekämpning_PMax (konkurrentnamn, varumärke, mål-CPA 300 mot sökets 800), därefter fågel. Möss-rapporten tar dubbla annonsgrupper och fel slutadress (/moss-i-huset-och-vaggarna/ i stället för /tjanster/moss/).

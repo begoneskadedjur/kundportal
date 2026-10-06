@@ -1,0 +1,5134 @@
+{
+  "status": "FÖRSLAG, ej godkänt. EJ PROVKÖRD: provkörningen nekades av behörighetsspärren i sessionen 2026-10-06, kör mutate.mjs utan --genomfor först.",
+  "framtagen": "2026-10-06",
+  "beskrivning": "Kontoplan steg 6: Sök | Vägglöss, Sök | Insekter i hemmet, Sök | Möss, Sök | Företag och avtal, Sök | Getingar (säsong) och Sök | Myror (säsong), alla PAUSADE. Kopplas till de delade listorna från steg 2.",
+  "operationer": [
+    {
+      "campaignBudgetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaignBudgets/-1001",
+          "name": "Sök | Vägglöss budget",
+          "amountMicros": "600000000",
+          "deliveryMethod": "STANDARD",
+          "explicitlyShared": false
+        }
+      }
+    },
+    {
+      "campaignOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaigns/-1002",
+          "name": "Sök | Vägglöss",
+          "status": "PAUSED",
+          "advertisingChannelType": "SEARCH",
+          "campaignBudget": "customers/9407604856/campaignBudgets/-1001",
+          "networkSettings": {
+            "targetGoogleSearch": true,
+            "targetSearchNetwork": false,
+            "targetContentNetwork": false,
+            "targetPartnerSearchNetwork": false
+          },
+          "geoTargetTypeSetting": {
+            "positiveGeoTargetType": "PRESENCE",
+            "negativeGeoTargetType": "PRESENCE"
+          },
+          "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+          "finalUrlSuffix": "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}",
+          "maximizeConversions": {}
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21000"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21003"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21004"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21005"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21017"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21018"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "language": {
+            "languageConstant": "languageConstants/1015"
+          }
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "sharedSet": "<<Neg | Konkurrenter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "sharedSet": "<<Neg | Försäkringsbolag: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "sharedSet": "<<Neg | Gör det själv och produkter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "sharedSet": "<<Neg | Jobb och utbildning: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "sharedSet": "<<Neg | Information: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "sharedSet": "<<Neg | Jour och akut (tas bort när jouren startar): id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "sharedSet": "<<Neg | Engelska: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "sharedSet": "<<Neg | Utanför våra län: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "sharedSet": "<<Neg | Myndighet och ansvar: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1003",
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "name": "Vägglöss sanering",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanering vägglöss",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "vägglöss sanering",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanering vägglöss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "vägglöss sanering",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanera vägglöss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "vägglöss bekämpning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med vägglöss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "vägglöss i sängen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "vägglöss stockholm",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "vägglöss sanering kostnad",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1003",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/vaggloss-sanering/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Sanering av vägglöss"
+                },
+                {
+                  "text": "Vägglöss i sängen?"
+                },
+                {
+                  "text": "Ånga, kiselgur och värmetält"
+                },
+                {
+                  "text": "Fast pris innan vi börjar"
+                },
+                {
+                  "text": "Fast pris per telefon"
+                },
+                {
+                  "text": "Beskriv angreppet, få ett pris"
+                },
+                {
+                  "text": "Du kan bo kvar hemma"
+                },
+                {
+                  "text": "Vägglushund när det behövs"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta hjälp redan samma dag"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Beskriv angreppet, gärna med en bild, så får du ett fast pris innan vi börjar."
+                },
+                {
+                  "text": "Överhettad ånga och kiselgur, och värmetält när det behövs en kraftigare åtgärd."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "vägglöss",
+              "path2": "sanering"
+            }
+          }
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1004",
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "name": "Värmebehandling",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1004",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "värmebehandling vägglöss",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1004",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "värmebehandling vägglöss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1004",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "värmetält vägglöss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1004",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "värmesanering vägglöss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1004",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "värmebehandling mot vägglöss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1004",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/vaggloss-varmebehandling/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Värmebehandling av vägglöss"
+                },
+                {
+                  "text": "Värmetält mot vägglöss"
+                },
+                {
+                  "text": "Fast pris innan vi börjar"
+                },
+                {
+                  "text": "Beskriv angreppet, få ett pris"
+                },
+                {
+                  "text": "Sanering av vägglöss"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Vi packar tältet åt dig"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Värmetält när problemet kommer tillbaka eller du vill ha den kraftigaste åtgärden."
+                },
+                {
+                  "text": "Beskriv angreppet, gärna med en bild, så får du ett fast pris innan vi börjar."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "vägglöss",
+              "path2": "värmetält"
+            }
+          }
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1005",
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "name": "Vägglushund",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1005",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "vägglushund",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1005",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "vägglushund",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1005",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "vägglushund pris",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1005",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "hund vägglöss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1005",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "hundsök vägglöss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1005",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "vägglöss hund",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1005",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/vagglushund/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Vägglushund"
+                },
+                {
+                  "text": "Hundsök efter vägglöss"
+                },
+                {
+                  "text": "Hunden söker på lukten"
+                },
+                {
+                  "text": "Behandling där hunden markerar"
+                },
+                {
+                  "text": "Fast pris innan vi börjar"
+                },
+                {
+                  "text": "Många rum på kort tid"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Hunden är luktränad mot levande vägglöss och ägg och markerar där den känner lukten."
+                },
+                {
+                  "text": "Hunden söker ihop med vår tekniker, som sedan behandlar där hunden har markerat."
+                },
+                {
+                  "text": "Hunden hinner ungefär 25 lägenheter eller 30 hotellrum på en halv dag."
+                },
+                {
+                  "text": "Beskriv vad som ska sökas igenom, så får du ett fast pris innan vi börjar."
+                }
+              ],
+              "path1": "vägglushund"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1006",
+          "finalUrls": [
+            "https://begone.se/prisforslag/?tjanst=vaggloss-sanering"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Få ett fast pris",
+            "description1": "Beskriv angreppet med en bild",
+            "description2": "Fast pris innan vi börjar"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1006",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1007",
+          "finalUrls": [
+            "https://begone.se/tjanster/vaggloss-varmebehandling/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Värmebehandling",
+            "description1": "Behandling i värmetält",
+            "description2": "Fast pris innan vi börjar"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1007",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1008",
+          "finalUrls": [
+            "https://begone.se/tjanster/vagglushund/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Vägglushund",
+            "description1": "Hunden söker på lukten",
+            "description2": "Många rum på kort tid"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1008",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1009",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Ring 010 280 44 10",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1009",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1010",
+          "calloutAsset": {
+            "calloutText": "Fast pris innan vi börjar"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1010",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1011",
+          "calloutAsset": {
+            "calloutText": "Du kan bo kvar hemma"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1011",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1012",
+          "calloutAsset": {
+            "calloutText": "ISO 9001 och ISO 14001"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1012",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1013",
+          "calloutAsset": {
+            "calloutText": "Erfarna tekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1013",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1014",
+          "calloutAsset": {
+            "calloutText": "Verksamma i sex län"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1014",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1015",
+          "calloutAsset": {
+            "calloutText": "Rapport när du behöver"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1015",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1016",
+          "structuredSnippetAsset": {
+            "header": "Tjänster",
+            "values": [
+              "Överhettad ånga",
+              "Kiselgur",
+              "Värmetält",
+              "Vägglushund"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1016",
+          "fieldType": "STRUCTURED_SNIPPET"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1017",
+          "callAsset": {
+            "countryCode": "SE",
+            "phoneNumber": "010 280 44 10",
+            "callConversionReportingState": "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+            "callConversionAction": "customers/9407604856/conversionActions/949482895",
+            "adScheduleTargets": [
+              {
+                "dayOfWeek": "MONDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "TUESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "WEDNESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "THURSDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "FRIDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "asset": "customers/9407604856/assets/-1017",
+          "fieldType": "CALL"
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "negative": true,
+          "keyword": {
+            "text": "pälsänger",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "negative": true,
+          "keyword": {
+            "text": "silverfisk",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "negative": true,
+          "keyword": {
+            "text": "begone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1002",
+          "negative": true,
+          "keyword": {
+            "text": "be gone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignBudgetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaignBudgets/-1018",
+          "name": "Sök | Insekter i hemmet budget",
+          "amountMicros": "450000000",
+          "deliveryMethod": "STANDARD",
+          "explicitlyShared": false
+        }
+      }
+    },
+    {
+      "campaignOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaigns/-1019",
+          "name": "Sök | Insekter i hemmet",
+          "status": "PAUSED",
+          "advertisingChannelType": "SEARCH",
+          "campaignBudget": "customers/9407604856/campaignBudgets/-1018",
+          "networkSettings": {
+            "targetGoogleSearch": true,
+            "targetSearchNetwork": false,
+            "targetContentNetwork": false,
+            "targetPartnerSearchNetwork": false
+          },
+          "geoTargetTypeSetting": {
+            "positiveGeoTargetType": "PRESENCE",
+            "negativeGeoTargetType": "PRESENCE"
+          },
+          "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+          "finalUrlSuffix": "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}",
+          "maximizeConversions": {}
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21000"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21003"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21004"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21005"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21017"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21018"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "language": {
+            "languageConstant": "languageConstants/1015"
+          }
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "sharedSet": "<<Neg | Konkurrenter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "sharedSet": "<<Neg | Försäkringsbolag: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "sharedSet": "<<Neg | Gör det själv och produkter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "sharedSet": "<<Neg | Jobb och utbildning: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "sharedSet": "<<Neg | Information: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "sharedSet": "<<Neg | Jour och akut (tas bort när jouren startar): id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "sharedSet": "<<Neg | Engelska: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "sharedSet": "<<Neg | Utanför våra län: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "sharedSet": "<<Neg | Myndighet och ansvar: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1020",
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "name": "Silverfisk",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1020",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanera silverfisk",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1020",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanera silverfisk",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1020",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanering silverfisk",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1020",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "silverfisk sanering",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1020",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bekämpa silverfisk",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1020",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med silverfiskar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1020",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "få bort silverfiskar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1020",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "långsprötad silverfisk",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1020",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "silverfisk bekämpning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1020",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/silverfisk-sanering/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Sanering av silverfisk"
+                },
+                {
+                  "text": "Långsprötad silverfisk?"
+                },
+                {
+                  "text": "Silverfisk i badrummet?"
+                },
+                {
+                  "text": "Fast pris innan vi börjar"
+                },
+                {
+                  "text": "Fast pris per telefon"
+                },
+                {
+                  "text": "Skicka en bild, få ett pris"
+                },
+                {
+                  "text": "Gelbete och sprutbehandling"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta hjälp redan samma dag"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Beskriv vad du ser, gärna med bild, så får du ett fast pris och vi kommer och behandlar."
+                },
+                {
+                  "text": "Vi behandlar med gelbete och ett vattenlösligt preparat med tryckspruta."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "silverfisk",
+              "path2": "sanering"
+            }
+          }
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1021",
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "name": "Pälsänger",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1021",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med pälsänger",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1021",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med pälsänger",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1021",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med pälsängrar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1021",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "pälsänger sanering",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1021",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanera pälsänger",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1021",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "få bort pälsängrar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1021",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "pälsänger i sängen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1021",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "pälsängerlarver",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1021",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/palsanger/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Sanering av pälsänger"
+                },
+                {
+                  "text": "Pälsängerlarver hemma?"
+                },
+                {
+                  "text": "Hål i ull och päls?"
+                },
+                {
+                  "text": "Fast pris innan vi börjar"
+                },
+                {
+                  "text": "Fast pris per telefon"
+                },
+                {
+                  "text": "Skicka en bild, få ett pris"
+                },
+                {
+                  "text": "Ånga och preparat"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta hjälp redan samma dag"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Larver eller hål i ull och päls? Beskriv angreppet, gärna med en bild, så får du ett pris."
+                },
+                {
+                  "text": "Vi behandlar ytorna där larverna lever med överhettad ånga och preparat."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "pälsänger",
+              "path2": "sanering"
+            }
+          }
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1022",
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "name": "Mjölbaggar",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1022",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med mjölbaggar",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1022",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med mjölbaggar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1022",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "mjölbaggar sanering",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1022",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanera mjölbaggar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1022",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "mjölbaggar i skafferiet",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1022",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "mjölbaggar försvinner inte",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1022",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skalbaggar i skafferiet",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1022",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/mjolbaggar/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Sanering av mjölbaggar"
+                },
+                {
+                  "text": "Mjölbaggar i skafferiet?"
+                },
+                {
+                  "text": "Småkryp i skafferiet?"
+                },
+                {
+                  "text": "Fast pris innan vi börjar"
+                },
+                {
+                  "text": "Fast pris per telefon"
+                },
+                {
+                  "text": "Skicka en bild, få ett pris"
+                },
+                {
+                  "text": "Besked om förberedelserna"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta hjälp redan samma dag"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Skicka en bild på det du ser, så får du ett fast pris och besked om förberedelserna."
+                },
+                {
+                  "text": "Före besöket tömmer och städar du skafferiet och skåpen bredvid, sedan behandlar vi."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "mjölbaggar",
+              "path2": "sanering"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1023",
+          "finalUrls": [
+            "https://begone.se/tjanster/silverfisk-sanering/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Silverfisk",
+            "description1": "Gelbete och sprutbehandling",
+            "description2": "Fast pris innan vi börjar"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1023",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1024",
+          "finalUrls": [
+            "https://begone.se/tjanster/palsanger/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Pälsänger",
+            "description1": "Ånga och preparat",
+            "description2": "Fast pris innan vi börjar"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1024",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1025",
+          "finalUrls": [
+            "https://begone.se/tjanster/mjolbaggar/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Mjölbaggar",
+            "description1": "Skicka en bild, få ett pris",
+            "description2": "Besked om förberedelserna"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1025",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1026",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Ring 010 280 44 10",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1026",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1027",
+          "calloutAsset": {
+            "calloutText": "Fast pris innan vi börjar"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1027",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1028",
+          "calloutAsset": {
+            "calloutText": "Fast pris efter en bild"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1028",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1029",
+          "calloutAsset": {
+            "calloutText": "ISO 9001 och ISO 14001"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1029",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1030",
+          "calloutAsset": {
+            "calloutText": "Erfarna tekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1030",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1031",
+          "calloutAsset": {
+            "calloutText": "Verksamma i sex län"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1031",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1032",
+          "calloutAsset": {
+            "calloutText": "Rapport när du behöver"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1032",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1033",
+          "structuredSnippetAsset": {
+            "header": "Tjänster",
+            "values": [
+              "Silverfisk",
+              "Pälsänger",
+              "Mjölbaggar",
+              "Vägglöss"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1033",
+          "fieldType": "STRUCTURED_SNIPPET"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1034",
+          "callAsset": {
+            "countryCode": "SE",
+            "phoneNumber": "010 280 44 10",
+            "callConversionReportingState": "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+            "callConversionAction": "customers/9407604856/conversionActions/949482895",
+            "adScheduleTargets": [
+              {
+                "dayOfWeek": "MONDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "TUESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "WEDNESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "THURSDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "FRIDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "asset": "customers/9407604856/assets/-1034",
+          "fieldType": "CALL"
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "negative": true,
+          "keyword": {
+            "text": "vägglöss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "negative": true,
+          "keyword": {
+            "text": "vägglus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "negative": true,
+          "keyword": {
+            "text": "begone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1019",
+          "negative": true,
+          "keyword": {
+            "text": "be gone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignBudgetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaignBudgets/-1035",
+          "name": "Sök | Möss budget",
+          "amountMicros": "450000000",
+          "deliveryMethod": "STANDARD",
+          "explicitlyShared": false
+        }
+      }
+    },
+    {
+      "campaignOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaigns/-1036",
+          "name": "Sök | Möss",
+          "status": "PAUSED",
+          "advertisingChannelType": "SEARCH",
+          "campaignBudget": "customers/9407604856/campaignBudgets/-1035",
+          "networkSettings": {
+            "targetGoogleSearch": true,
+            "targetSearchNetwork": false,
+            "targetContentNetwork": false,
+            "targetPartnerSearchNetwork": false
+          },
+          "geoTargetTypeSetting": {
+            "positiveGeoTargetType": "PRESENCE",
+            "negativeGeoTargetType": "PRESENCE"
+          },
+          "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+          "finalUrlSuffix": "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}",
+          "maximizeConversions": {}
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21000"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21003"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21004"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21005"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21017"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21018"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "language": {
+            "languageConstant": "languageConstants/1015"
+          }
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "sharedSet": "<<Neg | Konkurrenter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "sharedSet": "<<Neg | Försäkringsbolag: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "sharedSet": "<<Neg | Gör det själv och produkter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "sharedSet": "<<Neg | Jobb och utbildning: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "sharedSet": "<<Neg | Information: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "sharedSet": "<<Neg | Jour och akut (tas bort när jouren startar): id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "sharedSet": "<<Neg | Engelska: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "sharedSet": "<<Neg | Utanför våra län: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "sharedSet": "<<Neg | Myndighet och ansvar: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1037",
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "name": "Musbekämpning",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "musbekämpning",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "musbekämpning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bekämpa möss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanering möss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjursbekämpning möss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med möss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "utrota möss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "tätning möss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "tätning mot möss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/moss/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Musbekämpning"
+                },
+                {
+                  "text": "Möss i huset?"
+                },
+                {
+                  "text": "Teknikern hittar vägarna in"
+                },
+                {
+                  "text": "Vi stänger vägarna in"
+                },
+                {
+                  "text": "Sanering efter möss"
+                },
+                {
+                  "text": "Inspektion och kostnadsförslag"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta på plats redan samma dag"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikern hittar var mössen tar sig in, bekämpar och stänger vägarna in."
+                },
+                {
+                  "text": "Vi sanerar där mössen har varit. Privatpersoner får ROT på tätningsarbetet."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och ett kostnadsförslag att gå igenom i lugn och ro."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "musbekämpning"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1038",
+          "calloutAsset": {
+            "calloutText": "Kostnadsfri inspektion"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "asset": "customers/9407604856/assets/-1038",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1039",
+          "calloutAsset": {
+            "calloutText": "ROT på tätningsarbetet"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1037",
+          "asset": "customers/9407604856/assets/-1039",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1040",
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "name": "Möss i väggar och vind",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "möss i väggarna",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "möss i väggarna",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "möss i väggen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "möss på vinden",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "möss i huset",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "mus i huset",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "möss i hus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "möss i taket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "möss i köket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/moss/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Möss i väggarna?"
+                },
+                {
+                  "text": "Hör du möss i väggarna?"
+                },
+                {
+                  "text": "Möss på vinden?"
+                },
+                {
+                  "text": "Möss i huset?"
+                },
+                {
+                  "text": "Teknikern hittar vägarna in"
+                },
+                {
+                  "text": "Vi stänger vägarna in"
+                },
+                {
+                  "text": "Sanering efter möss"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta på plats redan samma dag"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikern hittar var mössen tar sig in, bekämpar och stänger vägarna in."
+                },
+                {
+                  "text": "Vi sanerar där mössen har varit. Privatpersoner får ROT på tätningsarbetet."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och ett kostnadsförslag att gå igenom i lugn och ro."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "möss",
+              "path2": "i-huset"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1041",
+          "calloutAsset": {
+            "calloutText": "Kostnadsfri inspektion"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "asset": "customers/9407604856/assets/-1041",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1042",
+          "calloutAsset": {
+            "calloutText": "ROT på tätningsarbetet"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1040",
+          "asset": "customers/9407604856/assets/-1042",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1043",
+          "finalUrls": [
+            "https://begone.se/prisforslag/?tjanst=moss"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skicka en förfrågan",
+            "description1": "Beskriv vad du hör och ser",
+            "description2": "Vardagar 08 till 17 ringer vi upp"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1043",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1044",
+          "finalUrls": [
+            "https://begone.se/tjanster/rattbekampning/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Råttor eller möss?",
+            "description1": "Teknikern ser skillnaden",
+            "description2": "Råttbekämpning"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1044",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1045",
+          "finalUrls": [
+            "https://begone.se/tjanster/skadedjursavtal/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skadedjursavtal",
+            "description1": "Första besöket är kostnadsfritt",
+            "description2": "Avtalsförslaget binder er inte"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1045",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1046",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Ring 010 280 44 10",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1046",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1047",
+          "calloutAsset": {
+            "calloutText": "Sanering efter möss"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1047",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1048",
+          "calloutAsset": {
+            "calloutText": "ISO 9001 och ISO 14001"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1048",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1049",
+          "calloutAsset": {
+            "calloutText": "Erfarna tekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1049",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1050",
+          "calloutAsset": {
+            "calloutText": "Verksamma i sex län"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1050",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1051",
+          "calloutAsset": {
+            "calloutText": "Rapport när du behöver"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1051",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1052",
+          "structuredSnippetAsset": {
+            "header": "Tjänster",
+            "values": [
+              "Tätning",
+              "Mekaniska fällor",
+              "Betesstationer",
+              "Sanering efter möss"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1052",
+          "fieldType": "STRUCTURED_SNIPPET"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1053",
+          "callAsset": {
+            "countryCode": "SE",
+            "phoneNumber": "010 280 44 10",
+            "callConversionReportingState": "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+            "callConversionAction": "customers/9407604856/conversionActions/949482895",
+            "adScheduleTargets": [
+              {
+                "dayOfWeek": "MONDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "TUESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "WEDNESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "THURSDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "FRIDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "asset": "customers/9407604856/assets/-1053",
+          "fieldType": "CALL"
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "negative": true,
+          "keyword": {
+            "text": "råtta",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "negative": true,
+          "keyword": {
+            "text": "råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "negative": true,
+          "keyword": {
+            "text": "begone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1036",
+          "negative": true,
+          "keyword": {
+            "text": "be gone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignBudgetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaignBudgets/-1054",
+          "name": "Sök | Företag och avtal budget",
+          "amountMicros": "200000000",
+          "deliveryMethod": "STANDARD",
+          "explicitlyShared": false
+        }
+      }
+    },
+    {
+      "campaignOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaigns/-1055",
+          "name": "Sök | Företag och avtal",
+          "status": "PAUSED",
+          "advertisingChannelType": "SEARCH",
+          "campaignBudget": "customers/9407604856/campaignBudgets/-1054",
+          "networkSettings": {
+            "targetGoogleSearch": true,
+            "targetSearchNetwork": false,
+            "targetContentNetwork": false,
+            "targetPartnerSearchNetwork": false
+          },
+          "geoTargetTypeSetting": {
+            "positiveGeoTargetType": "PRESENCE",
+            "negativeGeoTargetType": "PRESENCE"
+          },
+          "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+          "finalUrlSuffix": "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}",
+          "maximizeConversions": {}
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21000"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21003"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21004"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21005"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21017"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21018"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "language": {
+            "languageConstant": "languageConstants/1015"
+          }
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "sharedSet": "<<Neg | Konkurrenter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "sharedSet": "<<Neg | Försäkringsbolag: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "sharedSet": "<<Neg | Gör det själv och produkter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "sharedSet": "<<Neg | Jobb och utbildning: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "sharedSet": "<<Neg | Information: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "sharedSet": "<<Neg | Jour och akut (tas bort när jouren startar): id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "sharedSet": "<<Neg | Engelska: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "sharedSet": "<<Neg | Utanför våra län: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "sharedSet": "<<Neg | Myndighet och ansvar: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1056",
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "name": "Skadedjursavtal",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1056",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjursavtal",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1056",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjursavtal",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1056",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjursavtal företag",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1056",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjursavtal brf",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1056",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjursavtal restaurang",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1056",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "avtal skadedjur",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1056",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/skadedjursavtal/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Skadedjursavtal"
+                },
+                {
+                  "text": "Skadedjursavtal för företag"
+                },
+                {
+                  "text": "Kostnadsfritt första besök"
+                },
+                {
+                  "text": "Avtal efter ert behov"
+                },
+                {
+                  "text": "Kundportal för avtalskunder"
+                },
+                {
+                  "text": "Rapporter som PDF eller Excel"
+                },
+                {
+                  "text": "Avtalsförslaget binder er inte"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Frekvens, avtalstid och utryckningar styrs av vad er verksamhet behöver."
+                },
+                {
+                  "text": "I kundportalen ser ni ärenden, kommande besök och utplacerad utrustning."
+                },
+                {
+                  "text": "Rapporterna laddar ni ned som PDF eller Excel när ni behöver dem."
+                },
+                {
+                  "text": "Första besöket är kostnadsfritt, och avtalsförslaget binder er inte."
+                }
+              ],
+              "path1": "skadedjursavtal"
+            }
+          }
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1057",
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "name": "Företag och livsmedel",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1057",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjursbekämpning företag",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1057",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjursbekämpning företag",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1057",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjurskontroll restaurang",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1057",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjurskontroll livsmedel",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1057",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjur restaurang",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1057",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjur livsmedelslokal",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1057",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjursbekämpning fastighet",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1057",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/skadedjursbekampning-foretag/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Skadedjursbekämpning företag"
+                },
+                {
+                  "text": "Skadedjursavtal för företag"
+                },
+                {
+                  "text": "Kostnadsfritt första besök"
+                },
+                {
+                  "text": "Avtal efter ert behov"
+                },
+                {
+                  "text": "Kundportal för avtalskunder"
+                },
+                {
+                  "text": "Rapporter som PDF eller Excel"
+                },
+                {
+                  "text": "Avtalsförslaget binder er inte"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Frekvens, avtalstid och utryckningar styrs av vad er verksamhet behöver."
+                },
+                {
+                  "text": "I kundportalen ser ni ärenden, kommande besök och utplacerad utrustning."
+                },
+                {
+                  "text": "Rapporterna laddar ni ned som PDF eller Excel när ni behöver dem."
+                },
+                {
+                  "text": "Första besöket är kostnadsfritt, och avtalsförslaget binder er inte."
+                }
+              ],
+              "path1": "företag"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1058",
+          "finalUrls": [
+            "https://begone.se/skadedjursbekampning-foretag/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Företag och fastigheter",
+            "description1": "Hela organisationen i ett avtal",
+            "description2": "Stationskarta i kundportalen"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1058",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1059",
+          "finalUrls": [
+            "https://begone.se/prisforslag/?tjanst=skadedjursavtal"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skicka en förfrågan",
+            "description1": "Vi ringer upp er",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1059",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1060",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Ring 010 280 44 10",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1060",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1061",
+          "finalUrls": [
+            "https://begone.se/om-oss/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Om Begone",
+            "description1": "ISO 9001 och ISO 14001",
+            "description2": "Erfarna skadedjurstekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1061",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1062",
+          "calloutAsset": {
+            "calloutText": "Kundportal med avtalet"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1062",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1063",
+          "calloutAsset": {
+            "calloutText": "Rapporter i PDF och Excel"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1063",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1064",
+          "calloutAsset": {
+            "calloutText": "Avtal efter ert behov"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1064",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1065",
+          "calloutAsset": {
+            "calloutText": "ISO 9001 och ISO 14001"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1065",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1066",
+          "calloutAsset": {
+            "calloutText": "Erfarna tekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1066",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1067",
+          "calloutAsset": {
+            "calloutText": "Verksamma i sex län"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1067",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1068",
+          "calloutAsset": {
+            "calloutText": "Rapport när du behöver"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1068",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1069",
+          "structuredSnippetAsset": {
+            "header": "Tjänster",
+            "values": [
+              "Skadedjursavtal",
+              "Kontrollbesök",
+              "Kundportal",
+              "Rapporter",
+              "Fågelsäkring",
+              "Skyddsjakt"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1069",
+          "fieldType": "STRUCTURED_SNIPPET"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1070",
+          "callAsset": {
+            "countryCode": "SE",
+            "phoneNumber": "010 280 44 10",
+            "callConversionReportingState": "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+            "callConversionAction": "customers/9407604856/conversionActions/949482895",
+            "adScheduleTargets": [
+              {
+                "dayOfWeek": "MONDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "TUESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "WEDNESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "THURSDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "FRIDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "asset": "customers/9407604856/assets/-1070",
+          "fieldType": "CALL"
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "negative": true,
+          "keyword": {
+            "text": "begone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1055",
+          "negative": true,
+          "keyword": {
+            "text": "be gone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignBudgetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaignBudgets/-1071",
+          "name": "Sök | Getingar (säsong) budget",
+          "amountMicros": "10000000",
+          "deliveryMethod": "STANDARD",
+          "explicitlyShared": false
+        }
+      }
+    },
+    {
+      "campaignOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaigns/-1072",
+          "name": "Sök | Getingar (säsong)",
+          "status": "PAUSED",
+          "advertisingChannelType": "SEARCH",
+          "campaignBudget": "customers/9407604856/campaignBudgets/-1071",
+          "networkSettings": {
+            "targetGoogleSearch": true,
+            "targetSearchNetwork": false,
+            "targetContentNetwork": false,
+            "targetPartnerSearchNetwork": false
+          },
+          "geoTargetTypeSetting": {
+            "positiveGeoTargetType": "PRESENCE",
+            "negativeGeoTargetType": "PRESENCE"
+          },
+          "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+          "finalUrlSuffix": "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}",
+          "maximizeConversions": {}
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21000"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21003"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21004"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21005"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21017"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21018"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "language": {
+            "languageConstant": "languageConstants/1015"
+          }
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "sharedSet": "<<Neg | Konkurrenter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "sharedSet": "<<Neg | Försäkringsbolag: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "sharedSet": "<<Neg | Gör det själv och produkter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "sharedSet": "<<Neg | Jobb och utbildning: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "sharedSet": "<<Neg | Information: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "sharedSet": "<<Neg | Jour och akut (tas bort när jouren startar): id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "sharedSet": "<<Neg | Engelska: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "sharedSet": "<<Neg | Utanför våra län: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "sharedSet": "<<Neg | Myndighet och ansvar: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1073",
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "name": "Getingbo",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "ta bort getingbo",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "getingbo ta bort",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "ta bort getingbo",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "få bort getingbo",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "getingbo under taket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "getingbo i fasaden",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanera getingbo",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "getingsanering",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "getingbo borttagning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "hjälp att ta bort getingbo",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bålgetingbo",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1073",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/getingar/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Ta bort getingbo"
+                },
+                {
+                  "text": "Getingbo under taket?"
+                },
+                {
+                  "text": "Getingbo i fasaden?"
+                },
+                {
+                  "text": "Getingsanering"
+                },
+                {
+                  "text": "Fast pris innan vi börjar"
+                },
+                {
+                  "text": "Fast pris per telefon"
+                },
+                {
+                  "text": "Även högt upp med fallskydd"
+                },
+                {
+                  "text": "Bålgetingbo?"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta hjälp redan samma dag"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Getingbon och bålgetingbon bekämpar vi där de sitter, också högt upp med fallskydd."
+                },
+                {
+                  "text": "Beskriv var boet sitter, gärna med en bild, så får du ett fast pris innan vi kommer."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "getingar",
+              "path2": "getingbo"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1074",
+          "finalUrls": [
+            "https://begone.se/prisforslag/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skicka en förfrågan",
+            "description1": "Beskriv vad du ser, gärna med bild",
+            "description2": "Vardagar 08 till 17 ringer vi upp"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "asset": "customers/9407604856/assets/-1074",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1075",
+          "finalUrls": [
+            "https://begone.se/tjanster/skadedjursavtal/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skadedjursavtal",
+            "description1": "Första besöket är kostnadsfritt",
+            "description2": "Avtalsförslaget binder er inte"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "asset": "customers/9407604856/assets/-1075",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1076",
+          "finalUrls": [
+            "https://begone.se/om-oss/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Om Begone",
+            "description1": "ISO 9001 och ISO 14001",
+            "description2": "Erfarna skadedjurstekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "asset": "customers/9407604856/assets/-1076",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1077",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Ring 010 280 44 10",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "asset": "customers/9407604856/assets/-1077",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1078",
+          "calloutAsset": {
+            "calloutText": "ISO 9001 och ISO 14001"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "asset": "customers/9407604856/assets/-1078",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1079",
+          "calloutAsset": {
+            "calloutText": "Erfarna tekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "asset": "customers/9407604856/assets/-1079",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1080",
+          "calloutAsset": {
+            "calloutText": "Verksamma i sex län"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "asset": "customers/9407604856/assets/-1080",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1081",
+          "calloutAsset": {
+            "calloutText": "Rapport när du behöver"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "asset": "customers/9407604856/assets/-1081",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1082",
+          "structuredSnippetAsset": {
+            "header": "Tjänster",
+            "values": [
+              "Råttbekämpning",
+              "Fågelsäkring",
+              "Musbekämpning",
+              "Vägglöss",
+              "Silverfisk",
+              "Pälsänger",
+              "Mjölbaggar"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "asset": "customers/9407604856/assets/-1082",
+          "fieldType": "STRUCTURED_SNIPPET"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1083",
+          "callAsset": {
+            "countryCode": "SE",
+            "phoneNumber": "010 280 44 10",
+            "callConversionReportingState": "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+            "callConversionAction": "customers/9407604856/conversionActions/949482895",
+            "adScheduleTargets": [
+              {
+                "dayOfWeek": "MONDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "TUESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "WEDNESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "THURSDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "FRIDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "asset": "customers/9407604856/assets/-1083",
+          "fieldType": "CALL"
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "negative": true,
+          "keyword": {
+            "text": "begone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1072",
+          "negative": true,
+          "keyword": {
+            "text": "be gone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignBudgetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaignBudgets/-1084",
+          "name": "Sök | Myror (säsong) budget",
+          "amountMicros": "10000000",
+          "deliveryMethod": "STANDARD",
+          "explicitlyShared": false
+        }
+      }
+    },
+    {
+      "campaignOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaigns/-1085",
+          "name": "Sök | Myror (säsong)",
+          "status": "PAUSED",
+          "advertisingChannelType": "SEARCH",
+          "campaignBudget": "customers/9407604856/campaignBudgets/-1084",
+          "networkSettings": {
+            "targetGoogleSearch": true,
+            "targetSearchNetwork": false,
+            "targetContentNetwork": false,
+            "targetPartnerSearchNetwork": false
+          },
+          "geoTargetTypeSetting": {
+            "positiveGeoTargetType": "PRESENCE",
+            "negativeGeoTargetType": "PRESENCE"
+          },
+          "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+          "finalUrlSuffix": "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}",
+          "maximizeConversions": {}
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21000"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21003"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21004"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21005"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21017"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21018"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "language": {
+            "languageConstant": "languageConstants/1015"
+          }
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "sharedSet": "<<Neg | Konkurrenter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "sharedSet": "<<Neg | Försäkringsbolag: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "sharedSet": "<<Neg | Gör det själv och produkter: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "sharedSet": "<<Neg | Jobb och utbildning: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "sharedSet": "<<Neg | Information: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "sharedSet": "<<Neg | Jour och akut (tas bort när jouren startar): id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "sharedSet": "<<Neg | Engelska: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "sharedSet": "<<Neg | Utanför våra län: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "sharedSet": "<<Neg | Myndighet och ansvar: id fylls i när steg 2 är genomfört, kör om --json>>"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-1086",
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "name": "Myror",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1086",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "myrbekämpning",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1086",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "myrbekämpning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1086",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "myror inomhus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1086",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "hästmyror i huset",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1086",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med myror",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1086",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "få bort myror",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1086",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bekämpa myror",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1086",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "myror i huset",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1086",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "flytta myrstack",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-1086",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/myror/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Myrbekämpning"
+                },
+                {
+                  "text": "Myror inomhus?"
+                },
+                {
+                  "text": "Hästmyror i huset?"
+                },
+                {
+                  "text": "Myror i huset?"
+                },
+                {
+                  "text": "Vi flyttar även större stackar"
+                },
+                {
+                  "text": "Metod efter situationen"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta hjälp redan samma dag"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Hästmyror eller myror inomhus? Teknikern väljer metod efter situationen."
+                },
+                {
+                  "text": "Vi flyttar även större myrstackar när de behöver bort."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "myror"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1087",
+          "finalUrls": [
+            "https://begone.se/prisforslag/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skicka en förfrågan",
+            "description1": "Beskriv vad du ser, gärna med bild",
+            "description2": "Vardagar 08 till 17 ringer vi upp"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "asset": "customers/9407604856/assets/-1087",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1088",
+          "finalUrls": [
+            "https://begone.se/tjanster/skadedjursavtal/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skadedjursavtal",
+            "description1": "Första besöket är kostnadsfritt",
+            "description2": "Avtalsförslaget binder er inte"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "asset": "customers/9407604856/assets/-1088",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1089",
+          "finalUrls": [
+            "https://begone.se/om-oss/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Om Begone",
+            "description1": "ISO 9001 och ISO 14001",
+            "description2": "Erfarna skadedjurstekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "asset": "customers/9407604856/assets/-1089",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1090",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Ring 010 280 44 10",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "asset": "customers/9407604856/assets/-1090",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1091",
+          "calloutAsset": {
+            "calloutText": "ISO 9001 och ISO 14001"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "asset": "customers/9407604856/assets/-1091",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1092",
+          "calloutAsset": {
+            "calloutText": "Erfarna tekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "asset": "customers/9407604856/assets/-1092",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1093",
+          "calloutAsset": {
+            "calloutText": "Verksamma i sex län"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "asset": "customers/9407604856/assets/-1093",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1094",
+          "calloutAsset": {
+            "calloutText": "Rapport när du behöver"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "asset": "customers/9407604856/assets/-1094",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1095",
+          "structuredSnippetAsset": {
+            "header": "Tjänster",
+            "values": [
+              "Råttbekämpning",
+              "Fågelsäkring",
+              "Musbekämpning",
+              "Vägglöss",
+              "Silverfisk",
+              "Pälsänger",
+              "Mjölbaggar"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "asset": "customers/9407604856/assets/-1095",
+          "fieldType": "STRUCTURED_SNIPPET"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1096",
+          "callAsset": {
+            "countryCode": "SE",
+            "phoneNumber": "010 280 44 10",
+            "callConversionReportingState": "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+            "callConversionAction": "customers/9407604856/conversionActions/949482895",
+            "adScheduleTargets": [
+              {
+                "dayOfWeek": "MONDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "TUESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "WEDNESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "THURSDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "FRIDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "asset": "customers/9407604856/assets/-1096",
+          "fieldType": "CALL"
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "negative": true,
+          "keyword": {
+            "text": "begone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-1085",
+          "negative": true,
+          "keyword": {
+            "text": "be gone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    }
+  ]
+}

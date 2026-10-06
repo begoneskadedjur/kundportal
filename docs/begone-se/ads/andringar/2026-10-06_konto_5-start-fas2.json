@@ -1,0 +1,43 @@
+{
+  "status": "FÖRSLAG, ej godkänt. EJ PROVKÖRD: provkörningen nekades av behörighetsspärren i sessionen 2026-10-06, kör mutate.mjs utan --genomfor först.",
+  "framtagen": "2026-10-06",
+  "beskrivning": "Kontoplan steg 7: pausa gamla insektskampanjen, Möss, Myror och Getingar när de nya kampanjerna startas.",
+  "operationer": [
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/17434641064",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/17434641052",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/17434641046",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/17434641049",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    }
+  ]
+}

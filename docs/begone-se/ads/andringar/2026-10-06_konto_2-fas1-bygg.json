@@ -1,0 +1,5713 @@
+{
+  "status": "FÖRSLAG, ej godkänt. EJ PROVKÖRD: provkörningen nekades av behörighetsspärren i sessionen 2026-10-06, kör mutate.mjs utan --genomfor först.",
+  "framtagen": "2026-10-06",
+  "beskrivning": "Kontoplan steg 2: nio delade negativa listor (Konkurrenter också på kontonivå, så att den gäller Performance Max) och de nya sökkampanjerna Sök | Råttor, Sök | Fåglar och Sök | Varumärke, alla PAUSADE, med annonsgrupper, sökord, annonser och tillägg. Startas först efter granskning (steg 4).",
+  "operationer": [
+    {
+      "sharedSetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/sharedSets/-1",
+          "name": "Neg | Konkurrenter",
+          "type": "NEGATIVE_KEYWORDS"
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "anticimex",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "antisimex",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "anricimex",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "anticimx",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "rentokil",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "rent o kill",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "rent to kill",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "rentokill",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "nomor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "no more",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "nomore",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "lf skadedjur",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "svensk skadedjurskontroll",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "insecta",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "skadedjursbutiken",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "nomus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "mitt skadedjur",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-1",
+          "keyword": {
+            "text": "skadedjursexperten",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedSetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/sharedSets/-2",
+          "name": "Neg | Försäkringsbolag",
+          "type": "NEGATIVE_KEYWORDS"
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-2",
+          "keyword": {
+            "text": "trygg hansa",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-2",
+          "keyword": {
+            "text": "trygghansa",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-2",
+          "keyword": {
+            "text": "länsförsäkringar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-2",
+          "keyword": {
+            "text": "folksam",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-2",
+          "keyword": {
+            "text": "if skadeförsäkring",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-2",
+          "keyword": {
+            "text": "dina försäkringar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-2",
+          "keyword": {
+            "text": "moderna försäkringar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-2",
+          "keyword": {
+            "text": "gjensidige",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-2",
+          "keyword": {
+            "text": "ica försäkring",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedSetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/sharedSets/-3",
+          "name": "Neg | Gör det själv och produkter",
+          "type": "NEGATIVE_KEYWORDS"
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "själv",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "själva",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "gör det själv",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "råttgift",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "musgift",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "gift mot",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "köpa",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "köp",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "pris på fälla",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "råttfälla",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "musfälla",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "fällor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "klisterfälla",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "limfälla",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "ultraljud",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "skrämma",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "skrämmer",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "avskräckare",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "pepparmynta",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "tjära",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "huskur",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "huskurer",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "hemmagjord",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "recept",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "spray",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "bauhaus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "biltema",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "clas ohlson",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "jula",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "hornbach",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "plantagen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "byggmax",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "amazon",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "blocket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "repello",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "powersnap",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "fågelpiggar köpa",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "fågelnät köpa",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "duvskrämma",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "fågelskrämma",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "myrgift",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "getingfälla",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-3",
+          "keyword": {
+            "text": "vägglusfälla",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedSetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/sharedSets/-4",
+          "name": "Neg | Jobb och utbildning",
+          "type": "NEGATIVE_KEYWORDS"
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "jobb",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "lediga jobb",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "lön",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "utbildning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "kurs",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "behörighet",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "bli skadedjurstekniker",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "anställning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "praktik",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "yrke",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "arbetsförmedlingen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-4",
+          "keyword": {
+            "text": "skadedjurstekniker lön",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedSetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/sharedSets/-5",
+          "name": "Neg | Information",
+          "type": "NEGATIVE_KEYWORDS"
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "wikipedia",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "fakta om",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "bilder på",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "bild på",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "latin",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "livslängd",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "vad äter",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "hur länge lever",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "hur många",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "film",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "youtube",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "tecknad",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "tamråtta",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "råtta som husdjur",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "köpa råtta",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "hamster",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "farliga för hund",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "drömmer",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "drömtydning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "symbol",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-5",
+          "keyword": {
+            "text": "kan råttor klättra",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedSetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/sharedSets/-6",
+          "name": "Neg | Jour och akut (tas bort när jouren startar)",
+          "type": "NEGATIVE_KEYWORDS"
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-6",
+          "keyword": {
+            "text": "jour",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-6",
+          "keyword": {
+            "text": "journummer",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-6",
+          "keyword": {
+            "text": "dygnet runt",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-6",
+          "keyword": {
+            "text": "24/7",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-6",
+          "keyword": {
+            "text": "24 7",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedSetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/sharedSets/-7",
+          "name": "Neg | Engelska",
+          "type": "NEGATIVE_KEYWORDS"
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "rat",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "rats",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "mouse",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "mice",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "pest control",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "exterminator",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "how to",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "get rid",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "bed bugs",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "bedbugs",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "pigeon",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "pigeons",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "near me",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "silverfish",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-7",
+          "keyword": {
+            "text": "wasp",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedSetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/sharedSets/-8",
+          "name": "Neg | Utanför våra län",
+          "type": "NEGATIVE_KEYWORDS"
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "göteborg",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "malmö",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "helsingborg",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "lund",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "västerås",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "örebro",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "umeå",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "luleå",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "sundsvall",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "jönköping",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "karlstad",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "växjö",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "kalmar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "halmstad",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "borås",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "skellefteå",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "östersund",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "gotland",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "visby",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "skåne",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "norrland",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "finland",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "norge",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-8",
+          "keyword": {
+            "text": "åland",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedSetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/sharedSets/-9",
+          "name": "Neg | Myndighet och ansvar",
+          "type": "NEGATIVE_KEYWORDS"
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-9",
+          "keyword": {
+            "text": "kommunen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-9",
+          "keyword": {
+            "text": "miljöförvaltningen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-9",
+          "keyword": {
+            "text": "anmäla",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-9",
+          "keyword": {
+            "text": "anmälan",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-9",
+          "keyword": {
+            "text": "vem ansvarar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-9",
+          "keyword": {
+            "text": "skyldig",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-9",
+          "keyword": {
+            "text": "hyresgästföreningen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-9",
+          "keyword": {
+            "text": "lag om",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-9",
+          "keyword": {
+            "text": "socialstyrelsen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/-9",
+          "keyword": {
+            "text": "folkhälsomyndigheten",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "customerNegativeCriterionOperation": {
+        "create": {
+          "negativeKeywordList": {
+            "sharedSet": "customers/9407604856/sharedSets/-1"
+          }
+        }
+      }
+    },
+    {
+      "campaignBudgetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaignBudgets/-10",
+          "name": "Sök | Råttor budget",
+          "amountMicros": "1550000000",
+          "deliveryMethod": "STANDARD",
+          "explicitlyShared": false
+        }
+      }
+    },
+    {
+      "campaignOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaigns/-11",
+          "name": "Sök | Råttor",
+          "status": "PAUSED",
+          "advertisingChannelType": "SEARCH",
+          "campaignBudget": "customers/9407604856/campaignBudgets/-10",
+          "networkSettings": {
+            "targetGoogleSearch": true,
+            "targetSearchNetwork": false,
+            "targetContentNetwork": false,
+            "targetPartnerSearchNetwork": false
+          },
+          "geoTargetTypeSetting": {
+            "positiveGeoTargetType": "PRESENCE",
+            "negativeGeoTargetType": "PRESENCE"
+          },
+          "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+          "finalUrlSuffix": "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}",
+          "maximizeConversions": {}
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21000"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21003"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21004"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21005"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21017"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21018"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "language": {
+            "languageConstant": "languageConstants/1015"
+          }
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "sharedSet": "customers/9407604856/sharedSets/-1"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "sharedSet": "customers/9407604856/sharedSets/-2"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "sharedSet": "customers/9407604856/sharedSets/-3"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "sharedSet": "customers/9407604856/sharedSets/-4"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "sharedSet": "customers/9407604856/sharedSets/-5"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "sharedSet": "customers/9407604856/sharedSets/-6"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "sharedSet": "customers/9407604856/sharedSets/-7"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "sharedSet": "customers/9407604856/sharedSets/-8"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "sharedSet": "customers/9407604856/sharedSets/-9"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-12",
+          "campaign": "customers/9407604856/campaigns/-11",
+          "name": "Råttbekämpning",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttbekämpning",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttsanering",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanering råttor",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttbekämpning stockholm",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttsanering stockholm",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttbekämpning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttsanering",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanering råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanera råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bekämpa råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "få bort råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "utrota råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "hjälp med råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skadedjur råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttbekämpning"
+                },
+                {
+                  "text": "Råttsanering och bekämpning"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Teknikern hittar vägen in"
+                },
+                {
+                  "text": "Vi stänger vägarna in"
+                },
+                {
+                  "text": "Rätt metod för varje plats"
+                },
+                {
+                  "text": "Sanering efter råttor"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Råttor inomhus och utomhus"
+                },
+                {
+                  "text": "Rapport för försäkringsbolaget"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta på plats redan samma dag"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikern tar reda på hur råttorna tar sig in och vad som håller dem kvar."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och ett kostnadsförslag att gå igenom i lugn och ro."
+                },
+                {
+                  "text": "Vi stänger vägarna in, bekämpar och sanerar. Privatpersoner får ROT på tätningsarbetet."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "råttbekämpning",
+              "path2": "inspektion"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-13",
+          "calloutAsset": {
+            "calloutText": "Kostnadsfri inspektion"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "asset": "customers/9407604856/assets/-13",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-14",
+          "calloutAsset": {
+            "calloutText": "ROT på tätningsarbetet"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-12",
+          "asset": "customers/9407604856/assets/-14",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-15",
+          "campaign": "customers/9407604856/campaigns/-11",
+          "name": "Råttor inomhus",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i huset",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i väggarna",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i huset",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råtta i huset",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor inomhus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med råttor inomhus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i väggen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i väggarna",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor på vinden",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i taket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i källaren",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i krypgrunden",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råtta i köket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "täta mot råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttor i huset?"
+                },
+                {
+                  "text": "Hör du råttor i väggen?"
+                },
+                {
+                  "text": "Spillning eller gnagspår?"
+                },
+                {
+                  "text": "Råttbekämpning inomhus"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Teknikern hittar vägen in"
+                },
+                {
+                  "text": "Vi stänger vägarna in"
+                },
+                {
+                  "text": "Sanering efter råttor"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Rapport för försäkringsbolaget"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta på plats redan samma dag"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikern hittar var råttorna tar sig in i huset, stänger vägarna och bekämpar."
+                },
+                {
+                  "text": "Vi sanerar efter råttorna, även isoleringen. Privatpersoner får ROT på tätningen."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och ett kostnadsförslag att gå igenom i lugn och ro."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "råttor",
+              "path2": "inomhus"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-16",
+          "calloutAsset": {
+            "calloutText": "Kostnadsfri inspektion"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "asset": "customers/9407604856/assets/-16",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-17",
+          "calloutAsset": {
+            "calloutText": "ROT på tätningsarbetet"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-15",
+          "asset": "customers/9407604856/assets/-17",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-18",
+          "campaign": "customers/9407604856/campaigns/-11",
+          "name": "Råttor utomhus",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i trädgården",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i trädgården",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med råttor i trädgården",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor på tomten",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råtta i trädgården",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bekämpa råttor utomhus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttbekämpning utomhus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor under altanen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i komposten",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor under huset",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttor på tomten?"
+                },
+                {
+                  "text": "Råttor i trädgården?"
+                },
+                {
+                  "text": "Råttor under altanen?"
+                },
+                {
+                  "text": "Råttbekämpning utomhus"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Vi ser vad som lockar råttorna"
+                },
+                {
+                  "text": "Teknikern hittar vägen in"
+                },
+                {
+                  "text": "Rätt metod för varje plats"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Ofta på plats redan samma dag"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikern ser vad som lockar råttorna till tomten och var de kan ta sig in i huset."
+                },
+                {
+                  "text": "Tätning, mekaniska fällor, betongstationer, betesstationer och råtthund, efter platsen."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och ett kostnadsförslag att gå igenom i lugn och ro."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "råttor",
+              "path2": "utomhus"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-19",
+          "calloutAsset": {
+            "calloutText": "Kostnadsfri inspektion"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "asset": "customers/9407604856/assets/-19",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-20",
+          "calloutAsset": {
+            "calloutText": "ROT på tätningsarbetet"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-18",
+          "asset": "customers/9407604856/assets/-20",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-21",
+          "campaign": "customers/9407604856/campaigns/-11",
+          "name": "Råttor i avlopp",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttspärr",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttstopp",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i avloppet",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i avloppsrören",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råtta i toaletten",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råtta i toalettstolen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttspärr",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttstopp",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttstopp avlopp",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttspärr avlopp",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttor i avloppet?"
+                },
+                {
+                  "text": "Råttor upp genom toaletten?"
+                },
+                {
+                  "text": "Råttspärr i avloppet"
+                },
+                {
+                  "text": "Vi monterar råttspärr"
+                },
+                {
+                  "text": "Vi hittar var de tar sig in"
+                },
+                {
+                  "text": "Vi stänger vägen ur avloppet"
+                },
+                {
+                  "text": "Rapport för försäkringsbolaget"
+                },
+                {
+                  "text": "Råttbekämpning"
+                },
+                {
+                  "text": "Råttbekämpning i sex län"
+                },
+                {
+                  "text": "Sanering efter råttor"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Vi ringer när vi ser förfrågan"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Råttor ur avloppet? Vi ser till att skadan hittas och lagas, och monterar råttspärr."
+                },
+                {
+                  "text": "Vi stänger vägen upp ur avloppet och sanerar efter råttorna, med rapport om du vill."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och ett kostnadsförslag att gå igenom i lugn och ro."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "råttor",
+              "path2": "avlopp"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-22",
+          "calloutAsset": {
+            "calloutText": "ROT på tätningsarbetet"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-21",
+          "asset": "customers/9407604856/assets/-22",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-23",
+          "campaign": "customers/9407604856/campaigns/-11",
+          "name": "Råttor i fastighet",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-23",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i soprummet",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-23",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor brf",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-23",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttbekämpning brf",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-23",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor bostadsrättsförening",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-23",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i fastigheten",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-23",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttbekämpning företag",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-23",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor restaurang",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-23",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "råttor i lokalen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-23",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/?kundtyp=foretag"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttor i fastigheten?"
+                },
+                {
+                  "text": "Råttor i soprummet?"
+                },
+                {
+                  "text": "Råttbekämpning för BRF"
+                },
+                {
+                  "text": "Råttbekämpning för företag"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Teknikern hittar vägen in"
+                },
+                {
+                  "text": "Vi stänger vägarna in"
+                },
+                {
+                  "text": "Rapport när ni behöver"
+                },
+                {
+                  "text": "Kundportal för avtalskunder"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikern hittar var råttorna kommer in i fastigheten och vad som håller dem kvar."
+                },
+                {
+                  "text": "Med skadedjursavtal ser ni ärenden, besök och utrustning i kundportalen."
+                },
+                {
+                  "text": "Ni får teknikerns bedömning och ett kostnadsförslag efter en kostnadsfri inspektion."
+                },
+                {
+                  "text": "Skicka en förfrågan när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "råttbekämpning",
+              "path2": "fastighet"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-24",
+          "calloutAsset": {
+            "calloutText": "Kostnadsfri inspektion"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-23",
+          "asset": "customers/9407604856/assets/-24",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-25",
+          "finalUrls": [
+            "https://begone.se/prisforslag/?tjanst=rattbekampning"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kostnadsfri inspektion",
+            "description1": "Skicka en förfrågan med bilder",
+            "description2": "Vardagar 08 till 17 ringer vi upp"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-25",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-26",
+          "finalUrls": [
+            "https://begone.se/skadedjursbekampning-foretag/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Företag och fastigheter",
+            "description1": "Hela organisationen i ett avtal",
+            "description2": "Stationskarta i kundportalen"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-26",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-27",
+          "finalUrls": [
+            "https://begone.se/tjanster/skadedjursavtal/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skadedjursavtal",
+            "description1": "Första besöket är kostnadsfritt",
+            "description2": "Avtalsförslaget binder er inte"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-27",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-28",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Ring 010 280 44 10",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-28",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-29",
+          "calloutAsset": {
+            "calloutText": "Sanering efter råttor"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-29",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-30",
+          "calloutAsset": {
+            "calloutText": "ISO 9001 och ISO 14001"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-30",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-31",
+          "calloutAsset": {
+            "calloutText": "Erfarna tekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-31",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-32",
+          "calloutAsset": {
+            "calloutText": "Verksamma i sex län"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-32",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-33",
+          "calloutAsset": {
+            "calloutText": "Rapport när du behöver"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-33",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-34",
+          "structuredSnippetAsset": {
+            "header": "Tjänster",
+            "values": [
+              "Tätning",
+              "Mekaniska fällor",
+              "Betongstationer",
+              "Betesstationer",
+              "Råtthund",
+              "Råttspärr",
+              "Råttsanering"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-34",
+          "fieldType": "STRUCTURED_SNIPPET"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-35",
+          "callAsset": {
+            "countryCode": "SE",
+            "phoneNumber": "010 280 44 10",
+            "callConversionReportingState": "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+            "callConversionAction": "customers/9407604856/conversionActions/949482895",
+            "adScheduleTargets": [
+              {
+                "dayOfWeek": "MONDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "TUESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "WEDNESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "THURSDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "FRIDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "asset": "customers/9407604856/assets/-35",
+          "fieldType": "CALL"
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "negative": true,
+          "keyword": {
+            "text": "möss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "negative": true,
+          "keyword": {
+            "text": "mus",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "negative": true,
+          "keyword": {
+            "text": "mössen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "negative": true,
+          "keyword": {
+            "text": "begone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-11",
+          "negative": true,
+          "keyword": {
+            "text": "be gone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignBudgetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaignBudgets/-36",
+          "name": "Sök | Fåglar budget",
+          "amountMicros": "800000000",
+          "deliveryMethod": "STANDARD",
+          "explicitlyShared": false
+        }
+      }
+    },
+    {
+      "campaignOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaigns/-37",
+          "name": "Sök | Fåglar",
+          "status": "PAUSED",
+          "advertisingChannelType": "SEARCH",
+          "campaignBudget": "customers/9407604856/campaignBudgets/-36",
+          "networkSettings": {
+            "targetGoogleSearch": true,
+            "targetSearchNetwork": false,
+            "targetContentNetwork": false,
+            "targetPartnerSearchNetwork": false
+          },
+          "geoTargetTypeSetting": {
+            "positiveGeoTargetType": "PRESENCE",
+            "negativeGeoTargetType": "PRESENCE"
+          },
+          "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+          "finalUrlSuffix": "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}",
+          "maximizeConversions": {}
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21000"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21003"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21004"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21005"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21017"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21018"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "language": {
+            "languageConstant": "languageConstants/1015"
+          }
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "sharedSet": "customers/9407604856/sharedSets/-1"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "sharedSet": "customers/9407604856/sharedSets/-2"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "sharedSet": "customers/9407604856/sharedSets/-3"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "sharedSet": "customers/9407604856/sharedSets/-4"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "sharedSet": "customers/9407604856/sharedSets/-5"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "sharedSet": "customers/9407604856/sharedSets/-6"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "sharedSet": "customers/9407604856/sharedSets/-7"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "sharedSet": "customers/9407604856/sharedSets/-8"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "sharedSet": "customers/9407604856/sharedSets/-9"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-38",
+          "campaign": "customers/9407604856/campaigns/-37",
+          "name": "Fågelsäkring",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelsäkring",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelskydd tak",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelsäkring",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelskydd tak",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelskydd fasad",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelskydd solceller",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "duvor solceller",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fåglar under solceller",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "montera fågelnät",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelnät montering",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelsäkra taket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med fåglar på taket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/fagelsakring/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Fågelsäkring"
+                },
+                {
+                  "text": "Fågelskydd för tak och fasad"
+                },
+                {
+                  "text": "Fågelskydd för solceller"
+                },
+                {
+                  "text": "Nät, piggar, vajer och band"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Skydd valt efter platsen"
+                },
+                {
+                  "text": "Utan håltagning i tätskiktet"
+                },
+                {
+                  "text": "Vi monterar på hög höjd"
+                },
+                {
+                  "text": "Gamla bon tas bort"
+                },
+                {
+                  "text": "Skriftlig offert efter besöket"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Vi väljer nät, piggar, vajer eller fågelband efter platsen och fåglarna."
+                },
+                {
+                  "text": "Vi tar bort gamla bon och spillning när skyddet monteras. Privatpersoner får i regel ROT."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "fågelsäkring",
+              "path2": "inspektion"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-39",
+          "calloutAsset": {
+            "calloutText": "ROT på montering av skydd"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-38",
+          "asset": "customers/9407604856/assets/-39",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-40",
+          "campaign": "customers/9407604856/campaigns/-37",
+          "name": "Duvor",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "problem med duvor",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "problem med duvor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "duvor på balkongen",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "duvor på taket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "få bort duvor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "bli av med duvor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "duvor på vinden",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelskydd balkong",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "duvor häckar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/fagelsakring/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Problem med duvor?"
+                },
+                {
+                  "text": "Duvor på balkongen?"
+                },
+                {
+                  "text": "Duvor på taket?"
+                },
+                {
+                  "text": "Fågelskydd mot duvor"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Skydd valt efter platsen"
+                },
+                {
+                  "text": "Nät, piggar, vajer och band"
+                },
+                {
+                  "text": "Sanering av duvträck"
+                },
+                {
+                  "text": "Skriftlig offert efter besöket"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikern ser var duvorna sitter och häckar och väljer skydd efter platsen."
+                },
+                {
+                  "text": "Vi sanerar spillningen och monterar nät, piggar eller vajer, valt efter platsen."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "fågelsäkring",
+              "path2": "duvor"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-41",
+          "calloutAsset": {
+            "calloutText": "ROT på montering av skydd"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-40",
+          "asset": "customers/9407604856/assets/-41",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-42",
+          "campaign": "customers/9407604856/campaigns/-37",
+          "name": "Måsar och trutar",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-42",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "måsar på taket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-42",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fiskmåsar på taket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-42",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "få bort måsar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-42",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "få bort fiskmåsar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-42",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "trutar på taket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-42",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "måsar häckar på taket",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-42",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fiskmås bo tak",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-42",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "ta bort måsbo",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-42",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/fagelsakring/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Måsar på taket?"
+                },
+                {
+                  "text": "Fiskmåsar på taket?"
+                },
+                {
+                  "text": "Måsar och trutar på taket"
+                },
+                {
+                  "text": "Fågelskydd mot måsar"
+                },
+                {
+                  "text": "Montera skydd före häckningen"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Skydd valt efter taket"
+                },
+                {
+                  "text": "Vi monterar på hög höjd"
+                },
+                {
+                  "text": "Skriftlig offert efter besöket"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Skyddet monteras helst innan häckningen börjar, utan håltagning i tätskiktet."
+                },
+                {
+                  "text": "Vi monterar nät, vajer eller piggar på taket, valt efter platsen och fåglarna."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "fågelsäkring",
+              "path2": "måsar"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-43",
+          "calloutAsset": {
+            "calloutText": "ROT på montering av skydd"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAssetOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-42",
+          "asset": "customers/9407604856/assets/-43",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-44",
+          "campaign": "customers/9407604856/campaigns/-37",
+          "name": "Fågelspillning",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanera fågelspillning",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelsanering",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanera fågelspillning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanering fågelspillning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelsanering",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "duvträck",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "sanering duvträck",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "duvspillning",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelspillning vind",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "fågelspillning balkong",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-44",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/fagelspillning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Sanering av fågelspillning"
+                },
+                {
+                  "text": "Sanering av duvträck"
+                },
+                {
+                  "text": "Duvträck på vinden?"
+                },
+                {
+                  "text": "Fågelspillning på balkongen?"
+                },
+                {
+                  "text": "Arbetsområdet lämnas rent"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Skydd mot nya fåglar"
+                },
+                {
+                  "text": "Skriftlig offert efter besöket"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Vi tar bort spillning, bon och fjädrar och lämnar arbetsområdet rent."
+                },
+                {
+                  "text": "Teknikern ser också hur fåglarna tar sig in och föreslår skydd mot nya fåglar."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "fågelspillning",
+              "path2": "sanering"
+            }
+          }
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-45",
+          "campaign": "customers/9407604856/campaigns/-37",
+          "name": "Skyddsjakt",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-45",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skyddsjakt duvor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-45",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skyddsjakt fåglar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-45",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skyddsjakt måsar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-45",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skyddsjakt kråkor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-45",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skyddsjakt fiskmås",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-45",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "skjuta duvor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-45",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/skyddsjakt/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Skyddsjakt på duvor"
+                },
+                {
+                  "text": "Skyddsjakt på måsar"
+                },
+                {
+                  "text": "Skyddsjakt på fåglar"
+                },
+                {
+                  "text": "Vi sköter tillstånden"
+                },
+                {
+                  "text": "Behörig personal"
+                },
+                {
+                  "text": "Skyddsjakt och fågelsäkring"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Skriftlig offert efter besöket"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Vi bedömer vad lagen tillåter på er plats och sköter ansökan och tillstånden."
+                },
+                {
+                  "text": "Skyddsjakten utförs av behörig personal och kan kombineras med fågelsäkring."
+                },
+                {
+                  "text": "Ni får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
+                },
+                {
+                  "text": "Skicka en förfrågan när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "skyddsjakt",
+              "path2": "fåglar"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-46",
+          "finalUrls": [
+            "https://begone.se/prisforslag/?tjanst=fagelsakring"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kostnadsfri inspektion",
+            "description1": "Skicka en förfrågan med bilder",
+            "description2": "Vardagar 08 till 17 ringer vi upp"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-46",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-47",
+          "finalUrls": [
+            "https://begone.se/tjanster/fagelspillning/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Fågelspillning",
+            "description1": "Arbetsområdet lämnas rent",
+            "description2": "Skydd mot nya fåglar"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-47",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-48",
+          "finalUrls": [
+            "https://begone.se/tjanster/skyddsjakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skyddsjakt",
+            "description1": "Vi sköter tillstånden",
+            "description2": "Utförs av behörig personal"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-48",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-49",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Ring 010 280 44 10",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-49",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-50",
+          "calloutAsset": {
+            "calloutText": "Kostnadsfri inspektion"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-50",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-51",
+          "calloutAsset": {
+            "calloutText": "Arbete på hög höjd"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-51",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-52",
+          "calloutAsset": {
+            "calloutText": "ISO 9001 och ISO 14001"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-52",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-53",
+          "calloutAsset": {
+            "calloutText": "Erfarna tekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-53",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-54",
+          "calloutAsset": {
+            "calloutText": "Verksamma i sex län"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-54",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-55",
+          "calloutAsset": {
+            "calloutText": "Rapport när du behöver"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-55",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-56",
+          "structuredSnippetAsset": {
+            "header": "Tjänster",
+            "values": [
+              "Fågelnät",
+              "Piggar",
+              "Vajer",
+              "Fågelband",
+              "Sanering av spillning",
+              "Fågelplock",
+              "Skyddsjakt"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-56",
+          "fieldType": "STRUCTURED_SNIPPET"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-57",
+          "callAsset": {
+            "countryCode": "SE",
+            "phoneNumber": "010 280 44 10",
+            "callConversionReportingState": "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+            "callConversionAction": "customers/9407604856/conversionActions/949482895",
+            "adScheduleTargets": [
+              {
+                "dayOfWeek": "MONDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "TUESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "WEDNESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "THURSDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "FRIDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "asset": "customers/9407604856/assets/-57",
+          "fieldType": "CALL"
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "negative": true,
+          "keyword": {
+            "text": "getingar",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "negative": true,
+          "keyword": {
+            "text": "råttor",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "negative": true,
+          "keyword": {
+            "text": "begone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-37",
+          "negative": true,
+          "keyword": {
+            "text": "be gone",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignBudgetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaignBudgets/-58",
+          "name": "Sök | Varumärke budget",
+          "amountMicros": "180000000",
+          "deliveryMethod": "STANDARD",
+          "explicitlyShared": false
+        }
+      }
+    },
+    {
+      "campaignOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/campaigns/-59",
+          "name": "Sök | Varumärke",
+          "status": "PAUSED",
+          "advertisingChannelType": "SEARCH",
+          "campaignBudget": "customers/9407604856/campaignBudgets/-58",
+          "networkSettings": {
+            "targetGoogleSearch": true,
+            "targetSearchNetwork": false,
+            "targetContentNetwork": false,
+            "targetPartnerSearchNetwork": false
+          },
+          "geoTargetTypeSetting": {
+            "positiveGeoTargetType": "PRESENCE",
+            "negativeGeoTargetType": "PRESENCE"
+          },
+          "containsEuPoliticalAdvertising": "DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING",
+          "finalUrlSuffix": "utm_source=google&utm_medium=cpc&utm_campaign={campaignid}&utm_content={adgroupid}&utm_term={keyword}",
+          "targetSpend": {
+            "cpcBidCeilingMicros": "12000000"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21000"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21003"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21004"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21005"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21017"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "location": {
+            "geoTargetConstant": "geoTargetConstants/21018"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "language": {
+            "languageConstant": "languageConstants/1015"
+          }
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "sharedSet": "customers/9407604856/sharedSets/-1"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "sharedSet": "customers/9407604856/sharedSets/-5"
+        }
+      }
+    },
+    {
+      "campaignSharedSetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "sharedSet": "customers/9407604856/sharedSets/-7"
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/adGroups/-60",
+          "campaign": "customers/9407604856/campaigns/-59",
+          "name": "Begone",
+          "status": "ENABLED",
+          "type": "SEARCH_STANDARD"
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-60",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "begone",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-60",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "begone skadedjur",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-60",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "be gone",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-60",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "begone skadedjur & sanering ab",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-60",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "begone skadedjur och sanering",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-60",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "begone skadedjursbekämpning",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-60",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "begone se",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-60",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "begone skadedjur",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-60",
+          "status": "ENABLED",
+          "keyword": {
+            "text": "begone sanering",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/-60",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Begone Skadedjur"
+                },
+                {
+                  "text": "Begone Skadedjur och Sanering"
+                },
+                {
+                  "text": "Kontakta Begone"
+                },
+                {
+                  "text": "Skicka en förfrågan"
+                },
+                {
+                  "text": "Ring 010 280 44 10"
+                },
+                {
+                  "text": "Vardagar 08 till 17"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Verksamma i sex län"
+                },
+                {
+                  "text": "Skadedjur inomhus och utomhus"
+                },
+                {
+                  "text": "Skadedjursavtal för företag"
+                },
+                {
+                  "text": "Kundportal för avtalskunder"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Skicka en förfrågan när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Avtalskunder ser ärenden, kommande besök och utrustning i kundportalen."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och ett pris innan vi börjar."
+                }
+              ],
+              "path1": "skadedjur"
+            }
+          }
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-61",
+          "finalUrls": [
+            "https://begone.se/prisforslag/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skicka en förfrågan",
+            "description1": "Beskriv vad du ser, gärna med bild",
+            "description2": "Vardagar 08 till 17 ringer vi upp"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "asset": "customers/9407604856/assets/-61",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-62",
+          "finalUrls": [
+            "https://begone.se/tjanster/skadedjursavtal/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skadedjursavtal",
+            "description1": "Första besöket är kostnadsfritt",
+            "description2": "Avtalsförslaget binder er inte"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "asset": "customers/9407604856/assets/-62",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-63",
+          "finalUrls": [
+            "https://begone.se/om-oss/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Om Begone",
+            "description1": "ISO 9001 och ISO 14001",
+            "description2": "Erfarna skadedjurstekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "asset": "customers/9407604856/assets/-63",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-64",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Ring 010 280 44 10",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "asset": "customers/9407604856/assets/-64",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-65",
+          "calloutAsset": {
+            "calloutText": "ISO 9001 och ISO 14001"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "asset": "customers/9407604856/assets/-65",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-66",
+          "calloutAsset": {
+            "calloutText": "Erfarna tekniker"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "asset": "customers/9407604856/assets/-66",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-67",
+          "calloutAsset": {
+            "calloutText": "Verksamma i sex län"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "asset": "customers/9407604856/assets/-67",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-68",
+          "calloutAsset": {
+            "calloutText": "Rapport när du behöver"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "asset": "customers/9407604856/assets/-68",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-69",
+          "structuredSnippetAsset": {
+            "header": "Tjänster",
+            "values": [
+              "Råttbekämpning",
+              "Fågelsäkring",
+              "Musbekämpning",
+              "Vägglöss",
+              "Silverfisk",
+              "Pälsänger",
+              "Mjölbaggar"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "asset": "customers/9407604856/assets/-69",
+          "fieldType": "STRUCTURED_SNIPPET"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-70",
+          "callAsset": {
+            "countryCode": "SE",
+            "phoneNumber": "010 280 44 10",
+            "callConversionReportingState": "USE_RESOURCE_LEVEL_CALL_CONVERSION_ACTION",
+            "callConversionAction": "customers/9407604856/conversionActions/949482895",
+            "adScheduleTargets": [
+              {
+                "dayOfWeek": "MONDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "TUESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "WEDNESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "THURSDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "FRIDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/-59",
+          "asset": "customers/9407604856/assets/-70",
+          "fieldType": "CALL"
+        }
+      }
+    }
+  ]
+}
