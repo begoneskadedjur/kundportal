@@ -1,0 +1,14 @@
+{
+  "beskrivning": "FÖRSLAG: koppla delade negativa listan Neg | Konkurrenter till hela kontot (gäller även PMax). Körs efter steg 2; sharedSet-id fylls i efter att listan skapats.",
+  "operationer": [
+    {
+      "customerNegativeCriterionOperation": {
+        "create": {
+          "negativeKeywordList": {
+            "sharedSet": "customers/9407604856/sharedSets/-1"
+          }
+        }
+      }
+    }
+  ]
+}

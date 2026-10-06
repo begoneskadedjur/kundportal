@@ -1,7 +1,7 @@
 {
   "status": "FÖRSLAG, ej godkänt. EJ PROVKÖRD: provkörningen nekades av behörighetsspärren i sessionen 2026-10-06, kör mutate.mjs utan --genomfor först.",
   "framtagen": "2026-10-06",
-  "beskrivning": "Kontoplan steg 1, mätningen: telefonklick (click_phone, click_akut, click_phone_akut) och GA4 generate_lead blir sekundära; Calls from ads blir primär (60 s, en per klick, värde 1 400 kr); nya åtgärder Samtal från webbplatsen 60 s (primär, kräver Googles vidarekopplingsnummer på sajten) och Bokat uppdrag / Genomfört uppdrag för offline-import (sekundära tills vidare); målen Övrigt och Sidvisning slutar styra budgivningen.",
+  "beskrivning": "Kontoplan steg 1, mätningen: telefonklick (click_phone, click_akut, click_phone_akut) och GA4 generate_lead blir sekundära; Calls from ads blir primär (60 s, en per klick, värde 1 400 kr); nya åtgärder Samtal från webbplatsen 60 s (primär, kräver Googles vidarekopplingsnummer på sajten) och Bokat uppdrag / Genomfört uppdrag för offline-import (sekundära tills vidare); målen Övrigt och Sidvisning slutar styra budgivningen. Rättat 2026-10-06: alla leadkonverteringar har värde 1 (Christian: inget fast värde, riktiga belopp via Bokat/Genomfört).",
   "operationer": [
     {
       "conversionActionOperation": {
@@ -47,12 +47,11 @@
           "countingType": "ONE_PER_CLICK",
           "phoneCallDurationSeconds": "60",
           "valueSettings": {
-            "defaultValue": 1400,
-            "alwaysUseDefaultValue": false,
+            "defaultValue": 1,
             "defaultCurrencyCode": "SEK"
           }
         },
-        "updateMask": "primaryForGoal,countingType,phoneCallDurationSeconds,valueSettings.defaultValue,valueSettings.alwaysUseDefaultValue,valueSettings.defaultCurrencyCode"
+        "updateMask": "primaryForGoal,countingType,phoneCallDurationSeconds,valueSettings.defaultValue,valueSettings.defaultCurrencyCode"
       }
     },
     {
@@ -66,8 +65,8 @@
           "countingType": "ONE_PER_CLICK",
           "phoneCallDurationSeconds": "60",
           "valueSettings": {
-            "defaultValue": 1400,
-            "alwaysUseDefaultValue": false,
+            "defaultValue": 1,
+            "alwaysUseDefaultValue": true,
             "defaultCurrencyCode": "SEK"
           }
         }

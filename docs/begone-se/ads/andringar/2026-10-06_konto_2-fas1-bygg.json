@@ -1812,15 +1812,6 @@
       }
     },
     {
-      "customerNegativeCriterionOperation": {
-        "create": {
-          "negativeKeywordList": {
-            "sharedSet": "customers/9407604856/sharedSets/-1"
-          }
-        }
-      }
-    },
-    {
       "campaignBudgetOperation": {
         "create": {
           "resourceName": "customers/9407604856/campaignBudgets/-10",
@@ -3347,7 +3338,7 @@
           ],
           "sitelinkAsset": {
             "linkText": "Kontakta oss",
-            "description1": "Ring 010 280 44 10",
+            "description1": "Skicka en förfrågan",
             "description2": "Vardagar 08 till 17"
           }
         }
@@ -4868,7 +4859,7 @@
           ],
           "sitelinkAsset": {
             "linkText": "Kontakta oss",
-            "description1": "Ring 010 280 44 10",
+            "description1": "Skicka en förfrågan",
             "description2": "Vardagar 08 till 17"
           }
         }
@@ -5406,9 +5397,6 @@
                   "text": "Skicka en förfrågan"
                 },
                 {
-                  "text": "Ring 010 280 44 10"
-                },
-                {
                   "text": "Vardagar 08 till 17"
                 },
                 {
@@ -5428,6 +5416,9 @@
                 },
                 {
                   "text": "Kundportal för avtalskunder"
+                },
+                {
+                  "text": "Skadedjursbekämpning"
                 }
               ],
               "descriptions": [
@@ -5531,7 +5522,7 @@
           ],
           "sitelinkAsset": {
             "linkText": "Kontakta oss",
-            "description1": "Ring 010 280 44 10",
+            "description1": "Skicka en förfrågan",
             "description2": "Vardagar 08 till 17"
           }
         }

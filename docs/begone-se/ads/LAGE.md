@@ -39,6 +39,8 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 
 ## Beslut
 
+- 2026-10-06 (kontoplanen, avsnitt 8): Ordning och budgetfördelning: agenten bestämmer inom 4 430 kr/dag. Inga konkurrentnamn i annonseringen (de som söker konkurrenter går ofta via försäkringsbolag och förväntar sig gratis arbete). Fåglarnas PMax får gå kvar till vecka 8. Kostnadsfri inspektion gäller även möss. Fågelspillning: blandat, mindre saneringar (balkong o.d.) kan få pris per telefon efter bild, omfattande kräver inspektion. Fast pris per telefon eller mejl gäller även värmebehandling av vägglöss. Förfrågans värde: följer huvudsessionens förslag (inget fast värde, riktiga belopp via Bokat/Genomfört). Vidarekopplingsnummer och offline-import: förklarade för Christian, inväntar ja.
+
 - 2026-10-06: Steg 1A, 2, 3, 4 och 5 i råttrapporten GENOMFÖRDA (95 operationer, se andringslogg.jsonl). 1B (pausa gamla annonser) körs när de nya annonserna är godkända av Google.
 - 2026-10-06: Kontot ska SÄTTAS UPP FRÅN NOLL. Historiken används bara som underlag (sökord, söktermer, vad som har gett formulär). Ny struktur byggs vid sidan av, gamla kampanjer pausas när den nya är godkänd och igång. Christian föredrar större, ordentliga ändringar framför att lappa i det gamla.
 - 2026-10-06: ISO 9001 och ISO 14001 är certifierade av Qvalify (ackrediterat organ). Framhävningen får stå.
