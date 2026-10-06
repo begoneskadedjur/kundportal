@@ -42,6 +42,7 @@ async function getTechnicianPerformanceById(technicianId: string) {
       .from('private_cases')
       .select('pris, commission_amount, completed_date, created_at, status')
       .eq('primary_assignee_id', technician.id)
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .not('pris', 'is', null),
 
@@ -50,6 +51,7 @@ async function getTechnicianPerformanceById(technicianId: string) {
       .from('business_cases')
       .select('pris, commission_amount, completed_date, created_at, status')
       .eq('primary_assignee_id', technician.id) 
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .not('pris', 'is', null),
 
@@ -105,6 +107,7 @@ async function getTechnicianMonthlyData(technicianId: string) {
       .from('private_cases')
       .select('commission_amount, completed_date, pris')
       .eq('primary_assignee_id', technicianId)
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .not('commission_amount', 'is', null)
       .gte('completed_date', yearStart),
@@ -113,6 +116,7 @@ async function getTechnicianMonthlyData(technicianId: string) {
       .from('business_cases')
       .select('commission_amount, completed_date, pris')
       .eq('primary_assignee_id', technicianId)
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .not('commission_amount', 'is', null)
       .gte('completed_date', yearStart)
@@ -170,6 +174,7 @@ async function getRecentCases(technicianId: string) {
       .from('private_cases')
       .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, created_at, description, skadedjur, telefon_kontaktperson, e_post_kontaktperson, personnummer, pris, material_cost, time_spent_minutes, work_started_at, start_date, due_date, r_rot_rut, r_fastighetsbeteckning, r_arbetskostnad, r_material_utrustning, r_servicebil, rapport, adress, priority, case_number, billing_status, filer, reklamation, avvikelser_tillbud_olyckor, annat_skadedjur, skicka_bokningsbekraftelse, primary_assignee_id, primary_assignee_name')
       .eq('primary_assignee_id', technicianId)
+      .is('legacy_archived_at', null)
       .order('created_at', { ascending: false })
       .limit(50), // Öka limit för att få fler cases för pending-räkning
 
@@ -179,6 +184,7 @@ async function getRecentCases(technicianId: string) {
       .from('business_cases')
       .select('id, clickup_task_id, title, status, completed_date, commission_amount, kontaktperson, created_at, description, skadedjur, telefon_kontaktperson, e_post_kontaktperson, org_nr, pris, material_cost, time_spent_minutes, work_started_at, start_date, due_date, rapport, adress, priority, case_number, billing_status, filer, reklamation, avvikelser_tillbud_olyckor, annat_skadedjur, skicka_bokningsbekraftelse, markning_faktura, e_post_faktura, skicka_erbjudande, bestallare, primary_assignee_id, primary_assignee_name')
       .eq('primary_assignee_id', technicianId)
+      .is('legacy_archived_at', null)
       .order('created_at', { ascending: false })
       .limit(50) // Öka limit för att få fler cases för pending-räkning
   ])

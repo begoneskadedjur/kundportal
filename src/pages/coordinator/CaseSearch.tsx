@@ -150,11 +150,13 @@ export default function CaseSearch() {
   const [selectedCase, setSelectedCase] = useState<BeGoneCaseRow | null>(null);
   const [commentMatches, setCommentMatches] = useState<Map<string, CaseComment[]>>(new Map());
   const [searchingComments, setSearchingComments] = useState(false);
+  // Arkiverade ClickUp-ärenden (legacy_archived_at satt) döljs som standard
+  const [includeArchived, setIncludeArchived] = useState(false);
 
-  // Hämta data
+  // Hämta data, och igen när arkivväxeln ändras
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchData(includeArchived);
+  }, [includeArchived]);
 
   // Hantera openCase URL-parameter (från notifikationer)
   useEffect(() => {
@@ -209,14 +211,21 @@ export default function CaseSearch() {
     return () => clearTimeout(timeoutId);
   }, [filters.searchQuery, filters.includeComments]);
 
-  const fetchData = async () => {
+  const fetchData = async (inclArchived: boolean) => {
     try {
       setLoading(true);
       setError(null);
 
+      let privateQuery = supabase.from('private_cases').select('*').order('created_at', { ascending: false });
+      let businessQuery = supabase.from('business_cases').select('*').order('created_at', { ascending: false });
+      if (!inclArchived) {
+        privateQuery = privateQuery.is('legacy_archived_at', null);
+        businessQuery = businessQuery.is('legacy_archived_at', null);
+      }
+
       const [privateCases, businessCases, technicianData] = await Promise.all([
-        supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
-        supabase.from('business_cases').select('*').order('created_at', { ascending: false }),
+        privateQuery,
+        businessQuery,
         supabase.from('technicians').select('id, name').eq('is_active', true).order('name')
       ]);
 
@@ -482,6 +491,15 @@ export default function CaseSearch() {
                   Sök även i kommentarer
                 </span>
               </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={includeArchived}
+                  onChange={(e) => { setIncludeArchived(e.target.checked); setCurrentPage(1); }}
+                  className="rounded border-slate-600 bg-slate-700 text-[#20c58f] focus:ring-[#20c58f]"
+                />
+                <span className="text-sm text-slate-300">Visa arkiv</span>
+              </label>
               {searchingComments && (
                 <span className="text-xs text-slate-500 flex items-center gap-1">
                   <div className="w-3 h-3 border-2 border-slate-600 border-t-purple-400 rounded-full animate-spin"></div>
@@ -689,6 +707,9 @@ export default function CaseSearch() {
                           </h3>
                           {caseItem.case_number && (
                             <span className="text-xs text-slate-500 font-mono shrink-0">{caseItem.case_number}</span>
+                          )}
+                          {caseItem.legacy_archived_at && (
+                            <span className="text-xs text-slate-500 shrink-0">Arkiv (ClickUp)</span>
                           )}
                           {hasCommentMatch && (
                             <span className="flex items-center gap-1 text-xs text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded" title={`${caseCommentMatches.length} kommentar${caseCommentMatches.length > 1 ? 'er' : ''} matchar sökningen`}>

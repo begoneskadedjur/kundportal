@@ -72,6 +72,7 @@ export const getTechnicianKpi = async (): Promise<TechnicianKpi> => {
       supabase
         .from('private_cases')
         .select('pris, primary_assignee_id, created_at')
+        .is('legacy_archived_at', null)
         .eq('status', 'Avslutat')
         .not('pris', 'is', null)
         .gte('created_at', yearStart),
@@ -80,6 +81,7 @@ export const getTechnicianKpi = async (): Promise<TechnicianKpi> => {
       supabase
         .from('business_cases')
         .select('pris, primary_assignee_id, created_at')
+        .is('legacy_archived_at', null)
         .eq('status', 'Avslutat')
         .not('pris', 'is', null)
         .gte('created_at', yearStart),
@@ -150,6 +152,7 @@ export const getTechnicianPerformance = async (): Promise<TechnicianPerformance[
       const { data: privateCases } = await supabase
         .from('private_cases')
         .select('pris')
+        .is('legacy_archived_at', null)
         .eq('primary_assignee_id', tech.id)
         .eq('status', 'Avslutat')
         .not('pris', 'is', null) || { data: [] }
@@ -158,6 +161,7 @@ export const getTechnicianPerformance = async (): Promise<TechnicianPerformance[
       const { data: businessCases } = await supabase
         .from('business_cases')
         .select('pris')
+        .is('legacy_archived_at', null)
         .eq('primary_assignee_id', tech.id)
         .eq('status', 'Avslutat')
         .not('pris', 'is', null) || { data: [] }
@@ -242,6 +246,7 @@ export const getTechnicianMonthlyData = async (monthsBack: number = 12): Promise
       const { data: privateMonthly } = await supabase
         .from('private_cases')
         .select('pris, created_at')
+        .is('legacy_archived_at', null)
         .eq('primary_assignee_id', tech.id)
         .eq('status', 'Avslutat')
         .not('pris', 'is', null)
@@ -252,6 +257,7 @@ export const getTechnicianMonthlyData = async (monthsBack: number = 12): Promise
       const { data: businessMonthly } = await supabase
         .from('business_cases')
         .select('pris, created_at')
+        .is('legacy_archived_at', null)
         .eq('primary_assignee_id', tech.id)
         .eq('status', 'Avslutat')
         .not('pris', 'is', null)
@@ -349,6 +355,7 @@ export const getPestSpecialization = async (): Promise<PestSpecialization[]> => 
       const { data: privateCases } = await supabase
         .from('private_cases')
         .select('skadedjur, pris')
+        .is('legacy_archived_at', null)
         .eq('primary_assignee_id', tech.id)
         .eq('status', 'Avslutat')
         .not('skadedjur', 'is', null)
@@ -381,6 +388,7 @@ export const getPestSpecialization = async (): Promise<PestSpecialization[]> => 
       const { data: businessCases } = await supabase
         .from('business_cases')
         .select('skadedjur, pris')
+        .is('legacy_archived_at', null)
         .eq('primary_assignee_id', tech.id)
         .eq('status', 'Avslutat')
         .not('skadedjur', 'is', null)

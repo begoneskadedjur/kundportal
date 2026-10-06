@@ -354,6 +354,7 @@ export class ContractService {
             id, company_name, contact_person, contact_email, products, price_list_id
           )
         `)
+        .is('legacy_archived_at', null)
         .order('created_at', { ascending: false })
 
       // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
@@ -688,6 +689,7 @@ export class ContractService {
           begone_employee_name, begone_employee_email, selected_products,
           company_name, contact_person
         `)
+        .is('legacy_archived_at', null)
 
       // Filtrera bort draft-kontrakt och kontrakt med oanvända mallar
       query = query.neq('status', 'draft')
@@ -1381,6 +1383,7 @@ export class ContractService {
       .select(
         'id, type, status, total_value, contract_length, created_at, updated_at, start_date, begone_employee_name, begone_employee_email, company_name, contact_person, customer_id'
       )
+      .is('legacy_archived_at', null)
       .neq('status', 'draft')
       .in('template_id', allowedTemplates)
       .gte('created_at', cutoffISO)

@@ -142,12 +142,12 @@ export default function TodayScheduleCard({ technicianId }: Props) {
         supabase.from('private_cases').select(selectFields)
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
           .gte('start_date', today).lt('start_date', tomorrowStr)
-          .is('deleted_at', null)
+          .is('deleted_at', null).is('legacy_archived_at', null)
           .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
         supabase.from('business_cases').select(`${selectFields}, company_name`)
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
           .gte('start_date', today).lt('start_date', tomorrowStr)
-          .is('deleted_at', null)
+          .is('deleted_at', null).is('legacy_archived_at', null)
           .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
       ])
 
@@ -167,12 +167,12 @@ export default function TodayScheduleCard({ technicianId }: Props) {
         supabase.from('private_cases').select(selectFields)
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
           .gte('start_date', tomorrowStr).lt('start_date', dayAfterStr)
-          .is('deleted_at', null)
+          .is('deleted_at', null).is('legacy_archived_at', null)
           .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
         supabase.from('business_cases').select(`${selectFields}, company_name`)
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
           .gte('start_date', tomorrowStr).lt('start_date', dayAfterStr)
-          .is('deleted_at', null)
+          .is('deleted_at', null).is('legacy_archived_at', null)
           .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
       ])
 

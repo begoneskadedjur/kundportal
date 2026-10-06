@@ -25,6 +25,7 @@ export const getCommissionKpis = async (month: string): Promise<CommissionKpi> =
     const { data: privateCases } = await supabase
       .from('private_cases')
       .select('commission_amount, primary_assignee_id, primary_assignee_name')
+      .is('legacy_archived_at', null)
       .not('commission_amount', 'is', null)
       .gte('completed_date', monthStart)
       .lt('completed_date', monthEnd)
@@ -33,6 +34,7 @@ export const getCommissionKpis = async (month: string): Promise<CommissionKpi> =
     const { data: businessCases } = await supabase
       .from('business_cases')
       .select('commission_amount, primary_assignee_id, primary_assignee_name')
+      .is('legacy_archived_at', null)
       .not('commission_amount', 'is', null)
       .gte('completed_date', monthStart)
       .lt('completed_date', monthEnd)
@@ -97,6 +99,7 @@ export const getCommissionMonthlyData = async (months: number = 6): Promise<Comm
     const { data: privateCases } = await supabase
       .from('private_cases')
       .select('commission_amount, completed_date, primary_assignee_id, primary_assignee_name')
+      .is('legacy_archived_at', null)
       .not('commission_amount', 'is', null)
       .gte('completed_date', startDateString)
       .not('primary_assignee_id', 'is', null)
@@ -104,6 +107,7 @@ export const getCommissionMonthlyData = async (months: number = 6): Promise<Comm
     const { data: businessCases } = await supabase
       .from('business_cases')
       .select('commission_amount, completed_date, primary_assignee_id, primary_assignee_name')
+      .is('legacy_archived_at', null)
       .not('commission_amount', 'is', null)
       .gte('completed_date', startDateString)
       .not('primary_assignee_id', 'is', null)
@@ -187,6 +191,7 @@ export const getTechnicianCommissionSummaries = async (month: string): Promise<T
         primary_assignee_name, primary_assignee_email, skadedjur, adress, 
         kontaktperson, billing_status
       `)
+      .is('legacy_archived_at', null)
       .not('commission_amount', 'is', null)
       .gte('completed_date', monthStart)
       .lt('completed_date', monthEnd)
@@ -199,6 +204,7 @@ export const getTechnicianCommissionSummaries = async (month: string): Promise<T
         primary_assignee_name, primary_assignee_email, skadedjur, adress, 
         kontaktperson, org_nr, bestallare, billing_status
       `)
+      .is('legacy_archived_at', null)
       .not('commission_amount', 'is', null)
       .gte('completed_date', monthStart)
       .lt('completed_date', monthEnd)
@@ -305,12 +311,14 @@ export const getAvailableTechnicians = async (): Promise<TechnicianFilter[]> => 
     const { data: techFromPrivate } = await supabase
       .from('private_cases')
       .select('primary_assignee_id, primary_assignee_name, primary_assignee_email')
+      .is('legacy_archived_at', null)
       .not('commission_amount', 'is', null)
       .not('primary_assignee_id', 'is', null)
 
     const { data: techFromBusiness } = await supabase
       .from('business_cases')
       .select('primary_assignee_id, primary_assignee_name, primary_assignee_email')
+      .is('legacy_archived_at', null)
       .not('commission_amount', 'is', null)
       .not('primary_assignee_id', 'is', null)
 
@@ -372,6 +380,7 @@ export const getCommissionCaseDetails = async (
         primary_assignee_name, primary_assignee_email, skadedjur, adress, 
         kontaktperson, billing_status
       `)
+      .is('legacy_archived_at', null)
       .not('commission_amount', 'is', null)
       .gte('completed_date', monthStart)
       .lt('completed_date', monthEnd)
@@ -384,6 +393,7 @@ export const getCommissionCaseDetails = async (
         primary_assignee_name, primary_assignee_email, skadedjur, adress, 
         kontaktperson, org_nr, bestallare, billing_status
       `)
+      .is('legacy_archived_at', null)
       .not('commission_amount', 'is', null)
       .gte('completed_date', monthStart)
       .lt('completed_date', monthEnd)

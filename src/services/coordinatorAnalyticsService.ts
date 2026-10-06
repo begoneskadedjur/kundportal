@@ -89,12 +89,14 @@ export const getCoordinatorKpiData = async (
       const { data: privateScheduling } = await supabase
         .from('private_cases')
         .select('created_at, start_date')
+        .is('legacy_archived_at', null)
         .not('start_date', 'is', null)
         .gte('created_at', startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
 
       const { data: businessScheduling } = await supabase
         .from('business_cases')
         .select('created_at, start_date')
+        .is('legacy_archived_at', null)
         .not('start_date', 'is', null)
         .gte('created_at', startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString());
 
@@ -128,12 +130,14 @@ export const getCoordinatorKpiData = async (
     const { data: todaysPrivateCases } = await supabase
       .from('private_cases')
       .select('primary_assignee_id, start_date, due_date')
+      .is('legacy_archived_at', null)
       .gte('start_date', new Date().toISOString().split('T')[0] + ' 00:00:00')
       .lte('start_date', new Date().toISOString().split('T')[0] + ' 23:59:59');
 
     const { data: todaysBusinessCases } = await supabase
       .from('business_cases')
       .select('primary_assignee_id, start_date, due_date')
+      .is('legacy_archived_at', null)
       .gte('start_date', new Date().toISOString().split('T')[0] + ' 00:00:00')
       .lte('start_date', new Date().toISOString().split('T')[0] + ' 23:59:59');
 
@@ -221,12 +225,14 @@ export const getSchedulingEfficiencyTrend = async (
     const { data: privateCases } = await supabase
       .from('private_cases')
       .select('created_at, start_date')
+      .is('legacy_archived_at', null)
       .not('start_date', 'is', null)
       .gte('created_at', startDate.toISOString());
 
     const { data: businessCases } = await supabase
       .from('business_cases')
       .select('created_at, start_date')
+      .is('legacy_archived_at', null)
       .not('start_date', 'is', null)
       .gte('created_at', startDate.toISOString());
 
@@ -356,6 +362,7 @@ export const getTechnicianUtilizationData = async (
       const { data: privateCases } = await supabase
         .from('private_cases')
         .select('start_date, due_date, pris')
+        .is('legacy_archived_at', null)
         .eq('primary_assignee_id', tech.id)
         .gte('start_date', periodStart.toISOString())
         .lte('start_date', periodEnd.toISOString());
@@ -363,6 +370,7 @@ export const getTechnicianUtilizationData = async (
       const { data: businessCases } = await supabase
         .from('business_cases')
         .select('start_date, due_date, pris')
+        .is('legacy_archived_at', null)
         .eq('primary_assignee_id', tech.id)
         .gte('start_date', periodStart.toISOString())
         .lte('start_date', periodEnd.toISOString());
@@ -427,12 +435,14 @@ export const getBusinessImpactMetrics = async (
     const { data: privateCases } = await supabase
       .from('private_cases')
       .select('pris, created_at, start_date, completed_date')
+      .is('legacy_archived_at', null)
       .gte('created_at', dateFilter.gte)
       .lte('created_at', dateFilter.lte || new Date().toISOString());
 
     const { data: businessCases } = await supabase
       .from('business_cases')
       .select('pris, created_at, start_date, completed_date')
+      .is('legacy_archived_at', null)
       .gte('created_at', dateFilter.gte)
       .lte('created_at', dateFilter.lte || new Date().toISOString());
 

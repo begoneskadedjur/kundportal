@@ -166,8 +166,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const [customersRes, techsRes, privateCasesRes, businessCasesRes] = await Promise.all([
         supabase.from('customers').select('*').eq('is_active', true),
         supabase.from('technicians').select('*').eq('is_active', true),
-        supabase.from('private_cases').select('*').order('created_at', { ascending: false }).limit(300),
-        supabase.from('business_cases').select('*').order('created_at', { ascending: false }).limit(300)
+        supabase.from('private_cases').select('*').is('legacy_archived_at', null).order('created_at', { ascending: false }).limit(300),
+        supabase.from('business_cases').select('*').is('legacy_archived_at', null).order('created_at', { ascending: false }).limit(300)
       ]);
 
       // Rensa gamla embeddings

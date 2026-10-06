@@ -46,8 +46,8 @@ export default function ReportModal({ isOpen, onClose, technicianId, onOpenCase 
         try {
             // KORRIGERING: Använder select('*') för att hämta ALLA kolumner.
             const [privateResult, businessResult] = await Promise.all([
-                supabase.from('private_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`),
-                supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`)
+                supabase.from('private_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).is('legacy_archived_at', null).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`),
+                supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId}`).is('legacy_archived_at', null).gte('start_date', startDate).lte('start_date', `${endDate}T23:59:59`)
             ]);
 
             if (privateResult.error) throw privateResult.error;

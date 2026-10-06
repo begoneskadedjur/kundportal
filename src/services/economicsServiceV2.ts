@@ -196,8 +196,8 @@ export const getRevenuePulse = async (months: number = 12): Promise<RevenuePulse
   // (case_billing_items.case_id saknar FK och kan peka mot cases / private_cases / business_cases)
   const [legacyRes, privateRes, businessRes] = await Promise.all([
     supabase.from('cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
-    supabase.from('private_cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
-    supabase.from('business_cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('private_cases').select('id, completed_date').is('legacy_archived_at', null).gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('business_cases').select('id, completed_date').is('legacy_archived_at', null).gte('completed_date', since).not('completed_date', 'is', null),
   ])
 
   const caseById = new Map<string, { completed_date: string }>()
@@ -242,8 +242,8 @@ export const getMarginByMonth = async (months: number = 12): Promise<MarginPoint
   // (case_billing_items.case_id saknar FK och kan peka mot cases / private_cases / business_cases)
   const [legacyRes, privateRes, businessRes] = await Promise.all([
     supabase.from('cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
-    supabase.from('private_cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
-    supabase.from('business_cases').select('id, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('private_cases').select('id, completed_date').is('legacy_archived_at', null).gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('business_cases').select('id, completed_date').is('legacy_archived_at', null).gte('completed_date', since).not('completed_date', 'is', null),
   ])
 
   const caseMonth = new Map<string, string | undefined>()
@@ -311,8 +311,8 @@ export const getServiceMarginRanking = async (
   // eftersom case_billing_items.case_id saknar FK och kan peka mot vilken som helst
   const [legacyRes, privateRes, businessRes] = await Promise.all([
     supabase.from('cases').select('id, completed_date').gte('completed_date', startDate).lte('completed_date', endDate).not('completed_date', 'is', null),
-    supabase.from('private_cases').select('id, completed_date').gte('completed_date', startDate).lte('completed_date', endDate).not('completed_date', 'is', null),
-    supabase.from('business_cases').select('id, completed_date').gte('completed_date', startDate).lte('completed_date', endDate).not('completed_date', 'is', null),
+    supabase.from('private_cases').select('id, completed_date').is('legacy_archived_at', null).gte('completed_date', startDate).lte('completed_date', endDate).not('completed_date', 'is', null),
+    supabase.from('business_cases').select('id, completed_date').is('legacy_archived_at', null).gte('completed_date', startDate).lte('completed_date', endDate).not('completed_date', 'is', null),
   ])
 
   const validCaseIds = new Set<string>([
@@ -726,8 +726,8 @@ export const getTechnicianMarginScatter = async (
   // cases (legacy): primary_technician_id/name | private_cases/business_cases: primary_assignee_id/name
   const [legacyRes, privateRes, businessRes] = await Promise.all([
     supabase.from('cases').select('id, primary_technician_id, primary_technician_name').gte('completed_date', startDate).lte('completed_date', endDate).not('primary_technician_id', 'is', null),
-    supabase.from('private_cases').select('id, primary_assignee_id, primary_assignee_name').gte('completed_date', startDate).lte('completed_date', endDate).not('primary_assignee_id', 'is', null),
-    supabase.from('business_cases').select('id, primary_assignee_id, primary_assignee_name').gte('completed_date', startDate).lte('completed_date', endDate).not('primary_assignee_id', 'is', null),
+    supabase.from('private_cases').select('id, primary_assignee_id, primary_assignee_name').is('legacy_archived_at', null).gte('completed_date', startDate).lte('completed_date', endDate).not('primary_assignee_id', 'is', null),
+    supabase.from('business_cases').select('id, primary_assignee_id, primary_assignee_name').is('legacy_archived_at', null).gte('completed_date', startDate).lte('completed_date', endDate).not('primary_assignee_id', 'is', null),
   ])
 
   const cases: Array<{ id: string; primary_technician_id: string; primary_technician_name: string }> = [
@@ -840,8 +840,8 @@ export const getCaseThroughput = async (months: number = 12): Promise<Throughput
   // Hämta från alla tre case-tabellerna
   const [legacyRes, privateRes, businessRes] = await Promise.all([
     supabase.from('cases').select('created_at, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
-    supabase.from('private_cases').select('created_at, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
-    supabase.from('business_cases').select('created_at, completed_date').gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('private_cases').select('created_at, completed_date').is('legacy_archived_at', null).gte('completed_date', since).not('completed_date', 'is', null),
+    supabase.from('business_cases').select('created_at, completed_date').is('legacy_archived_at', null).gte('completed_date', since).not('completed_date', 'is', null),
   ])
   const cases: Array<{ created_at: string; completed_date: string }> = [
     ...((legacyRes.data || []) as any[]),

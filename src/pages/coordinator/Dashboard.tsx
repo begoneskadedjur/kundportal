@@ -169,21 +169,21 @@ export default function CoordinatorDashboard() {
           // Expiring contracts
           expiringContractsResult,
         ] = await Promise.all([
-          supabase.from('private_cases').select('id', { count: 'exact', head: true }).in('status', unplannedStatuses),
-          supabase.from('business_cases').select('id', { count: 'exact', head: true }).in('status', unplannedStatuses),
-          supabase.from('private_cases').select('id', { count: 'exact', head: true }).gte('start_date', todayStart).lte('start_date', todayEnd),
-          supabase.from('business_cases').select('id', { count: 'exact', head: true }).gte('start_date', todayStart).lte('start_date', todayEnd),
-          supabase.from('private_cases').select('id', { count: 'exact', head: true }).gte('completed_date', weekAgoStart),
-          supabase.from('business_cases').select('id', { count: 'exact', head: true }).gte('completed_date', weekAgoStart),
+          supabase.from('private_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null).in('status', unplannedStatuses),
+          supabase.from('business_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null).in('status', unplannedStatuses),
+          supabase.from('private_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null).gte('start_date', todayStart).lte('start_date', todayEnd),
+          supabase.from('business_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null).gte('start_date', todayStart).lte('start_date', todayEnd),
+          supabase.from('private_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null).gte('completed_date', weekAgoStart),
+          supabase.from('business_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null).gte('completed_date', weekAgoStart),
           supabase.from('technicians').select('*').eq('is_active', true).eq('role', 'Skadedjurstekniker'),
           supabase.from('technician_absences').select('*')
             .lte('start_date', todayDateString + ' 23:59:59')
             .gte('end_date', todayDateString + ' 00:00:00'),
-          supabase.from('private_cases').select('*').order('created_at', { ascending: false }),
-          supabase.from('business_cases').select('*').order('created_at', { ascending: false }),
+          supabase.from('private_cases').select('*').is('legacy_archived_at', null).order('created_at', { ascending: false }),
+          supabase.from('business_cases').select('*').is('legacy_archived_at', null).order('created_at', { ascending: false }),
           // Previous 7 days (for trend): completed between 14 and 7 days ago
-          supabase.from('private_cases').select('id', { count: 'exact', head: true }).gte('completed_date', twoWeeksAgoStart).lt('completed_date', weekAgoStart),
-          supabase.from('business_cases').select('id', { count: 'exact', head: true }).gte('completed_date', twoWeeksAgoStart).lt('completed_date', weekAgoStart),
+          supabase.from('private_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null).gte('completed_date', twoWeeksAgoStart).lt('completed_date', weekAgoStart),
+          supabase.from('business_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null).gte('completed_date', twoWeeksAgoStart).lt('completed_date', weekAgoStart),
           // Expiring contracts
           getExpiringContracts().catch(() => [] as ExpiringContract[]),
         ])

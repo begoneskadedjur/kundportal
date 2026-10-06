@@ -106,8 +106,8 @@ export default function CustomerJourney() {
     try {
       const selectFields = 'id, title, status, kontaktperson, telefon_kontaktperson, pris, start_date, completed_date, created_at, skadedjur'
 
-      let privateQuery = supabase.from('private_cases').select(selectFields).gte('created_at', startDate).is('deleted_at', null)
-      let businessQuery = supabase.from('business_cases').select(`${selectFields}, company_name`).gte('created_at', startDate).is('deleted_at', null)
+      let privateQuery = supabase.from('private_cases').select(selectFields).gte('created_at', startDate).is('deleted_at', null).is('legacy_archived_at', null)
+      let businessQuery = supabase.from('business_cases').select(`${selectFields}, company_name`).gte('created_at', startDate).is('deleted_at', null).is('legacy_archived_at', null)
 
       if (selectedTechnician.id !== 'all') {
         privateQuery = privateQuery.eq('primary_assignee_id', selectedTechnician.id)
@@ -134,7 +134,7 @@ export default function CustomerJourney() {
       const caseIds = allCases.map(c => c.id)
       if (caseIds.length > 0) {
         const [contractsRes, invoicesRes] = await Promise.allSettled([
-          supabase.from('contracts').select('source_id, status, type').in('source_id', caseIds),
+          supabase.from('contracts').select('source_id, status, type').in('source_id', caseIds).is('legacy_archived_at', null),
           supabase.from('invoices').select('case_id, status').in('case_id', caseIds).neq('status', 'cancelled'),
         ])
 

@@ -207,7 +207,7 @@ export default function CoordinatorSchedule() {
           parent_case_id, created_by_technician_id, created_by_technician_name,
           service_id, service:services!service_id(name),
           oneflow_contract_id
-        `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
+        `).is('legacy_archived_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('business_cases').select(`
           id, title, status, priority, start_date, due_date, created_at, updated_at,
           adress, kontaktperson, skadedjur, annat_skadedjur, bestallare, company_name,
@@ -221,7 +221,7 @@ export default function CoordinatorSchedule() {
           parent_case_id, created_by_technician_id, created_by_technician_name,
           service_id, service:services!service_id(name),
           oneflow_contract_id
-        `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
+        `).is('legacy_archived_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('cases').select(`
           *, customer:customers(
             company_name, contact_address, contact_person, contact_phone,

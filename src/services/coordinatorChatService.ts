@@ -50,6 +50,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
       supabase
         .from('private_cases')
         .select('*')
+        .is('legacy_archived_at', null)
         .gte('created_at', oneWeekAgo)
         .order('created_at', { ascending: false })
         .limit(100),
@@ -58,6 +59,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
       supabase
         .from('business_cases')
         .select('*')
+        .is('legacy_archived_at', null)
         .gte('created_at', oneWeekAgo)
         .order('created_at', { ascending: false })
         .limit(100),
@@ -90,6 +92,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
           id, title, description, adress, start_date, due_date, status,
           primary_assignee_id, secondary_assignee_id, tertiary_assignee_id
         `)
+        .is('legacy_archived_at', null)
         .gte('start_date', today)
         .lte('start_date', oneWeekFromNow)
         .not('start_date', 'is', null)
@@ -104,6 +107,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
           primary_assignee_id, secondary_assignee_id, tertiary_assignee_id,
           adress, status
         `)
+        .is('legacy_archived_at', null)
         .not('pris', 'is', null)
         .gte('created_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()) // SENASTE ÅRET
         .order('created_at', { ascending: false }) // Sortera efter datum för relevans
@@ -118,6 +122,7 @@ export const getCoordinatorChatData = async (): Promise<CoordinatorChatData> => 
           primary_assignee_id, secondary_assignee_id, tertiary_assignee_id,
           adress, status
         `)
+        .is('legacy_archived_at', null)
         .not('pris', 'is', null)
         .gte('created_at', new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString()) // SENASTE ÅRET
         .order('created_at', { ascending: false }) // Sortera efter datum för relevans
@@ -245,6 +250,7 @@ const analyzeScheduleGaps = async (technicians: any[], startDate: string, endDat
     const { data: scheduledCases } = await supabase
       .from('private_cases')
       .select('start_date, due_date')
+      .is('legacy_archived_at', null)
       .eq('primary_assignee_id', tech.id)
       .gte('start_date', startDate)
       .lte('start_date', endDate)
@@ -334,6 +340,7 @@ const analyzeTechnicianAvailability = async (technicians: any[], startDate: stri
     const { data: scheduledCases } = await supabase
       .from('private_cases')
       .select('start_date, due_date')
+      .is('legacy_archived_at', null)
       .eq('primary_assignee_id', tech.id)
       .gte('start_date', startDate)
       .lte('start_date', endDate)
@@ -374,8 +381,8 @@ const calculatePerformanceMetrics = async () => {
   
   // Hämta grunddata för senaste veckan
   const [privateCases, businessCases] = await Promise.all([
-    supabase.from('private_cases').select('*').gte('created_at', oneWeekAgo),
-    supabase.from('business_cases').select('*').gte('created_at', oneWeekAgo)
+    supabase.from('private_cases').select('*').is('legacy_archived_at', null).gte('created_at', oneWeekAgo),
+    supabase.from('business_cases').select('*').is('legacy_archived_at', null).gte('created_at', oneWeekAgo)
   ]);
 
   const allCases = [...(privateCases.data || []), ...(businessCases.data || [])];

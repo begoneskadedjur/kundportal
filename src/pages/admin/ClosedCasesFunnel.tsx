@@ -94,9 +94,11 @@ export default function ClosedCasesFunnel() {
       const selectFields = 'id, title, status, kontaktperson, telefon_kontaktperson, pris, start_date, completed_date, created_at, skadedjur, deleted_at, close_reason, close_reason_notes, deleted_by_technician_name'
 
       let privateQuery = supabase.from('private_cases').select(selectFields)
+        .is('legacy_archived_at', null)
         .not('deleted_at', 'is', null)
         .gte('deleted_at', startDate)
       let businessQuery = supabase.from('business_cases').select(`${selectFields}, company_name`)
+        .is('legacy_archived_at', null)
         .not('deleted_at', 'is', null)
         .gte('deleted_at', startDate)
 

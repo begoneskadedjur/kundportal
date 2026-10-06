@@ -14,6 +14,7 @@ interface SearchResult {
   adress: any
   personnummer?: string | null
   org_nr?: string | null
+  legacy_archived_at?: string | null
   case_type: SearchCaseType
 }
 
@@ -49,6 +50,8 @@ function formatAddress(adress: any): string {
 export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
   const [query, setQuery] = useState('')
   const [includeCompleted, setIncludeCompleted] = useState(false)
+  // Arkiverade ClickUp-ärenden (legacy_archived_at satt) döljs som standard
+  const [includeArchived, setIncludeArchived] = useState(false)
   const [results, setResults] = useState<SearchResult[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
@@ -69,7 +72,7 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
     return () => document.removeEventListener('mousedown', handler)
   }, [isOpen])
 
-  const performSearch = useCallback(async (term: string, inclCompleted: boolean) => {
+  const performSearch = useCallback(async (term: string, inclCompleted: boolean, inclArchived: boolean) => {
     if (term.length < 2) {
       setResults([])
       setIsOpen(false)
@@ -85,14 +88,14 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
 
       let privateQuery = supabase
         .from('private_cases')
-        .select('id, case_number, status, kontaktperson, skadedjur, adress, personnummer')
+        .select('id, case_number, status, kontaktperson, skadedjur, adress, personnummer, legacy_archived_at')
         .or(privateFilter)
         .order('created_at', { ascending: false })
         .limit(10)
 
       let businessQuery = supabase
         .from('business_cases')
-        .select('id, case_number, status, kontaktperson, company_name, bestallare, skadedjur, adress, org_nr')
+        .select('id, case_number, status, kontaktperson, company_name, bestallare, skadedjur, adress, org_nr, legacy_archived_at')
         .or(businessFilter)
         .order('created_at', { ascending: false })
         .limit(10)
@@ -124,6 +127,12 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
         contractQuery = contractQuery.not('status', 'in', '("Avslutat","Borttaget")')
         privateQuery = privateQuery.not('status', 'in', '("Avslutat","Borttaget")')
         businessQuery = businessQuery.not('status', 'in', '("Avslutat","Borttaget")')
+      }
+
+      // cases-tabellen har ingen arkivkolumn, bara private/business filtreras
+      if (!inclArchived) {
+        privateQuery = privateQuery.is('legacy_archived_at', null)
+        businessQuery = businessQuery.is('legacy_archived_at', null)
       }
 
       const [privateRes, businessRes, contractRes] = await Promise.all([privateQuery, businessQuery, contractQuery])
@@ -172,7 +181,7 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
   const handleInputChange = (value: string) => {
     setQuery(value)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => performSearch(value, includeCompleted), 300)
+    debounceRef.current = setTimeout(() => performSearch(value, includeCompleted, includeArchived), 300)
   }
 
   const handleToggleCompleted = () => {
@@ -180,7 +189,16 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
     setIncludeCompleted(next)
     if (query.length >= 2) {
       if (debounceRef.current) clearTimeout(debounceRef.current)
-      performSearch(query, next)
+      performSearch(query, next, includeArchived)
+    }
+  }
+
+  const handleToggleArchived = () => {
+    const next = !includeArchived
+    setIncludeArchived(next)
+    if (query.length >= 2) {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      performSearch(query, includeCompleted, next)
     }
   }
 
@@ -252,6 +270,17 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
           />
           Inkl. avslutade
         </label>
+
+        {/* Visa arkiv (gamla ClickUp-ärenden) */}
+        <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer whitespace-nowrap select-none">
+          <input
+            type="checkbox"
+            checked={includeArchived}
+            onChange={handleToggleArchived}
+            className="w-3 h-3 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f] focus:ring-offset-0 cursor-pointer"
+          />
+          Visa arkiv
+        </label>
       </div>
 
       {/* Dropdown med resultat */}
@@ -289,6 +318,9 @@ export function ScheduleSearch({ onSelectCase }: ScheduleSearchProps) {
                       <span className="text-xs font-medium text-white truncate">{getDisplayName(r)}</span>
                       {r.case_number && (
                         <span className="text-[10px] text-slate-500 shrink-0">{r.case_number}</span>
+                      )}
+                      {r.legacy_archived_at && (
+                        <span className="text-[10px] text-slate-500 shrink-0">Arkiv (ClickUp)</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">

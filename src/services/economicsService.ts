@@ -137,6 +137,7 @@ export const getKpiData = async (): Promise<KpiData> => {
     const { data: privateData } = await supabase
       .from('private_cases')
       .select('pris')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', `${currentYear}-01-01`)
       .lte('completed_date', `${currentYear}-12-31`)
@@ -145,6 +146,7 @@ export const getKpiData = async (): Promise<KpiData> => {
     const { data: businessData } = await supabase
       .from('business_cases')
       .select('pris')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', `${currentYear}-01-01`)
       .lte('completed_date', `${currentYear}-12-31`)
@@ -203,6 +205,7 @@ export const getMonthlyRevenue = async (): Promise<MonthlyRevenue[]> => {
     const { data: privateCases } = await supabase
       .from('private_cases')
       .select('pris, completed_date')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', twelveMonthsAgo.toISOString().split('T')[0])
       .not('completed_date', 'is', null)
@@ -211,6 +214,7 @@ export const getMonthlyRevenue = async (): Promise<MonthlyRevenue[]> => {
     const { data: businessCases } = await supabase
       .from('business_cases')
       .select('pris, completed_date')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', twelveMonthsAgo.toISOString().split('T')[0])
       .not('completed_date', 'is', null)
@@ -294,6 +298,7 @@ export const getBeGoneMonthlyStats = async (): Promise<BeGoneMonthlyStats[]> => 
     const { data: privateCases } = await supabase
       .from('private_cases')
       .select('pris, completed_date')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', dateString)
       .not('completed_date', 'is', null)
@@ -302,6 +307,7 @@ export const getBeGoneMonthlyStats = async (): Promise<BeGoneMonthlyStats[]> => 
     const { data: businessCases } = await supabase
       .from('business_cases')
       .select('pris, completed_date')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', dateString)
       .not('completed_date', 'is', null)
@@ -397,6 +403,7 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
     const { data: completedPrivateCases } = await supabase
       .from('private_cases')
       .select('pris, completed_date, created_at')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', monthStart)
       .lt('completed_date', monthEnd)
@@ -405,6 +412,7 @@ export const getCaseEconomy = async (): Promise<CaseEconomy> => {
     const { data: completedBusinessCases } = await supabase
       .from('business_cases')
       .select('pris, completed_date, created_at')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', monthStart)
       .lt('completed_date', monthEnd)
@@ -619,12 +627,14 @@ export const getTechnicianRevenue = async (): Promise<TechnicianRevenue[]> => {
           supabase
             .from('private_cases')
             .select('pris')
+            .is('legacy_archived_at', null)
             .eq('primary_assignee_id', tech.id)
             .eq('status', 'Avslutat')
             .not('pris', 'is', null),
           supabase
             .from('business_cases')
             .select('pris')
+            .is('legacy_archived_at', null)
             .eq('primary_assignee_id', tech.id)
             .eq('status', 'Avslutat')
             .not('pris', 'is', null),
@@ -918,6 +928,7 @@ export const getKpiDataWithTrends = async (
     const { data: prevPrivate } = await supabase
       .from('private_cases')
       .select('pris')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', prevStart)
       .lte('completed_date', prevEnd)
@@ -926,6 +937,7 @@ export const getKpiDataWithTrends = async (
     const { data: prevBusiness } = await supabase
       .from('business_cases')
       .select('pris')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', prevStart)
       .lte('completed_date', prevEnd)
@@ -1004,6 +1016,7 @@ export const getRevenueHealthMix = async (startDate: string, endDate: string): P
     const { data: privateData } = await supabase
       .from('private_cases')
       .select('pris')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', startDate)
       .lte('completed_date', endDate)
@@ -1012,6 +1025,7 @@ export const getRevenueHealthMix = async (startDate: string, endDate: string): P
     const { data: businessData } = await supabase
       .from('business_cases')
       .select('pris')
+      .is('legacy_archived_at', null)
       .eq('status', 'Avslutat')
       .gte('completed_date', startDate)
       .lte('completed_date', endDate)

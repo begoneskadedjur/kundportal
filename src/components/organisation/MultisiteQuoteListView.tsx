@@ -94,6 +94,8 @@ const MultisiteQuoteListView: React.FC<MultisiteQuoteListViewProps> = ({ userRol
           )
         `)
         .eq('type', 'offer')
+        // Gamla Oneflow-offerter (före 2026-05-01) är arkiverade och visas aldrig för kunden
+        .is('legacy_archived_at', null)
         .eq('customers.organization_id', orgId)
         .eq('customers.is_multisite', true)
         .eq('customers.is_active', true)

@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.31.0',
+    date: '2026-10-06',
+    title: 'Ny start: bara portalens egna ärenden räknas',
+    items: [
+      { kind: 'andring', text: 'Statistik, översikter och listor räknar nu bara ärenden och offerter från portalen. Det gäller dashboards, ekonomi, teknikerstatistik, kundresa, försäljningspipeline, dokumentsignering och AI-assistenterna. De gamla ClickUp-ärendena är arkiverade.' },
+      { kind: 'andring', text: 'Kalendrarna för koordinator och tekniker visar inte längre gamla ClickUp-bokningar, inte heller bakåt i tiden.' },
+      { kind: 'nyhet', text: 'Ärendesöken och sökningen i schemat har kryssrutan Visa arkiv, för när en kund hör av sig om ett gammalt ärende. Arkiverade träffar är märkta Arkiv (ClickUp).' },
+      { kind: 'andring', text: 'Kundkortets siffror räknar bara nya ärenden. Historiken visar fortfarande allt, med gamla ärenden märkta Arkiv (ClickUp). Kunderna ser inte längre gamla offerter i kundportalen.' },
+    ],
+  },
+  {
     version: '3.30.0',
     date: '2026-10-06',
     title: 'Gamla ärenden från ClickUp är arkiverade',

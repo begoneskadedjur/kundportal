@@ -159,7 +159,8 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
     // fakturarad att visa — därför bara i summeringen, se noten under.
     const invoicedCaseIds = new Set(live.filter((i) => i.case_id).map((i) => i.case_id))
     const caseRevenue = cases
-      .filter((c) => Number(c.price ?? 0) > 0 && isCaseCompleted(c) && !invoicedCaseIds.has(c.id))
+      // Arkiverad ClickUp-historik (legacy_archived_at) räknas inte i siffrorna
+      .filter((c) => !c.legacy_archived_at && Number(c.price ?? 0) > 0 && isCaseCompleted(c) && !invoicedCaseIds.has(c.id))
       .reduce((s, c) => s + Number(c.price ?? 0), 0)
 
     // Fortnox-historik som bara finns i faktureringsunderlaget. 13 fakturor

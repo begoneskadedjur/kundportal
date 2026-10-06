@@ -402,10 +402,12 @@ export default function CasesPage() {
         supabase
           .from('private_cases')
           .select('*, service:services(name)')
+          .is('legacy_archived_at', null)
           .order('due_date', { ascending: true, nullsFirst: false }),
         supabase
           .from('business_cases')
           .select('*, service:services(name)')
+          .is('legacy_archived_at', null)
           .order('due_date', { ascending: true, nullsFirst: false }),
         supabase
           .from('cases')

@@ -26,6 +26,7 @@ import {
   type RecordCustomer,
   type RecordInvoice,
   type RecordWorkItem,
+  isLegacyArchived,
 } from '../../../../hooks/useCustomerRecord'
 import { buildRevenueEntries, sumPipeline, sumRevenue } from '../../../../utils/customerRevenue'
 import WorkChainSection from './WorkChainSection'
@@ -54,10 +55,13 @@ export default function RevenueSection({ root, units, invoices, additions, cases
   const model = useMemo(() => {
     // Båda världarna i en ström: portalens fakturor, Fortnox-importen och
     // ClickUp-erans utförda ärenden. De överlappar aldrig.
-    const all = buildRevenueEntries(invoices, cases, root.id, billingItems)
+    // Arkiverade ClickUp-ärenden (legacy_archived_at) syns i ärendelistan men
+    // räknas aldrig i kortets siffror.
+    const kpiCases = cases.filter((c) => !isLegacyArchived(c))
+    const all = buildRevenueEntries(invoices, kpiCases, root.id, billingItems)
     const entries = showHistorical ? all : all.filter((e) => !e.historical)
     const totals = sumRevenue(entries)
-    const pipeline = sumPipeline(cases)
+    const pipeline = sumPipeline(kpiCases)
 
     // Per år — bara år med data. Ett enda år ger ingen kurva värd namnet.
     const yearMap = new Map<string, { year: string; avtal: number; mer: number }>()

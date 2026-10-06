@@ -17,6 +17,7 @@ export class CasePipelineService {
     const { data: offers, error } = await supabase
       .from('contracts')
       .select(OFFER_COLUMNS)
+      .is('legacy_archived_at', null)
       .in('status', ['pending', 'signed', 'overdue', 'declined'])
       .order('created_at', { ascending: true })
 

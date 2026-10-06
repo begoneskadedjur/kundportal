@@ -403,6 +403,7 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
       const { data: privateCases } = await supabase
         .from('private_cases')
         .select('id, title, kontaktperson, adress, start_date, due_date, status, skadedjur')
+        .is('legacy_archived_at', null)
         .eq('primary_assignee_id', technicianId)
         .gte('start_date', today + ' 00:00:00')
         .lte('start_date', today + ' 23:59:59')
@@ -411,6 +412,7 @@ const GeographicOptimizationMap: React.FC<GeographicOptimizationMapProps> = ({ d
       const { data: businessCases } = await supabase
         .from('business_cases')
         .select('id, title, kontaktperson, adress, start_date, due_date, status, skadedjur')
+        .is('legacy_archived_at', null)
         .eq('primary_assignee_id', technicianId)
         .gte('start_date', today + ' 00:00:00')
         .lte('start_date', today + ' 23:59:59')

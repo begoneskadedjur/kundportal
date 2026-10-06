@@ -971,6 +971,8 @@ export default function ContractCasesSection({
         continue
       }
       if (t < yearAgo) continue
+      // Arkiverad ClickUp-historik syns i flödet men räknas inte
+      if (r.case.legacy_archived_at) continue
       counts[r.cat]++
       if (r.done && (!latest[r.cat] || (r.date ?? '') > (latest[r.cat] as string))) latest[r.cat] = r.date ?? undefined
     }
@@ -1228,7 +1230,10 @@ export default function ContractCasesSection({
   const extra = useMemo(() => {
     const now = Date.now()
     const yearAgo = now - 365 * DAY
-    const all = base.rows.filter((r) => r.cat === 'extra')
+    // Arkiverad ClickUp-historik (legacy_archived_at) ingår inte i analysen:
+    // artrader, intäkt, kön "sålt men inte utfört" och tempot räknas bara på
+    // ärenden från och med 2026-05-01. Ärendeflödet nedan visar fortfarande allt.
+    const all = base.rows.filter((r) => r.cat === 'extra' && !r.case.legacy_archived_at)
     const inWindow = all.filter((r) => new Date(r.date ?? 0).getTime() >= yearAgo)
 
     // Artrader: gruppera på skadedjur, största först, max 5 + Övrigt
@@ -1978,6 +1983,7 @@ export default function ContractCasesSection({
                     <span className="block truncate text-[11.5px] text-slate-500">
                       {r.case.pest_type}
                       {r.unitName && `${r.case.pest_type ? ' · ' : ''}${r.unitName}`}
+                      {r.case.legacy_archived_at && `${r.case.pest_type || r.unitName ? ' · ' : ''}Arkiv (ClickUp)`}
                     </span>
                   </span>
                   <span className="truncate text-xs text-slate-400 max-md:hidden">{r.case.primary_technician_name ?? ''}</span>

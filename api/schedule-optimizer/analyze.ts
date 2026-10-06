@@ -120,6 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       supabase
         .from('private_cases')
         .select('*')
+        .is('legacy_archived_at', null)
         .or(`primary_assignee_id.in.(${technician_ids.join(',')}),secondary_assignee_id.in.(${technician_ids.join(',')}),tertiary_assignee_id.in.(${technician_ids.join(',')})`)
         .gte('start_date', startDateTime)
         .lte('start_date', endDateTime)
@@ -128,6 +129,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       supabase
         .from('business_cases')
         .select('*')
+        .is('legacy_archived_at', null)
         .or(`primary_assignee_id.in.(${technician_ids.join(',')}),secondary_assignee_id.in.(${technician_ids.join(',')}),tertiary_assignee_id.in.(${technician_ids.join(',')})`)
         .gte('start_date', startDateTime)
         .lte('start_date', endDateTime)
@@ -1249,6 +1251,7 @@ async function fetchExistingBookings(technicianIds: string[], startDate: string,
       supabase
         .from('private_cases')
         .select('id, title, start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, skadedjur')
+        .is('legacy_archived_at', null)
         .or(`primary_assignee_id.in.(${technicianIds.join(',')}),secondary_assignee_id.in.(${technicianIds.join(',')}),tertiary_assignee_id.in.(${technicianIds.join(',')})`)
         .gte('start_date', `${startDate}T00:00:00`)
         .lte('start_date', `${endDate}T23:59:59`)
@@ -1257,6 +1260,7 @@ async function fetchExistingBookings(technicianIds: string[], startDate: string,
       supabase
         .from('business_cases')
         .select('id, title, start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, skadedjur')
+        .is('legacy_archived_at', null)
         .or(`primary_assignee_id.in.(${technicianIds.join(',')}),secondary_assignee_id.in.(${technicianIds.join(',')}),tertiary_assignee_id.in.(${technicianIds.join(',')})`)
         .gte('start_date', `${startDate}T00:00:00`)
         .lte('start_date', `${endDate}T23:59:59`)

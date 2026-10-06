@@ -54,7 +54,20 @@ const QuoteListView: React.FC<QuoteListViewProps> = ({ customerId }) => {
 
       if (error) throw error
 
-      setQuotes(data || [])
+      // quotes_secure_view saknar legacy_archived_at. Arkiverade offerter
+      // (gamla Oneflow-dokument före 2026-05-01) slås därför upp i contracts
+      // och tas bort här, så de aldrig visas för kunden.
+      const rows = data || []
+      let archivedIds = new Set<string>()
+      if (rows.length > 0) {
+        const { data: archived } = await supabase
+          .from('contracts')
+          .select('id')
+          .in('id', rows.map((q) => q.id))
+          .not('legacy_archived_at', 'is', null)
+        archivedIds = new Set((archived ?? []).map((a) => a.id))
+      }
+      setQuotes(rows.filter((q) => !archivedIds.has(q.id)))
     } catch (error: any) {
       console.error('Error fetching quotes:', error)
       setError(`Kunde inte hämta offerter: ${error.message}`)

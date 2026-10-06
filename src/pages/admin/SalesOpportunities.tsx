@@ -224,6 +224,7 @@ const SalesOpportunities: React.FC = () => {
             primary_assignee_name, skadedjur, adress, description,
             kontaktperson, telefon_kontaktperson, e_post_kontaktperson, personnummer
           `)
+          .is('legacy_archived_at', null)
           .eq('status', 'Avslutat')
           .gte('completed_date', startDateString)
           .lt('completed_date', endDateString)
@@ -237,6 +238,7 @@ const SalesOpportunities: React.FC = () => {
             primary_assignee_name, skadedjur, adress, description,
             kontaktperson, telefon_kontaktperson, e_post_kontaktperson, org_nr
           `)
+          .is('legacy_archived_at', null)
           .eq('status', 'Avslutat')
           .gte('completed_date', startDateString)
           .lt('completed_date', endDateString)

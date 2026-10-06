@@ -107,6 +107,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
         supabase
           .from('private_cases')
           .select('*')
+          .is('legacy_archived_at', null)
           .gte('start_date', todayStart)
           .lte('start_date', todayEnd)
           .not('adress', 'is', null),
@@ -114,6 +115,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
         supabase
           .from('business_cases')
           .select('*')
+          .is('legacy_archived_at', null)
           .gte('start_date', todayStart)
           .lte('start_date', todayEnd)
           .not('adress', 'is', null),
@@ -143,6 +145,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           supabase
             .from('private_cases')
             .select('*')
+            .is('legacy_archived_at', null)
             .gte('start_date', weekAgoStart)
             .not('adress', 'is', null)
             .limit(10),
@@ -150,6 +153,7 @@ const GeographicOverview: React.FC<GeographicOverviewProps> = ({ className = '' 
           supabase
             .from('business_cases')
             .select('*')
+            .is('legacy_archived_at', null)
             .gte('start_date', weekAgoStart)
             .not('adress', 'is', null)
             .limit(10)

@@ -390,43 +390,43 @@ const AdminDashboard: React.FC = () => {
         supabase.from('profiles').select('id, display_name, role, technician_id, email, technicians(name)')
           .in('role', ['admin', 'koordinator', 'technician']).eq('is_active', true),
         // Öppna ärenden
-        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+        supabase.from('private_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null)
           .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
-        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+        supabase.from('business_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null)
           .not('status', 'in', '("Avslutat","Stängt - slasklogg")'),
         // Inbokade idag
-        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+        supabase.from('private_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null)
           .gte('start_date', todayStart).lte('start_date', todayEnd),
-        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+        supabase.from('business_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null)
           .gte('start_date', todayStart).lte('start_date', todayEnd),
         // Slutförda idag
-        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+        supabase.from('private_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null)
           .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
-        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+        supabase.from('business_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null)
           .eq('status', 'Avslutat').gte('completed_date', todayStart).lte('completed_date', todayEnd),
         // Genomförda denna period (med pris för intäkt)
-        supabase.from('private_cases').select('id, title, kontaktperson, pris, completed_date')
+        supabase.from('private_cases').select('id, title, kontaktperson, pris, completed_date').is('legacy_archived_at', null)
           .eq('status', 'Avslutat').gte('completed_date', periodStartISO),
-        supabase.from('business_cases').select('id, title, kontaktperson, pris, completed_date')
+        supabase.from('business_cases').select('id, title, kontaktperson, pris, completed_date').is('legacy_archived_at', null)
           .eq('status', 'Avslutat').gte('completed_date', periodStartISO),
         supabase.from('cases').select('id, price, completed_date')
           .not('completed_date', 'is', null)
           .gte('completed_date', periodStartISO),
         // Genomförda föregående period (count)
-        supabase.from('private_cases').select('id', { count: 'exact', head: true })
+        supabase.from('private_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null)
           .eq('status', 'Avslutat')
           .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
-        supabase.from('business_cases').select('id', { count: 'exact', head: true })
+        supabase.from('business_cases').select('id', { count: 'exact', head: true }).is('legacy_archived_at', null)
           .eq('status', 'Avslutat')
           .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
         supabase.from('cases').select('id', { count: 'exact', head: true })
           .not('completed_date', 'is', null)
           .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
         // Intäkt föregående period
-        supabase.from('private_cases').select('pris')
+        supabase.from('private_cases').select('pris').is('legacy_archived_at', null)
           .eq('status', 'Avslutat').not('pris', 'is', null)
           .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
-        supabase.from('business_cases').select('pris')
+        supabase.from('business_cases').select('pris').is('legacy_archived_at', null)
           .eq('status', 'Avslutat').not('pris', 'is', null)
           .gte('completed_date', prevStartISO).lte('completed_date', prevEndISO),
         supabase.from('cases').select('price')
@@ -447,10 +447,10 @@ const AdminDashboard: React.FC = () => {
           .eq('status', 'billed')
           .gte('created_at', prevStartISO).lte('created_at', prevEndISO),
         // Sparkline: avslutade ärenden senaste 7 dagar (med pris och datum)
-        supabase.from('private_cases').select('completed_date, pris')
+        supabase.from('private_cases').select('completed_date, pris').is('legacy_archived_at', null)
           .eq('status', 'Avslutat').not('completed_date', 'is', null)
           .gte('completed_date', sevenDaysAgoISO),
-        supabase.from('business_cases').select('completed_date, pris')
+        supabase.from('business_cases').select('completed_date, pris').is('legacy_archived_at', null)
           .eq('status', 'Avslutat').not('completed_date', 'is', null)
           .gte('completed_date', sevenDaysAgoISO),
         supabase.from('cases').select('completed_date, price')

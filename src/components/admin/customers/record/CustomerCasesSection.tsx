@@ -144,6 +144,8 @@ function RoomCasesView({
     const latest: Partial<Record<FlowCat, string>> = {}
     for (const r of rows) {
       if (new Date(r.date ?? 0).getTime() < yearAgo) continue
+      // Arkiverad ClickUp-historik syns i flödet men räknas inte
+      if (r.case.legacy_archived_at) continue
       counts[r.cat]++
       if (!latest[r.cat] || (r.date ?? '') > (latest[r.cat] as string)) latest[r.cat] = r.date ?? undefined
     }
@@ -321,6 +323,7 @@ function RoomCasesView({
                     {r.case.room_number && (r.case.pest_type || r.unitName) && ' · '}
                     {r.case.pest_type}
                     {r.unitName && `${r.case.pest_type ? ' · ' : ''}${r.unitName}`}
+                    {r.case.legacy_archived_at && `${r.case.room_number || r.case.pest_type || r.unitName ? ' · ' : ''}Arkiv (ClickUp)`}
                   </span>
                 </span>
                 <span className="truncate text-xs text-slate-400 max-md:hidden">{r.case.primary_technician_name ?? ''}</span>

@@ -104,6 +104,7 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   const { data: privateCases, error: privateError } = await supabase
     .from('private_cases')
     .select('id, start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title, status')
+    .is('legacy_archived_at', null)
     .or(`primary_assignee_id.in.(${staffIds.join(',')}),secondary_assignee_id.in.(${staffIds.join(',')}),tertiary_assignee_id.in.(${staffIds.join(',')})`)
     .gte('start_date', from.toISOString())
     .lte('start_date', to.toISOString())
@@ -143,6 +144,7 @@ export async function getSchedules(staff: StaffMember[], from: Date, to: Date): 
   const { data: businessCases, error: businessError } = await supabase
     .from('business_cases')
     .select('id, start_date, due_date, primary_assignee_id, secondary_assignee_id, tertiary_assignee_id, adress, title, status')
+    .is('legacy_archived_at', null)
     .or(`primary_assignee_id.in.(${staffIds.join(',')}),secondary_assignee_id.in.(${staffIds.join(',')}),tertiary_assignee_id.in.(${staffIds.join(',')})`)
     .gte('start_date', from.toISOString())
     .lte('start_date', to.toISOString())

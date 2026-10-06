@@ -166,6 +166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { data: privateCases } = await supabase
             .from('private_cases')
             .select('primary_assignee_id')
+            .is('legacy_archived_at', null)
             .gte('start_date', today + ' 00:00:00')
             .lte('start_date', today + ' 23:59:59')
             .in('primary_assignee_id', technicians.map(t => t.id));
@@ -173,6 +174,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { data: businessCases } = await supabase
             .from('business_cases')
             .select('primary_assignee_id')
+            .is('legacy_archived_at', null)
             .gte('start_date', today + ' 00:00:00')
             .lte('start_date', today + ' 23:59:59')
             .in('primary_assignee_id', technicians.map(t => t.id));

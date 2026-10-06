@@ -53,6 +53,8 @@ export type RecordContract = Contract & {
   framework_overrides?: string[] | null
   /** Fakturapaus till datum (billing_active=false). Tomt = tills vidare. */
   billing_paused_until?: string | null
+  /** Satt = gammalt Oneflow-dokument före 2026-05-01. Aktiva avtal är aldrig arkiverade. */
+  legacy_archived_at?: string | null
 }
 
 /** Besöksfrekvenser — samma värden som recurring_schedules använder */
@@ -311,6 +313,17 @@ export interface RecordCase {
   service_id?: string | null
   /** Vilken tabell raden kom från — business_cases saknar service_type */
   origin: 'case' | 'business'
+  /**
+   * Satt = gammal ClickUp-import (före 2026-05-01). Raden visas i historiken
+   * men räknas aldrig i kortets siffror. Bara business_cases bär kolumnen;
+   * tabellen cases saknar den och är därför alltid null här.
+   */
+  legacy_archived_at?: string | null
+}
+
+/** Ärendet är arkiverad ClickUp-historik: syns i listor, räknas aldrig i KPI:er. */
+export function isLegacyArchived(c: { legacy_archived_at?: string | null }): boolean {
+  return !!c.legacy_archived_at
 }
 
 // Etapp 6: Åtkomst & konton — portalanvändare, multisite-roller och inbjudningar.
@@ -569,7 +582,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       orgNumbers.length > 0
         ? supabase
             .from('business_cases')
-            .select('id, title, status, org_nr, start_date, completed_date, created_at, pris, primary_assignee_name, skadedjur')
+            .select('id, title, status, org_nr, start_date, completed_date, created_at, pris, primary_assignee_name, skadedjur, legacy_archived_at')
             .in('org_nr', orgNumbers)
             .order('created_at', { ascending: false })
         : Promise.resolve({ data: [], error: null }),
@@ -761,6 +774,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       pris: number | null
       primary_assignee_name: string | null
       skadedjur: string | null
+      legacy_archived_at: string | null
     }
     const orgToCustomerId = new Map(
       [root, ...units]
@@ -787,6 +801,7 @@ export function useCustomerRecord(customerId: string | undefined) {
       price: b.pris != null ? Number(b.pris) : null,
       primary_technician_name: b.primary_assignee_name,
       origin: 'business' as const,
+      legacy_archived_at: b.legacy_archived_at ?? null,
     }))
 
     const familyCases = [...legacyCases, ...businessCases]
@@ -902,9 +917,12 @@ export function useCustomerRecord(customerId: string | undefined) {
         attribution: 'sales' as const,
       }
     })
+    // Antalet är en KPI: arkiverad ClickUp-historik räknas inte (ny kula från
+    // 2026-05-01). Listan `cases` bär fortfarande alla rader.
     const caseCounts: Record<string, number> = {}
     for (const row of familyCases) {
       if (!row.customer_id) continue
+      if (isLegacyArchived(row)) continue
       caseCounts[row.customer_id] = (caseCounts[row.customer_id] ?? 0) + 1
     }
 

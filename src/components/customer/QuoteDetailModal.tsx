@@ -79,6 +79,10 @@ const QuoteDetailModal: React.FC<QuoteDetailModalProps> = ({
         `)
         .eq('id', quoteId)
         .eq('customers.id', customerId)
+        // Arkiverade offerter (före 2026-05-01) visas aldrig för kunden. Arkiverade
+        // rader saknar customer_id, så reservvägen via quotes_secure_view (som
+        // filtrerar på customer_id) kan inte heller hitta dem.
+        .is('legacy_archived_at', null)
         .maybeSingle()
 
       if (contractError || !contractData) {

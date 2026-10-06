@@ -363,6 +363,7 @@ async function fetchBookingsForDateRange(startDate: string, endDate: string, tec
         id, title, start_date, due_date, adress, skadedjur, status, kontaktperson,
         primary_assignee_name, secondary_assignee_name, tertiary_assignee_name
       `)
+      .is('legacy_archived_at', null)
       .gte('start_date', startISO)
       .lte('start_date', endISO)
       .order('start_date', { ascending: true }),
@@ -373,6 +374,7 @@ async function fetchBookingsForDateRange(startDate: string, endDate: string, tec
         id, title, start_date, due_date, adress, skadedjur, status, kontaktperson,
         primary_assignee_name, secondary_assignee_name, tertiary_assignee_name
       `)
+      .is('legacy_archived_at', null)
       .gte('start_date', startISO)
       .lte('start_date', endISO)
       .order('start_date', { ascending: true }),
@@ -716,7 +718,8 @@ async function generateCaseReport(args: Record<string, unknown>) {
       .from('private_cases')
       .select('start_date, skadedjur, pris, status, primary_assignee_name')
       .gte('start_date', dateFromISO)
-      .lte('start_date', dateToISO);
+      .lte('start_date', dateToISO)
+      .is('legacy_archived_at', null);
 
     if (technicianName) {
       query = query.ilike('primary_assignee_name', `%${technicianName}%`);
@@ -740,7 +743,8 @@ async function generateCaseReport(args: Record<string, unknown>) {
       .from('business_cases')
       .select('start_date, skadedjur, pris, status, primary_assignee_name')
       .gte('start_date', dateFromISO)
-      .lte('start_date', dateToISO);
+      .lte('start_date', dateToISO)
+      .is('legacy_archived_at', null);
 
     if (technicianName) {
       query = query.ilike('primary_assignee_name', `%${technicianName}%`);
@@ -920,6 +924,7 @@ async function fetchTodayBookings() {
         title, start_date, due_date, adress, skadedjur, status, kontaktperson,
         primary_assignee_name, secondary_assignee_name, tertiary_assignee_name
       `)
+      .is('legacy_archived_at', null)
       .gte('start_date', todayStart)
       .lt('start_date', tomorrowStart)
       .order('start_date', { ascending: true }),
@@ -931,6 +936,7 @@ async function fetchTodayBookings() {
         title, start_date, due_date, adress, skadedjur, status, kontaktperson,
         primary_assignee_name, secondary_assignee_name, tertiary_assignee_name
       `)
+      .is('legacy_archived_at', null)
       .gte('start_date', todayStart)
       .lt('start_date', tomorrowStart)
       .order('start_date', { ascending: true }),
@@ -1035,13 +1041,13 @@ async function fetchSystemData() {
         primary_assignee_name, primary_assignee_email,
         start_date, due_date, created_at, updated_at, completed_date,
         telefon_kontaktperson, e_post_kontaktperson, billing_status
-      `).order('created_at', { ascending: false }),
+      `).is('legacy_archived_at', null).order('created_at', { ascending: false }),
       supabase.from('business_cases').select(`
         id, title, status, kontaktperson, pris, skadedjur, adress,
         primary_assignee_name, primary_assignee_email,
         start_date, due_date, created_at, updated_at, completed_date,
         telefon_kontaktperson, e_post_kontaktperson, billing_status
-      `).order('created_at', { ascending: false }),
+      `).is('legacy_archived_at', null).order('created_at', { ascending: false }),
       // Hämta profiles för att filtrera på roll (endast technician)
       supabase.from('profiles').select('technician_id, role').not('technician_id', 'is', null),
       // Hämta frånvaro som gäller idag eller framåt
