@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.29.1',
+    date: '2026-10-06',
+    title: 'Leads (Webb): tydligare länkar',
+    items: [
+      { kind: 'andring', text: 'Öppna ärende, Öppna kunden, Öppna offerten och länken till Leads (B2B) i en webbförfrågan ser nu ut som knappar.' },
+    ],
+  },
+  {
     version: '3.29.0',
     date: '2026-10-06',
     title: 'Leads (Webb): befintliga avtalskunder',

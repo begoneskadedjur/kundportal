@@ -9,6 +9,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Phone, Mail, MapPin, MessageSquare, Image as ImageIcon, Globe, History, UserPlus, Target, Send, X, ClipboardPlus, ExternalLink, FileSignature, Link2 } from 'lucide-react'
+
+// Länkar i åtgärdsraden ser ut som sekundära knappar (samma klasser som Button variant secondary, size sm).
+const LANKKNAPP =
+  'inline-flex items-center justify-center gap-1.5 font-medium transition-all duration-200 rounded-lg glass glass-hover text-white text-sm px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:ring-offset-2 focus:ring-offset-slate-950'
 import toast from 'react-hot-toast'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
@@ -517,14 +521,14 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
                 </Button>
               )}
               {arendeLank && (
-                <Link to={arendeLank} className="inline-flex items-center gap-1.5 text-sm text-[#20c58f] hover:underline">
-                  <ExternalLink className="w-4 h-4" />
+                <Link to={arendeLank} className={LANKKNAPP}>
+                  <ExternalLink className="w-4 h-4 text-[#20c58f]" />
                   {inquiry.arende_nummer ? `Öppna ärende ${inquiry.arende_nummer}` : 'Öppna ärendet'}
                 </Link>
               )}
               {befintligKund && inquiry.customer_id && (
-                <Link to={`${basePath}/befintliga-kunder/${inquiry.customer_id}`} className="inline-flex items-center gap-1.5 text-sm text-[#20c58f] hover:underline">
-                  <ExternalLink className="w-4 h-4" />
+                <Link to={`${basePath}/befintliga-kunder/${inquiry.customer_id}`} className={LANKKNAPP}>
+                  <ExternalLink className="w-4 h-4 text-[#20c58f]" />
                   Öppna kunden
                 </Link>
               )}
@@ -536,9 +540,9 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
                   href={`https://app.oneflow.com/contracts/${inquiry.offert_oneflow_id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm text-[#20c58f] hover:underline"
+                  className={LANKKNAPP}
                 >
-                  <ExternalLink className="w-4 h-4" />
+                  <ExternalLink className="w-4 h-4 text-[#20c58f]" />
                   Öppna offerten i Oneflow
                 </a>
               )}
@@ -549,7 +553,8 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
                 </Button>
               )}
               {inquiry.lead_id && (
-                <Link to={leadsBasePath} className="text-sm text-[#20c58f] hover:underline">
+                <Link to={leadsBasePath} className={LANKKNAPP}>
+                  <ExternalLink className="w-4 h-4 text-[#20c58f]" />
                   B2B-lead skapad, öppna Leads (B2B)
                 </Link>
               )}
