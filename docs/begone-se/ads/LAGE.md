@@ -67,6 +67,8 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 
 ## Beslut
 
+- 2026-10-07: Christian: "Hundratals nöjda kunder" är sant och får stå. Fågelsäkring utan preparat eller avdödning får stå (konkret, inte "miljövänligt"). Lägg in i PMax Fåglar-texterna före start. Experten var för sträng här.
+
 - 2026-10-06: Namnregel: kampanjer som Claude skapat eller arbetat i heter "Claude | ...". Bytt: Claude | Råttbekämpning (gammal, rensad), Claude | Sök | Råttor, Claude | Sök | Fåglar, Claude | Sök | Varumärke. Fas 2 i data och förslagsfil har samma prefix.
 
 - 2026-10-06: GENOMFÖRT: mätningen (konto_1, telefonklick sekundära, Calls from ads ≥60 s primär, nya åtgärder Samtal från webbplatsen 60 s, Bokat uppdrag, Genomfört uppdrag), fas 1-bygget PAUSAT (Sök | Råttor 1 550, Sök | Fåglar 800, Sök | Varumärke 180), kontolistan Konto | Konkurrenter (ACCOUNT_LEVEL_NEGATIVE_KEYWORDS) på hela kontot. GOOGLE_ADS_*-variabler i kundportalens Vercel (production), nattjobbet i torrläge (GOOGLE_ADS_KONVERTERINGAR_TORR=1) första veckan. begone.se main 317c0b7: samtal/utfall-text i policyn, kort cookiebanner (Christian vill inte ha detaljer i bannern), samtyckesversion 2. Kvar: etiketten PUBLIC_GOOGLE_ADS_ETIKETT_SAMTAL i begone-se Vercel för nummerbyte, start av fas 1 efter råttsidans formular_forst, 1B för råttsöket.
