@@ -149,10 +149,11 @@ export default function NotificationModal({
 
       if (pathname.includes('/technician')) {
         navigate(`/technician/schedule?openCase=${notification.case_id}&caseType=${notification.case_type}`);
-      } else if (pathname.includes('/admin')) {
-        navigate(`/admin/case-search?openCase=${notification.case_id}&caseType=${notification.case_type}`);
-      } else if (pathname.includes('/coordinator')) {
-        navigate(`/coordinator/case-search?openCase=${notification.case_id}&caseType=${notification.case_type}`);
+      } else if (pathname.includes('/admin') || pathname.includes('/koordinator') || pathname.includes('/coordinator')) {
+        // Admin och koordinator: koordinatorns ärendesökning (admin släpps in). Avtalsärenden
+        // finns inte i ärendesökningen och öppnas i stället i ärendeöversikten.
+        const target = notification.case_type === 'contract' ? '/koordinator/arenden' : '/koordinator/sok-arenden';
+        navigate(`${target}?openCase=${notification.case_id}&caseType=${notification.case_type}`);
       } else {
         navigate(`/technician/schedule?openCase=${notification.case_id}&caseType=${notification.case_type}`);
       }

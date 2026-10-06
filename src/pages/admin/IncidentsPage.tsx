@@ -4,6 +4,7 @@
 // övriga ser bara incidenter de rapporterat eller är berörda i.
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Search, RefreshCw, Calendar, Plus, X, Clock, User, Briefcase, ExternalLink, ChevronRight, Download, Trash2 } from 'lucide-react'
 import { supabase, getAuthHeaders } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -24,6 +25,7 @@ interface CaseSearchResult { id: string; title: string; case_number: string | nu
 
 export default function IncidentsPage() {
   const { user, profile, isTechnician } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const technicianId = profile?.technician_id || null
   const reporterName = profile?.display_name || profile?.email || 'Okänd'
 
@@ -183,6 +185,38 @@ export default function IncidentsPage() {
   useEffect(() => {
     fetchIncidents()
   }, [fetchIncidents])
+
+  // Öppna formuläret från URL-param (?new=1, valfritt &caseId=<id>), t.ex. från söklådan.
+  // Ärendet kopplas bara om det är ett privat- eller företagsärende (som i ärendesöket).
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return
+    const caseIdParam = searchParams.get('caseId')
+    setShowForm(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('new')
+    next.delete('caseId')
+    next.delete('caseType')
+    setSearchParams(next, { replace: true })
+    if (!caseIdParam) return
+
+    // Ingen avbrytning vid omkörning: parametern rensas ovan, vilket kör effekten
+    // igen direkt, men hämtningen ska ändå landa i formuläret.
+    ;(async () => {
+      for (const table of ['private_cases', 'business_cases'] as const) {
+        const { data } = await supabase.from(table)
+          .select('id, title, case_number')
+          .eq('id', caseIdParam)
+          .maybeSingle()
+        if (data) {
+          setSelectedCase({
+            ...data,
+            case_type: table === 'private_cases' ? 'private' : 'business',
+          })
+          return
+        }
+      }
+    })().catch(err => console.error('Kunde inte hämta ärendet för tillbudet:', err))
+  }, [searchParams, setSearchParams])
 
   const resetForm = () => {
     setShowForm(false)

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import {
   Search, AlertTriangle, CalendarPlus, CalendarCheck, FileText,
   RotateCcw, FileCheck, ChevronDown, ChevronRight, ClipboardList,
@@ -129,6 +130,7 @@ export default function TechnicianCases() {
   const { profile, availableViews } = useAuth()
   const hasTechnicianView = availableViews.includes('technician')
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -393,6 +395,69 @@ export default function TechnicianCases() {
       return next
     })
   }
+
+  // ─── Öppna ärende från URL-param (?openCase=<id>&caseType=private|business|contract) ──
+  // Ärenden utanför listan (t.ex. äldre avslutade) hämtas på id, men öppnas bara
+  // om teknikern är tilldelad. Parametrarna tas bort när ärendet hanterats.
+  useEffect(() => {
+    const openCaseId = searchParams.get('openCase')
+    const technicianId = profile?.technician_id
+    if (!openCaseId || loading || !technicianId) return
+    const typeParam = searchParams.get('caseType')
+    const caseType: TechnicianCase['case_type'] | null =
+      typeParam === 'private' || typeParam === 'business' || typeParam === 'contract' ? typeParam : null
+
+    const clearParams = () => {
+      const next = new URLSearchParams(searchParams)
+      next.delete('openCase')
+      next.delete('caseType')
+      setSearchParams(next, { replace: true })
+    }
+
+    const loaded = cases.find(c => c.id === openCaseId && (!caseType || c.case_type === caseType))
+    if (loaded) {
+      handleEdit(loaded)
+      clearParams()
+      return
+    }
+
+    let cancelled = false
+    const fetchCase = async (): Promise<TechnicianCase | null> => {
+      const types: TechnicianCase['case_type'][] = caseType ? [caseType] : ['private', 'business', 'contract']
+      for (const t of types) {
+        const table = t === 'private' ? 'private_cases' : t === 'business' ? 'business_cases' : 'cases'
+        const { data } = await supabase.from(table).select('*').eq('id', openCaseId).maybeSingle()
+        if (!data) continue
+        const c = data as Record<string, unknown>
+        const assigned = t === 'contract'
+          ? [c.primary_technician_id, c.secondary_technician_id, c.tertiary_technician_id]
+          : [c.primary_assignee_id, c.secondary_assignee_id, c.tertiary_assignee_id]
+        if (!assigned.includes(technicianId)) return null
+        return {
+          ...c,
+          case_type: t,
+          created_date: t === 'contract' ? (c.created_date || c.created_at) : (c.start_date || c.created_at),
+          ...(t !== 'contract' ? { case_price: c.pris } : {}),
+          clickup_url: c.clickup_task_id ? `https://app.clickup.com/t/${c.clickup_task_id}` : undefined,
+        } as unknown as TechnicianCase
+      }
+      return null
+    }
+
+    fetchCase()
+      .then(found => {
+        if (cancelled) return
+        if (found) handleEdit(found)
+        else toast.error('Ärendet kunde inte hittas bland dina ärenden')
+      })
+      .catch(err => {
+        console.error('Kunde inte öppna ärendet:', err)
+        if (!cancelled) toast.error('Ärendet kunde inte öppnas')
+      })
+      .finally(() => { if (!cancelled) clearParams() })
+
+    return () => { cancelled = true }
+  }, [searchParams, setSearchParams, loading, cases, profile?.technician_id])
 
   // ─── Render ───────────────────────────────────────
 

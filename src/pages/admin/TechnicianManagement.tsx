@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import toast from 'react-hot-toast'
 import {
   Plus, Search, User, UserCheck, Users, Key, Car, AlertTriangle
 } from 'lucide-react'
@@ -25,6 +27,7 @@ const STAFF_ROLES = [
 ] as const
 
 export default function TechnicianManagement() {
+  const [searchParams, setSearchParams] = useSearchParams()
   // Data state
   const [technicians, setTechnicians] = useState<Technician[]>([])
   const [filteredTechnicians, setFilteredTechnicians] = useState<Technician[]>([])
@@ -116,6 +119,19 @@ export default function TechnicianManagement() {
     setEditingTechnician(technician)
     setShowEditModal(true)
   }
+
+  // Öppna en person från URL-param (?id=<technicianId>), t.ex. från söklådan.
+  // Parametern tas bort när modalen öppnats så att den inte öppnas igen.
+  useEffect(() => {
+    const technicianId = searchParams.get('id')
+    if (!technicianId || loading) return
+    const technician = technicians.find(t => t.id === technicianId)
+    if (technician) handleEditTechnician(technician)
+    else toast.error('Personen kunde inte hittas')
+    const next = new URLSearchParams(searchParams)
+    next.delete('id')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, loading, technicians, setSearchParams])
 
   const handleManageAuth = (technician: Technician) => {
     setAuthTechnician(technician)

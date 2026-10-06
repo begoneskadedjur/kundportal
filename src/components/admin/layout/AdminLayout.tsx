@@ -8,6 +8,7 @@ import { hasProcurementAccess } from '../../../hooks/useProcurementAccess'
 import { AdminSidebar } from './AdminSidebar'
 import { AdminTopHeader } from './AdminTopHeader'
 import { AdminMobileNav } from './AdminMobileNav'
+import { GlobalSearch } from '../../shared/search/GlobalSearch'
 
 export default function AdminLayout() {
   const { profile, signOut, loading } = useAuth()
@@ -63,6 +64,9 @@ export default function AdminLayout() {
         sidebarCollapsed={sidebarCollapsed}
         userName={userName}
       />
+
+      {/* Global söklåda (Ctrl+K) */}
+      <GlobalSearch portal="admin" />
 
       {/* Main content area */}
       <main

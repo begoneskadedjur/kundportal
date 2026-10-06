@@ -32,6 +32,9 @@ const DEFAULT_ACTIVE_STATUSES = ALL_VALID_STATUSES.filter(
   s => s !== 'Avslutat' && s !== 'Borttaget'
 )
 
+// Typvalet i avtalsläge (nytt ärende för en känd avtalskund via ?newCase=1&customerId=)
+const CONTRACT_CREATE_TYPES: Array<'contract' | 'inspection' | 'establishment'> = ['contract', 'inspection', 'establishment']
+
 /** Skeleton-loading som matchar ScheduleGrid-layouten */
 function ScheduleSkeleton() {
   const rows = 6 // Placeholder-tekniker
@@ -97,6 +100,8 @@ export default function CoordinatorSchedule() {
   const [isEgenkontrollModalOpen, setIsEgenkontrollModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [caseTypeForCreate, setCaseTypeForCreate] = useState<CaseType | null>(null)
+  // Förvald avtalskund (och enhet) när ett nytt ärende öppnas via ?newCase=1&customerId=
+  const [createContractPrefill, setCreateContractPrefill] = useState<{ customerId: string; siteId: string | null } | null>(null)
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false)
   const [selectedAbsence, setSelectedAbsence] = useState<Absence | null>(null)
   const [isAbsenceDetailsModalOpen, setIsAbsenceDetailsModalOpen] = useState(false)
@@ -337,6 +342,67 @@ export default function CoordinatorSchedule() {
       setSearchParams({})
     }
   }, [searchParams, allCases, contractCases, loading])
+
+  // ─── Förval av tekniker från URL-param (?tech=<id>[,<id>]) ───
+  // Körs när teknikerna laddats och ersätter standardurvalet. Okända id:n ignoreras.
+  useEffect(() => {
+    const techParam = searchParams.get('tech')
+    if (!techParam || technicians.length === 0) return
+    const wanted = techParam.split(',').map(s => s.trim()).filter(Boolean)
+    const valid = wanted.filter(id => technicians.some(t => t.id === id))
+    if (valid.length > 0) {
+      setSelectedTechnicianIds(new Set(valid))
+    } else {
+      toast.error('Teknikern kunde inte hittas i schemat')
+    }
+    const next = new URLSearchParams(searchParams)
+    next.delete('tech')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, technicians, setSearchParams])
+
+  // ─── Nytt ärende från URL-param (?newCase=1[&customerId=<id>]) ───
+  // Med customerId öppnas bokningen i avtalsläge med kunden förvald; är kunden en
+  // enhet förväljs huvudkontoret som kund och enheten som enhet.
+  useEffect(() => {
+    if (searchParams.get('newCase') !== '1') return
+    const customerIdParam = searchParams.get('customerId')
+    const next = new URLSearchParams(searchParams)
+    next.delete('newCase')
+    next.delete('customerId')
+    setSearchParams(next, { replace: true })
+
+    if (!customerIdParam) {
+      setSelectedCase(null)
+      setCaseTypeForCreate(null)
+      setCreateContractPrefill(null)
+      setIsCreateModalOpen(true)
+      return
+    }
+
+    // Ingen avbrytning vid omkörning: parametern rensas ovan, vilket kör effekten igen
+    ;(async () => {
+      const { data: customer, error } = await supabase
+        .from('customers')
+        .select('id, parent_customer_id')
+        .eq('id', customerIdParam)
+        .maybeSingle()
+      if (error) throw error
+      setSelectedCase(null)
+      setCaseTypeForCreate(null)
+      if (customer) {
+        setCreateContractPrefill(customer.parent_customer_id
+          ? { customerId: customer.parent_customer_id, siteId: customer.id }
+          : { customerId: customer.id, siteId: null })
+      } else {
+        toast.error('Kunden kunde inte hittas, välj kund i formuläret')
+        setCreateContractPrefill(null)
+      }
+      setIsCreateModalOpen(true)
+    })().catch(err => {
+      console.error('Kunde inte förbereda nytt ärende:', err)
+      toast.error('Kunde inte öppna nytt ärende för kunden')
+    })
+  }, [searchParams, setSearchParams])
 
   // ─── Filtrerade ärenden ───
 
@@ -579,6 +645,7 @@ export default function CoordinatorSchedule() {
   const handleCreateSuccess = async () => {
     setIsCreateModalOpen(false)
     setSelectedCase(null)
+    setCreateContractPrefill(null)
     await fetchData()
   }
   const handleAbsenceCreateSuccess = () => { setIsAbsenceModalOpen(false); fetchData() }
@@ -672,11 +739,14 @@ export default function CoordinatorSchedule() {
       />
       <CreateCaseModal
         isOpen={isCreateModalOpen}
-        onClose={() => { setIsCreateModalOpen(false); setSelectedCase(null); setCaseTypeForCreate(null) }}
+        onClose={() => { setIsCreateModalOpen(false); setSelectedCase(null); setCaseTypeForCreate(null); setCreateContractPrefill(null) }}
         onSuccess={handleCreateSuccess}
         technicians={technicians}
         initialCaseData={selectedCase}
         initialCaseType={caseTypeForCreate}
+        allowedCaseTypes={createContractPrefill ? CONTRACT_CREATE_TYPES : null}
+        initialContractCustomerId={createContractPrefill?.customerId ?? null}
+        initialSiteId={createContractPrefill?.siteId ?? null}
       />
       <CreateAbsenceModal
         isOpen={isAbsenceModalOpen}

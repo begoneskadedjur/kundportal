@@ -2,6 +2,7 @@
 // Ärendeöversikt för koordinatorer — ClickUp-liknande vy grupperad per status
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import {
   Search, ChevronDown, ChevronRight, RefreshCw, Columns, X,
@@ -378,6 +379,7 @@ function CaseRow({
 // ─── Huvudkomponent ───────────────────────────────────────────────────────────
 
 export default function CasesPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [allCases, setAllCases] = useState<ArendeRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -514,6 +516,68 @@ export default function CasesPage() {
       setEditCaseOpen(true)
     }
   }
+
+  // ── Öppna ärende från URL-param (?openCase=<id>&caseType=private|business|contract) ──
+  // Slås upp på id oberoende av listans filter: avslutade och arkiverade ärenden
+  // hämtas separat från databasen. Parametrarna tas bort när ärendet öppnats.
+  useEffect(() => {
+    const openCaseId = searchParams.get('openCase')
+    if (!openCaseId || loading) return
+    const typeParam = searchParams.get('caseType')
+    const caseType: CaseType | null =
+      typeParam === 'private' || typeParam === 'business' || typeParam === 'contract' ? typeParam : null
+
+    const clearParams = () => {
+      const next = new URLSearchParams(searchParams)
+      next.delete('openCase')
+      next.delete('caseType')
+      setSearchParams(next, { replace: true })
+    }
+
+    const loaded = allCases.find(c => c.id === openCaseId && (!caseType || c.case_type === caseType))
+    if (loaded) {
+      openCase(loaded)
+      clearParams()
+      return
+    }
+
+    let cancelled = false
+    const fetchCase = async (): Promise<ArendeRow | null> => {
+      const types: CaseType[] = caseType ? [caseType] : ['private', 'business', 'contract']
+      for (const t of types) {
+        const table = t === 'private' ? 'private_cases' : t === 'business' ? 'business_cases' : 'cases'
+        const { data } = await supabase
+          .from(table)
+          .select('*, service:services(name)')
+          .eq('id', openCaseId)
+          .maybeSingle()
+        if (data) {
+          const row = data as Record<string, unknown>
+          return {
+            ...row,
+            case_type: t,
+            ...(t === 'contract' ? { assigned_technician_name: row.primary_technician_name as string | null } : {}),
+            _raw: row,
+          } as unknown as ArendeRow
+        }
+      }
+      return null
+    }
+
+    fetchCase()
+      .then(found => {
+        if (cancelled) return
+        if (found) openCase(found)
+        else toast.error('Ärendet kunde inte hittas')
+      })
+      .catch(err => {
+        console.error('Kunde inte öppna ärendet:', err)
+        if (!cancelled) toast.error('Ärendet kunde inte öppnas')
+      })
+      .finally(() => { if (!cancelled) clearParams() })
+
+    return () => { cancelled = true }
+  }, [searchParams, setSearchParams, loading, allCases])
 
   // ── Kolumnhuvuden ─────────────────────────────────────────────────────────
 

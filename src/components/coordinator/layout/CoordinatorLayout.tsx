@@ -7,6 +7,7 @@ import LoadingSpinner from '../../shared/LoadingSpinner'
 import { CoordinatorSidebar } from './CoordinatorSidebar'
 import { CoordinatorTopHeader } from './CoordinatorTopHeader'
 import { CoordinatorMobileNav } from './CoordinatorMobileNav'
+import { GlobalSearch } from '../../shared/search/GlobalSearch'
 
 export default function CoordinatorLayout() {
   const { profile, signOut, loading } = useAuth()
@@ -54,6 +55,9 @@ export default function CoordinatorLayout() {
         sidebarCollapsed={sidebarCollapsed}
         userName={userName}
       />
+
+      {/* Global söklåda (Ctrl+K) */}
+      <GlobalSearch portal="koordinator" />
 
       {/* Main content area */}
       <main

@@ -2,6 +2,7 @@
 // Fakturering 2.0 – arbetskö i pipelineordning, arkiv bakom toggle och färgdiet på raderna
 
 import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   RefreshCw,
   Search,
@@ -62,6 +63,18 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
   const [loading, setLoading] = useState(true)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
+
+  // Öppna en faktura från URL-param (?invoiceId=<id>), t.ex. från söklådan.
+  // InvoiceDetailModal hämtar fakturan själv på id, så ingen väntan på listan behövs.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const invoiceIdParam = searchParams.get('invoiceId')
+    if (!invoiceIdParam) return
+    setSelectedInvoiceId(invoiceIdParam)
+    const next = new URLSearchParams(searchParams)
+    next.delete('invoiceId')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
 
   // Filter state – arbetskö-cell + arkiv-toggle
   const [queueFilter, setQueueFilter] = useState<QueueFilter>(null)

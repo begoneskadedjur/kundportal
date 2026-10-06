@@ -6,6 +6,7 @@ import LoadingSpinner from '../../shared/LoadingSpinner'
 import { TechnicianSidebar } from './TechnicianSidebar'
 import { TechnicianTopHeader } from './TechnicianTopHeader'
 import { TechnicianMobileNav } from './TechnicianMobileNav'
+import { GlobalSearch } from '../../shared/search/GlobalSearch'
 
 export default function TechnicianLayout() {
   const { profile, signOut, loading } = useAuth()
@@ -52,6 +53,9 @@ export default function TechnicianLayout() {
 
       {/* Desktop top header */}
       <TechnicianTopHeader userName={userName} />
+
+      {/* Global söklåda (Ctrl+K) */}
+      <GlobalSearch portal="technician" />
 
       {/* Main content area */}
       <main className="min-h-screen pt-14 pb-20 lg:pb-0 lg:pl-64 lg:pt-12 transition-all duration-300">

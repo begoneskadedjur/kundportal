@@ -1,7 +1,8 @@
 // src/components/coordinator/layout/CoordinatorMobileNav.tsx
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { Bell, Menu, X, LogOut } from 'lucide-react'
+import { Bell, Menu, X, LogOut, Search } from 'lucide-react'
+import { openGlobalSearch } from '../../shared/search/globalSearchEvents'
 import { topLevelItems, navGroups, mobileBottomItems } from './coordinatorNavConfig'
 import { MobileNavGroup } from '../../admin/layout/MobileNavGroup'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
@@ -41,6 +42,14 @@ export function CoordinatorMobileNav({ currentPath, onSignOut }: CoordinatorMobi
           <p className="text-white font-semibold text-sm">BeGone</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openGlobalSearch}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            aria-label="Sök"
+          >
+            <Search className="w-5 h-5" />
+          </button>
           <ThemeToggle />
           <Link to="/koordinator/tickets" className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 relative" aria-label="Notifieringar">
             <Bell className="w-5 h-5" />

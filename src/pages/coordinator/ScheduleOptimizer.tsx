@@ -1,7 +1,8 @@
 // 📁 src/pages/coordinator/ScheduleOptimizer.tsx
 // ⭐ Schemaoptimerare för att minska körsträckor och optimera tekniker-scheman ⭐
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, Users, MapPin, Clock, TrendingDown, ArrowRight, Settings, Zap, ChevronDown, ChevronUp, UserCheck, UserX, Home, Target, Route, Gauge, Navigation, Calendar, TrendingUp, Map, Activity, Compass } from 'lucide-react';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -664,6 +665,21 @@ export default function ScheduleOptimizer() {
   const [selectedChanges, setSelectedChanges] = useState<Set<number>>(new Set());
   const [showTechnicianDetails, setShowTechnicianDetails] = useState(false);
 
+  // Förvalda tekniker från URL-param (?tech=<id>[,<id>]), t.ex. från söklådan.
+  // Ersätter standardurvalet (även vid datumbyte) tills användaren själv ändrar urvalet.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const forcedTechIdsRef = useRef<string[] | null>(
+    searchParams.get('tech')?.split(',').map(s => s.trim()).filter(Boolean) || null
+  );
+
+  // Ta bort parametern ur URL:en så att den inte gäller vid omladdning
+  useEffect(() => {
+    if (!searchParams.has('tech')) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('tech');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   // Hämta tekniker vid laddning
   useEffect(() => {
     fetchTechnicians();
@@ -713,6 +729,16 @@ export default function ScheduleOptimizer() {
   };
 
   const updateSelectedTechnicians = async (technicians: Technician[]) => {
+    // Förval från URL vinner över standardurvalet så länge minst en av teknikerna finns
+    const forcedIds = forcedTechIdsRef.current;
+    if (forcedIds) {
+      const forced = technicians.filter(t => forcedIds.includes(t.id)).map(t => t.id);
+      if (forced.length > 0) {
+        setSelectedTechnicianIds(new Set(forced));
+        return;
+      }
+    }
+
     console.log(`[Tech Selection] === Updating for period ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]} ===`);
     console.log(`[Tech Selection] Processing ${technicians.length} technicians`);
     
@@ -792,6 +818,8 @@ export default function ScheduleOptimizer() {
   };
 
   const toggleTechnician = (technicianId: string) => {
+    // Användaren tar över urvalet: URL-förvalet släpps
+    forcedTechIdsRef.current = null;
     const newSelected = new Set(selectedTechnicianIds);
     if (newSelected.has(technicianId)) {
       newSelected.delete(technicianId);

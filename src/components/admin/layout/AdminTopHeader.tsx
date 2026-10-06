@@ -5,6 +5,7 @@ import { ChevronRight, Search, RefreshCw, Bell } from 'lucide-react'
 import { breadcrumbMap } from './adminNavConfig'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { ThemeToggle } from '../../shared/ThemeToggle'
+import { openGlobalSearch } from '../../shared/search/globalSearchEvents'
 import { useAuth } from '../../../contexts/AuthContext'
 import { getTicketStats } from '../../../services/communicationService'
 
@@ -43,6 +44,8 @@ export function AdminTopHeader({ sidebarCollapsed, userName }: AdminTopHeaderPro
 
       {/* Centered search */}
       <button
+        type="button"
+        onClick={openGlobalSearch}
         className="flex-1 max-w-md mx-auto flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/60 ring-1 ring-slate-700/50 hover:ring-slate-600 text-slate-400 transition-all duration-200"
         aria-label="Sök"
       >

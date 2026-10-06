@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.32.0',
+    date: '2026-10-06',
+    title: 'Sökrutan fungerar',
+    items: [
+      { kind: 'nyhet', text: 'Sökrutan högst upp, eller Ctrl+K, söker nu i hela systemet: ärenden, kunder, offerter och avtal, webbleads, tekniker och fakturor. Den känner igen ärendenummer, org.nr, telefon, e-post, kundnummer och postnummer.' },
+      { kind: 'nyhet', text: 'Varje träff har en egen ikon för sin typ. Under den markerade raden finns snabbval, till exempel Boka in, Schemat, Ny offert och Nytt avtal med kunden ifylld. Tab hoppar mellan valen.' },
+      { kind: 'nyhet', text: 'Tekniker hittar sina egna ärenden och ärenden de delar med andra, kundernas samlade stationsvy och sina egna dokument. Koordinator och admin hittar allt. Skriv ordet arkiv för att även få med gamla ClickUp-ärenden.' },
+      { kind: 'buggfix', text: 'Notiser och Gå till ärende i Dokumentsignering ledde till inloggningssidan i stället för till ärendet.' },
+    ],
+  },
+  {
     version: '3.31.0',
     date: '2026-10-06',
     title: 'Ny start: bara portalens egna ärenden räknas',

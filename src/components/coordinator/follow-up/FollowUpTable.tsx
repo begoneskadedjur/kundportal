@@ -345,8 +345,8 @@ function OfferRow({
                   onClick={() => {
                     const caseType = offer.source_type === 'business_case' ? 'business' : 'private'
                     const path = isCoordinator
-                      ? `/coordinator/case-search?openCase=${offer.source_id}&caseType=${caseType}`
-                      : `/technician/schedule?openCase=${offer.source_id}&caseType=${caseType}`
+                      ? `/koordinator/arenden?openCase=${offer.source_id}&caseType=${caseType}`
+                      : `/technician/cases?openCase=${offer.source_id}&caseType=${caseType}`
                     navigate(path)
                     setMenuOpen(false)
                   }}

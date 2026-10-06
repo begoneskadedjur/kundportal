@@ -1,7 +1,7 @@
 // src/pages/admin/Leads.tsx - Lead Pipeline Management Page
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import {
@@ -45,6 +45,7 @@ interface LeadStats {
 
 const Leads: React.FC = () => {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user, profile, isAdmin, isKoordinator, isTechnician, activeView } = useAuth()
   
   const [loading, setLoading] = useState(true)
@@ -734,6 +735,18 @@ const Leads: React.FC = () => {
     }
   }, [sortField, sortDirection])
 
+  // Öppna ett lead från URL-param (?id=<leadId>), t.ex. från söklådan.
+  // Parametern tas bort när leadet öppnats så att det inte öppnas igen.
+  useEffect(() => {
+    const leadId = searchParams.get('id')
+    if (!leadId || loading) return
+    const lead = leads.find(l => l.id === leadId)
+    if (lead) handleViewLead(lead)
+    else toast.error('Leadet kunde inte hittas')
+    const next = new URLSearchParams(searchParams)
+    next.delete('id')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, loading, leads, handleViewLead, setSearchParams])
 
   if (loading) {
     return (

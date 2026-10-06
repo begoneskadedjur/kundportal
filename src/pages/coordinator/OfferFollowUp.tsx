@@ -4,6 +4,7 @@
 // diskret textrad. Tekniker/säljare ser samma vy filtrerad server-side
 // till sina egna dokument.
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { FileSignature, Loader2, RefreshCw, Search, TrendingUp, X } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { OfferFollowUpService, QUEUE_SECTIONS } from '../../services/offerFollowUpService'
@@ -19,6 +20,7 @@ import type { CoordinatorCaseStatus } from '../../types/casePipeline'
 
 export default function OfferFollowUp() {
   const { profile, user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const userId = user?.id
   const isCoordinator = profile?.role === 'koordinator' || profile?.role === 'admin'
   // Tekniker & säljare ser bara sina egna dokument (avsändare eller skapare)
@@ -58,6 +60,29 @@ export default function OfferFollowUp() {
   }, [ownDocsEmail, userId])
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Öppna ett dokument från URL-param (?id=<contractId>), t.ex. från söklådan.
+  // Filtren nollställs så att dokumentet syns, även om användaren har dolt det.
+  useEffect(() => {
+    const targetId = searchParams.get('id')
+    if (!targetId || loading) return
+    const target = offers.find(o => o.id === targetId)
+    if (target) {
+      setView('queue')
+      setDocTypeFilter('all')
+      setSearchQuery('')
+      if (userId && (target.hidden_by || []).includes(userId)) setShowHidden(true)
+      setSelectedId(target.id)
+      setTimeout(() => {
+        document.querySelector(`[data-queue-row="${target.id}"]`)?.scrollIntoView({ block: 'nearest' })
+      }, 100)
+    } else {
+      toast.error('Dokumentet finns inte i din dokumentlista')
+    }
+    const next = new URLSearchParams(searchParams)
+    next.delete('id')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, loading, offers, userId, setSearchParams])
 
   // Filtrering: typ + sök + dolda
   const filteredOffers = useMemo(() => {
