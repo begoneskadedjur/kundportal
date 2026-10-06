@@ -32,6 +32,9 @@ export interface WebInquiry {
   utm_term: string | null
   utm_content: string | null
   gclid: string | null
+  /** Google Ads klick-id för iOS och appar (gbraid) och webb till app (wbraid). */
+  gbraid: string | null
+  wbraid: string | null
   form_type: 'offert' | 'akut'
   akut: boolean
   customer_kind: 'privat' | 'foretag'

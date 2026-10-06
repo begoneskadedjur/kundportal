@@ -22,6 +22,9 @@ export const TILLATNA_MIME: Record<string, string> = {
 const DETALJ_NYCKLAR = new Set([
   'fraga', 'svar', 'foljfraga', 'folj', 'akut', 'nar_ringa', 'antal_bilder',
   'kalla', 'fran', 'kundgrupp', 'art', 'sakerhet', 'utfall', 'vag',
+  // Om besökaren samtyckt till marknadsföringscookies (Google Ads) när förfrågan skickades. Styr om
+  // klick-id:n får användas för att stämma av konverteringar i Ads.
+  'samtycke_marknadsforing',
 ])
 
 const EPOST = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
@@ -171,6 +174,8 @@ export function validera(body: Record<string, unknown>): ValideradForfragan {
     utm_term: text(body.utm_term, 200),
     utm_content: text(body.utm_content, 200),
     gclid: text(body.gclid, 300),
+    gbraid: text(body.gbraid, 300),
+    wbraid: text(body.wbraid, 300),
     form_type: formType,
     akut: formType === 'akut' || details.akut === true,
     customer_kind: customerKind,

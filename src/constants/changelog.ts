@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.34.0',
+    date: '2026-10-06',
+    title: 'Förberett för cookiebannern på begone.se',
+    items: [
+      { kind: 'nyhet', text: 'Portalen tar emot och sparar besökarnas cookieval från begone.se, utan IP-adress, så att samtycket kan visas i efterhand.' },
+      { kind: 'nyhet', text: 'En webbförfrågan sparar nu även annonsklick från iPhone och om besökaren har godkänt mätning, så att förfrågan kan kopplas till rätt annons.' },
+    ],
+  },
+  {
     version: '3.33.0',
     date: '2026-10-06',
     title: 'Guide till sökrutan',
