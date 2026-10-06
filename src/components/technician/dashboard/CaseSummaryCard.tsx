@@ -57,10 +57,10 @@ export default function CaseSummaryCard({ technicianId }: Props) {
       const [privRes, bizRes] = await Promise.allSettled([
         supabase.from('private_cases').select(selectFields)
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
-          .is('deleted_at', null),
+          .is('deleted_at', null).is('legacy_archived_at', null),
         supabase.from('business_cases').select(selectFields)
           .or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`)
-          .is('deleted_at', null),
+          .is('deleted_at', null).is('legacy_archived_at', null),
       ])
 
       const allCases = [

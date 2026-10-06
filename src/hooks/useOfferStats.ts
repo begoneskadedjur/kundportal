@@ -16,6 +16,7 @@ export function useOfferStats() {
       .in('template_id', offerTemplateIds)
       .neq('status', 'draft')
       .neq('status', 'trashed')
+      .is('legacy_archived_at', null)
       .then(({ data, error }) => {
         if (error || !data) return
 

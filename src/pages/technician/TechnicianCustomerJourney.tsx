@@ -69,8 +69,8 @@ export default function TechnicianCustomerJourney() {
       const selectFields = 'id, title, status, kontaktperson, telefon_kontaktperson, pris, start_date, completed_date, created_at, skadedjur'
 
       const [privateRes, businessRes] = await Promise.allSettled([
-        supabase.from('private_cases').select(selectFields).gte('created_at', startDate).is('deleted_at', null).eq('primary_assignee_id', technicianId),
-        supabase.from('business_cases').select(`${selectFields}, company_name`).gte('created_at', startDate).is('deleted_at', null).eq('primary_assignee_id', technicianId),
+        supabase.from('private_cases').select(selectFields).gte('created_at', startDate).is('deleted_at', null).is('legacy_archived_at', null).eq('primary_assignee_id', technicianId),
+        supabase.from('business_cases').select(`${selectFields}, company_name`).gte('created_at', startDate).is('deleted_at', null).is('legacy_archived_at', null).eq('primary_assignee_id', technicianId),
       ])
 
       const allCases: JourneyCaseRow[] = [

@@ -267,6 +267,7 @@ export type Database = {
         Row: {
           id: string
           clickup_task_id: string
+          legacy_archived_at?: string | null // satt = ClickUp-import, döljs i arbets- och statistikvyer
           case_number: string | null
           title: string
           description: string | null
@@ -344,6 +345,7 @@ export type Database = {
         Row: {
           id: string
           clickup_task_id: string
+          legacy_archived_at?: string | null // satt = ClickUp-import, döljs i arbets- och statistikvyer
           case_number: string | null
           title: string
           description: string | null

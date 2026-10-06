@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.30.0',
+    date: '2026-10-06',
+    title: 'Gamla ärenden från ClickUp är arkiverade',
+    items: [
+      { kind: 'andring', text: 'Ärenden som importerades från ClickUp är arkiverade. De syns inte längre i Mina ärenden, på Översikt eller i Min kundresa, så listorna visar bara det som hanteras i portalen.' },
+      { kind: 'andring', text: 'Offerter och avtal från före 2026-05-01 som väntar på signering, har förfallit eller redan är signerade syns inte längre i Dokumentsignering eller i offertstatistiken. Aktiva avtal påverkas inte.' },
+    ],
+  },
+  {
     version: '3.29.1',
     date: '2026-10-06',
     title: 'Leads (Webb): tydligare länkar',

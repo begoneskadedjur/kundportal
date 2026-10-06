@@ -254,6 +254,7 @@ export class OfferFollowUpService {
       .from('contracts')
       .select(OFFER_COLUMNS)
       .in('status', ['pending', 'overdue', 'signed', 'declined'])
+      .is('legacy_archived_at', null)
       .order('created_at', { ascending: true })
 
     if (technicianEmail) {
@@ -570,6 +571,7 @@ export class OfferFollowUpService {
         source_id, source_type
       `)
       .in('status', ['pending', 'overdue', 'signed', 'declined'])
+      .is('legacy_archived_at', null)
       .not('created_by_email', 'is', null)
       .order('created_at', { ascending: true })
     if (technicianEmail) {

@@ -174,8 +174,8 @@ export default function TechnicianCases() {
     try {
       // Fetch cases (with soft-delete filter)
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        supabase.from('private_cases').select('*').is('deleted_at', null).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
-        supabase.from('business_cases').select('*').is('deleted_at', null).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
+        supabase.from('private_cases').select('*').is('deleted_at', null).is('legacy_archived_at', null).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
+        supabase.from('business_cases').select('*').is('deleted_at', null).is('legacy_archived_at', null).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
         supabase.from('cases').select('*').is('deleted_at', null).or(`primary_technician_id.eq.${technicianId},secondary_technician_id.eq.${technicianId},tertiary_technician_id.eq.${technicianId}`)
       ])
 
