@@ -21,7 +21,7 @@ export const TILLATNA_MIME: Record<string, string> = {
 
 const DETALJ_NYCKLAR = new Set([
   'fraga', 'svar', 'foljfraga', 'folj', 'akut', 'nar_ringa', 'antal_bilder',
-  'kalla', 'fran', 'kundgrupp', 'art', 'sakerhet', 'utfall',
+  'kalla', 'fran', 'kundgrupp', 'art', 'sakerhet', 'utfall', 'vag',
 ])
 
 const EPOST = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/

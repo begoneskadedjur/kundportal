@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.28.0',
+    date: '2026-10-06',
+    title: 'Bildanalysen: vägen och bilden följer med förfrågan',
+    items: [
+      { kind: 'nyhet', text: 'En förfrågan från bildanalysen på begone.se visar nu vilken väg sajten har lovat, till exempel fast pris per telefon eller mejl, kostnadsfri inspektion eller råd först, så att ingen erbjuder ett besök i onödan.' },
+      { kind: 'nyhet', text: 'Bilden från analysen följer med förfrågan och syns bland bilderna i Leads (Webb).' },
+      { kind: 'nyhet', text: 'Analysen känner igen fem arter till: stadsduva, trut eller fiskmås, kaja, skogsmus och brokig pälsänger.' },
+    ],
+  },
+  {
     version: '3.27.0',
     date: '2026-10-05',
     title: 'Leads (Webb): rätt adress och personnummer eller org.nr',

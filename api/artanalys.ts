@@ -1,7 +1,7 @@
 // api/artanalys.ts
 // Artanalysen på begone.se (/identifiera-skadedjur/). Sajten tar ut bildrutor ur besökarens film eller
 // bild i webbläsaren och skickar högst fyra JPEG-rutor hit. Gemini beskriver kännetecknen och väljer
-// bara bland referenssamlingens 24 arter (api/_lib/artanalysArter.ts). Råd, länkar och texter i
+// bara bland referenssamlingens 29 arter (api/_lib/artanalysArter.ts). Råd, länkar och texter i
 // protokollet kommer ur sajtens egen referenssamling, aldrig ur AI-svaret.
 // Plan och texter: docs/begone-se/kluster/artanalys.md.
 //
@@ -160,7 +160,7 @@ const MORF = ['kropp', 'ben', 'antenner', 'vingar', 'farg'] as const
 
 function fraga(antal: number): string {
   const lista = ARTANALYS_ARTER.map((a) => `- ${a.id}: ${a.namn} (${a.vetenskapligt}), ${a.storlek}. ${a.kannetecken.join('. ')}.`).join('\n')
-  return `Du är entomolog och bestämmer arter åt ett svenskt skadedjursföretag. Bilderna är ${antal === 1 ? 'en bild' : `${antal} bildrutor ur samma film`} som en privatperson har tagit av ett djur hemma. Bildruta 1 är den skarpaste.
+  return `Du är entomolog och zoolog och bestämmer arter åt ett svenskt skadedjursföretag. Bilderna är ${antal === 1 ? 'en bild' : `${antal} bildrutor ur samma film`} som en privatperson har tagit av ett djur i eller vid hemmet. Bildruta 1 är den skarpaste.
 
 Avgör vilket djur det är. Välj ENBART bland de här arterna (id: namn):
 ${lista}
