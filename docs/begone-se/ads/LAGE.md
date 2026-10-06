@@ -27,6 +27,13 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 
 ## Beslut
 
+- 2026-10-06: Steg 1A, 2, 3, 4 och 5 i råttrapporten GENOMFÖRDA (95 operationer, se andringslogg.jsonl). 1B (pausa gamla annonser) körs när de nya annonserna är godkända av Google.
+- 2026-10-06: Kontot ska SÄTTAS UPP FRÅN NOLL. Historiken används bara som underlag (sökord, söktermer, vad som har gett formulär). Ny struktur byggs vid sidan av, gamla kampanjer pausas när den nya är godkänd och igång. Christian föredrar större, ordentliga ändringar framför att lappa i det gamla.
+- 2026-10-06: ISO 9001 och ISO 14001 är certifierade av Qvalify (ackrediterat organ). Framhävningen får stå.
+- 2026-10-06: "Ofta redan samma dag" får stå i annonser.
+- 2026-10-06: Teknikerna har 8 till 16 års erfarenhet av skadedjur (alla utom en). Begone är premium inom skadedjur; positionera därefter (utan siffror som inte är belagda per tekniker, inga garantier).
+- 2026-10-06: Historik: när kontot sköttes för cirka två år sedan kostade råttleads 300 till 600 kr och höll bra kvalitet. Ingen med Ads-kompetens har arbetat i kontot sedan dess.
+
 - 2026-10-06: Råttor och fågel prioriteras, sedan insekter och möss. Getingar och myror (10 kr per dag) lämnas tills vidare.
 - 2026-10-06: Total dagsbudget oförändrad, pengar flyttas mellan kampanjer.
 - 2026-10-06: Kostnadsfri inspektion får stå för råttor och fågel. "På plats inom 24 timmar" stämmer inte för vanliga ärenden och tas bort som löfte.
