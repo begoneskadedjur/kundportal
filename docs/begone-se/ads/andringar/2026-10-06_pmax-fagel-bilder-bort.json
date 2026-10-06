@@ -1,0 +1,82 @@
+{
+ "status": "FÖRSLAG, ej godkänt. Provkörs med mutate.mjs utan --genomfor.",
+ "framtagen": "2026-10-07",
+ "beskrivning": "Claude | PMax | Fåglar (övergång): kopplar bort de 12 gamla bilderna (BrightBid-bilder från 2024 och stockbilder från 2025) så att bara de sex granskade bilderna från fas 1 visas. Körs när de nya bilderna är godkända av Google (de är det 2026-10-07).",
+ "godkand_av": "",
+ "bilder": [
+  "120306554227 MARKETING_IMAGE fågelsäkring google ads landscape- utan logo grön 1.jpg",
+  "170433007559 SQUARE_MARKETING_IMAGE p-max square fågel - fågelsäkring.png",
+  "170433013622 MARKETING_IMAGE p-max landscape fågel - solpaneler.png",
+  "170433015395 MARKETING_IMAGE p-max landscape fågel - fågelpiggar.png",
+  "170433015761 PORTRAIT_MARKETING_IMAGE p-max portrait fågel - fågelpiggar.png",
+  "170473407004 MARKETING_IMAGE p-max landscape fågel.png",
+  "170473407013 SQUARE_MARKETING_IMAGE p-max square fågel - fågelpiggar.png",
+  "170473415692 PORTRAIT_MARKETING_IMAGE p-max portrait fågel - solpaneler.png",
+  "248702912693 MARKETING_IMAGE Free stock image - 2025-06-19 14:20:22_1.9108.055 (1)",
+  "248782230415 MARKETING_IMAGE Free stock image - 2025-06-19 14:20:33_1.9108.477 (1)",
+  "248814599946 SQUARE_MARKETING_IMAGE Free stock image - 2025-06-19 14:20:22_1.055 (1)",
+  "248814653910 SQUARE_MARKETING_IMAGE Free stock image - 2025-06-19 14:20:33_1.477 (1)"
+ ],
+ "operationer": [
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~120306554227~MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170433007559~SQUARE_MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170433013622~MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170433015395~MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170433015761~PORTRAIT_MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170473407004~MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170473407013~SQUARE_MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170473415692~PORTRAIT_MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~248702912693~MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~248782230415~MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~248814599946~SQUARE_MARKETING_IMAGE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~248814653910~SQUARE_MARKETING_IMAGE"
+   }
+  }
+ ]
+}

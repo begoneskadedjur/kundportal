@@ -1,0 +1,174 @@
+{
+ "status": "FÖRSLAG, ej godkänt. Provkörs med mutate.mjs utan --genomfor.",
+ "framtagen": "2026-10-07",
+ "beskrivning": "Gemensam start: startar Claude | Sök | Råttor, Claude | Sök | Fåglar, Claude | Sök | Varumärke, Claude | Sök | Vägglöss, Claude | Sök | Insekter i hemmet, Claude | Sök | Möss, Claude | Sök | Företag och avtal; PMax Fåglar döps om till Claude | PMax | Fåglar (övergång) och får 200 kr; pausar Claude | Råttbekämpning (gammal, rensad), BrightBid_High Priority_Råttbekämpning_PMax, Brightbid - [Pmax] - Websites + Own Data + Generic Terms, BrightBid_High Priority_Fågelsäkring_Fågelbekämpning, Brightbid - Standard - Silverfisk | Pälsänger | Mjölbaggar | Vägglöss, Brightbid - Standard - Möss, Brightbid - Search - Getingar, Brightbid - Standard - Myror. Dagsbudget efter start 4430 kr (oförändrad total).",
+ "godkand_av": "",
+ "budget_efter_start": [
+  {
+   "kampanj": "Claude | Sök | Råttor",
+   "plan": 1550,
+   "kontot": 1550
+  },
+  {
+   "kampanj": "Claude | Sök | Fåglar",
+   "plan": 800,
+   "kontot": 800
+  },
+  {
+   "kampanj": "Claude | PMax | Fåglar (övergång)",
+   "plan": 200,
+   "kontot": 200
+  },
+  {
+   "kampanj": "Claude | Sök | Varumärke",
+   "plan": 180,
+   "kontot": 180
+  },
+  {
+   "kampanj": "Claude | Sök | Vägglöss",
+   "plan": 600,
+   "kontot": null
+  },
+  {
+   "kampanj": "Claude | Sök | Insekter i hemmet",
+   "plan": 450,
+   "kontot": null
+  },
+  {
+   "kampanj": "Claude | Sök | Möss",
+   "plan": 450,
+   "kontot": null
+  },
+  {
+   "kampanj": "Claude | Sök | Företag och avtal",
+   "plan": 200,
+   "kontot": null
+  }
+ ],
+ "summa_kr_per_dag": 4430,
+ "saknas_i_kontot": [
+  "Claude | Sök | Vägglöss",
+  "Claude | Sök | Insekter i hemmet",
+  "Claude | Sök | Möss",
+  "Claude | Sök | Företag och avtal"
+ ],
+ "operationer": [
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/19729967497",
+     "status": "PAUSED"
+    },
+    "updateMask": "status"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/20818570318",
+     "status": "PAUSED"
+    },
+    "updateMask": "status"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/17655089896",
+     "status": "PAUSED"
+    },
+    "updateMask": "status"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/17434641058",
+     "status": "PAUSED"
+    },
+    "updateMask": "status"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/17434641064",
+     "status": "PAUSED"
+    },
+    "updateMask": "status"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/17434641052",
+     "status": "PAUSED"
+    },
+    "updateMask": "status"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/17434641049",
+     "status": "PAUSED"
+    },
+    "updateMask": "status"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/17434641046",
+     "status": "PAUSED"
+    },
+    "updateMask": "status"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/21697769249",
+     "name": "Claude | PMax | Fåglar (övergång)"
+    },
+    "updateMask": "name"
+   }
+  },
+  {
+   "campaignBudgetOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaignBudgets/13914659886",
+     "amountMicros": "200000000"
+    },
+    "updateMask": "amountMicros"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/24321036648",
+     "status": "ENABLED"
+    },
+    "updateMask": "status"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/24326353874",
+     "status": "ENABLED"
+    },
+    "updateMask": "status"
+   }
+  },
+  {
+   "campaignOperation": {
+    "update": {
+     "resourceName": "customers/9407604856/campaigns/24321036645",
+     "status": "ENABLED"
+    },
+    "updateMask": "status"
+   }
+  }
+ ]
+}

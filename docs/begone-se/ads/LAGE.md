@@ -35,10 +35,23 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 
 - Flöde: `scripts/ads/generera-annonsbilder.mjs` (Gemini gemini-3.1-flash-image-preview, stilrad ur BILDNORM, högst 3 försök), manifest `docs/begone-se/ads/bilder/manifest.json` (id, kampanj, motiv, format, prompt, status, kommentar, historik), original i `bilder/original/` (i .gitignore), färdiga JPG i `bilder/klara/` (1200x628, 1200x1200, 960x1200). sharp lånas från begone-se:s node_modules.
 - Fas 1: 18 bilder, 24 genereringar. Skadedjursexperten godkände 17 (tre omgångar). Struken: fagel-vajer-nock-l (Gemini ger inget trovärdigt vajersystem; ta riktigt foto från ett uppdrag). Rensbrunnen är svag som annons (låg vikt), spillningsbilden bara i fågelsöket, inte PMax.
-- Kontaktark `Ads_Bilder_2026-10-06.pdf` (skript `gen-ads-bilder.mjs`). Förslagsfil `andringar/2026-10-06_bilder-fas1.json` byggs med `scripts/ads/bygg-bildforslag.mjs`: 17 bildtillgångar + 22 kopplingar (AD_IMAGE på Claude | Sök | Råttor, Fåglar, Varumärke; MARKETING/SQUARE/PORTRAIT_MARKETING_IMAGE i PMax Fåglar, grupp 6516988320). PROVKÖRD OK 2026-10-06 (39 op). EJ GENOMFÖRD, väntar på Christian.
+- Kontaktark `Ads_Bilder_2026-10-06.pdf` (skript `gen-ads-bilder.mjs`). Förslagsfil `andringar/2026-10-06_bilder-fas1.json` byggs med `scripts/ads/bygg-bildforslag.mjs`: 17 bildtillgångar + 22 kopplingar (AD_IMAGE på Claude | Sök | Råttor, Fåglar, Varumärke; MARKETING/SQUARE/PORTRAIT_MARKETING_IMAGE i PMax Fåglar, grupp 6516988320). PROVKÖRD OK 2026-10-06 (39 op). GENOMFÖRD 2026-10-06 20.58 (bilderna godkända av Google).
 - Kontoplanens motiv med tekniker bakifrån gjordes om till bilder av utfört arbete (BILDNORM: inga personer eller händer).
 - PMax Fåglar har 12 gamla bilder (flera stockbilder från 2025); med de 6 nya blir det 18 av 20 tillåtna. Föreslå borttagning av de gamla i eget steg när de nya är godkända av Google.
 - Fas 2 (ej påbörjad): vägglöss och värmetält, silverfisk, pälsänger, mjölbaggar, möss (husmus inomhus).
+
+## Gemensam start (2026-10-07)
+
+- Christian vill ha annonser i alla kampanjer snart: fas 1 och fas 2 startas TILLSAMMANS. Underlag `Ads_Start_2026-10-07.pdf` (skript `gen-ads-start.mjs`). INGET GENOMFÖRT, väntar på Christians ja.
+- Företagsnamn (asset.field_type_policy_summaries): BeGone, Begone, BeGone AB och Begone.se är GODKÄNDA. Begone Skadedjur och BeGone Skadedjur är underkända (BUSINESS_NAME_IRRELEVANCE, "Skadedjur" matchar inte annonsör/domän). Rekommendation: BeGone (tillgång 112323469970).
+- Filer (byggs med `node --env-file=.env.local scripts/ads/bygg-start.mjs`), körordning: 1 `2026-10-06_logotyp-namn.json` (18 op, OK), 2 `_annonser-b-fas1.json` (11, OK), 3 `_pmax-fagel-texter.json` (89, EJ PROVKÖRD, kvoten), 4 `_pmax-fagel-bilder-bort.json` (12, OK), 5 `_fas2-komplett.json` (423 = konto_3 384 OK + annons B och bilder fas 2 EJ PROVKÖRDA, kvoten), 6 `_start-alla.json` (13 OK utan fas 2; efter fil 5 kör `bygg-start.mjs --bara-start`, då 17 op, provkör igen).
+- Explorer-kvoten (2 880 op/dygn, provkörningar räknas) tog slut 2026-10-07 cirka 00:00. Provkör fil 3 och 5 efter återställning.
+- konto_3: listornas id ifyllda direkt i filen (gen-ads-kontoplan.mjs --json skulle skriva över fil 1, 2, 2b och 4). Neg | Konkurrenter kopplas inte per kampanj i fas 2 (kontolistan Konto | Konkurrenter, 18 ord, gäller hela kontot). Provkörd OK 384 op 2026-10-06.
+- Annons B: `docs/begone-se/ads/annonser-b-data.mjs`, 21 grupper (inte Getingar/Myror), vinkel erfarna tekniker, ISO, uppföljning. Experten underkände först, elva rättningar, sedan godkänd. Pälsänger: ingen uppföljning som rutin. Värmetält 1 till 3 dygn. Fåglar: "gamla bon".
+- PMax Fåglar: nya texter `docs/begone-se/ads/pmax-fagel-data.mjs` (experten godkände direkt), gamla texter och bilder sparade i `pmax-fagel-fore-2026-10-07.json`. Tillägg ersätts med fågelsökets (sitelänkar, framhävningar, utdrag, samtal vardagar 08 till 17). Logotyper: tre minsta bort (tak 5), nya in, namn BeGone.
+- Logotyper `bilder/klara/logo-1x1.png` (1200x1200) och `logo-4x1.png` (1200x300), ordbilden oförändrad på vit botten. Kontonivå BUSINESS_LOGO + BUSINESS_NAME (ärvs av fas 2), kampanjnivå på fas 1.
+- Bilder fas 2: 14 motiv, 20 genereringar, 13 godkända av experten, mjolbaggar-skafferi-l struken (fel skala tre gånger). Kopplas i fas2-komplett per annonsgrupp (Vägglöss, Insekter) och per kampanj (Möss, Företag).
+- Budget efter start: Råttor 1 550, Fåglar 800, PMax Fåglar 200, Varumärke 180, Vägglöss 600, Insekter 450, Möss 450, Företag 200 = 4 430 kr. Pausas: gamla råttsöket, båda BrightBid-PMax (råttor, generell), gamla fågelsöket, Silverfisk|Pälsänger|Mjölbaggar|Vägglöss, Möss, Getingar, Myror.
 
 ## Kampanjer
 
@@ -74,6 +87,7 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 
 ## Nästa steg
 
+- (2026-10-07, gäller före punkterna nedan) Christian läser `Ads_Start_2026-10-07.pdf`. Efter ja: provkör fil 3 och 5 när kvoten är återställd, genomför 1 till 5, kör `bygg-start.mjs --bara-start`, provkör och genomför startfilen. Policystatus dag 1 och 2, A mot B 2026-10-21, mål-CPA 2026-11-04. YouTube-filmerna i PMax Fåglar är inte granskade.
 0. (2026-10-06, kontoplanen) Provkör de fem konto-filerna, Christian läser `Ads_Kontoplan_2026-10-06.pdf` och svarar på avsnitt 8. Ordning: mätning, råttsidan formular_forst, fas 1 pausad, granskning, start fas 1 + paus gamla samma dag, fas 2 vecka 2, utvärdering vecka 4 och 8. Kontoplanen ersätter fas 2 i råttrapporten och de planerade separata rapporterna för PMax, fågel och möss.
 1. Christian läser råttrapporten och svarar per steg (1A, 1B, 2, 3, 4, 5) samt på frågorna om ISO, "ofta redan samma dag" och stoppet 2026-09-24 till 2026-10-04.
 2. Efter ja: genomför stegen, kontrollera policystatus 2026-10-08, kör 1B när nya annonser är godkända. Avstämning 2026-10-20, utvärdering och fas 2 2026-11-03.

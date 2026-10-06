@@ -1,0 +1,235 @@
+{
+ "hamtad": "2026-10-07",
+ "kampanj": "21697769249",
+ "tillgangsgrupp": "6516988320",
+ "texter": [
+  {
+   "typ": "HEADLINE",
+   "id": "170505314101",
+   "text": "Fågelsäkra dina solpaneler"
+  },
+  {
+   "typ": "HEADLINE",
+   "id": "170505314104",
+   "text": "Fågelsäkra med BeGone"
+  },
+  {
+   "typ": "HEADLINE",
+   "id": "170505314107",
+   "text": "Trygghet och kvalitet"
+  },
+  {
+   "typ": "HEADLINE",
+   "id": "170505314110",
+   "text": "BeGone skadedjursbekämpning"
+  },
+  {
+   "typ": "HEADLINE",
+   "id": "170505314113",
+   "text": "Experter inom fågelsäkring"
+  },
+  {
+   "typ": "HEADLINE",
+   "id": "170505314116",
+   "text": "Snabb återkoppling med BeGone"
+  },
+  {
+   "typ": "HEADLINE",
+   "id": "170505314119",
+   "text": "Pålitlig partner mot skadedjur"
+  },
+  {
+   "typ": "HEADLINE",
+   "id": "170505314122",
+   "text": "Bred kompetens inom skadedjur"
+  },
+  {
+   "typ": "HEADLINE",
+   "id": "170505314125",
+   "text": "Hundratals nöjda kunder"
+  },
+  {
+   "typ": "HEADLINE",
+   "id": "170505314128",
+   "text": "Tryggare hem och arbetsplatser"
+  },
+  {
+   "typ": "HEADLINE",
+   "id": "170505314131",
+   "text": "Bli av med fåglar med BeGone"
+  },
+  {
+   "typ": "DESCRIPTION",
+   "id": "170505314134",
+   "text": "Skräddarsydda och effektiva lösningar för långsiktigt skydd."
+  },
+  {
+   "typ": "DESCRIPTION",
+   "id": "170505314137",
+   "text": "Åtgärder som effektivt skyddar från oönskade fågelbesök och potentiella skador."
+  },
+  {
+   "typ": "DESCRIPTION",
+   "id": "170505314140",
+   "text": "Trygghet, kvalitet & omsorg för ditt hem och verksamhet. Alltid ett steg före skadedjuren."
+  },
+  {
+   "typ": "DESCRIPTION",
+   "id": "170505314143",
+   "text": "Med vår hjälp kan du känna dig säker i en miljö fri från skadedjur."
+  },
+  {
+   "typ": "LONG_HEADLINE",
+   "id": "170505314146",
+   "text": "Snabb och noggrann hjälp som fungerar från riktiga experter med BeGone"
+  },
+  {
+   "typ": "LONG_HEADLINE",
+   "id": "170505314149",
+   "text": "Skadedjurshantering med fokus på service och kvalitet. Fågelsäkra fastigheten med oss."
+  },
+  {
+   "typ": "LONG_HEADLINE",
+   "id": "170505314152",
+   "text": "Begone Skadedjur - Din expert inom skadedjursbekämpning och skadedjurssanering."
+  },
+  {
+   "typ": "LONG_HEADLINE",
+   "id": "170505314155",
+   "text": "Låt oss ta hand om skadedjuren, så kan du fokusera på att växa din verksamhet."
+  },
+  {
+   "typ": "LONG_HEADLINE",
+   "id": "170505314158",
+   "text": "BeGone kombinerar expertis med omsorg för att att ditt hem blir en trygg plats."
+  }
+ ],
+ "bilder": [
+  {
+   "typ": "MARKETING_IMAGE",
+   "id": "120306554227",
+   "namn": "fågelsäkring google ads landscape- utan logo grön 1.jpg",
+   "storlek": "1200x628",
+   "url": "https://tpc.googlesyndication.com/simgad/12483819735559766030"
+  },
+  {
+   "typ": "SQUARE_MARKETING_IMAGE",
+   "id": "170433007559",
+   "namn": "p-max square fågel - fågelsäkring.png",
+   "storlek": "1200x1200",
+   "url": "https://tpc.googlesyndication.com/simgad/12237048313533464712"
+  },
+  {
+   "typ": "MARKETING_IMAGE",
+   "id": "170433013622",
+   "namn": "p-max landscape fågel - solpaneler.png",
+   "storlek": "1200x628",
+   "url": "https://tpc.googlesyndication.com/simgad/5899283158151509762"
+  },
+  {
+   "typ": "MARKETING_IMAGE",
+   "id": "170433015395",
+   "namn": "p-max landscape fågel - fågelpiggar.png",
+   "storlek": "1200x628",
+   "url": "https://tpc.googlesyndication.com/simgad/15966021815908911017"
+  },
+  {
+   "typ": "PORTRAIT_MARKETING_IMAGE",
+   "id": "170433015761",
+   "namn": "p-max portrait fågel - fågelpiggar.png",
+   "storlek": "960x1200",
+   "url": "https://tpc.googlesyndication.com/simgad/6646447677815447569"
+  },
+  {
+   "typ": "MARKETING_IMAGE",
+   "id": "170473407004",
+   "namn": "p-max landscape fågel.png",
+   "storlek": "1200x628",
+   "url": "https://tpc.googlesyndication.com/simgad/9986367982890146432"
+  },
+  {
+   "typ": "SQUARE_MARKETING_IMAGE",
+   "id": "170473407013",
+   "namn": "p-max square fågel - fågelpiggar.png",
+   "storlek": "1200x1200",
+   "url": "https://tpc.googlesyndication.com/simgad/12135257319155148588"
+  },
+  {
+   "typ": "PORTRAIT_MARKETING_IMAGE",
+   "id": "170473415692",
+   "namn": "p-max portrait fågel - solpaneler.png",
+   "storlek": "960x1200",
+   "url": "https://tpc.googlesyndication.com/simgad/16956643438614613635"
+  },
+  {
+   "typ": "MARKETING_IMAGE",
+   "id": "248702912693",
+   "namn": "Free stock image - 2025-06-19 14:20:22_1.9108.055 (1)",
+   "storlek": "2048x1066",
+   "url": "https://tpc.googlesyndication.com/simgad/15838574335205574330"
+  },
+  {
+   "typ": "MARKETING_IMAGE",
+   "id": "248782230415",
+   "namn": "Free stock image - 2025-06-19 14:20:33_1.9108.477 (1)",
+   "storlek": "2048x1075",
+   "url": "https://tpc.googlesyndication.com/simgad/15838574335205574330"
+  },
+  {
+   "typ": "SQUARE_MARKETING_IMAGE",
+   "id": "248814599946",
+   "namn": "Free stock image - 2025-06-19 14:20:22_1.055 (1)",
+   "storlek": "1372x1366",
+   "url": "https://tpc.googlesyndication.com/simgad/15838574335205574330"
+  },
+  {
+   "typ": "SQUARE_MARKETING_IMAGE",
+   "id": "248814653910",
+   "namn": "Free stock image - 2025-06-19 14:20:33_1.477 (1)",
+   "storlek": "1536x1536",
+   "url": "https://tpc.googlesyndication.com/simgad/15838574335205574330"
+  },
+  {
+   "typ": "SQUARE_MARKETING_IMAGE",
+   "id": "428118259607",
+   "namn": "Claude fagel-duvor-piggar-k 2026-10-06",
+   "storlek": "1200x1200",
+   "url": "https://tpc.googlesyndication.com/simgad/655886712950097940"
+  },
+  {
+   "typ": "PORTRAIT_MARKETING_IMAGE",
+   "id": "428118268466",
+   "namn": "Claude fagel-nat-balkong-s 2026-10-06",
+   "storlek": "960x1200",
+   "url": "https://tpc.googlesyndication.com/simgad/11998328755171709960"
+  },
+  {
+   "typ": "SQUARE_MARKETING_IMAGE",
+   "id": "428217325804",
+   "namn": "Claude fagel-trutar-tak-k 2026-10-06",
+   "storlek": "1200x1200",
+   "url": "https://tpc.googlesyndication.com/simgad/11167120485819013624"
+  },
+  {
+   "typ": "MARKETING_IMAGE",
+   "id": "428306235168",
+   "namn": "Claude fagel-solpaneler-nat-l 2026-10-06",
+   "storlek": "1200x628",
+   "url": "https://tpc.googlesyndication.com/simgad/10367270216002703816"
+  },
+  {
+   "typ": "MARKETING_IMAGE",
+   "id": "428306238729",
+   "namn": "Claude fagel-nat-balkong-l 2026-10-06",
+   "storlek": "1200x628",
+   "url": "https://tpc.googlesyndication.com/simgad/744775908406148124"
+  },
+  {
+   "typ": "PORTRAIT_MARKETING_IMAGE",
+   "id": "428306238741",
+   "namn": "Claude fagel-trutar-tak-s 2026-10-06",
+   "storlek": "960x1200",
+   "url": "https://tpc.googlesyndication.com/simgad/9724866025115599868"
+  }
+ ]
+}

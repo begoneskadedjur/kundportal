@@ -199,5 +199,214 @@
     "forsok": 1,
     "status": "godkand",
     "kommentar": "Låst station mot villagrunden vid stupröret i en prydlig trädgård. Trovärdig, diskret och premium."
+  },
+  {
+    "id": "vagglus-varmetalt-l",
+    "kampanj": "Claude | Sök | Vägglöss",
+    "motiv": "Rest värmetält i ett sovrum, möbler synliga genom öppen tältdörr, aggregat utanför",
+    "format": "1.91:1",
+    "prompt": "Wide interior shot of a plain Swedish bedroom with white walls and a wooden floor. In the middle of the room stands a free-standing heat treatment tent for bed bugs: a cube-shaped enclosure about 2.4 m wide and 2.2 m high made of grey insulated fabric panels on a light metal frame, with one zipped door panel rolled half open. Inside the tent you can see a bed frame, a mattress standing on its side and a wooden chair. Just outside the tent stands one compact grey electric heater unit about half a metre on each side, connected to the tent with a short insulated flexible duct, and two thin grey sensor cables run in through the tent wall. The rest of the room is empty and tidy. Completely plain equipment: no labels, no brand names, no displays with numbers, no writing. No insects visible, no people.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Kubtältet på ram har rimliga mått, aggregatet cirka en halv meter med isolerad slang, givarkablar in i tältet, möblerna uppställda. Svensk miljö, ingen text.",
+    "forsok": 1
+  },
+  {
+    "id": "vagglus-varmetalt-k",
+    "kampanj": "Claude | Sök | Vägglöss",
+    "motiv": "Värmetält i ett sovrum, kvadratiskt",
+    "format": "1:1",
+    "prompt": "Square interior shot of a calm Swedish bedroom with a free-standing heat treatment tent for bed bugs: a rigid cube on a light metal frame, about 2.4 m by 2.4 m footprint and 2.2 m high, clearly larger than a bed with free space inside, grey insulated fabric panels, one zipped door panel rolled half open. Inside only a bare wooden bed frame and a mattress standing on its long edge, no bedding, no duvet, no pillows. Next to the tent one compact grey heater unit about 50 cm on each side, without handle, connected by a short insulated duct; two thin grey sensor cables run in through the tent wall. Plain equipment, no labels, brands, displays or writing. No insects, no people. The tent is fully enclosed on all four sides and the roof. Through the open door only the grey inner fabric walls of the tent are visible; no room walls, shelves, lamps, plants or windows can be seen inside the tent.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Försök 3 godkänt: sluten kub med grå insida, naken sängram och madrass på högkant, aggregat med isolerad slang och givarkablar utanför. Aggregatet något stort men rimligt.",
+    "forsok": 3,
+    "historik": [
+      {
+        "forsok": 1,
+        "prompt": "Square interior shot of a calm Swedish bedroom where a free-standing grey insulated heat treatment tent for bed bugs has been set up, about 2.4 m wide and 2.2 m high, fabric panels on a light metal frame, the zipped door panel partly open so a mattress and a wooden bed frame are visible inside. A compact grey heater unit about half a metre in size stands next to the tent, joined by a short insulated duct. Daylight from a window with simple white curtains. Plain equipment without any labels, brands, displays or writing. No insects, no people.",
+        "kommentar": "Försök 1 underkänt: campingtält i sängstorlek, bäddad säng med täcke inuti, aggregatet liknar en avfuktare."
+      },
+      {
+        "forsok": 2,
+        "prompt": "Square interior shot of a calm Swedish bedroom with a free-standing heat treatment tent for bed bugs: a rigid cube on a light metal frame, about 2.4 m by 2.4 m footprint and 2.2 m high, clearly larger than a bed with free space inside, grey insulated fabric panels, one zipped door panel rolled half open. Inside only a bare wooden bed frame and a mattress standing on its long edge, no bedding, no duvet, no pillows. Next to the tent one compact grey heater unit about 50 cm on each side, without handle, connected by a short insulated duct; two thin grey sensor cables run in through the tent wall. Plain equipment, no labels, brands, displays or writing. No insects, no people.",
+        "kommentar": "Försök 2 underkänt: rummets vägg, hylla och fönster syns inne i tältet, som om tältet saknar bak- och sidovägg."
+      }
+    ]
+  },
+  {
+    "id": "vagglus-madrass-k",
+    "kampanj": "Claude | Sök | Vägglöss",
+    "motiv": "Vägglöss och svarta prickar i madrassens söm, närbild",
+    "format": "1:1",
+    "prompt": "Macro photograph of the seam and piping along the edge of a light beige mattress. Tucked into the seam are four adult bed bugs (Cimex lectularius): flat, oval, reddish brown, about 5 mm long, wingless, each with exactly six legs and two short antennae, plus two smaller pale nymphs. Next to them small clusters of black faecal spots and one pale shed skin. Soft natural daylight, sharp focus on the insects, shallow depth of field. No text, no people.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Platta rödbruna vuxna vägglöss med blodfylld bakkropp och ljusa nymfer i sömmen. Avföringsprickar och skinn rätt placerade, anatomin håller.",
+    "forsok": 1
+  },
+  {
+    "id": "silverfisk-badrum-l",
+    "kampanj": "Claude | Sök | Insekter i hemmet",
+    "motiv": "Långsprötad silverfisk på ljust kakelgolv vid golvlist",
+    "format": "1.91:1",
+    "prompt": "Close-up wide photograph at floor level in a Swedish bathroom: light grey ceramic floor tiles with grey grout and a white skirting board. On the tiles near the skirting board is one long-tailed silverfish (Ctenolepisma longicaudatum): a wingless, carrot-shaped, flattened insect about 15 mm long, covered in grey-brown scales, with exactly six legs, two very long thin antennae and three long thin tail filaments at the rear that are about as long as the body. The rest of the floor is clean and empty. Soft daylight, the insect sharp, background softly out of focus. No text, no people.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Morotsformad grå kropp, mycket långa antenner och tre långa svansspröt. Kakel och golvlist rimliga, storleken stämmer.",
+    "forsok": 1
+  },
+  {
+    "id": "silverfisk-badrum-k",
+    "kampanj": "Claude | Sök | Insekter i hemmet",
+    "motiv": "Långsprötad silverfisk på kakel, kvadratiskt",
+    "format": "1:1",
+    "prompt": "Square macro photograph of one long-tailed silverfish (Ctenolepisma longicaudatum) on light grey bathroom floor tiles next to a grout line: wingless, carrot-shaped, flattened, grey-brown scaly body about 15 mm long, exactly six legs, two very long thin antennae and three long thin tail filaments at the rear. Clean tiles, soft daylight, shallow depth of field. No text, no people. The three tail filaments at the rear are each at least as long as the whole body; slender tapered carrot-shaped body widest just behind the small head, smooth overlapping grey scales, not plate-like segments, no woodlouse appearance, small inconspicuous eyes.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Försök 2 godkänt: morotsformad fjällig gråbrun kropp, litet huvud, mycket långa antenner och tre långa svansspröt.",
+    "forsok": 2,
+    "historik": [
+      {
+        "forsok": 1,
+        "prompt": "Square macro photograph of one long-tailed silverfish (Ctenolepisma longicaudatum) on light grey bathroom floor tiles next to a grout line: wingless, carrot-shaped, flattened, grey-brown scaly body about 15 mm long, exactly six legs, two very long thin antennae and three long thin tail filaments at the rear. Clean tiles, soft daylight, shallow depth of field. No text, no people.",
+        "kommentar": "Försök 1 underkänt: plattsegment och runt huvud som en gråsugga, svansspröten för korta."
+      }
+    ]
+  },
+  {
+    "id": "palsanger-matta-l",
+    "kampanj": "Claude | Sök | Insekter i hemmet",
+    "motiv": "Pälsängerlarver vid golvlist och kant på yllematta",
+    "format": "1.91:1",
+    "prompt": "Close-up wide photograph at floor level in a Swedish living room: the edge of a light grey wool rug lying on a pale wooden floor next to a white skirting board. Along the edge of the rug are three larvae of the black carpet beetle (Attagenus): elongated, carrot-shaped, about 7 to 9 mm long, shiny golden brown to dark brown and covered with short bristles, with a tuft of long hairs at the tail end. Next to them a few pale shed larval skins and some loose wool fibres. Soft daylight, sharp focus on the larvae. No adult beetles, no text, no people.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Gyllenbruna ledade larver med svanstofs, ljusa larvskinn och ullfibrer vid mattkanten. Läses som Attagenus, kroppen något tjock men går.",
+    "forsok": 1
+  },
+  {
+    "id": "palsanger-matta-k",
+    "kampanj": "Claude | Sök | Insekter i hemmet",
+    "motiv": "Pälsängerlarver på yllematta, kvadratiskt",
+    "format": "1:1",
+    "prompt": "Square macro photograph of two larvae of the black carpet beetle (Attagenus) on the pile of a light grey wool rug: elongated, carrot-shaped, about 8 mm long, shiny golden brown with short bristles and a tuft of long hairs at the tail end, next to a pale shed larval skin. Soft daylight, shallow depth of field. No text, no people.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Ledad gyllenbrun larv med svanstofs och genomskinligt larvskinn. Borsten något långa för Attagenus men duger för en annons.",
+    "forsok": 1
+  },
+  {
+    "id": "mjolbaggar-skafferi-l",
+    "kampanj": "Claude | Sök | Insekter i hemmet",
+    "motiv": "Mjölbaggar på skafferihylla vid öppnad mjölpåse",
+    "format": "1.91:1",
+    "prompt": "Close-up wide photograph of a white pantry shelf in a Swedish kitchen. Tight close-up of only the spilled flour at the opening of a plain unprinted paper bag lying on its side on the shelf; no jars and no other objects of known size. Four rust-red flour beetles (Tribolium) appear as very small specks in the flour, each beetle no wider than 2 percent of the image width, slender and flattened, about the size of a sesame seed, reddish brown, hard wing covers meeting in a straight line, six legs and two short antennae. Soft daylight. No text, no people.",
+    "fas": 2,
+    "status": "underkand",
+    "kommentar": "Struken efter tre försök: Gemini ger fel skala (baggarna 5 till 10 gånger för stora). mjolbaggar-skafferi-k täcker gruppen.",
+    "forsok": 3,
+    "historik": [
+      {
+        "forsok": 1,
+        "prompt": "Close-up wide photograph of a white pantry shelf in a Swedish kitchen. An opened plain paper flour bag lies on its side with a little flour spilled on the shelf. In the spilled flour are four rust-red flour beetles (Tribolium): small, slender, flattened beetles about 3 to 4 mm long, reddish brown, with hard wing covers that meet in a straight line down the back, exactly six legs and two short antennae. A plain glass jar with rice stands out of focus behind. The bag has no print, no labels, no text. Soft daylight. No people.",
+        "kommentar": "Försök 1 underkänt: baggarna cirka tio gånger för stora mot riskrukan, läses som kackerlackor."
+      },
+      {
+        "forsok": 2,
+        "prompt": "Close-up wide photograph of a white pantry shelf in a Swedish kitchen. An opened plain paper flour bag lies on its side with a little flour spilled on the shelf. In the spilled flour are four rust-red flour beetles (Tribolium): small, slender, flattened beetles about 3 to 4 mm long, reddish brown, with hard wing covers that meet in a straight line down the back, exactly six legs and two short antennae. A plain glass jar with rice stands out of focus behind. The bag has no print, no labels, no text. Soft daylight. No people. Each beetle is tiny, about the size of a sesame seed and clearly smaller than a single rice grain in the jar; the beetles are only small specks relative to the flour bag; flattened, parallel-sided body, broad rectangular pronotum almost as wide as the wing covers.",
+        "kommentar": "Försök 2 underkänt: baggarna cirka 2 cm mot riskrukan, ser ut som kaffebönor."
+      },
+      {
+        "forsok": 3,
+        "prompt": "Close-up wide photograph of a white pantry shelf in a Swedish kitchen. Tight close-up of only the spilled flour at the opening of a plain unprinted paper bag lying on its side on the shelf; no jars and no other objects of known size. Four rust-red flour beetles (Tribolium) appear as very small specks in the flour, each beetle no wider than 2 percent of the image width, slender and flattened, about the size of a sesame seed, reddish brown, hard wing covers meeting in a straight line, six legs and two short antennae. Soft daylight. No text, no people.",
+        "kommentar": "Försök 3 underkänt: baggarna 1,5 till 2,5 cm mot mjölpåsen."
+      }
+    ]
+  },
+  {
+    "id": "mjolbaggar-skafferi-k",
+    "kampanj": "Claude | Sök | Insekter i hemmet",
+    "motiv": "Mjölbaggar i spillt mjöl, kvadratiskt",
+    "format": "1:1",
+    "prompt": "Square macro photograph of three rust-red flour beetles (Tribolium) crawling in a thin layer of spilled flour on a white pantry shelf: slender, flattened, reddish brown, about 3 to 4 mm long, hard wing covers meeting in a straight line down the back, exactly six legs and two short antennae. The edge of a plain unprinted paper bag in soft focus. Soft daylight. No text, no people.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Rostbruna långsträckta baggar med strierade täckvingar och korta antenner i mjöl. Halsskölden något smal för Tribolium men godtagbar.",
+    "forsok": 1
+  },
+  {
+    "id": "moss-kok-l",
+    "kampanj": "Claude | Sök | Möss",
+    "motiv": "Husmus längs golvlisten i ett kök",
+    "format": "1.91:1",
+    "prompt": "Wide photograph at floor level in a Swedish home kitchen in the evening light: white kitchen cabinets with a plinth, a pale wooden floor. One house mouse (Mus musculus) runs along the base of the cabinet plinth: small, slender, grey-brown with a slightly lighter belly, large rounded ears, small black eyes, pointed snout with whiskers, four legs and a long thin almost hairless tail about as long as its body. A few small dark droppings, about 5 mm long, lie on the floor near the plinth. Clean, tidy kitchen. No text, no people.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Husmus med stora öron och svans ungefär lika lång som kroppen, rimlig spillning vid sockeln, svenskt kök.",
+    "forsok": 1
+  },
+  {
+    "id": "moss-kok-k",
+    "kampanj": "Claude | Sök | Möss",
+    "motiv": "Husmus vid golvlist, kvadratiskt",
+    "format": "1:1",
+    "prompt": "Square photograph at floor level of one house mouse (Mus musculus) sitting next to a white skirting board on a pale wooden floor in a Swedish home: small, slender, grey-brown with a lighter belly, large rounded ears, small black eyes, whiskers, four legs and a long thin tail about as long as its body. A small gap where the skirting board meets the floor behind it. Soft light, sharp focus on the mouse. No text, no people.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Rätt art och proportioner, glipan under golvlisten är en bra detalj.",
+    "forsok": 1
+  },
+  {
+    "id": "foretag-station-gard-l",
+    "kampanj": "Claude | Sök | Företag och avtal",
+    "motiv": "Låst betesstation vid soprummet på en flerbostadsgård",
+    "format": "1.91:1",
+    "prompt": "Wide photograph of the courtyard of a Swedish apartment building from the 1950s with light rendered facades. Next to the closed door of a small refuse room stands one locked, plain dark grey plastic rodent bait station tight against the building wall: a low rectangular box about 30 cm long and 20 cm high with a closed locked lid. Tidy paving, a bicycle stand and a birch tree out of focus. Overcast daylight. The station is completely plain: no labels, no stickers, no logo, no writing. No signs anywhere. No animals, no people.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Godkänd som miljöbild: svensk 50-talsgård med soprum. Lådan läses inte tydligt som station, men inget i bilden är fel.",
+    "forsok": 1
+  },
+  {
+    "id": "foretag-lager-k",
+    "kampanj": "Claude | Sök | Företag och avtal",
+    "motiv": "Rent lager i livsmedelsverksamhet med station längs väggen",
+    "format": "1:1",
+    "prompt": "Square photograph inside the clean dry storage room of a Swedish restaurant: stainless steel shelving with plain unlabeled boxes and closed containers on the shelves, a light grey epoxy floor. On the floor tight against the wall next to a shelf leg stands one small plain dark grey rodent monitoring station, a low closed box about 25 cm long, 15 cm wide and 8 cm high with a small round entrance opening at each end. No other boxes or crates on the floor. Bright even light, very tidy room. No labels, no brands, no writing, no signs. No animals, no people.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Försök 2 godkänt: låg mörkgrå station med ingångshål tätt mot väggen vid hyllbenet i rent torrförråd, ingen text.",
+    "forsok": 2,
+    "historik": [
+      {
+        "forsok": 1,
+        "prompt": "Square photograph inside the clean dry storage room of a Swedish restaurant: stainless steel shelving with plain unlabeled boxes and closed containers, a light grey epoxy floor. Along the wall under the lowest shelf stands one small plain dark grey rodent monitoring station, a low closed box tight against the wall. Bright even light, very tidy room. No labels, no brands, no writing, no signs. No animals, no people.",
+        "kommentar": "Försök 1 underkänt: ingen station syns, bara en stor plastback på golvet."
+      }
+    ]
+  },
+  {
+    "id": "foretag-station-gard-k",
+    "kampanj": "Claude | Sök | Företag och avtal",
+    "motiv": "Låst betesstation vid soprum på flerbostadsgård, kvadratiskt",
+    "format": "1:1",
+    "prompt": "Square photograph of one compact plain dark grey plastic rodent bait station, about 40 cm long, 25 cm wide and 15 cm high, with a round entrance opening at each short end and a flush lid secured by a recessed key lock (no padlock, no hasp, no latch), standing on paving tight against the well-kept rendered wall of a Swedish apartment building next to the closed door of a refuse room. Tidy paving, overcast daylight. No labels, stickers, logo or writing. No animals, no people. The refuse room door is a plain grey metal door with no sign, no lettering, no numbers and no text of any kind; no signs anywhere on the wall or building. Entrance openings on the short ends of the station.",
+    "fas": 2,
+    "status": "godkand",
+    "kommentar": "Försök 3 godkänt: ingångshål på kortsidan, nyckellås utan hasp, tätt mot fasaden vid slät soprumsdörr utan text, välskött gård.",
+    "forsok": 3,
+    "historik": [
+      {
+        "forsok": 1,
+        "prompt": "Square photograph of one locked, plain dark grey plastic rodent bait station standing tight against the rendered wall of a Swedish apartment building, next to the closed door of a refuse room. The station is a low rectangular box about 30 cm long and 20 cm high with a closed locked lid. Tidy paving stones, overcast daylight. Completely plain station: no labels, no stickers, no logo, no writing. No animals, no people.",
+        "kommentar": "Försök 1 underkänt: stor kista med hänglås och hasp, flagnande puts ger vanvårdat intryck."
+      },
+      {
+        "forsok": 2,
+        "prompt": "Square photograph of one compact plain dark grey plastic rodent bait station, about 40 cm long, 25 cm wide and 15 cm high, with a round entrance opening at each short end and a flush lid secured by a recessed key lock (no padlock, no hasp, no latch), standing on paving tight against the well-kept rendered wall of a Swedish apartment building next to the closed door of a refuse room. Tidy paving, overcast daylight. No labels, stickers, logo or writing. No animals, no people.",
+        "kommentar": "Försök 2 underkänt: stationen rätt, men dörren har texten SOPRUM REFUSE ROOM."
+      }
+    ]
   }
 ]

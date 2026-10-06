@@ -1,0 +1,718 @@
+{
+ "status": "FÖRSLAG, ej godkänt. Provkörs med mutate.mjs utan --genomfor.",
+ "framtagen": "2026-10-07",
+ "beskrivning": "Claude | PMax | Fåglar (övergång): 20 gamla texter (BrightBid: \"Hundratals nöjda kunder\", \"Snabb återkoppling\", \"Alltid ett steg före\", \"miljö fri från skadedjur\", tankstreck m.m.) ersätts med 15 rubriker, 5 långa rubriker och 5 beskrivningar granskade av skadedjursexperten. Gamla tillägg bort (sitelänkar med \"I hela Stockholms Län\", \"Få svar inom 48 timmar\", två underkända; framhävningar \"Få hjälp inom 48 timmar\", \"Miljövänligt\", \"Skräddarsydda lösningar\", \"Effektiva metoder\"; samtalstillägg utan schema). In: fågelsökets granskade sitelänkar, framhävningar, utdrag och samtalstillägg vardagar 08 till 17.",
+ "godkand_av": "",
+ "operationer": [
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7001",
+     "textAsset": {
+      "text": "Fågelsäkring"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7001",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7002",
+     "textAsset": {
+      "text": "Fågelskydd för tak och fasad"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7002",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7003",
+     "textAsset": {
+      "text": "Fågelskydd för solceller"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7003",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7004",
+     "textAsset": {
+      "text": "Problem med duvor?"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7004",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7005",
+     "textAsset": {
+      "text": "Måsar på taket?"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7005",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7006",
+     "textAsset": {
+      "text": "Nät, piggar, vajer och band"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7006",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7007",
+     "textAsset": {
+      "text": "Kostnadsfri inspektion"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7007",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7008",
+     "textAsset": {
+      "text": "Skriftlig offert efter besöket"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7008",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7009",
+     "textAsset": {
+      "text": "Erfarna skadedjurstekniker"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7009",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7010",
+     "textAsset": {
+      "text": "ISO 9001 och ISO 14001"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7010",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7011",
+     "textAsset": {
+      "text": "Montering på hög höjd"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7011",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7012",
+     "textAsset": {
+      "text": "Gamla bon tas bort"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7012",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7013",
+     "textAsset": {
+      "text": "Sanering av fågelspillning"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7013",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7014",
+     "textAsset": {
+      "text": "Skydd valt efter platsen"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7014",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7015",
+     "textAsset": {
+      "text": "Begone Skadedjur"
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7015",
+     "fieldType": "HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7016",
+     "textAsset": {
+      "text": "Fågelsäkring av tak, fasad, balkong och solceller, med skydd valt efter platsen."
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7016",
+     "fieldType": "LONG_HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7017",
+     "textAsset": {
+      "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7017",
+     "fieldType": "LONG_HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7018",
+     "textAsset": {
+      "text": "Kostnadsfri inspektion och en skriftlig offert innan arbetet börjar."
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7018",
+     "fieldType": "LONG_HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7019",
+     "textAsset": {
+      "text": "Nät, piggar, vajer eller fågelband, monterat av tekniker med liftkort och fallskydd."
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7019",
+     "fieldType": "LONG_HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7020",
+     "textAsset": {
+      "text": "Problem med duvor eller måsar? Skicka en förfrågan med bilder."
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7020",
+     "fieldType": "LONG_HEADLINE"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7021",
+     "textAsset": {
+      "text": "Fågelskydd valt efter platsen och fåglarna."
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7021",
+     "fieldType": "DESCRIPTION"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7022",
+     "textAsset": {
+      "text": "Vi tar bort gamla bon och spillning när skyddet monteras. Privatpersoner får i regel ROT."
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7022",
+     "fieldType": "DESCRIPTION"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7023",
+     "textAsset": {
+      "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7023",
+     "fieldType": "DESCRIPTION"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7024",
+     "textAsset": {
+      "text": "Skicka en förfrågan när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7024",
+     "fieldType": "DESCRIPTION"
+    }
+   }
+  },
+  {
+   "assetOperation": {
+    "create": {
+     "resourceName": "customers/9407604856/assets/-7025",
+     "textAsset": {
+      "text": "Skydd för solceller monteras med clips, utan åverkan på panelerna."
+     }
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "create": {
+     "assetGroup": "customers/9407604856/assetGroups/6516988320",
+     "asset": "customers/9407604856/assets/-7025",
+     "fieldType": "DESCRIPTION"
+    }
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314101~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314104~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314107~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314110~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314113~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314116~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314119~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314122~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314125~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314128~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314131~HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314134~DESCRIPTION"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314137~DESCRIPTION"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314140~DESCRIPTION"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314143~DESCRIPTION"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314146~LONG_HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314149~LONG_HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314152~LONG_HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314155~LONG_HEADLINE"
+   }
+  },
+  {
+   "assetGroupAssetOperation": {
+    "remove": "customers/9407604856/assetGroupAssets/6516988320~170505314158~LONG_HEADLINE"
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "remove": "customers/9407604856/campaignAssets/21697769249~41144792313~SITELINK"
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "remove": "customers/9407604856/campaignAssets/21697769249~170438311754~SITELINK"
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "remove": "customers/9407604856/campaignAssets/21697769249~170467561506~SITELINK"
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "remove": "customers/9407604856/campaignAssets/21697769249~170476226401~SITELINK"
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "remove": "customers/9407604856/campaignAssets/21697769249~238716674121~CALLOUT"
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "remove": "customers/9407604856/campaignAssets/21697769249~259096188326~CALLOUT"
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "remove": "customers/9407604856/campaignAssets/21697769249~259096188329~CALLOUT"
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "remove": "customers/9407604856/campaignAssets/21697769249~259096188332~CALLOUT"
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "remove": "customers/9407604856/campaignAssets/21697769249~125436853183~CALL"
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "create": {
+     "campaign": "customers/9407604856/campaigns/21697769249",
+     "asset": "customers/9407604856/assets/428102614277",
+     "fieldType": "SITELINK"
+    }
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "create": {
+     "campaign": "customers/9407604856/campaigns/21697769249",
+     "asset": "customers/9407604856/assets/428201437795",
+     "fieldType": "SITELINK"
+    }
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "create": {
+     "campaign": "customers/9407604856/campaigns/21697769249",
+     "asset": "customers/9407604856/assets/428201441575",
+     "fieldType": "SITELINK"
+    }
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "create": {
+     "campaign": "customers/9407604856/campaigns/21697769249",
+     "asset": "customers/9407604856/assets/428201442211",
+     "fieldType": "CALLOUT"
+    }
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "create": {
+     "campaign": "customers/9407604856/campaigns/21697769249",
+     "asset": "customers/9407604856/assets/428201442418",
+     "fieldType": "CALLOUT"
+    }
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "create": {
+     "campaign": "customers/9407604856/campaigns/21697769249",
+     "asset": "customers/9407604856/assets/428201442682",
+     "fieldType": "CALLOUT"
+    }
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "create": {
+     "campaign": "customers/9407604856/campaigns/21697769249",
+     "asset": "customers/9407604856/assets/428201443147",
+     "fieldType": "CALLOUT"
+    }
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "create": {
+     "campaign": "customers/9407604856/campaigns/21697769249",
+     "asset": "customers/9407604856/assets/428201444650",
+     "fieldType": "CALLOUT"
+    }
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "create": {
+     "campaign": "customers/9407604856/campaigns/21697769249",
+     "asset": "customers/9407604856/assets/428290368369",
+     "fieldType": "STRUCTURED_SNIPPET"
+    }
+   }
+  },
+  {
+   "campaignAssetOperation": {
+    "create": {
+     "campaign": "customers/9407604856/campaigns/21697769249",
+     "asset": "customers/9407604856/assets/428102625605",
+     "fieldType": "CALL"
+    }
+   }
+  }
+ ]
+}
