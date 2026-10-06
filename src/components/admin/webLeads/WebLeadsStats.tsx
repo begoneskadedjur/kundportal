@@ -2,13 +2,15 @@
 // Fliken Statistik i Leads (Webb): efterfrågan per ISO-vecka (staplat per kundgrupp), kedjan
 // förfrågan, bokad, vunnen, förlorad efter bokning och förlorad utan bokning per tjänst, källa,
 // kundgrupp, vecka, kampanj och sökord, kundens val mot bokad tjänst, per sida och andel med kontakt samma dag. Aggregeras i
-// klienten på periodens rader (cirka 70 till 80 förfrågningar i månaden).
+// klienten på periodens rader (cirka 70 till 80 förfrågningar i månaden). Förfrågningar från befintliga
+// avtalskunder (status Befintlig kund) räknas inte som nyförsäljning och visas för sig.
 
 import { useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { KUNDGRUPP_LABEL, type WebInquiry, type WebInquiryKundgrupp } from '../../../types/webInquiry'
 import WebLeadsKedja from './WebLeadsKedja'
 import WebLeadsTjanstUtfall from './WebLeadsTjanstUtfall'
+import WebLeadsBefintliga from './WebLeadsBefintliga'
 import { isoVecka, svDatum } from './format'
 
 const PERIODER = [
@@ -70,10 +72,15 @@ function rakna(lista: string[]): [string, number][] {
 export default function WebLeadsStats({ inquiries }: { inquiries: WebInquiry[] }) {
   const [dagar, setDagar] = useState(90)
 
-  const urval = useMemo(() => {
+  const urvalPeriod = useMemo(() => {
     const gans = Date.now() - dagar * 86400000
     return inquiries.filter((i) => new Date(i.created_at).getTime() >= gans && i.status !== 'skrap')
   }, [inquiries, dagar])
+
+  // Nyförsäljning: allt utom befintliga avtalskunder, som visas i en egen tabell
+  const nyforsaljning = useMemo(() => urvalPeriod.filter((i) => i.status !== 'befintlig_kund'), [urvalPeriod])
+  const befintliga = useMemo(() => urvalPeriod.filter((i) => i.status === 'befintlig_kund'), [urvalPeriod])
+  const urval = nyforsaljning
 
   const perVecka = useMemo(() => {
     const m = new Map<string, Record<WebInquiryKundgrupp, number>>()
@@ -99,9 +106,10 @@ export default function WebLeadsStats({ inquiries }: { inquiries: WebInquiry[] }
       kontaktSammaDag: andel(kontaktSammaDag, urval.length),
       bokade: `${bokade} (${andel(bokade, urval.length)})`,
       vunna: `${vunna} (${andel(vunna, urval.length)})`,
+      befintliga: String(befintliga.length),
       forloradeEfterBokning: `${forloradeEfterBokning} (${andel(forloradeEfterBokning, bokade)})`,
     }
-  }, [urval])
+  }, [urval, befintliga])
 
   const perSida = useMemo(() => rakna(urval.map((i) => i.sida || 'Okänd')), [urval])
 
@@ -122,14 +130,15 @@ export default function WebLeadsStats({ inquiries }: { inquiries: WebInquiry[] }
         ))}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-7 gap-3">
         {[
-          { label: 'Förfrågningar', varde: String(nyckeltal.totalt) },
+          { label: 'Förfrågningar, nyförsäljning', varde: String(nyckeltal.totalt) },
           { label: 'Varav akuta', varde: String(nyckeltal.akuta) },
           { label: 'Kontakt samma dag', varde: nyckeltal.kontaktSammaDag },
           { label: 'Bokade', varde: nyckeltal.bokade },
           { label: 'Vunna', varde: nyckeltal.vunna },
           { label: 'Förlorade efter bokning', varde: nyckeltal.forloradeEfterBokning },
+          { label: 'Befintliga avtalskunder', varde: nyckeltal.befintliga },
         ].map((k) => (
           <div key={k.label} className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
             <p className="text-xs text-slate-400">{k.label}</p>
@@ -164,11 +173,13 @@ export default function WebLeadsStats({ inquiries }: { inquiries: WebInquiry[] }
 
       <WebLeadsTjanstUtfall urval={urval} />
 
+      <WebLeadsBefintliga befintliga={befintliga} />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Topplista titel="Per sida" rader={perSida} />
       </div>
       <p className="text-xs text-slate-500">
-        Förfrågningar markerade som skräp räknas inte. Bokad betyder att ett ärende skapats från förfrågan. Vunnen när ärendet
+        Förfrågningar markerade som skräp räknas inte. Nyckeltalen, veckodiagrammet och kedjan gäller nyförsäljning; förfrågningar från befintliga avtalskunder visas för sig. Bokad betyder att ett ärende skapats från förfrågan. Vunnen när ärendet
         fakturerats inom 30 dagar från bokningen (90 dagar om offert skickats), annars förlorad efter bokning. Andelen förlorade
         efter bokning räknas på de bokade. Veckor enligt ISO, måndag först, i svensk tid.
       </p>

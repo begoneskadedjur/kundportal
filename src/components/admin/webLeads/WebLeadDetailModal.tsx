@@ -1,12 +1,14 @@
 // src/components/admin/webLeads/WebLeadDetailModal.tsx
 // Detaljvy för en webbförfrågan i Leads (Webb): kontaktuppgifter, formulärets svar, bilder, källa,
 // statusflöde, tilldelning, anteckningar med historik och konvertering till ärende, offert (Oneflow-
-// guiden, kopplas när offerten skickats) och B2B-lead.
+// guiden, kopplas när offerten skickats) och B2B-lead. Matchning mot befintliga kunder: för en avtalskund
+// öppnar Skapa ärende ärendemodalen i avtalsläge (extrabesök, stationskontroll, etablering) och ärendet ger
+// status Befintlig kund. Koppla befintligt ärende för ärenden som redan skapats på annat sätt.
 // Modalstandard: inget Card, sektioner p-3 bg-slate-800/30, status som text med statuspunkt.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Phone, Mail, MapPin, MessageSquare, Image as ImageIcon, Globe, History, UserPlus, Target, Send, X, ClipboardPlus, ExternalLink, FileSignature } from 'lucide-react'
+import { Phone, Mail, MapPin, MessageSquare, Image as ImageIcon, Globe, History, UserPlus, Target, Send, X, ClipboardPlus, ExternalLink, FileSignature, Link2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
@@ -23,7 +25,9 @@ import {
   FRIST_DAGAR_OFFERT,
   kallaLabel,
   tjanstLabel,
+  type KundMatchning,
   type StaffProfile,
+  type WebInquiryArendeTabell,
   type WebInquiry,
   type WebInquiryEvent,
   type WebInquiryStatus,
@@ -31,6 +35,8 @@ import {
 import type { BusinessCasesInsert, LeadInsert, PrivateCasesInsert, Technician } from '../../../types/database'
 import { formatSvTid, svDatum } from './format'
 import WebLeadUppgifter from './WebLeadUppgifter'
+import WebLeadBefintligKund from './WebLeadBefintligKund'
+import WebLeadKopplaArende from './WebLeadKopplaArende'
 import { adressDelar, effektivtIdNummer, sattIhopAdress } from '../../../shared/webLeadUppgifter'
 
 interface Props {
@@ -68,6 +74,9 @@ function formularSvar(inquiry: WebInquiry): Svar[] {
 }
 
 const OSPECIFICERAD = ['annat', 'vetinte', 'foretag']
+
+/** Ärendetyperna för en befintlig avtalskund. Rondering och egenkontroll ingår inte. */
+const AVTALSTYPER: Array<'contract' | 'inspection' | 'establishment'> = ['contract', 'inspection', 'establishment']
 
 /** Offertens innehållstext i guiden: djuret när kunden angett ett, annars en allmän formulering. */
 function offertText(inquiry: WebInquiry): string {
@@ -111,7 +120,7 @@ function idForArende(inquiry: WebInquiry, foretag: boolean): string {
 }
 
 /** Ärendemodalens fält förifyllda från förfrågan. Det som saknas lämnas tomt. */
-function arendeFalt(inquiry: WebInquiry, typ: 'private' | 'business'): Partial<PrivateCasesInsert & BusinessCasesInsert> {
+function arendeFalt(inquiry: WebInquiry, typ: 'private' | 'business' | 'avtal'): Partial<PrivateCasesInsert & BusinessCasesInsert> {
   const adress = sattIhopAdress(inquiry)
   const tjanst = inquiry.pest_type ? tjanstLabel(inquiry.pest_type) : ''
   const beskrivning = [
@@ -133,10 +142,18 @@ function arendeFalt(inquiry: WebInquiry, typ: 'private' | 'business'): Partial<P
   if (typ === 'business') {
     falt.company_name = inquiry.company_name || ''
     falt.org_nr = idForArende(inquiry, true)
-  } else {
+  } else if (typ === 'private') {
     falt.personnummer = idForArende(inquiry, false)
   }
+  // Avtalskund: företagsnamn och org.nr kommer från kundregistret när kunden väljs i ärendemodalen
   return falt
+}
+
+/** Länk till ärendet: avtalsärenden öppnas i koordinatorns schema, övriga i sök ärenden. */
+function arendeUrl(arendeSokPath: string | null, tabell: WebInquiryArendeTabell | string | null, caseId: string): string | null {
+  if (!arendeSokPath) return null
+  if (tabell === 'cases') return `${arendeSokPath.replace(/\/sok-arenden$/, '/schema')}?openCase=${caseId}`
+  return `${arendeSokPath}?openCase=${caseId}&caseType=${tabell === 'business_cases' ? 'business' : 'private'}`
 }
 
 export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBasePath, arendeSokPath, onClose, onChanged }: Props) {
@@ -151,13 +168,50 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
   // Skapa ärende: tekniker, förifyllda fält och bilder hämtas innan ärendemodalen öppnas
   const [forbereder, setForbereder] = useState(false)
   const [arendeUnderlag, setArendeUnderlag] = useState<{
-    typ: 'private' | 'business'
+    typ: 'private' | 'business' | 'avtal'
     falt: Partial<PrivateCasesInsert & BusinessCasesInsert>
     bilder: File[]
     tekniker: Technician[]
+    /** Avtalsläge: förvald kund (huvudkontoret för en enhet) och enhet. */
+    kundId?: string | null
+    enhetId?: string | null
   } | null>(null)
+  // Befintliga kunder som förfrågan matchar, valt kundkort och om koordinatorn valt bort matchningen
+  const [matchningar, setMatchningar] = useState<KundMatchning[]>([])
+  const [valdKundId, setValdKundId] = useState<string | null>(null)
+  const [matchBortvald, setMatchBortvald] = useState(false)
+  const [visaKoppla, setVisaKoppla] = useState(false)
 
   const id = inquiry?.id
+  const matchNyckel = inquiry
+    ? [inquiry.id, inquiry.id_nummer ?? '', inquiry.id_nummer_typ ?? '', inquiry.organization_number ?? '', inquiry.email ?? '', inquiry.phone].join('|')
+    : ''
+
+  useEffect(() => {
+    setMatchningar([])
+    setValdKundId(null)
+    setMatchBortvald(false)
+    setVisaKoppla(false)
+  }, [id])
+
+  useEffect(() => {
+    if (!inquiry || !matchNyckel) return
+    let avbruten = false
+    WebInquiryService.findCustomerMatches(inquiry)
+      .then((m) => {
+        if (avbruten) return
+        setMatchningar(m)
+        setValdKundId((prev) => (prev && m.some((x) => x.customer_id === prev && x.har_avtal) ? prev : m.find((x) => x.har_avtal)?.customer_id ?? null))
+      })
+      .catch(() => {
+        if (!avbruten) setMatchningar([])
+      })
+    return () => {
+      avbruten = true
+    }
+    // Matchningen görs om när org.nr, e-post eller telefon ändras, inte vid varje statusbyte
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matchNyckel])
 
   const laddaHistorik = useCallback(async () => {
     if (!id) return
@@ -184,6 +238,11 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
     const p = staff.find((s) => s.id === profileId)
     return p ? p.display_name || p.email : 'Okänd användare'
   }
+
+  // Matchad avtalskund som Skapa ärende ska använda, om koordinatorn inte valt bort matchningen
+  const avtalskund = matchBortvald
+    ? null
+    : matchningar.find((m) => m.har_avtal && m.customer_id === valdKundId) ?? matchningar.find((m) => m.har_avtal) ?? null
 
   const byttStatus = async (status: WebInquiryStatus) => {
     if (status === inquiry.status) return
@@ -260,7 +319,8 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
         toast.error('Förfrågan har redan ett ärende')
         return
       }
-      const typ: 'private' | 'business' = inquiry.kundgrupp === 'privat' ? 'private' : 'business'
+      const avtalsMatch = avtalskund
+      const typ: 'private' | 'business' | 'avtal' = avtalsMatch ? 'avtal' : inquiry.kundgrupp === 'privat' ? 'private' : 'business'
       const [tekniker, filer] = await Promise.all([
         WebInquiryService.listTechnicians(),
         WebInquiryService.imageFiles(inquiry.id).catch(() => [] as File[]),
@@ -268,7 +328,15 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
       if (inquiry.bilder.some((b) => b.uppladdad) && filer.length === 0) {
         toast.error('Bilderna kunde inte hämtas och följer inte med till ärendet')
       }
-      setArendeUnderlag({ typ, falt: arendeFalt(inquiry, typ), bilder: filer, tekniker })
+      setArendeUnderlag({
+        typ,
+        falt: arendeFalt(inquiry, typ),
+        bilder: filer,
+        tekniker,
+        // En enhet förväljs under sitt huvudkontor, som ärendemodalens enhetsval kräver
+        kundId: avtalsMatch ? (avtalsMatch.ar_enhet && avtalsMatch.huvudkontor_id ? avtalsMatch.huvudkontor_id : avtalsMatch.customer_id) : null,
+        enhetId: avtalsMatch && avtalsMatch.ar_enhet ? avtalsMatch.customer_id : null,
+      })
     } catch {
       toast.error('Ärendemodalen kunde inte öppnas')
     } finally {
@@ -300,7 +368,7 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
     try {
       const uppdaterad = await WebInquiryService.linkCase(
         inquiry.id,
-        caseType === 'business' ? 'business_cases' : 'private_cases',
+        caseType === 'contract' ? 'cases' : caseType === 'business' ? 'business_cases' : 'private_cases',
         caseId,
       )
       onChanged(uppdaterad)
@@ -321,9 +389,8 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
   const fristDatum = inquiry.bokad_at
     ? svDatum(new Date(new Date(inquiry.bokad_at).getTime() + fristDagar * 86400000))
     : null
-  const arendeLank = inquiry.arende_id && arendeSokPath
-    ? `${arendeSokPath}?openCase=${inquiry.arende_id}&caseType=${inquiry.arende_tabell === 'business_cases' ? 'business' : 'private'}`
-    : null
+  const arendeLank = inquiry.arende_id ? arendeUrl(arendeSokPath, inquiry.arende_tabell, inquiry.arende_id) : null
+  const befintligKund = inquiry.status === 'befintlig_kund'
 
   return (
     <>
@@ -364,8 +431,12 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
               <div className="text-sm">
                 <p className="text-xs font-medium text-slate-400 mb-1">Utfall</p>
                 <p className="text-slate-300">
-                  {inquiry.arende_nummer ? `Ärende ${inquiry.arende_nummer} skapat` : 'Ärende skapat'}
+                  {inquiry.arende_nummer ? `Ärende ${inquiry.arende_nummer} ` : 'Ärende '}
+                  {inquiry.arende_kopplat ? 'kopplat' : 'skapat'}
                   {inquiry.bokad_at ? ` ${formatSvTid(inquiry.bokad_at)}. ` : '. '}
+                  {befintligKund && (
+                    <>Befintlig kund: avtalskundens ärende räknas inte som nyförsäljning och får inget utfall vunnen eller förlorad.</>
+                  )}
                   {inquiry.status === 'bokad' && fristDatum && (
                     <>Räknas som vunnen om ärendet faktureras senast {fristDatum} ({fristDagar} dagar{inquiry.haft_offert ? ' eftersom offert har skickats' : ''}), annars som förlorad. Sätts automatiskt en gång per dygn.</>
                   )}
@@ -398,7 +469,7 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
                 ))}
               </div>
               <p className="text-xs text-slate-500 mt-1">
-                Offert sätts när en offert skickas med Skapa offert. Bokad sätts när ett ärende skapas. Vunnen sätts automatiskt när ärendet fakturerats.
+                Offert sätts när en offert skickas med Skapa offert. Bokad sätts när ett ärende skapas eller kopplas, Befintlig kund när det är ett ärende för en avtalskund. Vunnen sätts automatiskt när ärendet fakturerats.
               </p>
               {inquiry.offert_skickad_at && (
                 <p className="text-xs text-slate-400 mt-1">Offert skickad {formatSvTid(inquiry.offert_skickad_at)}. Bokas ett ärende gäller 90 dagars frist.</p>
@@ -433,6 +504,12 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
                   {forbereder ? 'Förbereder...' : 'Skapa ärende'}
                 </Button>
               )}
+              {arendeSokPath && !bokad && inquiry.status !== 'skrap' && !visaKoppla && (
+                <Button variant="secondary" size="sm" disabled={forbereder || sparar} onClick={() => setVisaKoppla(true)}>
+                  <Link2 className="w-4 h-4 mr-1.5" />
+                  Koppla befintligt ärende
+                </Button>
+              )}
               {!bokad && inquiry.status !== 'skrap' && (
                 <Button variant="secondary" size="sm" disabled={forbereder || sparar} onClick={oppnaSkapaOffert}>
                   <FileSignature className="w-4 h-4 mr-1.5" />
@@ -443,6 +520,12 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
                 <Link to={arendeLank} className="inline-flex items-center gap-1.5 text-sm text-[#20c58f] hover:underline">
                   <ExternalLink className="w-4 h-4" />
                   {inquiry.arende_nummer ? `Öppna ärende ${inquiry.arende_nummer}` : 'Öppna ärendet'}
+                </Link>
+              )}
+              {befintligKund && inquiry.customer_id && (
+                <Link to={`${basePath}/befintliga-kunder/${inquiry.customer_id}`} className="inline-flex items-center gap-1.5 text-sm text-[#20c58f] hover:underline">
+                  <ExternalLink className="w-4 h-4" />
+                  Öppna kunden
                 </Link>
               )}
               {bokad && !arendeLank && (
@@ -472,6 +555,31 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
               )}
             </div>
           </div>
+
+          {!bokad && (
+            <WebLeadBefintligKund
+              matchningar={matchningar}
+              valdId={valdKundId}
+              onValj={setValdKundId}
+              bortvald={matchBortvald}
+              onBortval={setMatchBortvald}
+              basePath={basePath}
+              kanSkapaArende={!!arendeSokPath}
+            />
+          )}
+
+          {visaKoppla && !bokad && (
+            <WebLeadKopplaArende
+              inquiry={inquiry}
+              onStang={() => setVisaKoppla(false)}
+              onKopplad={(uppdaterad) => {
+                setVisaKoppla(false)
+                onChanged(uppdaterad)
+                refreshWebLeadsBadge()
+                void laddaHistorik()
+              }}
+            />
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Kontakt */}
@@ -627,11 +735,11 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
                     </div>
                     <p className="text-white whitespace-pre-wrap">
                       {handelseText(e, namnFor)}
-                      {e.typ === 'konvertering' && arendeSokPath && e.till_varde && /^(private|business)_cases:/.test(e.till_varde) && (
+                      {e.typ === 'konvertering' && arendeSokPath && e.till_varde && /^(private_cases|business_cases|cases):/.test(e.till_varde) && (
                         <>
                           {' '}
                           <Link
-                            to={`${arendeSokPath}?openCase=${e.till_varde.split(':')[1]}&caseType=${e.till_varde.startsWith('business_cases') ? 'business' : 'private'}`}
+                            to={arendeUrl(arendeSokPath, e.till_varde.split(':')[0], e.till_varde.split(':')[1]) ?? ''}
                             className="text-[#20c58f] hover:underline"
                           >
                             Öppna ärendet
@@ -692,10 +800,13 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
           onClose={() => setArendeUnderlag(null)}
           onSuccess={() => undefined}
           technicians={arendeUnderlag.tekniker}
-          initialCaseType={arendeUnderlag.typ}
+          initialCaseType={arendeUnderlag.typ === 'avtal' ? null : arendeUnderlag.typ}
           initialFormData={arendeUnderlag.falt}
           initialImages={arendeUnderlag.bilder}
           onCaseCreated={efterArende}
+          allowedCaseTypes={arendeUnderlag.typ === 'avtal' ? AVTALSTYPER : null}
+          initialContractCustomerId={arendeUnderlag.kundId ?? null}
+          initialSiteId={arendeUnderlag.enhetId ?? null}
         />
       )}
     </>

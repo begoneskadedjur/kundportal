@@ -2,8 +2,9 @@
 // Leads (Webb): förfrågningar från formulären på begone.se (tabellerna web_inquiries och
 // web_inquiry_events). Skilt från B2B-leadsen i tabellen leads.
 
-export type WebInquiryStatus = 'ny' | 'kontaktad' | 'offert' | 'bokad' | 'vunnen' | 'forlorad' | 'skrap'
-export type WebInquiryArendeTabell = 'private_cases' | 'business_cases'
+export type WebInquiryStatus = 'ny' | 'kontaktad' | 'offert' | 'bokad' | 'befintlig_kund' | 'vunnen' | 'forlorad' | 'skrap'
+/** cases = avtalsärende, stationskontroll eller etablering för en befintlig avtalskund. */
+export type WebInquiryArendeTabell = 'private_cases' | 'business_cases' | 'cases'
 export type WebInquiryKundgrupp = 'privat' | 'brf_fastighet' | 'verksamhet'
 export type WebInquiryKalla = 'offertflode' | 'artanalys'
 export type WebInquiryEventTyp = 'anteckning' | 'status' | 'tilldelning' | 'konvertering' | 'bilder'
@@ -74,6 +75,8 @@ export interface WebInquiry {
   bokad_tjanst: string | null
   /** Ärendenumret kunden fick (case_number). Har inget med förfrågans referens att göra. */
   arende_nummer: string | null
+  /** Sant när ett befintligt ärende kopplades i efterhand i stället för att skapas från förfrågan. */
+  arende_kopplat: boolean
   /**
    * Kompletteringar efter samtalet. Kundens originalsvar ovan står kvar oförändrade.
    * id_nummer: personnummer (ÅÅÅÅMMDD-XXXX) eller org.nr (XXXXXX-XXXX). Logga aldrig värdet.
@@ -95,6 +98,47 @@ export interface WebInquiryKomplettering {
   rattad_ort: string | null
 }
 
+/** Hur en förfrågan matchades mot en befintlig kund, i prioritetsordning. */
+export type KundMatchSatt = 'orgnr' | 'epostdoman' | 'telefon'
+
+export const KUND_MATCH_LABEL: Record<KundMatchSatt, string> = {
+  orgnr: 'org.nr',
+  epostdoman: 'e-postdomän',
+  telefon: 'telefonnummer',
+}
+
+/** En aktiv kund i kundregistret som förfrågan matchar. */
+export interface KundMatchning {
+  customer_id: string
+  namn: string
+  kundnummer: number | null
+  /** Enheten under ett huvudkontor; huvudkontor_id pekar då på huvudkontoret. */
+  ar_enhet: boolean
+  huvudkontor_id: string | null
+  huvudkontor_namn: string | null
+  /** Gällande avtal (eget, via avtalsomfattning, via huvudkontoret eller på kundraden). */
+  har_avtal: boolean
+  /** Avtalets slutdatum ÅÅÅÅ-MM-DD, null när det saknas (tillsvidare). */
+  avtal_till: string | null
+  satt: KundMatchSatt
+}
+
+/** Ett ärende som hittats på ärendenummer för Koppla befintligt ärende. */
+export interface ArendeTraff {
+  tabell: WebInquiryArendeTabell
+  id: string
+  case_number: string
+  created_at: string
+  /** Kundens namn eller kontaktpersonen. */
+  kund: string | null
+  /** Ärendets typ i klartext: Privatperson, Företag, Avtalsärende, Stationskontroll, Etablering. */
+  typ: string
+  service_type: string | null
+  status: string | null
+  /** Sant när ärendet redan är kopplat till en förfrågan. */
+  kopplat: boolean
+}
+
 export interface WebInquiryEvent {
   id: string
   inquiry_id: string
@@ -113,7 +157,7 @@ export interface StaffProfile {
   role: string | null
 }
 
-export const STATUS_ORDNING: WebInquiryStatus[] = ['ny', 'kontaktad', 'offert', 'bokad', 'vunnen', 'forlorad', 'skrap']
+export const STATUS_ORDNING: WebInquiryStatus[] = ['ny', 'kontaktad', 'offert', 'bokad', 'befintlig_kund', 'vunnen', 'forlorad', 'skrap']
 
 /**
  * Statusar som personalen kan sätta för hand på en förfrågan som inte bokats. Offert sätts när en
@@ -131,6 +175,7 @@ export const STATUS_CONFIG: Record<WebInquiryStatus, { label: string; text: stri
   kontaktad: { label: 'Kontaktad', text: 'text-sky-400', dot: 'bg-sky-400' },
   offert: { label: 'Offert', text: 'text-violet-400', dot: 'bg-violet-400' },
   bokad: { label: 'Bokad', text: 'text-teal-300', dot: 'bg-teal-300' },
+  befintlig_kund: { label: 'Befintlig kund', text: 'text-cyan-300', dot: 'bg-cyan-300' },
   vunnen: { label: 'Vunnen', text: 'text-[#20c58f]', dot: 'bg-[#20c58f]' },
   forlorad: { label: 'Förlorad', text: 'text-slate-400', dot: 'bg-slate-500' },
   skrap: { label: 'Skräp', text: 'text-slate-500', dot: 'bg-slate-600' },

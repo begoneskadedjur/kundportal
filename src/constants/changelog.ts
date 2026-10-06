@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.29.0',
+    date: '2026-10-06',
+    title: 'Leads (Webb): befintliga avtalskunder',
+    items: [
+      { kind: 'nyhet', text: 'En förfrågan från en befintlig avtalskund visar en ruta med kunden, avtalets slutdatum och hur den känns igen (org.nr, e-postdomän eller telefonnummer), med länk till kunden.' },
+      { kind: 'nyhet', text: 'Skapa ärende öppnar då ärendemodalen för avtalskunder med kunden vald, och du väljer extrabesök, stationskontroll eller etablering. Är det fel kund väljer du bort matchningen och skapar ärendet som vanligt.' },
+      { kind: 'nyhet', text: 'Koppla befintligt ärende: har ärendet redan skapats på annat sätt söker du fram det på ärendenumret och kopplar det till förfrågan.' },
+      { kind: 'nyhet', text: 'Ny status Befintlig kund. Avtalskundernas ärenden räknas inte som vunna eller förlorade, och statistiken visar dem för sig med hur många ärenden som genomförts.' },
+    ],
+  },
+  {
     version: '3.28.0',
     date: '2026-10-06',
     title: 'Bildanalysen: vägen och bilden följer med förfrågan',

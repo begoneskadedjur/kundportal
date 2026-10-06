@@ -1,7 +1,8 @@
 // src/components/admin/webLeads/WebLeadsKedja.tsx
 // Statistik i Leads (Webb): kedjan förfrågan, bokad, vunnen, förlorad efter bokning och förlorad
 // utan bokning, grupperad per tjänst, källa, kundgrupp, vecka, kampanj eller sökord.
-// Bokad = ett ärende har skapats från förfrågan (bokad_at), oavsett vad som hänt sedan.
+// Bokad = ett ärende har skapats eller kopplats (bokad_at), oavsett vad som hänt sedan.
+// Gäller bara nyförsäljning: förfrågningar med status Befintlig kund filtreras bort i WebLeadsStats.
 
 import { useMemo, useState } from 'react'
 import { KUNDGRUPP_LABEL, kallaLabel, tjanstLabel, type WebInquiry } from '../../../types/webInquiry'

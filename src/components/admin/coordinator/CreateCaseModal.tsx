@@ -77,6 +77,17 @@ interface CreateCaseModalProps {
   initialImages?: File[] | null;
   /** Anropas när ett nytt ärende skapats, innan modalen stängs. */
   onCaseCreated?: (caseId: string, caseType: 'private' | 'business' | 'contract') => void | Promise<void>;
+  /**
+   * Avtalsläge (t.ex. en webbförfrågan från en befintlig avtalskund): typvalet visar bara dessa
+   * avtalstyper. När en typ väljs förifylls initialFormData och initialImages, och kunden och
+   * enheten nedan förväljs. Stationskontroll och etablering anropar då också onCaseCreated (med
+   * caseType 'contract') och laddar upp valda bilder.
+   */
+  allowedCaseTypes?: Array<'contract' | 'inspection' | 'establishment'> | null;
+  /** Förvald avtalskund i avtalsläge (huvudkontoret när en enhet är vald). */
+  initialContractCustomerId?: string | null;
+  /** Förvald enhet i avtalsläge. */
+  initialSiteId?: string | null;
 }
 
 /**
@@ -126,7 +137,7 @@ function resolveAssigneeFields(form: Record<string, string | null | undefined>, 
   };
 }
 
-export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType, initialFormData, initialImages, onCaseCreated }: CreateCaseModalProps) {
+export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType, initialFormData, initialImages, onCaseCreated, allowedCaseTypes, initialContractCustomerId, initialSiteId }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
   const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | 'egenkontroll' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
@@ -799,6 +810,24 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       return;
     }
     setFormData({ status: 'Bokad' });
+    // Avtalsläge: förfrågans uppgifter, bilder och den matchade kunden följer med in
+    if (allowedCaseTypes && allowedCaseTypes.length > 0) {
+      if (initialFormData) setFormData({ status: 'Bokad', ...initialFormData });
+      if (initialImages && initialImages.length > 0) {
+        setSelectedImages(prev => {
+          prev.forEach(img => URL.revokeObjectURL(img.preview));
+          return initialImages.slice(0, 10).map(file => ({
+            file,
+            preview: URL.createObjectURL(file),
+            category: 'general' as const,
+          }));
+        });
+      }
+      if (initialContractCustomerId) {
+        setSelectedContractCustomer(initialContractCustomerId);
+        setSelectedSiteId(initialSiteId ?? null);
+      }
+    }
     setStep('form');
   };
   
@@ -1021,6 +1050,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     // Kundraden ärendet skrivs på (multisite: enheten). Funktionsscope, så att
     // utkastraderna längre ner kan läsa den - tidigare block-scopad let → ReferenceError.
     let actualCustomerId: string | null = null;
+    // Stationskontroll och etablering i avtalsläge: ärendet som skapades, för onCaseCreated
+    let avtalslageCaseId: string | null = null;
 
     // För inspection-ärenden krävs inte title från användaren
     if (!caseType) {
@@ -1157,6 +1188,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           .single();
 
         if (caseError) throw caseError;
+        avtalslageCaseId = createdCase?.id ?? null;
 
         // Räkna stationer för denna kund
         const [outdoorResult, indoorResult] = await Promise.all([
@@ -1218,7 +1250,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           : customer;
         const customerName = customerForTitle?.company_name || 'Okänd kund';
 
-        const { error } = await supabase.from('cases').insert([{
+        const { data: createdEstablishment, error } = await supabase.from('cases').insert([{
           customer_id: actualCustomerId!,
           contract_id: persistedContractId ?? null,
           site_id: customer?.is_multisite ? selectedSiteId : null,
@@ -1244,8 +1276,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           work_order_number: (formData as any).work_order_number?.trim() || null,
           work_object: (formData as any).work_object?.trim() || null,
           room_number: (formData as any).room_number?.trim() || null,
-        }]);
+        }]).select('id').single();
         if (error) throw error;
+        avtalslageCaseId = createdEstablishment?.id ?? null;
 
         // Inga fakturarader kopieras från avtalet (beslut 2026-09-04). En
         // etablering är en del av avtalet och premien styrs av avtalskartan;
@@ -1446,10 +1479,25 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         finalCaseType = caseType === 'business' ? 'business' : 'private';
       }
 
+      // Avtalsläge: stationskontroll och etablering får förfrågans bilder (avtalsärenden laddar
+      // upp sina ovan) och rapporteras till den som öppnade modalen.
+      const avtalslage = !!allowedCaseTypes && allowedCaseTypes.length > 0;
+      if (avtalslage && avtalslageCaseId && selectedImages.length > 0) {
+        const { success, failed } = await uploadSelectedImages(selectedImages, avtalslageCaseId, 'contract');
+        if (success > 0) toast.success(`${success} bild${success > 1 ? 'er' : ''} uppladdade`);
+        if (failed > 0) toast.error(`${failed} bild${failed > 1 ? 'er' : ''} kunde inte laddas upp`);
+      }
+
       // Den som öppnade modalen (t.ex. Leads (Webb)) får veta vilket nytt ärende som skapades
       if (onCaseCreated && finalCaseId && !initialCaseData?.id) {
         try {
           await onCaseCreated(finalCaseId, finalCaseType);
+        } catch (callbackError) {
+          console.error('onCaseCreated misslyckades:', callbackError);
+        }
+      } else if (onCaseCreated && avtalslage && avtalslageCaseId && !initialCaseData?.id) {
+        try {
+          await onCaseCreated(avtalslageCaseId, 'contract');
         } catch (callbackError) {
           console.error('onCaseCreated misslyckades:', callbackError);
         }
@@ -1630,7 +1678,35 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   return (
       <Modal isOpen={isOpen} onClose={onClose} title={getModalTitle()} size={`w-full sm:w-[95%] ${getModalSize()}`} preventClose={loading} footer={footer} usePortal={true}>
         <div className="p-4 max-h-[80vh] overflow-y-auto">
-          {step === 'selectType' && !initialCaseData && (
+          {step === 'selectType' && !initialCaseData && allowedCaseTypes && allowedCaseTypes.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-sm text-slate-400">Kunden är befintlig avtalskund. Välj vilken typ av ärende det gäller.</p>
+                <div className="flex flex-col md:flex-row gap-3">
+                  {allowedCaseTypes.includes('contract') && (
+                    <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
+                      <FileCheck className="w-6 h-6 mx-auto mb-1.5 text-emerald-400" />
+                      <h3 className="text-sm font-semibold">Extrabesök Avtalskund</h3>
+                      <p className="text-xs text-slate-400 mt-1">Enstaka tjänst utöver avtalet</p>
+                    </button>
+                  )}
+                  {allowedCaseTypes.includes('inspection') && (
+                    <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
+                      <ClipboardCheck className="w-6 h-6 mx-auto mb-1.5 text-cyan-400" />
+                      <h3 className="text-sm font-semibold">Stationskontroll Avtalskund</h3>
+                      <p className="text-xs text-slate-400 mt-1">Enstaka kontroll av stationerna</p>
+                    </button>
+                  )}
+                  {allowedCaseTypes.includes('establishment') && (
+                    <button type="button" onClick={() => selectCaseType('establishment')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-lime-500/30 cursor-pointer">
+                      <MapPin className="w-6 h-6 mx-auto mb-1.5 text-lime-400" />
+                      <h3 className="text-sm font-semibold">Etablering Avtalskund</h3>
+                      <p className="text-xs text-slate-400 mt-1">Utplacering av stationer</p>
+                    </button>
+                  )}
+                </div>
+              </div>
+          )}
+          {step === 'selectType' && !initialCaseData && !(allowedCaseTypes && allowedCaseTypes.length > 0) && (
               <div className="space-y-3">
                 {/* Rad 1: Engångsärenden */}
                 <div className="flex flex-col md:flex-row gap-3">

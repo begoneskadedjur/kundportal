@@ -2,7 +2,9 @@
 // Daglig cron för Leads (Webb): bokade förfrågningar får utfallet Vunnen när det kopplade ärendet
 // fakturerats inom fristen (30 dagar från bokningen, 90 dagar om förfrågan haft status Offert),
 // annars Förlorad när fristen gått. Logiken bor i databasfunktionen web_inquiries_berakna_utfall()
-// (migrationen 20261005_web_inquiries_bokad_utfall.sql), som bara service role får köra.
+// (migrationen 20261005_web_inquiries_bokad_utfall.sql, senast 20261006_web_inquiries_befintlig_kund.sql),
+// som bara service role får köra. Förfrågningar med status Befintlig kund (avtalsärende, kontroll eller
+// etablering för en befintlig avtalskund) räknas aldrig: de är inte nyförsäljning.
 // Körs 05:30 UTC via Vercel Cron.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
