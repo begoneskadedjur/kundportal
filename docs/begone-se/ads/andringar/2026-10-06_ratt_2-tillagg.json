@@ -1,0 +1,368 @@
+{
+  "status": "FÖRSLAG, ej godkänt",
+  "kampanj": "BrightBid_High Priority_Råttbekämpning (19729967497)",
+  "framtagen": "2026-10-06",
+  "beskrivning": "Råttkampanjen steg 2: nya webbplatslänkar, framhävningar, strukturerat utdrag och samtalstillägg som bara visas vardagar 08 till 17. De gamla kopplingarna (jour, dygnet runt, garanti, inom 24h, 10 års erfarenhet, öppet alla dagar, underkända länkar) tas bort från kampanjen. Själva tillgångarna finns kvar i kontot.",
+  "operationer": [
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1",
+          "finalUrls": [
+            "https://begone.se/prisforslag/?tjanst=rattbekampning"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kostnadsfri inspektion",
+            "description1": "Skicka en förfrågan med bilder",
+            "description2": "Före 17 en vardag ringer vi i dag"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-2",
+          "finalUrls": [
+            "https://begone.se/skadedjursbekampning-foretag/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Företag och fastigheter",
+            "description1": "Hela organisationen i ett avtal",
+            "description2": "Varje station syns i portalen"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-2",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-3",
+          "finalUrls": [
+            "https://begone.se/tjanster/skadedjursavtal/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Skadedjursavtal",
+            "description1": "Första besöket är kostnadsfritt",
+            "description2": "Avtalsförslaget binder er inte"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-3",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-4",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Ring 010 280 44 10",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-4",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-5",
+          "calloutAsset": {
+            "calloutText": "Kostnadsfri inspektion"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-5",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-6",
+          "calloutAsset": {
+            "calloutText": "Verksamma i sex län"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-6",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-7",
+          "calloutAsset": {
+            "calloutText": "Sanering efter råttor"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-7",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-8",
+          "calloutAsset": {
+            "calloutText": "Rapport när du behöver"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-8",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-9",
+          "calloutAsset": {
+            "calloutText": "Alla tekniker har 1SO"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-9",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-10",
+          "calloutAsset": {
+            "calloutText": "ISO 9001 och ISO 14001"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-10",
+          "fieldType": "CALLOUT"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-11",
+          "structuredSnippetAsset": {
+            "header": "Tjänster",
+            "values": [
+              "Tätning",
+              "Mekaniska fällor",
+              "Betongstationer",
+              "Betesstationer",
+              "Råtthund",
+              "Råttspärr",
+              "Råttsanering"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-11",
+          "fieldType": "STRUCTURED_SNIPPET"
+        }
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-12",
+          "callAsset": {
+            "countryCode": "SE",
+            "phoneNumber": "010 280 44 10",
+            "adScheduleTargets": [
+              {
+                "dayOfWeek": "MONDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "TUESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "WEDNESDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "THURSDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              },
+              {
+                "dayOfWeek": "FRIDAY",
+                "startHour": 8,
+                "startMinute": "ZERO",
+                "endHour": 17,
+                "endMinute": "ZERO"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-12",
+          "fieldType": "CALL"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~40465249201~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~40465249207~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~70037823160~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~70037823163~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~317591413832~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~317592029606~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~40497293658~CALLOUT"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~40497293661~CALLOUT"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~40497293667~CALLOUT"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~40497293673~CALLOUT"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~112324354832~CALLOUT"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~97581863450~STRUCTURED_SNIPPET"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~51180997218~CALL"
+      }
+    }
+  ]
+}

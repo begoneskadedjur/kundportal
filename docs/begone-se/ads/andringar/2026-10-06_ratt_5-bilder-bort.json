@@ -1,0 +1,103 @@
+{
+  "status": "FÖRSLAG, ej godkänt",
+  "kampanj": "BrightBid_High Priority_Råttbekämpning (19729967497)",
+  "framtagen": "2026-10-06",
+  "beskrivning": "Råttkampanjen steg 5: kopplar bort alla 19 bilder från kampanjen (porträtt med person, fyra okontrollerbara stockbilder, underkända bilder med text och pausade gamla bilder). Nya bilder läggs till när experten har godkänt dem. Logotyperna behålls.",
+  "operationer": [
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~215048271225~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~248702724290~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~248814219834~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~248814269934~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~248814273150~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~75063149263~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~75079498081~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~75082670335~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~75129930816~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~114920225173~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~114920225182~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~114944129209~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~122609361617~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~47224403570~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~85707618798~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~85709621586~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~85709665476~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~85709761146~AD_IMAGE"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~109226842200~AD_IMAGE"
+      }
+    }
+  ]
+}

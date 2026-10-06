@@ -1,0 +1,35 @@
+{
+  "status": "FÖRSLAG, ej godkänt",
+  "kampanj": "BrightBid_High Priority_Råttbekämpning (19729967497)",
+  "framtagen": "2026-10-06",
+  "beskrivning": "Råttkampanjen steg 1B: pausar de tre gamla annonserna (inom 24h, 100% nöjd-garanti, #1, över 10 års erfarenhet). Körs först när annonserna i 1A har status Godkänd.",
+  "operationer": [
+    {
+      "adGroupAdOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/adGroupAds/144177432377~681944856479",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/adGroupAds/156232459823~687195236383",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/adGroupAds/156232459823~687195236386",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    }
+  ]
+}

@@ -1,0 +1,170 @@
+{
+  "status": "FÖRSLAG, ej godkänt",
+  "kampanj": "BrightBid_High Priority_Råttbekämpning (19729967497)",
+  "framtagen": "2026-10-06",
+  "beskrivning": "Råttkampanjen steg 1A: två nya responsiva sökannonser utan förbjudna löften (en per aktiv annonsgrupp), och annonsgruppen Home & Business Rat Control döps om till Råttbekämpning. De gamla annonserna pausas i steg 1B när de nya är godkända.",
+  "operationer": [
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/144177432377",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttbekämpning"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Råttor inomhus och utomhus"
+                },
+                {
+                  "text": "Teknikern hittar vägen in"
+                },
+                {
+                  "text": "Vi stänger vägarna in"
+                },
+                {
+                  "text": "Rätt metod för varje plats"
+                },
+                {
+                  "text": "Sanering efter råttor"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Vi ringer när vi ser förfrågan"
+                },
+                {
+                  "text": "Byggnadstekniska lösningar"
+                },
+                {
+                  "text": "Råttspärr i avloppet"
+                },
+                {
+                  "text": "Rapport för försäkringsbolaget"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                },
+                {
+                  "text": "Spillning eller gnagspår?"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikern tar reda på hur råttorna tar sig in och vad som håller dem kvar."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och ett kostnadsförslag att gå igenom i lugn och ro."
+                },
+                {
+                  "text": "Vi stänger vägarna in, bekämpar och sanerar. Privatpersoner får ROT på tätningsarbetet."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "råttbekämpning",
+              "path2": "inspektion"
+            }
+          }
+        }
+      }
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/156232459823",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttor i avloppet?"
+                },
+                {
+                  "text": "Råttor upp genom toaletten?"
+                },
+                {
+                  "text": "Råttspärr i avloppet"
+                },
+                {
+                  "text": "Vi monterar råttspärr"
+                },
+                {
+                  "text": "Vi hittar var de tar sig in"
+                },
+                {
+                  "text": "Vi stänger vägen ur avloppet"
+                },
+                {
+                  "text": "Rapport för försäkringsbolaget"
+                },
+                {
+                  "text": "Råttbekämpning"
+                },
+                {
+                  "text": "Råttbekämpning i sex län"
+                },
+                {
+                  "text": "Sanering efter råttor"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Vi ringer när vi ser förfrågan"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Råttor ur avloppet? Vi hittar var de tar sig in, åtgärdar det och monterar råttspärr."
+                },
+                {
+                  "text": "Vi stänger vägen upp ur avloppet och sanerar efter råttorna, med rapport om du vill."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och ett kostnadsförslag att gå igenom i lugn och ro."
+                },
+                {
+                  "text": "Skicka förfrågan med bilder när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "råttor",
+              "path2": "avlopp"
+            }
+          }
+        }
+      }
+    },
+    {
+      "adGroupOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/adGroups/144177432377",
+          "name": "Råttbekämpning"
+        },
+        "updateMask": "name"
+      }
+    }
+  ]
+}

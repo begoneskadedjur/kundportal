@@ -1,0 +1,314 @@
+{
+  "status": "FÖRSLAG, ej godkänt",
+  "kampanj": "BrightBid_High Priority_Råttbekämpning (19729967497)",
+  "framtagen": "2026-10-06",
+  "beskrivning": "Råttkampanjen steg 3: negativa sökord på kampanjnivå (engelska sökningar, produkter och gör det själv, jour, avloppsservice, möss som ägs av kampanjen Möss) och konkurrentnamn i den delade listan Konkurrenter (som bara är kopplad till råttkampanjen).",
+  "operationer": [
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "rat",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "rats",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "pest control",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "how to",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "get rid",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "getting rid",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "trap",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "poison",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "repello",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "powersnap",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "aurotrap",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "klisterfälla",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "gnagarstopp",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "pepparmynta",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "stålull",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "jour",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "saneringsbolag",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "spolbil",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "avloppsservice",
+            "matchType": "EXACT"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "negative": true,
+          "keyword": {
+            "text": "möss",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/11230827368",
+          "keyword": {
+            "text": "ocab",
+            "matchType": "BROAD"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/11230827368",
+          "keyword": {
+            "text": "rentokil",
+            "matchType": "BROAD"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/11230827368",
+          "keyword": {
+            "text": "rentokill",
+            "matchType": "BROAD"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/11230827368",
+          "keyword": {
+            "text": "lf skadedjur",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/11230827368",
+          "keyword": {
+            "text": "antisemix",
+            "matchType": "BROAD"
+          }
+        }
+      }
+    },
+    {
+      "sharedCriterionOperation": {
+        "create": {
+          "sharedSet": "customers/9407604856/sharedSets/11230827368",
+          "keyword": {
+            "text": "anti semex",
+            "matchType": "PHRASE"
+          }
+        }
+      }
+    }
+  ]
+}

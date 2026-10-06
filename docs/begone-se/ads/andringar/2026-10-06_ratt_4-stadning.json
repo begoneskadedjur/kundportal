@@ -1,0 +1,86 @@
+{
+  "status": "FÖRSLAG, ej godkänt",
+  "kampanj": "BrightBid_High Priority_Råttbekämpning (19729967497)",
+  "framtagen": "2026-10-06",
+  "beskrivning": "Råttkampanjen steg 4: tar bort de pausade annonsgrupperna Search - Råttor (20% rabatt, 10/10, garanti), Elektriska råttfällor (495:-/mån) och Emergency Rat Control (24/7, akut, garanterat) så att de inte kan slås på av misstag. Nollställer budjusteringarna fredag -90 % och +10 % för tre län (Smart Bidding bortser från dem). Pausar tre breda sökord med gör det själv-avsikt och inga formulär.",
+  "operationer": [
+    {
+      "adGroupOperation": {
+        "remove": "customers/9407604856/adGroups/167641997028"
+      }
+    },
+    {
+      "adGroupOperation": {
+        "remove": "customers/9407604856/adGroups/167641997188"
+      }
+    },
+    {
+      "adGroupOperation": {
+        "remove": "customers/9407604856/adGroups/176988443757"
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignCriteria/19729967497~340096",
+          "bidModifier": 1
+        },
+        "updateMask": "bid_modifier"
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignCriteria/19729967497~21005",
+          "bidModifier": 1
+        },
+        "updateMask": "bid_modifier"
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignCriteria/19729967497~21017",
+          "bidModifier": 1
+        },
+        "updateMask": "bid_modifier"
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignCriteria/19729967497~21018",
+          "bidModifier": 1
+        },
+        "updateMask": "bid_modifier"
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/adGroupCriteria/144177432377~303484396519",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/adGroupCriteria/144177432377~2203806882161",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    },
+    {
+      "adGroupCriterionOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/adGroupCriteria/144177432377~2225261253013",
+          "status": "PAUSED"
+        },
+        "updateMask": "status"
+      }
+    }
+  ]
+}
