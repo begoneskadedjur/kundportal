@@ -47,7 +47,7 @@ const D_PREMIUM = 'Erfarna skadedjurstekniker i en organisation certifierad enli
 // Budstrategi per fas gäller alla sökkampanjer om inget annat står.
 export const kampanjer = [
   {
-    namn: 'Sök | Råttor', kort: 'ratt', prio: 1, budget: 1550, start: 'Fas 1',
+    namn: 'Claude | Sök | Råttor', kort: 'ratt', prio: 1, budget: 1550, start: 'Fas 1',
     bud: 'Maximera konverteringar utan mål-CPA vecka 1 till 4, sedan mål-CPA (start cirka 650 kr)',
     sitelinks: 'ratt',
     grupper: [
@@ -90,7 +90,7 @@ export const kampanjer = [
     ],
   },
   {
-    namn: 'Sök | Fåglar', kort: 'fagel', prio: 1, budget: 800, start: 'Fas 1',
+    namn: 'Claude | Sök | Fåglar', kort: 'fagel', prio: 1, budget: 800, start: 'Fas 1',
     bud: 'Maximera konverteringar utan mål-CPA vecka 1 till 4, sedan mål-CPA efter utfallet',
     sitelinks: 'fagel',
     grupper: [
@@ -130,7 +130,7 @@ export const kampanjer = [
     ],
   },
   {
-    namn: 'Sök | Vägglöss', kort: 'vaggloss', prio: 2, budget: 600, start: 'Fas 1',
+    namn: 'Claude | Sök | Vägglöss', kort: 'vaggloss', prio: 2, budget: 600, start: 'Fas 1',
     bud: 'Maximera konverteringar utan mål-CPA vecka 1 till 4, sedan mål-CPA',
     sitelinks: 'vaggloss',
     grupper: [
@@ -155,7 +155,7 @@ export const kampanjer = [
     ],
   },
   {
-    namn: 'Sök | Insekter i hemmet', kort: 'insekter', prio: 2, budget: 450, start: 'Fas 1',
+    namn: 'Claude | Sök | Insekter i hemmet', kort: 'insekter', prio: 2, budget: 450, start: 'Fas 1',
     bud: 'Maximera konverteringar utan mål-CPA vecka 1 till 4, sedan mål-CPA',
     sitelinks: 'insekter',
     grupper: [
@@ -180,7 +180,7 @@ export const kampanjer = [
     ],
   },
   {
-    namn: 'Sök | Möss', kort: 'moss', prio: 3, budget: 450, start: 'Fas 1',
+    namn: 'Claude | Sök | Möss', kort: 'moss', prio: 3, budget: 450, start: 'Fas 1',
     bud: 'Maximera konverteringar utan mål-CPA vecka 1 till 4, sedan mål-CPA',
     sitelinks: 'moss',
     grupper: [
@@ -201,7 +201,7 @@ export const kampanjer = [
     ],
   },
   {
-    namn: 'Sök | Varumärke', kort: 'varumarke', prio: 1, budget: 180, start: 'Fas 1',
+    namn: 'Claude | Sök | Varumärke', kort: 'varumarke', prio: 1, budget: 180, start: 'Fas 1',
     bud: 'Maximera klick med tak 12 kr per klick (byte till Målvisningsandel 90 % om andelen är låg)',
     sitelinks: 'konto',
     grupper: [
@@ -214,7 +214,7 @@ export const kampanjer = [
     ],
   },
   {
-    namn: 'Sök | Företag och avtal', kort: 'foretag', prio: 3, budget: 200, start: 'Fas 1',
+    namn: 'Claude | Sök | Företag och avtal', kort: 'foretag', prio: 3, budget: 200, start: 'Fas 1',
     bud: 'Maximera konverteringar utan mål-CPA; bedöms på bokade möten och avtal, inte formulär',
     sitelinks: 'foretag',
     grupper: [
@@ -234,7 +234,7 @@ export const kampanjer = [
     ],
   },
   {
-    namn: 'Sök | Getingar (säsong)', kort: 'getingar', prio: 4, budget: 0, start: 'Pausad till juni 2027',
+    namn: 'Claude | Sök | Getingar (säsong)', kort: 'getingar', prio: 4, budget: 0, start: 'Pausad till juni 2027',
     bud: 'Maximera konverteringar; budget sätts inför säsongen',
     sitelinks: 'konto',
     grupper: [
@@ -247,7 +247,7 @@ export const kampanjer = [
     ],
   },
   {
-    namn: 'Sök | Myror (säsong)', kort: 'myror', prio: 4, budget: 0, start: 'Pausad till maj 2027',
+    namn: 'Claude | Sök | Myror (säsong)', kort: 'myror', prio: 4, budget: 0, start: 'Pausad till maj 2027',
     bud: 'Maximera konverteringar; budget sätts inför säsongen',
     sitelinks: 'konto',
     grupper: [
@@ -346,11 +346,11 @@ export const negativaListor = [
 
 // Korsnegativ: varje tjänst utesluter de andra så att rätt annons visas.
 export const korsnegativ = [
-  ['Sök | Råttor', 'möss, mus, mössen (fras)'],
-  ['Sök | Möss', 'råtta, råttor (fras)'],
-  ['Sök | Fåglar', 'getingar, råttor (fras)'],
-  ['Sök | Vägglöss', 'pälsänger, silverfisk (fras)'],
-  ['Sök | Insekter i hemmet', 'vägglöss, vägglus (fras)'],
+  ['Claude | Sök | Råttor', 'möss, mus, mössen (fras)'],
+  ['Claude | Sök | Möss', 'råtta, råttor (fras)'],
+  ['Claude | Sök | Fåglar', 'getingar, råttor (fras)'],
+  ['Claude | Sök | Vägglöss', 'pälsänger, silverfisk (fras)'],
+  ['Claude | Sök | Insekter i hemmet', 'vägglöss, vägglus (fras)'],
   ['Alla utom Varumärke', 'begone, be gone (exakt och fras, när varumärkeskampanjen går)'],
 ];
 
