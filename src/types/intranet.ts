@@ -5,7 +5,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
   BookOpen, ShieldCheck, HeartPulse, Leaf, FileText,
   MessageSquareText, ClipboardList, MapPin, AlertTriangle, Users,
-  Calculator, Receipt, Wallet, CalendarPlus, CalendarDays, Repeat, PackagePlus,
+  Calculator, Receipt, Wallet, CalendarPlus, CalendarDays, Repeat, PackagePlus, Search,
 } from 'lucide-react'
 
 // ─── Innehållsblock (jsonb i intranet_documents.content) ───
@@ -33,7 +33,7 @@ export type IntranetBlock =
   /** Länk till ett annat intranätdokument (kort med titel + beskrivning) */
   | { type: 'link'; slug: string; label: string; description?: string }
   /** Interaktiv demo - component slås upp i registret i dokumentläsaren */
-  | { type: 'interactive'; component: string }
+  | { type: 'interactive'; component: string; variant?: string }
 
 export type IntranetSection = 'obligatoriskt' | 'handbok'
 export type IntranetCategory =
@@ -139,6 +139,8 @@ export const INTRANET_SLUG_ICONS: Record<string, LucideIcon> = {
   'guide-schemavyn': CalendarDays,
   'guide-aterkommande-schema': Repeat,
   'guide-tillaggsstationer': PackagePlus,
+  'guide-sokrutan-tekniker': Search,
+  'guide-sokrutan-kontor': Search,
 }
 
 // ─── Anslagstavla ───

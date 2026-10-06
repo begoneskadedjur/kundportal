@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.33.0',
+    date: '2026-10-06',
+    title: 'Guide till sökrutan',
+    items: [
+      { kind: 'nyhet', text: 'Ny guide i Intranät & Hjälpcenter: Sökrutan. Tekniker och kontor har var sin version med vad du kan skriva, vad ikonerna betyder och vilka snabbval som finns.' },
+      { kind: 'nyhet', text: 'I guiden finns en övningssökruta med exempeldata, där du kan prova sökningen och tangenterna utan att röra riktiga ärenden.' },
+      { kind: 'nyhet', text: 'När sökrutan är tom finns länken Ny här? Så fungerar sökningen, som går direkt till guiden för din roll.' },
+    ],
+  },
+  {
     version: '3.32.0',
     date: '2026-10-06',
     title: 'Sökrutan fungerar',

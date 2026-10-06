@@ -36,13 +36,16 @@ import TillaggKedja from './intranet/interactive/tillagg/TillaggKedja'
 import TillaggRoller from './intranet/interactive/tillagg/TillaggRoller'
 import TillaggRakneexempel from './intranet/interactive/tillagg/TillaggRakneexempel'
 import TillaggJamforelse from './intranet/interactive/tillagg/TillaggJamforelse'
+import SokIkoner from './intranet/interactive/sok/SokIkoner'
+import SokOvning from './intranet/interactive/sok/SokOvning'
 import AudienceModal from './intranet/AudienceModal'
 import { describeAudience } from '../../types/intranet'
 import { Eye } from 'lucide-react'
 
 // Interaktiva demos - innehållsblock av typen interactive slår upp
 // sin komponent här via nyckeln i blockets component-fält
-const INTERACTIVE_COMPONENTS: Record<string, ComponentType> = {
+// variant skickas vidare från blocket (t.ex. 'tekniker' eller 'kontor')
+const INTERACTIVE_COMPONENTS: Record<string, ComponentType<{ variant?: string }>> = {
   'prissattning-demo': PrissattningDemo,
   'dokumentsignering-demo': DokumentsigneringDemo,
   'fakturering-demo': FaktureringDemo,
@@ -52,6 +55,8 @@ const INTERACTIVE_COMPONENTS: Record<string, ComponentType> = {
   'tillagg-kedja': TillaggKedja,
   'tillagg-rakneexempel': TillaggRakneexempel,
   'tillagg-jamforelse': TillaggJamforelse,
+  'sok-ikoner': SokIkoner,
+  'sok-ovning': SokOvning,
 }
 
 // ─── Blockrendering ────────────────────────────────
@@ -144,7 +149,7 @@ function BlockRenderer({ block, anchorId }: { block: IntranetBlock; anchorId?: s
       return <DocLinkBlock slug={block.slug} label={block.label} description={block.description} />
     case 'interactive': {
       const InteractiveComponent = INTERACTIVE_COMPONENTS[block.component]
-      return InteractiveComponent ? <InteractiveComponent /> : null
+      return InteractiveComponent ? <InteractiveComponent variant={block.variant} /> : null
     }
     case 'chain':
       return (

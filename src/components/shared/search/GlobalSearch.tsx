@@ -14,6 +14,7 @@ import { OPEN_GLOBAL_SEARCH_EVENT } from './globalSearchEvents'
 import {
   GROUP_LABELS,
   KIND_LABELS,
+  PORTAL_PREFIX,
   buildGroups,
   commonActions,
   parseQuery,
@@ -41,6 +42,12 @@ const SCOPE_TEXT: Record<SearchPortal, string> = {
   technician: 'Dina ärenden och ärenden du delar',
   koordinator: 'Alla ärenden',
   admin: 'Allt',
+}
+
+/** Intranätguiden om sökrutan för portalen */
+function guideHref(portal: SearchPortal): string {
+  const slug = portal === 'technician' ? 'guide-sokrutan-tekniker' : 'guide-sokrutan-kontor'
+  return `${PORTAL_PREFIX[portal]}/intranat/dokument/${slug}`
 }
 
 interface GlobalSearchProps {
@@ -360,6 +367,19 @@ export function GlobalSearch({ portal: requestedPortal }: GlobalSearchProps) {
                   })}
                 </div>
               ))}
+
+              {!query.trim() && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    close()
+                    navigate(guideHref(portal))
+                  }}
+                  className="w-full text-left px-2.5 pt-3 pb-1 text-xs text-slate-500 hover:text-[#20c58f] transition-colors"
+                >
+                  Ny här? Så fungerar sökningen
+                </button>
+              )}
 
               {searchable && loading && !data && (
                 <p className="px-3 py-6 text-sm text-slate-500">Söker …</p>
