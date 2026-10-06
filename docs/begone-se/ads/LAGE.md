@@ -45,6 +45,8 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 
 ## Beslut
 
+- 2026-10-06: GENOMFÖRT: mätningen (konto_1, telefonklick sekundära, Calls from ads ≥60 s primär, nya åtgärder Samtal från webbplatsen 60 s, Bokat uppdrag, Genomfört uppdrag), fas 1-bygget PAUSAT (Sök | Råttor 1 550, Sök | Fåglar 800, Sök | Varumärke 180), kontolistan Konto | Konkurrenter (ACCOUNT_LEVEL_NEGATIVE_KEYWORDS) på hela kontot. GOOGLE_ADS_*-variabler i kundportalens Vercel (production), nattjobbet i torrläge (GOOGLE_ADS_KONVERTERINGAR_TORR=1) första veckan. begone.se main 317c0b7: samtal/utfall-text i policyn, kort cookiebanner (Christian vill inte ha detaljer i bannern), samtyckesversion 2. Kvar: etiketten PUBLIC_GOOGLE_ADS_ETIKETT_SAMTAL i begone-se Vercel för nummerbyte, start av fas 1 efter råttsidans formular_forst, 1B för råttsöket.
+
 - 2026-10-06 (kontoplanen, avsnitt 8): Ordning och budgetfördelning: agenten bestämmer inom 4 430 kr/dag. Inga konkurrentnamn i annonseringen (de som söker konkurrenter går ofta via försäkringsbolag och förväntar sig gratis arbete). Fåglarnas PMax får gå kvar till vecka 8. Kostnadsfri inspektion gäller även möss. Fågelspillning: blandat, mindre saneringar (balkong o.d.) kan få pris per telefon efter bild, omfattande kräver inspektion. Fast pris per telefon eller mejl gäller även värmebehandling av vägglöss. Förfrågans värde: följer huvudsessionens förslag (inget fast värde, riktiga belopp via Bokat/Genomfört). Vidarekopplingsnummer och offline-import: förklarade för Christian, inväntar ja.
 
 - 2026-10-06: Steg 1A, 2, 3, 4 och 5 i råttrapporten GENOMFÖRDA (95 operationer, se andringslogg.jsonl). 1B (pausa gamla annonser) körs när de nya annonserna är godkända av Google.
