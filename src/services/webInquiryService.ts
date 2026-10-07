@@ -284,6 +284,21 @@ export class WebInquiryService {
     return filer.filter((f): f is File => !!f)
   }
 
+  /**
+   * Arkiverar (eller återställer) en eller flera förfrågningar. Databasens trigger sätter tidpunkten
+   * och användaren och skriver historikraden; klientens tidpunkt används inte.
+   */
+  static async setArchived(ids: string[], arkivera: boolean): Promise<WebInquiry[]> {
+    if (!ids.length) return []
+    const { data, error } = await db
+      .from('web_inquiries')
+      .update({ archived_at: arkivera ? toLocalISOStringWithOffset() : null })
+      .in('id', ids)
+      .select('*')
+    if (error) throw error
+    return (data ?? []) as WebInquiry[]
+  }
+
   static async listEvents(id: string): Promise<WebInquiryEvent[]> {
     const { data, error } = await db
       .from('web_inquiry_events')

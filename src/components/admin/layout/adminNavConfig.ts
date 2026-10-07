@@ -165,6 +165,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/rondering-schema': 'Rondering & Schema',
   '/admin/leads': 'Leads (B2B)',
   '/admin/leads-webb': 'Leads (Webb)',
+  '/admin/leads-webb/marknad': 'Marknad',
   '/admin/ekonomi': 'Ekonomisk översikt',
   '/admin/fakturering': 'Fakturering',
   '/admin/godkannanden': 'Godkännanden',

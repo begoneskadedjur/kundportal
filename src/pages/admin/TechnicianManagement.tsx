@@ -195,6 +195,13 @@ export default function TechnicianManagement() {
     ))
   }
 
+  // Uppdatera lokalt state när Marknadsansvarig togglas direkt på ett kort
+  const handleMarketingViewerChange = (technicianId: string, canView: boolean) => {
+    setTechnicians(prev => prev.map(t =>
+      t.id === technicianId ? { ...t, can_view_marketing: canView } : t
+    ))
+  }
+
   const handleDeleteTechnician = async (id: string) => {
     try {
       await technicianManagementService.deleteTechnician(id)
@@ -436,6 +443,7 @@ export default function TechnicianManagement() {
               onDiscountApproverChange={handleDiscountApproverChange}
               onInvoiceApproverChange={handleInvoiceApproverChange}
               onProcurementManagerChange={handleProcurementManagerChange}
+              onMarketingViewerChange={handleMarketingViewerChange}
             />
           ))}
         </div>

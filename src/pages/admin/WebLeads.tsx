@@ -1,75 +1,56 @@
 // src/pages/admin/WebLeads.tsx
 // Leads (Webb): förfrågningar från formulären på begone.se, i en egen pipeline skild från
-// Leads (B2B). Flikar Inkorg (status ny, äldst först), Alla och Statistik. Realtid på web_inquiries.
-// Används av /admin, /koordinator och /saljare (leads-webb). ?id=<uuid> öppnar en förfrågan direkt.
+// Leads (B2B). Flikar Inkorg (status ny, akuta först och sedan äldst först), Alla och Statistik.
+// Realtid på web_inquiries. Används av /admin, /koordinator och /saljare (leads-webb).
+// Flik och filter står i adressen (flik, q, status, tjanst, kundgrupp, kalla, tilldelad, fran, till,
+// arkiv) så att en länk visar samma urval; ?id=<uuid> öppnar en förfrågan direkt.
+// Arkiverade förfrågningar (archived_at) döljs i Inkorg och Alla tills Visa arkiverade är ikryssat.
+// Överst finns ingången till Marknad (annonser, kostnader och utfall), låst utan behörigheten
+// Marknadsansvarig (profiles.can_view_marketing).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation, useSearchParams } from 'react-router-dom'
-import { Inbox, RefreshCw } from 'lucide-react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { ChevronRight, RefreshCw, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import { WebInquiryService } from '../../services/webInquiryService'
 import { refreshWebLeadsBadge } from '../../hooks/useWebLeadsBadge'
+import Button from '../../components/ui/Button'
 import WebLeadDetailModal from '../../components/admin/webLeads/WebLeadDetailModal'
 import WebLeadsStats from '../../components/admin/webLeads/WebLeadsStats'
-import { formatSvTid, svDatum } from '../../components/admin/webLeads/format'
-import { adressDelar, formatPostnummer } from '../../shared/webLeadUppgifter'
+import WebLeadsTabell from '../../components/admin/webLeads/WebLeadsTabell'
+import WebLeadsFilterRad from '../../components/admin/webLeads/WebLeadsFilterRad'
+import { LeadIcon, type TjanstIkon } from '../../components/admin/webLeads/WebLeadIcons'
+import { tjanstNyckel } from '../../components/admin/webLeads/leadKlassning'
 import {
-  KUNDGRUPP_LABEL,
-  STATUS_CONFIG,
-  STATUS_ORDNING,
-  kallaLabel,
-  tjanstLabel,
-  type StaffProfile,
-  type WebInquiry,
-  type WebInquiryKundgrupp,
-  type WebInquiryStatus,
-} from '../../types/webInquiry'
-
-type Flik = 'inkorg' | 'alla' | 'statistik'
-
-interface Filter {
-  status: WebInquiryStatus | ''
-  tjanst: string
-  kalla: string
-  kundgrupp: WebInquiryKundgrupp | ''
-  fran: string
-  till: string
-}
-
-const TOMT_FILTER: Filter = { status: '', tjanst: '', kalla: '', kundgrupp: '', fran: '', till: '' }
-const FILTER_NYCKEL = 'begone_leads_webb_filter'
-
-function lasFilter(): Filter {
-  try {
-    const raw = localStorage.getItem(FILTER_NYCKEL)
-    return raw ? { ...TOMT_FILTER, ...(JSON.parse(raw) as Partial<Filter>) } : TOMT_FILTER
-  } catch {
-    return TOMT_FILTER
-  }
-}
-
-function sparaFilter(f: Filter) {
-  try {
-    localStorage.setItem(FILTER_NYCKEL, JSON.stringify(f))
-  } catch {
-    // localStorage kan saknas (privat fönster)
-  }
-}
-
-const FALT = 'px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#20c58f]'
+  FILTER_NYCKLAR,
+  aktivaFilter,
+  filtrera,
+  lasFilter,
+  lasFlik,
+  sortera,
+  type AktivtFilter,
+  type Flik,
+} from '../../components/admin/webLeads/leadFilter'
+import type { StaffProfile, WebInquiry } from '../../types/webInquiry'
 
 export default function WebLeads() {
   const location = useLocation()
+  const { profile } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [inquiries, setInquiries] = useState<WebInquiry[]>([])
   const [staff, setStaff] = useState<StaffProfile[]>([])
   const [loading, setLoading] = useState(true)
-  const [flik, setFlik] = useState<Flik>('inkorg')
-  const [filter, setFilter] = useState<Filter>(lasFilter)
+  const [valda, setValda] = useState<Set<string>>(new Set())
+  const [arbetar, setArbetar] = useState(false)
 
   const base = location.pathname.startsWith('/koordinator') ? '/koordinator' : location.pathname.startsWith('/saljare') ? '/saljare' : '/admin'
   const valtId = searchParams.get('id')
+  const flik = lasFlik(searchParams)
+  const filter = useMemo(() => lasFilter(searchParams), [searchParams])
+  const minProfilId = profile?.id ?? null
+  const kanMarknad = !!(profile as { can_view_marketing?: boolean } | null)?.can_view_marketing
 
   const ladda = useCallback(async () => {
     try {
@@ -104,83 +85,192 @@ export default function WebLeads() {
       .catch(() => undefined)
   }, [valtId, loading, inquiries])
 
-  const andraFilter = (patch: Partial<Filter>) => {
-    setFilter((prev) => {
-      const nytt = { ...prev, ...patch }
-      sparaFilter(nytt)
-      return nytt
+  // Markeringen gäller det man ser: byte av flik eller filter tömmer den
+  const urvalsNyckel = useMemo(() => {
+    const p = new URLSearchParams(searchParams)
+    p.delete('id')
+    return p.toString()
+  }, [searchParams])
+  useEffect(() => {
+    setValda(new Set())
+  }, [urvalsNyckel])
+
+  const andraParam = (nyckel: AktivtFilter['nyckel'] | 'flik', varde: string) => {
+    setSearchParams(
+      (p) => {
+        if (varde) p.set(nyckel, varde)
+        else p.delete(nyckel)
+        return p
+      },
+      // Fritext skrivs tecken för tecken: ersätt i historiken i stället för att lägga till
+      { replace: nyckel === 'q' },
+    )
+  }
+
+  const rensaFilter = () => {
+    setSearchParams((p) => {
+      for (const k of FILTER_NYCKLAR) p.delete(k)
+      return p
     })
   }
 
-  const tjanster = useMemo(() => [...new Set(inquiries.map((i) => tjanstLabel(i.pest_type)))].sort((a, b) => a.localeCompare(b, 'sv')), [inquiries])
-  const kallor = useMemo(() => [...new Set(inquiries.map((i) => kallaLabel(i)))].sort((a, b) => a.localeCompare(b, 'sv')), [inquiries])
+  const bytFlik = (f: Flik) => andraParam('flik', f === 'inkorg' ? '' : f)
 
-  const nyaAntal = useMemo(() => inquiries.filter((i) => i.status === 'ny').length, [inquiries])
+  const ejArkiverade = useMemo(() => inquiries.filter((i) => !i.archived_at), [inquiries])
+  const nyaAntal = useMemo(() => ejArkiverade.filter((i) => i.status === 'ny').length, [ejArkiverade])
+  const tjanster = useMemo(() => new Set<TjanstIkon>(inquiries.map((i) => tjanstNyckel(i.pest_type))), [inquiries])
 
-  const synliga = useMemo(() => {
-    if (flik === 'inkorg') {
-      return inquiries
-        .filter((i) => i.status === 'ny')
-        .sort((a, b) => Number(b.akut) - Number(a.akut) || a.created_at.localeCompare(b.created_at))
-    }
-    return inquiries.filter((i) => {
-      if (filter.status && i.status !== filter.status) return false
-      if (filter.tjanst && tjanstLabel(i.pest_type) !== filter.tjanst) return false
-      if (filter.kalla && kallaLabel(i) !== filter.kalla) return false
-      if (filter.kundgrupp && i.kundgrupp !== filter.kundgrupp) return false
-      const dag = svDatum(i.created_at)
-      if (filter.fran && dag < filter.fran) return false
-      if (filter.till && dag > filter.till) return false
-      return true
-    })
-  }, [inquiries, flik, filter])
+  const synliga = useMemo(() => sortera(filtrera(inquiries, filter, flik, minProfilId), flik), [inquiries, filter, flik, minProfilId])
+  const doldaArkiverade = useMemo(
+    () => (filter.arkiv ? 0 : filtrera(inquiries, { ...filter, arkiv: true }, flik, minProfilId).length - synliga.length),
+    [inquiries, filter, flik, minProfilId, synliga.length],
+  )
+  const aktiva = aktivaFilter(filter, flik, staff)
 
   const vald = useMemo(() => inquiries.find((i) => i.id === valtId) ?? null, [inquiries, valtId])
 
   const oppna = (id: string) => setSearchParams((p) => { p.set('id', id); return p })
   const stang = () => setSearchParams((p) => { p.delete('id'); return p })
 
-  const namnFor = (id: string | null) => {
-    if (!id) return ''
-    const p = staff.find((s) => s.id === id)
-    return p ? p.display_name || p.email : ''
+  const uppdateraRader = (rader: Partial<WebInquiry>[]) => {
+    const perId = new Map(rader.filter((r) => r.id).map((r) => [r.id as string, r]))
+    setInquiries((prev) => prev.map((i) => (perId.has(i.id) ? { ...i, ...perId.get(i.id) } : i)))
   }
 
-  const flikar: { id: Flik; label: string }[] = [
-    { id: 'inkorg', label: nyaAntal ? `Inkorg (${nyaAntal})` : 'Inkorg' },
+  const arkivera = async (ids: string[], ark: boolean, tyst = false): Promise<void> => {
+    if (!ids.length) return
+    setArbetar(true)
+    try {
+      const rader = await WebInquiryService.setArchived(ids, ark)
+      uppdateraRader(rader)
+      setValda((prev) => {
+        const nya = new Set(prev)
+        ids.forEach((id) => nya.delete(id))
+        return nya
+      })
+      refreshWebLeadsBadge()
+      if (tyst) return
+      const text = ark
+        ? ids.length === 1 ? 'Förfrågan arkiverad' : `${ids.length} förfrågningar arkiverade`
+        : ids.length === 1 ? 'Förfrågan återställd' : `${ids.length} förfrågningar återställda`
+      toast.success(
+        (t) => (
+          <span className="flex items-center gap-3">
+            {text}
+            <button
+              type="button"
+              className="text-[#20c58f] font-medium hover:underline"
+              onClick={() => {
+                toast.dismiss(t.id)
+                void arkivera(ids, !ark, true)
+              }}
+            >
+              Ångra
+            </button>
+          </span>
+        ),
+        { duration: 6000 },
+      )
+    } catch {
+      toast.error(ark ? 'Arkiveringen kunde inte sparas' : 'Återställningen kunde inte sparas')
+    } finally {
+      setArbetar(false)
+    }
+  }
+
+  const ta = async (id: string) => {
+    if (!minProfilId) return
+    try {
+      await WebInquiryService.assign(id, minProfilId)
+      uppdateraRader([{ id, tilldelad_till: minProfilId }])
+      toast.success('Förfrågan tilldelad dig')
+    } catch {
+      toast.error('Tilldelningen kunde inte sparas')
+    }
+  }
+
+  const valdaRader = synliga.filter((i) => valda.has(i.id))
+  const attArkivera = valdaRader.filter((i) => !i.archived_at).map((i) => i.id)
+  const attAterstalla = valdaRader.filter((i) => i.archived_at).map((i) => i.id)
+
+  const tomText =
+    aktiva.length > 0
+      ? 'Inga förfrågningar matchar filtret.'
+      : flik === 'inkorg'
+        ? 'Inga nya förfrågningar. Allt är hanterat.'
+        : 'Inga förfrågningar än.'
+
+  const flikar: { id: Flik; label: string; antal?: number }[] = [
+    { id: 'inkorg', label: 'Inkorg', antal: nyaAntal },
     { id: 'alla', label: 'Alla' },
     { id: 'statistik', label: 'Statistik' },
   ]
 
   return (
     <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Leads (Webb)</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-white">Leads (Webb)</h1>
+            <button
+              type="button"
+              onClick={() => { setLoading(true); void ladda(); refreshWebLeadsBadge() }}
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+              aria-label="Uppdatera"
+              title="Uppdatera"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
           <p className="text-sm text-slate-400 mt-1">Förfrågningar från formulären på begone.se. B2B-leads finns under Leads (B2B).</p>
         </div>
-        <button
-          type="button"
-          onClick={() => { setLoading(true); void ladda(); refreshWebLeadsBadge() }}
-          className="p-2 text-slate-400 hover:text-white rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
-          aria-label="Uppdatera"
-          title="Uppdatera"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+
+        {/* Ingången till Marknad */}
+        {kanMarknad ? (
+          <Link
+            to={`${base}/leads-webb/marknad`}
+            className="group flex items-center gap-3 pl-3 pr-2 py-2 w-full sm:w-auto bg-slate-800/30 border border-slate-700 rounded-xl hover:border-[#20c58f]/60 hover:bg-slate-800/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+          >
+            <span className="w-9 h-9 rounded-lg grid place-items-center flex-none bg-[#20c58f]/15 text-[#20c58f]">
+              <LeadIcon name="marknad" className="w-5 h-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-white">Marknad: annonser, kostnader och utfall</span>
+              <span className="block text-xs text-slate-400">Vad annonserna kostar och vad förfrågningarna blir</span>
+            </span>
+            <ChevronRight className="w-4 h-4 text-slate-500 group-hover:text-[#20c58f] flex-none" />
+          </Link>
+        ) : (
+          <div
+            aria-disabled="true"
+            title="Kräver behörigheten Marknadsansvarig"
+            className="flex items-center gap-3 pl-3 pr-4 py-2 w-full sm:w-auto bg-slate-800/20 border border-slate-700/60 rounded-xl opacity-60 cursor-not-allowed select-none"
+          >
+            <span className="w-9 h-9 rounded-lg grid place-items-center flex-none bg-slate-700/40 text-slate-400">
+              <LeadIcon name="las" className="w-5 h-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-slate-300">Marknad: annonser, kostnader och utfall</span>
+              <span className="block text-xs text-slate-500">Kräver behörigheten Marknadsansvarig</span>
+            </span>
+          </div>
+        )}
       </div>
 
-      <div className="flex border-b border-slate-700/50">
+      <div className="flex border-b border-slate-700/50" role="tablist">
         {flikar.map((f) => (
           <button
             key={f.id}
             type="button"
-            onClick={() => setFlik(f.id)}
+            role="tab"
+            aria-selected={flik === f.id}
+            onClick={() => bytFlik(f.id)}
             className={`px-4 py-2 text-sm -mb-px border-b-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${
               flik === f.id ? 'border-[#20c58f] text-white font-medium' : 'border-transparent text-slate-400 hover:text-white'
             }`}
           >
             {f.label}
+            {f.antal ? <span className={`ml-1.5 font-mono text-xs ${flik === f.id ? 'text-[#20c58f]' : 'text-amber-400'}`}>{f.antal}</span> : null}
           </button>
         ))}
       </div>
@@ -189,130 +279,85 @@ export default function WebLeads() {
         <WebLeadsStats inquiries={inquiries} />
       ) : (
         <>
-          {flik === 'alla' && (
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="wl-status">Status</label>
-                <select id="wl-status" className={FALT} value={filter.status} onChange={(e) => andraFilter({ status: e.target.value as WebInquiryStatus | '' })}>
-                  <option value="">Alla</option>
-                  {STATUS_ORDNING.map((s) => <option key={s} value={s}>{STATUS_CONFIG[s].label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="wl-tjanst">Tjänst</label>
-                <select id="wl-tjanst" className={FALT} value={filter.tjanst} onChange={(e) => andraFilter({ tjanst: e.target.value })}>
-                  <option value="">Alla</option>
-                  {tjanster.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="wl-kalla">Källa</label>
-                <select id="wl-kalla" className={FALT} value={filter.kalla} onChange={(e) => andraFilter({ kalla: e.target.value })}>
-                  <option value="">Alla</option>
-                  {kallor.map((k) => <option key={k} value={k}>{k}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="wl-kundgrupp">Kundgrupp</label>
-                <select id="wl-kundgrupp" className={FALT} value={filter.kundgrupp} onChange={(e) => andraFilter({ kundgrupp: e.target.value as WebInquiryKundgrupp | '' })}>
-                  <option value="">Alla</option>
-                  {(Object.keys(KUNDGRUPP_LABEL) as WebInquiryKundgrupp[]).map((k) => <option key={k} value={k}>{KUNDGRUPP_LABEL[k]}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="wl-fran">Från</label>
-                <input id="wl-fran" type="date" className={FALT} value={filter.fran} onChange={(e) => andraFilter({ fran: e.target.value })} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="wl-till">Till</label>
-                <input id="wl-till" type="date" className={FALT} value={filter.till} onChange={(e) => andraFilter({ till: e.target.value })} />
-              </div>
-              {JSON.stringify(filter) !== JSON.stringify(TOMT_FILTER) && (
-                <button type="button" onClick={() => andraFilter(TOMT_FILTER)} className="px-2 py-1.5 text-sm text-slate-400 hover:text-white">
-                  Rensa filter
-                </button>
+          <WebLeadsFilterRad
+            filter={filter}
+            flik={flik}
+            staff={staff}
+            tjanster={tjanster}
+            aktiva={aktiva}
+            onAndra={andraParam}
+            onRensa={rensaFilter}
+          />
+
+          {valdaRader.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-[#20c58f]/10 border border-[#20c58f]/40 rounded-xl text-sm">
+              <span className="text-white font-medium mr-1">{valdaRader.length} markerade</span>
+              {attArkivera.length > 0 && (
+                <Button variant="secondary" size="sm" disabled={arbetar} onClick={() => void arkivera(attArkivera, true)}>
+                  <LeadIcon name="arkiv" className="w-4 h-4 mr-1.5" />
+                  Arkivera {attArkivera.length}
+                </Button>
               )}
+              {attAterstalla.length > 0 && (
+                <Button variant="secondary" size="sm" disabled={arbetar} onClick={() => void arkivera(attAterstalla, false)}>
+                  <LeadIcon name="aterstall" className="w-4 h-4 mr-1.5" />
+                  Återställ {attAterstalla.length}
+                </Button>
+              )}
+              <button
+                type="button"
+                onClick={() => setValda(new Set())}
+                className="ml-auto flex items-center gap-1 px-2 py-1 text-slate-400 hover:text-white rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+              >
+                <X className="w-4 h-4" />
+                Avmarkera
+              </button>
             </div>
           )}
 
-          <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-x-auto">
-            {loading && inquiries.length === 0 ? (
-              <p className="p-6 text-sm text-slate-400">Hämtar förfrågningar...</p>
-            ) : synliga.length === 0 ? (
-              <div className="py-10 text-center">
-                <Inbox className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                <p className="text-sm text-slate-400">
-                  {flik === 'inkorg' ? 'Inga nya förfrågningar. Allt är hanterat.' : 'Inga förfrågningar matchar filtret.'}
-                </p>
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-slate-400 border-b border-slate-700">
-                    <th className="px-3 py-2 font-medium whitespace-nowrap">Inkom</th>
-                    <th className="px-3 py-2 font-medium">Nummer</th>
-                    <th className="px-3 py-2 font-medium">Namn</th>
-                    <th className="px-3 py-2 font-medium">Tjänst</th>
-                    <th className="px-3 py-2 font-medium">Ort</th>
-                    <th className="px-3 py-2 font-medium">Kundgrupp</th>
-                    <th className="px-3 py-2 font-medium">Källa</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium whitespace-nowrap">Ärende</th>
-                    <th className="px-3 py-2 font-medium">Tilldelad</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {synliga.map((i) => {
-                    const s = STATUS_CONFIG[i.status]
-                    return (
-                      <tr
-                        key={i.id}
-                        onClick={() => oppna(i.id)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') oppna(i.id) }}
-                        tabIndex={0}
-                        className="border-b border-slate-700/50 last:border-0 hover:bg-slate-800/50 cursor-pointer focus:outline-none focus-visible:bg-slate-800/60"
-                      >
-                        <td className="px-3 py-2 text-slate-300 whitespace-nowrap font-mono text-xs">{formatSvTid(i.created_at)}</td>
-                        <td className="px-3 py-2 text-slate-400 font-mono text-xs">{i.referens}</td>
-                        <td className="px-3 py-2 text-white">
-                          {i.company_name ? (
-                            <>
-                              <span className="block">{i.company_name}</span>
-                              <span className="block text-xs text-slate-400">{i.name}</span>
-                            </>
-                          ) : i.name}
-                        </td>
-                        <td className="px-3 py-2 text-slate-300">
-                          {tjanstLabel(i.pest_type)}
-                          {i.bilder.some((b) => b.uppladdad) && <span className="text-xs text-slate-500"> · bild</span>}
-                          {i.bokad_tjanst && i.bokad_tjanst !== tjanstLabel(i.pest_type) && (
-                            <span className="block text-xs text-slate-400">Bokad: {i.bokad_tjanst}</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-slate-300">{adressDelar(i).ort || i.city || formatPostnummer(i.postal_code)}</td>
-                        <td className="px-3 py-2 text-slate-300">{KUNDGRUPP_LABEL[i.kundgrupp]}</td>
-                        <td className="px-3 py-2 text-slate-400">{kallaLabel(i)}</td>
-                        <td className="px-3 py-2 whitespace-nowrap">
-                          <span className={`flex items-center gap-1.5 ${s.text}`}>
-                            <span className={`w-2 h-2 rounded-full ${s.dot}`} />
-                            {s.label}
-                          </span>
-                          {i.akut && (
-                            <span className="flex items-center gap-1.5 text-red-400 text-xs mt-0.5">
-                              <span className="w-2 h-2 rounded-full bg-red-500" />
-                              Akut
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-slate-300 font-mono text-xs whitespace-nowrap">{i.arende_nummer ?? ''}</td>
-                        <td className="px-3 py-2 text-slate-400">{namnFor(i.tilldelad_till)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
+          <WebLeadsTabell
+            rader={synliga}
+            laddar={loading}
+            staff={staff}
+            minProfilId={minProfilId}
+            valda={valda}
+            onVal={(id) =>
+              setValda((prev) => {
+                const nya = new Set(prev)
+                if (nya.has(id)) nya.delete(id)
+                else nya.add(id)
+                return nya
+              })
+            }
+            onValAlla={(markera) => setValda(markera ? new Set(synliga.map((i) => i.id)) : new Set())}
+            onOppna={oppna}
+            onArkivera={(ids, ark) => void arkivera(ids, ark)}
+            onTa={(id) => void ta(id)}
+            tomText={tomText}
+            harFilter={aktiva.length > 0}
+            onRensaFilter={rensaFilter}
+          />
+
+          {!(loading && inquiries.length === 0) && (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+              <span>
+                {synliga.length === 1 ? '1 förfrågan' : `${synliga.length} förfrågningar`}
+                {doldaArkiverade > 0 && (
+                  <>
+                    {' · '}
+                    <button
+                      type="button"
+                      onClick={() => andraParam('arkiv', '1')}
+                      className="text-slate-400 hover:text-white underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded"
+                    >
+                      {doldaArkiverade} arkiverade dolda
+                    </button>
+                  </>
+                )}
+              </span>
+              <span className="hidden md:inline">Pil upp och ned flyttar, Enter öppnar, X markerar</span>
+            </div>
+          )}
         </>
       )}
 

@@ -7,7 +7,7 @@ export type WebInquiryStatus = 'ny' | 'kontaktad' | 'offert' | 'bokad' | 'befint
 export type WebInquiryArendeTabell = 'private_cases' | 'business_cases' | 'cases'
 export type WebInquiryKundgrupp = 'privat' | 'brf_fastighet' | 'verksamhet'
 export type WebInquiryKalla = 'offertflode' | 'artanalys'
-export type WebInquiryEventTyp = 'anteckning' | 'status' | 'tilldelning' | 'konvertering' | 'bilder'
+export type WebInquiryEventTyp = 'anteckning' | 'status' | 'tilldelning' | 'konvertering' | 'bilder' | 'arkivering'
 
 export interface WebInquiryBild {
   path: string
@@ -91,6 +91,9 @@ export interface WebInquiry {
   rattad_ort: string | null
   kompletterad_at: string | null
   kompletterad_av: string | null
+  /** Arkiverad: döljs i Inkorg och Alla. Tidpunkt och användare sätts av databasens trigger. */
+  archived_at: string | null
+  archived_by: string | null
 }
 
 export interface WebInquiryKomplettering {
@@ -199,6 +202,11 @@ const DJUR: Record<string, string> = {
   myror: 'Myror',
   kackerlackor: 'Kackerlackor',
   faglar: 'Fåglar',
+  palsanger: 'Pälsänger',
+  mjolbaggar: 'Mjölbaggar',
+  mal: 'Mal',
+  flugor: 'Flugor',
+  mogel: 'Mögel',
   annat: 'Annat',
   vetinte: 'Vet inte',
   foretag: 'Företag, ospecificerat',

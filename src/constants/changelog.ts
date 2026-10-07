@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.35.0',
+    date: '2026-10-07',
+    title: 'Leads (Webb) i ny form och sidan Marknad',
+    items: [
+      { kind: 'nyhet', text: 'Leads (Webb) har filter för fritext, status, tjänst, kundgrupp, källa, tilldelad och datum. Filtren sparas i adressen, så en filtrerad lista går att länka till.' },
+      { kind: 'nyhet', text: 'Förfrågningar kan arkiveras en och en eller flera åt gången, så att skräp och avslutade inte syns. Visa arkiverade tar fram dem igen, och Ångra finns direkt efteråt.' },
+      { kind: 'andring', text: 'Tabellen i Leads (Webb) har ikoner för tjänst och källa (till exempel Google Ads eller organisk sökning), statuspunkt, fast rubrikrad och kort på mobil.' },
+      { kind: 'nyhet', text: 'Ny sida Marknad, nås från Leads (Webb): annonskostnad, visningar, klick, konverteringar, bokade och genomförda uppdrag med värde, förfrågningar per källa och cookiesamtycke. Kräver den nya behörigheten Marknadsansvarig, som sätts i personalvyn.' },
+    ],
+  },
+  {
     version: '3.34.0',
     date: '2026-10-06',
     title: 'Förberett för cookiebannern på begone.se',

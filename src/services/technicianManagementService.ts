@@ -49,6 +49,7 @@ export type Technician = {
   can_approve_discounts?: boolean
   can_approve_invoices?: boolean
   is_procurement_manager?: boolean
+  can_view_marketing?: boolean
 }
 
 export type TechnicianFormData = {
@@ -199,6 +200,26 @@ export const technicianManagementService = {
     }
   },
 
+  /**
+   * Sätter/tar bort behörigheten Marknadsansvarig (profiles.can_view_marketing): åtkomst till
+   * sidan Marknad under Leads (Webb). Bara administratör får ändra (trigger
+   * guard_profile_privilege_columns).
+   */
+  async updateCanViewMarketing(technicianId: string, canView: boolean): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ can_view_marketing: canView } as never)
+        .eq('technician_id', technicianId)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating marketing viewer:', error)
+      toast.error('Kunde inte uppdatera Marknadsansvarig')
+      throw error
+    }
+  },
+
   async updateDisplayName(technicianId: string, displayName: string): Promise<void> {
     const { error } = await supabase
       .from('profiles')
@@ -257,7 +278,7 @@ export const technicianManagementService = {
     try {
       const [techniciansRes, profilesRes, recipientsRes] = await Promise.all([
         supabase.from('technicians').select('*').order('name', { ascending: true }),
-        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, extra_roles, can_approve_discounts, can_approve_invoices, is_procurement_manager'),
+        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, extra_roles, can_approve_discounts, can_approve_invoices, is_procurement_manager, can_view_marketing'),
         supabase.from('incident_recipients').select('user_id, incident_type')
       ]);
       if (techniciansRes.error) throw techniciansRes.error;
@@ -289,6 +310,7 @@ export const technicianManagementService = {
           can_approve_discounts: profile?.can_approve_discounts || false,
           can_approve_invoices: profile?.can_approve_invoices || false,
           is_procurement_manager: (profile as { is_procurement_manager?: boolean } | null)?.is_procurement_manager || false,
+          can_view_marketing: (profile as { can_view_marketing?: boolean } | null)?.can_view_marketing || false,
           incident_recipient_types: profile?.user_id
             ? (recipientTypesByUserId.get(profile.user_id) || [])
             : []
@@ -563,7 +585,7 @@ export const technicianManagementService = {
 
   async getTechnicianById(id: string): Promise<Technician> {
     try {
-      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, extra_roles, can_approve_discounts, can_approve_invoices, is_procurement_manager)`).eq('id', id).single();
+      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, extra_roles, can_approve_discounts, can_approve_invoices, is_procurement_manager, can_view_marketing)`).eq('id', id).single();
       if (error) throw error;
 
       // FK-join hittar profiler direkt (alla roller har nu technician_id)
@@ -588,6 +610,7 @@ export const technicianManagementService = {
         can_approve_discounts: profile?.can_approve_discounts || false,
         can_approve_invoices: profile?.can_approve_invoices || false,
         is_procurement_manager: (profile as { is_procurement_manager?: boolean } | null)?.is_procurement_manager || false,
+        can_view_marketing: (profile as { can_view_marketing?: boolean } | null)?.can_view_marketing || false,
         incident_recipient_types: incidentRecipientTypes
       };
     } catch (error: any) {

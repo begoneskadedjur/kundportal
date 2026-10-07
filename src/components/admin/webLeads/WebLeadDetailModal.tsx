@@ -41,6 +41,7 @@ import { formatSvTid, svDatum } from './format'
 import WebLeadUppgifter from './WebLeadUppgifter'
 import WebLeadBefintligKund from './WebLeadBefintligKund'
 import WebLeadKopplaArende from './WebLeadKopplaArende'
+import { LeadIcon } from './WebLeadIcons'
 import { adressDelar, effektivtIdNummer, sattIhopAdress } from '../../../shared/webLeadUppgifter'
 
 interface Props {
@@ -276,6 +277,22 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
     }
   }
 
+  // Arkivera eller återställ: triggern sätter tidpunkt och användare och skriver historiken
+  const bytArkiv = async (arkivera: boolean) => {
+    setSparar(true)
+    try {
+      const [rad] = await WebInquiryService.setArchived([inquiry.id], arkivera)
+      if (rad) onChanged(rad)
+      refreshWebLeadsBadge()
+      void laddaHistorik()
+      toast.success(arkivera ? 'Förfrågan arkiverad' : 'Förfrågan återställd från arkivet')
+    } catch {
+      toast.error(arkivera ? 'Arkiveringen kunde inte sparas' : 'Återställningen kunde inte sparas')
+    } finally {
+      setSparar(false)
+    }
+  }
+
   const sparaAnteckning = async () => {
     if (!anteckning.trim() || !profile?.id) return
     setSparar(true)
@@ -430,6 +447,13 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
               {inquiry.forsta_kontakt_at && (
                 <span className="text-slate-500">Första kontakt {formatSvTid(inquiry.forsta_kontakt_at)}</span>
               )}
+              {inquiry.archived_at && (
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <LeadIcon name="arkiv" className="w-4 h-4" />
+                  Arkiverad {formatSvTid(inquiry.archived_at)}
+                  {inquiry.archived_by ? ` av ${namnFor(inquiry.archived_by)}` : ''}
+                </span>
+              )}
             </div>
             {bokad ? (
               <div className="text-sm">
@@ -557,6 +581,23 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
                   <ExternalLink className="w-4 h-4 text-[#20c58f]" />
                   B2B-lead skapad, öppna Leads (B2B)
                 </Link>
+              )}
+              {inquiry.archived_at ? (
+                <Button variant="secondary" size="sm" disabled={sparar} onClick={() => bytArkiv(false)}>
+                  <LeadIcon name="aterstall" className="w-4 h-4 mr-1.5" />
+                  Återställ från arkivet
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={sparar}
+                  onClick={() => bytArkiv(true)}
+                  title="Döljer förfrågan i Inkorg och Alla. Går att återställa."
+                >
+                  <LeadIcon name="arkiv" className="w-4 h-4 mr-1.5" />
+                  Arkivera
+                </Button>
               )}
             </div>
           </div>
@@ -833,6 +874,8 @@ function handelseText(e: WebInquiryEvent, namnFor: (id: string | null) => string
       return e.text || 'Konverterad'
     case 'bilder':
       return e.text || 'Bilder uppladdade'
+    case 'arkivering':
+      return e.text || (e.till_varde === 'aterstalld' ? 'Återställd från arkivet' : 'Arkiverad')
     default:
       return e.text ?? ''
   }

@@ -16,6 +16,7 @@ export type Profile = {
   can_approve_discounts?: boolean;
   can_approve_invoices?: boolean;
   is_procurement_manager?: boolean;
+  can_view_marketing?: boolean;
   theme_preference?: 'dark' | 'light' | 'system' | null;
   technicians?: { name: string; role: string; email: string; } | null;
 };

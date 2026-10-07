@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react' // useEffect lades till för att hantera klick utanför
 import {
   User, Mail, Phone, MapPin, MoreVertical, Edit,
-  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle, BadgeCheck, Receipt, Gavel
+  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle, BadgeCheck, Receipt, Gavel, Megaphone
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '../../../ui/Button'
@@ -9,6 +9,7 @@ import { technicianManagementService, type Technician, type ExtraPortalRole } fr
 import { ALL_INCIDENT_TYPES, INCIDENT_TYPE_CONFIG, type IncidentType } from '../../../../types/caseIncidents'
 import { IncidentRecipientService } from '../../../../services/incidentRecipientService'
 import { PROCUREMENT_PORTAL_URL } from '../../../../lib/procurementPortal'
+import { useAuth } from '../../../../contexts/AuthContext'
 
 // Primärrollen (technicians.role) mappad till portalvyn den redan ger
 const PRIMARY_ROLE_TO_PORTAL: Record<string, ExtraPortalRole | null> = {
@@ -37,6 +38,7 @@ type TechnicianCardProps = {
   onDiscountApproverChange?: (technicianId: string, canApprove: boolean) => void
   onInvoiceApproverChange?: (technicianId: string, canApprove: boolean) => void
   onProcurementManagerChange?: (technicianId: string, isManager: boolean) => void
+  onMarketingViewerChange?: (technicianId: string, canView: boolean) => void
 }
 
 export default function TechnicianCard({
@@ -51,8 +53,12 @@ export default function TechnicianCard({
   onExtraRolesChange,
   onDiscountApproverChange,
   onInvoiceApproverChange,
-  onProcurementManagerChange
+  onProcurementManagerChange,
+  onMarketingViewerChange
 }: TechnicianCardProps) {
+  const { profile: currentProfile } = useAuth()
+  // Marknadsansvarig får bara ändras av administratör (spärras även i databasen)
+  const canEditMarketing = !!currentProfile?.is_admin
   const [showDropdown, setShowDropdown] = useState(false)
   const [recipientTypes, setRecipientTypes] = useState<Set<IncidentType>>(
     new Set(technician.incident_recipient_types || [])
@@ -69,6 +75,8 @@ export default function TechnicianCard({
   const [savingInvoiceApprover, setSavingInvoiceApprover] = useState(false)
   const [isProcurementManager, setIsProcurementManager] = useState(!!technician.is_procurement_manager)
   const [savingProcurementManager, setSavingProcurementManager] = useState(false)
+  const [isMarketingViewer, setIsMarketingViewer] = useState(!!technician.can_view_marketing)
+  const [savingMarketingViewer, setSavingMarketingViewer] = useState(false)
 
   const handleSendNewPassword = async () => {
     if (!technician.user_id || sendingPassword) return
@@ -106,6 +114,30 @@ export default function TechnicianCard({
   useEffect(() => {
     setIsProcurementManager(!!technician.is_procurement_manager)
   }, [technician.is_procurement_manager])
+
+  useEffect(() => {
+    setIsMarketingViewer(!!technician.can_view_marketing)
+  }, [technician.can_view_marketing])
+
+  const toggleMarketingViewer = async () => {
+    if (!technician.user_id || savingMarketingViewer || !canEditMarketing) return
+    const previous = isMarketingViewer
+    const next = !previous
+
+    setIsMarketingViewer(next)
+    setSavingMarketingViewer(true)
+    try {
+      await technicianManagementService.updateCanViewMarketing(technician.id, next)
+      onMarketingViewerChange?.(technician.id, next)
+      toast.success(next
+        ? `${technician.name} är nu marknadsansvarig`
+        : `${technician.name} är inte längre marknadsansvarig`)
+    } catch {
+      setIsMarketingViewer(previous)
+    } finally {
+      setSavingMarketingViewer(false)
+    }
+  }
 
   const toggleProcurementManager = async () => {
     if (!technician.user_id || savingProcurementManager) return
@@ -630,6 +662,51 @@ export default function TechnicianCard({
         ) : (
           <p className="text-xs text-slate-500">
             Kräver aktiverad inloggning - bara personer med konto kan vara upphandlingsansvariga
+          </p>
+        )}
+      </div>
+
+      {/* Marknadsansvarig - togglas direkt på kortet, ger åtkomst till sidan Marknad under Leads (Webb) */}
+      <div className="mt-4 pt-3 border-t border-slate-700">
+        <div className="flex items-center gap-1.5 mb-2">
+          <Megaphone className="w-3.5 h-3.5 text-[#20c58f]" />
+          <span className="text-xs font-medium text-slate-400">Marknadsansvarig</span>
+        </div>
+        {technician.has_login && technician.user_id ? (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-slate-500">
+              {isMarketingViewer
+                ? 'Ser Google Ads, webbförfrågningar och cookiesamtycke under Leads (Webb), Marknad'
+                : 'Kan få åtkomst till marknadssidan (annonskostnader och samtycken)'}
+              {!canEditMarketing && ' (bara administratör kan ändra)'}
+            </p>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isMarketingViewer}
+              onClick={toggleMarketingViewer}
+              disabled={savingMarketingViewer || !canEditMarketing}
+              title={!canEditMarketing
+                ? 'Bara administratör kan ändra Marknadsansvarig'
+                : isMarketingViewer
+                  ? 'Klicka för att ta bort behörigheten Marknadsansvarig'
+                  : 'Klicka för att göra personen marknadsansvarig'}
+              className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${
+                isMarketingViewer
+                  ? 'bg-[#20c58f] border-[#20c58f]'
+                  : 'bg-slate-700 border-slate-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-[#fff] transition-transform ${
+                  isMarketingViewer ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                }`}
+              />
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">
+            Kräver aktiverad inloggning - bara personer med konto kan vara marknadsansvariga
           </p>
         )}
       </div>

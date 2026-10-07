@@ -114,6 +114,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/forsaljningsmojligheter': 'Försäljningsmöjligheter',
   '/koordinator/leads': 'Leads (B2B)',
   '/koordinator/leads-webb': 'Leads (Webb)',
+  '/koordinator/leads-webb/marknad': 'Marknad',
   '/koordinator/leadsstatistik': 'Leadsstatistik',
   // Fakturering
   '/koordinator/fakturering': 'Fakturering',

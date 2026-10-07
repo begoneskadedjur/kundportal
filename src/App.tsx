@@ -51,6 +51,7 @@ import DiscountApprovals from './pages/admin/DiscountApprovals';
 import Leads from './pages/admin/Leads';
 import LeadAnalytics from './pages/admin/LeadAnalytics';
 import WebLeads from './pages/admin/WebLeads';
+import Marknad from './pages/admin/Marknad';
 import CustomerAnalytics from './pages/admin/CustomerAnalytics';
 import RonderingPage from './pages/admin/RonderingPage';
 import EgenkontrollPage from './pages/admin/EgenkontrollPage';
@@ -193,6 +194,7 @@ function App() {
               <Route path="manadsrapport" element={<ProtectedRoute requiredRole="admin"><MonthlyReport /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><Leads /></ProtectedRoute>} />
               <Route path="leads-webb" element={<ProtectedRoute requiredRole="admin"><WebLeads /></ProtectedRoute>} />
+              <Route path="leads-webb/marknad" element={<ProtectedRoute requiredRole="admin"><Marknad /></ProtectedRoute>} />
               <Route path="leadsstatistik" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><LeadAnalytics /></ProtectedRoute>} />
               <Route path="ekonomi" element={<ProtectedRoute requiredRole="admin"><Economics /></ProtectedRoute>} />
               <Route path="teknikerstatistik" element={<ProtectedRoute requiredRole="admin"><Technicians /></ProtectedRoute>} />
@@ -307,6 +309,7 @@ function App() {
               <Route path="forsaljningsmojligheter" element={<ProtectedRoute requiredRole="koordinator"><SalesOpportunities /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole="koordinator"><Leads /></ProtectedRoute>} />
               <Route path="leads-webb" element={<ProtectedRoute requiredRole="koordinator"><WebLeads /></ProtectedRoute>} />
+              <Route path="leads-webb/marknad" element={<ProtectedRoute requiredRole="koordinator"><Marknad /></ProtectedRoute>} />
               <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="koordinator"><LeadAnalytics /></ProtectedRoute>} />
               <Route path="offertuppfoljning" element={<Navigate to="/koordinator/dokumentsignering" replace />} />
 
@@ -371,6 +374,7 @@ function App() {
               <Route path="forsaljningsmojligheter" element={<ProtectedRoute requiredRole="säljare"><SalesOpportunities /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole="säljare"><Leads /></ProtectedRoute>} />
               <Route path="leads-webb" element={<ProtectedRoute requiredRole="säljare"><WebLeads /></ProtectedRoute>} />
+              <Route path="leads-webb/marknad" element={<ProtectedRoute requiredRole="säljare"><Marknad /></ProtectedRoute>} />
               <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="säljare"><LeadAnalytics /></ProtectedRoute>} />
               <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="säljare"><OfferFollowUp /></ProtectedRoute>} />
               <Route path="offerthantering" element={<Navigate to="/saljare/dokumentsignering" replace />} />
