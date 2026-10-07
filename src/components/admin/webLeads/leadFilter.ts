@@ -13,7 +13,17 @@ import {
 } from '../../../types/webInquiry'
 import { adressDelar } from '../../../shared/webLeadUppgifter'
 import { svDatum } from './format'
-import { KANAL_LABEL, TJANST_LABEL, kanalFor, tjanstNyckel, type Kanal } from './leadKlassning'
+import {
+  KANAL_LABEL,
+  TJANST_LABEL,
+  arAiKalla,
+  arUnderdelad,
+  kanalFor,
+  tjanstNyckel,
+  underkallaNamn,
+  type Kanal,
+  type UnderdeladKanal,
+} from './leadKlassning'
 import type { TjanstIkon } from './WebLeadIcons'
 
 export type Flik = 'inkorg' | 'alla' | 'statistik'
@@ -23,13 +33,36 @@ export interface LeadFilter {
   status: WebInquiryStatus | ''
   tjanst: TjanstIkon | ''
   kundgrupp: WebInquiryKundgrupp | ''
-  /** En kanal, eller 'artanalys' för förfrågningar från artanalysen. */
-  kalla: Kanal | 'artanalys' | ''
+  /**
+   * En kanal, en källa inom en kanal ('ai:copilot', 'hanvisning:trustpilot') eller 'artanalys' för
+   * förfrågningar från artanalysen.
+   */
+  kalla: KallaFilter | ''
   /** '' alla, 'mig', 'ingen' eller en profils id. */
   tilldelad: string
   fran: string
   till: string
   arkiv: boolean
+}
+
+export type KallaFilter = Kanal | 'artanalys' | `${UnderdeladKanal}:${string}`
+
+/** Kanal och källnyckel i ett källfilter som ai:copilot eller hanvisning:trustpilot, annars null. */
+export function underIFilter(kalla: string): { kanal: UnderdeladKanal; nyckel: string } | null {
+  const i = kalla.indexOf(':')
+  if (i < 0) return null
+  const kanal = kalla.slice(0, i)
+  const nyckel = kalla.slice(i + 1)
+  if (!nyckel || !arUnderdelad(kanal)) return null
+  if (kanal === 'ai' && !arAiKalla(nyckel)) return null
+  return { kanal, nyckel }
+}
+
+function kallaText(kalla: KallaFilter): string {
+  if (kalla === 'artanalys') return 'Artanalys'
+  const under = underIFilter(kalla)
+  if (under) return `${KANAL_LABEL[under.kanal]}, ${underkallaNamn(under.kanal, under.nyckel)}`
+  return KANAL_LABEL[kalla as Kanal]
 }
 
 export const FILTER_NYCKLAR = ['q', 'status', 'tjanst', 'kundgrupp', 'kalla', 'tilldelad', 'fran', 'till', 'arkiv'] as const
@@ -52,7 +85,7 @@ export function lasFilter(p: URLSearchParams): LeadFilter {
     status: har(STATUS_CONFIG, status) ? (status as WebInquiryStatus) : '',
     tjanst: har(TJANST_LABEL, tjanst) ? (tjanst as TjanstIkon) : '',
     kundgrupp: har(KUNDGRUPP_LABEL, kundgrupp) ? (kundgrupp as WebInquiryKundgrupp) : '',
-    kalla: kalla === 'artanalys' || har(KANAL_LABEL, kalla) ? (kalla as Kanal | 'artanalys') : '',
+    kalla: kalla === 'artanalys' || har(KANAL_LABEL, kalla) || underIFilter(kalla) ? (kalla as KallaFilter) : '',
     tilldelad: p.get('tilldelad') ?? '',
     fran: datum(p.get('fran')),
     till: datum(p.get('till')),
@@ -72,7 +105,7 @@ export function aktivaFilter(f: LeadFilter, flik: Flik, staff: StaffProfile[]): 
   if (f.status && flik !== 'inkorg') ut.push({ nyckel: 'status', text: `Status: ${STATUS_CONFIG[f.status].label}` })
   if (f.tjanst) ut.push({ nyckel: 'tjanst', text: `Tjänst: ${TJANST_LABEL[f.tjanst]}` })
   if (f.kundgrupp) ut.push({ nyckel: 'kundgrupp', text: `Kundgrupp: ${KUNDGRUPP_LABEL[f.kundgrupp]}` })
-  if (f.kalla) ut.push({ nyckel: 'kalla', text: `Källa: ${f.kalla === 'artanalys' ? 'Artanalys' : KANAL_LABEL[f.kalla]}` })
+  if (f.kalla) ut.push({ nyckel: 'kalla', text: `Källa: ${kallaText(f.kalla)}` })
   if (f.tilldelad) {
     const p = staff.find((s) => s.id === f.tilldelad)
     const namn = f.tilldelad === 'mig' ? 'mig' : f.tilldelad === 'ingen' ? 'ingen' : p ? p.display_name || p.email : 'okänd'
@@ -117,7 +150,13 @@ export function filtrera(rader: WebInquiry[], f: LeadFilter, flik: Flik, minProf
     if (f.tjanst && tjanstNyckel(i.pest_type) !== f.tjanst) return false
     if (f.kundgrupp && i.kundgrupp !== f.kundgrupp) return false
     if (f.kalla) {
-      if (f.kalla === 'artanalys' ? i.kalla !== 'artanalys' : kanalFor(i).kanal !== f.kalla) return false
+      if (f.kalla === 'artanalys') {
+        if (i.kalla !== 'artanalys') return false
+      } else {
+        const k = kanalFor(i)
+        const under = underIFilter(f.kalla)
+        if (under ? k.kanal !== under.kanal || k.under?.nyckel !== under.nyckel : k.kanal !== f.kalla) return false
+      }
     }
     if (f.tilldelad) {
       if (f.tilldelad === 'ingen' ? !!i.tilldelad_till : f.tilldelad === 'mig' ? i.tilldelad_till !== minProfilId : i.tilldelad_till !== f.tilldelad) return false

@@ -22,7 +22,7 @@ import WebLeadsStats from '../../components/admin/webLeads/WebLeadsStats'
 import WebLeadsTabell from '../../components/admin/webLeads/WebLeadsTabell'
 import WebLeadsFilterRad from '../../components/admin/webLeads/WebLeadsFilterRad'
 import { LeadIcon, type TjanstIkon } from '../../components/admin/webLeads/WebLeadIcons'
-import { tjanstNyckel } from '../../components/admin/webLeads/leadKlassning'
+import { AI_KALLA_ORDNING, kanalFor, tjanstNyckel } from '../../components/admin/webLeads/leadKlassning'
 import {
   FILTER_NYCKLAR,
   aktivaFilter,
@@ -119,6 +119,23 @@ export default function WebLeads() {
   const ejArkiverade = useMemo(() => inquiries.filter((i) => !i.archived_at), [inquiries])
   const nyaAntal = useMemo(() => ejArkiverade.filter((i) => i.status === 'ny').length, [ejArkiverade])
   const tjanster = useMemo(() => new Set<TjanstIkon>(inquiries.map((i) => tjanstNyckel(i.pest_type))), [inquiries])
+  // Källorna inom AI-assistent och Hänvisning som finns i datan: AI i listans ordning, hänvisningar
+  // efter antal och sedan namn
+  const underkallor = useMemo(() => {
+    const ai = new Map<string, { nyckel: string; namn: string; n: number }>()
+    const hanv = new Map<string, { nyckel: string; namn: string; n: number }>()
+    for (const i of inquiries) {
+      const k = kanalFor(i)
+      if (!k.under || (k.kanal !== 'ai' && k.kanal !== 'hanvisning')) continue
+      const m = k.kanal === 'ai' ? ai : hanv
+      const fore = m.get(k.under.nyckel)
+      m.set(k.under.nyckel, { ...k.under, n: (fore?.n ?? 0) + 1 })
+    }
+    return {
+      ai: AI_KALLA_ORDNING.filter((a) => ai.has(a)).map((a) => ai.get(a)!),
+      hanvisning: [...hanv.values()].sort((a, b) => b.n - a.n || a.namn.localeCompare(b.namn, 'sv')),
+    }
+  }, [inquiries])
 
   const synliga = useMemo(() => sortera(filtrera(inquiries, filter, flik, minProfilId), flik), [inquiries, filter, flik, minProfilId])
   const doldaArkiverade = useMemo(
@@ -284,6 +301,7 @@ export default function WebLeads() {
             flik={flik}
             staff={staff}
             tjanster={tjanster}
+            underkallor={underkallor}
             aktiva={aktiva}
             onAndra={andraParam}
             onRensa={rensaFilter}

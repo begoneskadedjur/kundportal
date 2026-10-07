@@ -4,23 +4,29 @@
 // vecka, kampanj, sökord eller sida. Raderna kommer aggregerade från RPC:n web_inquiry_statistik.
 // Bokad = ett ärende har skapats eller kopplats (bokad_at), oavsett vad som hänt sedan.
 // Sorterbara kolumner, inline-staplar för andelar, nollor nedtonade, summeringsrad och CSV-export.
+// Under Kanal är AI-assistent och Hänvisning grupprader med delsumma som fälls ut till en rad per
+// källa (assistent eller hänvisande webbplats); sorteringen gäller både mellan kanalerna och mellan
+// källorna inom gruppen. Fliken Per källa inom kanal listar källorna i en kanal, med kanalens summa
+// i foten.
 
-import { useMemo, useState, type ReactNode } from 'react'
-import { Download } from 'lucide-react'
+import { Fragment, useMemo, useState, type ReactNode } from 'react'
+import { ChevronRight, Download } from 'lucide-react'
 import type { StatGrupp, StatMatt, StatRad } from '../../../services/webLeadStatistikService'
 import { kr, tal } from '../marknad/marknadFormat'
 import { SortRubrik, type Riktning } from '../marknad/MarknadUi'
 import { KallaIcon, TjanstIcon } from './WebLeadIcons'
-import { KANAL_FARG } from './leadKlassning'
-import { andelText, grupp, kanalFranNyckel, laddaNerCsv, tjanstIkon, type Grupprad } from './statistik/statistikData'
+import { KANAL_FARG, KANAL_LABEL, UNDERDELADE, UNDERKALLA_RUBRIK, arUnderdelad, type UnderdeladKanal } from './leadKlassning'
+import { andelText, grupp, kanalFranNyckel, laddaNerCsv, summaAv, tjanstIkon, underGrupp, type Grupprad } from './statistik/statistikData'
 import { Andelsstapel, Vaxel } from './statistik/StatistikUi'
 
-type Dimension = Extract<StatGrupp, 'tjanst' | 'kalla' | 'kanal' | 'kundgrupp' | 'vecka' | 'kampanj' | 'sokord' | 'sida'>
+/** 'inom' är kanalraderna för AI-assistent eller Hänvisning uppdelade per källa (ingen egen grupp i RPC:n). */
+type Dimension = Extract<StatGrupp, 'tjanst' | 'kalla' | 'kanal' | 'kundgrupp' | 'vecka' | 'kampanj' | 'sokord' | 'sida'> | 'inom'
 
 const DIMENSIONER: Array<[Dimension, string]> = [
   ['tjanst', 'Tjänst'],
   ['kalla', 'Källa'],
   ['kanal', 'Kanal'],
+  ['inom', 'Per källa inom kanal'],
   ['kundgrupp', 'Kundgrupp'],
   ['vecka', 'Vecka'],
   ['kampanj', 'Kampanj'],
@@ -32,12 +38,15 @@ type Falt = 'namn' | 'n' | 'kontaktade' | 'bokade' | 'vunna' | 'forl_efter' | 'f
 
 const TOPP = 15
 
-function ikonFor(dim: Dimension, r: Grupprad): ReactNode {
+const INOM_VAL: Array<[UnderdeladKanal, string]> = UNDERDELADE.map((k) => [k, KANAL_LABEL[k]])
+
+function ikonFor(dim: Dimension, r: Grupprad, inomKanal: UnderdeladKanal): ReactNode {
   if (dim === 'tjanst') return <TjanstIcon name={tjanstIkon(r.nyckel)} className="w-4 h-4 text-slate-400 flex-none" />
   if (dim === 'kanal') {
     const k = kanalFranNyckel(r.nyckel)
     return <KallaIcon name={k} className={`w-4 h-4 flex-none ${KANAL_FARG[k]}`} />
   }
+  if (dim === 'inom') return <KallaIcon name={inomKanal} className={`w-4 h-4 flex-none ${KANAL_FARG[inomKanal]}`} />
   return null
 }
 
@@ -72,15 +81,45 @@ export default function WebLeadsKedja({
   const [falt, setFalt] = useState<Falt>('n')
   const [riktning, setRiktning] = useState<Riktning>('desc')
   const [alla, setAlla] = useState(false)
+  const [inomKanal, setInomKanal] = useState<UnderdeladKanal>('ai')
+  // Utfällda grupper under Kanal: AI från början (få rader), Hänvisning kan bli lång
+  const [oppna, setOppna] = useState<Set<UnderdeladKanal>>(() => new Set(['ai']))
+  const vaxla = (k: UnderdeladKanal) =>
+    setOppna((s) => {
+      const ny = new Set(s)
+      if (ny.has(k)) ny.delete(k)
+      else ny.add(k)
+      return ny
+    })
 
-  const lista = useMemo(() => {
-    const g = grupp(rader, dim)
+  const jamfor = useMemo(() => {
     const tecken = riktning === 'asc' ? 1 : -1
-    return g.sort((a, b) => {
+    return (a: Grupprad, b: Grupprad) => {
       if (falt === 'namn') return tecken * a.namn.localeCompare(b.namn, 'sv')
       return tecken * (a[falt] - b[falt]) || a.namn.localeCompare(b.namn, 'sv')
-    })
-  }, [rader, dim, falt, riktning])
+    }
+  }, [falt, riktning])
+
+  // Källorna inom kanalerna sorteras sinsemellan med samma kolumn och riktning som tabellen
+  const inom = useMemo(
+    () => ({ ai: underGrupp(rader, 'ai').sort(jamfor), hanvisning: underGrupp(rader, 'hanvisning').sort(jamfor) }),
+    [rader, jamfor],
+  )
+
+  const lista = useMemo(
+    () => (dim === 'inom' ? [...inom[inomKanal]] : grupp(rader, dim).sort(jamfor)),
+    [rader, dim, jamfor, inom, inomKanal],
+  )
+
+  /** Kanalen för en grupprad under Kanal när den delas upp i källor, annars null. */
+  const underdeladFor = (r: Grupprad): UnderdeladKanal | null => {
+    if (dim !== 'kanal') return null
+    const k = kanalFranNyckel(r.nyckel)
+    return arUnderdelad(k) && inom[k].length > 0 ? k : null
+  }
+
+  const fot = dim === 'inom' ? summaAv(inom[inomKanal]) : summa
+  const fotText = dim === 'inom' ? `Totalt ${KANAL_LABEL[inomKanal]}` : 'Totalt'
 
   const sortera = (f: Falt) => {
     if (f === falt) setRiktning((r) => (r === 'asc' ? 'desc' : 'asc'))
@@ -103,14 +142,17 @@ export default function WebLeadsKedja({
   }
 
   const visaVarde = summa.varde > 0
-  const etikett = DIMENSIONER.find(([d]) => d === dim)?.[1] ?? ''
+  const etikett = dim === 'inom' ? UNDERKALLA_RUBRIK[inomKanal] : (DIMENSIONER.find(([d]) => d === dim)?.[1] ?? '')
   const synliga = alla ? lista : lista.slice(0, TOPP)
   const ingaBokade = summa.n > 0 && summa.bokade === 0
 
   const exportera = () => {
-    const rubriker = [etikett, 'Förfrågningar', 'Kontaktade', 'Bokade', 'Andel bokade (%)', 'Vunna', 'Andel vunna av bokade (%)', 'Förlorade efter bokning', 'Förlorade utan bokning', 'Väntar på utfall', 'Värde vunna (kr)']
-    const rad = (namn: string, r: StatMatt) => [
+    // Kanal: AI-assistent och Hänvisning delas upp i en rad per källa så att summan i Excel stämmer
+    const medInom = dim === 'kanal' || dim === 'inom'
+    const rubriker = [medInom ? 'Kanal' : etikett, ...(medInom ? ['Källa inom kanal (assistent eller webbplats)'] : []), 'Förfrågningar', 'Kontaktade', 'Bokade', 'Andel bokade (%)', 'Vunna', 'Andel vunna av bokade (%)', 'Förlorade efter bokning', 'Förlorade utan bokning', 'Väntar på utfall', 'Värde vunna (kr)']
+    const rad = (namn: string, r: StatMatt, kalla?: string) => [
       namn,
+      ...(medInom ? [kalla ?? ''] : []),
       r.n,
       r.kontaktade,
       r.bokade,
@@ -122,7 +164,15 @@ export default function WebLeadsKedja({
       r.pagaende,
       Math.round(r.varde),
     ]
-    laddaNerCsv(`leads-webb-${dim}-${fran}-${till}.csv`, rubriker, [...lista.map((r) => rad(r.namn, r)), rad('Totalt', summa)])
+    const kropp =
+      dim === 'inom'
+        ? lista.map((r) => rad(KANAL_LABEL[inomKanal], r, r.namn))
+        : lista.flatMap((r) => {
+            const k = underdeladFor(r)
+            return k ? inom[k].map((b) => rad(r.namn, b, b.namn)) : [rad(r.namn, r)]
+          })
+    const filDim = dim === 'inom' ? `inom-${inomKanal}` : dim
+    laddaNerCsv(`leads-webb-${filDim}-${fran}-${till}.csv`, rubriker, [...kropp, rad(fotText, fot)])
   }
 
   const radCeller = (r: StatMatt, stark = false) => (
@@ -145,8 +195,9 @@ export default function WebLeadsKedja({
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
-        <div className="max-w-full overflow-x-auto">
+        <div className="max-w-full overflow-x-auto space-y-2">
           <Vaxel etikett="Gruppera på" val={DIMENSIONER} varde={dim} onVal={bytDim} />
+          {dim === 'inom' && <Vaxel etikett="Kanal" val={INOM_VAL} varde={inomKanal} onVal={setInomKanal} />}
         </div>
         <button
           type="button"
@@ -158,7 +209,13 @@ export default function WebLeadsKedja({
         </button>
       </div>
 
-      {lista.length === 0 ? (
+      {lista.length === 0 && dim === 'inom' ? (
+        <p className="py-8 text-center text-sm text-slate-500">
+          {inomKanal === 'ai'
+            ? 'Inga förfrågningar från AI-assistenter under perioden. Här listas varje assistent (ChatGPT, Copilot, Perplexity, Gemini med flera) när kunder hittar hit via dem.'
+            : 'Inga förfrågningar via hänvisning under perioden. Här listas varje webbplats som skickat besökare (Trustpilot, Reco med flera).'}
+        </p>
+      ) : lista.length === 0 ? (
         <p className="py-8 text-center text-sm text-slate-500">
           Inga förfrågningar för nyförsäljning under perioden. Tabellen visar hur förfrågningarna går vidare till kontakt, bokning och
           affär när de kommer in.
@@ -192,24 +249,53 @@ export default function WebLeadsKedja({
                 </tr>
               </thead>
               <tbody>
-                {synliga.map((r) => (
-                  <tr key={r.namn} className="border-b border-slate-700/40 hover:bg-slate-700/10">
-                    <td className="px-2 py-2 align-top">
-                      <span className="flex items-center gap-2 min-w-0">
-                        {ikonFor(dim, r)}
-                        <span className="text-slate-200 break-words min-w-0">{r.namn}</span>
-                      </span>
-                    </td>
-                    {radCeller(r)}
-                  </tr>
-                ))}
+                {synliga.map((r) => {
+                  const k = underdeladFor(r)
+                  const barn = k ? inom[k] : []
+                  const oppen = k != null && oppna.has(k)
+                  return (
+                    <Fragment key={r.namn}>
+                      <tr className="border-b border-slate-700/40 hover:bg-slate-700/10">
+                        <td className="px-2 py-2 align-top">
+                          <span className="flex items-center gap-2 min-w-0">
+                            {ikonFor(dim, r, inomKanal)}
+                            {k ? (
+                              <button
+                                type="button"
+                                onClick={() => vaxla(k)}
+                                aria-expanded={oppen}
+                                className="inline-flex items-center gap-1 min-w-0 text-slate-200 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded"
+                              >
+                                <span className="break-words min-w-0 text-left">{r.namn}</span>
+                                <ChevronRight className={`w-3.5 h-3.5 flex-none text-slate-400 transition-transform ${oppen ? 'rotate-90' : ''}`} aria-hidden="true" />
+                                <span className="sr-only">{oppen ? ', dölj källorna' : `, visa ${barn.length} källor`}</span>
+                              </button>
+                            ) : (
+                              <span className="text-slate-200 break-words min-w-0">{r.namn}</span>
+                            )}
+                          </span>
+                        </td>
+                        {radCeller(r)}
+                      </tr>
+                      {oppen &&
+                        barn.map((b) => (
+                          <tr key={`${r.namn}|${b.namn}`} className="border-b border-slate-700/30 bg-slate-900/20 hover:bg-slate-700/10 text-[13px]">
+                            <td className="pl-8 pr-2 py-1.5 align-top">
+                              <span className="block border-l border-slate-600 pl-2 text-slate-300 break-words">{b.namn}</span>
+                            </td>
+                            {radCeller(b)}
+                          </tr>
+                        ))}
+                    </Fragment>
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr className="border-t border-slate-600 bg-slate-900/30">
                   <th scope="row" className="px-2 py-2 text-left font-semibold text-white align-top">
-                    Totalt
+                    {fotText}
                   </th>
-                  {radCeller(summa, true)}
+                  {radCeller(fot, true)}
                 </tr>
               </tfoot>
             </table>

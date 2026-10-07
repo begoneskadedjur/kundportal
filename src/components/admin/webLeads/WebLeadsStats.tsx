@@ -18,7 +18,7 @@ import DateField from '../../ui/DateField'
 import { dagarMellan, foregaende, kr, procent, tal } from '../marknad/marknadFormat'
 import { Sektion } from '../marknad/MarknadUi'
 import { KallaIcon, TjanstIcon } from './WebLeadIcons'
-import { KANAL_FARG } from './leadKlassning'
+import { KANAL_FARG, arUnderdelad } from './leadKlassning'
 import { svDatum } from './format'
 import WebLeadsKedja from './WebLeadsKedja'
 import WebLeadsBefintliga from './WebLeadsBefintliga'
@@ -36,6 +36,7 @@ import {
   tillFordelning,
   tjanstIkon,
   totalt,
+  underGrupp,
   type StatPeriod,
 } from './statistik/statistikData'
 import { Delta, KpiRuta, Skelett, Sparkline } from './statistik/StatistikUi'
@@ -149,14 +150,19 @@ export default function WebLeadsStats({ inquiries }: { inquiries: WebInquiry[] }
   )
 
   const tjanster = useMemo(() => tillFordelning(grupp(rader, 'tjanst'), (r) => <TjanstIcon name={tjanstIkon(r.nyckel)} className="w-4 h-4" />), [rader])
-  const kanaler = useMemo(
-    () =>
-      tillFordelning(grupp(rader, 'kanal'), (r) => {
-        const k = kanalFranNyckel(r.nyckel)
-        return <KallaIcon name={k} className={`w-4 h-4 ${KANAL_FARG[k]}`} />
-      }),
-    [rader],
-  )
+  const kanaler = useMemo(() => {
+    const ikon = (r: { nyckel: string }) => {
+      const k = kanalFranNyckel(r.nyckel)
+      return <KallaIcon name={k} className={`w-4 h-4 ${KANAL_FARG[k]}`} />
+    }
+    // AI-assistent och Hänvisning som en rad med summa som fälls ut till en rad per källa
+    return grupp(rader, 'kanal').map((g) => {
+      const [f] = tillFordelning([g], ikon)
+      const k = kanalFranNyckel(g.nyckel)
+      const under = arUnderdelad(k) ? tillFordelning(underGrupp(rader, k)) : []
+      return under.length ? { ...f!, under } : f!
+    })
+  }, [rader])
   const kundgrupper = useMemo(() => tillFordelning(grupp(rader, 'kundgrupp')), [rader])
   const orter = useMemo(() => tillFordelning(grupp(rader, 'ort')), [rader])
   const ingangar = useMemo(() => tillFordelning(grupp(rader, 'kalla')), [rader])
@@ -323,7 +329,7 @@ export default function WebLeadsStats({ inquiries }: { inquiries: WebInquiry[] }
               <Sektion titel="Tjänst" under="Vad kunden valde i formuläret">
                 <StatistikFordelning rader={tjanster} />
               </Sektion>
-              <Sektion titel="Källa" under="Kanal enligt klick-id, utm-fält och hänvisning">
+              <Sektion titel="Källa" under="Kanal enligt klick-id, utm-fält och hänvisning. Fäll ut AI-assistent och Hänvisning för att se varje källa.">
                 <StatistikFordelning rader={kanaler} />
               </Sektion>
               <Sektion titel="Kundgrupp">

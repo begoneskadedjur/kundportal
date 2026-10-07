@@ -12,7 +12,7 @@ import {
 } from '../../../../services/webLeadStatistikService'
 import { KUNDGRUPP_LABEL, kallaLabel, tjanstLabel, type WebInquiryKalla, type WebInquiryKundgrupp } from '../../../../types/webInquiry'
 import { datumNyckel, parseDatum, plusDagar, tal } from '../../marknad/marknadFormat'
-import { KANAL_LABEL, kanalFor, tjanstNyckel, type Kanal } from '../leadKlassning'
+import { KANAL_LABEL, kanalFor, tjanstNyckel, type Kanal, type KanalInfo, type UnderdeladKanal } from '../leadKlassning'
 import type { TjanstIkon } from '../WebLeadIcons'
 
 // ---------- Period ----------
@@ -126,6 +126,11 @@ export interface Grupprad extends StatMatt {
 
 /** Kanal ur RPC:ns gruppnyckel [klick-id, utm_source, utm_medium, annons-id i adressen, referrerns domän]. */
 export function kanalFranNyckel(k: string): Kanal {
+  return kanalInfoFranNyckel(k).kanal
+}
+
+/** Hela klassningen (kanal och AI-assistent) ur RPC:ns gruppnyckel. */
+export function kanalInfoFranNyckel(k: string): KanalInfo {
   try {
     const [klick, kalla, medium, adsUrl, vard] = JSON.parse(k) as [boolean, string, string, boolean, string]
     return kanalFor({
@@ -138,9 +143,9 @@ export function kanalFranNyckel(k: string): Kanal {
       utm_campaign: null,
       landing_url: adsUrl ? 'https://begone.se/?gclid=x' : null,
       referrer: vard ? `https://${vard}/` : null,
-    }).kanal
+    })
   } catch {
-    return 'direkt'
+    return { kanal: 'direkt', detalj: '' }
   }
 }
 
@@ -180,6 +185,27 @@ export function grupp(rader: StatRad[], g: StatGrupp): Grupprad[] {
     m.set(namn, fore ? { ...fore, ...summera(fore, r) } : { ...TOM_MATT, ...r, namn, nyckel: r.k })
   }
   return [...m.values()].sort((a, b) => b.n - a.n || a.namn.localeCompare(b.namn, 'sv'))
+}
+
+/**
+ * Kanalraderna för en uppdelad kanal ihopslagna per källa (AI-assistent per assistent, Hänvisning
+ * per webbplats), sorterade på antal. Tom när ingen förfrågan kom från kanalen.
+ */
+export function underGrupp(rader: StatRad[], kanal: UnderdeladKanal): Grupprad[] {
+  const m = new Map<string, Grupprad>()
+  for (const r of rader) {
+    if (r.g !== 'kanal') continue
+    const info = kanalInfoFranNyckel(r.k)
+    if (info.kanal !== kanal || !info.under) continue
+    const fore = m.get(info.under.nyckel)
+    m.set(info.under.nyckel, fore ? { ...fore, ...summera(fore, r) } : { ...TOM_MATT, ...r, namn: info.under.namn, nyckel: r.k })
+  }
+  return [...m.values()].sort((a, b) => b.n - a.n || a.namn.localeCompare(b.namn, 'sv'))
+}
+
+/** Summan av flera grupprader (medianen följer bara med när en enda rad har underlag). */
+export function summaAv(rader: StatMatt[]): StatMatt {
+  return rader.reduce<StatMatt>((s, r) => summera(s, r), TOM_MATT)
 }
 
 export function totalt(rader: StatRad[]): StatMatt {
@@ -226,6 +252,8 @@ export interface Fordelningsrad {
   ikon?: ReactNode
   /** Extra text i tooltip, t.ex. bokade och vunna. */
   detalj?: string
+  /** Underrader som raden kan fällas ut till (AI-assistent per assistent). */
+  under?: Fordelningsrad[]
 }
 
 export function tillFordelning(rader: Grupprad[], ikon?: (r: Grupprad) => ReactNode): Fordelningsrad[] {

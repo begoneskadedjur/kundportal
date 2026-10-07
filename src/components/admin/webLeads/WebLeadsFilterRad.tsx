@@ -7,8 +7,8 @@ import { X } from 'lucide-react'
 import DateField from '../../ui/DateField'
 import { SearchGlass } from '../../shared/search/SearchIcons'
 import { KUNDGRUPP_LABEL, STATUS_CONFIG, STATUS_ORDNING, type StaffProfile, type WebInquiryKundgrupp } from '../../../types/webInquiry'
-import { KANAL_LABEL, KANAL_ORDNING, TJANST_LABEL, TJANST_ORDNING } from './leadKlassning'
-import type { AktivtFilter, Flik, LeadFilter } from './leadFilter'
+import { KANAL_LABEL, KANAL_ORDNING, TJANST_LABEL, TJANST_ORDNING, arUnderdelad, underkallaNamn, type UnderdeladKanal } from './leadKlassning'
+import { underIFilter, type AktivtFilter, type Flik, type LeadFilter } from './leadFilter'
 import type { TjanstIkon } from './WebLeadIcons'
 
 interface Props {
@@ -17,6 +17,11 @@ interface Props {
   staff: StaffProfile[]
   /** Tjänster som finns i underlaget, så att listan inte visar tomma val. */
   tjanster: Set<TjanstIkon>
+  /**
+   * Källor inom AI-assistent och Hänvisning som finns i underlaget (nyckel och namn i visningsordning),
+   * listas indragna under kanalen.
+   */
+  underkallor: Record<UnderdeladKanal, Array<{ nyckel: string; namn: string }>>
   aktiva: AktivtFilter[]
   onAndra: (nyckel: AktivtFilter['nyckel'], varde: string) => void
   onRensa: () => void
@@ -31,7 +36,19 @@ function falt(aktiv: boolean): string {
 
 const DATUM = 'w-full h-9 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent'
 
-export default function WebLeadsFilterRad({ filter, flik, staff, tjanster, aktiva, onAndra, onRensa }: Props) {
+/** Indrag i en option (vanliga mellanslag kollapsar). */
+const INDRAG = '    '
+
+export default function WebLeadsFilterRad({ filter, flik, staff, tjanster, underkallor, aktiva, onAndra, onRensa }: Props) {
+  const valdUnder = underIFilter(filter.kalla)
+  /** Källorna under en kanal, med det valda filtret kvar även om det saknas i underlaget. */
+  const kallorFor = (k: UnderdeladKanal) => {
+    const lista = underkallor[k]
+    if (valdUnder?.kanal === k && !lista.some((u) => u.nyckel === valdUnder.nyckel)) {
+      return [...lista, { nyckel: valdUnder.nyckel, namn: underkallaNamn(k, valdUnder.nyckel) }]
+    }
+    return lista
+  }
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -70,7 +87,16 @@ export default function WebLeadsFilterRad({ filter, flik, staff, tjanster, aktiv
 
         <select aria-label="Källa" className={falt(!!filter.kalla)} value={filter.kalla} onChange={(e) => onAndra('kalla', e.target.value)}>
           <option value="">Alla källor</option>
-          {KANAL_ORDNING.map((k) => <option key={k} value={k}>{KANAL_LABEL[k]}</option>)}
+          {KANAL_ORDNING.flatMap((k) =>
+            arUnderdelad(k)
+              ? [
+                  <option key={k} value={k}>{`${KANAL_LABEL[k]} (alla)`}</option>,
+                  ...kallorFor(k).map((u) => (
+                    <option key={`${k}:${u.nyckel}`} value={`${k}:${u.nyckel}`}>{`${INDRAG}${u.namn}`}</option>
+                  )),
+                ]
+              : [<option key={k} value={k}>{KANAL_LABEL[k]}</option>],
+          )}
           <option value="artanalys">Artanalys (bildanalys)</option>
         </select>
 

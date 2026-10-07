@@ -205,11 +205,12 @@ const KALLA: Record<KallaIkon, ReactNode> = {
       <path d="M10.5 10.6c0-1.6 1.1-2.6 2.6-2.6 0 1.6-1.1 2.6-2.6 2.6zM10.5 11.4c0-1.3-.9-2.1-2.1-2.1 0 1.3.9 2.1 2.1 2.1z" />
     </>
   ),
-  // AI-assistent: gnistor
+  // AI-assistent: pratbubbla med textrader och en gnista i hörnet (inget varumärke)
   ai: (
     <>
-      <path d="M11 3.5l1.8 5 5 1.8-5 1.8-1.8 5-1.8-5-5-1.8 5-1.8z" />
-      <path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" />
+      <path d="M12.5 7H6a2.5 2.5 0 0 0-2.5 2.5v5A2.5 2.5 0 0 0 6 17h1v3.2l3.6-3.2H14a2.5 2.5 0 0 0 2.5-2.5v-2.2" />
+      <path d="M7 10.6h4.5M7 13.6h6" />
+      <path d="M18 2.8l.9 2.4 2.4.9-2.4.9-.9 2.4-.9-2.4-2.4-.9 2.4-.9z" />
     </>
   ),
   // Sociala medier: delningsnoder

@@ -87,17 +87,20 @@ function Tjanst({ i }: { i: WebInquiry }) {
 }
 
 function Kalla({ i }: { i: WebInquiry }) {
-  const { kanal, detalj } = kanalFor(i)
+  const { kanal, detalj, under } = kanalFor(i)
   const ingang = kallaLabel(i)
+  // Källan inom kanalen (AI-assistenten eller den hänvisande webbplatsen) står först i undertexten
+  const inom = under?.namn ?? ''
+  const rubrik = inom ? `${KANAL_LABEL[kanal]} (${inom})` : KANAL_LABEL[kanal]
   return (
-    <div className="min-w-0" title={detalj ? `${KANAL_LABEL[kanal]}: ${detalj}` : KANAL_LABEL[kanal]}>
+    <div className="min-w-0" title={detalj ? `${rubrik}: ${detalj}` : rubrik}>
       <span className="flex items-center gap-1.5 text-slate-200">
         <KallaIcon name={kanal} className={`w-4 h-4 flex-none ${KANAL_FARG[kanal]}`} />
         <span className="truncate">{KANAL_LABEL[kanal]}</span>
       </span>
       <span className="flex items-center gap-1 text-xs text-slate-400 truncate">
         {i.kalla === 'artanalys' && <KallaIcon name="artanalys" className="w-3.5 h-3.5 flex-none" />}
-        <span className="truncate">{ingang}</span>
+        <span className="truncate">{[inom, ingang].filter(Boolean).join(' · ')}</span>
       </span>
     </div>
   )
@@ -270,7 +273,7 @@ export default function WebLeadsTabell(p: Props) {
         {p.rader.map((i) => {
           const vald = p.valda.has(i.id)
           const s = STATUS_CONFIG[i.status]
-          const { kanal } = kanalFor(i)
+          const { kanal, under } = kanalFor(i)
           return (
             <li
               key={i.id}
@@ -302,7 +305,10 @@ export default function WebLeadsTabell(p: Props) {
                   <div className="flex items-center justify-between gap-2 mt-1 text-xs text-slate-400">
                     <span className="flex items-center gap-1.5 min-w-0">
                       <KallaIcon name={kanal} className={`w-3.5 h-3.5 flex-none ${KANAL_FARG[kanal]}`} />
-                      <span className="truncate">{KANAL_LABEL[kanal]}</span>
+                      <span className="truncate">
+                        {KANAL_LABEL[kanal]}
+                        {under ? ` · ${under.namn}` : ''}
+                      </span>
                       {i.akut && <span className="flex items-center gap-1 text-red-400"><span className="w-1.5 h-1.5 rounded-full bg-red-500" />Akut</span>}
                       {i.archived_at && <span className="text-slate-500">Arkiverad</span>}
                     </span>

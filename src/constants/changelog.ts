@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.37.0',
+    date: '2026-10-07',
+    title: 'Leads (Webb): AI-assistenter och hänvisningar per källa',
+    items: [
+      { kind: 'nyhet', text: 'Förfrågningar från en AI-chatt visar vilken assistent kunden kom från, till exempel ChatGPT, Copilot eller Perplexity, med en egen AI-ikon. Hänvisningar visar källan direkt, till exempel Trustpilot.' },
+      { kind: 'nyhet', text: 'Källfiltret går att sätta på AI-assistent eller Hänvisning som helhet eller på en enskild källa.' },
+      { kind: 'nyhet', text: 'I statistiken fälls AI-assistent och Hänvisning ut per källa och går att sortera på båda nivåerna. Ny vy Per källa inom kanal, och CSV-exporten tar med källan.' },
+    ],
+  },
+  {
     version: '3.36.0',
     date: '2026-10-07',
     title: 'Ny statistik i Leads (Webb)',
