@@ -33,9 +33,9 @@ const kampanj = (id, b) => ops.push({ campaignAssetOperation: { create: { campai
 const kopplingar = [];
 for (const b of godkanda) {
   const sok = b.format !== '4:5';
-  if (sok && b.id.startsWith('ratt-')) { kampanj(SOK.rattor, b); kopplingar.push([b.id, 'Claude | Sök | Råttor']); }
-  if (sok && b.id.startsWith('fagel-')) { kampanj(SOK.faglar, b); kopplingar.push([b.id, 'Claude | Sök | Fåglar']); }
-  if (sok && (b.id.startsWith('allm-') || VARUMARKE_EXTRA.includes(b.id))) { kampanj(SOK.varumarke, b); kopplingar.push([b.id, 'Claude | Sök | Varumärke']); }
+  if (sok && b.id.startsWith('ratt-')) { kampanj(SOK.rattor, b); kopplingar.push([b.id, 'Christian | Sök | Råttor']); }
+  if (sok && b.id.startsWith('fagel-')) { kampanj(SOK.faglar, b); kopplingar.push([b.id, 'Christian | Sök | Fåglar']); }
+  if (sok && (b.id.startsWith('allm-') || VARUMARKE_EXTRA.includes(b.id))) { kampanj(SOK.varumarke, b); kopplingar.push([b.id, 'Christian | Sök | Varumärke']); }
   if (b.id.startsWith('fagel-') && !INTE_PMAX.includes(b.id)) {
     ops.push({ assetGroupAssetOperation: { create: { assetGroup: `${C}/assetGroups/${PMAX_FAGEL_GRUPP}`, asset: temp[b.id], fieldType: FALTTYP[b.format] } } });
     kopplingar.push([b.id, 'BrightBid PMax - Fågelsäkring']);
@@ -43,7 +43,7 @@ for (const b of godkanda) {
 }
 
 fs.writeFileSync(UT, JSON.stringify({
-  beskrivning: `Annonsbilder fas 1: ${godkanda.length} nya bildtillgångar (Gemini, godkända av skadedjursexperten) kopplade till Claude | Sök | Råttor, Claude | Sök | Fåglar, Claude | Sök | Varumärke (bildtillägg) och BrightBid PMax - Fågelsäkring (tillgångsgrupp Fågelsäkring 1). Gamla bilder rörs inte här.`,
+  beskrivning: `Annonsbilder fas 1: ${godkanda.length} nya bildtillgångar (Gemini, godkända av skadedjursexperten) kopplade till Christian | Sök | Råttor, Christian | Sök | Fåglar, Christian | Sök | Varumärke (bildtillägg) och BrightBid PMax - Fågelsäkring (tillgångsgrupp Fågelsäkring 1). Gamla bilder rörs inte här.`,
   godkand_av: '',
   kopplingar,
   operationer: ops,

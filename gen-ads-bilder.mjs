@@ -143,7 +143,7 @@ const html = `<!DOCTYPE html>
 <p>Skadedjursexperten har granskat varje bild. Underkända bilder har genererats om med skärpt prompt, högst tre försök per bild. Sidan med underkända försök visar vad som var fel.</p>
 <div class="callout">
   <div class="ct">Förslag</div>
-  Ladda upp de ${godkanda.length} godkända bilderna och koppla dem till Claude | Sök | Råttor, Claude | Sök | Fåglar och Claude | Sök | Varumärke som bildtillägg (liggande och kvadrat) och till BrightBid PMax - Fågelsäkring (alla tre formaten). Förslagsfilen docs/begone-se/ads/andringar/2026-10-06_bilder-fas1.json har ${forslag.operationer.length} operationer och är provkörd mot Google. De gamla bilderna i PMax Fåglar rörs inte i det här steget.
+  Ladda upp de ${godkanda.length} godkända bilderna och koppla dem till Christian | Sök | Råttor, Christian | Sök | Fåglar och Christian | Sök | Varumärke som bildtillägg (liggande och kvadrat) och till BrightBid PMax - Fågelsäkring (alla tre formaten). Förslagsfilen docs/begone-se/ads/andringar/2026-10-06_bilder-fas1.json har ${forslag.operationer.length} operationer och är provkörd mot Google. De gamla bilderna i PMax Fåglar rörs inte i det här steget.
 </div>
 
 ${grupper.map(([namn, f], gi) => `
@@ -161,7 +161,7 @@ ${strukna.length ? `<p><b>Strukna efter tre försök:</b></p><ul>${strukna.map((
 <h2><span class="num">6.</span>Kopplingar och uppföljning</h2>
 <table>
 <tr><th>Kampanj</th><th>Bilder</th></tr>
-${['Claude | Sök | Råttor', 'Claude | Sök | Fåglar', 'Claude | Sök | Varumärke', 'BrightBid PMax - Fågelsäkring'].map((k) => `<tr><td><b>${esc(k)}</b></td><td>${forslag.kopplingar.filter(([, kk]) => kk === k).map(([i]) => esc(i)).join(', ')}</td></tr>`).join('')}
+${['Christian | Sök | Råttor', 'Christian | Sök | Fåglar', 'Christian | Sök | Varumärke', 'BrightBid PMax - Fågelsäkring'].map((k) => `<tr><td><b>${esc(k)}</b></td><td>${forslag.kopplingar.filter(([, kk]) => kk === k).map(([i]) => esc(i)).join(', ')}</td></tr>`).join('')}
 </table>
 <ul>
   <li>Sökkampanjerna är pausade. Bilderna granskas av Google även när kampanjen står still, så policystatus kontrolleras dagen efter uppladdning.</li>

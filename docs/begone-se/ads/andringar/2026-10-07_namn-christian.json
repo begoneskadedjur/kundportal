@@ -1,0 +1,96 @@
+{
+  "beskrivning": "Prefixet Claude byts mot Christian på alla kampanjer (Christian 2026-10-07).",
+  "godkand_av": "Christian 2026-10-07 (begärt i chatten)",
+  "operationer": [
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/19729967497",
+          "name": "Christian | Råttbekämpning (gammal, rensad)"
+        },
+        "updateMask": "name"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24321036645",
+          "name": "Christian | Sök | Varumärke"
+        },
+        "updateMask": "name"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24321036648",
+          "name": "Christian | Sök | Råttor"
+        },
+        "updateMask": "name"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24322339899",
+          "name": "Christian | Sök | Insekter i hemmet"
+        },
+        "updateMask": "name"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24322340547",
+          "name": "Christian | Sök | Möss"
+        },
+        "updateMask": "name"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24322341009",
+          "name": "Christian | Sök | Myror (säsong)"
+        },
+        "updateMask": "name"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24326353874",
+          "name": "Christian | Sök | Fåglar"
+        },
+        "updateMask": "name"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24327615542",
+          "name": "Christian | Sök | Vägglöss"
+        },
+        "updateMask": "name"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24327616250",
+          "name": "Christian | Sök | Getingar (säsong)"
+        },
+        "updateMask": "name"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24333539005",
+          "name": "Christian | Sök | Företag och avtal"
+        },
+        "updateMask": "name"
+      }
+    }
+  ]
+}

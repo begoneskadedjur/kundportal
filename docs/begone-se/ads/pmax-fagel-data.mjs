@@ -1,4 +1,4 @@
-// Nya texter och tillägg för Claude | PMax | Fåglar (övergång), kampanj 21697769249, tillgångsgrupp 6516988320.
+// Nya texter och tillägg för Christian | PMax | Fåglar (övergång), kampanj 21697769249, tillgångsgrupp 6516988320.
 // Ersätter BrightBids texter ("Hundratals nöjda kunder", "Snabb återkoppling", "Få hjälp inom 48 timmar",
 // "miljö fri från skadedjur", "Alltid ett steg före", "I hela Stockholms Län", tankstreck i långa rubriker).
 // Rubrik högst 30, lång rubrik högst 90, beskrivning högst 90 (minst en högst 60).

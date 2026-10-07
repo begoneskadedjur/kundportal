@@ -1,4 +1,4 @@
-// Beslutsunderlag för den gemensamma starten av alla Claude-kampanjer i Google Ads.
+// Beslutsunderlag för den gemensamma starten av alla Christian-kampanjer i Google Ads.
 // Kör: node gen-ads-start.mjs   (skriver Ads_Start_2026-10-07.pdf i repo-roten)
 import fs from 'fs';
 import path from 'path';
@@ -28,22 +28,22 @@ const png = (fil) => `data:image/png;base64,${fs.readFileSync(fil).toString('bas
 
 // ---------- Budget ----------
 const budgetRader = [
-  ['Claude | Sök | Råttor', 1550, 'Startas', 'Fas 1, byggd och pausad sedan 2026-10-06'],
-  ['Claude | Sök | Fåglar', 800, 'Startas', 'Fas 1'],
-  ['Claude | PMax | Fåglar (övergång)', 200, 'Går vidare (100 → 200 kr)', 'Byter namn från BrightBid PMax - Fågelsäkring, nya texter'],
-  ['Claude | Sök | Varumärke', 180, 'Startas', 'Fas 1'],
-  ['Claude | Sök | Vägglöss', 600, 'Byggs och startas', 'Fas 2'],
-  ['Claude | Sök | Insekter i hemmet', 450, 'Byggs och startas', 'Fas 2: silverfisk, pälsänger, mjölbaggar'],
-  ['Claude | Sök | Möss', 450, 'Byggs och startas', 'Fas 2'],
-  ['Claude | Sök | Företag och avtal', 200, 'Byggs och startas', 'Fas 2'],
-  ['Claude | Sök | Getingar (säsong)', 0, 'Byggs pausad', 'Startas inför säsongen 2027 (budget 10 kr i vila)'],
-  ['Claude | Sök | Myror (säsong)', 0, 'Byggs pausad', 'Startas inför säsongen 2027 (budget 10 kr i vila)'],
+  ['Christian | Sök | Råttor', 1550, 'Startas', 'Fas 1, byggd och pausad sedan 2026-10-06'],
+  ['Christian | Sök | Fåglar', 800, 'Startas', 'Fas 1'],
+  ['Christian | PMax | Fåglar (övergång)', 200, 'Går vidare (100 → 200 kr)', 'Byter namn från BrightBid PMax - Fågelsäkring, nya texter'],
+  ['Christian | Sök | Varumärke', 180, 'Startas', 'Fas 1'],
+  ['Christian | Sök | Vägglöss', 600, 'Byggs och startas', 'Fas 2'],
+  ['Christian | Sök | Insekter i hemmet', 450, 'Byggs och startas', 'Fas 2: silverfisk, pälsänger, mjölbaggar'],
+  ['Christian | Sök | Möss', 450, 'Byggs och startas', 'Fas 2'],
+  ['Christian | Sök | Företag och avtal', 200, 'Byggs och startas', 'Fas 2'],
+  ['Christian | Sök | Getingar (säsong)', 0, 'Byggs pausad', 'Startas inför säsongen 2027 (budget 10 kr i vila)'],
+  ['Christian | Sök | Myror (säsong)', 0, 'Byggs pausad', 'Startas inför säsongen 2027 (budget 10 kr i vila)'],
 ];
 const summaNy = budgetRader.reduce((s, r) => s + r[1], 0);
 const gamla = [
-  ['Claude | Råttbekämpning (gammal, rensad)', 2000], ['Brightbid - [Pmax] - Websites + Own Data + Generic Terms', 1500],
+  ['Christian | Råttbekämpning (gammal, rensad)', 2000], ['Brightbid - [Pmax] - Websites + Own Data + Generic Terms', 1500],
   ['BrightBid_High Priority_Råttbekämpning_PMax', 300], ['Brightbid - Standard - Silverfisk | Pälsänger | Mjölbaggar | Vägglöss', 300],
-  ['BrightBid_High Priority_Fågelsäkring_Fågelbekämpning', 200], ['BrightBid PMax - Fågelsäkring (blir Claude | PMax | Fåglar)', 100],
+  ['BrightBid_High Priority_Fågelsäkring_Fågelbekämpning', 200], ['BrightBid PMax - Fågelsäkring (blir Christian | PMax | Fåglar)', 100],
   ['Brightbid - Standard - Möss', 10], ['Brightbid - Search - Getingar', 10], ['Brightbid - Standard - Myror', 10],
 ];
 const summaGammal = gamla.reduce((s, r) => s + r[1], 0);
@@ -56,14 +56,14 @@ const filer = [
   ['3', '2026-10-06_pmax-fagel-texter.json', 89, 'Ej provkörd: dagskvoten slut', 'Nya texter och tillägg i PMax Fåglar'],
   ['4', '2026-10-06_pmax-fagel-bilder-bort.json', 12, 'OK', 'De tolv gamla bilderna i PMax Fåglar bort'],
   ['5', '2026-10-06_fas2-komplett.json', fas2.operationer.length, 'Delvis: grunden (384 op) OK 2026-10-06, tilläggen ej provkörda (kvoten)', 'Fas 2 byggs pausad med annons A och B och bilder'],
-  ['6', '2026-10-06_start-alla.json', start.operationer.length, 'OK (utan fas 2, se nedan)', 'Startar alla Claude-kampanjer, pausar alla gamla'],
+  ['6', '2026-10-06_start-alla.json', start.operationer.length, 'OK (utan fas 2, se nedan)', 'Startar alla Christian-kampanjer, pausar alla gamla'],
 ];
 
 // ---------- Bilder ----------
 const fas2Bilder = manifest.filter((b) => b.fas === 2);
 const godkanda = fas2Bilder.filter((b) => b.status === 'godkand');
 const strukna = fas2Bilder.filter((b) => b.status === 'underkand');
-const kopplingar = (id) => fas2.bildkopplingar.filter(([i]) => i === id).map(([, k]) => k.replace('Claude | Sök | ', ''));
+const kopplingar = (id) => fas2.bildkopplingar.filter(([i]) => i === id).map(([, k]) => k.replace('Christian | Sök | ', ''));
 const bildkort = [];
 for (const b of godkanda) {
   bildkort.push(`<div class="bk"><img src="${await tumme(`${BILDER}/klara/${b.id}.jpg`)}"><div class="bt"><b>${esc(b.id)}</b><br>${esc(b.motiv)}<br><span class="muted">${b.format === '1:1' ? 'Kvadrat 1200 × 1200' : 'Liggande 1200 × 628'} · försök ${b.forsok} · ${esc(kopplingar(b.id).join(', '))}</span><div class="exp">${esc(b.kommentar)}</div></div></div>`);
@@ -73,7 +73,7 @@ for (const b of godkanda) {
 const kampanjOrdning = [...new Set(annonserB.map((a) => a.kampanj))];
 const annonsTabell = (a) => `
 <div class="annons">
-  <div class="ah">${esc(a.kampanj.replace('Claude | Sök | ', ''))} · ${esc(a.grupp)}<span class="muted"> · ${esc(a.url.replace('https://begone.se', 'begone.se'))} · /${esc(a.sokvag.join('/'))}</span></div>
+  <div class="ah">${esc(a.kampanj.replace('Christian | Sök | ', ''))} · ${esc(a.grupp)}<span class="muted"> · ${esc(a.url.replace('https://begone.se', 'begone.se'))} · /${esc(a.sokvag.join('/'))}</span></div>
   <table class="txt">
     <tr><th style="width:4%">#</th><th style="width:44%">Rubrik</th><th style="width:5%">Tkn</th><th>Beskrivning</th><th style="width:5%">Tkn</th></tr>
     ${a.rubriker.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r)}</td><td>${r.length}</td><td>${a.beskrivningar[i] ? esc(a.beskrivningar[i]) : ''}</td><td>${a.beskrivningar[i] ? a.beskrivningar[i].length : ''}</td></tr>`).join('')}
@@ -153,7 +153,7 @@ const html = `<!DOCTYPE html>
   </div>
   <div class="cover-center">
     <div class="cover-kicker">Gemensam start</div>
-    <h1>Alla Claude-kampanjer<br>startar samtidigt</h1>
+    <h1>Alla Christian-kampanjer<br>startar samtidigt</h1>
     <div class="subtitle">Fas 1 och fas 2 i ett svep: två annonser i varje annonsgrupp, nya logotyper och företagsnamn, bilder till fas 2 och en rensad PMax för fåglar. De gamla kampanjerna pausas samma minut.</div>
     <div class="cover-rule"></div>
     <div class="cover-meta">
@@ -232,7 +232,7 @@ ${kampanjOrdning.map((k) => `<h3>${esc(k)}</h3>${annonserB.filter((a) => a.kampa
 </div>
 <ul>
   <li><b>Kontonivå:</b> ny företagslogotyp (ersätter 192 × 192 från 2022) och företagsnamnet BeGone. Alla sökkampanjer utan egna ärver dem, även fas 2.</li>
-  <li><b>Claude | Sök | Råttor, Fåglar, Varumärke:</b> logotypen och BeGone direkt på kampanjen.</li>
+  <li><b>Christian | Sök | Råttor, Fåglar, Varumärke:</b> logotypen och BeGone direkt på kampanjen.</li>
   <li><b>PMax Fåglar:</b> kvadrat som LOGO, liggande som LANDSCAPE_LOGO. Taket är fem logotyper, så de tre minsta gamla (32 × 32, 150 × 150 från Instagram och 192 × 192) tas bort. Begone Skadedjur byts mot BeGone.</li>
 </ul>
 
@@ -248,7 +248,7 @@ ${kampanjOrdning.map((k) => `<h3>${esc(k)}</h3>${annonserB.filter((a) => a.kampa
 ${strukna.length ? `<p style="margin-top:8px"><b>Struken:</b> ${strukna.map((b) => `${esc(b.id)}: ${esc(b.kommentar)}`).join(' ')}</p>` : ''}
 <p class="muted">Underkända försök i omgång 1 och 2: värmetältet (campingtält med bäddad säng, sedan öppen bakvägg), silverfisk kvadrat (såg ut som en gråsugga), lagret (ingen station), gårdsstationen (kista med hänglås, sedan text på dörren), mjölbaggarna liggande (fel skala i alla tre försöken). Alla försök finns i manifest.json med orsak.</p>
 
-<h2 class="brytsida"><span class="num">7.</span>Claude | PMax | Fåglar (övergång): rensning</h2>
+<h2 class="brytsida"><span class="num">7.</span>Christian | PMax | Fåglar (övergång): rensning</h2>
 <p>Kampanjen går kvar till vecka 8 med 200 kr per dag. BrightBids texter har inga ord om garanti eller jour, men flera påståenden vi inte kan belägga eller som strider mot skrivreglerna: "Hundratals nöjda kunder", "Snabb återkoppling", "Alltid ett steg före skadedjuren", "en miljö fri från skadedjur", "riktiga experter", tankstreck i en lång rubrik, och i tilläggen "Få hjälp inom 48 timmar", "I hela Stockholms Län" och "Miljövänligt". Allt byts.</p>
 <table>
 <tr><th style="width:14%">Fält</th><th style="width:43%">Före (tas bort)</th><th>Efter (granskat av experten, tecken)</th></tr>

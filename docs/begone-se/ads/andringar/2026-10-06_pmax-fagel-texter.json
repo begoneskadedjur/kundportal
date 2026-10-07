@@ -2,7 +2,7 @@
   "status": "FÖRSLAG, ej godkänt. Provkörs med mutate.mjs utan --genomfor.",
   "framtagen": "2026-10-07",
   "beskrivning": "Claude | PMax | Fåglar (övergång): 20 gamla texter (BrightBid: \"Hundratals nöjda kunder\", \"Snabb återkoppling\", \"Alltid ett steg före\", \"miljö fri från skadedjur\", tankstreck m.m.) ersätts med 15 rubriker, 5 långa rubriker och 5 beskrivningar granskade av skadedjursexperten. Gamla tillägg bort (sitelänkar med \"I hela Stockholms Län\", \"Få svar inom 48 timmar\", två underkända; framhävningar \"Få hjälp inom 48 timmar\", \"Miljövänligt\", \"Skräddarsydda lösningar\", \"Effektiva metoder\"; samtalstillägg utan schema). In: fågelsökets granskade sitelänkar, framhävningar, utdrag och samtalstillägg vardagar 08 till 17. Ordnad 2026-10-07: borttag och tillägg i par per fälttyp (tak 15/5). Rubrik och beskrivning enligt Christian 2026-10-07.",
-  "godkand_av": "",
+  "godkand_av": "Christian 2026-10-07 (gemensam start, punkt 1 och 3 godkända i chatten)",
   "operationer": [
     {
       "assetOperation": {

@@ -67,6 +67,8 @@ Konto: BeGone.se - Ny (940-760-4856) under MCC MCP-BEGONE (679-697-3203). Agent:
 
 ## Beslut
 
+- 2026-10-07 09.40: GEMENSAM START GENOMFÖRD. Logotyp + företagsnamnet BeGone, annons B, PMax Fåglar-texter (med "Hundratals nöjda kunder" och "Vi stänger ute fåglarna med nät, piggar och vajer, utan preparat."), gamla PMax-bilder bort, fas 2 byggd, och start-alla: 8 Christian-kampanjer aktiva (Råttor 1 550, Fåglar 800, Vägglöss 600, Insekter i hemmet 450, Möss 450, PMax Fåglar 200, Företag och avtal 200, Varumärke 180 = 4 430 kr/dag), 8 gamla pausade. Getingar och Myror (säsong) byggda men pausade. Namnprefix bytt från Claude till Christian (Christians begäran). Nästa: "Hundratals nöjda kunder" i övriga kampanjer om specialisten tycker det, kolla annonsgranskning och söktermer 2026-10-08, veckogenomgång, utvärdering vecka 4.
+
 - 2026-10-07: Christian: "Hundratals nöjda kunder" är sant och får stå. Fågelsäkring utan preparat eller avdödning får stå (konkret, inte "miljövänligt"). Lägg in i PMax Fåglar-texterna före start. Experten var för sträng här.
 
 - 2026-10-06: Namnregel: kampanjer som Claude skapat eller arbetat i heter "Claude | ...". Bytt: Claude | Råttbekämpning (gammal, rensad), Claude | Sök | Råttor, Claude | Sök | Fåglar, Claude | Sök | Varumärke. Fas 2 i data och förslagsfil har samma prefix.

@@ -1,830 +1,830 @@
 {
- "status": "FÖRSLAG, ej godkänt. Provkörs med mutate.mjs utan --genomfor.",
- "framtagen": "2026-10-07",
- "beskrivning": "Annons B (vinkel: erfarna tekniker, ISO 9001 och 14001, uppföljning) i de elva annonsgrupperna i Claude | Sök | Råttor, Fåglar och Varumärke. Texterna granskade och godkända av skadedjursexperten 2026-10-07.",
- "godkand_av": "",
- "operationer": [
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/200902345357",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/tjanster/rattbekampning/"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Råttbekämpning"
-        },
-        {
-         "text": "Råttbekämpning med uppföljning"
-        },
-        {
-         "text": "Uppföljning tills de är borta"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Certifierad enligt ISO 9001"
-        },
-        {
-         "text": "Råttsanering"
-        },
-        {
-         "text": "Tätning, fällor och stationer"
-        },
-        {
-         "text": "Vi åtgärdar grundorsaken"
-        },
-        {
-         "text": "Kostnadsfri inspektion"
-        },
-        {
-         "text": "Kostnadsförslag efter besöket"
-        },
-        {
-         "text": "Rapport för försäkringsbolaget"
-        },
-        {
-         "text": "Råttor inomhus och utomhus"
-        },
-        {
-         "text": "Ofta på plats redan samma dag"
-        },
-        {
-         "text": "Begone Skadedjur"
+  "status": "FÖRSLAG, ej godkänt. Provkörs med mutate.mjs utan --genomfor.",
+  "framtagen": "2026-10-07",
+  "beskrivning": "Annons B (vinkel: erfarna tekniker, ISO 9001 och 14001, uppföljning) i de elva annonsgrupperna i Claude | Sök | Råttor, Fåglar och Varumärke. Texterna granskade och godkända av skadedjursexperten 2026-10-07.",
+  "godkand_av": "Christian 2026-10-07 (gemensam start, punkt 1 och 3 godkända i chatten)",
+  "operationer": [
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/200902345357",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttbekämpning"
+                },
+                {
+                  "text": "Råttbekämpning med uppföljning"
+                },
+                {
+                  "text": "Uppföljning tills de är borta"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Certifierad enligt ISO 9001"
+                },
+                {
+                  "text": "Råttsanering"
+                },
+                {
+                  "text": "Tätning, fällor och stationer"
+                },
+                {
+                  "text": "Vi åtgärdar grundorsaken"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Rapport för försäkringsbolaget"
+                },
+                {
+                  "text": "Råttor inomhus och utomhus"
+                },
+                {
+                  "text": "Ofta på plats redan samma dag"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Teknikern hittar grundorsaken, stänger vägarna in och följer upp tills råttorna är borta."
+                },
+                {
+                  "text": "Efter en kostnadsfri inspektion får du ett kostnadsförslag att gå igenom i lugn och ro."
+                },
+                {
+                  "text": "Rapport till försäkringsbolaget när du behöver. Privatpersoner får ROT på tätningen."
+                }
+              ],
+              "path1": "råttbekämpning",
+              "path2": "tekniker"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Teknikern hittar grundorsaken, stänger vägarna in och följer upp tills råttorna är borta."
-        },
-        {
-         "text": "Efter en kostnadsfri inspektion får du ett kostnadsförslag att gå igenom i lugn och ro."
-        },
-        {
-         "text": "Rapport till försäkringsbolaget när du behöver. Privatpersoner får ROT på tätningen."
-        }
-       ],
-       "path1": "råttbekämpning",
-       "path2": "tekniker"
       }
-     }
-    }
-   }
-  },
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/206558459411",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/tjanster/rattbekampning/"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Råttor i huset?"
-        },
-        {
-         "text": "Råttor i väggarna?"
-        },
-        {
-         "text": "Råttor på vinden?"
-        },
-        {
-         "text": "Råttor i källaren?"
-        },
-        {
-         "text": "Råttbekämpning inomhus"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Uppföljning tills de är borta"
-        },
-        {
-         "text": "Vi åtgärdar grundorsaken"
-        },
-        {
-         "text": "Kostnadsfri inspektion"
-        },
-        {
-         "text": "Vi sanerar även isoleringen"
-        },
-        {
-         "text": "Rapport för försäkringsbolaget"
-        },
-        {
-         "text": "ROT på tätningsarbetet"
-        },
-        {
-         "text": "Ofta på plats redan samma dag"
-        },
-        {
-         "text": "Begone Skadedjur"
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/206558459411",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttor i huset?"
+                },
+                {
+                  "text": "Råttor i väggarna?"
+                },
+                {
+                  "text": "Råttor på vinden?"
+                },
+                {
+                  "text": "Råttor i källaren?"
+                },
+                {
+                  "text": "Råttbekämpning inomhus"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Uppföljning tills de är borta"
+                },
+                {
+                  "text": "Vi åtgärdar grundorsaken"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Vi sanerar även isoleringen"
+                },
+                {
+                  "text": "Rapport för försäkringsbolaget"
+                },
+                {
+                  "text": "ROT på tätningsarbetet"
+                },
+                {
+                  "text": "Ofta på plats redan samma dag"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Ljud i väggen eller spillning på vinden? Teknikern hittar vägen in och stänger den."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Vi sanerar allt som behövs efter råttorna och följer upp tills de är borta."
+                },
+                {
+                  "text": "Efter en kostnadsfri inspektion får du ett kostnadsförslag att gå igenom i lugn och ro."
+                }
+              ],
+              "path1": "råttor",
+              "path2": "i-huset"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Ljud i väggen eller spillning på vinden? Teknikern hittar vägen in och stänger den."
-        },
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Vi sanerar allt som behövs efter råttorna och följer upp tills de är borta."
-        },
-        {
-         "text": "Efter en kostnadsfri inspektion får du ett kostnadsförslag att gå igenom i lugn och ro."
-        }
-       ],
-       "path1": "råttor",
-       "path2": "i-huset"
       }
-     }
-    }
-   }
-  },
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/206558386051",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/tjanster/rattbekampning/"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Råttor på tomten?"
-        },
-        {
-         "text": "Råttor i trädgården?"
-        },
-        {
-         "text": "Råttor i komposten?"
-        },
-        {
-         "text": "Råttor under huset?"
-        },
-        {
-         "text": "Råttbekämpning utomhus"
-        },
-        {
-         "text": "Vi ser vad som lockar råttorna"
-        },
-        {
-         "text": "Fällor med digital övervakning"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Uppföljning tills de är borta"
-        },
-        {
-         "text": "Kostnadsfri inspektion"
-        },
-        {
-         "text": "Kostnadsförslag efter besöket"
-        },
-        {
-         "text": "Ofta på plats redan samma dag"
-        },
-        {
-         "text": "Begone Skadedjur"
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/206558386051",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttor på tomten?"
+                },
+                {
+                  "text": "Råttor i trädgården?"
+                },
+                {
+                  "text": "Råttor i komposten?"
+                },
+                {
+                  "text": "Råttor under huset?"
+                },
+                {
+                  "text": "Råttbekämpning utomhus"
+                },
+                {
+                  "text": "Vi ser vad som lockar råttorna"
+                },
+                {
+                  "text": "Fällor med digital övervakning"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Uppföljning tills de är borta"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Ofta på plats redan samma dag"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikern ser vad som lockar råttorna och hur de kan ta sig in i huset."
+                },
+                {
+                  "text": "Mekaniska fällor som följs digitalt, betesstationer eller tätning, efter platsen."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Efter en kostnadsfri inspektion får du ett kostnadsförslag att gå igenom i lugn och ro."
+                }
+              ],
+              "path1": "råttor",
+              "path2": "tomten"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Teknikern ser vad som lockar råttorna och hur de kan ta sig in i huset."
-        },
-        {
-         "text": "Mekaniska fällor som följs digitalt, betesstationer eller tätning, efter platsen."
-        },
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Efter en kostnadsfri inspektion får du ett kostnadsförslag att gå igenom i lugn och ro."
-        }
-       ],
-       "path1": "råttor",
-       "path2": "tomten"
       }
-     }
-    }
-   }
-  },
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/206558386731",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/tjanster/rattbekampning/"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Råttor i avloppet?"
-        },
-        {
-         "text": "Råtta i toaletten?"
-        },
-        {
-         "text": "Råttspärr i avloppet"
-        },
-        {
-         "text": "Vi monterar råttspärr"
-        },
-        {
-         "text": "Råttsäkra golvbrunnar"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Uppföljning tills de är borta"
-        },
-        {
-         "text": "Rapport för försäkringsbolaget"
-        },
-        {
-         "text": "Sanering efter råttor"
-        },
-        {
-         "text": "Kostnadsförslag efter besöket"
-        },
-        {
-         "text": "Skicka förfrågan med bilder"
-        },
-        {
-         "text": "Råttbekämpning"
-        },
-        {
-         "text": "Begone Skadedjur"
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/206558386731",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttor i avloppet?"
+                },
+                {
+                  "text": "Råtta i toaletten?"
+                },
+                {
+                  "text": "Råttspärr i avloppet"
+                },
+                {
+                  "text": "Vi monterar råttspärr"
+                },
+                {
+                  "text": "Råttsäkra golvbrunnar"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Uppföljning tills de är borta"
+                },
+                {
+                  "text": "Rapport för försäkringsbolaget"
+                },
+                {
+                  "text": "Sanering efter råttor"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Skicka förfrågan med bilder"
+                },
+                {
+                  "text": "Råttbekämpning"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Vi ser till att skadan på ledningen hittas och monterar råttspärr där den behövs."
+                },
+                {
+                  "text": "Vi monterar även råttsäkra vattenlås och galler i golvbrunnar."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Rapport till försäkringsbolaget när du behöver, och uppföljning tills råttorna är borta."
+                }
+              ],
+              "path1": "råttor",
+              "path2": "avlopp"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Vi ser till att skadan på ledningen hittas och monterar råttspärr där den behövs."
-        },
-        {
-         "text": "Vi monterar även råttsäkra vattenlås och galler i golvbrunnar."
-        },
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Rapport till försäkringsbolaget när du behöver, och uppföljning tills råttorna är borta."
-        }
-       ],
-       "path1": "råttor",
-       "path2": "avlopp"
       }
-     }
-    }
-   }
-  },
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/200902347997",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/tjanster/rattbekampning/?kundtyp=foretag"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Råttbekämpning för fastigheter"
-        },
-        {
-         "text": "Råttor i soprummet?"
-        },
-        {
-         "text": "Råttbekämpning för BRF"
-        },
-        {
-         "text": "Råttbekämpning för företag"
-        },
-        {
-         "text": "Skadedjursavtal efter behov"
-        },
-        {
-         "text": "Kundportal för avtalskunder"
-        },
-        {
-         "text": "Rapporter som PDF eller Excel"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Certifierad enligt ISO 14001"
-        },
-        {
-         "text": "Uppföljning tills de är borta"
-        },
-        {
-         "text": "Kostnadsfri inspektion"
-        },
-        {
-         "text": "Kostnadsförslag efter besöket"
-        },
-        {
-         "text": "Begone Skadedjur"
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/200902347997",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/rattbekampning/?kundtyp=foretag"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Råttbekämpning för fastigheter"
+                },
+                {
+                  "text": "Råttor i soprummet?"
+                },
+                {
+                  "text": "Råttbekämpning för BRF"
+                },
+                {
+                  "text": "Råttbekämpning för företag"
+                },
+                {
+                  "text": "Skadedjursavtal efter behov"
+                },
+                {
+                  "text": "Kundportal för avtalskunder"
+                },
+                {
+                  "text": "Rapporter som PDF eller Excel"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Certifierad enligt ISO 14001"
+                },
+                {
+                  "text": "Uppföljning tills de är borta"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Kostnadsförslag efter besöket"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Ni ser ärenden, kommande besök och utplacerad utrustning i kundportalen."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Teknikern hittar var råttorna kommer in och följer upp tills de är borta."
+                },
+                {
+                  "text": "Ni får ett kostnadsförslag efter en kostnadsfri inspektion. Rapporter när ni behöver."
+                }
+              ],
+              "path1": "råttbekämpning",
+              "path2": "avtal"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Ni ser ärenden, kommande besök och utplacerad utrustning i kundportalen."
-        },
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Teknikern hittar var råttorna kommer in och följer upp tills de är borta."
-        },
-        {
-         "text": "Ni får ett kostnadsförslag efter en kostnadsfri inspektion. Rapporter när ni behöver."
-        }
-       ],
-       "path1": "råttbekämpning",
-       "path2": "avtal"
       }
-     }
-    }
-   }
-  },
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/206558389851",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/tjanster/fagelsakring/"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Fågelsäkring"
-        },
-        {
-         "text": "Fågelsäkring av tak och fasad"
-        },
-        {
-         "text": "Fågelskydd för solceller"
-        },
-        {
-         "text": "Solcellsskydd utan åverkan"
-        },
-        {
-         "text": "Montering på hög höjd"
-        },
-        {
-         "text": "Liftkort och fallskydd"
-        },
-        {
-         "text": "Nät, piggar, vajer och band"
-        },
-        {
-         "text": "Gamla bon tas bort"
-        },
-        {
-         "text": "ROT i regel på monteringen"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Kostnadsfri inspektion"
-        },
-        {
-         "text": "Skriftlig offert efter besöket"
-        },
-        {
-         "text": "Begone Skadedjur"
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/206558389851",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/fagelsakring/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Fågelsäkring"
+                },
+                {
+                  "text": "Fågelsäkring av tak och fasad"
+                },
+                {
+                  "text": "Fågelskydd för solceller"
+                },
+                {
+                  "text": "Solcellsskydd utan åverkan"
+                },
+                {
+                  "text": "Montering på hög höjd"
+                },
+                {
+                  "text": "Liftkort och fallskydd"
+                },
+                {
+                  "text": "Nät, piggar, vajer och band"
+                },
+                {
+                  "text": "Gamla bon tas bort"
+                },
+                {
+                  "text": "ROT i regel på monteringen"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Skriftlig offert efter besöket"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikerna har liftkort och fallskydd och monterar nät, piggar, vajer eller fågelband."
+                },
+                {
+                  "text": "Skydd för solceller monteras med clips, utan åverkan på panelerna."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
+                }
+              ],
+              "path1": "fågelsäkring",
+              "path2": "montering"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Teknikerna har liftkort och fallskydd och monterar nät, piggar, vajer eller fågelband."
-        },
-        {
-         "text": "Skydd för solceller monteras med clips, utan åverkan på panelerna."
-        },
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
-        }
-       ],
-       "path1": "fågelsäkring",
-       "path2": "montering"
       }
-     }
-    }
-   }
-  },
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/200902350437",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/tjanster/fagelsakring/"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Problem med duvor?"
-        },
-        {
-         "text": "Duvor på balkongen?"
-        },
-        {
-         "text": "Duvor under solcellerna?"
-        },
-        {
-         "text": "Duvor häckar på huset?"
-        },
-        {
-         "text": "Fågelskydd mot duvor"
-        },
-        {
-         "text": "Sanering av duvträck"
-        },
-        {
-         "text": "Skydd valt efter platsen"
-        },
-        {
-         "text": "Gamla bon tas bort"
-        },
-        {
-         "text": "Montering på hög höjd"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Kostnadsfri inspektion"
-        },
-        {
-         "text": "Skriftlig offert efter besöket"
-        },
-        {
-         "text": "Begone Skadedjur"
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/200902350437",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/fagelsakring/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Problem med duvor?"
+                },
+                {
+                  "text": "Duvor på balkongen?"
+                },
+                {
+                  "text": "Duvor under solcellerna?"
+                },
+                {
+                  "text": "Duvor häckar på huset?"
+                },
+                {
+                  "text": "Fågelskydd mot duvor"
+                },
+                {
+                  "text": "Sanering av duvträck"
+                },
+                {
+                  "text": "Skydd valt efter platsen"
+                },
+                {
+                  "text": "Gamla bon tas bort"
+                },
+                {
+                  "text": "Montering på hög höjd"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Skriftlig offert efter besöket"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Vi tar bort gamla bon och spillning och monterar skydd valt efter platsen och fåglarna."
+                },
+                {
+                  "text": "Teknikerna har liftkort och fallskydd när skyddet ska monteras högt upp."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
+                }
+              ],
+              "path1": "fågelsäkring",
+              "path2": "duvor"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Vi tar bort gamla bon och spillning och monterar skydd valt efter platsen och fåglarna."
-        },
-        {
-         "text": "Teknikerna har liftkort och fallskydd när skyddet ska monteras högt upp."
-        },
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
-        }
-       ],
-       "path1": "fågelsäkring",
-       "path2": "duvor"
       }
-     }
-    }
-   }
-  },
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/203745260071",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/tjanster/fagelsakring/"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Måsar på taket?"
-        },
-        {
-         "text": "Fiskmåsar på taket?"
-        },
-        {
-         "text": "Trutar på taket?"
-        },
-        {
-         "text": "Fågelskydd mot måsar"
-        },
-        {
-         "text": "Skydd före häckningen"
-        },
-        {
-         "text": "Utan håltagning i tätskiktet"
-        },
-        {
-         "text": "Montering på hög höjd"
-        },
-        {
-         "text": "Liftkort och fallskydd"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Kostnadsfri inspektion"
-        },
-        {
-         "text": "Skriftlig offert efter besöket"
-        },
-        {
-         "text": "Begone Skadedjur"
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/203745260071",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/fagelsakring/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Måsar på taket?"
+                },
+                {
+                  "text": "Fiskmåsar på taket?"
+                },
+                {
+                  "text": "Trutar på taket?"
+                },
+                {
+                  "text": "Fågelskydd mot måsar"
+                },
+                {
+                  "text": "Skydd före häckningen"
+                },
+                {
+                  "text": "Utan håltagning i tätskiktet"
+                },
+                {
+                  "text": "Montering på hög höjd"
+                },
+                {
+                  "text": "Liftkort och fallskydd"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Skriftlig offert efter besöket"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Teknikerna har liftkort och fallskydd och monterar skyddet utan håltagning i tätskiktet."
+                },
+                {
+                  "text": "Boka gärna före våren, så att skyddet sitter på plats innan måsarna börjar häcka."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
+                }
+              ],
+              "path1": "fågelsäkring",
+              "path2": "måsar"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Teknikerna har liftkort och fallskydd och monterar skyddet utan håltagning i tätskiktet."
-        },
-        {
-         "text": "Boka gärna före våren, så att skyddet sitter på plats innan måsarna börjar häcka."
-        },
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Du får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
-        }
-       ],
-       "path1": "fågelsäkring",
-       "path2": "måsar"
       }
-     }
-    }
-   }
-  },
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/206558391011",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/tjanster/fagelspillning/"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Sanering av fågelspillning"
-        },
-        {
-         "text": "Fågelspillning på vinden?"
-        },
-        {
-         "text": "Duvträck på balkongen?"
-        },
-        {
-         "text": "Sanering av duvträck"
-        },
-        {
-         "text": "Gamla bon och fjädrar tas bort"
-        },
-        {
-         "text": "Arbetsområdet lämnas rent"
-        },
-        {
-         "text": "Skydd mot nya fåglar"
-        },
-        {
-         "text": "Skicka en bild på spillningen"
-        },
-        {
-         "text": "Rapport när du behöver"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Begone Skadedjur"
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/206558391011",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/fagelspillning/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Sanering av fågelspillning"
+                },
+                {
+                  "text": "Fågelspillning på vinden?"
+                },
+                {
+                  "text": "Duvträck på balkongen?"
+                },
+                {
+                  "text": "Sanering av duvträck"
+                },
+                {
+                  "text": "Gamla bon och fjädrar tas bort"
+                },
+                {
+                  "text": "Arbetsområdet lämnas rent"
+                },
+                {
+                  "text": "Skydd mot nya fåglar"
+                },
+                {
+                  "text": "Skicka en bild på spillningen"
+                },
+                {
+                  "text": "Rapport när du behöver"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Skicka en bild. En mindre sanering kan få pris per telefon, en större kräver inspektion."
+                },
+                {
+                  "text": "Spillningen tas bort och arbetsområdet lämnas rent, med rapport om du behöver."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Skicka en förfrågan när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                }
+              ],
+              "path1": "fågelspillning",
+              "path2": "sanering"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Skicka en bild. En mindre sanering kan få pris per telefon, en större kräver inspektion."
-        },
-        {
-         "text": "Spillningen tas bort och arbetsområdet lämnas rent, med rapport om du behöver."
-        },
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Skicka en förfrågan när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
-        }
-       ],
-       "path1": "fågelspillning",
-       "path2": "sanering"
       }
-     }
-    }
-   }
-  },
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/200902351837",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/tjanster/skyddsjakt/"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Skyddsjakt på fåglar"
-        },
-        {
-         "text": "Skyddsjakt på duvor"
-        },
-        {
-         "text": "Skyddsjakt på måsar"
-        },
-        {
-         "text": "Skyddsjakt på kråkor"
-        },
-        {
-         "text": "Vi sköter tillstånden"
-        },
-        {
-         "text": "Behörig personal"
-        },
-        {
-         "text": "Skyddsjakt och fågelsäkring"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Certifierad enligt ISO 14001"
-        },
-        {
-         "text": "Skriftlig offert efter besöket"
-        },
-        {
-         "text": "Kostnadsfri inspektion"
-        },
-        {
-         "text": "Begone Skadedjur"
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/200902351837",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/tjanster/skyddsjakt/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Skyddsjakt på fåglar"
+                },
+                {
+                  "text": "Skyddsjakt på duvor"
+                },
+                {
+                  "text": "Skyddsjakt på måsar"
+                },
+                {
+                  "text": "Skyddsjakt på kråkor"
+                },
+                {
+                  "text": "Vi sköter tillstånden"
+                },
+                {
+                  "text": "Behörig personal"
+                },
+                {
+                  "text": "Skyddsjakt och fågelsäkring"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Certifierad enligt ISO 14001"
+                },
+                {
+                  "text": "Skriftlig offert efter besöket"
+                },
+                {
+                  "text": "Kostnadsfri inspektion"
+                },
+                {
+                  "text": "Begone Skadedjur"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Vi sköter ansökan och tillstånden och utför jakten med behörig personal."
+                },
+                {
+                  "text": "Skyddsjakten kan kombineras med fågelsäkring av tak, fasad och solceller."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Ni får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
+                }
+              ],
+              "path1": "skyddsjakt",
+              "path2": "tillstånd"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Vi sköter ansökan och tillstånden och utför jakten med behörig personal."
-        },
-        {
-         "text": "Skyddsjakten kan kombineras med fågelsäkring av tak, fasad och solceller."
-        },
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Ni får teknikerns bedömning och en skriftlig offert efter en kostnadsfri inspektion."
-        }
-       ],
-       "path1": "skyddsjakt",
-       "path2": "tillstånd"
       }
-     }
-    }
-   }
-  },
-  {
-   "adGroupAdOperation": {
-    "create": {
-     "adGroup": "customers/9407604856/adGroups/203745261271",
-     "status": "ENABLED",
-     "ad": {
-      "finalUrls": [
-       "https://begone.se/"
-      ],
-      "responsiveSearchAd": {
-       "headlines": [
-        {
-         "text": "Begone Skadedjur"
-        },
-        {
-         "text": "Skadedjur och sanering"
-        },
-        {
-         "text": "Skicka en förfrågan till oss"
-        },
-        {
-         "text": "Kontakta Begone"
-        },
-        {
-         "text": "Råttbekämpning"
-        },
-        {
-         "text": "Fågelsäkring"
-        },
-        {
-         "text": "Sanering av vägglöss"
-        },
-        {
-         "text": "Musbekämpning"
-        },
-        {
-         "text": "Skadedjursavtal för företag"
-        },
-        {
-         "text": "Erfarna skadedjurstekniker"
-        },
-        {
-         "text": "ISO 9001 och ISO 14001"
-        },
-        {
-         "text": "Skadedjur inomhus och utomhus"
-        },
-        {
-         "text": "Kundportal för avtalskunder"
-        },
-        {
-         "text": "Vardagar 08 till 17"
-        },
-        {
-         "text": "Skadedjursbekämpning"
+    },
+    {
+      "adGroupAdOperation": {
+        "create": {
+          "adGroup": "customers/9407604856/adGroups/203745261271",
+          "status": "ENABLED",
+          "ad": {
+            "finalUrls": [
+              "https://begone.se/"
+            ],
+            "responsiveSearchAd": {
+              "headlines": [
+                {
+                  "text": "Begone Skadedjur"
+                },
+                {
+                  "text": "Skadedjur och sanering"
+                },
+                {
+                  "text": "Skicka en förfrågan till oss"
+                },
+                {
+                  "text": "Kontakta Begone"
+                },
+                {
+                  "text": "Råttbekämpning"
+                },
+                {
+                  "text": "Fågelsäkring"
+                },
+                {
+                  "text": "Sanering av vägglöss"
+                },
+                {
+                  "text": "Musbekämpning"
+                },
+                {
+                  "text": "Skadedjursavtal för företag"
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker"
+                },
+                {
+                  "text": "ISO 9001 och ISO 14001"
+                },
+                {
+                  "text": "Skadedjur inomhus och utomhus"
+                },
+                {
+                  "text": "Kundportal för avtalskunder"
+                },
+                {
+                  "text": "Vardagar 08 till 17"
+                },
+                {
+                  "text": "Skadedjursbekämpning"
+                }
+              ],
+              "descriptions": [
+                {
+                  "text": "Råttor, möss, fåglar, vägglöss och andra skadedjur, inomhus och utomhus."
+                },
+                {
+                  "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
+                },
+                {
+                  "text": "Skicka en förfrågan när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
+                },
+                {
+                  "text": "Vi följer upp tills skadedjuren är borta, och rapport får du när du behöver."
+                }
+              ],
+              "path1": "skadedjur",
+              "path2": "förfrågan"
+            }
+          }
         }
-       ],
-       "descriptions": [
-        {
-         "text": "Råttor, möss, fåglar, vägglöss och andra skadedjur, inomhus och utomhus."
-        },
-        {
-         "text": "Erfarna skadedjurstekniker i en organisation certifierad enligt ISO 9001 och 14001."
-        },
-        {
-         "text": "Skicka en förfrågan när det passar. Vardagar 08 till 17 ringer vi upp samma dag."
-        },
-        {
-         "text": "Vi följer upp tills skadedjuren är borta, och rapport får du när du behöver."
-        }
-       ],
-       "path1": "skadedjur",
-       "path2": "förfrågan"
       }
-     }
     }
-   }
-  }
- ]
+  ]
 }

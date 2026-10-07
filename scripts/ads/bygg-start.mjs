@@ -6,9 +6,9 @@
 //   2026-10-06_annonser-b-fas1.json      annons B i de elva annonsgrupperna i fas 1 (finns redan i kontot)
 //   2026-10-06_fas2-komplett.json        fas 2-bygget (konto_3) + annons B + bilder fas 2, allt PAUSAT
 //   2026-10-06_logotyp-namn.json         nya logotyper, företagsnamnet BeGone (godkänt) på konto, fas 1 och PMax Fåglar
-//   2026-10-06_pmax-fagel-texter.json    nya texter och tillägg i Claude | PMax | Fåglar (övergång)
+//   2026-10-06_pmax-fagel-texter.json    nya texter och tillägg i Christian | PMax | Fåglar (övergång)
 //   2026-10-06_pmax-fagel-bilder-bort.json  tar bort de tolv gamla bilderna i PMax Fåglar
-//   2026-10-06_start-alla.json           startar alla Claude-kampanjer och pausar alla gamla aktiva
+//   2026-10-06_start-alla.json           startar alla Christian-kampanjer och pausar alla gamla aktiva
 // Startfilen slår upp fas 2-kampanjernas id via GAQL. Finns de inte än (fas2-komplett ej genomförd)
 // skrivs startfilen utan dem och med en varning. Efter fas2-komplett: kör med --bara-start (skriver bara
 // startfilen, rör inte de andra filerna) och provkör startfilen igen.
@@ -35,7 +35,7 @@ async function q(query) {
 
 const kampanjer = await q(`SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type, campaign_budget.amount_micros FROM campaign WHERE campaign.status != 'REMOVED'`)
 const kampanjId = Object.fromEntries(kampanjer.map((r) => [r.campaign.name, r.campaign.id]))
-const grupper = await q(`SELECT campaign.name, ad_group.id, ad_group.name FROM ad_group WHERE campaign.name LIKE 'Claude | Sök%' AND ad_group.status != 'REMOVED'`)
+const grupper = await q(`SELECT campaign.name, ad_group.id, ad_group.name FROM ad_group WHERE campaign.name LIKE 'Christian | Sök%' AND ad_group.status != 'REMOVED'`)
 const gruppId = Object.fromEntries(grupper.map((r) => [`${r.campaign.name}|${r.adGroup.name}`, r.adGroup.id]))
 
 const BARA_START = process.argv.includes('--bara-start')
@@ -51,14 +51,14 @@ const rsa = (adGroup, a) => ({ adGroupAdOperation: { create: { adGroup, status: 
 } } } })
 
 // ---------- 1. Annons B i fas 1 ----------
-const fas1Kampanjer = ['Claude | Sök | Råttor', 'Claude | Sök | Fåglar', 'Claude | Sök | Varumärke']
+const fas1Kampanjer = ['Christian | Sök | Råttor', 'Christian | Sök | Fåglar', 'Christian | Sök | Varumärke']
 const opsB1 = []
 for (const a of annonserB.filter((x) => fas1Kampanjer.includes(x.kampanj))) {
   const id = gruppId[`${a.kampanj}|${a.grupp}`]
   if (!id) throw new Error(`Annonsgruppen saknas i kontot: ${a.kampanj} | ${a.grupp}`)
   opsB1.push(rsa(`${C}/adGroups/${id}`, a))
 }
-skriv('2026-10-06_annonser-b-fas1.json', 'Annons B (vinkel: erfarna tekniker, ISO 9001 och 14001, uppföljning) i de elva annonsgrupperna i Claude | Sök | Råttor, Fåglar och Varumärke. Texterna granskade och godkända av skadedjursexperten 2026-10-07.', opsB1)
+skriv('2026-10-06_annonser-b-fas1.json', 'Annons B (vinkel: erfarna tekniker, ISO 9001 och 14001, uppföljning) i de elva annonsgrupperna i Christian | Sök | Råttor, Fåglar och Varumärke. Texterna granskade och godkända av skadedjursexperten 2026-10-07.', opsB1)
 
 // ---------- 2. Fas 2 komplett ----------
 const bas = JSON.parse(fs.readFileSync(path.join(DIR, '2026-10-06_konto_3-fas2-bygg.json'), 'utf8'))
@@ -116,7 +116,7 @@ fas2Bilder.forEach((b, i) => {
     }
   }
 })
-skriv('2026-10-06_fas2-komplett.json', `Fas 2 byggs PAUSAD: Claude | Sök | Vägglöss, Insekter i hemmet, Möss, Företag och avtal, Getingar (säsong) och Myror (säsong) med sökord, annons A, tillägg och delade negativa listor (konto_3), plus annons B i tio annonsgrupper (${antalB2}) och ${fas2Bilder.length} bilder fas 2 (granskade av skadedjursexperten) med ${bildKopplingar.length} kopplingar. Startas av 2026-10-06_start-alla.json.`, ops2, { bildkopplingar: bildKopplingar })
+skriv('2026-10-06_fas2-komplett.json', `Fas 2 byggs PAUSAD: Christian | Sök | Vägglöss, Insekter i hemmet, Möss, Företag och avtal, Getingar (säsong) och Myror (säsong) med sökord, annons A, tillägg och delade negativa listor (konto_3), plus annons B i tio annonsgrupper (${antalB2}) och ${fas2Bilder.length} bilder fas 2 (granskade av skadedjursexperten) med ${bildKopplingar.length} kopplingar. Startas av 2026-10-06_start-alla.json.`, ops2, { bildkopplingar: bildKopplingar })
 
 // ---------- 3. Logotyper och företagsnamn ----------
 const BEGONE_NAMN = `${C}/assets/112323469970` // "BeGone", granskat och GODKÄNT som företagsnamn
@@ -143,7 +143,7 @@ opsL.push({ campaignAssetOperation: { remove: `${C}/campaignAssets/${PMAX}~69900
 opsL.push({ campaignAssetOperation: { create: { campaign: `${C}/campaigns/${PMAX}`, asset: BEGONE_NAMN, fieldType: 'BUSINESS_NAME' } } })
 opsL.push({ campaignAssetOperation: { create: { campaign: `${C}/campaigns/${PMAX}`, asset: logo1, fieldType: 'LOGO' } } })
 opsL.push({ campaignAssetOperation: { create: { campaign: `${C}/campaigns/${PMAX}`, asset: logo4, fieldType: 'LANDSCAPE_LOGO' } } })
-skriv('2026-10-06_logotyp-namn.json', 'Nya logotyper (kvadrat 1200x1200 och liggande 1200x300, ordbilden oförändrad på vit botten) och företagsnamnet BeGone (redan granskat och godkänt av Google) på kontonivå, i Claude | Sök | Råttor, Fåglar och Varumärke, och i Claude | PMax | Fåglar (övergång). Den gamla kontologotypen 192x192 och PMax-logotypen 32x32 tas bort, namnet Begone Skadedjur (underkänt i sök, begränsat i PMax) byts mot BeGone.', opsL)
+skriv('2026-10-06_logotyp-namn.json', 'Nya logotyper (kvadrat 1200x1200 och liggande 1200x300, ordbilden oförändrad på vit botten) och företagsnamnet BeGone (redan granskat och godkänt av Google) på kontonivå, i Christian | Sök | Råttor, Fåglar och Varumärke, och i Christian | PMax | Fåglar (övergång). Den gamla kontologotypen 192x192 och PMax-logotypen 32x32 tas bort, namnet Begone Skadedjur (underkänt i sök, begränsat i PMax) byts mot BeGone.', opsL)
 
 // ---------- 4. PMax Fåglar: texter och tillägg ----------
 const AG = `${C}/assetGroups/6516988320`
@@ -160,33 +160,33 @@ for (const [falt, lista] of [['HEADLINE', pmax.rubriker], ['LONG_HEADLINE', pmax
 for (const r of pmaxAssets) opsP.push({ assetGroupAssetOperation: { remove: `${AG.replace('assetGroups/', 'assetGroupAssets/')}~${r.asset.id}~${r.assetGroupAsset.fieldType}` } })
 const gamlaTillagg = [['41144792313', 'SITELINK'], ['170438311754', 'SITELINK'], ['170467561506', 'SITELINK'], ['170476226401', 'SITELINK'], ['238716674121', 'CALLOUT'], ['259096188326', 'CALLOUT'], ['259096188329', 'CALLOUT'], ['259096188332', 'CALLOUT'], ['125436853183', 'CALL']]
 for (const [id, f] of gamlaTillagg) opsP.push({ campaignAssetOperation: { remove: `${C}/campaignAssets/${PMAX}~${id}~${f}` } })
-// Samma granskade tillägg som Claude | Sök | Fåglar (redan godkända av Google).
+// Samma granskade tillägg som Christian | Sök | Fåglar (redan godkända av Google).
 const nyaTillagg = [['428102614277', 'SITELINK'], ['428201437795', 'SITELINK'], ['428201441575', 'SITELINK'], ['428201442211', 'CALLOUT'], ['428201442418', 'CALLOUT'], ['428201442682', 'CALLOUT'], ['428201443147', 'CALLOUT'], ['428201444650', 'CALLOUT'], ['428290368369', 'STRUCTURED_SNIPPET'], ['428102625605', 'CALL']]
 for (const [id, f] of nyaTillagg) opsP.push({ campaignAssetOperation: { create: { campaign: `${C}/campaigns/${PMAX}`, asset: `${C}/assets/${id}`, fieldType: f } } })
-skriv('2026-10-06_pmax-fagel-texter.json', `Claude | PMax | Fåglar (övergång): ${pmaxAssets.length} gamla texter (BrightBid: "Hundratals nöjda kunder", "Snabb återkoppling", "Alltid ett steg före", "miljö fri från skadedjur", tankstreck m.m.) ersätts med 15 rubriker, 5 långa rubriker och 5 beskrivningar granskade av skadedjursexperten. Gamla tillägg bort (sitelänkar med "I hela Stockholms Län", "Få svar inom 48 timmar", två underkända; framhävningar "Få hjälp inom 48 timmar", "Miljövänligt", "Skräddarsydda lösningar", "Effektiva metoder"; samtalstillägg utan schema). In: fågelsökets granskade sitelänkar, framhävningar, utdrag och samtalstillägg vardagar 08 till 17.`, opsP)
+skriv('2026-10-06_pmax-fagel-texter.json', `Christian | PMax | Fåglar (övergång): ${pmaxAssets.length} gamla texter (BrightBid: "Hundratals nöjda kunder", "Snabb återkoppling", "Alltid ett steg före", "miljö fri från skadedjur", tankstreck m.m.) ersätts med 15 rubriker, 5 långa rubriker och 5 beskrivningar granskade av skadedjursexperten. Gamla tillägg bort (sitelänkar med "I hela Stockholms Län", "Få svar inom 48 timmar", två underkända; framhävningar "Få hjälp inom 48 timmar", "Miljövänligt", "Skräddarsydda lösningar", "Effektiva metoder"; samtalstillägg utan schema). In: fågelsökets granskade sitelänkar, framhävningar, utdrag och samtalstillägg vardagar 08 till 17.`, opsP)
 
 // ---------- 5. PMax Fåglar: gamla bilder bort ----------
 const bilderPmax = await q(`SELECT asset_group_asset.field_type, asset.id, asset.name FROM asset_group_asset WHERE asset_group.id = 6516988320 AND asset_group_asset.status != 'REMOVED' AND asset_group_asset.field_type IN ('MARKETING_IMAGE','SQUARE_MARKETING_IMAGE','PORTRAIT_MARKETING_IMAGE')`)
 const gamla = bilderPmax.filter((r) => !(r.asset.name || '').startsWith('Claude '))
-skriv('2026-10-06_pmax-fagel-bilder-bort.json', `Claude | PMax | Fåglar (övergång): kopplar bort de ${gamla.length} gamla bilderna (BrightBid-bilder från 2024 och stockbilder från 2025) så att bara de sex granskade bilderna från fas 1 visas. Körs när de nya bilderna är godkända av Google (de är det 2026-10-07).`,
+skriv('2026-10-06_pmax-fagel-bilder-bort.json', `Christian | PMax | Fåglar (övergång): kopplar bort de ${gamla.length} gamla bilderna (BrightBid-bilder från 2024 och stockbilder från 2025) så att bara de sex granskade bilderna från fas 1 visas. Körs när de nya bilderna är godkända av Google (de är det 2026-10-07).`,
   gamla.map((r) => ({ assetGroupAssetOperation: { remove: `${AG.replace('assetGroups/', 'assetGroupAssets/')}~${r.asset.id}~${r.assetGroupAsset.fieldType}` } })),
   { bilder: gamla.map((r) => `${r.asset.id} ${r.assetGroupAsset.fieldType} ${r.asset.name || ''}`) })
 
 // ---------- 6. Start alla ----------
 const BUDGET = {
-  'Claude | Sök | Råttor': 1550, 'Claude | Sök | Fåglar': 800, 'Claude | PMax | Fåglar (övergång)': 200, 'Claude | Sök | Varumärke': 180,
-  'Claude | Sök | Vägglöss': 600, 'Claude | Sök | Insekter i hemmet': 450, 'Claude | Sök | Möss': 450, 'Claude | Sök | Företag och avtal': 200,
+  'Christian | Sök | Råttor': 1550, 'Christian | Sök | Fåglar': 800, 'Christian | PMax | Fåglar (övergång)': 200, 'Christian | Sök | Varumärke': 180,
+  'Christian | Sök | Vägglöss': 600, 'Christian | Sök | Insekter i hemmet': 450, 'Christian | Sök | Möss': 450, 'Christian | Sök | Företag och avtal': 200,
 }
-const starta = ['Claude | Sök | Råttor', 'Claude | Sök | Fåglar', 'Claude | Sök | Varumärke', 'Claude | Sök | Vägglöss', 'Claude | Sök | Insekter i hemmet', 'Claude | Sök | Möss', 'Claude | Sök | Företag och avtal']
+const starta = ['Christian | Sök | Råttor', 'Christian | Sök | Fåglar', 'Christian | Sök | Varumärke', 'Christian | Sök | Vägglöss', 'Christian | Sök | Insekter i hemmet', 'Christian | Sök | Möss', 'Christian | Sök | Företag och avtal']
 const pausa = {
-  '19729967497': 'Claude | Råttbekämpning (gammal, rensad)', '20818570318': 'BrightBid_High Priority_Råttbekämpning_PMax',
+  '19729967497': 'Christian | Råttbekämpning (gammal, rensad)', '20818570318': 'BrightBid_High Priority_Råttbekämpning_PMax',
   '17655089896': 'Brightbid - [Pmax] - Websites + Own Data + Generic Terms', '17434641058': 'BrightBid_High Priority_Fågelsäkring_Fågelbekämpning',
   '17434641064': 'Brightbid - Standard - Silverfisk | Pälsänger | Mjölbaggar | Vägglöss', '17434641052': 'Brightbid - Standard - Möss',
   '17434641049': 'Brightbid - Search - Getingar', '17434641046': 'Brightbid - Standard - Myror',
 }
 const opsS = []
 for (const [id] of Object.entries(pausa)) opsS.push({ campaignOperation: { update: { resourceName: `${C}/campaigns/${id}`, status: 'PAUSED' }, updateMask: 'status' } })
-opsS.push({ campaignOperation: { update: { resourceName: `${C}/campaigns/${PMAX}`, name: 'Claude | PMax | Fåglar (övergång)' }, updateMask: 'name' } })
+opsS.push({ campaignOperation: { update: { resourceName: `${C}/campaigns/${PMAX}`, name: 'Christian | PMax | Fåglar (övergång)' }, updateMask: 'name' } })
 opsS.push({ campaignBudgetOperation: { update: { resourceName: `${C}/campaignBudgets/13914659886`, amountMicros: '200000000' }, updateMask: 'amountMicros' } })
 const saknas = []
 for (const n of starta) {
@@ -195,8 +195,8 @@ for (const n of starta) {
 }
 // Kontroll: budget i kontot mot planen för de kampanjer som finns.
 const budgetKontot = Object.fromEntries(kampanjer.map((r) => [r.campaign.name, Number(r.campaignBudget.amountMicros) / 1e6]))
-const kontroll = Object.entries(BUDGET).map(([n, b]) => ({ kampanj: n, plan: b, kontot: n.startsWith('Claude | PMax') ? 200 : budgetKontot[n] ?? null }))
+const kontroll = Object.entries(BUDGET).map(([n, b]) => ({ kampanj: n, plan: b, kontot: n.startsWith('Christian | PMax') ? 200 : budgetKontot[n] ?? null }))
 const summa = Object.values(BUDGET).reduce((a, b) => a + b, 0)
-skriv('2026-10-06_start-alla.json', `Gemensam start: startar ${starta.join(', ')}; PMax Fåglar döps om till Claude | PMax | Fåglar (övergång) och får 200 kr; pausar ${Object.values(pausa).join(', ')}. Dagsbudget efter start ${summa} kr (oförändrad total).`, opsS,
+skriv('2026-10-06_start-alla.json', `Gemensam start: startar ${starta.join(', ')}; PMax Fåglar döps om till Christian | PMax | Fåglar (övergång) och får 200 kr; pausar ${Object.values(pausa).join(', ')}. Dagsbudget efter start ${summa} kr (oförändrad total).`, opsS,
   { budget_efter_start: kontroll, summa_kr_per_dag: summa, saknas_i_kontot: saknas })
 if (saknas.length) console.log(`VARNING: ${saknas.join(', ')} finns inte i kontot än. Genomför fas2-komplett, kör sedan skriptet med --bara-start och provkör startfilen igen.`)
