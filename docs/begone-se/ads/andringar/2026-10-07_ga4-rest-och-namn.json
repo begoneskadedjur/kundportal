@@ -1,0 +1,26 @@
+{
+  "beskrivning": "Sista GA4-konverteringen bort (dold, primär) och företagsnamnet BeGone på kontonivå så att fas 2 ärver det.",
+  "godkand_av": "Christian 2026-10-07 (städning godkänd i chatten)",
+  "operationer": [
+    {
+      "conversionActionOperation": {
+        "remove": "customers/9407604856/conversionActions/951702859"
+      }
+    },
+    {
+      "conversionActionOperation": {
+        "remove": "customers/9407604856/conversionActions/6481414442"
+      }
+    },
+    {
+      "conversionActionOperation": {
+        "remove": "customers/9407604856/conversionActions/6481989305"
+      }
+    },
+    {
+      "conversionActionOperation": {
+        "remove": "customers/9407604856/conversionActions/6764728245"
+      }
+    }
+  ]
+}

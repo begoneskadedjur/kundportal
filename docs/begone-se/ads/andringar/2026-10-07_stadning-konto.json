@@ -1,0 +1,504 @@
+{
+  "beskrivning": "Städning 2026-10-07: kontonivåns gamla webbplatslänkar och utdrag bort, ny Kontakta oss ersätter underkända i alla Christian-kampanjer, webbplatslänkar kompletterade (4 till 6 per aktiv kampanj), underkänt företagsnamn i gamla råttsöket ersatt med BeGone, GA4 click_phone/click_akut/click_phone_akut/generate_lead borttagna, 45 pausade gamla kampanjer borttagna: Brightbid - Fågelspillning - Search kampanj - old; Brightbid - Standard - Myror; Brightbid - Search - Getingar; Brightbid - Standard - Möss; Brightbid - Search - Råttbekämpning - old; BrightBid_High Priority_Fågelsäkring_Fågelbekämpning; Brightbid - Standard - Jour; Brightbid - Standard - Silverfisk | Pälsänger | Mjölbaggar | Vägglöss; Brightbid - Standard - Kackerlackor; Brightbid - [PB] Vägglöss - old; Brightbid - Standard - Flugor; Brightbid - Konkurrenter - Search; Brightbid - Standard - Skadedjursbekämpning; Brightbid - Huddinge Search test; Brightbid - [Pmax] - Websites + Own Data + Generic Terms; Brightbid - Elektriska råttfällor; Brightbid - Mjölbaggar Search - old; Brightbid - Standard - Värmebehandling vägglöss; Brightbid - Bekämpa mal; Brightbid - Pälsänger - old; BrightBid_Brand Campaign; BrightBid_High Priority_Råttbekämpning_PMax; [PB] Brand; [PB] Råttbekämpning; [PB] Silverfisk; [PB] Skadedjursbekämpning Ordentlig; [PB] Vägglöss; [PB] Värmebehandling vägglöss; Fågelsäkring; Jour - Search; Kackerlackor - Search; Pälsänger; [G] Pmax - Websites + Own Data; [PB] [Pmax] Råttbekämpning; Bekämpa mal; Elektriska råttfällor; Fågelspillning - Search kampanj; Flugor - Search; Huddinge Search test; Konkurrenter - Search; Mjölbaggar Search; Search - Getingar; Search - Möss; Search - Myror; Search - Råttbekämpning",
+  "godkand_av": "Christian 2026-10-07 (städning godkänd i chatten)",
+  "operationer": [
+    {
+      "customerAssetOperation": {
+        "remove": "customers/9407604856/customerAssets/40465249201~SITELINK"
+      }
+    },
+    {
+      "customerAssetOperation": {
+        "remove": "customers/9407604856/customerAssets/40465249207~SITELINK"
+      }
+    },
+    {
+      "customerAssetOperation": {
+        "remove": "customers/9407604856/customerAssets/41144792316~SITELINK"
+      }
+    },
+    {
+      "customerAssetOperation": {
+        "remove": "customers/9407604856/customerAssets/170476226401~SITELINK"
+      }
+    },
+    {
+      "customerAssetOperation": {
+        "remove": "customers/9407604856/customerAssets/46517774275~STRUCTURED_SNIPPET"
+      }
+    },
+    {
+      "customerAssetOperation": {
+        "remove": "customers/9407604856/customerAssets/77262512473~STRUCTURED_SNIPPET"
+      }
+    },
+    {
+      "assetOperation": {
+        "create": {
+          "resourceName": "customers/9407604856/assets/-1",
+          "finalUrls": [
+            "https://begone.se/kontakt/"
+          ],
+          "sitelinkAsset": {
+            "linkText": "Kontakta oss",
+            "description1": "Skicka en förfrågan",
+            "description2": "Vardagar 08 till 17"
+          }
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/24321036648~428102498855~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~428191755469~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/24321036645~428201454136~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/24327615542~428210231597~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/24327616250~428210252624~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/24322341009~428210253641~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/24326353874~428290367463~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/24322339899~428309510287~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/24322340547~428309517451~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/24333539005~428397717681~SITELINK"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24321036648",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24321036645",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24327615542",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24327616250",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24322341009",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24326353874",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24322339899",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24322340547",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24333539005",
+          "asset": "customers/9407604856/assets/-1",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "remove": "customers/9407604856/campaignAssets/19729967497~40472371487~BUSINESS_NAME"
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/19729967497",
+          "asset": "customers/9407604856/assets/112323469970",
+          "fieldType": "BUSINESS_NAME"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24321036648",
+          "asset": "customers/9407604856/assets/428290382898",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24326353874",
+          "asset": "customers/9407604856/assets/428290382898",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/21697769249",
+          "asset": "customers/9407604856/assets/428290382898",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24321036645",
+          "asset": "customers/9407604856/assets/428201423581",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24322339899",
+          "asset": "customers/9407604856/assets/428290383993",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "campaignAssetOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24333539005",
+          "asset": "customers/9407604856/assets/428201454061",
+          "fieldType": "SITELINK"
+        }
+      }
+    },
+    {
+      "conversionActionOperation": {
+        "remove": "customers/9407604856/conversionActions/6757755502"
+      }
+    },
+    {
+      "conversionActionOperation": {
+        "remove": "customers/9407604856/conversionActions/6757892796"
+      }
+    },
+    {
+      "conversionActionOperation": {
+        "remove": "customers/9407604856/conversionActions/6758016197"
+      }
+    },
+    {
+      "conversionActionOperation": {
+        "remove": "customers/9407604856/conversionActions/951702856"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641043"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641046"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641049"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641052"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641055"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641058"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641061"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641064"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641067"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641070"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641073"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641076"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641079"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17434641082"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/17655089896"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/18961280051"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/19732723104"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/19736011350"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/19740914587"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/20230078972"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/20635859505"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/20818570318"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927254"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927257"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927260"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927263"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927266"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927269"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927272"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927275"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927278"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927401"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927404"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927407"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927410"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927413"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927416"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927419"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927422"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927425"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927428"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927431"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927434"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927437"
+      }
+    },
+    {
+      "campaignOperation": {
+        "remove": "customers/9407604856/campaigns/21041927440"
+      }
+    }
+  ]
+}
