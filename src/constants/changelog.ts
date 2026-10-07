@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.37.1',
+    date: '2026-10-08',
+    title: 'Samtyckesloggen räknar även statistik',
+    items: [
+      { kind: 'andring', text: 'Cookiesamtycket på sidan Marknad räknar nu valet för Statistik (Google Analytics) tillsammans med Marknadsföring, så godkänt, nekat och delvis stämmer när statistiken slås på på begone.se.' },
+    ],
+  },
+  {
     version: '3.37.0',
     date: '2026-10-07',
     title: 'Leads (Webb): AI-assistenter och hänvisningar per källa',

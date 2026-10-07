@@ -29,10 +29,10 @@ const HANDLINGAR = new Set(['godkann_alla', 'neka', 'eget_val'])
 const LAGER = new Set(['banner', 'installningar'])
 const ATGARDER = new Set(['first_choice', 'changed', 'withdrawn'])
 /**
- * Valbara kategorier som faktiskt används på sajten, för status. Statistik (GA4) används inte än;
- * lägg till 'statistik' här när GA4 införs (samtidigt höjs CONSENT_VERSION på sajten).
+ * Valbara kategorier som faktiskt används på sajten, för status: accepted när alla är godkända, partial när
+ * några är det, rejected när ingen är det. Statistik (Google Analytics 4) sedan CONSENT_VERSION 3 (2026-10-07).
  */
-const AKTIVA_KATEGORIER = ['marknadsforing'] as const
+const AKTIVA_KATEGORIER = ['statistik', 'marknadsforing'] as const
 
 let db: SupabaseClient | null = null
 function supabase(): SupabaseClient {
