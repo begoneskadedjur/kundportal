@@ -71,10 +71,10 @@ export default function WebLeadsBefintliga({ befintliga }: { befintliga: WebInqu
   const totalGenomforda = befintliga.filter(genomford).length
 
   return (
-    <div className="p-4 bg-slate-800/30 border border-slate-700 rounded-xl">
+    <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-4 sm:p-5">
       <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
         <div>
-          <h3 className="text-sm font-semibold text-white">Befintliga avtalskunder</h3>
+          <h3 className="text-base font-semibold text-white">Befintliga avtalskunder</h3>
           <p className="text-xs text-slate-500 mt-0.5">
             {befintliga.length} förfrågningar, {statusar ? `${totalGenomforda} ärenden genomförda` : 'hämtar ärendenas status...'}
           </p>
@@ -110,8 +110,8 @@ export default function WebLeadsBefintliga({ befintliga }: { befintliga: WebInqu
               {rader.map((r) => (
                 <tr key={r.namn} className="border-b border-slate-700/50">
                   <td className="px-3 py-2 text-slate-300 break-all">{r.namn}</td>
-                  <td className="px-3 py-2 text-right font-mono text-white">{r.antal}</td>
-                  <td className="px-3 py-2 text-right font-mono text-slate-300">{statusar ? r.genomforda : ''}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-white">{r.antal}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-slate-300">{statusar ? r.genomforda : ''}</td>
                 </tr>
               ))}
             </tbody>

@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.36.0',
+    date: '2026-10-07',
+    title: 'Ny statistik i Leads (Webb)',
+    items: [
+      { kind: 'nyhet', text: 'Statistikfliken har nyckeltal med förändring mot föregående period och trendlinje, en tratt från förfrågan till vunnen affär, trend per dag, vecka eller månad, fördelning per tjänst, källa och kundgrupp, och en värmekarta över när förfrågningarna kommer in.' },
+      { kind: 'nyhet', text: 'Tabellen Från förfrågan till affär går att sortera, visar värdet av vunna affärer och kan exporteras till CSV. Nya flikar för kanal och ingångssida.' },
+      { kind: 'andring', text: 'Statistiken räknas nu i databasen, så den stämmer och går snabbt även med tusentals förfrågningar.' },
+    ],
+  },
+  {
     version: '3.35.0',
     date: '2026-10-07',
     title: 'Leads (Webb) i ny form och sidan Marknad',
