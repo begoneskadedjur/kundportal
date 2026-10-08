@@ -304,6 +304,12 @@ export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, case
             <div className="text-sm font-bold text-[#20c58f] tabular-nums">
               Kundnr {pulse.fortnoxCustomerNumber} ✓
             </div>
+          ) : invoice.case_type === 'private' || invoice.case_type === 'business' ? (
+            // Engångskunder får kundnummer automatiskt när utkastet skapas
+            <>
+              <div className="text-sm font-bold text-slate-100">Nytt kundnr</div>
+              <div className="text-[11px] text-slate-500 truncate">tilldelas när utkastet skapas</div>
+            </>
           ) : (
             <>
               <div className="text-sm font-bold text-red-400">Kundnr saknas</div>

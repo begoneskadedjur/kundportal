@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.38.1',
+    date: '2026-10-08',
+    title: 'Fakturamodalen: kundnummer för engångskunder',
+    items: [
+      { kind: 'buggfix', text: 'Fakturor till privatpersoner och företag utan avtal visar inte längre "Kundnr saknas" i rött. Där står nu att kundnumret tilldelas när utkastet skapas i Fortnox, vilket sker automatiskt.' },
+    ],
+  },
+  {
     version: '3.38.0',
     date: '2026-10-08',
     title: 'Marknad: retargeting',
