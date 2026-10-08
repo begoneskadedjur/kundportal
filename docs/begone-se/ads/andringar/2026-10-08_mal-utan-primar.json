@@ -1,0 +1,150 @@
+{
+  "beskrivning": "Målen Kvalificerat lead (Bokat uppdrag) och Konverterat lead (Genomfört uppdrag) tas bort från budgivningen tills konverteringarna blir primära (de är sekundära tills portalen har skickat data). Löser varningen Your targeted goal is missing a primary conversion action.",
+  "godkand_av": "Christian 2026-10-08 (mätningen godkänd; ändringen påverkar inte budgivningen eftersom målen saknar primära konverteringar)",
+  "operationer": [
+    {
+      "customerConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/customerConversionGoals/QUALIFIED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "customerConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/customerConversionGoals/CONVERTED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24321036645~QUALIFIED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24321036645~CONVERTED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24321036648~QUALIFIED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24321036648~CONVERTED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24322339899~QUALIFIED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24322339899~CONVERTED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24322340547~QUALIFIED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24322340547~CONVERTED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24326353874~QUALIFIED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24326353874~CONVERTED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24327615542~QUALIFIED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24327615542~CONVERTED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24333539005~QUALIFIED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    },
+    {
+      "campaignConversionGoalOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaignConversionGoals/24333539005~CONVERTED_LEAD~WEBSITE",
+          "biddable": false
+        },
+        "updateMask": "biddable"
+      }
+    }
+  ]
+}
