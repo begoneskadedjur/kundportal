@@ -1,0 +1,360 @@
+{
+  "beskrivning": "Besökslistorna per tjänst: livslängd 180 dagar (lookbackWindowDays per regel). Google satte 540 som standard.",
+  "godkand_av": "Christian 2026-10-08 (retargeting godkänt i chatten)",
+  "operationer": [
+    {
+      "userListOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/userLists/9484152263",
+          "ruleBasedUserList": {
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/rattbekampning"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                }
+              ]
+            }
+          }
+        },
+        "updateMask": "rule_based_user_list.flexible_rule_user_list.inclusive_operands"
+      }
+    },
+    {
+      "userListOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/userLists/9484152266",
+          "ruleBasedUserList": {
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/moss"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                }
+              ]
+            }
+          }
+        },
+        "updateMask": "rule_based_user_list.flexible_rule_user_list.inclusive_operands"
+      }
+    },
+    {
+      "userListOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/userLists/9484152269",
+          "ruleBasedUserList": {
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/fagelsakring"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                },
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/fagelspillning"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                },
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/skyddsjakt"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                }
+              ]
+            }
+          }
+        },
+        "updateMask": "rule_based_user_list.flexible_rule_user_list.inclusive_operands"
+      }
+    },
+    {
+      "userListOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/userLists/9484152272",
+          "ruleBasedUserList": {
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/vaggl"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                }
+              ]
+            }
+          }
+        },
+        "updateMask": "rule_based_user_list.flexible_rule_user_list.inclusive_operands"
+      }
+    },
+    {
+      "userListOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/userLists/9484152275",
+          "ruleBasedUserList": {
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/silverfisk-sanering"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                },
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/palsanger"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                },
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/mjolbaggar"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                }
+              ]
+            }
+          }
+        },
+        "updateMask": "rule_based_user_list.flexible_rule_user_list.inclusive_operands"
+      }
+    },
+    {
+      "userListOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/userLists/9485418918",
+          "ruleBasedUserList": {
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/getingar"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                }
+              ]
+            }
+          }
+        },
+        "updateMask": "rule_based_user_list.flexible_rule_user_list.inclusive_operands"
+      }
+    },
+    {
+      "userListOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/userLists/9485418921",
+          "ruleBasedUserList": {
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/myror"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                }
+              ]
+            }
+          }
+        },
+        "updateMask": "rule_based_user_list.flexible_rule_user_list.inclusive_operands"
+      }
+    },
+    {
+      "userListOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/userLists/9485418924",
+          "ruleBasedUserList": {
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/skadedjursbekampning-foretag"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                },
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/skadedjursavtal"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "lookbackWindowDays": "180"
+                }
+              ]
+            }
+          }
+        },
+        "updateMask": "rule_based_user_list.flexible_rule_user_list.inclusive_operands"
+      }
+    }
+  ]
+}

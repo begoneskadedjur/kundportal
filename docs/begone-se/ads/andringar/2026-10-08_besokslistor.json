@@ -1,0 +1,423 @@
+{
+  "beskrivning": "Besökslistor för remarketing (url__ contains). Alla 540 d, per tjänst 180 d, förfrågan 540 d. Kopplas INTE till kampanjer (först efter vecka 4).",
+  "godkand_av": "Christian 2026-10-08 (retargeting godkänt i chatten)",
+  "operationer": [
+    {
+      "userListOperation": {
+        "create": {
+          "name": "Christian | Besökare | Alla",
+          "description": "Alla besökare på begone.se",
+          "membershipStatus": "OPEN",
+          "membershipLifeSpan": "540",
+          "ruleBasedUserList": {
+            "prepopulationStatus": "REQUESTED",
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "begone.se"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "userListOperation": {
+        "create": {
+          "name": "Christian | Besökare | Råttor",
+          "description": "Besökare på råttbekämpning",
+          "membershipStatus": "OPEN",
+          "membershipLifeSpan": "180",
+          "ruleBasedUserList": {
+            "prepopulationStatus": "REQUESTED",
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/rattbekampning"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "userListOperation": {
+        "create": {
+          "name": "Christian | Besökare | Möss",
+          "description": "Besökare på möss",
+          "membershipStatus": "OPEN",
+          "membershipLifeSpan": "180",
+          "ruleBasedUserList": {
+            "prepopulationStatus": "REQUESTED",
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/moss"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "userListOperation": {
+        "create": {
+          "name": "Christian | Besökare | Fåglar",
+          "description": "Besökare på fågelsäkring, fågelspillning, skyddsjakt",
+          "membershipStatus": "OPEN",
+          "membershipLifeSpan": "180",
+          "ruleBasedUserList": {
+            "prepopulationStatus": "REQUESTED",
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/fagelsakring"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/fagelspillning"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/skyddsjakt"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "userListOperation": {
+        "create": {
+          "name": "Christian | Besökare | Vägglöss",
+          "description": "Besökare på alla vägglössidor (sanering, värmebehandling, vägglushund)",
+          "membershipStatus": "OPEN",
+          "membershipLifeSpan": "180",
+          "ruleBasedUserList": {
+            "prepopulationStatus": "REQUESTED",
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/vaggl"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "userListOperation": {
+        "create": {
+          "name": "Christian | Besökare | Insekter",
+          "description": "Besökare på silverfisk, pälsänger, mjölbaggar",
+          "membershipStatus": "OPEN",
+          "membershipLifeSpan": "180",
+          "ruleBasedUserList": {
+            "prepopulationStatus": "REQUESTED",
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/silverfisk-sanering"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/palsanger"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/mjolbaggar"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "userListOperation": {
+        "create": {
+          "name": "Christian | Besökare | Getingar",
+          "description": "Besökare på getingar",
+          "membershipStatus": "OPEN",
+          "membershipLifeSpan": "180",
+          "ruleBasedUserList": {
+            "prepopulationStatus": "REQUESTED",
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/getingar"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "userListOperation": {
+        "create": {
+          "name": "Christian | Besökare | Myror",
+          "description": "Besökare på myror",
+          "membershipStatus": "OPEN",
+          "membershipLifeSpan": "180",
+          "ruleBasedUserList": {
+            "prepopulationStatus": "REQUESTED",
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/myror"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "userListOperation": {
+        "create": {
+          "name": "Christian | Besökare | Företag och BRF",
+          "description": "Besökare på företagssidan och skadedjursavtal",
+          "membershipStatus": "OPEN",
+          "membershipLifeSpan": "180",
+          "ruleBasedUserList": {
+            "prepopulationStatus": "REQUESTED",
+            "flexibleRuleUserList": {
+              "inclusiveRuleOperator": "OR",
+              "inclusiveOperands": [
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/skadedjursbekampning-foretag"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                {
+                  "rule": {
+                    "ruleItemGroups": [
+                      {
+                        "ruleItems": [
+                          {
+                            "name": "url__",
+                            "stringRuleItem": {
+                              "operator": "CONTAINS",
+                              "value": "/tjanster/skadedjursavtal"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "userListOperation": {
+        "create": {
+          "name": "Christian | Besökare | Har skickat förfrågan",
+          "description": "Har konverterat på Formulär ifyllt. För uteslutning.",
+          "membershipStatus": "OPEN",
+          "membershipLifeSpan": "540",
+          "basicUserList": {
+            "actions": [
+              {
+                "conversionAction": "customers/9407604856/conversionActions/6481860144"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
