@@ -1,5 +1,5 @@
 // Engångs-backfill av Google Ads-statistik till sidan Marknad. Samma kod som nattjobbet
-// (api/_lib/googleAdsStatistik.ts, laddas med jiti). Tre GAQL-anrop oavsett längd på perioden.
+// (api/_lib/googleAdsStatistik.ts, laddas med jiti). Fem GAQL-anrop oavsett längd på perioden.
 //
 // Kör:
 //   node --env-file=.env.local scripts/ads/backfill-statistik.mjs [--fran ÅÅÅÅ-MM-DD] [--till ÅÅÅÅ-MM-DD] [--ut fil.json]
@@ -9,7 +9,8 @@
 // --ut (standard backfill-statistik.json i systemets temp-mapp, aldrig i repot) och
 // laddas in med SQL: select public.google_ads_statistik_spara(...).
 //
-// Avbryter om skriptet skulle använda fler än 600 operationer (det använder tre).
+// Avbryter om skriptet skulle använda fler än 600 operationer (det använder fem).
+// --torr: hämtar och skriver ut antal rader, sparar ingenting.
 import { createJiti } from 'jiti'
 import { writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -28,7 +29,8 @@ const till = arg('till') ?? lib.plusDagar(lib.idagSverige(), -1)
 const fran = arg('fran') ?? lib.plusDagar(till, -89)
 const ut = arg('ut') ?? join(tmpdir(), 'backfill-statistik.json')
 
-const planerade = 3
+const planerade = 5
+const torr = process.argv.includes('--torr')
 if (planerade > MAX_OPERATIONER) {
   console.error(`Avbryter: ${planerade} operationer överstiger gränsen ${MAX_OPERATIONER}.`)
   process.exit(1)
@@ -41,10 +43,17 @@ console.log(`Operationer: ${st.operationer}`)
 console.log(`Rader: kampanj_dag ${st.kampanj.length}, konvertering_dag ${st.konv.length}, sokterm_vecka ${st.sok.length}`)
 const atgarder = [...new Set(st.konv.map((k) => `${k.konverteringsatgard} (${k.kategori})`))]
 console.log('Konverteringsåtgärder:', atgarder.join('; '))
+console.log(`Besökslistor ${st.listaDatum}: ${st.listor.length}, målgrupp_dag: ${st.malgrupp.length}`)
+for (const l of st.listor) console.log(`  ${l.namn}: sök ${l.storlek_sok}, display ${l.storlek_display}, ${l.storleksintervall_sok}, ${l.membership_status}`)
+if (torr) {
+  console.log('Torrkörning: inget sparat.')
+  process.exit(0)
+}
 
 const nyckel = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
 const url = process.env.VITE_SUPABASE_URL
 const params = lib.sparaParametrar(st)
+const rtParams = lib.retargetingParametrar(st)
 
 if (nyckel && url) {
   const svar = await fetch(`${url}/rest/v1/rpc/google_ads_statistik_spara`, {
@@ -58,7 +67,19 @@ if (nyckel && url) {
     process.exit(1)
   }
   console.log('Sparat:', data)
+  const rt = await fetch(`${url}/rest/v1/rpc/google_ads_retargeting_spara`, {
+    method: 'POST',
+    headers: { apikey: nyckel, Authorization: `Bearer ${nyckel}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(rtParams),
+  })
+  const rtData = await rt.json().catch(() => null)
+  if (!rt.ok) {
+    console.error('Kunde inte spara retargeting:', rtData)
+    process.exit(1)
+  }
+  console.log('Sparat retargeting:', rtData)
 } else {
   writeFileSync(ut, JSON.stringify(params))
-  console.log(`Ingen service-nyckel i miljön. Parametrarna skrevs till ${ut}.`)
+  writeFileSync(ut.replace(/.json$/, '') + '-retargeting.json', JSON.stringify(rtParams))
+  console.log(`Ingen service-nyckel i miljön. Parametrarna skrevs till ${ut} (och -retargeting.json).`)
 }

@@ -1,20 +1,21 @@
 // api/cron/google-ads-statistik.ts
 // Nattjobb: hämtar Google Ads-statistik till sidan Marknad (/admin/leads-webb/marknad).
-// Kampanj per dag, konverteringar per dag och åtgärd, söktermer per vecka. Se api/_lib/googleAdsStatistik.ts.
+// Kampanj per dag, konverteringar per dag och åtgärd, söktermer per vecka, besökslistornas storlek (i dag)
+// och resultat per målgrupp (retargeting). Se api/_lib/googleAdsStatistik.ts.
 //
 // Fönster: de senaste 30 dagarna till och med i går (svensk tid). Google justerar bakåt och räknar
 // konverteringar på klickdagen (samtal, formulär och offline-uppladdningar kan komma dagar senare),
-// så hela fönstret skrivs om varje natt. Kostar tre operationer av Explorer-kvoten (2 880 per dygn).
+// så hela fönstret skrivs om varje natt. Kostar fem operationer av Explorer-kvoten (2 880 per dygn).
 // ?dagar=N (1 till 90) ändrar fönstret vid manuell körning.
 //
-// Skrivning via google_ads_statistik_spara() (bara service role). Körs 04:30 UTC via Vercel Cron.
+// Skrivning via google_ads_statistik_spara() och google_ads_retargeting_spara() (bara service role). Körs 04:30 UTC via Vercel Cron.
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { withCronLog } from '../_lib/cronLogger'
 import { requireCronSecret } from '../_lib/cronAuth'
 import { saknadeMiljovariabler } from '../_lib/googleAdsKonverteringar'
-import { hamtaAccessToken, hamtaStatistik, idagSverige, plusDagar, sparaParametrar } from '../_lib/googleAdsStatistik'
+import { hamtaAccessToken, hamtaStatistik, idagSverige, plusDagar, retargetingParametrar, sparaParametrar } from '../_lib/googleAdsStatistik'
 
 export const config = { maxDuration: 60 }
 
@@ -27,8 +28,9 @@ interface Sammanfattning {
   fran?: string
   till?: string
   operationer: number
-  hamtade?: { kampanj_dag: number; konvertering_dag: number; sokterm_vecka: number }
+  hamtade?: { kampanj_dag: number; konvertering_dag: number; sokterm_vecka: number; besokslistor: number; malgrupp_dag: number }
   sparade?: unknown
+  sparade_retargeting?: unknown
   meddelande?: string
 }
 
@@ -54,7 +56,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const token = await hamtaAccessToken()
     const st = await hamtaStatistik(token, fran, till)
     s.operationer = st.operationer
-    s.hamtade = { kampanj_dag: st.kampanj.length, konvertering_dag: st.konv.length, sokterm_vecka: st.sok.length }
+    s.hamtade = {
+      kampanj_dag: st.kampanj.length,
+      konvertering_dag: st.konv.length,
+      sokterm_vecka: st.sok.length,
+      besokslistor: st.listor.length,
+      malgrupp_dag: st.malgrupp.length,
+    }
 
     const { data, error } = await supabase.rpc('google_ads_statistik_spara', sparaParametrar(st))
     if (error) {
@@ -62,6 +70,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return { status: 'failed', summary: s, errorMessage: s.meddelande }
     }
     s.sparade = data
+
+    const rt = await supabase.rpc('google_ads_retargeting_spara', retargetingParametrar(st))
+    if (rt.error) {
+      s.meddelande = `Kunde inte spara retargeting: ${rt.error.message}`
+      return { status: 'failed', summary: s, errorMessage: s.meddelande }
+    }
+    s.sparade_retargeting = rt.data
     return { status: 'success', summary: s }
   })
 

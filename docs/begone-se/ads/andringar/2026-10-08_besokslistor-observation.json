@@ -1,0 +1,258 @@
+{
+  "beskrivning": "Besökslistorna som OBSERVATION (målgruppsinställningen AUDIENCE bid_only=true, ingen budjustering) på de sju aktiva Christian-sökkampanjerna. Råttor: Alla + Råttor + Företag och BRF. Fåglar, Vägglöss, Insekter i hemmet, Möss: Alla + sin tjänstelista. Företag och avtal: Alla + Företag och BRF. Varumärke: bara Alla. PMax Fåglar och pausade kampanjer ingår inte. Har skickat förfrågan kopplas inte (blir uteslutning senare). Syfte: statistik återkommande mot nya besökare på sidan Marknad.",
+  "operationer": [
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24321036648",
+          "targetingSetting": {
+            "targetRestrictions": [
+              {
+                "targetingDimension": "AUDIENCE",
+                "bidOnly": true
+              }
+            ]
+          }
+        },
+        "updateMask": "targeting_setting.target_restrictions"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24326353874",
+          "targetingSetting": {
+            "targetRestrictions": [
+              {
+                "targetingDimension": "AUDIENCE",
+                "bidOnly": true
+              }
+            ]
+          }
+        },
+        "updateMask": "targeting_setting.target_restrictions"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24327615542",
+          "targetingSetting": {
+            "targetRestrictions": [
+              {
+                "targetingDimension": "AUDIENCE",
+                "bidOnly": true
+              }
+            ]
+          }
+        },
+        "updateMask": "targeting_setting.target_restrictions"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24322339899",
+          "targetingSetting": {
+            "targetRestrictions": [
+              {
+                "targetingDimension": "AUDIENCE",
+                "bidOnly": true
+              }
+            ]
+          }
+        },
+        "updateMask": "targeting_setting.target_restrictions"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24322340547",
+          "targetingSetting": {
+            "targetRestrictions": [
+              {
+                "targetingDimension": "AUDIENCE",
+                "bidOnly": true
+              }
+            ]
+          }
+        },
+        "updateMask": "targeting_setting.target_restrictions"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24333539005",
+          "targetingSetting": {
+            "targetRestrictions": [
+              {
+                "targetingDimension": "AUDIENCE",
+                "bidOnly": true
+              }
+            ]
+          }
+        },
+        "updateMask": "targeting_setting.target_restrictions"
+      }
+    },
+    {
+      "campaignOperation": {
+        "update": {
+          "resourceName": "customers/9407604856/campaigns/24321036645",
+          "targetingSetting": {
+            "targetRestrictions": [
+              {
+                "targetingDimension": "AUDIENCE",
+                "bidOnly": true
+              }
+            ]
+          }
+        },
+        "updateMask": "targeting_setting.target_restrictions"
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24321036648",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152260"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24321036648",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152263"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24321036648",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9485418924"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24326353874",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152260"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24326353874",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152269"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24327615542",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152260"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24327615542",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152272"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24322339899",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152260"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24322339899",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152275"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24322340547",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152260"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24322340547",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152266"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24333539005",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152260"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24333539005",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9485418924"
+          }
+        }
+      }
+    },
+    {
+      "campaignCriterionOperation": {
+        "create": {
+          "campaign": "customers/9407604856/campaigns/24321036645",
+          "userList": {
+            "userList": "customers/9407604856/userLists/9484152260"
+          }
+        }
+      }
+    }
+  ],
+  "godkand_av": "Christian 2026-10-08 (JA i chatten till observationskoppling)"
+}

@@ -1,5 +1,5 @@
 // src/pages/admin/Marknad.tsx
-// Sidan Marknad: Google Ads, webbförfrågningar och cookiesamtycke. Nås från Leads (Webb) på
+// Sidan Marknad: Google Ads, retargeting, webbförfrågningar och cookiesamtycke. Nås från Leads (Webb) på
 // /admin/leads-webb/marknad, /koordinator/leads-webb/marknad och /saljare/leads-webb/marknad.
 // Åtkomst: profiles.can_view_marketing (Marknadsansvarig, sätts av admin under Användarkonton).
 // RPC:erna kontrollerar samma flagga i databasen; vyn här är bara ett skal.
@@ -35,6 +35,7 @@ import { KampanjTabell } from '../../components/admin/marknad/MarknadKampanjer'
 import { LeadsSektion } from '../../components/admin/marknad/MarknadLeads'
 import { SamtyckeSektion } from '../../components/admin/marknad/MarknadSamtycke'
 import { SoktermTabell } from '../../components/admin/marknad/MarknadSoktermer'
+import { RetargetingSektion } from '../../components/admin/marknad/MarknadRetargeting'
 
 const SNABBVAL: Array<[PeriodVal, string]> = [
   ['7', '7 dagar'],
@@ -286,6 +287,14 @@ export default function Marknad() {
           {/* (c) Per kampanj */}
           <Sektion titel="Per kampanj och tjänst" under="Klicka på en kolumnrubrik för att sortera.">
             <KampanjTabell kampanjer={o.per_kampanj} />
+          </Sektion>
+
+          {/* (c2) Retargeting */}
+          <Sektion
+            titel="Retargeting"
+            under="Besökslistorna för remarketing och om återkommande besökare ger billigare konverteringar än nya, per kampanj och tjänst."
+          >
+            <RetargetingSektion fran={fran} till={till} />
           </Sektion>
 
           {/* (d) Webbförfrågningar */}

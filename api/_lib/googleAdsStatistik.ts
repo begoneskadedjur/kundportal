@@ -1,11 +1,13 @@
 // api/_lib/googleAdsStatistik.ts
 // Hämtar statistik från Google Ads (API v25, GAQL via searchStream) till sidan Marknad:
-// kampanj per dag, konverteringar per dag och åtgärd, söktermer per vecka. Tre frågor per körning,
-// alltså tre operationer mot Explorer-kvoten (2 880 per dygn).
+// kampanj per dag, konverteringar per dag och åtgärd, söktermer per vecka, besökslistornas storlek
+// och resultat per målgrupp (retargeting). Fem frågor per körning, alltså fem operationer mot
+// Explorer-kvoten (2 880 per dygn).
 //
 // Används av nattjobbet api/cron/google-ads-statistik.ts och av engångsskriptet
 // scripts/ads/backfill-statistik.mjs (laddar den här filen med jiti). Ingen Supabase-import här.
-// Raderna skrivs med databasfunktionen google_ads_statistik_spara() (migrationen 20261007_marknad.sql).
+// Raderna skrivs med databasfunktionerna google_ads_statistik_spara() (migrationen 20261007_marknad.sql)
+// och google_ads_retargeting_spara() (20261008_marknad_retargeting.sql).
 //
 // Datum är kontots tidszon (Europe/Stockholm). Konverteringar räknas på klickdagen (Googles standard),
 // så sena konverteringar och offline-uppladdningar ändrar äldre dagar; därför hämtas ett fönster bakåt.
@@ -54,6 +56,36 @@ export interface SoktermVecka {
   konverteringar: number
 }
 
+export interface BesokslistaDag {
+  user_list_id: string
+  namn: string
+  typ: string | null
+  membership_status: string | null
+  storlek_sok: number | null
+  storlek_display: number | null
+  storleksintervall_sok: string | null
+  kan_visas_i_sok: boolean | null
+}
+
+export interface MalgruppDag {
+  datum: string
+  campaign_id: string
+  criterion_id: string
+  user_list_id: string | null
+  malgrupp: string | null
+  bud_justering: number | null
+  visningar: number
+  klick: number
+  kostnad_sek: number
+  konverteringar: number
+  konverteringsvarde: number
+  alla_konverteringar: number
+  alla_konverteringsvarde: number
+}
+
+/** Besökslistorna som följs på sidan Marknad (namnprefix). */
+export const BESOKSLISTA_PREFIX = 'Christian | Besökare'
+
 export interface Statistik {
   customerId: string
   fran: string
@@ -62,6 +94,10 @@ export interface Statistik {
   kampanj: KampanjDag[]
   konv: KonverteringDag[]
   sok: SoktermVecka[]
+  /** Dagen listornas storlek gäller (i dag, svensk tid). */
+  listaDatum: string
+  listor: BesokslistaDag[]
+  malgrupp: MalgruppDag[]
   operationer: number
 }
 
@@ -102,6 +138,17 @@ interface GaqlRad {
   segments?: { date?: string; week?: string; conversionAction?: string; conversionActionName?: string; conversionActionCategory?: string }
   campaign?: { id?: string; name?: string; status?: string; advertisingChannelType?: string }
   campaignSearchTermView?: { searchTerm?: string }
+  userList?: {
+    id?: string
+    name?: string
+    type?: string
+    membershipStatus?: string
+    sizeForSearch?: string
+    sizeForDisplay?: string
+    sizeRangeForSearch?: string
+    eligibleForSearch?: boolean
+  }
+  campaignCriterion?: { criterionId?: string; displayName?: string; bidModifier?: number; userList?: { userList?: string } }
   metrics?: Record<string, unknown>
 }
 
@@ -139,7 +186,7 @@ const sistaDelen = (resurs: string | undefined) => (resurs ?? '').split('/').pop
 
 /**
  * Hämtar kampanj- och konverteringsdata för [fran, till] och söktermer för veckorna från måndagen
- * före fran till och med till. Exakt tre GAQL-anrop.
+ * före fran till och med till, besökslistornas storlek i dag och resultat per målgrupp. Exakt fem GAQL-anrop.
  */
 export async function hamtaStatistik(token: string, fran: string, till: string): Promise<Statistik> {
   if (!DATUM_RE.test(fran) || !DATUM_RE.test(till) || till < fran) throw new Error('Ogiltigt datumintervall')
@@ -243,6 +290,67 @@ export async function hamtaStatistik(token: string, fran: string, till: string):
     })
   }
 
+  // 4. Besökslistornas storlek i dag (ögonblicksbild, user_list har inget datumsegment)
+  const l = await gaql(
+    token,
+    'SELECT user_list.id, user_list.name, user_list.type, user_list.membership_status, user_list.size_for_search, ' +
+      'user_list.size_for_display, user_list.size_range_for_search, user_list.eligible_for_search ' +
+      `FROM user_list WHERE user_list.name LIKE '${BESOKSLISTA_PREFIX}%'`,
+  )
+  operationer++
+  const listor: BesokslistaDag[] = []
+  for (const r of l.rader) {
+    const u = r.userList
+    if (!u?.id || !u.name) continue
+    listor.push({
+      user_list_id: String(u.id),
+      namn: u.name,
+      typ: u.type ?? null,
+      membership_status: u.membershipStatus ?? null,
+      storlek_sok: u.sizeForSearch == null ? null : tal(u.sizeForSearch),
+      storlek_display: u.sizeForDisplay == null ? null : tal(u.sizeForDisplay),
+      storleksintervall_sok: u.sizeRangeForSearch ?? null,
+      kan_visas_i_sok: u.eligibleForSearch ?? null,
+    })
+  }
+
+  // 5. Resultat per målgrupp (listor kopplade på kampanjnivå, som observation eller inriktning) per dag
+  const a = await gaql(
+    token,
+    'SELECT segments.date, campaign.id, campaign_criterion.criterion_id, campaign_criterion.display_name, ' +
+      'campaign_criterion.bid_modifier, campaign_criterion.user_list.user_list, metrics.impressions, metrics.clicks, ' +
+      'metrics.cost_micros, metrics.conversions, metrics.conversions_value, metrics.all_conversions, ' +
+      'metrics.all_conversions_value FROM campaign_audience_view ' +
+      `WHERE segments.date BETWEEN '${fran}' AND '${till}' AND metrics.impressions > 0`,
+  )
+  operationer++
+  const malgrupp = new Map<string, MalgruppDag>()
+  for (const r of a.rader) {
+    const datum = String(r.segments?.date ?? '')
+    const id = String(r.campaign?.id ?? '')
+    const krit = String(r.campaignCriterion?.criterionId ?? '')
+    if (!datum || !id || !krit) continue
+    const m = r.metrics ?? {}
+    const nyckel = `${datum}|${id}|${krit}`
+    const fore = malgrupp.get(nyckel)
+    const bud = r.campaignCriterion?.bidModifier
+    malgrupp.set(nyckel, {
+      datum,
+      campaign_id: id,
+      criterion_id: krit,
+      user_list_id: sistaDelen(r.campaignCriterion?.userList?.userList) || null,
+      malgrupp: r.campaignCriterion?.displayName ?? null,
+      bud_justering: bud == null ? null : avrunda(tal(bud), 4),
+      visningar: tal(m.impressions) + (fore?.visningar ?? 0),
+      klick: tal(m.clicks) + (fore?.klick ?? 0),
+      kostnad_sek: avrunda(tal(m.costMicros) / 1e6 + (fore?.kostnad_sek ?? 0)),
+      konverteringar: avrunda(tal(m.conversions) + (fore?.konverteringar ?? 0)),
+      konverteringsvarde: avrunda(tal(m.conversionsValue) + (fore?.konverteringsvarde ?? 0)),
+      alla_konverteringar: avrunda(tal(m.allConversions) + (fore?.alla_konverteringar ?? 0)),
+      alla_konverteringsvarde: avrunda(tal(m.allConversionsValue) + (fore?.alla_konverteringsvarde ?? 0)),
+    })
+  }
+
   return {
     customerId: kundId(),
     fran,
@@ -251,6 +359,9 @@ export async function hamtaStatistik(token: string, fran: string, till: string):
     kampanj: [...kampanjer.values()],
     konv: [...konv.values()],
     sok: [...sok.values()],
+    listaDatum: idagSverige(),
+    listor,
+    malgrupp: [...malgrupp.values()],
     operationer,
   }
 }
@@ -265,5 +376,17 @@ export function sparaParametrar(st: Statistik) {
     p_konv: st.konv,
     p_sok: st.sok,
     p_sok_fran: st.sokFran,
+  }
+}
+
+/** Parametrarna till google_ads_retargeting_spara(). */
+export function retargetingParametrar(st: Statistik) {
+  return {
+    p_customer_id: st.customerId,
+    p_fran: st.fran,
+    p_till: st.till,
+    p_lista_datum: st.listaDatum,
+    p_listor: st.listor,
+    p_malgrupp: st.malgrupp,
   }
 }

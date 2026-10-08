@@ -120,6 +120,52 @@ export interface MarknadSamtycke {
   senaste: SamtyckeRad[]
 }
 
+export interface RetargetingLista {
+  user_list_id: string
+  namn: string
+  typ: string | null
+  status: string | null
+  datum: string
+  storlek_sok: number | null
+  storlek_display: number | null
+  storleksintervall_sok: string | null
+  kan_visas_i_sok: boolean | null
+  start_datum: string | null
+  start_storlek_sok: number | null
+  start_storlek_display: number | null
+  trend: Array<{ datum: string; sok: number | null; display: number | null }>
+}
+
+export interface RetargetingVarden {
+  visningar: number
+  klick: number
+  kostnad: number
+  konverteringar: number
+  konverteringsvarde: number
+}
+
+export interface RetargetingJamforelse {
+  campaign_id: string
+  kampanj: string
+  kampanjstatus: string | null
+  criterion_id: string
+  user_list_id: string | null
+  lista: string
+  bud_justering: number | null
+  /** Första dagen i perioden som listan hade data i kampanjen. */
+  fran: string
+  /** Besökare på listan (målgruppsraden). */
+  lista_varden: RetargetingVarden
+  /** Kampanjens totaler minus listan, från samma dag. */
+  ovriga: RetargetingVarden
+}
+
+export interface MarknadRetargeting {
+  listor: RetargetingLista[]
+  jamforelse: RetargetingJamforelse[]
+  data: { listor_hamtad_at: string | null; malgrupp_forsta_datum: string | null; malgrupp_hamtad_at: string | null }
+}
+
 /** Fel från RPC:erna när behörigheten saknas (errcode 42501). */
 export class SaknarBehorighetError extends Error {}
 
@@ -146,4 +192,5 @@ export const marknadService = {
   leads: (fran: string, till: string) => anropa<MarknadLeads>('marknad_leads', period(fran, till)),
   utfall: (fran: string, till: string) => anropa<MarknadUtfall>('marknad_utfall', period(fran, till)),
   samtycke: (fran: string, till: string) => anropa<MarknadSamtycke>('marknad_samtycke', period(fran, till)),
+  retargeting: (fran: string, till: string) => anropa<MarknadRetargeting>('marknad_retargeting', period(fran, till)),
 }

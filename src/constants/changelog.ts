@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.38.0',
+    date: '2026-10-08',
+    title: 'Marknad: retargeting',
+    items: [
+      { kind: 'nyhet', text: 'Sidan Marknad har en ny sektion Retargeting: hur stora besökslistorna är per tjänst och när de är stora nog för att användas i sökannonser.' },
+      { kind: 'nyhet', text: 'Lönar det sig? jämför besökare som varit på sajten förut med nya, per kampanj och tjänst, och säger i klartext om det är lönsamt, inte lönsamt eller om det är för lite data än.' },
+    ],
+  },
+  {
     version: '3.37.1',
     date: '2026-10-08',
     title: 'Samtyckesloggen räknar även statistik',
