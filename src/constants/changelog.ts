@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.38.2',
+    date: '2026-10-09',
+    title: 'Avtalswizarden: avtalslängd med enhet',
+    items: [
+      { kind: 'buggfix', text: 'Avtalet skrev "inledande period om 2." utan enhet. Nu väljer du år eller månader vid avtalslängden och avtalet säger "om 2 år" eller "om 6 månader".' },
+      { kind: 'buggfix', text: 'Avtalsöversikten räknade avtal på "6 månader" som sex år i avtalsvärde och snittlängd.' },
+    ],
+  },
+  {
     version: '3.38.1',
     date: '2026-10-08',
     title: 'Fakturamodalen: kundnummer för engångskunder',

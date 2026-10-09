@@ -10,6 +10,7 @@
 
 import { supabase } from '../lib/supabase'
 import { OneflowTemplateService } from '../services/oneflowTemplateService'
+import { splitContractLength, type ContractLengthUnit } from './contractLength'
 
 export interface RenewalPrefill {
   documentType: 'contract'
@@ -26,6 +27,7 @@ export interface RenewalPrefill {
   anstalld: string
   'e-post-anstlld': string
   avtalslngd: string
+  avtalslangdEnhet: ContractLengthUnit
   begynnelsedag: string
   noticePeriodMonths: string
   billingFrequency: string
@@ -112,23 +114,6 @@ function dayAfter(dateStr: string): string {
 function todayIso(): string {
   const n = new Date()
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`
-}
-
-/** "1 år" / "12 månader" → antal år som sträng. Wizarden vill ha år. */
-function parseContractLength(raw: string | null): string {
-  if (!raw) return '1'
-  const yearMatch = raw.match(/(\d+)\s*år/i)
-  if (yearMatch) return yearMatch[1]
-  const monthMatch = raw.match(/(\d+)\s*(mån|månad)/i)
-  if (monthMatch) {
-    const months = Number(monthMatch[1])
-    if (months >= 12) return String(Math.round(months / 12))
-    // Kortare än ett år går inte att uttrycka i wizardens årsfält —
-    // förnyelsen får då ett år som förval och justeras för hand.
-    return '1'
-  }
-  const bare = raw.match(/^\s*(\d+)\s*$/)
-  return bare ? bare[1] : '1'
 }
 
 interface ContractRow {
@@ -228,6 +213,7 @@ export async function buildRenewalPrefill(contractId: string): Promise<RenewalPr
   // Nytt avtal börjar dagen efter det gamla upphörde
   const lastDay = c.effective_end_date ?? c.contract_end_date
   const start = lastDay ? dayAfter(lastDay) : todayIso()
+  const length = splitContractLength(c.contract_length)
 
   const orgnr = c.organization_number ?? cust.organization_number ?? ''
 
@@ -249,7 +235,8 @@ export async function buildRenewalPrefill(contractId: string): Promise<RenewalPr
     // när fältet är tomt, vilket är ett bättre förval ändå.
     anstalld: c.begone_employee_name ?? '',
     'e-post-anstlld': c.begone_employee_email ?? '',
-    avtalslngd: parseContractLength(c.contract_length),
+    avtalslngd: length.value,
+    avtalslangdEnhet: length.unit,
     begynnelsedag: start,
     noticePeriodMonths: String(c.notice_period_months ?? 3),
     billingFrequency: c.billing_frequency ?? 'annual',

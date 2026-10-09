@@ -34,6 +34,7 @@ import DeepDiveTabs from '../../components/admin/sales-pipeline/DeepDiveTabs'
 import TopServicesBreakdown from '../../components/admin/sales-pipeline/TopServicesBreakdown'
 import PurchaseArticleBreakdown from '../../components/admin/sales-pipeline/PurchaseArticleBreakdown'
 import TechnicianDeliveryGrid from '../../components/admin/sales-pipeline/TechnicianDeliveryGrid'
+import { contractLengthYears } from '../../utils/contractLength'
 
 // ═══ Hjälpfunktioner ═══
 
@@ -47,7 +48,7 @@ function formatKr(v: number): string {
 function contractTotalValue(c: ContractWithSourceData): number {
   let val = Number(c.total_value) || 0
   if (c.type === 'contract' && c.contract_length) {
-    const years = parseInt(c.contract_length) || 1
+    const years = contractLengthYears(c.contract_length) ?? 1
     val = val * years
   }
   return val
@@ -253,7 +254,7 @@ export default function ContractsOverview() {
 
     // Snittavtalslängd (år)
     const lengths = activeContracts
-      .map(c => parseInt(c.contract_length || '0'))
+      .map(c => contractLengthYears(c.contract_length) ?? 0)
       .filter(n => n > 0)
     const avgLength =
       lengths.length > 0 ? Math.round(lengths.reduce((s, v) => s + v, 0) / lengths.length) : 0

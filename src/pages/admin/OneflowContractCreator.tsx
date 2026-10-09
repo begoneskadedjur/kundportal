@@ -27,6 +27,7 @@ import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
 import { supabase, getAuthHeaders } from '../../lib/supabase'
 import toast from 'react-hot-toast'
+import { formatContractLength, type ContractLengthUnit } from '../../utils/contractLength'
 
 interface WizardData {
   // Steg 1 - Dokumenttyp
@@ -42,6 +43,8 @@ interface WizardData {
   anstalld: string
   'e-post-anstlld': string
   avtalslngd: string
+  /** Enheten till avtalslngd. Skickas till Oneflow som "2 år" / "6 månader". */
+  avtalslangdEnhet: ContractLengthUnit
   begynnelsedag: string
   /** Uppsägningstid i månader. Portalens data — skickas INTE till Oneflow.
    *  Styr bevakning av sista uppsägningsdag på kundsidan. */
@@ -199,6 +202,7 @@ export default function OneflowContractCreator() {
     anstalld: profile?.technicians?.name || profile?.display_name || user?.user_metadata?.full_name || 'BeGone Medarbetare',
     'e-post-anstlld': user?.email || '',
     avtalslngd: '1',
+    avtalslangdEnhet: 'år',
     begynnelsedag: new Date().toISOString().split('T')[0],
     noticePeriodMonths: '3',
     billingFrequency: 'annual',
@@ -284,6 +288,7 @@ export default function OneflowContractCreator() {
             'e-post-anstlld': customerData['e-post-anstlld'] || prev['e-post-anstlld'],
             // Lägg till avtalslängd och startdatum om det finns
             avtalslngd: customerData.avtalslngd || prev.avtalslngd,
+            avtalslangdEnhet: customerData.avtalslangdEnhet || prev.avtalslangdEnhet,
             begynnelsedag: customerData.begynnelsedag || prev.begynnelsedag,
             // Lägg till case_id för webhook-koppling
             case_id: customerData.case_id || undefined,
@@ -645,7 +650,8 @@ export default function OneflowContractCreator() {
     const contractData = {
       anstalld: wizardData.anstalld,
       'e-post-anstlld': wizardData['e-post-anstlld'],
-      avtalslngd: wizardData.avtalslngd,
+      // Mallen skriver "inledande period om {avtalslngd}", så enheten följer med
+      avtalslngd: formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet),
       begynnelsedag: wizardData.begynnelsedag,
       'dokument-skapat': new Date().toISOString().split('T')[0],
       'e-post-kontaktperson': wizardData['e-post-kontaktperson'],
@@ -1253,15 +1259,33 @@ export default function OneflowContractCreator() {
                 {/* Visa endast avtalslängd och startdatum för avtal, inte för offerter */}
                 {wizardData.documentType === 'contract' && (
                   <div className="grid grid-cols-2 gap-4">
-                    <Input
-                      label="Avtalslängd (år) *"
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={wizardData.avtalslngd}
-                      onChange={e => updateWizardData('avtalslngd', e.target.value)}
-                      icon={<Calendar className="w-4 h-4" />}
-                    />
+                    <div className="w-full">
+                      <label className="block text-xs font-medium text-slate-400 mb-1">
+                        Avtalslängd *
+                      </label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          max={wizardData.avtalslangdEnhet === 'år' ? '10' : '120'}
+                          value={wizardData.avtalslngd}
+                          onChange={e => updateWizardData('avtalslngd', e.target.value)}
+                          icon={<Calendar className="w-4 h-4" />}
+                        />
+                        <select
+                          aria-label="Enhet för avtalslängd"
+                          value={wizardData.avtalslangdEnhet}
+                          onChange={e => updateWizardData('avtalslangdEnhet', e.target.value)}
+                          className="shrink-0 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                        >
+                          <option value="år">år</option>
+                          <option value="månader">månader</option>
+                        </select>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        Står i avtalet som "inledande period om {formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet) || '…'}".
+                      </p>
+                    </div>
                     
                     {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
                         och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets.
@@ -1657,7 +1681,7 @@ export default function OneflowContractCreator() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-400">Längd:</span>
-                    <span className="text-white">{wizardData.avtalslngd} år</span>
+                    <span className="text-white">{formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet)}</span>
                   </div>
                 </div>
               </Card>
@@ -2003,6 +2027,7 @@ export default function OneflowContractCreator() {
                         anstalld: profile?.technicians?.name || profile?.display_name || user?.user_metadata?.full_name || 'BeGone Medarbetare',
                         'e-post-anstlld': user?.email || '',
                         avtalslngd: '1',
+                        avtalslangdEnhet: 'år',
                         begynnelsedag: new Date().toISOString().split('T')[0],
                         noticePeriodMonths: '3',
                         billingFrequency: 'annual',
