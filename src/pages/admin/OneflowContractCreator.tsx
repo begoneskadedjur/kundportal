@@ -28,6 +28,9 @@ import { CustomerGroup } from '../../types/customerGroups'
 import { supabase, getAuthHeaders } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { formatContractLength, type ContractLengthUnit } from '../../utils/contractLength'
+import {
+  formatAdress, formatEpost, formatForetagsnamn, formatIdNummer, formatPersonnamn, formatTelefon,
+} from '../../shared/kontaktFormat'
 
 interface WizardData {
   // Steg 1 - Dokumenttyp
@@ -113,6 +116,30 @@ interface WizardData {
   web_inquiry_id?: string
   /** Leads (Webb): sidan guiden går tillbaka till efter en skickad offert. */
   returnPath?: string
+}
+
+// Kontaktfälten snyggas till när de lämnas och igen innan avtalet skapas:
+// namn med stor bokstav, telefon som "070-123 45 67", adress som "Gata 1, 111 22 Ort".
+type KontaktFalt = 'foretag' | 'org-nr' | 'Kontaktperson' | 'e-post-kontaktperson'
+  | 'telefonnummer-kontaktperson' | 'utforande-adress' | 'anstalld' | 'e-post-anstlld'
+
+const KONTAKT_FORMAT: Record<KontaktFalt, (s: string) => string> = {
+  foretag: formatForetagsnamn,
+  'org-nr': formatIdNummer,
+  Kontaktperson: formatPersonnamn,
+  'e-post-kontaktperson': formatEpost,
+  'telefonnummer-kontaktperson': formatTelefon,
+  'utforande-adress': formatAdress,
+  anstalld: formatPersonnamn,
+  'e-post-anstlld': formatEpost,
+}
+
+function snyggaTillKontakt<T extends Record<KontaktFalt, string>>(d: T): T {
+  const ut = { ...d }
+  for (const falt of Object.keys(KONTAKT_FORMAT) as KontaktFalt[]) {
+    ut[falt] = KONTAKT_FORMAT[falt](d[falt] ?? '') as T[KontaktFalt]
+  }
+  return ut
 }
 
 const OFFER_STEPS = [
@@ -464,9 +491,22 @@ export default function OneflowContractCreator() {
   // Motpart-steget
   const counterpartyStep = isContract ? 6 : 5
 
+  /** Snyggar till ett kontaktfält när det lämnas. */
+  const snyggaTillFalt = (falt: KontaktFalt) => () => {
+    setWizardData(prev => {
+      const nytt = KONTAKT_FORMAT[falt](prev[falt] ?? '')
+      return nytt === prev[falt] ? prev : { ...prev, [falt]: nytt }
+    })
+  }
+
   const nextStep = () => {
     if (currentStep < STEPS.length) {
       let nextStepNumber = currentStep + 1
+
+      // Förifyllda uppgifter har aldrig fått fokus, så de snyggas till när steget lämnas
+      if (currentStep === begoneStep || currentStep === counterpartyStep) {
+        setWizardData(prev => snyggaTillKontakt(prev))
+      }
 
       // Om vi är på steg 2 (mallval) och har valt en offertmall,
       // hoppa över steg 3 (avtalspart) eftersom den väljs automatiskt
@@ -647,29 +687,32 @@ export default function OneflowContractCreator() {
     ).find(r => r.rot_rut_type)
     const fastighetsbeteckning = rotRutRow?.fastighetsbeteckning || ''
 
+    // Samma formatering som när fälten lämnas, ifall något förifyllts och aldrig fått fokus
+    const kontakt = snyggaTillKontakt(wizardData)
+
     const contractData = {
-      anstalld: wizardData.anstalld,
-      'e-post-anstlld': wizardData['e-post-anstlld'],
+      anstalld: kontakt.anstalld,
+      'e-post-anstlld': kontakt['e-post-anstlld'],
       // Mallen skriver "inledande period om {avtalslngd}", så enheten följer med
       avtalslngd: formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet),
       begynnelsedag: wizardData.begynnelsedag,
       'dokument-skapat': new Date().toISOString().split('T')[0],
-      'e-post-kontaktperson': wizardData['e-post-kontaktperson'],
+      'e-post-kontaktperson': kontakt['e-post-kontaktperson'],
       // 'faktura-adress-pdf' lämnas tom så kunden kan fylla i
-      foretag: wizardData.foretag,
-      Kontaktperson: wizardData.Kontaktperson,
-      'org-nr': wizardData['org-nr'],
-      'telefonnummer-kontaktperson': wizardData['telefonnummer-kontaktperson'],
-      'utforande-adress': wizardData['utforande-adress'],
+      foretag: kontakt.foretag,
+      Kontaktperson: kontakt.Kontaktperson,
+      'org-nr': kontakt['org-nr'],
+      'telefonnummer-kontaktperson': kontakt['telefonnummer-kontaktperson'],
+      'utforande-adress': kontakt['utforande-adress'],
       'stycke-1': part1,
       'stycke-2': part2
     }
 
     const recipient = {
-      name: wizardData.Kontaktperson,
-      email: wizardData['e-post-kontaktperson'],
-      company_name: wizardData.foretag,
-      organization_number: wizardData['org-nr']
+      name: kontakt.Kontaktperson,
+      email: kontakt['e-post-kontaktperson'],
+      company_name: kontakt.foretag,
+      organization_number: kontakt['org-nr']
     }
 
     setIsCreating(true)
@@ -1243,6 +1286,7 @@ export default function OneflowContractCreator() {
                   label="Ansvarig från BeGone *"
                   value={wizardData.anstalld}
                   onChange={e => updateWizardData('anstalld', e.target.value)}
+                  onBlur={snyggaTillFalt('anstalld')}
                   icon={<User className="w-4 h-4" />}
                   placeholder="Förnamn Efternamn"
                 />
@@ -1252,6 +1296,7 @@ export default function OneflowContractCreator() {
                   type="email"
                   value={wizardData['e-post-anstlld']}
                   onChange={e => updateWizardData('e-post-anstlld', e.target.value)}
+                  onBlur={snyggaTillFalt('e-post-anstlld')}
                   icon={<Mail className="w-4 h-4" />}
                   placeholder="namn@begone.se"
                 />
@@ -1330,6 +1375,7 @@ export default function OneflowContractCreator() {
                       label="Företagsnamn *"
                       value={wizardData.foretag}
                       onChange={e => updateWizardData('foretag', e.target.value)}
+                      onBlur={snyggaTillFalt('foretag')}
                       icon={<Building2 className="w-4 h-4" />}
                       placeholder="AB Företagsnamn"
                     />
@@ -1338,6 +1384,7 @@ export default function OneflowContractCreator() {
                       label="Organisationsnummer"
                       value={wizardData['org-nr']}
                       onChange={e => updateWizardData('org-nr', e.target.value)}
+                      onBlur={snyggaTillFalt('org-nr')}
                       icon={<Hash className="w-4 h-4" />}
                       placeholder="556123-4567"
                     />
@@ -1354,6 +1401,7 @@ export default function OneflowContractCreator() {
                       label="Personnummer"
                       value={wizardData['org-nr']}
                       onChange={e => updateWizardData('org-nr', e.target.value)}
+                      onBlur={snyggaTillFalt('org-nr')}
                       icon={<Hash className="w-4 h-4" />}
                       placeholder="YYYYMMDD-XXXX"
                     />
@@ -1366,6 +1414,7 @@ export default function OneflowContractCreator() {
                     label={wizardData.partyType === 'company' ? 'Kontaktperson *' : 'Namn *'}
                   value={wizardData.Kontaktperson}
                   onChange={e => updateWizardData('Kontaktperson', e.target.value)}
+                  onBlur={snyggaTillFalt('Kontaktperson')}
                   icon={<User className="w-4 h-4" />}
                   placeholder="Förnamn Efternamn"
                 />
@@ -1375,6 +1424,7 @@ export default function OneflowContractCreator() {
                   type="email"
                   value={wizardData['e-post-kontaktperson']}
                   onChange={e => updateWizardData('e-post-kontaktperson', e.target.value)}
+                  onBlur={snyggaTillFalt('e-post-kontaktperson')}
                   icon={<Mail className="w-4 h-4" />}
                   placeholder="kontakt@exempel.se"
                   error={
@@ -1389,6 +1439,7 @@ export default function OneflowContractCreator() {
                   type="tel"
                   value={wizardData['telefonnummer-kontaktperson']}
                   onChange={e => updateWizardData('telefonnummer-kontaktperson', e.target.value)}
+                  onBlur={snyggaTillFalt('telefonnummer-kontaktperson')}
                   icon={<Phone className="w-4 h-4" />}
                   placeholder="08-555 0123"
                 />
@@ -1397,6 +1448,7 @@ export default function OneflowContractCreator() {
                   label="Adress"
                   value={wizardData['utforande-adress']}
                   onChange={e => updateWizardData('utforande-adress', e.target.value)}
+                  onBlur={snyggaTillFalt('utforande-adress')}
                   icon={<MapPin className="w-4 h-4" />}
                   placeholder="Gatuadress, Postnummer Stad"
                 />

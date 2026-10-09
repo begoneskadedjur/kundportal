@@ -45,10 +45,11 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '3.38.2',
+    version: '3.39.0',
     date: '2026-10-09',
-    title: 'Avtalswizarden: avtalslängd med enhet',
+    title: 'Avtalswizarden: avtalslängd med enhet och snygga kontaktuppgifter',
     items: [
+      { kind: 'nyhet', text: 'Kontaktuppgifterna snyggas till när du lämnar fältet: namn får stor bokstav, telefon skrivs som 070-123 45 67, adressen som "Storgatan 15, 111 22 Stockholm", e-post med gemener och org.nr med bindestreck. Företagsnamn med egen skiftning lämnas som de är.' },
       { kind: 'buggfix', text: 'Avtalet skrev "inledande period om 2." utan enhet. Nu väljer du år eller månader vid avtalslängden och avtalet säger "om 2 år" eller "om 6 månader".' },
       { kind: 'buggfix', text: 'Avtalsöversikten räknade avtal på "6 månader" som sex år i avtalsvärde och snittlängd.' },
     ],
