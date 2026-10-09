@@ -9,7 +9,16 @@
 import { formatPayback, marginTone, summarizeBillingLines, toneTextClass, type MarginLine } from '../../shared/marginEngine'
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ExternalLink, Loader2 } from 'lucide-react'
+import {
+  ArrowLeft, ArrowRight, Building2, Check, Clock, ExternalLink, FileText, Info, Loader2, Lock,
+  Mail, MapPin, Phone, Sparkles, User,
+} from 'lucide-react'
+// Rubrikfonten (självhostad via npm, laddas bara när en rubrik använder den)
+import '@fontsource-variable/fraunces/opsz.css'
+import {
+  IKON_TON, DokumentAvtalIkon, DokumentOffertIkon, ForetagIkon, PrivatpersonIkon,
+  ikonForKundgrupp, ikonForMall,
+} from '../../components/shared/avtalsIkoner'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
 import { apiFetch } from '../../lib/api'
@@ -187,12 +196,21 @@ const noticeLabel = (months: string) =>
 const fmtSEK = (n: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
 
 // --- Gemensamma klasser (slate-skalan mappas om i ljust tema) ----------------
-const FIELD_CLASS = 'w-full min-h-[44px] px-3 bg-slate-900 border border-slate-600 rounded-lg text-[15px] text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent'
-const LABEL_CLASS = 'flex flex-col gap-1.5 text-[13px] font-semibold text-slate-300'
-const CARD_CLASS = 'bg-slate-900 border border-slate-700 rounded-xl'
-const PRIMARY_BUTTON = 'min-h-[44px] px-5 rounded-lg bg-[#20c58f] hover:bg-[#1aaa7a] text-[#052e22] text-[15px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
-const OUTLINE_BUTTON = 'min-h-[44px] px-4 rounded-lg border border-slate-600 bg-slate-900 hover:bg-slate-800 text-white text-[15px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
-const LINK_BUTTON = 'min-h-[44px] text-[15px] font-semibold text-[#20c58f] hover:underline'
+// Neutrala ytor/text/kanter med slate så att båda temana fungerar. Det mörka
+// bandet överst är mörkt i båda temana och använder därför hex-färger.
+const RUBRIK_FONT = "font-['Fraunces_Variable',Georgia,serif] font-semibold"
+const SKUGGA = 'shadow-[0_1px_2px_rgba(15,31,46,0.04),0_10px_28px_rgba(15,31,46,0.06)]'
+const FIELD_CLASS = 'w-full min-h-[48px] px-3.5 bg-slate-800/60 border border-slate-600 rounded-[10px] text-[15px] text-white placeholder-slate-500 transition-shadow focus:outline-none focus:border-[#20c58f] focus:ring-4 focus:ring-[#20c58f]/15'
+const LABEL_CLASS = 'flex flex-col gap-[7px] text-[13px] font-bold text-slate-300'
+const CARD_CLASS = `bg-slate-900 border border-slate-700 rounded-2xl ${SKUGGA}`
+const PRIMARY_BUTTON = 'min-h-[46px] px-[22px] rounded-[10px] bg-[#20c58f] hover:bg-[#1aaa7a] text-[#052e22] text-[15px] font-bold shadow-[0_6px_16px_rgba(32,197,143,0.35)] transition-colors disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed'
+const PRIMARY_BUTTON_STOR = 'min-h-[48px] px-[22px] rounded-[10px] bg-[#20c58f] hover:bg-[#1aaa7a] text-[#052e22] text-base font-bold shadow-[0_6px_16px_rgba(32,197,143,0.35)] transition-colors disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed'
+const OUTLINE_BUTTON ='min-h-[46px] px-[18px] rounded-[10px] border border-slate-600 bg-slate-900 hover:bg-slate-800 text-white text-[15px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
+const SECONDARY_TONED_BUTTON = 'min-h-[44px] inline-flex items-center gap-2 px-3.5 rounded-[10px] border border-[#20c58f]/35 bg-[#20c58f]/10 hover:bg-[#20c58f]/15 text-emerald-300 text-sm font-bold transition-colors'
+// Hover lyfter bara när användaren inte bett om minskad rörelse.
+// Klasserna skrivs ut i klartext så att Tailwind hittar dem.
+const LYFT = 'transition-[transform,box-shadow,border-color] duration-150 motion-safe:hover:-translate-y-0.5'
+const LYFT_SKUGGA = 'hover:shadow-[0_2px_4px_rgba(15,31,46,0.06),0_14px_32px_rgba(15,31,46,0.10)]'
 
 const PUNKT_FARG: Record<KontrollNiva, string> = {
   rod: 'bg-red-500',
@@ -200,47 +218,119 @@ const PUNKT_FARG: Record<KontrollNiva, string> = {
   gron: 'bg-[#20c58f]',
 }
 
-/** Valbart kort (dokumenttyp, avtalspart). */
-function ValKort({ vald, namn, text, onClick }: { vald: boolean; namn: string; text: string; onClick: () => void }) {
+/** Grön bock-badge i hörnet på ett valt stort kort. */
+function ValdBadge() {
+  return (
+    <span className="absolute top-3.5 right-3.5 w-[26px] h-[26px] rounded-full bg-[#20c58f] text-[#052e22] flex items-center justify-center">
+      <Check className="w-3.5 h-3.5" strokeWidth={3} aria-hidden="true" />
+    </span>
+  )
+}
+
+/** Stort valbart kort (dokumenttyp, avtalspart): ikon i 84 px tonad ruta, rubrik, text. */
+function ValKort({ vald, namn, text, ikon, ruta, onClick }: {
+  vald: boolean; namn: string; text: string; ikon: React.ReactNode; ruta: string; onClick: () => void
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={vald}
-      className={`flex flex-col gap-2 items-start text-left p-6 min-h-[140px] rounded-xl bg-slate-900 transition-colors ${
+      className={`relative flex flex-col gap-2.5 items-start text-left p-[26px] min-h-[230px] rounded-[18px] bg-slate-900 ${LYFT} ${
         vald
-          ? 'border-2 border-[#20c58f] ring-4 ring-[#20c58f]/15'
-          : 'border border-slate-700 hover:border-slate-500'
+          ? 'border-2 border-[#20c58f] shadow-[0_0_0_4px_rgba(32,197,143,0.18),0_14px_32px_rgba(15,31,46,0.10)]'
+          : `border border-slate-700 hover:border-slate-600 ${SKUGGA} ${LYFT_SKUGGA}`
       }`}
     >
-      <span className="text-lg font-bold text-white">{namn}</span>
-      <span className="text-sm text-slate-400 leading-relaxed">{text}</span>
+      {vald && <ValdBadge />}
+      <span className={`w-[84px] h-[84px] rounded-[20px] flex items-center justify-center mb-1 ${ruta}`}>{ikon}</span>
+      <span className="text-xl font-bold text-white">{namn}</span>
+      <span className="text-[15px] text-slate-400 leading-relaxed">{text}</span>
     </button>
   )
 }
 
-/** Rad med radioknapp i en lista (mall, kundgrupp). */
-function RadioRad({ vald, namn, text, onClick }: { vald: boolean; namn: string; text?: string; onClick: () => void }) {
+/** Mindre valbart kort i två kolumner (mall, kundgrupp): ikon i tonad ruta, namn, undertext. */
+function ValKortLitet({ vald, namn, text, ikon, ruta, rutaStorlek = 56, onClick }: {
+  vald: boolean; namn: string; text?: string; ikon: React.ReactNode; ruta: string; rutaStorlek?: number; onClick: () => void
+}) {
   return (
     <button
       type="button"
       role="radio"
       aria-checked={vald}
       onClick={onClick}
-      className={`w-full flex items-center gap-3.5 min-h-[56px] px-5 py-3 border-b border-slate-700/60 last:border-b-0 text-left transition-colors ${
-        vald ? 'bg-[#20c58f]/10' : 'bg-slate-900 hover:bg-slate-800'
+      className={`flex items-center gap-3.5 p-4 min-h-[80px] rounded-[14px] text-left ${LYFT} ${
+        vald
+          ? 'bg-[#20c58f]/5 border-2 border-[#20c58f] shadow-[0_0_0_4px_rgba(32,197,143,0.15)]'
+          : `bg-slate-900 border border-slate-700 hover:border-slate-600 shadow-[0_1px_2px_rgba(15,31,46,0.04),0_6px_16px_rgba(15,31,46,0.05)] ${LYFT_SKUGGA}`
       }`}
     >
       <span
-        className={`w-[18px] h-[18px] rounded-full shrink-0 ${
-          vald ? 'border-[6px] border-[#20c58f]' : 'border-2 border-slate-500'
-        }`}
-      />
-      <span className="flex flex-col gap-0.5 flex-1 min-w-0">
-        <span className="text-[15px] font-semibold text-white">{namn}</span>
+        className={`shrink-0 rounded-xl flex items-center justify-center ${ruta}`}
+        style={{ width: rutaStorlek, height: rutaStorlek }}
+      >
+        {ikon}
+      </span>
+      <span className="flex flex-col gap-0.5 min-w-0">
+        <span className="text-[15px] font-bold text-white break-words">{namn}</span>
         {text && <span className="text-[13px] text-slate-400">{text}</span>}
       </span>
     </button>
+  )
+}
+
+/** Formulärfält: etikett ovanför, ruta på 48 px med ikon till vänster och grön fokusring. */
+function Falt({ etikett, tillagg, ikon, slut, under, children, className = '' }: {
+  etikett: string
+  /** Liten dämpad text efter etiketten, t.ex. "valfritt". */
+  tillagg?: string
+  ikon?: React.ReactNode
+  /** Något i rutans högra kant, t.ex. en bock. */
+  slut?: React.ReactNode
+  under?: React.ReactNode
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <label className={`${LABEL_CLASS} ${className}`}>
+      <span>
+        {etikett}
+        {tillagg && <span className="font-normal text-slate-500"> {tillagg}</span>}
+      </span>
+      <span className="flex items-center gap-2.5 min-h-[48px] px-3.5 rounded-[10px] border border-slate-600 bg-slate-800/60 transition-shadow focus-within:border-[#20c58f] focus-within:ring-4 focus-within:ring-[#20c58f]/15">
+        {ikon && <span className="text-slate-500 shrink-0 flex">{ikon}</span>}
+        {children}
+        {slut}
+      </span>
+      {under}
+    </label>
+  )
+}
+
+/** Klass för input inuti Falt. */
+const FALT_INPUT = 'flex-1 min-w-0 min-h-[46px] bg-transparent border-0 outline-none focus:outline-none focus:ring-0 text-[15px] font-normal text-white placeholder-slate-500'
+
+/** Rubrik i ett formulärkort med liten tonad ikonruta. */
+function KortRubrik({ ikon, ruta, titel, text }: { ikon: React.ReactNode; ruta: string; titel: string; text?: string }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className={`w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0 ${ruta}`}>{ikon}</span>
+      <span className="flex flex-col">
+        <span className="text-base font-bold text-white">{titel}</span>
+        {text && <span className="text-[13px] font-normal text-slate-400">{text}</span>}
+      </span>
+    </div>
+  )
+}
+
+/** Infobox med ikon (blågrå ton). */
+function InfoRuta({ ikon, children }: { ikon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3 items-start px-4 py-3.5 rounded-xl bg-sky-400/10 text-sm text-slate-300 leading-relaxed">
+      <span className="text-sky-400 shrink-0 mt-px flex">{ikon}</span>
+      <span>{children}</span>
+    </div>
   )
 }
 
@@ -1233,17 +1323,22 @@ export default function OneflowContractCreator() {
       )}
 
       {!groupsLoading && !groupsError && customerGroups.length > 0 && (
-        <div role="radiogroup" aria-label="Kundgrupp" className={`${CARD_CLASS} overflow-hidden`}>
+        <div role="radiogroup" aria-label="Kundgrupp" className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {customerGroups.map(group => {
             const capacity = group.series_end - group.series_start + 1
             const used = Math.max(0, group.current_counter - group.series_start + 1)
             const remaining = capacity - used
+            const vald = wizardData.customer_group_id === group.id
+            const { Ikon, ton } = ikonForKundgrupp(group.name)
             return (
-              <RadioRad
+              <ValKortLitet
                 key={group.id}
-                vald={wizardData.customer_group_id === group.id}
+                vald={vald}
                 namn={group.name}
                 text={`Serie ${group.series_start}–${group.series_end} · ${remaining} lediga`}
+                ikon={<Ikon size={30} />}
+                ruta={vald ? IKON_TON[ton].rutaVald : IKON_TON[ton].ruta}
+                rutaStorlek={48}
                 onClick={() => updateWizardData('customer_group_id', group.id)}
               />
             )
@@ -1262,7 +1357,7 @@ export default function OneflowContractCreator() {
     return (
       <button
         type="button"
-        className={`${LINK_BUTTON} text-sm`}
+        className={SECONDARY_TONED_BUTTON}
         onClick={() => {
           const lines: string[] = []
           if (hasPrefill) {
@@ -1301,6 +1396,7 @@ export default function OneflowContractCreator() {
           toast.success('Förslaget är skrivet utifrån tjänsterna')
         }}
       >
+        <Sparkles className="w-4 h-4" aria-hidden="true" />
         Skriv förslag från tjänsterna
       </button>
     )
@@ -1322,17 +1418,21 @@ export default function OneflowContractCreator() {
     switch (logicalStep) {
       case 1:
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
             <ValKort
               vald={wizardData.documentType === 'contract'}
               namn="Avtalsförslag"
               text="Löpande avtal med årspremie. Kunden signerar i Oneflow."
+              ikon={<DokumentAvtalIkon size={56} />}
+              ruta={IKON_TON.gron.ruta}
               onClick={() => updateWizardData('documentType', 'contract')}
             />
             <ValKort
               vald={wizardData.documentType === 'offer'}
               namn="Offert"
               text="Engångsuppdrag med fast pris. Kunden godkänner i Oneflow."
+              ikon={<DokumentOffertIkon size={56} />}
+              ruta={IKON_TON.bla.ruta}
               onClick={() => updateWizardData('documentType', 'offer')}
             />
           </div>
@@ -1340,37 +1440,48 @@ export default function OneflowContractCreator() {
 
       case 2:
         return (
-          <div role="radiogroup" aria-label="Mall" className={`${CARD_CLASS} overflow-hidden`}>
-            {availableTemplates.map(template => (
-              <RadioRad
-                key={template.id}
-                vald={wizardData.selectedTemplate === template.id}
-                namn={template.name}
-                text={[
-                  wizardData.documentType === 'offer' && template.category
-                    ? (template.category === 'company' ? 'Företag' : 'Privatperson')
-                    : null,
-                  template.popular ? 'Mest använd' : null,
-                ].filter(Boolean).join(' · ') || undefined}
-                onClick={() => updateWizardData('selectedTemplate', template.id)}
-              />
-            ))}
+          <div role="radiogroup" aria-label="Mall" className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            {availableTemplates.map(template => {
+              const vald = wizardData.selectedTemplate === template.id
+              const { Ikon, ton, beskrivning } = ikonForMall(template.name)
+              const text = [
+                wizardData.documentType === 'offer' && template.category
+                  ? (template.category === 'company' ? 'Företag' : 'Privatperson')
+                  : null,
+                template.popular ? 'Mest använd' : null,
+              ].filter(Boolean).join(' · ') || beskrivning || undefined
+              return (
+                <ValKortLitet
+                  key={template.id}
+                  vald={vald}
+                  namn={template.name}
+                  text={text}
+                  ikon={<Ikon size={40} />}
+                  ruta={vald ? IKON_TON[ton].rutaVald : IKON_TON[ton].ruta}
+                  onClick={() => updateWizardData('selectedTemplate', template.id)}
+                />
+              )
+            })}
           </div>
         )
 
       case 3:
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
             <ValKort
               vald={wizardData.partyType === 'company'}
               namn="Företag"
               text="Org.nr och kontaktperson hos bolaget."
+              ikon={<ForetagIkon size={56} />}
+              ruta={IKON_TON.gron.ruta}
               onClick={() => updateWizardData('partyType', 'company')}
             />
             <ValKort
               vald={wizardData.partyType === 'individual'}
               namn="Privatperson"
               text="Personnummer. ROT-avdrag kan bli aktuellt."
+              ikon={<PrivatpersonIkon size={56} />}
+              ruta={IKON_TON.orange.ruta}
               onClick={() => updateWizardData('partyType', 'individual')}
             />
           </div>
@@ -1378,242 +1489,275 @@ export default function OneflowContractCreator() {
 
       case 4:
         return (
-          <div className={`${CARD_CLASS} p-6 space-y-5`}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <label className={LABEL_CLASS}>
-                Ansvarig från BeGone
-                <input
-                  className={FIELD_CLASS}
-                  value={wizardData.anstalld}
-                  onChange={e => updateWizardData('anstalld', e.target.value)}
-                  onBlur={snyggaTillFalt('anstalld')}
-                  placeholder="Förnamn Efternamn"
-                />
-              </label>
-              <label className={LABEL_CLASS}>
-                E-post ansvarig
-                <input
-                  type="email"
-                  className={FIELD_CLASS}
-                  value={wizardData['e-post-anstlld']}
-                  onChange={e => updateWizardData('e-post-anstlld', e.target.value)}
-                  onBlur={snyggaTillFalt('e-post-anstlld')}
-                  placeholder="namn@begone.se"
-                />
-              </label>
+          <div className={`${CARD_CLASS} p-6 sm:p-7 grid grid-cols-1 sm:grid-cols-2 gap-[22px]`}>
+            <Falt etikett="Ansvarig från BeGone" ikon={<User className="w-[18px] h-[18px]" />}>
+              <input
+                className={FALT_INPUT}
+                value={wizardData.anstalld}
+                onChange={e => updateWizardData('anstalld', e.target.value)}
+                onBlur={snyggaTillFalt('anstalld')}
+                placeholder="Förnamn Efternamn"
+              />
+            </Falt>
+            <Falt etikett="E-post ansvarig" ikon={<Mail className="w-[18px] h-[18px]" />}>
+              <input
+                type="email"
+                className={FALT_INPUT}
+                value={wizardData['e-post-anstlld']}
+                onChange={e => updateWizardData('e-post-anstlld', e.target.value)}
+                onBlur={snyggaTillFalt('e-post-anstlld')}
+                placeholder="namn@begone.se"
+              />
+            </Falt>
 
-              {/* Visa endast avtalslängd och startdatum för avtal, inte för offerter */}
-              {wizardData.documentType === 'contract' && (
-                <>
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="avtalslangd" className="text-[13px] font-semibold text-slate-300">Avtalslängd</label>
-                    <div className="flex gap-2">
+            {/* Visa endast avtalslängd och startdatum för avtal, inte för offerter */}
+            {wizardData.documentType === 'contract' && (
+              <>
+                <div className="flex flex-col gap-[7px]">
+                  <label htmlFor="avtalslangd" className="text-[13px] font-bold text-slate-300">Avtalslängd</label>
+                  <div className="flex gap-2">
+                    <span className="w-[120px] shrink-0 flex items-center gap-2.5 min-h-[48px] px-3.5 rounded-[10px] border border-slate-600 bg-slate-800/60 transition-shadow focus-within:border-[#20c58f] focus-within:ring-4 focus-within:ring-[#20c58f]/15">
+                      <Clock className="w-[18px] h-[18px] text-slate-500 shrink-0" aria-hidden="true" />
                       <input
                         id="avtalslangd"
                         type="number"
                         min="1"
                         max={wizardData.avtalslangdEnhet === 'år' ? '10' : '120'}
-                        className={FIELD_CLASS.replace('w-full', 'w-24 shrink-0')}
+                        className={FALT_INPUT}
                         value={wizardData.avtalslngd}
                         onChange={e => updateWizardData('avtalslngd', e.target.value)}
                       />
-                      <select
-                        aria-label="Enhet för avtalslängd"
-                        value={wizardData.avtalslangdEnhet}
-                        onChange={e => updateWizardData('avtalslangdEnhet', e.target.value)}
-                        className={`${FIELD_CLASS} flex-1`}
-                      >
-                        <option value="år">år</option>
-                        <option value="månader">månader</option>
-                      </select>
-                    </div>
-                    <span className="text-[13px] text-slate-400">
-                      I avtalet: "inledande period om {formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet) || '…'}"
                     </span>
+                    <select
+                      aria-label="Enhet för avtalslängd"
+                      value={wizardData.avtalslangdEnhet}
+                      onChange={e => updateWizardData('avtalslangdEnhet', e.target.value)}
+                      className={`${FIELD_CLASS} flex-1`}
+                    >
+                      <option value="år">år</option>
+                      <option value="månader">månader</option>
+                    </select>
                   </div>
+                  <span className="text-[13px] text-slate-400">
+                    I avtalet: "inledande period om {formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet) || '…'}"
+                  </span>
+                </div>
 
-                  {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
-                      och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets.
-                      Labeln lyfts ut hit eftersom DateField saknar label-prop, och
-                      kalenderikonen ingår redan i komponenten. */}
-                  <div className="flex flex-col gap-1.5">
-                    <label htmlFor="begynnelsedag" className="text-[13px] font-semibold text-slate-300">Startdatum</label>
-                    <DateField
-                      id="begynnelsedag"
-                      value={wizardData.begynnelsedag}
-                      onChange={(v) => updateWizardData('begynnelsedag', v)}
-                      className="w-full min-h-[44px] pr-3 bg-slate-900 border border-slate-600 rounded-lg text-[15px] text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
-                    />
-                  </div>
-                </>
-              )}
+                {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
+                    och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets.
+                    Labeln lyfts ut hit eftersom DateField saknar label-prop, och
+                    kalenderikonen ingår redan i komponenten. */}
+                <div className="flex flex-col gap-[7px]">
+                  <label htmlFor="begynnelsedag" className="text-[13px] font-bold text-slate-300">Startdatum</label>
+                  <DateField
+                    id="begynnelsedag"
+                    value={wizardData.begynnelsedag}
+                    onChange={(v) => updateWizardData('begynnelsedag', v)}
+                    className="w-full min-h-[48px] pr-3 bg-slate-800/60 border border-slate-600 rounded-[10px] text-[15px] text-white placeholder-slate-500 focus:outline-none focus:border-[#20c58f] focus:ring-4 focus:ring-[#20c58f]/15"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="sm:col-span-2">
+              <InfoRuta ikon={<Mail className="w-5 h-5" />}>
+                {isContract ? 'Avtalet' : 'Offerten'} skickas från info@begone.se med dig som ansvarig. Inloggad som {user?.email}.
+              </InfoRuta>
             </div>
-            <p className="text-[13px] text-slate-400 border-t border-slate-700/60 pt-4">
-              Inloggad som {user?.email}. {isContract ? 'Avtalet' : 'Offerten'} skickas från info@begone.se med ditt namn som ansvarig.
-            </p>
           </div>
         )
 
       case 5: {
         const isCompany = wizardData.partyType === 'company'
         const epost = wizardData['e-post-kontaktperson']
+        const epostFel = !!epost && !isValidEmail(epost)
         return (
-          <div className={`${CARD_CLASS} p-6 space-y-6`}>
-            {isCompany ? (
-              <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-5">
-                <label className={LABEL_CLASS}>
-                  Företagsnamn
-                  <input
-                    className={FIELD_CLASS}
-                    value={wizardData.foretag}
-                    onChange={e => updateWizardData('foretag', e.target.value)}
-                    onBlur={snyggaTillFalt('foretag')}
-                    placeholder="Företaget AB"
-                  />
-                </label>
-                <label className={LABEL_CLASS}>
-                  Org.nr
-                  <input
-                    className={FIELD_CLASS}
-                    value={wizardData['org-nr']}
-                    onChange={e => updateWizardData('org-nr', e.target.value)}
-                    onBlur={snyggaTillFalt('org-nr')}
-                    placeholder="556123-4567"
-                  />
-                </label>
-              </div>
-            ) : (
-              <label className={`${LABEL_CLASS} sm:max-w-xs`}>
-                Personnummer
-                <input
-                  className={FIELD_CLASS}
-                  value={wizardData['org-nr']}
-                  onChange={e => updateWizardData('org-nr', e.target.value)}
-                  onBlur={snyggaTillFalt('org-nr')}
-                  placeholder="ÅÅÅÅMMDD-XXXX"
-                />
-              </label>
-            )}
-
-            <div className="border-t border-slate-700/60" />
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-              <label className={LABEL_CLASS}>
-                {isCompany ? 'Kontaktperson' : 'Namn'}
-                <input
-                  className={FIELD_CLASS}
-                  value={wizardData.Kontaktperson}
-                  onChange={e => updateWizardData('Kontaktperson', e.target.value)}
-                  onBlur={snyggaTillFalt('Kontaktperson')}
-                  placeholder="Förnamn Efternamn"
-                />
-              </label>
-              <label className={LABEL_CLASS}>
-                Telefon
-                <input
-                  type="tel"
-                  className={FIELD_CLASS}
-                  value={wizardData['telefonnummer-kontaktperson']}
-                  onChange={e => updateWizardData('telefonnummer-kontaktperson', e.target.value)}
-                  onBlur={snyggaTillFalt('telefonnummer-kontaktperson')}
-                  placeholder="070-123 45 67"
-                />
-              </label>
-              <label className={LABEL_CLASS}>
-                E-post
-                <input
-                  type="email"
-                  className={FIELD_CLASS}
-                  value={epost}
-                  onChange={e => updateWizardData('e-post-kontaktperson', e.target.value)}
-                  onBlur={snyggaTillFalt('e-post-kontaktperson')}
-                  placeholder="namn@foretag.se"
-                  aria-invalid={!!epost && !isValidEmail(epost)}
-                />
-                {epost && !isValidEmail(epost) && (
-                  <span className="flex items-center gap-1.5 text-xs font-normal text-red-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                    Ogiltig e-postadress
-                  </span>
-                )}
-              </label>
-              <label className={LABEL_CLASS}>
-                E-post för faktura
-                <input
-                  type="email"
-                  className={FIELD_CLASS}
-                  value={wizardData['e-post-faktura']}
-                  onChange={e => updateWizardData('e-post-faktura', e.target.value)}
-                  onBlur={snyggaTillFalt('e-post-faktura')}
-                  placeholder="faktura@foretag.se"
-                />
-                <span className="text-xs font-normal text-slate-400">
-                  {isContract ? 'Valfritt. Lämnas det tomt fyller kunden i det vid signering.' : 'Valfritt. Lämnas det tomt används e-posten ovan.'}
-                </span>
-              </label>
+          <div className="flex flex-col gap-4">
+            <div className={`${CARD_CLASS} px-6 py-6 sm:px-7 flex flex-col gap-[18px]`}>
+              {isCompany ? (
+                <>
+                  <KortRubrik ikon={<Building2 className="w-5 h-5 text-emerald-300" />} ruta={IKON_TON.gron.ruta} titel="Bolaget" />
+                  <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-[18px]">
+                    <Falt etikett="Företagsnamn" ikon={<Building2 className="w-[18px] h-[18px]" />}>
+                      <input
+                        className={FALT_INPUT}
+                        value={wizardData.foretag}
+                        onChange={e => updateWizardData('foretag', e.target.value)}
+                        onBlur={snyggaTillFalt('foretag')}
+                        placeholder="Företaget AB"
+                      />
+                    </Falt>
+                    <Falt etikett="Org.nr" ikon={<FileText className="w-[18px] h-[18px]" />}>
+                      <input
+                        className={FALT_INPUT}
+                        value={wizardData['org-nr']}
+                        onChange={e => updateWizardData('org-nr', e.target.value)}
+                        onBlur={snyggaTillFalt('org-nr')}
+                        placeholder="556123-4567"
+                      />
+                    </Falt>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <KortRubrik ikon={<User className="w-5 h-5 text-orange-300" />} ruta={IKON_TON.orange.ruta} titel="Privatpersonen" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
+                    <Falt etikett="Namn" ikon={<User className="w-[18px] h-[18px]" />}>
+                      <input
+                        className={FALT_INPUT}
+                        value={wizardData.Kontaktperson}
+                        onChange={e => updateWizardData('Kontaktperson', e.target.value)}
+                        onBlur={snyggaTillFalt('Kontaktperson')}
+                        placeholder="Förnamn Efternamn"
+                      />
+                    </Falt>
+                    <Falt etikett="Personnummer" ikon={<FileText className="w-[18px] h-[18px]" />}>
+                      <input
+                        className={FALT_INPUT}
+                        value={wizardData['org-nr']}
+                        onChange={e => updateWizardData('org-nr', e.target.value)}
+                        onBlur={snyggaTillFalt('org-nr')}
+                        placeholder="ÅÅÅÅMMDD-XXXX"
+                      />
+                    </Falt>
+                  </div>
+                </>
+              )}
             </div>
 
-            <label className={LABEL_CLASS}>
-              Utförande adress
-              <input
-                className={FIELD_CLASS}
-                value={wizardData['utforande-adress']}
-                onChange={e => updateWizardData('utforande-adress', e.target.value)}
-                onBlur={snyggaTillFalt('utforande-adress')}
-                placeholder="Gatuadress, postnummer ort"
-              />
-            </label>
+            <div className={`${CARD_CLASS} px-6 py-6 sm:px-7 flex flex-col gap-[18px]`}>
+              {isCompany
+                ? <KortRubrik ikon={<User className="w-5 h-5 text-orange-300" />} ruta={IKON_TON.orange.ruta} titel="Kontaktperson" />
+                : <KortRubrik ikon={<Phone className="w-5 h-5 text-emerald-300" />} ruta={IKON_TON.gron.ruta} titel="Kontaktuppgifter" />}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
+                {isCompany && (
+                  <Falt etikett="Namn" ikon={<User className="w-[18px] h-[18px]" />}>
+                    <input
+                      className={FALT_INPUT}
+                      value={wizardData.Kontaktperson}
+                      onChange={e => updateWizardData('Kontaktperson', e.target.value)}
+                      onBlur={snyggaTillFalt('Kontaktperson')}
+                      placeholder="Förnamn Efternamn"
+                    />
+                  </Falt>
+                )}
+                <Falt etikett="Telefon" ikon={<Phone className="w-[18px] h-[18px]" />}>
+                  <input
+                    type="tel"
+                    className={FALT_INPUT}
+                    value={wizardData['telefonnummer-kontaktperson']}
+                    onChange={e => updateWizardData('telefonnummer-kontaktperson', e.target.value)}
+                    onBlur={snyggaTillFalt('telefonnummer-kontaktperson')}
+                    placeholder="070-123 45 67"
+                  />
+                </Falt>
+                <Falt
+                  etikett="E-post"
+                  ikon={<Mail className="w-[18px] h-[18px]" />}
+                  under={epostFel ? (
+                    <span className="flex items-center gap-1.5 text-xs font-normal text-red-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                      Ogiltig e-postadress
+                    </span>
+                  ) : undefined}
+                >
+                  <input
+                    type="email"
+                    className={FALT_INPUT}
+                    value={epost}
+                    onChange={e => updateWizardData('e-post-kontaktperson', e.target.value)}
+                    onBlur={snyggaTillFalt('e-post-kontaktperson')}
+                    placeholder={isCompany ? 'namn@foretag.se' : 'namn@exempel.se'}
+                    aria-invalid={epostFel}
+                  />
+                </Falt>
+                <Falt
+                  etikett="E-post för faktura"
+                  tillagg="valfritt"
+                  ikon={<FileText className="w-[18px] h-[18px]" />}
+                  under={
+                    <span className="text-xs font-normal text-slate-400">
+                      {isContract ? 'Lämnas det tomt fyller kunden i det vid signering.' : 'Lämnas det tomt används e-posten ovan.'}
+                    </span>
+                  }
+                >
+                  <input
+                    type="email"
+                    className={FALT_INPUT}
+                    value={wizardData['e-post-faktura']}
+                    onChange={e => updateWizardData('e-post-faktura', e.target.value)}
+                    onBlur={snyggaTillFalt('e-post-faktura')}
+                    placeholder={isCompany ? 'faktura@foretag.se' : 'namn@exempel.se'}
+                  />
+                </Falt>
+              </div>
+              <Falt etikett="Utförande adress" ikon={<MapPin className="w-[18px] h-[18px]" />}>
+                <input
+                  className={FALT_INPUT}
+                  value={wizardData['utforande-adress']}
+                  onChange={e => updateWizardData('utforande-adress', e.target.value)}
+                  onBlur={snyggaTillFalt('utforande-adress')}
+                  placeholder="Gatuadress, postnummer ort"
+                />
+              </Falt>
+            </div>
           </div>
         )
       }
 
       case 6: {
         const hasCaseLink = !!wizardData.case_id
-        return hasCaseLink ? (
-          <CaseServiceSelector
-            caseId={wizardData.case_id}
-            caseType={wizardData.case_type ?? (wizardData.partyType === 'company' ? 'business' : 'private')}
-            customerId={null}
-            primaryServiceId={null}
-            onChange={(items) => {
-              const services = mapBillingItemsToPrefillServices(items)
-              const articles = mapBillingItemsToSelectedArticles(items)
-              setWizardData(prev => ({
-                ...prev,
-                prefillServices: services,
-                selectedArticles: articles,
-              }))
-            }}
-          />
-        ) : (
-          <CaseServiceSelector
-            draftMode
-            caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
-            customerId={null}
-            primaryServiceId={null}
-            initialDraftItems={wizardData.draftItems}
-            initialPriceAssignments={wizardData.draftPriceAssignments}
-            initialPriceMarkups={wizardData.draftPriceMarkups}
-            onChange={(items, _summary, meta) => {
-              setWizardData(prev => ({
-                ...prev,
-                draftItems: items,
-                draftPriceAssignments: meta?.priceAssignments ?? prev.draftPriceAssignments,
-                draftPriceMarkups: meta?.priceMarkups ?? prev.draftPriceMarkups,
-              }))
-            }}
-          />
+        return (
+          <div className={`${CARD_CLASS} p-4 sm:p-6`}>
+            {hasCaseLink ? (
+              <CaseServiceSelector
+                caseId={wizardData.case_id}
+                caseType={wizardData.case_type ?? (wizardData.partyType === 'company' ? 'business' : 'private')}
+                customerId={null}
+                primaryServiceId={null}
+                onChange={(items) => {
+                  const services = mapBillingItemsToPrefillServices(items)
+                  const articles = mapBillingItemsToSelectedArticles(items)
+                  setWizardData(prev => ({
+                    ...prev,
+                    prefillServices: services,
+                    selectedArticles: articles,
+                  }))
+                }}
+              />
+            ) : (
+              <CaseServiceSelector
+                draftMode
+                caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
+                customerId={null}
+                primaryServiceId={null}
+                initialDraftItems={wizardData.draftItems}
+                initialPriceAssignments={wizardData.draftPriceAssignments}
+                initialPriceMarkups={wizardData.draftPriceMarkups}
+                onChange={(items, _summary, meta) => {
+                  setWizardData(prev => ({
+                    ...prev,
+                    draftItems: items,
+                    draftPriceAssignments: meta?.priceAssignments ?? prev.draftPriceAssignments,
+                    draftPriceMarkups: meta?.priceMarkups ?? prev.draftPriceMarkups,
+                  }))
+                }}
+              />
+            )}
+          </div>
         )
       }
 
       case 7: {
         const length = wizardData.agreementText.length
+        const forLang = length > AVTALSOBJEKT_MAX_TECKEN
+        const andel = Math.min(100, (length / AVTALSOBJEKT_MAX_TECKEN) * 100)
         return (
           <div className="flex flex-col gap-4">
-            <div className={`${CARD_CLASS} p-6 flex flex-col gap-2.5`}>
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <label htmlFor="avtalsobjekt" className="text-[13px] font-semibold text-slate-300">
-                  {isContract ? 'Avtalsobjekt, står under § 2 i avtalet' : 'Offertinnehåll, arbetsbeskrivningen i offerten'}
+            <div className={`${CARD_CLASS} px-6 py-6 sm:px-7 flex flex-col gap-3`}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="avtalsobjekt" className="text-[13px] font-bold text-slate-300">
+                  {isContract ? 'Står under § 2 Avtalsobjekt' : 'Offertinnehåll, arbetsbeskrivningen i offerten'}
                 </label>
                 {renderAgreementSuggestionButton()}
               </div>
@@ -1625,23 +1769,30 @@ export default function OneflowContractCreator() {
                 placeholder={isContract
                   ? 'Vad som ingår: antal kontroller per år, vilka stationer, objektets adress och hur aktivitet hanteras.'
                   : 'Vad arbetet omfattar: åtgärder, antal besök och vad som ingår i priset.'}
-                className="w-full px-3 py-3 bg-slate-900 border border-slate-600 rounded-lg text-[15px] leading-relaxed text-white placeholder-slate-500 resize-y focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+                className="w-full p-3.5 bg-slate-800/60 border border-slate-600 rounded-[10px] text-[15px] leading-relaxed text-white placeholder-slate-500 resize-y transition-shadow focus:outline-none focus:border-[#20c58f] focus:ring-4 focus:ring-[#20c58f]/15"
               />
-              <span className={`text-[13px] ${length > AVTALSOBJEKT_MAX_TECKEN ? 'text-red-400 font-semibold' : 'text-slate-400'}`}>
-                {length.toLocaleString('sv-SE')} av {AVTALSOBJEKT_MAX_TECKEN.toLocaleString('sv-SE')} tecken
-                {length > 1024 && length <= AVTALSOBJEKT_MAX_TECKEN && ', delas automatiskt i två stycken'}
-              </span>
+              <div className="flex items-center gap-2.5">
+                <div className="flex-1 h-1 rounded-full bg-slate-700 overflow-hidden" aria-hidden="true">
+                  <div className={`h-1 ${forLang ? 'bg-red-500' : 'bg-[#20c58f]'}`} style={{ width: `${andel}%` }} />
+                </div>
+                <span className={`text-[13px] ${forLang ? 'text-red-400 font-semibold' : 'text-slate-400'}`}>
+                  {length.toLocaleString('sv-SE')} av {AVTALSOBJEKT_MAX_TECKEN.toLocaleString('sv-SE')} tecken
+                  {length > 1024 && !forLang && ', delas automatiskt i två stycken'}
+                </span>
+              </div>
             </div>
 
             {/* Portalens avtalsvillkor — skickas INTE till Oneflow.
                 Styr uppsägningsbevakning och avtalsfakturering i portalen. */}
             {isContract && (
-              <div className={`${CARD_CLASS} p-6 flex flex-col gap-4`}>
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-base font-bold text-white">Villkor i portalen</span>
-                  <span className="text-[13px] text-slate-400">Styr bevakning och fakturering. Skickas inte till Oneflow och syns inte för kunden.</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className={`${CARD_CLASS} px-6 py-[22px] sm:px-7 flex flex-col gap-4`}>
+                <KortRubrik
+                  ikon={<Lock className="w-5 h-5 text-sky-400" />}
+                  ruta="bg-sky-400/10"
+                  titel="Villkor i portalen"
+                  text="Styr bevakning och fakturering. Skickas inte till Oneflow och syns inte för kunden."
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px]">
                   <label className={LABEL_CLASS}>
                     Uppsägningstid
                     <select
@@ -1702,7 +1853,7 @@ export default function OneflowContractCreator() {
     const tomt = (v: string) => v.trim() || '–'
 
     const andra = (step: number) => (
-      <button type="button" onClick={() => goToStepFromReview(step)} className="min-h-[44px] px-1 text-sm font-semibold text-[#20c58f] hover:underline">
+      <button type="button" onClick={() => goToStepFromReview(step)} className="min-h-[44px] px-1 text-sm font-semibold text-emerald-400 hover:underline">
         Ändra
       </button>
     )
@@ -1710,7 +1861,7 @@ export default function OneflowContractCreator() {
     return (
       <div className="flex flex-wrap gap-6 items-start">
         {/* Pappret: det kunden ser */}
-        <div className="flex-[999_1_600px] min-w-0 bg-slate-900 border border-slate-700 rounded shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.06)] px-6 py-8 sm:px-14 sm:py-12 flex flex-col gap-7">
+        <div className="flex-[999_1_600px] min-w-0 bg-slate-900 border border-slate-700 rounded-md shadow-[0_2px_4px_rgba(15,31,46,0.05),0_24px_48px_rgba(15,31,46,0.10)] px-6 py-8 sm:px-14 sm:py-12 flex flex-col gap-7">
           <div className="flex flex-wrap justify-between items-baseline gap-2 border-b border-slate-700 pb-4">
             <span className="text-[22px] font-bold text-white">{isContract ? 'Avtal' : 'Offert'} – {motpartNamn}</span>
             <span className="text-[13px] text-slate-400">{selectedTemplate?.name}</span>
@@ -1816,7 +1967,7 @@ export default function OneflowContractCreator() {
                       <button
                         type="button"
                         onClick={() => goToStepFromReview(avsnittSteg[p.avsnitt])}
-                        className="self-start min-h-[32px] text-sm font-semibold text-[#20c58f] hover:underline"
+                        className="self-start min-h-[44px] text-sm font-semibold text-emerald-400 hover:underline"
                       >
                         {p.niva === 'rod' ? 'Rätta' : 'Fyll i'} under {avsnittNamn[p.avsnitt]}
                       </button>
@@ -1879,7 +2030,7 @@ export default function OneflowContractCreator() {
               type="button"
               onClick={() => { setSubmitError(null); handleSubmit() }}
               disabled={kontrollStoppar || isCreating}
-              className={`${PRIMARY_BUTTON} min-h-[48px] text-base flex items-center justify-center gap-2`}
+              className={`${PRIMARY_BUTTON_STOR} flex items-center justify-center gap-2`}
             >
               {isCreating ? (
                 <>
@@ -1897,7 +2048,7 @@ export default function OneflowContractCreator() {
                 <span className="flex flex-col gap-0.5">
                   <span className="text-white">{submitError}</span>
                   {submitErrorStep !== null && (
-                    <button type="button" onClick={() => goToStepFromReview(submitErrorStep)} className="self-start min-h-[32px] text-sm font-semibold text-[#20c58f] hover:underline">
+                    <button type="button" onClick={() => goToStepFromReview(submitErrorStep)} className="self-start min-h-[44px] text-sm font-semibold text-emerald-400 hover:underline">
                       Rätta under {avsnittNamn.motpart}
                     </button>
                   )}
@@ -1921,7 +2072,7 @@ export default function OneflowContractCreator() {
     return (
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-[28px] font-bold tracking-tight text-white">Så här ser kunden {isContract ? 'avtalet' : 'offerten'}</h1>
+          <h1 className={`text-[30px] leading-tight tracking-[-0.015em] text-white ${RUBRIK_FONT}`}>Så här ser kunden {isContract ? 'avtalet' : 'offerten'}</h1>
           <p className="text-base text-slate-400 max-w-[680px]">
             Oneflows egen PDF, med mallens fasta text. Bläddra igenom och godkänn innan {isContract ? 'det' : 'den'} skickas.
           </p>
@@ -1938,7 +2089,7 @@ export default function OneflowContractCreator() {
           <OneflowPdfFrame
             oneflowContractId={draftContract.id}
             title={dokNamn}
-            className="flex-[999_1_600px] min-w-0"
+            className="flex-[999_1_600px] min-w-0 shadow-[0_1px_2px_rgba(15,31,46,0.04),0_10px_28px_rgba(15,31,46,0.06)]"
           />
 
           <div className="flex-[1_1_320px] min-w-[280px] flex flex-col gap-4">
@@ -1949,7 +2100,7 @@ export default function OneflowContractCreator() {
                   type="button"
                   onClick={handleSendDraft}
                   disabled={busy || !!draftContract.warning}
-                  className={`${PRIMARY_BUTTON} min-h-[48px] text-base flex items-center justify-center gap-2`}
+                  className={`${PRIMARY_BUTTON_STOR} flex items-center justify-center gap-2`}
                 >
                   {draftAction === 'send' && <Loader2 className="w-4 h-4 animate-spin" />}
                   {isContract ? 'Skicka för signering' : 'Skicka offerten'}
@@ -1997,7 +2148,7 @@ export default function OneflowContractCreator() {
   const renderSent = () => (
     <div className={`${CARD_CLASS} p-6 flex flex-col gap-5`}>
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-[28px] font-bold tracking-tight text-white">
+        <h1 className={`text-[30px] leading-tight tracking-[-0.015em] text-white ${RUBRIK_FONT}`}>
           {isContract ? 'Avtalet är skickat' : 'Offerten är skickad'}
         </h1>
         <p className="text-base text-slate-400">
@@ -2048,48 +2199,127 @@ export default function OneflowContractCreator() {
   const [rubrik, ingress] = stepHeadings()
   const isReview = currentStep === reviewStep
   const phase: 'wizard' | 'draft' | 'sent' = createdContract ? 'sent' : draftContract ? 'draft' : 'wizard'
-  const wide = phase !== 'wizard' || isReview || currentStep === productsStep
-  const contentWidth = wide ? 'max-w-[1120px]' : 'max-w-[760px]'
   const motpartNamn = (wizardData.partyType === 'company' ? wizardData.foretag : '') || wizardData.Kontaktperson
   const hint = !canProceed() ? getValidationHint() : ''
+  const procent = Math.round(((Math.max(visibleIndex, 1) - 1) / visibleSteps.length) * 100)
+  const bandTitel = phase === 'wizard'
+    ? (isContract ? 'Nytt avtal' : 'Ny offert')
+    : `${isContract ? 'Avtal' : 'Offert'} – ${motpartNamn || 'kund'}`
+
+  // Sidokolumnen "Ditt avtal": riktiga värden ur wizarden, grön punkt när ifyllt
+  const visaSammanfattning = phase === 'wizard' && !isReview
+  const kundgruppNamn = customerGroups.find(g => g.id === wizardData.customer_group_id)?.name
+  const avtalslangdText = formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet)
+  const sammanfattning: Array<{ namn: string; text: string; klar: boolean }> = [
+    { namn: 'Dokument', text: isContract ? 'Avtalsförslag' : 'Offert', klar: maxReachedStep > 1 },
+    { namn: 'Mall', text: selectedTemplate?.name ?? '', klar: !!selectedTemplate },
+    { namn: 'Avtalspart', text: isPrivate ? 'Privatperson' : 'Företag', klar: maxReachedStep > 3 },
+    ...(isContract ? [
+      { namn: 'Kundgrupp', text: kundgruppNamn ?? '', klar: !!kundgruppNamn },
+      {
+        namn: 'Avtalstid',
+        text: `${avtalslangdText}${wizardData.begynnelsedag ? ` från ${wizardData.begynnelsedag}` : ''}`,
+        klar: maxReachedStep > begoneStep && !!avtalslangdText,
+      },
+    ] : []),
+    { namn: 'Motpart', text: motpartNamn, klar: !!motpartNamn.trim() },
+    {
+      namn: isContract ? 'Årspremie' : 'Pris',
+      text: `${fmtSEK(prisData.serviceTotal * priceMultiplier)} ${isPrivate ? 'inkl.' : 'exkl.'} moms`,
+      klar: prisData.serviceTotal > 0,
+    },
+    {
+      namn: isContract ? 'Avtalsobjekt' : 'Offertinnehåll',
+      text: `${wizardData.agreementText.length.toLocaleString('sv-SE')} tecken`,
+      klar: maxReachedStep >= agreementStep && !!wizardData.agreementText.trim(),
+    },
+  ]
+  const antalIfyllda = sammanfattning.filter(r => r.klar).length
+
+  const renderSammanfattning = () => (
+    <aside
+      aria-label={isContract ? 'Ditt avtal' : 'Din offert'}
+      className={`${currentStep === productsStep ? 'hidden xl:flex' : 'hidden lg:flex'} flex-[1_1_280px] min-w-[260px] max-w-[340px] sticky top-6 flex-col gap-3.5`}
+    >
+      <div className={`${CARD_CLASS} overflow-hidden`}>
+        <div className="px-5 py-[18px] border-b border-slate-700 flex items-center justify-between">
+          <span className="text-[15px] font-bold text-white">{isContract ? 'Ditt avtal' : 'Din offert'}</span>
+          <span className="text-[13px] text-slate-500">{antalIfyllda} av {sammanfattning.length}</span>
+        </div>
+        <ul className="flex flex-col py-2">
+          {sammanfattning.map(r => (
+            <li key={r.namn} className="flex gap-3 items-start px-5 py-[9px]">
+              <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${r.klar ? 'bg-[#20c58f]' : 'bg-slate-700'}`} />
+              <span className="flex flex-col gap-px min-w-0">
+                <span className="text-xs text-slate-500">{r.namn}</span>
+                <span className={`text-sm truncate ${r.klar ? 'font-semibold text-white' : 'text-slate-500'}`} title={r.klar ? r.text : undefined}>
+                  {r.klar ? r.text : 'Inte ifyllt än'}
+                </span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <InfoRuta ikon={<Info className="w-[18px] h-[18px]" />}>
+        Inget skickas till kunden förrän du har sett Oneflows PDF och godkänt den.
+      </InfoRuta>
+    </aside>
+  )
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">
-      {/* Header: brödsmula + Avbryt, stegrad */}
-      <header className="bg-slate-900 border-b border-slate-700">
-        <div className="max-w-[1120px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 text-[15px] min-w-0">
-            <button
-              type="button"
-              onClick={() => leaveWizard(getDraftListRoute())}
-              className="min-h-[44px] text-slate-400 hover:text-white"
-            >
-              Avtal &amp; Offerter
-            </button>
-            <span className="text-slate-500">/</span>
-            <span className="font-semibold text-white truncate">
-              {phase === 'wizard'
-                ? (isContract ? 'Nytt avtal' : 'Ny offert')
-                : `${isContract ? 'Avtal' : 'Offert'} – ${motpartNamn || 'kund'}`}
-            </span>
+      {/* Mörkt band: mörkt i båda temana, därför hex-färger och aldrig slate/white */}
+      <header className="relative overflow-hidden bg-[#0e1c2b] text-[#e8eef4]">
+        <svg aria-hidden="true" className="absolute inset-0 w-full h-full opacity-50 pointer-events-none">
+          <defs>
+            <pattern id="avtalsband-prickar" width="22" height="22" patternUnits="userSpaceOnUse">
+              <circle cx="2" cy="2" r="1" fill="#2a3d52" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#avtalsband-prickar)" />
+        </svg>
+        <svg aria-hidden="true" width="420" height="220" viewBox="0 0 420 220" className="absolute -right-10 -top-[30px] opacity-90 pointer-events-none">
+          <circle cx="300" cy="90" r="120" fill="none" stroke="#20c58f" strokeOpacity="0.18" strokeWidth="1.5" />
+          <circle cx="300" cy="90" r="80" fill="none" stroke="#20c58f" strokeOpacity="0.12" strokeWidth="1.5" />
+          <circle cx="300" cy="90" r="40" fill="#20c58f" fillOpacity="0.08" />
+        </svg>
+
+        <div className={`relative max-w-[1180px] mx-auto px-4 sm:px-6 pt-[22px] flex flex-col gap-[22px] ${phase === 'wizard' ? '' : 'pb-[26px]'}`}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3.5 min-w-0">
+              <span className="w-11 h-11 shrink-0 rounded-xl bg-[#20c58f] text-[#052e22] flex items-center justify-center shadow-[0_6px_18px_rgba(32,197,143,0.35)]">
+                <FileText className="w-6 h-6" strokeWidth={1.9} aria-hidden="true" />
+              </span>
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => leaveWizard(getDraftListRoute())}
+                  className="self-start min-h-[44px] -my-3 flex items-center text-[13px] text-[#8ea3b8] hover:text-[#fff] transition-colors"
+                >
+                  Avtal &amp; Offerter
+                </button>
+                <span className={`text-2xl tracking-[-0.01em] text-[#fff] truncate ${RUBRIK_FONT}`}>{bandTitel}</span>
+              </div>
+            </div>
+            {phase === 'draft' && draftContract ? (
+              <span className="flex items-center gap-2 text-sm text-[#c9d6e2]">
+                <span className="w-2 h-2 rounded-full bg-[#f5a524] shadow-[0_0_0_4px_rgba(245,165,36,0.2)]" />
+                Utkast i Oneflow · ID {draftContract.id}
+              </span>
+            ) : phase === 'wizard' ? (
+              <div className="flex items-center gap-[18px]">
+                <span className="text-sm text-[#8ea3b8]">{procent} % klart</span>
+                <button
+                  type="button"
+                  onClick={() => leaveWizard(getDashboardRoute())}
+                  className="min-h-[44px] text-sm text-[#c9d6e2] hover:text-[#fff] transition-colors"
+                >
+                  Avbryt
+                </button>
+              </div>
+            ) : null}
           </div>
-          {phase === 'draft' && draftContract ? (
-            <span className="flex items-center gap-1.5 text-sm text-slate-400">
-              <span className="w-[7px] h-[7px] rounded-full bg-amber-500" />
-              Utkast i Oneflow · ID {draftContract.id}
-            </span>
-          ) : phase === 'wizard' ? (
-            <button
-              type="button"
-              onClick={() => leaveWizard(getDashboardRoute())}
-              className="min-h-[44px] text-sm text-slate-400 hover:text-white"
-            >
-              Avbryt
-            </button>
-          ) : null}
-        </div>
-        {phase === 'wizard' && (
-          <div className="max-w-[1120px] mx-auto px-4 sm:px-6">
+          {phase === 'wizard' && (
             <AnimatedProgressBar
               steps={STEPS}
               currentStep={currentStep}
@@ -2097,60 +2327,84 @@ export default function OneflowContractCreator() {
               maxReachedStep={maxReachedStep}
               documentType={wizardData.documentType}
               selectedTemplate={wizardData.selectedTemplate}
+              procent={procent}
             />
-          </div>
-        )}
+          )}
+        </div>
       </header>
 
       {/* Innehåll */}
-      <main className={`flex-1 w-full ${contentWidth} mx-auto px-4 sm:px-6 pt-10 pb-8`}>
+      <main className="flex-1 w-full max-w-[1180px] mx-auto px-4 sm:px-6 pt-9 sm:pt-10 pb-10">
         {phase === 'sent' ? renderSent() : phase === 'draft' ? renderDraft() : (
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="flex flex-col gap-6"
-            >
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[13px] text-slate-400">Steg {visibleIndex} av {visibleSteps.length}</span>
-                <h1 className="text-[28px] font-bold tracking-tight text-white">{rubrik}</h1>
-                <p className="text-base text-slate-400 max-w-[680px]">{ingress}</p>
-              </div>
-              {renderStepContent()}
-            </motion.div>
-          </AnimatePresence>
+          <div className="flex flex-wrap gap-7 items-start">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="flex-[999_1_560px] min-w-0 flex flex-col gap-6"
+              >
+                {isReview ? (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[13px] text-slate-400">Steg {visibleIndex} av {visibleSteps.length}</span>
+                    <h1 className={`text-[30px] leading-tight tracking-[-0.015em] text-white ${RUBRIK_FONT}`}>{rubrik}</h1>
+                    <p className="text-base text-slate-400 max-w-[680px]">{ingress}</p>
+                  </div>
+                ) : (
+                  <div className="flex gap-[18px] items-center">
+                    <span className={`w-14 h-14 shrink-0 rounded-2xl bg-slate-900 border border-slate-700 shadow-[0_4px_14px_rgba(15,31,46,0.06)] flex items-center justify-center text-[22px] text-emerald-400 ${RUBRIK_FONT}`}>
+                      {visibleIndex}
+                    </span>
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <h1 className={`text-[26px] sm:text-[30px] leading-tight tracking-[-0.015em] text-white ${RUBRIK_FONT}`}>{rubrik}</h1>
+                      <p className="text-base text-slate-400">{ingress}</p>
+                    </div>
+                  </div>
+                )}
+                {renderStepContent()}
+              </motion.div>
+            </AnimatePresence>
+            {visaSammanfattning && renderSammanfattning()}
+          </div>
         )}
       </main>
 
       {/* Fast bottenlist: Föregående, valideringstips, Nästa */}
       {phase === 'wizard' && (
-        <div className="sticky bottom-0 z-20 bg-slate-900 border-t border-slate-700">
-          <div className={`${contentWidth} mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3`}>
+        <div className="sticky bottom-0 z-20 bg-slate-900/90 backdrop-blur border-t border-slate-700 shadow-[0_-8px_24px_rgba(15,31,46,0.05)]">
+          <div className="max-w-[1180px] mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={prevStep}
               disabled={currentStep === 1}
-              className={OUTLINE_BUTTON}
+              className={`${OUTLINE_BUTTON} inline-flex items-center gap-2`}
             >
-              Föregående
+              <ArrowLeft className="w-[18px] h-[18px]" aria-hidden="true" />
+              <span className="hidden sm:inline">Föregående</span>
+              <span className="sm:hidden">Tillbaka</span>
             </button>
 
-            <p className="flex-1 text-center text-[13px] text-amber-400 min-w-0">
+            <p className="flex-1 text-center text-[13px] min-w-0">
               {isReview
-                ? (kontrollStoppar ? <span className="text-red-400">Rätta de röda punkterna först</span> : null)
-                : hint}
+                ? (kontrollStoppar
+                  ? <span className="text-red-400">Rätta de röda punkterna först</span>
+                  : <span className="text-slate-400">Steg {visibleIndex} av {visibleSteps.length}</span>)
+                : hint
+                  ? <span className="text-amber-400">{hint}</span>
+                  : <span className="text-slate-400">Steg {visibleIndex} av {visibleSteps.length}</span>}
             </p>
 
             {!isReview && (fromReview ? (
-              <button type="button" onClick={backToReview} disabled={!canProceed()} className={PRIMARY_BUTTON}>
+              <button type="button" onClick={backToReview} disabled={!canProceed()} className={`${PRIMARY_BUTTON} inline-flex items-center gap-2`}>
                 Tillbaka till granskningen
+                <ArrowRight className="w-[18px] h-[18px]" aria-hidden="true" />
               </button>
             ) : (
-              <button type="button" onClick={nextStep} disabled={!canProceed()} className={PRIMARY_BUTTON}>
+              <button type="button" onClick={nextStep} disabled={!canProceed()} className={`${PRIMARY_BUTTON} inline-flex items-center gap-2`}>
                 {currentStep === agreementStep ? (isContract ? 'Granska avtalet' : 'Granska offerten') : 'Nästa'}
+                <ArrowRight className="w-[18px] h-[18px]" aria-hidden="true" />
               </button>
             ))}
           </div>

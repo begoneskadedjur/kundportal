@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.41.0',
+    date: '2026-10-09',
+    title: 'Avtalswizarden: tydligare val och en sammanfattning bredvid',
+    items: [
+      { kind: 'andring', text: 'Valen i avtalswizarden, som dokumenttyp, mall, avtalspart och kundgrupp, visas som kort med egna illustrationer så att det går fort att hitta rätt.' },
+      { kind: 'andring', text: 'På bred skärm syns en sammanfattning av avtalet bredvid formuläret, med det du fyllt i hittills: mall, kundgrupp, avtalstid, motpart, årspremie och avtalsobjekt.' },
+    ],
+  },
+  {
     version: '3.40.0',
     date: '2026-10-09',
     title: 'Avtalswizarden: granska avtalet och se Oneflows PDF innan det skickas',
