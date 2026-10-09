@@ -112,6 +112,7 @@ export const OFFER_STATUS_CONFIG: Record<string, {
   signed: { label: 'Signerat', color: 'text-green-400', bgColor: 'bg-green-500/15' },
   overdue: { label: 'Förfallet', color: 'text-amber-400', bgColor: 'bg-amber-500/15' },
   declined: { label: 'Avfärdat', color: 'text-red-400', bgColor: 'bg-red-500/15' },
+  draft: { label: 'Utkast', color: 'text-amber-400', bgColor: 'bg-amber-500/15' },
 }
 
 export type PipelineTab = 'pending' | 'signed' | 'overdue' | 'declined' | 'alla'

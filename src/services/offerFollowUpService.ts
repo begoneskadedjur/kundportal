@@ -29,7 +29,8 @@ function classifyPriority(
 // === Arbetskön: kategorier sorterade efter väntekostnad ===
 // Varje dokument ligger i exakt EN kategori (högsta prioritet vinner).
 export type QueueCategory =
-  | 'ringlista'    // uppföljningsdatum är idag eller passerat
+  | 'utkast'       // skapat i wizarden men inte skickat — väntar på oss
+  | 'ringlista'   // uppföljningsdatum är idag eller passerat
   | 'boka'         // signerat, ej bokat — kunden väntar på oss
   | 'svar'         // oläst kundkommentar — dialogen är levande
   | 'loper_ut'     // signeringsfristen ≤ 3 dagar (eller ålders-fallback)
@@ -45,6 +46,7 @@ export const QUEUE_SECTIONS: Array<{
   accent: string
   collapsedByDefault: boolean
 }> = [
+  { key: 'utkast', label: 'Utkast, ej skickade', accent: 'text-amber-400', collapsedByDefault: false },
   { key: 'ringlista', label: 'Ringlista idag', accent: 'text-[#20c58f]', collapsedByDefault: false },
   { key: 'boka', label: 'Signerade — boka in', accent: 'text-[#20c58f]', collapsedByDefault: false },
   { key: 'svar', label: 'Kunden har svarat', accent: 'text-blue-400', collapsedByDefault: false },
@@ -72,6 +74,9 @@ function classifyQueueCategory(o: {
   created_at: string
   action: CoordinatorCaseAction | null
 }): QueueCategory {
+  // 0. Utkast: inget har gått till kunden, nästa steg är att granska PDF:en och skicka
+  if (o.status === 'draft') return 'utkast'
+
   const coordStatus = o.action?.coordinator_status
   const followUpAt = o.action?.follow_up_at || null
   const today = new Date().toISOString().substring(0, 10)
@@ -253,7 +258,8 @@ export class OfferFollowUpService {
     let contractsQuery = supabase
       .from('contracts')
       .select(OFFER_COLUMNS)
-      .in('status', ['pending', 'overdue', 'signed', 'declined'])
+      // draft = utkast från avtalswizarden som sparats för att skickas senare
+      .in('status', ['draft', 'pending', 'overdue', 'signed', 'declined'])
       .is('legacy_archived_at', null)
       .order('created_at', { ascending: true })
 
@@ -390,7 +396,8 @@ export class OfferFollowUpService {
     const pendingContracts = allContracts.filter(c => c.status === 'pending')
     const overdueContracts = allContracts.filter(c => c.status === 'overdue')
     const signedContracts = allContracts.filter(c => c.status === 'signed')
-    const totalCount = allContracts.length
+    // Utkast har aldrig skickats och räknas inte in i signeringsgraden
+    const totalCount = allContracts.filter(c => c.status !== 'draft').length
 
     const signedDays = signedContracts.map(c => {
       const created = new Date(c.created_at).getTime()

@@ -128,7 +128,8 @@ function buildDataFieldsForDocument(
     const currentDate = new Date().toISOString().split('T')[0]
     fields.push(
       { custom_id: 'offert-skapad', value: currentDate },
-      { custom_id: 'epost-faktura', value: contractData['e-post-kontaktperson'] || '' }
+      // E-post för faktura från wizarden; tomt fält faller tillbaka på kontaktpersonens e-post
+      { custom_id: 'epost-faktura', value: contractData['faktura-adress-pdf'] || contractData['e-post-kontaktperson'] || '' }
       // Faktura-referens och märkning lämnas tomma så kunden kan fylla i
     )
 
@@ -389,12 +390,18 @@ export default async function handler(
 
   const data_fields = buildDataFieldsForDocument(contractData, documentType, caseId, fastighetsbeteckning)
 
-  // Bygg participant-objekt
+  // Bygg participant-objekt.
+  // Kunden är ALLTID signerande part med rätt att fylla i fält, även när
+  // dokumentet skapas som utkast. Sedan 3.40.0 skapar wizarden allt som utkast,
+  // visar Oneflows PDF och publicerar först därefter (api/oneflow/draft.ts).
+  // Tidigare fick utkast signatory: false, och ett sådant utkast som publicerades
+  // senare gick bara att läsa för kunden. Avtal och offerter får nu samma värden
+  // som när de skickades direkt före 3.40.0.
   const participantData = {
     name: recipient.name,
     email: recipient.email,
-    _permissions: { 'contract:update': !!sendForSigning },
-    signatory: !!sendForSigning,
+    _permissions: { 'contract:update': true },
+    signatory: true,
     delivery_channel: 'email'
   }
 

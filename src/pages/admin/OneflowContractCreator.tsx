@@ -1,20 +1,22 @@
 // 📁 src/pages/admin/oneflow/OneflowContractCreator.tsx
-// KOMPLETT WIZARD VERSION - STEG FÖR STEG GUIDE MED ANVÄNDARINTEGRATION
+// Avtalswizarden: steg för steg till ett avtal eller en offert i Oneflow.
+//
+// Flödet sedan 3.40.0: formulärstegen → Granska (avtalet som papper + kontrollista)
+// → dokumentet skapas som UTKAST i Oneflow → Oneflows egen PDF visas här → skicka,
+// ändra (utkastet tas bort och ett nytt skapas) eller spara som utkast.
+// Inget skickas till kunden förrän PDF:en är godkänd.
 
 import { formatPayback, marginTone, summarizeBillingLines, toneTextClass, type MarginLine } from '../../shared/marginEngine'
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import Confetti from 'react-confetti'
-import { ArrowLeft, ArrowRight, Eye, FileText, Building2, Mail, Send, CheckCircle, ExternalLink, User, Calendar, Hash, Phone, MapPin, DollarSign, FileCheck, ShoppingCart, Users, Settings } from 'lucide-react'
+import { ExternalLink, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext' // 🆕 HÄMTA ANVÄNDARINFO
 import { apiFetch } from '../../lib/api'
-import Button from '../../components/ui/Button'
-import Card from '../../components/ui/Card'
-import Input from '../../components/ui/Input'
 import DateField from '../../components/ui/DateField'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import CaseServiceSelector from '../../components/shared/CaseServiceSelector'
+import OneflowPdfFrame from '../../components/shared/OneflowPdfFrame'
 import AnimatedProgressBar from '../../components/ui/AnimatedProgressBar'
 import { SelectedProduct, CustomerType, SelectedArticleItem } from '../../types/products'
 import { convertServicesToOneflowProducts } from '../../utils/articlePricingCalculator'
@@ -22,26 +24,30 @@ import { mapBillingItemsToPrefillServices, mapBillingItemsToSelectedArticles } f
 import type { CaseBillingItemWithRelations } from '../../types/caseBilling'
 import { OFFER_TEMPLATES, CONTRACT_TEMPLATES, type OneflowTemplate } from '../../constants/oneflowTemplates'
 import { OneflowTemplateService } from '../../services/oneflowTemplateService'
+import { OneflowDraftService } from '../../services/oneflowDraftService'
 import { WebInquiryService } from '../../services/webInquiryService'
 import { CustomerGroupService } from '../../services/customerGroupService'
 import { CustomerGroup } from '../../types/customerGroups'
-import { supabase, getAuthHeaders } from '../../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 import { formatContractLength, type ContractLengthUnit } from '../../utils/contractLength'
 import {
   formatAdress, formatEpost, formatForetagsnamn, formatIdNummer, formatPersonnamn, formatTelefon,
 } from '../../shared/kontaktFormat'
+import {
+  AVTALSOBJEKT_MAX_TECKEN, harStopp, kontrolleraAvtal, type KontrollAvsnitt, type KontrollNiva,
+} from '../../shared/avtalsKontroll'
 
 interface WizardData {
   // Steg 1 - Dokumenttyp
   documentType: 'offer' | 'contract'
-  
+
   // Steg 2 - Mall
   selectedTemplate: string
-  
+
   // Steg 3 - Avtalspart
   partyType: 'company' | 'individual'
-  
+
   // Steg 4 - BeGone info
   anstalld: string
   'e-post-anstlld': string
@@ -67,7 +73,10 @@ interface WizardData {
   'utforande-adress': string
   foretag: string
   'org-nr': string
-  
+  /** Valfri. Skickas som 'faktura-adress-pdf' (avtal) eller 'epost-faktura' (offert).
+   *  Tomt fält: avtalet lämnar det åt kunden, offerten använder kontaktpersonens e-post. */
+  'e-post-faktura': string
+
   // Steg 6 - Prislista & Artiklar
   selectedPriceListId: string | null
   selectedArticles: SelectedArticleItem[]
@@ -97,13 +106,10 @@ interface WizardData {
       rut_eligible?: boolean
     } | null
   }>
-  
+
   // Steg 7 - Avtalsobjekt
   agreementText: string
-  
-  // Steg 8 - Slutsteg
-  sendForSigning: boolean
-  
+
   // Case linking
   case_id?: string
   /** Ärendetyp för case_billing_items-uppslag (avtalsärenden lagrar rader med case_type='contract') */
@@ -118,10 +124,12 @@ interface WizardData {
   returnPath?: string
 }
 
+const DEFAULT_AGREEMENT_TEXT = 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.'
+
 // Kontaktfälten snyggas till när de lämnas och igen innan avtalet skapas:
 // namn med stor bokstav, telefon som "070-123 45 67", adress som "Gata 1, 111 22 Ort".
 type KontaktFalt = 'foretag' | 'org-nr' | 'Kontaktperson' | 'e-post-kontaktperson'
-  | 'telefonnummer-kontaktperson' | 'utforande-adress' | 'anstalld' | 'e-post-anstlld'
+  | 'telefonnummer-kontaktperson' | 'utforande-adress' | 'anstalld' | 'e-post-anstlld' | 'e-post-faktura'
 
 const KONTAKT_FORMAT: Record<KontaktFalt, (s: string) => string> = {
   foretag: formatForetagsnamn,
@@ -132,6 +140,7 @@ const KONTAKT_FORMAT: Record<KontaktFalt, (s: string) => string> = {
   'utforande-adress': formatAdress,
   anstalld: formatPersonnamn,
   'e-post-anstlld': formatEpost,
+  'e-post-faktura': formatEpost,
 }
 
 function snyggaTillKontakt<T extends Record<KontaktFalt, string>>(d: T): T {
@@ -143,27 +152,142 @@ function snyggaTillKontakt<T extends Record<KontaktFalt, string>>(d: T): T {
 }
 
 const OFFER_STEPS = [
-  { id: 1, title: 'Dokumenttyp', icon: FileCheck },
-  { id: 2, title: 'Välj Mall', icon: FileText },
-  { id: 3, title: 'Avtalspart', icon: User },
-  { id: 4, title: 'BeGone Info', icon: Building2 },
-  { id: 5, title: 'Motpart', icon: Mail },
-  { id: 6, title: 'Produkter', icon: ShoppingCart },
-  { id: 7, title: 'Avtalsobjekt', icon: FileText },
-  { id: 8, title: 'Granska & Skicka', icon: Send }
+  { id: 1, title: 'Dokument' },
+  { id: 2, title: 'Mall' },
+  { id: 3, title: 'Avtalspart' },
+  { id: 4, title: 'BeGone' },
+  { id: 5, title: 'Motpart' },
+  { id: 6, title: 'Tjänster' },
+  { id: 7, title: 'Offertinnehåll' },
+  { id: 8, title: 'Granska' }
 ]
 
 const CONTRACT_STEPS = [
-  { id: 1, title: 'Dokumenttyp', icon: FileCheck },
-  { id: 2, title: 'Välj Mall', icon: FileText },
-  { id: 3, title: 'Avtalspart', icon: User },
-  { id: 4, title: 'Kundgrupp', icon: Users },
-  { id: 5, title: 'BeGone Info', icon: Building2 },
-  { id: 6, title: 'Motpart', icon: Mail },
-  { id: 7, title: 'Produkter', icon: ShoppingCart },
-  { id: 8, title: 'Avtalsobjekt', icon: FileText },
-  { id: 9, title: 'Granska & Skicka', icon: Send }
+  { id: 1, title: 'Dokument' },
+  { id: 2, title: 'Mall' },
+  { id: 3, title: 'Avtalspart' },
+  { id: 4, title: 'Kundgrupp' },
+  { id: 5, title: 'BeGone' },
+  { id: 6, title: 'Motpart' },
+  { id: 7, title: 'Tjänster' },
+  { id: 8, title: 'Avtalsobjekt' },
+  { id: 9, title: 'Granska' }
 ]
+
+const BILLING_FREQUENCY_LABEL: Record<string, string> = {
+  annual: 'Årsvis',
+  semi_annual: 'Halvårsvis',
+  quarterly: 'Kvartalsvis',
+  monthly: 'Månadsvis',
+}
+
+const noticeLabel = (months: string) =>
+  months === '0' ? 'Ingen' : months === '1' ? '1 månad' : `${months} månader`
+
+const fmtSEK = (n: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
+
+// --- Gemensamma klasser (slate-skalan mappas om i ljust tema) ----------------
+const FIELD_CLASS = 'w-full min-h-[44px] px-3 bg-slate-900 border border-slate-600 rounded-lg text-[15px] text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent'
+const LABEL_CLASS = 'flex flex-col gap-1.5 text-[13px] font-semibold text-slate-300'
+const CARD_CLASS = 'bg-slate-900 border border-slate-700 rounded-xl'
+const PRIMARY_BUTTON = 'min-h-[44px] px-5 rounded-lg bg-[#20c58f] hover:bg-[#1aaa7a] text-[#052e22] text-[15px] font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
+const OUTLINE_BUTTON = 'min-h-[44px] px-4 rounded-lg border border-slate-600 bg-slate-900 hover:bg-slate-800 text-white text-[15px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed'
+const LINK_BUTTON = 'min-h-[44px] text-[15px] font-semibold text-[#20c58f] hover:underline'
+
+const PUNKT_FARG: Record<KontrollNiva, string> = {
+  rod: 'bg-red-500',
+  gul: 'bg-amber-500',
+  gron: 'bg-[#20c58f]',
+}
+
+/** Valbart kort (dokumenttyp, avtalspart). */
+function ValKort({ vald, namn, text, onClick }: { vald: boolean; namn: string; text: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={vald}
+      className={`flex flex-col gap-2 items-start text-left p-6 min-h-[140px] rounded-xl bg-slate-900 transition-colors ${
+        vald
+          ? 'border-2 border-[#20c58f] ring-4 ring-[#20c58f]/15'
+          : 'border border-slate-700 hover:border-slate-500'
+      }`}
+    >
+      <span className="text-lg font-bold text-white">{namn}</span>
+      <span className="text-sm text-slate-400 leading-relaxed">{text}</span>
+    </button>
+  )
+}
+
+/** Rad med radioknapp i en lista (mall, kundgrupp). */
+function RadioRad({ vald, namn, text, onClick }: { vald: boolean; namn: string; text?: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={vald}
+      onClick={onClick}
+      className={`w-full flex items-center gap-3.5 min-h-[56px] px-5 py-3 border-b border-slate-700/60 last:border-b-0 text-left transition-colors ${
+        vald ? 'bg-[#20c58f]/10' : 'bg-slate-900 hover:bg-slate-800'
+      }`}
+    >
+      <span
+        className={`w-[18px] h-[18px] rounded-full shrink-0 ${
+          vald ? 'border-[6px] border-[#20c58f]' : 'border-2 border-slate-500'
+        }`}
+      />
+      <span className="flex flex-col gap-0.5 flex-1 min-w-0">
+        <span className="text-[15px] font-semibold text-white">{namn}</span>
+        {text && <span className="text-[13px] text-slate-400">{text}</span>}
+      </span>
+    </button>
+  )
+}
+
+/** Ett uppgiftsfält på granskningspappret. */
+function PappersFalt({ etikett, children }: { etikett: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 min-w-0">
+      <span className="text-[13px] text-slate-400">{etikett}</span>
+      <span className="text-[15px] text-white break-words">{children}</span>
+    </div>
+  )
+}
+
+function createInitialWizardData(
+  anstalld: string,
+  epostAnstalld: string
+): WizardData {
+  return {
+    documentType: 'contract',
+    selectedTemplate: '',
+    partyType: 'company',
+    anstalld,
+    'e-post-anstlld': epostAnstalld,
+    avtalslngd: '1',
+    avtalslangdEnhet: 'år',
+    begynnelsedag: new Date().toISOString().split('T')[0],
+    noticePeriodMonths: '3',
+    billingFrequency: 'annual',
+    Kontaktperson: '',
+    'e-post-kontaktperson': '',
+    'telefonnummer-kontaktperson': '',
+    'utforande-adress': '',
+    foretag: '',
+    'org-nr': '',
+    'e-post-faktura': '',
+    selectedPriceListId: null,
+    selectedArticles: [],
+    deductionType: null,
+    customTotalPrice: null,
+    selectedProducts: [],
+    draftItems: [],
+    draftPriceAssignments: {},
+    draftPriceMarkups: {},
+    agreementText: DEFAULT_AGREEMENT_TEXT,
+    customer_group_id: null
+  }
+}
 
 export default function OneflowContractCreator() {
   const navigate = useNavigate()
@@ -196,13 +320,25 @@ export default function OneflowContractCreator() {
         return '/admin/dashboard';
     }
   }, [profile?.role]);
+
+  // Sparade utkast listas i Dokumentsignering. Admins egen sida med samma namn
+  // är pipelinen utan utkast, så admin skickas till koordinatorns vy.
+  const getDraftListRoute = useCallback(() => {
+    const route = getFollowUpRoute()
+    return route === '/admin/dashboard' ? '/koordinator/dokumentsignering' : route
+  }, [getFollowUpRoute])
+
   const [currentStep, setCurrentStep] = useState(1)
   const [maxReachedStep, setMaxReachedStep] = useState(1)
+  /** Sant när användaren gått från granskningen till ett steg via "Ändra" */
+  const [fromReview, setFromReview] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [creationStep, setCreationStep] = useState('')
+  /** Utkastet i Oneflow som visas som PDF (steg 10). */
+  const [draftContract, setDraftContract] = useState<{ id: number | string; warning?: string } | null>(null)
+  const [draftAction, setDraftAction] = useState<'send' | 'remove' | null>(null)
+  /** Skickat dokument — visar bekräftelsen. */
   const [createdContract, setCreatedContract] = useState<any>(null)
-  const [showConfetti, setShowConfetti] = useState(false)
-  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submitErrorStep, setSubmitErrorStep] = useState<number | null>(null)
   const [customerGroups, setCustomerGroups] = useState<CustomerGroup[]>([])
@@ -220,45 +356,17 @@ export default function OneflowContractCreator() {
     OneflowTemplateService.getActiveByType('contract').then(setContractTemplates)
   }, [])
 
-  const [wizardData, setWizardData] = useState<WizardData>({
-    documentType: 'contract',
-    selectedTemplate: '',
-    partyType: 'company',
-    // 🆕 ANVÄND INLOGGAD ANVÄNDARES INFO SOM DEFAULT
-    // Prioritera technicians.name om det finns, annars display_name eller user metadata
-    anstalld: profile?.technicians?.name || profile?.display_name || user?.user_metadata?.full_name || 'BeGone Medarbetare',
-    'e-post-anstlld': user?.email || '',
-    avtalslngd: '1',
-    avtalslangdEnhet: 'år',
-    begynnelsedag: new Date().toISOString().split('T')[0],
-    noticePeriodMonths: '3',
-    billingFrequency: 'annual',
-    Kontaktperson: '',
-    'e-post-kontaktperson': '',
-    'telefonnummer-kontaktperson': '',
-    'utforande-adress': '',
-    foretag: '',
-    'org-nr': '',
-    selectedPriceListId: null,
-    selectedArticles: [],
-    deductionType: null,
-    customTotalPrice: null,
-    selectedProducts: [],
-    draftItems: [],
-    draftPriceAssignments: {},
-    draftPriceMarkups: {},
-    agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
-    sendForSigning: true,
-    customer_group_id: null
-  })
+  // Prioritera technicians.name om det finns, annars display_name eller user metadata
+  const defaultAnstalld = profile?.technicians?.name || profile?.display_name || user?.user_metadata?.full_name || 'BeGone Medarbetare'
+  const [wizardData, setWizardData] = useState<WizardData>(() =>
+    createInitialWizardData(defaultAnstalld, user?.email || '')
+  )
 
   // Dynamiska steg baserat på dokumenttyp
   const STEPS = wizardData.documentType === 'contract' ? CONTRACT_STEPS : OFFER_STEPS
 
   // Steg-offset: vid avtal skiftas steg 4+ med 1 (kundgrupp injicerat)
   const isContract = wizardData.documentType === 'contract'
-  // Mappa logiska steg-ID:n till offer-steg (för renderStepContent)
-  const stepOffset = (step: number) => isContract && step >= 5 ? step - 1 : step
 
   // Hämta kundgrupper (med session-check + error/retry-handling)
   const loadCustomerGroups = useCallback(async () => {
@@ -292,13 +400,13 @@ export default function OneflowContractCreator() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
     const prefillType = urlParams.get('prefill')
-    
+
     if (prefillType && (prefillType === 'contract' || prefillType === 'offer')) {
       const savedData = sessionStorage.getItem('prefill_customer_data')
       if (savedData) {
         try {
           const customerData = JSON.parse(savedData)
-          
+
           setWizardData(prev => ({
             ...prev,
             documentType: customerData.documentType || prefillType,
@@ -310,6 +418,7 @@ export default function OneflowContractCreator() {
             'utforande-adress': customerData['utforande-adress'] || '',
             foretag: customerData.foretag || '',
             'org-nr': customerData['org-nr'] || '',
+            'e-post-faktura': customerData['e-post-faktura'] || prev['e-post-faktura'],
             // Lägg till tekniker-info om det finns
             anstalld: customerData.anstalld || prev.anstalld,
             'e-post-anstlld': customerData['e-post-anstlld'] || prev['e-post-anstlld'],
@@ -351,7 +460,7 @@ export default function OneflowContractCreator() {
             web_inquiry_id: customerData.webInquiryId || undefined,
             returnPath: customerData.returnPath || undefined,
           }))
-          
+
           // Debug-logging för att spåra prefill-processen
           console.log('Prefill data received:', {
             autoSelectTemplate: customerData.autoSelectTemplate,
@@ -360,7 +469,7 @@ export default function OneflowContractCreator() {
             hasContact: !!customerData.Kontaktperson,
             hasEmail: !!customerData['e-post-kontaktperson']
           })
-          
+
           // Använd setTimeout för att säkerställa att state har uppdaterats innan steg-hoppning
           setTimeout(() => {
             // Om vi har autoSelectTemplate flagga och all nödvändig data, hoppa direkt till steg 6
@@ -396,16 +505,16 @@ export default function OneflowContractCreator() {
               // Börja från steg 1
               setCurrentStep(1)
             }
-            
+
             // Rensa sessionStorage efter användning
             sessionStorage.removeItem('prefill_customer_data')
           }, 100) // Vänta lite för att säkerställa state-uppdatering
-          
+
           toast.success(`Kundinformation förifylld från ärende! (${prefillType === 'contract' ? 'Avtal' : 'Offert'})`, {
             duration: 4000,
             icon: prefillType === 'contract' ? '📄' : '💰'
           })
-          
+
           // Debug: Visa vad som laddades
           console.log('Prefill completed:', {
             documentType: customerData.documentType || prefillType,
@@ -413,7 +522,7 @@ export default function OneflowContractCreator() {
             autoSelectTemplate: customerData.autoSelectTemplate,
             hasCustomerData: !!(customerData.Kontaktperson && customerData['e-post-kontaktperson'])
           })
-          
+
         } catch (error) {
           console.error('Error parsing prefill data:', error)
           toast.error('Kunde inte läsa förifylld kundinformation')
@@ -429,9 +538,10 @@ export default function OneflowContractCreator() {
     }
   }, [])  // Kör bara en gång vid mount
 
-  // Navigation guard — varna om osparade ändringar
+  // Navigation guard — varna om osparade ändringar.
+  // Ett skapat utkast ligger kvar i Oneflow, så då finns inget osparat.
   const hasUnsavedProgress = useCallback((): boolean => {
-    if (createdContract) return false
+    if (createdContract || draftContract) return false
     if (currentStep > 1) return true
     return (
       wizardData.Kontaktperson !== '' ||
@@ -440,7 +550,7 @@ export default function OneflowContractCreator() {
       wizardData.draftItems.length > 0 ||
       wizardData.selectedArticles.length > 0
     )
-  }, [currentStep, wizardData, createdContract])
+  }, [currentStep, wizardData, createdContract, draftContract])
 
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -456,7 +566,7 @@ export default function OneflowContractCreator() {
   const updateWizardData = (field: keyof WizardData, value: any) => {
     setWizardData(prev => {
       const updated = { ...prev, [field]: value }
-      
+
       // Om vi väljer en offertmall, uppdatera automatiskt partyType baserat på mallens typ
       if (field === 'selectedTemplate' && updated.documentType === 'offer') {
         const template = offerTemplates.find(t => t.id === value)
@@ -464,18 +574,18 @@ export default function OneflowContractCreator() {
           updated.partyType = template.category as 'company' | 'individual'
         }
       }
-      
+
       // Om vi byter dokumenttyp
       if (field === 'documentType') {
         updated.selectedTemplate = ''
-        
+
         // Sätt default-värden för offerter (används inte i offertmallar men krävs av API)
         if (value === 'offer') {
           updated.avtalslngd = updated.avtalslngd || '1'
           updated.begynnelsedag = updated.begynnelsedag || new Date().toISOString().split('T')[0]
         }
       }
-      
+
       return updated
     })
   }
@@ -518,6 +628,7 @@ export default function OneflowContractCreator() {
         nextStepNumber = 4 // Hoppa över steg 3 (avtalspart) → direkt till BeGone Info
       }
 
+      if (nextStepNumber === reviewStep) setFromReview(false)
       setCurrentStep(nextStepNumber)
       setMaxReachedStep(prev => Math.max(prev, nextStepNumber))
     }
@@ -535,6 +646,26 @@ export default function OneflowContractCreator() {
 
       setCurrentStep(prevStepNumber)
     }
+  }
+
+  /** "Ändra" på granskningen: hoppa till steget och visa "Tillbaka till granskningen". */
+  const goToStepFromReview = (step: number) => {
+    setFromReview(true)
+    setCurrentStep(step)
+  }
+
+  const backToReview = () => {
+    if (currentStep === begoneStep || currentStep === counterpartyStep) {
+      setWizardData(prev => snyggaTillKontakt(prev))
+    }
+    setFromReview(false)
+    setCurrentStep(reviewStep)
+  }
+
+  /** Stegrad: att gå direkt till granskningen avslutar ett "Ändra". */
+  const handleStepClick = (step: number) => {
+    if (step === reviewStep) setFromReview(false)
+    setCurrentStep(step)
   }
 
   const isValidEmail = (email: string): boolean =>
@@ -638,9 +769,9 @@ export default function OneflowContractCreator() {
   const selectedTemplate = availableTemplates.find(t => t.id === wizardData.selectedTemplate)
 
   // Leads (Webb): kopplar en skickad offert till webbförfrågan som guiden öppnades från.
-  // Utkast (inte skickade för signering) och avtal kopplas aldrig.
+  // Anropas först när offerten publicerats; utkast och avtal kopplas aldrig.
   const kopplaOffertTillForfragan = async (oneflowId: unknown) => {
-    if (!wizardData.web_inquiry_id || wizardData.documentType !== 'offer' || !wizardData.sendForSigning) return
+    if (!wizardData.web_inquiry_id || wizardData.documentType !== 'offer') return
     if (oneflowId === null || oneflowId === undefined || oneflowId === '') return
     try {
       await WebInquiryService.linkOffer(wizardData.web_inquiry_id, String(oneflowId))
@@ -648,6 +779,95 @@ export default function OneflowContractCreator() {
     } catch {
       toast.error('Offerten skickades men kunde inte kopplas till webbförfrågan')
     }
+  }
+
+  // --- Tjänster och pris: samma beräkning i granskningen och sidokortet ----
+  const isPrivate = wizardData.partyType === 'individual'
+  const priceMultiplier = isPrivate ? 1.25 : 1
+  const prisData = useMemo(() => {
+    const hasPrefill = !!wizardData.prefillServices && wizardData.prefillServices.length > 0
+    const draftServices = wizardData.draftItems.filter(i => i.item_type === 'service')
+    const draftArticles = wizardData.draftItems.filter(i => i.item_type === 'article')
+
+    let serviceTotal = 0
+    let articleCost = 0
+    let rows: Array<{ key: string; name: string; quantity: number; total: number; articles: string[] }> = []
+    // Raderna till motorn: varaktig utrustning (fällor, stationer) ska
+    // ställas mot en återkommande årsintäkt, inte dras från år 1.
+    let marginLines: MarginLine[] = []
+
+    if (hasPrefill) {
+      serviceTotal = wizardData.prefillServices!.reduce((s, i) => s + i.total_price, 0)
+      articleCost = wizardData.selectedArticles.reduce((s, a) => s + a.effectivePrice * a.quantity, 0)
+      marginLines = [
+        ...wizardData.prefillServices!.map((s): MarginLine => ({ item_type: 'service', total_price: s.total_price })),
+        ...wizardData.selectedArticles.map((a): MarginLine => ({
+          item_type: 'article',
+          total_price: a.effectivePrice * a.quantity,
+          quantity: a.quantity,
+          article_name: a.article.name,
+          article: { is_durable: a.article.is_durable, category: a.article.category },
+        })),
+      ]
+      rows = wizardData.prefillServices!.map(s => ({
+        key: s.id,
+        name: s.service_name ?? 'Tjänst',
+        quantity: s.quantity,
+        total: s.total_price,
+        articles: wizardData.selectedArticles
+          .filter(a => a.mapped_service_id === s.id)
+          .map(a => `${a.article.name}${a.quantity > 1 ? ` × ${a.quantity}` : ''}`),
+      }))
+    } else {
+      serviceTotal = draftServices.reduce((s, i) => s + i.total_price, 0)
+      articleCost = draftArticles.reduce((s, i) => s + i.total_price, 0)
+      marginLines = [...draftServices, ...draftArticles] as unknown as MarginLine[]
+      rows = draftServices.map(svc => ({
+        key: svc.id,
+        name: svc.service_name ?? 'Tjänst',
+        quantity: svc.quantity,
+        total: svc.total_price,
+        articles: draftArticles
+          .filter(a => (wizardData.draftPriceAssignments[a.id] ?? a.mapped_service_id) === svc.id)
+          .map(a => `${a.article_name}${a.quantity > 1 ? ` × ${a.quantity}` : ''}`),
+      }))
+    }
+
+    // Ett avtalsförslag är ett avtal: löpande marginal är huvudtalet, men
+    // säljaren ska också se att år 1 går back när fällorna köps in.
+    const mb = summarizeBillingLines(marginLines, { context: 'contract' })
+    return { rows, serviceTotal, articleCost, mb, serviceCount: rows.length }
+  }, [wizardData.prefillServices, wizardData.selectedArticles, wizardData.draftItems, wizardData.draftPriceAssignments])
+
+  const kontrollPunkter = useMemo(() => kontrolleraAvtal({
+    dokumentTyp: wizardData.documentType,
+    partTyp: wizardData.partyType,
+    foretag: wizardData.foretag,
+    orgNr: wizardData['org-nr'],
+    kontaktperson: wizardData.Kontaktperson,
+    epost: wizardData['e-post-kontaktperson'],
+    telefon: wizardData['telefonnummer-kontaktperson'],
+    epostFaktura: wizardData['e-post-faktura'],
+    avtalslangd: formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet),
+    startdatum: wizardData.begynnelsedag,
+    avtalsobjekt: wizardData.agreementText,
+    antalTjanster: wizardData.case_id
+      ? (wizardData.prefillServices?.length ?? 0)
+      : wizardData.draftItems.filter(i => i.item_type === 'service').length,
+  }), [wizardData])
+  const kontrollStoppar = harStopp(kontrollPunkter)
+
+  const avsnittSteg: Record<KontrollAvsnitt, number> = {
+    motpart: counterpartyStep,
+    avtalstid: begoneStep,
+    avtalsobjekt: agreementStep,
+    tjanster: productsStep,
+  }
+  const avsnittNamn: Record<KontrollAvsnitt, string> = {
+    motpart: 'Motpart',
+    avtalstid: 'BeGone',
+    avtalsobjekt: isContract ? 'Avtalsobjekt' : 'Offertinnehåll',
+    tjanster: 'Tjänster',
   }
 
   const handleSubmit = async () => {
@@ -690,7 +910,7 @@ export default function OneflowContractCreator() {
     // Samma formatering som när fälten lämnas, ifall något förifyllts och aldrig fått fokus
     const kontakt = snyggaTillKontakt(wizardData)
 
-    const contractData = {
+    const contractData: Record<string, string> = {
       anstalld: kontakt.anstalld,
       'e-post-anstlld': kontakt['e-post-anstlld'],
       // Mallen skriver "inledande period om {avtalslngd}", så enheten följer med
@@ -698,7 +918,6 @@ export default function OneflowContractCreator() {
       begynnelsedag: wizardData.begynnelsedag,
       'dokument-skapat': new Date().toISOString().split('T')[0],
       'e-post-kontaktperson': kontakt['e-post-kontaktperson'],
-      // 'faktura-adress-pdf' lämnas tom så kunden kan fylla i
       foretag: kontakt.foretag,
       Kontaktperson: kontakt.Kontaktperson,
       'org-nr': kontakt['org-nr'],
@@ -707,6 +926,9 @@ export default function OneflowContractCreator() {
       'stycke-1': part1,
       'stycke-2': part2
     }
+    // E-post för faktura: avtalsmallens fält 'faktura-adress-pdf', i offerter
+    // 'epost-faktura' (mappas i create-contract). Tomt = kunden fyller i vid signering.
+    if (kontakt['e-post-faktura']) contractData['faktura-adress-pdf'] = kontakt['e-post-faktura']
 
     const recipient = {
       name: kontakt.Kontaktperson,
@@ -732,15 +954,15 @@ export default function OneflowContractCreator() {
     )
 
     try {
-      setCreationStep('Ansluter till Oneflow...')
-      const response = await fetch('/api/oneflow/create-contract', {
+      setCreationStep('Skapar utkast i Oneflow...')
+      const response = await apiFetch('/api/oneflow/create-contract', {
         method: 'POST',
-        headers: await getAuthHeaders(),
-        body: JSON.stringify({ 
-          templateId: wizardData.selectedTemplate, 
-          contractData, 
-          recipient, 
-          sendForSigning: wizardData.sendForSigning, 
+        body: JSON.stringify({
+          templateId: wizardData.selectedTemplate,
+          contractData,
+          recipient,
+          // Allt skapas som utkast och skickas först när PDF:en är godkänd (steg 10)
+          sendForSigning: false,
           partyType: wizardData.partyType,
           documentType: wizardData.documentType,
           fastighetsbeteckning, // Endast offerter använder fältet (hanteras i API:t)
@@ -804,31 +1026,28 @@ export default function OneflowContractCreator() {
           )
         })
       })
-      
+
       if (!response.ok) {
         const error = await response.json()
         console.error('[wizard] API-fel:', error)
-        // Leads (Webb): offerten kan ha skickats fast metadata inte kunde sparas efteråt
+        // Utkastet skapades i Oneflow men tjänsterna kunde inte sparas i portalen.
+        // Visa PDF:en ändå: "Ändra i wizarden" tar bort utkastet och försöker igen.
         if (response.status === 502 && error?.contract?.id) {
-          await kopplaOffertTillForfragan(error.contract.id)
+          setDraftContract({
+            id: error.contract.id,
+            warning: 'Utkastet skapades i Oneflow men tjänsterna kunde inte sparas i portalen. Välj Ändra i wizarden och skapa det igen.',
+          })
+          return
         }
         const thrown: any = new Error(error.detail || error.message || 'Ett okänt serverfel inträffade')
         // Bifoga OneFlow-felobjektet (inkl. parameter_problems) för fält-specifik felhantering
         thrown.oneflowError = error.oneflow_error || error
         throw thrown
       }
-      
-      setCreationStep('Skapar dokument...')
+
       const result = await response.json()
-      
       setCreationStep('Slutför...')
-      // Leads (Webb): bara en offert som faktiskt skickats kopplas till förfrågan
-      if (!result.warning) {
-        await kopplaOffertTillForfragan(result.contract?.id)
-      }
-      setCreatedContract(result.contract)
-      setShowConfetti(true)
-      
+
       // Handle multisite recipient saving for quotes
       if (wizardData.documentType === 'offer' && wizardData.multisite_recipient && wizardData.case_id) {
         setCreationStep('Sparar mottagare...')
@@ -853,21 +1072,10 @@ export default function OneflowContractCreator() {
           console.warn('Failed to save quote recipient:', recipientError)
         }
       }
-      
-      toast.success('✅ Kontrakt skapat framgångslikt!')
 
-      // Stäng av confetti efter 5 sekunder
-      setTimeout(() => setShowConfetti(false), 5000)
-
-      // Redirecta till offertuppföljning efter kort paus så success-cardet hinner registreras
-      setTimeout(() => {
-        navigate(
-          wizardData.web_inquiry_id && wizardData.returnPath && !result.warning
-            ? wizardData.returnPath
-            : getFollowUpRoute()
-        )
-      }, 2500)
-      
+      setDraftContract({ id: result.contract.id })
+      window.scrollTo({ top: 0 })
+      toast.success('Utkastet är skapat i Oneflow')
     } catch (err: any) {
       // Parse OneFlow parameter_problems om det finns, annars använd generic message
       const oneflowErr = err.oneflowError as
@@ -909,116 +1117,194 @@ export default function OneflowContractCreator() {
     }
   }
 
-  // Snabbfyll funktioner
-  const fillTestData = (type: 'company' | 'individual') => {
-    if (type === 'company') {
-      updateWizardData('foretag', 'Bella Vista Ristorante AB')
-      updateWizardData('org-nr', '556789-0123')
-      updateWizardData('Kontaktperson', 'Giuseppe Romano')
-      updateWizardData('e-post-kontaktperson', 'giuseppe@bellavista.se')
-      updateWizardData('telefonnummer-kontaktperson', '08-555 0123')
-      updateWizardData('utforande-adress', 'Kungsgatan 25, 111 56 Stockholm')
-    } else {
-      updateWizardData('Kontaktperson', 'Anna Svensson')
-      updateWizardData('org-nr', '19850315-1234')
-      updateWizardData('e-post-kontaktperson', 'anna.svensson@email.se')
-      updateWizardData('telefonnummer-kontaktperson', '070-123 45 67')
-      updateWizardData('utforande-adress', 'Storgatan 15, 111 22 Stockholm')
+  // --- Steg 10: utkastet --------------------------------------------------
+
+  const handleSendDraft = async () => {
+    if (!draftContract) return
+    setDraftAction('send')
+    try {
+      const sent = await OneflowDraftService.publish(draftContract.id)
+      // Leads (Webb): bara en offert som faktiskt skickats kopplas till förfrågan
+      await kopplaOffertTillForfragan(sent.id)
+      setCreatedContract({ id: sent.id, state: 'published' })
+      setDraftContract(null)
+      toast.success(isContract ? 'Avtalet är skickat för signering' : 'Offerten är skickad')
+
+      // Redirecta till offertuppföljning efter kort paus så bekräftelsen hinner registreras
+      setTimeout(() => {
+        navigate(
+          wizardData.web_inquiry_id && wizardData.returnPath
+            ? wizardData.returnPath
+            : getFollowUpRoute()
+        )
+      }, 2500)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte skicka dokumentet')
+    } finally {
+      setDraftAction(null)
     }
-    toast.success('📝 Testdata ifylld!')
+  }
+
+  const handleEditDraft = async () => {
+    if (!draftContract) return
+    const ok = window.confirm(
+      'Utkastet tas bort i Oneflow och du kommer tillbaka till granskningen med alla uppgifter kvar. Ett nytt utkast skapas när du är klar. Fortsätta?'
+    )
+    if (!ok) return
+    setDraftAction('remove')
+    try {
+      await OneflowDraftService.remove(draftContract.id)
+      setDraftContract(null)
+      setSubmitError(null)
+      setFromReview(false)
+      setCurrentStep(reviewStep)
+      toast.success('Utkastet är borttaget')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ta bort utkastet')
+    } finally {
+      setDraftAction(null)
+    }
+  }
+
+  const handleSaveDraft = () => {
+    toast.success('Utkastet ligger kvar under Dokumentsignering')
+    navigate(getDraftListRoute())
+  }
+
+  const leaveWizard = (route: string) => {
+    if (hasUnsavedProgress()) {
+      if (!window.confirm('Du har osparade ändringar. Vill du lämna sidan?')) return
+    }
+    navigate(route)
+  }
+
+  // --- Steginnehåll -------------------------------------------------------
+
+  const stepHeadings = (): [string, string] => {
+    if (isContract && currentStep === 4) return ['Kundgrupp', 'Styr prislista och hur kunden följs upp. Kundnumret tilldelas vid signering.']
+    const logicalStep = isContract && currentStep >= 5 ? currentStep - 1 : currentStep
+    switch (logicalStep) {
+      case 1: return ['Vad ska du skapa?', 'Välj om kunden ska få ett avtalsförslag eller en offert.']
+      case 2: return ['Välj mall', `Mallen styr ${isContract ? 'avtalets' : 'offertens'} fasta text i Oneflow.`]
+      case 3: return ['Vem är avtalspart?', 'Företag eller privatperson.']
+      case 4: return isContract
+        ? ['Avtalstid och ansvarig', 'Vem som står på avtalet från Begone, och hur länge det gäller.']
+        : ['Ansvarig', 'Vem som står på offerten från Begone.']
+      case 5: return ['Motpart', `Kundens uppgifter som de står i ${isContract ? 'avtalet' : 'offerten'}.`]
+      case 6: return ['Tjänster och pris', 'Det kunden betalar, och artiklarna som ingår internt.']
+      case 7: return isContract
+        ? ['Avtalsobjekt', 'Vad som ingår, med kundens egna ord.']
+        : ['Offertinnehåll', 'Vad arbetet omfattar, med kundens egna ord.']
+      case 8: return [
+        isContract ? 'Granska avtalet' : 'Granska offerten',
+        `Så här kommer ${isContract ? 'avtalet' : 'offerten'} att se ut för kunden. Ändra tar dig till rätt steg och tillbaka hit.`,
+      ]
+      default: return ['', '']
+    }
   }
 
   // Rendera kundgruppsteget (bara för avtal, steg 4)
   const renderCustomerGroupStep = () => (
-    <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-white mb-2">Välj Kundgrupp</h2>
-        <p className="text-slate-400">Vilken kundgrupp tillhör kunden? Kundnumret tilldelas vid signering.</p>
-      </div>
-
+    <>
       {groupsLoading && (
-        <div className="max-w-xl mx-auto py-8">
+        <div className="py-8">
           <LoadingSpinner text="Laddar kundgrupper…" />
         </div>
       )}
 
       {!groupsLoading && groupsError && (
-        <div className="max-w-xl mx-auto p-4 border border-red-500/40 bg-red-500/10 rounded-xl text-center">
-          <p className="text-red-300 text-sm mb-3">Kunde inte hämta kundgrupper: {groupsError}</p>
-          <Button variant="primary" onClick={loadCustomerGroups}>Försök igen</Button>
-          <p className="text-xs text-slate-400 mt-2">
+        <div className={`${CARD_CLASS} p-5 space-y-3`}>
+          <p className="flex items-center gap-2 text-[15px] text-white">
+            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+            Kunde inte hämta kundgrupper: {groupsError}
+          </p>
+          <p className="text-[13px] text-slate-400">
             Om problemet kvarstår: logga ut och in igen, eller rensa webbläsarens cache.
           </p>
+          <button type="button" onClick={loadCustomerGroups} className={OUTLINE_BUTTON}>Försök igen</button>
         </div>
       )}
 
       {!groupsLoading && !groupsError && customerGroups.length === 0 && (
-        <div className="max-w-xl mx-auto p-4 border border-amber-500/40 bg-amber-500/10 rounded-xl text-center">
-          <p className="text-amber-200 text-sm">Inga aktiva kundgrupper hittades. Kontakta administratör.</p>
-        </div>
+        <p className="flex items-center gap-2 text-[15px] text-slate-300">
+          <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+          Inga aktiva kundgrupper hittades. Kontakta administratör.
+        </p>
       )}
 
       {!groupsLoading && !groupsError && customerGroups.length > 0 && (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
-        {customerGroups.map((group, index) => {
-          const capacity = group.series_end - group.series_start + 1
-          const used = Math.max(0, group.current_counter - group.series_start + 1)
-          const remaining = capacity - used
-          const isSelected = wizardData.customer_group_id === group.id
-
-          return (
-            <motion.div
-              key={group.id}
-              onClick={() => updateWizardData('customer_group_id', group.id)}
-              className={`relative p-5 rounded-xl border-2 cursor-pointer overflow-hidden ${
-                isSelected
-                  ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/30'
-                  : 'border-slate-700 bg-slate-800/50'
-              }`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-              whileHover={{
-                scale: 1.02,
-                boxShadow: isSelected
-                  ? '0 25px 50px -12px rgba(34, 197, 94, 0.4)'
-                  : '0 25px 50px -12px rgba(148, 163, 184, 0.2)',
-                borderColor: isSelected ? '#22c55e' : '#64748b'
-              }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <div>
-                <h3 className="text-sm font-semibold text-white mb-1">{group.name}</h3>
-                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
-                  <span className="font-mono">Serie {group.series_start}–{group.series_end}</span>
-                  <span>|</span>
-                  <span>{remaining} lediga</span>
-                </div>
-                {/* Kapacitetsbar */}
-                <div className="w-full h-1.5 bg-slate-700 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${remaining < 20 ? 'bg-amber-500' : 'bg-[#20c58f]'}`}
-                    style={{ width: `${Math.min(100, (used / capacity) * 100)}%` }}
-                  />
-                </div>
-              </div>
-              {isSelected && (
-                <motion.div
-                  className="absolute top-2 right-2"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.3, type: 'spring', bounce: 0.5 }}
-                >
-                  <CheckCircle className="w-5 h-5 text-green-500" />
-                </motion.div>
-              )}
-            </motion.div>
-          )
-        })}
-      </div>
+        <div role="radiogroup" aria-label="Kundgrupp" className={`${CARD_CLASS} overflow-hidden`}>
+          {customerGroups.map(group => {
+            const capacity = group.series_end - group.series_start + 1
+            const used = Math.max(0, group.current_counter - group.series_start + 1)
+            const remaining = capacity - used
+            return (
+              <RadioRad
+                key={group.id}
+                vald={wizardData.customer_group_id === group.id}
+                namn={group.name}
+                text={`Serie ${group.series_start}–${group.series_end} · ${remaining} lediga`}
+                onClick={() => updateWizardData('customer_group_id', group.id)}
+              />
+            )
+          })}
+        </div>
       )}
-    </div>
+    </>
   )
+
+  const renderAgreementSuggestionButton = () => {
+    const hasPrefill = !!wizardData.case_id && !!wizardData.prefillServices && wizardData.prefillServices.length > 0
+    const serviceDraftItems = wizardData.draftItems.filter(i => i.item_type === 'service')
+    const articleDraftItems = wizardData.draftItems.filter(i => i.item_type === 'article')
+    const canGenerate = hasPrefill || serviceDraftItems.length > 0
+    if (!canGenerate) return null
+    return (
+      <button
+        type="button"
+        className={`${LINK_BUTTON} text-sm`}
+        onClick={() => {
+          const lines: string[] = []
+          if (hasPrefill) {
+            wizardData.prefillServices!.forEach(s => {
+              const qty = s.quantity > 1 ? ` (${s.quantity} st)` : ''
+              lines.push(`- ${s.service_name ?? 'Tjänst'}${qty}`)
+              // Artiklar mappade mot denna tjänsterad
+              const mappedArticles = wizardData.selectedArticles.filter(
+                a => a.mapped_service_id === s.id
+              )
+              mappedArticles.forEach(a => {
+                const aQty = a.quantity > 1 ? ` (${a.quantity} st)` : ''
+                const desc = a.article.description ? ` – ${a.article.description}` : ''
+                lines.push(`   • ${a.article.name}${aQty}${desc}`)
+              })
+            })
+          } else {
+            serviceDraftItems.forEach(svc => {
+              const qty = svc.quantity > 1 ? ` (${svc.quantity} st)` : ''
+              const extra = svc.notes ? ` - ${svc.notes}` : ''
+              lines.push(`- ${svc.service_name ?? 'Tjänst'}${qty}${extra}`)
+              // Artiklar mappade mot denna tjänst via priceAssignments eller mapped_service_id
+              const mapped = articleDraftItems.filter(a => {
+                const assigned = wizardData.draftPriceAssignments[a.id] ?? a.mapped_service_id
+                return assigned === svc.id
+              })
+              mapped.forEach(a => {
+                const aQty = a.quantity > 1 ? ` (${a.quantity} st)` : ''
+                const desc = a.article?.description ? ` – ${a.article.description}` : ''
+                lines.push(`   • ${a.article_name}${aQty}${desc}`)
+              })
+            })
+          }
+          const generatedText = `Tjänster som ingår:\n\n${lines.join('\n')}`
+          updateWizardData('agreementText', generatedText)
+          toast.success('Förslaget är skrivet utifrån tjänsterna')
+        }}
+      >
+        Skriv förslag från tjänsterna
+      </button>
+    )
+  }
 
   const renderStepContent = () => {
     // Steg 1-3 är samma för alla
@@ -1036,614 +1322,332 @@ export default function OneflowContractCreator() {
     switch (logicalStep) {
       case 1:
         return (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Typ av Dokument</h2>
-              <p className="text-slate-400">Välj om du vill skicka ett offertförslag eller avtalsförslag</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-              <motion.div
-                onClick={() => updateWizardData('documentType', 'offer')}
-                className={`p-8 rounded-xl border-2 cursor-pointer relative overflow-hidden ${
-                  wizardData.documentType === 'offer'
-                    ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/30'
-                    : 'border-slate-700 bg-slate-800/50'
-                }`}
-                whileHover={{ 
-                  scale: 1.02, 
-                  boxShadow: wizardData.documentType === 'offer' 
-                    ? '0 25px 50px -12px rgba(34, 197, 94, 0.4)' 
-                    : '0 25px 50px -12px rgba(148, 163, 184, 0.2)',
-                  borderColor: wizardData.documentType === 'offer' ? '#22c55e' : '#64748b'
-                }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="text-center">
-                  <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <DollarSign className="w-10 h-10 text-blue-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-3">Offertförslag</h3>
-                  <p className="text-slate-400 text-sm mb-4">
-                    Skicka prisförslag och tjänstebeskrivning till potentiell kund
-                  </p>
-                  <div className="text-xs text-slate-500 space-y-1">
-                    <div>• Företag (exkl moms)</div>
-                    <div>• Privatperson (inkl moms)</div>
-                    <div>• ROT/RUT-avdrag</div>
-                  </div>
-                  {wizardData.documentType === 'offer' && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ duration: 0.3, type: "spring", bounce: 0.5 }}
-                    >
-                      <CheckCircle className="w-6 h-6 text-green-500 mx-auto mt-4" />
-                    </motion.div>
-                  )}
-                </div>
-              </motion.div>
-
-              <motion.div
-                onClick={() => updateWizardData('documentType', 'contract')}
-                className={`p-8 rounded-xl border-2 cursor-pointer relative overflow-hidden ${
-                  wizardData.documentType === 'contract'
-                    ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/30'
-                    : 'border-slate-700 bg-slate-800/50'
-                }`}
-                whileHover={{ 
-                  scale: 1.02, 
-                  boxShadow: wizardData.documentType === 'contract' 
-                    ? '0 25px 50px -12px rgba(34, 197, 94, 0.4)' 
-                    : '0 25px 50px -12px rgba(148, 163, 184, 0.2)',
-                  borderColor: wizardData.documentType === 'contract' ? '#22c55e' : '#64748b'
-                }}
-                whileTap={{ scale: 0.98 }}
-                transition={{ duration: 0.2 }}
-              >
-                <div className="text-center">
-                  <div className="w-20 h-20 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <FileCheck className="w-10 h-10 text-purple-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-3">Avtalsförslag</h3>
-                  <p className="text-slate-400 text-sm mb-4">
-                    Skapa bindande serviceavtal med kund
-                  </p>
-                  <div className="text-xs text-slate-500 space-y-1">
-                    <div>• Skadedjursavtal</div>
-                    <div>• Betesstationer</div>
-                    <div>• Speciallösningar</div>
-                  </div>
-                  {wizardData.documentType === 'contract' && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ duration: 0.3, type: "spring", bounce: 0.5 }}
-                    >
-                      <CheckCircle className="w-6 h-6 text-green-500 mx-auto mt-4" />
-                    </motion.div>
-                  )}
-                </div>
-              </motion.div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <ValKort
+              vald={wizardData.documentType === 'contract'}
+              namn="Avtalsförslag"
+              text="Löpande avtal med årspremie. Kunden signerar i Oneflow."
+              onClick={() => updateWizardData('documentType', 'contract')}
+            />
+            <ValKort
+              vald={wizardData.documentType === 'offer'}
+              namn="Offert"
+              text="Engångsuppdrag med fast pris. Kunden godkänner i Oneflow."
+              onClick={() => updateWizardData('documentType', 'offer')}
+            />
           </div>
         )
 
       case 2:
         return (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">
-                Välj {wizardData.documentType === 'offer' ? 'Offertmall' : 'Avtalsmall'}
-              </h2>
-              <p className="text-slate-400">
-                Välj vilken {wizardData.documentType === 'offer' ? 'offertmall' : 'avtalsmall'} du vill använda
-              </p>
-              {wizardData.selectedTemplate && (
-                <div className="mt-4 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-lg inline-block">
-                  <p className="text-green-400 text-sm">
-                    ✓ Mall förvald från ärende: {availableTemplates.find(t => t.id === wizardData.selectedTemplate)?.name}
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-4xl mx-auto">
-              {availableTemplates.map((template, index) => (
-                <motion.div
-                  key={template.id}
-                  onClick={() => updateWizardData('selectedTemplate', template.id)}
-                  className={`relative p-6 rounded-xl border-2 cursor-pointer overflow-hidden ${
-                    wizardData.selectedTemplate === template.id
-                      ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/30'
-                      : 'border-slate-700 bg-slate-800/50'
-                  }`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ 
-                    scale: 1.02, 
-                    boxShadow: wizardData.selectedTemplate === template.id 
-                      ? '0 25px 50px -12px rgba(34, 197, 94, 0.4)' 
-                      : '0 25px 50px -12px rgba(148, 163, 184, 0.2)',
-                    borderColor: wizardData.selectedTemplate === template.id ? '#22c55e' : '#64748b'
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  {template.popular && (
-                    <div className="absolute -top-2 -right-2 bg-orange-500 text-[#fff] text-xs px-2 py-1 rounded-full font-medium">
-                      Populär
-                    </div>
-                  )}
-                  
-                  {wizardData.documentType === 'offer' && template.category && (
-                    <div className="absolute -top-2 -left-2 bg-blue-500 text-[#fff] text-xs px-2 py-1 rounded-full font-medium">
-                      {template.category === 'company' ? 'Företag' : 'Privatperson'}
-                    </div>
-                  )}
-                  
-                  <div className="text-center">
-                    <h3 className="text-lg font-semibold text-white mb-2">{template.name}</h3>
-                    
-                    {wizardData.selectedTemplate === template.id && (
-                      <motion.div 
-                        className="flex items-center justify-center mt-4"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ duration: 0.3, type: "spring", bounce: 0.5 }}
-                      >
-                        <CheckCircle className="w-6 h-6 text-green-500" />
-                      </motion.div>
-                    )}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
+          <div role="radiogroup" aria-label="Mall" className={`${CARD_CLASS} overflow-hidden`}>
+            {availableTemplates.map(template => (
+              <RadioRad
+                key={template.id}
+                vald={wizardData.selectedTemplate === template.id}
+                namn={template.name}
+                text={[
+                  wizardData.documentType === 'offer' && template.category
+                    ? (template.category === 'company' ? 'Företag' : 'Privatperson')
+                    : null,
+                  template.popular ? 'Mest använd' : null,
+                ].filter(Boolean).join(' · ') || undefined}
+                onClick={() => updateWizardData('selectedTemplate', template.id)}
+              />
+            ))}
           </div>
         )
 
       case 3:
         return (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-bold text-white mb-2">Typ av Avtalspart</h2>
-              <p className="text-slate-400">Är {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'} för ett företag eller en privatperson?</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-              <div
-                onClick={() => updateWizardData('partyType', 'company')}
-                className={`p-8 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:scale-105 ${
-                  wizardData.partyType === 'company'
-                    ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/20'
-                    : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                }`}
-              >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Building2 className="w-8 h-8 text-blue-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Företag</h3>
-                  <p className="text-slate-400 text-sm">Avtal med företag, organisationsnummer krävs</p>
-                  {wizardData.partyType === 'company' && (
-                    <CheckCircle className="w-6 h-6 text-green-500 mx-auto mt-4" />
-                  )}
-                </div>
-              </div>
-
-              <div
-                onClick={() => updateWizardData('partyType', 'individual')}
-                className={`p-8 rounded-xl border-2 cursor-pointer transition-all duration-300 hover:scale-105 ${
-                  wizardData.partyType === 'individual'
-                    ? 'border-green-500 bg-green-500/10 shadow-lg shadow-green-500/20'
-                    : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
-                }`}
-              >
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <User className="w-8 h-8 text-purple-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Privatperson</h3>
-                  <p className="text-slate-400 text-sm">Avtal med privatperson, personnummer kan användas</p>
-                  {wizardData.partyType === 'individual' && (
-                    <CheckCircle className="w-6 h-6 text-green-500 mx-auto mt-4" />
-                  )}
-                </div>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <ValKort
+              vald={wizardData.partyType === 'company'}
+              namn="Företag"
+              text="Org.nr och kontaktperson hos bolaget."
+              onClick={() => updateWizardData('partyType', 'company')}
+            />
+            <ValKort
+              vald={wizardData.partyType === 'individual'}
+              namn="Privatperson"
+              text="Personnummer. ROT-avdrag kan bli aktuellt."
+              onClick={() => updateWizardData('partyType', 'individual')}
+            />
           </div>
         )
 
       case 4:
         return (
-          <div className="space-y-6 max-w-2xl mx-auto">
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                <Building2 className="w-6 h-6 text-blue-400" />
-                BeGone Information
-              </h3>
-              <p className="text-slate-400">Uppgifter om ansvarig person från BeGone</p>
-            </div>
-            
-            <Card className="p-6">
-              <div className="space-y-6">
-                {/* 🆕 VISA AKTUELL ANVÄNDARES INFO */}
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                  <div className="flex items-center gap-2 text-blue-400 text-sm mb-2">
-                    <User className="w-4 h-4" />
-                    <span>Inloggad som: {user?.email}</span>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Avtalet kommer att skickas från info@begone.se med ditt namn som ansvarig.
-                  </p>
-                </div>
-                
-                <div className="border-t border-slate-700"></div>
-                
-                <div className="space-y-4">
-                  <Input
-                  label="Ansvarig från BeGone *"
+          <div className={`${CARD_CLASS} p-6 space-y-5`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <label className={LABEL_CLASS}>
+                Ansvarig från BeGone
+                <input
+                  className={FIELD_CLASS}
                   value={wizardData.anstalld}
                   onChange={e => updateWizardData('anstalld', e.target.value)}
                   onBlur={snyggaTillFalt('anstalld')}
-                  icon={<User className="w-4 h-4" />}
                   placeholder="Förnamn Efternamn"
                 />
-                
-                <Input
-                  label="E-post ansvarig *"
+              </label>
+              <label className={LABEL_CLASS}>
+                E-post ansvarig
+                <input
                   type="email"
+                  className={FIELD_CLASS}
                   value={wizardData['e-post-anstlld']}
                   onChange={e => updateWizardData('e-post-anstlld', e.target.value)}
                   onBlur={snyggaTillFalt('e-post-anstlld')}
-                  icon={<Mail className="w-4 h-4" />}
                   placeholder="namn@begone.se"
                 />
-                
-                {/* Visa endast avtalslängd och startdatum för avtal, inte för offerter */}
-                {wizardData.documentType === 'contract' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="w-full">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">
-                        Avtalslängd *
-                      </label>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          min="1"
-                          max={wizardData.avtalslangdEnhet === 'år' ? '10' : '120'}
-                          value={wizardData.avtalslngd}
-                          onChange={e => updateWizardData('avtalslngd', e.target.value)}
-                          icon={<Calendar className="w-4 h-4" />}
-                        />
-                        <select
-                          aria-label="Enhet för avtalslängd"
-                          value={wizardData.avtalslangdEnhet}
-                          onChange={e => updateWizardData('avtalslangdEnhet', e.target.value)}
-                          className="shrink-0 bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
-                        >
-                          <option value="år">år</option>
-                          <option value="månader">månader</option>
-                        </select>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        Står i avtalet som "inledande period om {formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet) || '…'}".
-                      </p>
-                    </div>
-                    
-                    {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
-                        och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets.
-                        Labeln lyfts ut hit eftersom DateField saknar label-prop, och
-                        kalenderikonen ingår redan i komponenten. */}
-                    <div className="w-full">
-                      <label className="block text-xs font-medium text-slate-400 mb-1">
-                        Startdatum *
-                      </label>
-                      <DateField
-                        value={wizardData.begynnelsedag}
-                        onChange={(v) => updateWizardData('begynnelsedag', v)}
-                        className="w-full pl-9 pr-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200"
+              </label>
+
+              {/* Visa endast avtalslängd och startdatum för avtal, inte för offerter */}
+              {wizardData.documentType === 'contract' && (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="avtalslangd" className="text-[13px] font-semibold text-slate-300">Avtalslängd</label>
+                    <div className="flex gap-2">
+                      <input
+                        id="avtalslangd"
+                        type="number"
+                        min="1"
+                        max={wizardData.avtalslangdEnhet === 'år' ? '10' : '120'}
+                        className={FIELD_CLASS.replace('w-full', 'w-24 shrink-0')}
+                        value={wizardData.avtalslngd}
+                        onChange={e => updateWizardData('avtalslngd', e.target.value)}
                       />
+                      <select
+                        aria-label="Enhet för avtalslängd"
+                        value={wizardData.avtalslangdEnhet}
+                        onChange={e => updateWizardData('avtalslangdEnhet', e.target.value)}
+                        className={`${FIELD_CLASS} flex-1`}
+                      >
+                        <option value="år">år</option>
+                        <option value="månader">månader</option>
+                      </select>
                     </div>
+                    <span className="text-[13px] text-slate-400">
+                      I avtalet: "inledande period om {formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet) || '…'}"
+                    </span>
                   </div>
-                )}
-                </div>
-              </div>
-            </Card>
+
+                  {/* DateField istället för <input type="date">: Chrome ignorerar lang="sv-SE"
+                      och visar mm/dd/yyyy efter webbläsarens språk, aldrig dokumentets.
+                      Labeln lyfts ut hit eftersom DateField saknar label-prop, och
+                      kalenderikonen ingår redan i komponenten. */}
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="begynnelsedag" className="text-[13px] font-semibold text-slate-300">Startdatum</label>
+                    <DateField
+                      id="begynnelsedag"
+                      value={wizardData.begynnelsedag}
+                      onChange={(v) => updateWizardData('begynnelsedag', v)}
+                      className="w-full min-h-[44px] pr-3 bg-slate-900 border border-slate-600 rounded-lg text-[15px] text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+            <p className="text-[13px] text-slate-400 border-t border-slate-700/60 pt-4">
+              Inloggad som {user?.email}. {isContract ? 'Avtalet' : 'Offerten'} skickas från info@begone.se med ditt namn som ansvarig.
+            </p>
           </div>
         )
 
-      case 5:
+      case 5: {
+        const isCompany = wizardData.partyType === 'company'
+        const epost = wizardData['e-post-kontaktperson']
         return (
-          <div className="space-y-6 max-w-2xl mx-auto">
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                <User className="w-6 h-6 text-green-400" />
-                {wizardData.partyType === 'company' ? 'Företagsinformation' : 'Personuppgifter'}
-              </h3>
-              <p className="text-slate-400">
-                Uppgifter om {wizardData.partyType === 'company' ? 'företaget' : 'personen'} som ska {wizardData.documentType === 'offer' ? 'få offerten' : 'teckna avtalet'}
-              </p>
-            </div>
-            
-            <Card className="p-6">
-              <div className="space-y-6">
-                {wizardData.partyType === 'company' && (
-                  <>
-                    <Input
-                      label="Företagsnamn *"
-                      value={wizardData.foretag}
-                      onChange={e => updateWizardData('foretag', e.target.value)}
-                      onBlur={snyggaTillFalt('foretag')}
-                      icon={<Building2 className="w-4 h-4" />}
-                      placeholder="AB Företagsnamn"
-                    />
-                    
-                    <Input
-                      label="Organisationsnummer"
-                      value={wizardData['org-nr']}
-                      onChange={e => updateWizardData('org-nr', e.target.value)}
-                      onBlur={snyggaTillFalt('org-nr')}
-                      icon={<Hash className="w-4 h-4" />}
-                      placeholder="556123-4567"
-                    />
-                  </>
-                )}
-                
-                {wizardData.partyType === 'company' && (
-                  <div className="border-t border-slate-700"></div>
-                )}
-                
-                {wizardData.partyType === 'individual' && (
-                  <>
-                    <Input
-                      label="Personnummer"
-                      value={wizardData['org-nr']}
-                      onChange={e => updateWizardData('org-nr', e.target.value)}
-                      onBlur={snyggaTillFalt('org-nr')}
-                      icon={<Hash className="w-4 h-4" />}
-                      placeholder="YYYYMMDD-XXXX"
-                    />
-                    <div className="border-t border-slate-700"></div>
-                  </>
-                )}
-                
-                <div className="space-y-4">
-                  <Input
-                    label={wizardData.partyType === 'company' ? 'Kontaktperson *' : 'Namn *'}
+          <div className={`${CARD_CLASS} p-6 space-y-6`}>
+            {isCompany ? (
+              <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr] gap-5">
+                <label className={LABEL_CLASS}>
+                  Företagsnamn
+                  <input
+                    className={FIELD_CLASS}
+                    value={wizardData.foretag}
+                    onChange={e => updateWizardData('foretag', e.target.value)}
+                    onBlur={snyggaTillFalt('foretag')}
+                    placeholder="Företaget AB"
+                  />
+                </label>
+                <label className={LABEL_CLASS}>
+                  Org.nr
+                  <input
+                    className={FIELD_CLASS}
+                    value={wizardData['org-nr']}
+                    onChange={e => updateWizardData('org-nr', e.target.value)}
+                    onBlur={snyggaTillFalt('org-nr')}
+                    placeholder="556123-4567"
+                  />
+                </label>
+              </div>
+            ) : (
+              <label className={`${LABEL_CLASS} sm:max-w-xs`}>
+                Personnummer
+                <input
+                  className={FIELD_CLASS}
+                  value={wizardData['org-nr']}
+                  onChange={e => updateWizardData('org-nr', e.target.value)}
+                  onBlur={snyggaTillFalt('org-nr')}
+                  placeholder="ÅÅÅÅMMDD-XXXX"
+                />
+              </label>
+            )}
+
+            <div className="border-t border-slate-700/60" />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <label className={LABEL_CLASS}>
+                {isCompany ? 'Kontaktperson' : 'Namn'}
+                <input
+                  className={FIELD_CLASS}
                   value={wizardData.Kontaktperson}
                   onChange={e => updateWizardData('Kontaktperson', e.target.value)}
                   onBlur={snyggaTillFalt('Kontaktperson')}
-                  icon={<User className="w-4 h-4" />}
                   placeholder="Förnamn Efternamn"
                 />
-                
-                <Input
-                  label="E-post *"
-                  type="email"
-                  value={wizardData['e-post-kontaktperson']}
-                  onChange={e => updateWizardData('e-post-kontaktperson', e.target.value)}
-                  onBlur={snyggaTillFalt('e-post-kontaktperson')}
-                  icon={<Mail className="w-4 h-4" />}
-                  placeholder="kontakt@exempel.se"
-                  error={
-                    wizardData['e-post-kontaktperson'] && !isValidEmail(wizardData['e-post-kontaktperson'])
-                      ? 'Ogiltig e-postadress'
-                      : undefined
-                  }
-                />
-                
-                <Input
-                  label="Telefon"
+              </label>
+              <label className={LABEL_CLASS}>
+                Telefon
+                <input
                   type="tel"
+                  className={FIELD_CLASS}
                   value={wizardData['telefonnummer-kontaktperson']}
                   onChange={e => updateWizardData('telefonnummer-kontaktperson', e.target.value)}
                   onBlur={snyggaTillFalt('telefonnummer-kontaktperson')}
-                  icon={<Phone className="w-4 h-4" />}
-                  placeholder="08-555 0123"
+                  placeholder="070-123 45 67"
                 />
-                
-                <Input
-                  label="Adress"
-                  value={wizardData['utforande-adress']}
-                  onChange={e => updateWizardData('utforande-adress', e.target.value)}
-                  onBlur={snyggaTillFalt('utforande-adress')}
-                  icon={<MapPin className="w-4 h-4" />}
-                  placeholder="Gatuadress, Postnummer Stad"
+              </label>
+              <label className={LABEL_CLASS}>
+                E-post
+                <input
+                  type="email"
+                  className={FIELD_CLASS}
+                  value={epost}
+                  onChange={e => updateWizardData('e-post-kontaktperson', e.target.value)}
+                  onBlur={snyggaTillFalt('e-post-kontaktperson')}
+                  placeholder="namn@foretag.se"
+                  aria-invalid={!!epost && !isValidEmail(epost)}
                 />
-                </div>
-              </div>
-              
-              <div className="mt-6 pt-4 border-t border-slate-700">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fillTestData(wizardData.partyType)}
-                  className="w-full"
-                >
-                  ⚡ Fyll i testdata
-                </Button>
-              </div>
-            </Card>
-          </div>
-        )
-
-      case 6: {
-        const hasCaseLink = !!wizardData.case_id
-        return (
-          <div className="space-y-4 max-w-5xl mx-auto">
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                <ShoppingCart className="w-6 h-6 text-green-400" />
-                Produkter
-              </h3>
-              <p className="text-slate-400">
-                {hasCaseLink
-                  ? 'Justera tjänster, interna kostnader och prisguide för ärendet'
-                  : `Välj prislista och artiklar som ska ingå i ${wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}`}
-              </p>
+                {epost && !isValidEmail(epost) && (
+                  <span className="flex items-center gap-1.5 text-xs font-normal text-red-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                    Ogiltig e-postadress
+                  </span>
+                )}
+              </label>
+              <label className={LABEL_CLASS}>
+                E-post för faktura
+                <input
+                  type="email"
+                  className={FIELD_CLASS}
+                  value={wizardData['e-post-faktura']}
+                  onChange={e => updateWizardData('e-post-faktura', e.target.value)}
+                  onBlur={snyggaTillFalt('e-post-faktura')}
+                  placeholder="faktura@foretag.se"
+                />
+                <span className="text-xs font-normal text-slate-400">
+                  {isContract ? 'Valfritt. Lämnas det tomt fyller kunden i det vid signering.' : 'Valfritt. Lämnas det tomt används e-posten ovan.'}
+                </span>
+              </label>
             </div>
 
-            {hasCaseLink ? (
-              <CaseServiceSelector
-                caseId={wizardData.case_id}
-                caseType={wizardData.case_type ?? (wizardData.partyType === 'company' ? 'business' : 'private')}
-                customerId={null}
-                primaryServiceId={null}
-                onChange={(items) => {
-                  const services = mapBillingItemsToPrefillServices(items)
-                  const articles = mapBillingItemsToSelectedArticles(items)
-                  setWizardData(prev => ({
-                    ...prev,
-                    prefillServices: services,
-                    selectedArticles: articles,
-                  }))
-                }}
+            <label className={LABEL_CLASS}>
+              Utförande adress
+              <input
+                className={FIELD_CLASS}
+                value={wizardData['utforande-adress']}
+                onChange={e => updateWizardData('utforande-adress', e.target.value)}
+                onBlur={snyggaTillFalt('utforande-adress')}
+                placeholder="Gatuadress, postnummer ort"
               />
-            ) : (
-              <CaseServiceSelector
-                draftMode
-                caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
-                customerId={null}
-                primaryServiceId={null}
-                initialDraftItems={wizardData.draftItems}
-                initialPriceAssignments={wizardData.draftPriceAssignments}
-                initialPriceMarkups={wizardData.draftPriceMarkups}
-                onChange={(items, _summary, meta) => {
-                  setWizardData(prev => ({
-                    ...prev,
-                    draftItems: items,
-                    draftPriceAssignments: meta?.priceAssignments ?? prev.draftPriceAssignments,
-                    draftPriceMarkups: meta?.priceMarkups ?? prev.draftPriceMarkups,
-                  }))
-                }}
-              />
-            )}
+            </label>
           </div>
         )
       }
 
-      case 7:
+      case 6: {
+        const hasCaseLink = !!wizardData.case_id
+        return hasCaseLink ? (
+          <CaseServiceSelector
+            caseId={wizardData.case_id}
+            caseType={wizardData.case_type ?? (wizardData.partyType === 'company' ? 'business' : 'private')}
+            customerId={null}
+            primaryServiceId={null}
+            onChange={(items) => {
+              const services = mapBillingItemsToPrefillServices(items)
+              const articles = mapBillingItemsToSelectedArticles(items)
+              setWizardData(prev => ({
+                ...prev,
+                prefillServices: services,
+                selectedArticles: articles,
+              }))
+            }}
+          />
+        ) : (
+          <CaseServiceSelector
+            draftMode
+            caseType={wizardData.partyType === 'company' ? 'business' : 'private'}
+            customerId={null}
+            primaryServiceId={null}
+            initialDraftItems={wizardData.draftItems}
+            initialPriceAssignments={wizardData.draftPriceAssignments}
+            initialPriceMarkups={wizardData.draftPriceMarkups}
+            onChange={(items, _summary, meta) => {
+              setWizardData(prev => ({
+                ...prev,
+                draftItems: items,
+                draftPriceAssignments: meta?.priceAssignments ?? prev.draftPriceAssignments,
+                draftPriceMarkups: meta?.priceMarkups ?? prev.draftPriceMarkups,
+              }))
+            }}
+          />
+        )
+      }
+
+      case 7: {
+        const length = wizardData.agreementText.length
         return (
-          <div className="space-y-6 max-w-4xl mx-auto">
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                <FileText className="w-6 h-6 text-blue-400" />
-                {wizardData.documentType === 'offer' ? 'Offertinnehåll' : 'Avtalsobjekt'}
-              </h3>
-              <p className="text-slate-400">
-                Beskriv vad som ska ingå i {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}
-              </p>
-            </div>
-            
-            <Card className="p-6">
-              <div className="space-y-4">
-                <Input
-                  as="textarea"
-                  rows={10}
-                  label={wizardData.documentType === 'offer' ? 'Offertens innehåll och omfattning *' : 'Avtalets innehåll och omfattning *'}
-                  value={wizardData.agreementText}
-                  onChange={(e) => updateWizardData('agreementText', e.target.value)}
-                  placeholder={wizardData.documentType === 'offer' 
-                    ? "Beskriv offertens omfattning och föreslagna tjänster i detalj. Inkludera vad som ingår, frekvens, priser och andra viktiga detaljer..."
-                    : "Beskriv avtalets omfattning och villkor i detalj. Inkludera vad som ingår i servicen, frekvens av besök, rapportering, och andra viktiga villkor..."
-                  }
-                  helperText="Detaljerad beskrivning hjälper kunden att förstå vad som ingår i tjänsten"
-                  icon={<FileText className="w-4 h-4" />}
-                  required
-                />
-                <div className="flex items-center justify-between text-sm">
-                  <span className={`${wizardData.agreementText.length > 2048 ? 'text-red-500' : 'text-slate-400'}`}>
-                    {wizardData.agreementText.length} / 2048 tecken
-                  </span>
-                  {wizardData.agreementText.length > 1024 && (
-                    <span className="text-yellow-500 flex items-center gap-1">
-                      <FileText className="w-3 h-3" />
-                      Texten delas automatiskt i stycken
-                    </span>
-                  )}
-                </div>
-                
-                {(() => {
-                  const hasPrefill = !!wizardData.case_id && !!wizardData.prefillServices && wizardData.prefillServices.length > 0
-                  const serviceDraftItems = wizardData.draftItems.filter(i => i.item_type === 'service')
-                  const articleDraftItems = wizardData.draftItems.filter(i => i.item_type === 'article')
-                  const canGenerate = hasPrefill || serviceDraftItems.length > 0
-                  if (!canGenerate) return null
-                  return (
-                    <div className="pt-4 border-t border-slate-700">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const lines: string[] = []
-                          if (hasPrefill) {
-                            wizardData.prefillServices!.forEach(s => {
-                              const qty = s.quantity > 1 ? ` (${s.quantity} st)` : ''
-                              lines.push(`- ${s.service_name ?? 'Tjänst'}${qty}`)
-                              // Artiklar mappade mot denna tjänsterad
-                              const mappedArticles = wizardData.selectedArticles.filter(
-                                a => a.mapped_service_id === s.id
-                              )
-                              mappedArticles.forEach(a => {
-                                const aQty = a.quantity > 1 ? ` (${a.quantity} st)` : ''
-                                const desc = a.article.description ? ` – ${a.article.description}` : ''
-                                lines.push(`   • ${a.article.name}${aQty}${desc}`)
-                              })
-                            })
-                          } else {
-                            serviceDraftItems.forEach(svc => {
-                              const qty = svc.quantity > 1 ? ` (${svc.quantity} st)` : ''
-                              const extra = svc.notes ? ` - ${svc.notes}` : ''
-                              lines.push(`- ${svc.service_name ?? 'Tjänst'}${qty}${extra}`)
-                              // Artiklar mappade mot denna tjänst via priceAssignments eller mapped_service_id
-                              const mapped = articleDraftItems.filter(a => {
-                                const assigned = wizardData.draftPriceAssignments[a.id] ?? a.mapped_service_id
-                                return assigned === svc.id
-                              })
-                              mapped.forEach(a => {
-                                const aQty = a.quantity > 1 ? ` (${a.quantity} st)` : ''
-                                const desc = a.article?.description ? ` – ${a.article.description}` : ''
-                                lines.push(`   • ${a.article_name}${aQty}${desc}`)
-                              })
-                            })
-                          }
-                          const generatedText = `Tjänster som ingår:\n\n${lines.join('\n')}`
-                          updateWizardData('agreementText', generatedText)
-                          toast.success('Beskrivning genererad från valda tjänster!')
-                        }}
-                        className="w-full"
-                      >
-                        ⚡ Generera beskrivning från valda tjänster
-                      </Button>
-                    </div>
-                  )
-                })()}
+          <div className="flex flex-col gap-4">
+            <div className={`${CARD_CLASS} p-6 flex flex-col gap-2.5`}>
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <label htmlFor="avtalsobjekt" className="text-[13px] font-semibold text-slate-300">
+                  {isContract ? 'Avtalsobjekt, står under § 2 i avtalet' : 'Offertinnehåll, arbetsbeskrivningen i offerten'}
+                </label>
+                {renderAgreementSuggestionButton()}
               </div>
-            </Card>
+              <textarea
+                id="avtalsobjekt"
+                rows={8}
+                value={wizardData.agreementText}
+                onChange={(e) => updateWizardData('agreementText', e.target.value)}
+                placeholder={isContract
+                  ? 'Vad som ingår: antal kontroller per år, vilka stationer, objektets adress och hur aktivitet hanteras.'
+                  : 'Vad arbetet omfattar: åtgärder, antal besök och vad som ingår i priset.'}
+                className="w-full px-3 py-3 bg-slate-900 border border-slate-600 rounded-lg text-[15px] leading-relaxed text-white placeholder-slate-500 resize-y focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent"
+              />
+              <span className={`text-[13px] ${length > AVTALSOBJEKT_MAX_TECKEN ? 'text-red-400 font-semibold' : 'text-slate-400'}`}>
+                {length.toLocaleString('sv-SE')} av {AVTALSOBJEKT_MAX_TECKEN.toLocaleString('sv-SE')} tecken
+                {length > 1024 && length <= AVTALSOBJEKT_MAX_TECKEN && ', delas automatiskt i två stycken'}
+              </span>
+            </div>
 
             {/* Portalens avtalsvillkor — skickas INTE till Oneflow.
                 Styr uppsägningsbevakning och avtalsfakturering i portalen. */}
-            {wizardData.documentType === 'contract' && (
-              <Card className="p-6">
-                <div className="flex items-start gap-2 mb-4">
-                  <Settings className="w-5 h-5 text-[#20c58f] mt-0.5 shrink-0" />
-                  <div>
-                    <h4 className="text-base font-semibold text-white">Villkor i portalen</h4>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      Används för uppsägningsbevakning och fakturering. Skickas inte till Oneflow och
-                      syns inte för kunden.
-                    </p>
-                  </div>
+            {isContract && (
+              <div className={`${CARD_CLASS} p-6 flex flex-col gap-4`}>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-base font-bold text-white">Villkor i portalen</span>
+                  <span className="text-[13px] text-slate-400">Styr bevakning och fakturering. Skickas inte till Oneflow och syns inte för kunden.</span>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-2">Uppsägningstid</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <label className={LABEL_CLASS}>
+                    Uppsägningstid
                     <select
                       value={wizardData.noticePeriodMonths}
                       onChange={(e) => updateWizardData('noticePeriodMonths', e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                      className={FIELD_CLASS}
                     >
                       <option value="0">Ingen uppsägningstid</option>
                       <option value="1">1 månad</option>
@@ -1652,581 +1656,506 @@ export default function OneflowContractCreator() {
                       <option value="6">6 månader</option>
                       <option value="12">12 månader</option>
                     </select>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Styr när avtalet flaggas för bevakning inför förlängning.
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-2">Faktureringsintervall</label>
+                    <span className="text-xs font-normal text-slate-400">Styr när avtalet flaggas för bevakning inför förlängning.</span>
+                  </label>
+                  <label className={LABEL_CLASS}>
+                    Faktureringsintervall
                     <select
                       value={wizardData.billingFrequency}
                       onChange={(e) => updateWizardData('billingFrequency', e.target.value)}
-                      className="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f]"
+                      className={FIELD_CLASS}
                     >
                       <option value="annual">Årsvis (1 gång per år)</option>
                       <option value="semi_annual">Halvårsvis</option>
                       <option value="quarterly">Kvartalsvis</option>
                       <option value="monthly">Månadsvis</option>
                     </select>
-                    <p className="text-[11px] text-slate-500 mt-1">
-                      Styr hur årspremien delas upp i fakturaperioder.
-                    </p>
-                  </div>
+                    <span className="text-xs font-normal text-slate-400">Styr hur årspremien delas upp i fakturaperioder.</span>
+                  </label>
                 </div>
-              </Card>
+              </div>
             )}
           </div>
         )
+      }
 
       case 8:
-        return (
-          <div className="space-y-6 max-w-4xl mx-auto">
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold text-white mb-2 flex items-center justify-center gap-2">
-                <CheckCircle className="w-6 h-6 text-green-400" />
-                Granska & Skicka
-              </h3>
-              <p className="text-slate-400">
-                Kontrollera att allt ser korrekt ut innan du skapar {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'}
-              </p>
-            </div>
-            
-            {/* 🆕 VISA AVSÄNDARINFO */}
-            <Card className="p-6 bg-green-500/10 border-green-500/20">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Avsändare
-              </h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Namn:</span>
-                  <span className="text-white">{wizardData.anstalld}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Avsändare:</span>
-                  <span className="text-white">info@begone.se</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">OneFlow-konto:</span>
-                  <span className="text-green-400">✓ Centraliserat</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* Sammanfattning */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  {wizardData.documentType === 'offer' ? 'Offert & Mall' : 'Avtal & Mall'}
-                </h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Mall:</span>
-                    <span className="text-white">{selectedTemplate?.name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Typ:</span>
-                    <span className="text-white">
-                      {wizardData.partyType === 'company' ? 'Företag' : 'Privatperson'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Längd:</span>
-                    <span className="text-white">{formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet)}</span>
-                  </div>
-                </div>
-              </Card>
-
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <User className="w-5 h-5" />
-                  Motpart
-                </h3>
-                <div className="space-y-2 text-sm">
-                  {wizardData.partyType === 'company' && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400">Företag:</span>
-                      <span className="text-white">{wizardData.foretag || '-'}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">Kontakt:</span>
-                    <span className="text-white">{wizardData.Kontaktperson}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-400">E-post:</span>
-                    <span className="text-white">{wizardData['e-post-kontaktperson']}</span>
-                  </div>
-                </div>
-              </Card>
-            </div>
-
-            {/* Tjänster & Priser (inkl. mappade artiklar + marginal) */}
-            {(() => {
-              const fmtSEK = (n: number) => new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
-              const isPrivate = wizardData.partyType === 'individual'
-              const priceMultiplier = isPrivate ? 1.25 : 1
-              const priceLabel = isPrivate ? 'Totalt inkl. moms' : 'Totalt exkl. moms'
-              const hasPrefill = wizardData.prefillServices && wizardData.prefillServices.length > 0
-              const draftServices = wizardData.draftItems.filter(i => i.item_type === 'service')
-              const draftArticles = wizardData.draftItems.filter(i => i.item_type === 'article')
-              const hasContent = hasPrefill || draftServices.length > 0
-              if (!hasContent) return null
-
-              let serviceTotal = 0
-              let articleCost = 0
-              let rows: React.ReactNode[] = []
-              // Raderna till motorn: varaktig utrustning (fällor, stationer) ska
-              // ställas mot en återkommande årsintäkt, inte dras från år 1.
-              let marginLines: MarginLine[] = []
-
-              if (hasPrefill) {
-                serviceTotal = wizardData.prefillServices!.reduce((s, i) => s + i.total_price, 0)
-                articleCost = wizardData.selectedArticles.reduce((s, a) => s + a.effectivePrice * a.quantity, 0)
-                marginLines = [
-                  ...wizardData.prefillServices!.map((s): MarginLine => ({ item_type: 'service', total_price: s.total_price })),
-                  ...wizardData.selectedArticles.map((a): MarginLine => ({
-                    item_type: 'article',
-                    total_price: a.effectivePrice * a.quantity,
-                    quantity: a.quantity,
-                    article_name: a.article.name,
-                    article: { is_durable: a.article.is_durable, category: a.article.category },
-                  })),
-                ]
-                rows = wizardData.prefillServices!.map(s => {
-                  const mapped = wizardData.selectedArticles.filter(a => a.mapped_service_id === s.id)
-                  return (
-                    <div key={s.id} className="flex justify-between items-start py-2 border-b border-slate-700/30 last:border-0">
-                      <div className="flex-1">
-                        <div className="text-sm text-white">
-                          {s.service_name ?? 'Tjänst'} {s.quantity > 1 && <span className="text-slate-500">× {s.quantity}</span>}
-                        </div>
-                        {mapped.map(a => (
-                          <div key={a.article.id} className="text-xs text-slate-500 ml-4 mt-0.5">
-                            • {a.article.name} {a.quantity > 1 && `× ${a.quantity}`}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-4">
-                        {fmtSEK(s.total_price * priceMultiplier)}
-                      </div>
-                    </div>
-                  )
-                })
-              } else {
-                serviceTotal = draftServices.reduce((s, i) => s + i.total_price, 0)
-                articleCost = draftArticles.reduce((s, i) => s + i.total_price, 0)
-                marginLines = [...draftServices, ...draftArticles] as unknown as MarginLine[]
-                rows = draftServices.map(svc => {
-                  const mapped = draftArticles.filter(a => {
-                    const assigned = wizardData.draftPriceAssignments[a.id] ?? a.mapped_service_id
-                    return assigned === svc.id
-                  })
-                  return (
-                    <div key={svc.id} className="flex justify-between items-start py-2 border-b border-slate-700/30 last:border-0">
-                      <div className="flex-1">
-                        <div className="text-sm text-white">
-                          {svc.service_name ?? 'Tjänst'} {svc.quantity > 1 && <span className="text-slate-500">× {svc.quantity}</span>}
-                        </div>
-                        {mapped.map(a => (
-                          <div key={a.id} className="text-xs text-slate-500 ml-4 mt-0.5">
-                            • {a.article_name} {a.quantity > 1 && `× ${a.quantity}`}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-4">
-                        {fmtSEK(svc.total_price * priceMultiplier)}
-                      </div>
-                    </div>
-                  )
-                })
-              }
-
-              // Ett avtalsförslag är ett avtal: löpande marginal är huvudtalet, men
-              // säljaren ska också se att år 1 går back när fällorna köps in.
-              const mb = summarizeBillingLines(marginLines, { context: 'contract' })
-              const marginAmount = mb.contribution_ongoing
-              const marginPercent = mb.headline_percent ?? 0
-              const marginColor = toneTextClass(marginTone(mb.headline_percent))
-              const hasDurable = mb.cost_durable > 0
-
-              return (
-                <Card className="p-6 mb-6">
-                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <DollarSign className="w-5 h-5" />
-                    Tjänster & Priser
-                  </h3>
-                  <div>{rows}</div>
-                  <div className="flex justify-between pt-3 mt-2 border-t border-slate-700">
-                    <span className="text-sm text-slate-400">{priceLabel}</span>
-                    <span className="text-sm font-bold text-white">{fmtSEK(serviceTotal * priceMultiplier)}</span>
-                  </div>
-                  {articleCost > 0 && (
-                    <>
-                      <div className="flex justify-between mt-2">
-                        <span className="text-xs text-slate-500">Intern inköpskostnad</span>
-                        <span className="text-xs text-slate-400">{fmtSEK(articleCost)}</span>
-                      </div>
-                      {hasDurable && (
-                        <div className="flex justify-between mt-1">
-                          <span className="text-xs text-slate-500">varav varaktig utrustning, engångs</span>
-                          <span className="text-xs text-slate-400 tabular-nums">{fmtSEK(mb.cost_durable)}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between mt-1">
-                        <span className="text-xs text-slate-500">{hasDurable ? 'Löpande marginal (intern)' : 'Marginal (intern)'}</span>
-                        <span className={`text-xs font-semibold ${marginColor}`}>
-                          {marginPercent.toFixed(1)}% ({fmtSEK(marginAmount)}{hasDurable ? '/år' : ''})
-                        </span>
-                      </div>
-                      {hasDurable && (
-                        <>
-                          <div className="flex justify-between mt-1">
-                            <span className="text-xs text-slate-500">Marginal år 1</span>
-                            <span className="text-xs text-slate-400 tabular-nums">
-                              {mb.margin_percent_year1 != null ? `${mb.margin_percent_year1.toFixed(1)}%` : '–'}
-                            </span>
-                          </div>
-                          <div className="flex justify-between mt-1">
-                            <span className="text-xs text-slate-500">Återbetald efter</span>
-                            <span className="text-xs text-slate-400 tabular-nums">
-                              {mb.payback_never ? 'återbetalas inte' : formatPayback(mb.payback_years)}
-                            </span>
-                          </div>
-                          {mb.margin_percent_3y != null && (
-                            <div className="flex justify-between mt-1">
-                              <span className="text-xs text-slate-500">Marginal över tre år</span>
-                              <span className="text-xs text-slate-400 tabular-nums">{mb.margin_percent_3y.toFixed(1)}%</span>
-                            </div>
-                          )}
-                          <p className="text-xs text-slate-500 mt-2">
-                            Fällor och stationer säljs oftast som årspris (tilläggsstation per år), inte som engångsköp.
-                          </p>
-                        </>
-                      )}
-                      <p className="text-xs text-slate-600 mt-2 italic">
-                        Marginalen visas bara internt och skickas inte till kund.
-                      </p>
-                    </>
-                  )}
-                </Card>
-              )
-            })()}
-
-            {/* Avtalsobjekt-förhandsvisning */}
-            {wizardData.agreementText && (
-              <Card className="p-6 mb-6">
-                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  {wizardData.documentType === 'offer' ? 'Offertinnehåll (det kunden ser)' : 'Avtalsobjekt (det kunden ser)'}
-                </h3>
-                <pre className="whitespace-pre-wrap text-sm text-slate-300 font-sans bg-slate-900/50 p-4 rounded-lg border border-slate-700/50">
-                  {wizardData.agreementText}
-                </pre>
-              </Card>
-            )}
-
-            {/* Signering */}
-            <Card className="p-6">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Send className="w-5 h-5" />
-                Signering & Skicka
-              </h3>
-              
-              <label className="flex items-center space-x-3 text-white cursor-pointer p-4 rounded-lg border border-slate-700 hover:bg-slate-800/30 transition-colors">
-                <input 
-                  type="checkbox" 
-                  checked={wizardData.sendForSigning} 
-                  onChange={e => updateWizardData('sendForSigning', e.target.checked)} 
-                  className="rounded border-slate-600 text-green-500 focus:ring-green-500" 
-                /> 
-                <div className="flex items-center gap-2">
-                  <Send className="w-4 h-4" />
-                  <span>Skicka för signering direkt</span>
-                </div>
-              </label>
-              
-              <p className="text-sm text-slate-400 mt-3 px-4">
-                {wizardData.sendForSigning 
-                  ? `📧 ${wizardData.documentType === 'offer' ? 'Offerten' : 'Kontraktet'} publiceras och skickas från info@begone.se till motparten för ${wizardData.documentType === 'offer' ? 'granskning' : 'signering'}` 
-                  : `📝 ${wizardData.documentType === 'offer' ? 'Offerten' : 'Kontraktet'} skapas som utkast i Oneflow och kan skickas senare`
-                }
-              </p>
-            </Card>
-
-            {/* Skapa kontrakt */}
-            <div className="text-center">
-              <Button
-                onClick={() => {
-                  setSubmitError(null)
-                  setShowSubmitConfirm(true)
-                }}
-                disabled={isCreating}
-                className="px-8 py-3 text-lg"
-                size="lg"
-              >
-                {isCreating ? (
-                  <motion.div 
-                    className="flex items-center gap-2"
-                    initial={{ opacity: 1 }}
-                    animate={{ opacity: [1, 0.7, 1] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                  >
-                    <LoadingSpinner size="sm" />
-                    {creationStep || 'Skapar kontrakt...'}
-                  </motion.div>
-                ) : (
-                  <>
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    {wizardData.sendForSigning 
-                      ? `Skapa & Skicka ${wizardData.documentType === 'offer' ? 'Offert' : 'Avtal'}` 
-                      : 'Skapa Utkast'
-                    }
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {/* Bekräftelsedialog */}
-            {showSubmitConfirm && !isCreating && !createdContract && (
-              <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                onClick={() => setShowSubmitConfirm(false)}>
-                <div className="bg-slate-800 rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4"
-                  onClick={e => e.stopPropagation()}>
-                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                    <Send className="w-5 h-5 text-green-400" />
-                    Bekräfta
-                  </h3>
-                  <p className="text-slate-300">
-                    Du är på väg att {wizardData.sendForSigning ? 'skicka' : 'spara'}{' '}
-                    {wizardData.documentType === 'offer' ? 'offerten' : 'avtalet'} till{' '}
-                    <span className="text-white font-medium">{wizardData.Kontaktperson}</span>.
-                  </p>
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="outline" size="sm" onClick={() => setShowSubmitConfirm(false)}>
-                      Avbryt
-                    </Button>
-                    <Button size="sm" onClick={() => { setShowSubmitConfirm(false); handleSubmit() }}>
-                      <CheckCircle className="w-4 h-4 mr-1" />
-                      {wizardData.sendForSigning ? 'Skapa & Skicka' : 'Skapa Utkast'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Retry vid fel */}
-            {submitError && !isCreating && !createdContract && (
-              <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-center">
-                <p className="text-red-400 text-sm mb-3">{submitError}</p>
-                <Button size="sm" onClick={() => { setSubmitError(null); handleSubmit() }}>
-                  Försök igen
-                </Button>
-              </div>
-            )}
-
-            {/* Resultat */}
-            {createdContract && (
-              <Card className="p-6 bg-green-500/10 border-green-500/20">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
-                  <CheckCircle className="w-5 h-5 text-green-400" /> 
-                  {wizardData.documentType === 'offer' ? 'Offert skapad!' : 'Kontrakt skapat!'}
-                </h3>
-                <div className="grid gap-4 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">{wizardData.documentType === 'offer' ? 'Offert-ID:' : 'Kontrakt-ID:'}</span>
-                    <span className="font-mono text-green-400 bg-green-500/10 px-3 py-1 rounded">
-                      #{createdContract.id}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Status:</span>
-                    <span className={`px-3 py-1 rounded text-sm font-medium ${
-                      createdContract.state === 'published' 
-                        ? 'bg-green-500/20 text-green-400' 
-                        : 'bg-yellow-500/20 text-yellow-400'
-                    }`}>
-                      {createdContract.state === 'published' 
-                        ? `📧 Skickat för ${wizardData.documentType === 'offer' ? 'granskning' : 'signering'}` 
-                        : '📝 Utkast'
-                      }
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="flex gap-3 mt-6">
-                  {createdContract.url && (
-                    <Button 
-                      onClick={() => window.open(createdContract.url, '_blank')} 
-                      className="flex-1 flex items-center justify-center gap-2"
-                    >
-                      <ExternalLink className="w-4 h-4" /> 
-                      Öppna i Oneflow
-                    </Button>
-                  )}
-                  
-                  <Button 
-                    variant="outline"
-                    onClick={() => {
-                      setCreatedContract(null)
-                      setCurrentStep(1)
-                      setWizardData({
-                        documentType: 'contract',
-                        selectedTemplate: '',
-                        partyType: 'company',
-                        anstalld: profile?.technicians?.name || profile?.display_name || user?.user_metadata?.full_name || 'BeGone Medarbetare',
-                        'e-post-anstlld': user?.email || '',
-                        avtalslngd: '1',
-                        avtalslangdEnhet: 'år',
-                        begynnelsedag: new Date().toISOString().split('T')[0],
-                        noticePeriodMonths: '3',
-                        billingFrequency: 'annual',
-                        Kontaktperson: '',
-                        'e-post-kontaktperson': '',
-                        'telefonnummer-kontaktperson': '',
-                        'utforande-adress': '',
-                        foretag: '',
-                        'org-nr': '',
-                        selectedPriceListId: null,
-                        selectedArticles: [],
-                        deductionType: null,
-                        customTotalPrice: null,
-                        selectedProducts: [],
-                        draftItems: [],
-                        draftPriceAssignments: {},
-                        draftPriceMarkups: {},
-                        agreementText: 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.',
-                        sendForSigning: true,
-                        customer_group_id: null
-                      })
-                    }}
-                    className="px-6"
-                  >
-                    Skapa nytt dokument
-                  </Button>
-                </div>
-              </Card>
-            )}
-          </div>
-        )
+        return renderReview()
 
       default:
         return null
     }
   }
 
-  return (
-    <div className="min-h-screen bg-slate-950">
-      {/* Success Confetti */}
-      {showConfetti && (
-        <Confetti
-          width={window.innerWidth}
-          height={window.innerHeight}  
-          recycle={false}
-          numberOfPieces={200}
-          gravity={0.3}
-        />
-      )}
-      {/* Header */}
-      <header className="bg-slate-900/50 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                if (hasUnsavedProgress()) {
-                  if (!window.confirm('Du har osparade ändringar. Vill du lämna sidan?')) return
-                }
-                navigate(getDashboardRoute())
-              }}
-              className="flex items-center gap-2"
+  // --- Steg 9: granskningen ---------------------------------------------------
+
+  const renderReview = () => {
+    const isCompany = wizardData.partyType === 'company'
+    const motpartNamn = (isCompany ? wizardData.foretag : '') || wizardData.Kontaktperson || 'kund'
+    const totalLabel = isContract
+      ? `Årspremie ${isPrivate ? 'inkl.' : 'exkl.'} moms`
+      : `Totalt ${isPrivate ? 'inkl.' : 'exkl.'} moms`
+    const { rows, serviceTotal, articleCost, mb } = prisData
+    const marginColor = toneTextClass(marginTone(mb.headline_percent))
+    const hasDurable = mb.cost_durable > 0
+    const kundgrupp = customerGroups.find(g => g.id === wizardData.customer_group_id)
+    const tomt = (v: string) => v.trim() || '–'
+
+    const andra = (step: number) => (
+      <button type="button" onClick={() => goToStepFromReview(step)} className="min-h-[44px] px-1 text-sm font-semibold text-[#20c58f] hover:underline">
+        Ändra
+      </button>
+    )
+
+    return (
+      <div className="flex flex-wrap gap-6 items-start">
+        {/* Pappret: det kunden ser */}
+        <div className="flex-[999_1_600px] min-w-0 bg-slate-900 border border-slate-700 rounded shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_rgba(15,23,42,0.06)] px-6 py-8 sm:px-14 sm:py-12 flex flex-col gap-7">
+          <div className="flex flex-wrap justify-between items-baseline gap-2 border-b border-slate-700 pb-4">
+            <span className="text-[22px] font-bold text-white">{isContract ? 'Avtal' : 'Offert'} – {motpartNamn}</span>
+            <span className="text-[13px] text-slate-400">{selectedTemplate?.name}</span>
+          </div>
+
+          <section className="flex flex-col gap-3">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-400 tracking-[0.06em] uppercase">Kund</span>
+              {andra(counterpartyStep)}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-4">
+              {isCompany && <PappersFalt etikett="Företag">{tomt(wizardData.foretag)}</PappersFalt>}
+              <PappersFalt etikett={isCompany ? 'Org.nr' : 'Personnummer'}>{tomt(wizardData['org-nr'])}</PappersFalt>
+              <PappersFalt etikett={isCompany ? 'Kontaktperson' : 'Namn'}>{tomt(wizardData.Kontaktperson)}</PappersFalt>
+              <PappersFalt etikett="Utförande adress">{tomt(wizardData['utforande-adress'])}</PappersFalt>
+              <PappersFalt etikett="Telefon">{tomt(wizardData['telefonnummer-kontaktperson'])}</PappersFalt>
+              <PappersFalt etikett="E-post">{tomt(wizardData['e-post-kontaktperson'])}</PappersFalt>
+              <PappersFalt etikett="E-post för faktura">
+                {wizardData['e-post-faktura'].trim() || (isContract ? (
+                  <span className="inline-flex items-center gap-1.5 text-amber-400 font-semibold">
+                    <span className="w-[7px] h-[7px] rounded-full bg-amber-500" />
+                    saknas, kunden fyller i
+                  </span>
+                ) : (
+                  <span className="text-slate-400">{tomt(wizardData['e-post-kontaktperson'])}</span>
+                ))}
+              </PappersFalt>
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-2.5">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-bold text-slate-400 tracking-[0.06em] uppercase">{isContract ? 'Avtalstid' : 'Ansvarig'}</span>
+              {andra(begoneStep)}
+            </div>
+            {isContract && (
+              <p className="text-[15px] leading-relaxed text-white">
+                Avtalet gäller under en inledande period om{' '}
+                <strong>{formatContractLength(wizardData.avtalslngd, wizardData.avtalslangdEnhet) || '…'}</strong>.
+                {' '}Avtalets begynnelsedag är <strong>{wizardData.begynnelsedag || '…'}</strong>.
+              </p>
+            )}
+            <p className="text-[15px] text-slate-300">
+              Ansvarig hos Begone: {wizardData.anstalld}{wizardData['e-post-anstlld'] ? `, ${wizardData['e-post-anstlld']}` : ''}
+            </p>
+          </section>
+
+          <section className="flex flex-col gap-2.5">
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-bold text-white">{isContract ? '2. Avtalsobjekt' : 'Offertinnehåll'}</span>
+              {andra(agreementStep)}
+            </div>
+            {wizardData.agreementText.trim() ? (
+              <p className="text-[15px] leading-relaxed text-white whitespace-pre-line break-words">{wizardData.agreementText}</p>
+            ) : (
+              <div className="border border-dashed border-red-500 bg-red-500/10 text-red-400 text-[15px] px-4 py-3.5 rounded-md">
+                {isContract ? 'Avtalsobjektet är tomt. Kunden får en tom § 2.' : 'Offertinnehållet är tomt.'}
+              </div>
+            )}
+          </section>
+
+          <section className="flex flex-col gap-2.5">
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-bold text-white">Produkter och pris</span>
+              {andra(productsStep)}
+            </div>
+            <div className="grid grid-cols-[minmax(0,3fr)_minmax(0,1fr)_minmax(0,1.2fr)] text-[15px] border-t border-slate-700">
+              <span className="py-2.5 text-[13px] text-slate-400">Produkt</span>
+              <span className="py-2.5 text-[13px] text-slate-400 text-right">Antal</span>
+              <span className="py-2.5 text-[13px] text-slate-400 text-right">Pris</span>
+              {rows.length === 0 && (
+                <span className="col-span-3 py-2.5 border-t border-slate-700/60 text-red-400">Inga tjänster är valda</span>
+              )}
+              {rows.map(r => (
+                <React.Fragment key={r.key}>
+                  <span className="py-2.5 border-t border-slate-700/60 text-white">{r.name}</span>
+                  <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">{r.quantity}</span>
+                  <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">{fmtSEK(r.total * priceMultiplier)}</span>
+                </React.Fragment>
+              ))}
+              <span className="py-2.5 border-t border-slate-600 font-bold text-white">{totalLabel}</span>
+              <span className="py-2.5 border-t border-slate-600" />
+              <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(serviceTotal * priceMultiplier)}</span>
+            </div>
+          </section>
+
+          <p className="border-t border-slate-700 pt-4 text-[13px] text-slate-400">
+            Mallens fasta text, som § 1 Bakgrund, § 3 Omfattning och prislistan, syns i Oneflows PDF i nästa steg.
+          </p>
+        </div>
+
+        {/* Sidokolumnen: kontroll, interna villkor, skapa */}
+        <div className="flex-[1_1_320px] min-w-[280px] flex flex-col gap-4">
+          <div className={`${CARD_CLASS} p-5 flex flex-col gap-3.5`}>
+            <span className="text-base font-bold text-white">Kontroll före utskick</span>
+            <ul className="flex flex-col gap-3 text-[15px]">
+              {kontrollPunkter.map((p, i) => (
+                <li key={i} className="flex gap-2.5 items-start">
+                  <span className={`w-2 h-2 rounded-full mt-[7px] shrink-0 ${PUNKT_FARG[p.niva]}`} />
+                  <span className="flex flex-col gap-0.5 min-w-0">
+                    <span className="text-white break-words">{p.text}</span>
+                    {p.niva !== 'gron' && (
+                      <button
+                        type="button"
+                        onClick={() => goToStepFromReview(avsnittSteg[p.avsnitt])}
+                        className="self-start min-h-[32px] text-sm font-semibold text-[#20c58f] hover:underline"
+                      >
+                        {p.niva === 'rod' ? 'Rätta' : 'Fyll i'} under {avsnittNamn[p.avsnitt]}
+                      </button>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <span className="text-[13px] text-slate-400 border-t border-slate-700/60 pt-3">
+              Röd punkt stoppar. Rätta först, sedan går det vidare.
+            </span>
+          </div>
+
+          <div className={`${CARD_CLASS} p-5 flex flex-col gap-3`}>
+            <div className="flex flex-col gap-0.5">
+              <span className="text-base font-bold text-white">{isContract ? 'Villkor i portalen' : 'Internt'}</span>
+              <span className="text-[13px] text-slate-400">Syns inte för kunden</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-[15px]">
+              {isContract && (
+                <>
+                  <span className="text-slate-400">Uppsägningstid</span><span className="text-white">{noticeLabel(wizardData.noticePeriodMonths)}</span>
+                  <span className="text-slate-400">Fakturering</span><span className="text-white">{BILLING_FREQUENCY_LABEL[wizardData.billingFrequency] ?? wizardData.billingFrequency}</span>
+                  <span className="text-slate-400">Kundgrupp</span><span className="text-white break-words">{kundgrupp?.name ?? '–'}</span>
+                </>
+              )}
+              {articleCost > 0 ? (
+                <>
+                  <span className="text-slate-400">Intern inköpskostnad</span><span className="text-white tabular-nums">{fmtSEK(articleCost)}</span>
+                  {hasDurable && (
+                    <><span className="text-slate-400">varav varaktig utrustning, engångs</span><span className="text-white tabular-nums">{fmtSEK(mb.cost_durable)}</span></>
+                  )}
+                  <span className="text-slate-400">{hasDurable ? 'Löpande marginal' : 'Marginal'}</span>
+                  <span className={`font-semibold tabular-nums ${marginColor}`}>
+                    {(mb.headline_percent ?? 0).toFixed(1)} % ({fmtSEK(mb.contribution_ongoing)}{hasDurable ? '/år' : ''})
+                  </span>
+                  {hasDurable && (
+                    <>
+                      <span className="text-slate-400">Marginal år 1</span>
+                      <span className="text-white tabular-nums">{mb.margin_percent_year1 != null ? `${mb.margin_percent_year1.toFixed(1)} %` : '–'}</span>
+                      <span className="text-slate-400">Återbetald efter</span>
+                      <span className="text-white tabular-nums">{mb.payback_never ? 'återbetalas inte' : formatPayback(mb.payback_years)}</span>
+                      {mb.margin_percent_3y != null && (
+                        <><span className="text-slate-400">Marginal över tre år</span><span className="text-white tabular-nums">{mb.margin_percent_3y.toFixed(1)} %</span></>
+                      )}
+                    </>
+                  )}
+                </>
+              ) : (
+                <><span className="text-slate-400">Marginal</span><span className="text-slate-400">inga interna artiklar</span></>
+              )}
+            </div>
+            {hasDurable && (
+              <p className="text-[13px] text-slate-400">Fällor och stationer säljs oftast som årspris (tilläggsstation per år), inte som engångsköp.</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2.5">
+            <button
+              type="button"
+              onClick={() => { setSubmitError(null); handleSubmit() }}
+              disabled={kontrollStoppar || isCreating}
+              className={`${PRIMARY_BUTTON} min-h-[48px] text-base flex items-center justify-center gap-2`}
             >
-              <ArrowLeft className="w-4 h-4" /> Tillbaka
-            </Button>
-            <div className="flex items-center gap-3">
-              <div className="bg-green-500/10 p-2 rounded-lg">
-                <FileText className="w-6 h-6 text-green-500" />
+              {isCreating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  {creationStep || 'Skapar utkast...'}
+                </>
+              ) : 'Skapa och visa Oneflows PDF'}
+            </button>
+            <span className="text-sm text-slate-400 leading-relaxed">
+              {isContract ? 'Avtalet' : 'Offerten'} skapas som utkast i Oneflow. Inget skickas till kunden förrän du godkänt PDF:en.
+            </span>
+            {submitError && !isCreating && (
+              <div className="flex gap-2.5 items-start text-[15px]">
+                <span className="w-2 h-2 rounded-full mt-[7px] shrink-0 bg-red-500" />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-white">{submitError}</span>
+                  {submitErrorStep !== null && (
+                    <button type="button" onClick={() => goToStepFromReview(submitErrorStep)} className="self-start min-h-[32px] text-sm font-semibold text-[#20c58f] hover:underline">
+                      Rätta under {avsnittNamn.motpart}
+                    </button>
+                  )}
+                </span>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">Skapa Oneflow Dokument</h1>
-                <p className="text-sm text-slate-400">Steg-för-steg guide för att skapa offert- eller avtalsförslag</p>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // --- Steg 10: Oneflows PDF -------------------------------------------------
+
+  const renderDraft = () => {
+    if (!draftContract) return null
+    const isCompany = wizardData.partyType === 'company'
+    const motpartNamn = (isCompany ? wizardData.foretag : '') || wizardData.Kontaktperson || 'kund'
+    const dokNamn = `${isContract ? 'Avtal' : 'Offert'} – ${motpartNamn}`
+    const busy = draftAction !== null
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-1.5">
+          <h1 className="text-[28px] font-bold tracking-tight text-white">Så här ser kunden {isContract ? 'avtalet' : 'offerten'}</h1>
+          <p className="text-base text-slate-400 max-w-[680px]">
+            Oneflows egen PDF, med mallens fasta text. Bläddra igenom och godkänn innan {isContract ? 'det' : 'den'} skickas.
+          </p>
+        </div>
+
+        {draftContract.warning && (
+          <p className="flex gap-2.5 items-start text-[15px] text-white">
+            <span className="w-2 h-2 rounded-full mt-[7px] shrink-0 bg-red-500" />
+            {draftContract.warning}
+          </p>
+        )}
+
+        <div className="flex flex-wrap gap-6 items-start">
+          <OneflowPdfFrame
+            oneflowContractId={draftContract.id}
+            title={dokNamn}
+            className="flex-[999_1_600px] min-w-0"
+          />
+
+          <div className="flex-[1_1_320px] min-w-[280px] flex flex-col gap-4">
+            <div className={`${CARD_CLASS} p-5 flex flex-col gap-4`}>
+              <span className="text-base font-bold text-white">Ser allt rätt ut?</span>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={handleSendDraft}
+                  disabled={busy || !!draftContract.warning}
+                  className={`${PRIMARY_BUTTON} min-h-[48px] text-base flex items-center justify-center gap-2`}
+                >
+                  {draftAction === 'send' && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {isContract ? 'Skicka för signering' : 'Skicka offerten'}
+                </button>
+                <span className="text-sm text-slate-400 break-words">
+                  Skickas från info@begone.se till {wizardData['e-post-kontaktperson']}.
+                </span>
               </div>
+              <div className="flex flex-col gap-2 border-t border-slate-700/60 pt-4">
+                <button
+                  type="button"
+                  onClick={handleEditDraft}
+                  disabled={busy}
+                  className={`${OUTLINE_BUTTON} flex items-center justify-center gap-2`}
+                >
+                  {draftAction === 'remove' && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Ändra i wizarden
+                </button>
+                <span className="text-sm text-slate-400">Utkastet tas bort i Oneflow och ett nytt skapas när du är klar.</span>
+              </div>
+              <div className="flex flex-col gap-2 border-t border-slate-700/60 pt-4">
+                <button type="button" onClick={handleSaveDraft} disabled={busy} className={OUTLINE_BUTTON}>
+                  Spara som utkast
+                </button>
+                <span className="text-sm text-slate-400">
+                  Ligger kvar under Dokumentsignering. Därifrån kan du öppna PDF:en igen och skicka senare, utan att gå in i Oneflow.
+                </span>
+              </div>
+            </div>
+
+            <div className={`${CARD_CLASS} p-5 flex flex-col gap-2 text-[15px]`}>
+              <span className="text-base font-bold text-white">Om något saknas i PDF:en</span>
+              <span className="text-slate-400 leading-relaxed">
+                Står ett fält tomt fast det var ifyllt i wizarden ligger felet i Oneflow-mallen. Välj Ändra och byt mall, eller säg till en admin.
+              </span>
             </div>
           </div>
         </div>
+      </div>
+    )
+  }
+
+  // --- Bekräftelse efter skick ------------------------------------------------
+
+  const renderSent = () => (
+    <div className={`${CARD_CLASS} p-6 flex flex-col gap-5`}>
+      <div className="flex flex-col gap-1.5">
+        <h1 className="text-[28px] font-bold tracking-tight text-white">
+          {isContract ? 'Avtalet är skickat' : 'Offerten är skickad'}
+        </h1>
+        <p className="text-base text-slate-400">
+          Kunden har fått {isContract ? 'avtalet för signering' : 'offerten för granskning'} från info@begone.se. Du skickas vidare till Dokumentsignering.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[15px] max-w-md">
+        <span className="text-slate-400">{isContract ? 'Avtals-ID' : 'Offert-ID'}</span>
+        <span className="font-mono text-white">#{createdContract?.id}</span>
+        <span className="text-slate-400">Status</span>
+        <span className="inline-flex items-center gap-1.5 text-white">
+          <span className="w-2 h-2 rounded-full bg-[#20c58f]" />
+          Skickat för {isContract ? 'signering' : 'granskning'}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <a
+          href={`https://app.oneflow.com/contracts/${createdContract?.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${OUTLINE_BUTTON} inline-flex items-center gap-2`}
+        >
+          <ExternalLink className="w-4 h-4" />
+          Öppna i Oneflow
+        </a>
+        <button
+          type="button"
+          className={OUTLINE_BUTTON}
+          onClick={() => {
+            setCreatedContract(null)
+            setDraftContract(null)
+            setCurrentStep(1)
+            setMaxReachedStep(1)
+            setFromReview(false)
+            setWizardData(createInitialWizardData(defaultAnstalld, user?.email || ''))
+          }}
+        >
+          Skapa nytt dokument
+        </button>
+      </div>
+    </div>
+  )
+
+  // --- Sidan ---------------------------------------------------------------
+
+  const visibleSteps = STEPS.filter(step => !(step.id === 3 && wizardData.documentType === 'offer' && wizardData.selectedTemplate))
+  const visibleIndex = visibleSteps.findIndex(s => s.id === currentStep) + 1
+  const [rubrik, ingress] = stepHeadings()
+  const isReview = currentStep === reviewStep
+  const phase: 'wizard' | 'draft' | 'sent' = createdContract ? 'sent' : draftContract ? 'draft' : 'wizard'
+  const wide = phase !== 'wizard' || isReview || currentStep === productsStep
+  const contentWidth = wide ? 'max-w-[1120px]' : 'max-w-[760px]'
+  const motpartNamn = (wizardData.partyType === 'company' ? wizardData.foretag : '') || wizardData.Kontaktperson
+  const hint = !canProceed() ? getValidationHint() : ''
+
+  return (
+    <div className="min-h-screen bg-slate-950 flex flex-col">
+      {/* Header: brödsmula + Avbryt, stegrad */}
+      <header className="bg-slate-900 border-b border-slate-700">
+        <div className="max-w-[1120px] mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 text-[15px] min-w-0">
+            <button
+              type="button"
+              onClick={() => leaveWizard(getDraftListRoute())}
+              className="min-h-[44px] text-slate-400 hover:text-white"
+            >
+              Avtal &amp; Offerter
+            </button>
+            <span className="text-slate-500">/</span>
+            <span className="font-semibold text-white truncate">
+              {phase === 'wizard'
+                ? (isContract ? 'Nytt avtal' : 'Ny offert')
+                : `${isContract ? 'Avtal' : 'Offert'} – ${motpartNamn || 'kund'}`}
+            </span>
+          </div>
+          {phase === 'draft' && draftContract ? (
+            <span className="flex items-center gap-1.5 text-sm text-slate-400">
+              <span className="w-[7px] h-[7px] rounded-full bg-amber-500" />
+              Utkast i Oneflow · ID {draftContract.id}
+            </span>
+          ) : phase === 'wizard' ? (
+            <button
+              type="button"
+              onClick={() => leaveWizard(getDashboardRoute())}
+              className="min-h-[44px] text-sm text-slate-400 hover:text-white"
+            >
+              Avbryt
+            </button>
+          ) : null}
+        </div>
+        {phase === 'wizard' && (
+          <div className="max-w-[1120px] mx-auto px-4 sm:px-6">
+            <AnimatedProgressBar
+              steps={STEPS}
+              currentStep={currentStep}
+              onStepClick={handleStepClick}
+              maxReachedStep={maxReachedStep}
+              documentType={wizardData.documentType}
+              selectedTemplate={wizardData.selectedTemplate}
+            />
+          </div>
+        )}
       </header>
 
-      {/* Enhanced Progress Steps */}
-      <AnimatedProgressBar
-        steps={STEPS}
-        currentStep={currentStep}
-        onStepClick={setCurrentStep}
-        maxReachedStep={maxReachedStep}
-        documentType={wizardData.documentType}
-        selectedTemplate={wizardData.selectedTemplate}
-      />
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        <div className="min-h-[600px] overflow-hidden">
+      {/* Innehåll */}
+      <main className={`flex-1 w-full ${contentWidth} mx-auto px-4 sm:px-6 pt-10 pb-8`}>
+        {phase === 'sent' ? renderSent() : phase === 'draft' ? renderDraft() : (
           <AnimatePresence mode="wait">
             <motion.div
               key={currentStep}
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{
-                duration: 0.4,
-                ease: "easeInOut"
-              }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="flex flex-col gap-6"
             >
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[13px] text-slate-400">Steg {visibleIndex} av {visibleSteps.length}</span>
+                <h1 className="text-[28px] font-bold tracking-tight text-white">{rubrik}</h1>
+                <p className="text-base text-slate-400 max-w-[680px]">{ingress}</p>
+              </div>
               {renderStepContent()}
             </motion.div>
           </AnimatePresence>
-        </div>
-
-        {/* Navigation Buttons */}
-        {!createdContract && (
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-800">
-            <Button
-              variant="outline"
-              onClick={prevStep}
-              disabled={currentStep === 1}
-              className="flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Föregående
-            </Button>
-
-            <div className="text-center">
-              <p className="text-sm text-slate-400">
-                Steg {currentStep} av {STEPS.length}
-              </p>
-              {!canProceed() && getValidationHint() && (
-                <p className="text-xs text-amber-400 mt-1">{getValidationHint()}</p>
-              )}
-            </div>
-
-            {currentStep < STEPS.length && (
-              <Button
-                onClick={nextStep}
-                disabled={!canProceed()}
-                className="flex items-center gap-2"
-              >
-                Nästa
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            )}
-
-            {currentStep === STEPS.length && (
-              <div className="w-20" /> // Placeholder för symmetri
-            )}
-          </div>
         )}
       </main>
+
+      {/* Fast bottenlist: Föregående, valideringstips, Nästa */}
+      {phase === 'wizard' && (
+        <div className="sticky bottom-0 z-20 bg-slate-900 border-t border-slate-700">
+          <div className={`${contentWidth} mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3`}>
+            <button
+              type="button"
+              onClick={prevStep}
+              disabled={currentStep === 1}
+              className={OUTLINE_BUTTON}
+            >
+              Föregående
+            </button>
+
+            <p className="flex-1 text-center text-[13px] text-amber-400 min-w-0">
+              {isReview
+                ? (kontrollStoppar ? <span className="text-red-400">Rätta de röda punkterna först</span> : null)
+                : hint}
+            </p>
+
+            {!isReview && (fromReview ? (
+              <button type="button" onClick={backToReview} disabled={!canProceed()} className={PRIMARY_BUTTON}>
+                Tillbaka till granskningen
+              </button>
+            ) : (
+              <button type="button" onClick={nextStep} disabled={!canProceed()} className={PRIMARY_BUTTON}>
+                {currentStep === agreementStep ? (isContract ? 'Granska avtalet' : 'Granska offerten') : 'Nästa'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

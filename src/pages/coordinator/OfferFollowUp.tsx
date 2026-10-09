@@ -176,7 +176,7 @@ export default function OfferFollowUp() {
 
   // Antal i "att agera"-kategorierna (för teknikerns kompakta sidhuvud)
   const actionCount = useMemo(
-    () => filteredOffers.filter(o => ['ringlista', 'boka', 'svar', 'loper_ut', 'aldrig_fram', 'forfallna'].includes(o.queue_category)).length,
+    () => filteredOffers.filter(o => ['utkast', 'ringlista', 'boka', 'svar', 'loper_ut', 'aldrig_fram', 'forfallna'].includes(o.queue_category)).length,
     [filteredOffers]
   )
 

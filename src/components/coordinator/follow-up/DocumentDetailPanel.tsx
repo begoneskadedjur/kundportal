@@ -11,6 +11,9 @@ import {
 import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
 import { OfferFollowUpService } from '../../../services/offerFollowUpService'
+import { OneflowDraftService } from '../../../services/oneflowDraftService'
+import Modal from '../../ui/Modal'
+import OneflowPdfFrame from '../../shared/OneflowPdfFrame'
 import type { FollowUpOffer } from '../../../services/offerFollowUpService'
 import { useCaseComments } from '../../../hooks/useCaseComments'
 import LifecycleTimeline from './LifecycleTimeline'
@@ -76,6 +79,9 @@ export default function DocumentDetailPanel({
   const [sending, setSending] = useState(false)
   const [showCallLog, setShowCallLog] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  // Utkast: Oneflows PDF i en modal + skicka för signering härifrån
+  const [showPdf, setShowPdf] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const conversationEndRef = useRef<HTMLDivElement>(null)
 
   // Intern chatt (realtid via befintlig hook)
@@ -93,6 +99,7 @@ export default function DocumentDetailPanel({
     setComposer('')
     setShowCallLog(false)
     setShowMenu(false)
+    setShowPdf(false)
     setItems(null)
     setFallbackContent(null)
 
@@ -221,6 +228,24 @@ export default function DocumentDetailPanel({
     }
   }, [offer, composer, channel, sending, addComment, userName])
 
+  // Skicka ett sparat utkast för signering (offert: för granskning)
+  const handlePublishDraft = useCallback(async () => {
+    if (!offer || publishing) return
+    const vad = offer.type === 'offer' ? 'offerten' : 'avtalet'
+    if (!window.confirm(`Skicka ${vad} till ${offer.contact_email || 'kunden'} från info@begone.se?`)) return
+    setPublishing(true)
+    try {
+      await OneflowDraftService.publish(offer.oneflow_contract_id)
+      toast.success(offer.type === 'offer' ? 'Offerten är skickad' : 'Avtalet är skickat för signering')
+      setShowPdf(false)
+      onChanged()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Kunde inte skicka dokumentet')
+    } finally {
+      setPublishing(false)
+    }
+  }, [offer, publishing, onChanged])
+
   if (!offer) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
@@ -238,6 +263,8 @@ export default function DocumentDetailPanel({
   // "Väntar på"-raden
   const waitingRow = (() => {
     switch (offer.queue_category) {
+      case 'utkast':
+        return { text: 'Utkast, inte skickat till kunden. Granska PDF:en och skicka.', action: 'Visa PDF', onClick: () => setShowPdf(true) }
       case 'boka':
         return isCoordinator
           ? { text: offer.customer_id ? 'Väntar: boka in utförande/etablering' : 'Väntar: kundregistrering + bokning', action: 'Boka in', onClick: () => onBookIn(offer) }
@@ -257,7 +284,8 @@ export default function DocumentDetailPanel({
     }
   })()
 
-  const primaryIsCall = ['ringlista', 'loper_ut', 'aldrig_fram', 'forfallna'].includes(offer.queue_category)
+  const isDraft = offer.status === 'draft'
+  const primaryIsCall =['ringlista', 'loper_ut', 'aldrig_fram', 'forfallna'].includes(offer.queue_category)
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
@@ -300,7 +328,7 @@ export default function DocumentDetailPanel({
               <span className="font-mono text-slate-600">· {offer.quote_reference_number}</span>
             </div>
             <p className="text-[11px] text-slate-500">
-              Skickad {sentAt}{sentBy ? ` av ${sentBy}` : ''}
+              {isDraft ? 'Skapad' : 'Skickad'} {sentAt}{sentBy ? ` av ${sentBy}` : ''}
             </p>
           </div>
           <a
@@ -512,7 +540,25 @@ export default function DocumentDetailPanel({
 
       {/* ── Åtgärdsfot ── */}
       <div className="flex items-center gap-2 px-3 py-2 border-t border-slate-800 bg-slate-900/60 relative">
-        {offer.queue_category === 'boka' && isCoordinator ? (
+        {isDraft ? (
+          <>
+            <button
+              onClick={handlePublishDraft}
+              disabled={publishing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#20c58f] hover:bg-[#1aaa7a] text-[#fff] rounded-lg transition-colors disabled:opacity-50"
+            >
+              {publishing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+              {offer.type === 'offer' ? 'Skicka offerten' : 'Skicka för signering'}
+            </button>
+            <button
+              onClick={() => setShowPdf(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600 rounded-lg transition-colors"
+            >
+              <FileText className="w-3 h-3" />
+              Visa PDF
+            </button>
+          </>
+        ) : offer.queue_category === 'boka' && isCoordinator ? (
           <button
             onClick={() => onBookIn(offer)}
             className="px-3 py-1.5 text-xs font-medium bg-[#20c58f] hover:bg-[#1aaa7a] text-[#fff] rounded-lg transition-colors"
@@ -537,12 +583,14 @@ export default function DocumentDetailPanel({
             Ring upp
           </a>
         )}
-        <button
-          onClick={() => setShowCallLog(v => !v)}
-          className="px-2.5 py-1.5 text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600 rounded-lg transition-colors"
-        >
-          Logga samtal
-        </button>
+        {!isDraft && (
+          <button
+            onClick={() => setShowCallLog(v => !v)}
+            className="px-2.5 py-1.5 text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-600 rounded-lg transition-colors"
+          >
+            Logga samtal
+          </button>
+        )}
         {(offer.status === 'pending' || offer.status === 'overdue') && (
           <button
             onClick={() => onExtend(offer)}
@@ -609,6 +657,42 @@ export default function DocumentDetailPanel({
           />
         )}
       </div>
+
+      {/* Utkastets PDF från Oneflow — samma vy som avtalswizardens sista steg */}
+      {isDraft && (
+        <Modal
+          isOpen={showPdf}
+          onClose={() => setShowPdf(false)}
+          title={`${offer.type === 'offer' ? 'Offert' : 'Avtal'} – ${offer.company_name || offer.contact_person || 'kund'}`}
+          subtitle={`Utkast i Oneflow · ID ${offer.oneflow_contract_id}`}
+          size="xl"
+          footer={
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowPdf(false)}
+                className="min-h-[44px] px-4 text-sm font-semibold text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 rounded-lg transition-colors"
+              >
+                Stäng
+              </button>
+              <button
+                onClick={handlePublishDraft}
+                disabled={publishing}
+                className="min-h-[44px] flex items-center gap-2 px-4 text-sm font-semibold bg-[#20c58f] hover:bg-[#1aaa7a] text-[#fff] rounded-lg transition-colors disabled:opacity-50"
+              >
+                {publishing && <Loader2 className="w-4 h-4 animate-spin" />}
+                {offer.type === 'offer' ? 'Skicka offerten' : 'Skicka för signering'}
+              </button>
+            </div>
+          }
+        >
+          {showPdf && (
+            <OneflowPdfFrame
+              oneflowContractId={offer.oneflow_contract_id}
+              title={offer.company_name || offer.contact_person || 'Dokument'}
+            />
+          )}
+        </Modal>
+      )}
     </div>
   )
 }

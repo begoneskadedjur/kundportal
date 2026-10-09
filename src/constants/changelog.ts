@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.40.0',
+    date: '2026-10-09',
+    title: 'Avtalswizarden: granska avtalet och se Oneflows PDF innan det skickas',
+    items: [
+      { kind: 'nyhet', text: 'Sista steget visar avtalet som kunden kommer att läsa, med en kontrollista bredvid. Röda punkter, som ett tomt avtalsobjekt eller en ogiltig e-post, måste rättas innan du går vidare. Ändra tar dig till rätt steg och tillbaka till granskningen.' },
+      { kind: 'nyhet', text: 'Avtal och offerter skapas först som utkast och du ser Oneflows riktiga PDF i portalen. Därifrån skickar du för signering, går tillbaka och ändrar, eller sparar utkastet till senare.' },
+      { kind: 'nyhet', text: 'Sparade utkast ligger överst i Dokumentsignering under "Utkast, ej skickade". Där kan du öppna PDF:en och skicka utan att gå in i Oneflow.' },
+      { kind: 'andring', text: 'Motpart har ett nytt fält, E-post för faktura, som följer med till avtalet. Wizarden har fått ett lugnare utseende med stegen överst och knapparna fast i nederkant.' },
+    ],
+  },
+  {
     version: '3.39.0',
     date: '2026-10-09',
     title: 'Avtalswizarden: avtalslängd med enhet och snygga kontaktuppgifter',
