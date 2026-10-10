@@ -11,6 +11,8 @@ import Button from '../../ui/Button'
 import DateField from '../../ui/DateField'
 import { ProvisionService } from '../../../services/provisionService'
 import type { TipsbonusSettings } from '../../../types/provision'
+// Samma regel som databasen: procent av premien, höjt till lägsta och sänkt till taket
+import { beraknaTipsbonus } from '../../../utils/tipsbonus'
 
 const FALT =
   'px-3 py-1.5 text-sm bg-slate-800 border border-slate-600 rounded text-slate-200 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent'
@@ -18,15 +20,6 @@ const ETIKETT = 'text-xs font-medium text-slate-400 mb-1 block'
 const KR = new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 })
 const NB = String.fromCharCode(160)
 const kr = (n: number) => `${KR.format(n)}${NB}kr`
-
-/** Samma regel som databasen: procent av premien, höjt till lägsta och sänkt till taket. */
-function beraknaTipsbonus(premie: number, s: Pick<TipsbonusSettings, 'procent' | 'minBelopp' | 'maxBelopp' | 'minPremie'>): number {
-  if (premie <= 0 || premie < s.minPremie) return 0
-  let b = Math.round(premie * s.procent) / 100
-  if (s.minBelopp > 0 && b < s.minBelopp) b = s.minBelopp
-  if (s.maxBelopp > 0 && b > s.maxBelopp) b = s.maxBelopp
-  return b
-}
 
 const EXEMPEL = [10000, 30000, 100000]
 

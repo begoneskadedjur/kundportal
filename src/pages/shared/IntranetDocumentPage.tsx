@@ -38,6 +38,12 @@ import TillaggRakneexempel from './intranet/interactive/tillagg/TillaggRakneexem
 import TillaggJamforelse from './intranet/interactive/tillagg/TillaggJamforelse'
 import SokIkoner from './intranet/interactive/sok/SokIkoner'
 import SokOvning from './intranet/interactive/sok/SokOvning'
+import LeadsStegDemo from './intranet/interactive/leads/LeadsStegDemo'
+import LeadsListaDemo from './intranet/interactive/leads/LeadsListaDemo'
+import SkapaLeadOvning from './intranet/interactive/leads/SkapaLeadOvning'
+import NastaStegOvning from './intranet/interactive/leads/NastaStegOvning'
+import TipsbonusRaknare from './intranet/interactive/leads/TipsbonusRaknare'
+import LeadsRollKarta from './intranet/interactive/leads/LeadsRollKarta'
 import AudienceModal from './intranet/AudienceModal'
 import { describeAudience } from '../../types/intranet'
 import { Eye } from 'lucide-react'
@@ -57,6 +63,12 @@ const INTERACTIVE_COMPONENTS: Record<string, ComponentType<{ variant?: string }>
   'tillagg-jamforelse': TillaggJamforelse,
   'sok-ikoner': SokIkoner,
   'sok-ovning': SokOvning,
+  'leads-steg': LeadsStegDemo,
+  'leads-lista': LeadsListaDemo,
+  'leads-skapa-ovning': SkapaLeadOvning,
+  'leads-nasta-steg': NastaStegOvning,
+  'leads-tipsbonus': TipsbonusRaknare,
+  'leads-roller': LeadsRollKarta,
 }
 
 // ─── Blockrendering ────────────────────────────────

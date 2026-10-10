@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.48.0',
+    date: '2026-10-10',
+    title: 'Handboken: guider till nya Leads',
+    items: [
+      { kind: 'nyhet', text: 'Handboken har tre nya guider om Leads, en per roll: Tipsa om en lead för tekniker, Leads för säljare och Leads för koordinator och admin. Var och en ser bara sin.' },
+      { kind: 'nyhet', text: 'Guiderna har övningar där du skapar en lead från ett påhittat ärende, trycker Klar, välj nästa och ser tidslinjen fyllas, klickar dig igenom stegen och räknar på tipsbonusen med de inställningar som gäller nu. Ingenting sparas.' },
+    ],
+  },
+  {
     version: '3.47.0',
     date: '2026-10-10',
     title: 'Tipsbonus för leads i provisionerna',
