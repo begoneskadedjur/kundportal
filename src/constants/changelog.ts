@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.48.1',
+    date: '2026-10-10',
+    title: 'Handboken: hoppa till avsnitt',
+    items: [
+      { kind: 'buggfix', text: 'Hoppa till-korten och innehållsförteckningen i handbokens guider skickade dig till startsidan. Nu går de till rätt avsnitt i guiden.' },
+    ],
+  },
+  {
     version: '3.48.0',
     date: '2026-10-10',
     title: 'Handboken: guider till nya Leads',

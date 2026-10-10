@@ -2,7 +2,7 @@
 // Dokumentläsare för Intranät med läs- och förståelsekvittens.
 // Innehållet renderas från strukturerade block (jsonb i databasen).
 
-import { useEffect, useMemo, useState, type ComponentType } from 'react'
+import { useEffect, useMemo, useState, type ComponentType, type MouseEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
@@ -73,6 +73,18 @@ const INTERACTIVE_COMPONENTS: Record<string, ComponentType<{ variant?: string }>
 
 // ─── Blockrendering ────────────────────────────────
 
+// index.html har <base href="/">, så ett rent href="#x" pekar på startsidan.
+// Ankarlänkar får därför full sökväg och scrollar själva utan omladdning.
+function ankarHref(id: string) {
+  return `${window.location.pathname}${window.location.search}#${id}`
+}
+
+function hoppaTill(e: MouseEvent<HTMLAnchorElement>, id: string) {
+  e.preventDefault()
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  window.history.replaceState(window.history.state, '', ankarHref(id))
+}
+
 function BlockRenderer({ block, anchorId }: { block: IntranetBlock; anchorId?: string }) {
   switch (block.type) {
     case 'h2':
@@ -89,7 +101,8 @@ function BlockRenderer({ block, anchorId }: { block: IntranetBlock; anchorId?: s
             {block.items.map((item, i) => (
               <a
                 key={i}
-                href={`#${item.target}`}
+                href={ankarHref(item.target)}
+                onClick={e => hoppaTill(e, item.target)}
                 className="group flex items-center gap-3 p-3 rounded-xl bg-slate-800/40 border border-slate-700 hover:border-[#20c58f]/50 hover:bg-slate-800/60 transition-all"
               >
                 <div className="flex-1 min-w-0">
@@ -434,7 +447,8 @@ export default function IntranetDocumentPage() {
             {toc.map(item => (
               <li key={item.id}>
                 <a
-                  href={`#${item.id}`}
+                  href={ankarHref(item.id)}
+                  onClick={e => hoppaTill(e, item.id)}
                   className="block px-2 py-1.5 text-sm text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors leading-snug"
                 >
                   {item.text}
@@ -455,10 +469,11 @@ export default function IntranetDocumentPage() {
       {/* Tillbaka till innehållet (smal skärm), ovanför mobilmenyn */}
       {toc.length > 1 && readProgress > 8 && (
         <a
-          href="#innehall"
-          onClick={() => {
+          href={ankarHref('innehall')}
+          onClick={e => {
             const el = document.getElementById('innehall') as HTMLDetailsElement | null
             if (el) el.open = true
+            hoppaTill(e, 'innehall')
           }}
           className="xl:hidden fixed right-4 bottom-20 lg:bottom-6 z-30 flex items-center gap-1.5 px-3 py-2 bg-slate-800/95 backdrop-blur border border-slate-700 rounded-full text-xs font-medium text-slate-200 shadow-lg hover:text-white"
         >
@@ -553,8 +568,9 @@ export default function IntranetDocumentPage() {
               {toc.map(item => (
                 <li key={item.id}>
                   <a
-                    href={`#${item.id}`}
-                    className="block px-2 py-1 text-sm text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors leading-snug"
+                    href={ankarHref(item.id)}
+                    onClick={e => hoppaTill(e, item.id)}
+                    className="block px-2 py-1text-sm text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-lg transition-colors leading-snug"
                   >
                     {item.text}
                   </a>
