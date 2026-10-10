@@ -2,12 +2,16 @@
 
 export type CommissionStatus = 'pending_invoice' | 'ready_for_payout' | 'approved' | 'paid_out'
 
-export type CommissionType = 'engangsjobb'
+/** engangsjobb: provision på ärende. tipsbonus: bonus till den som tipsade om en vunnen lead (leads etapp 7). */
+export type CommissionType = 'engangsjobb' | 'tipsbonus'
+
+/** lead: tipsbonus, case_id är leads.id. */
+export type CommissionCaseType = 'private' | 'business' | 'contract' | 'lead'
 
 export interface CommissionPost {
   id: string
   case_id: string
-  case_type: 'private' | 'business' | 'contract'
+  case_type: CommissionCaseType
   case_title: string | null
   case_number: string | null
   technician_id: string
@@ -89,6 +93,34 @@ export interface CommissionSettings {
   min_commission_base: number
   payout_cutoff_day: number
 }
+
+/**
+ * Tipsbonus för leads (etapp 7), nycklarna tipsbonus_* i commission_settings.
+ * Ja/nej lagras som 1/0 och datumet som ÅÅÅÅMMDD; maxBelopp 0 = inget tak.
+ * Posterna skapas av databasen (tipsbonus_skapa) när en lead vinns.
+ */
+export interface TipsbonusSettings {
+  aktiv: boolean
+  procent: number
+  minBelopp: number
+  maxBelopp: number
+  minPremie: number
+  utokning: boolean
+  baraTekniker: boolean
+  /** ÅÅÅÅ-MM-DD */
+  gallerFran: string
+}
+
+export const TIPSBONUS_NYCKLAR = {
+  aktiv: 'tipsbonus_aktiv',
+  procent: 'tipsbonus_procent',
+  minBelopp: 'tipsbonus_min_belopp',
+  maxBelopp: 'tipsbonus_max_belopp',
+  minPremie: 'tipsbonus_min_premie',
+  utokning: 'tipsbonus_utokning',
+  baraTekniker: 'tipsbonus_bara_tekniker',
+  gallerFran: 'tipsbonus_galler_fran',
+} as const satisfies Record<keyof TipsbonusSettings, string>
 
 export interface PayoutTechnicianSummary {
   technician_id: string

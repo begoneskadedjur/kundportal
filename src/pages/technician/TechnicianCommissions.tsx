@@ -462,7 +462,7 @@ function TechPostRow({ post, monthKey, now }: {
       />
 
       <span className={`font-mono text-[11.5px] font-semibold w-[104px] flex-shrink-0 truncate ${dim ? 'text-slate-500' : 'text-white'}`}>
-        {post.case_number || '—'}
+        {post.case_number || (post.case_type === 'lead' ? 'Tipsbonus' : '—')}
       </span>
 
       <span className={`truncate min-w-0 flex-1 ${dim ? 'text-slate-500' : 'text-slate-300'}`}>

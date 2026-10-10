@@ -56,6 +56,7 @@ const IKON: Partial<Record<Aktivitet['kind'], IconName>> = {
   offert_skickad: 'dok.offert',
   offert_avbojd: 'dok.offert',
   avtal_signerat: 'dok.avtal',
+  tipsbonus: 'lead.tips',
 }
 
 const stegNamn = (v: string | null) => (v && v in STAGE_ETIKETT ? STAGE_ETIKETT[v as LeadStage] : v ?? '')

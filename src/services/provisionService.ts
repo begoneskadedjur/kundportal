@@ -11,11 +11,13 @@ import type {
   CommissionPostInsert,
   CommissionSettings,
   CommissionStatus,
+  TipsbonusSettings,
   ProvisionKpi,
   ProvisionTechnicianSummary,
   ProvisionFilters,
   TechnicianShare
 } from '../types/provision'
+import { TIPSBONUS_NYCKLAR } from '../types/provision'
 
 export class ProvisionService {
   // ─── Inställningar ───────────────────────────────────────
@@ -61,6 +63,55 @@ export class ProvisionService {
       .eq('setting_key', key)
 
     if (error) throw error
+  }
+
+  // ─── Tipsbonus för leads (etapp 7) ──────────────────────
+  //
+  // Inställningarna ligger i commission_settings (tipsbonus_*). Posterna skapas
+  // av databasen (tipsbonus_skapa) när en lead vinns och frigörs när första
+  // fakturan är betald, aldrig från klienten. Befintliga poster påverkas inte
+  // av ändrade inställningar.
+
+  static async getTipsbonusSettings(): Promise<TipsbonusSettings> {
+    const { data, error } = await supabase
+      .from('commission_settings')
+      .select('setting_key, setting_value')
+      .like('setting_key', 'tipsbonus_%')
+
+    if (error) throw error
+
+    const varde = new Map((data || []).map(r => [r.setting_key as string, Number(r.setting_value)]))
+    const tal = (k: keyof TipsbonusSettings, standard: number) => varde.get(TIPSBONUS_NYCKLAR[k]) ?? standard
+    const datum = tal('gallerFran', 0)
+    const d = String(Math.round(datum))
+
+    return {
+      aktiv: tal('aktiv', 0) === 1,
+      procent: tal('procent', 0),
+      minBelopp: tal('minBelopp', 0),
+      maxBelopp: tal('maxBelopp', 0),
+      minPremie: tal('minPremie', 0),
+      utokning: tal('utokning', 1) === 1,
+      baraTekniker: tal('baraTekniker', 0) === 1,
+      gallerFran: d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : ''
+    }
+  }
+
+  /** Sparar bara de värden som ändrats. Datum ÅÅÅÅ-MM-DD lagras som ÅÅÅÅMMDD. */
+  static async saveTipsbonusSettings(
+    nya: TipsbonusSettings,
+    gamla: TipsbonusSettings,
+    updatedBy: string
+  ): Promise<void> {
+    const somTal = (k: keyof TipsbonusSettings, v: TipsbonusSettings[keyof TipsbonusSettings]): number => {
+      if (typeof v === 'boolean') return v ? 1 : 0
+      if (k === 'gallerFran') return v ? Number(String(v).replace(/-/g, '')) : 0
+      return Number(v)
+    }
+    for (const k of Object.keys(TIPSBONUS_NYCKLAR) as Array<keyof TipsbonusSettings>) {
+      if (nya[k] === gamla[k]) continue
+      await this.updateSetting(TIPSBONUS_NYCKLAR[k], somTal(k, nya[k]), updatedBy)
+    }
   }
 
   // ─── Hämta poster för enskild tekniker ──────────────────

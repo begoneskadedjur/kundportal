@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.47.0',
+    date: '2026-10-10',
+    title: 'Tipsbonus för leads i provisionerna',
+    items: [
+      { kind: 'nyhet', text: 'Den som tipsar om en lead som blir vunnen får en tipsbonus i provisionerna, som Tipsbonus: företaget. Bonusen blir klar för utbetalning när kundens första faktura är betald. Ägaren av leaden får ingen tipsbonus.' },
+      { kind: 'nyhet', text: 'Under Inställningar på Provisioner finns Tipsbonus för leads: på eller av, procent av första årets premie, lägsta och högsta belopp, lägsta årspremie, om utökning hos befintlig kund räknas, om bara tekniker får bonus och från vilket datum.' },
+      { kind: 'nyhet', text: 'Leadens historik visar när tipsbonusen bokförs och när den blir klar för utbetalning.' },
+    ],
+  },
+  {
     version: '3.46.0',
     date: '2026-10-10',
     title: 'Leads: statistiken flyttar in på Leads-sidan',

@@ -9,6 +9,7 @@ import {
   RefreshCw, Search, Settings, Eye, ChevronDown, ChevronRight, Wallet, Download
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useProvisionDashboard } from '../../hooks/useProvisionDashboard'
 import type { PayoutMonthTechnician, PayoutMonthView } from '../../hooks/useProvisionDashboard'
@@ -23,6 +24,7 @@ import {
 } from '../../utils/provisionPayout'
 import { FlowBand, ProgressRing, Sparkline } from '../../components/shared/ProvisionCharts'
 import ProvisionSettingsPanel from '../../components/admin/provisions/ProvisionSettingsPanel'
+import TipsbonusPanel from '../../components/admin/provisions/TipsbonusPanel'
 import InvoiceDetailModal from '../../components/admin/invoicing/InvoiceDetailModal'
 import ConfirmModal from '../../components/ui/ConfirmModal'
 import { InvoiceService } from '../../services/invoiceService'
@@ -125,8 +127,15 @@ const TechnicianCommissions: React.FC = () => {
   const [invoiceModalId, setInvoiceModalId] = useState<string | null>(null)
   const [openingInvoiceCaseId, setOpeningInvoiceCaseId] = useState<string | null>(null)
 
+  const navigate = useNavigate()
+
   const openInvoiceForCase = async (caseId: string | null | undefined) => {
     if (!caseId) return
+    // Tipsbonus (case_type lead): öppna leaden, där syns avtal, kund och historik
+    if (allPosts.some(p => p.case_id === caseId && p.case_type === 'lead')) {
+      navigate(`/admin/leads?id=${caseId}`)
+      return
+    }
     setOpeningInvoiceCaseId(caseId)
     try {
       const id = await InvoiceService.getInvoiceIdByCase(caseId)
@@ -249,13 +258,14 @@ const TechnicianCommissions: React.FC = () => {
 
       {/* Inställningspanel */}
       {showSettings && settings && profile && (
-        <div className="mb-4">
+        <div className="mb-4 space-y-4">
           <ProvisionSettingsPanel
             settings={settings}
             onSettingsUpdated={refreshData}
             onClose={() => setShowSettings(false)}
             userEmail={profile.email || ''}
           />
+          <TipsbonusPanel userEmail={profile.email || ''} />
         </div>
       )}
 
@@ -794,7 +804,7 @@ function PostRow({ post, selected, onToggle, onOpenInvoice, opening, showTechnic
       className={`flex items-center gap-2.5 pl-6 pr-3 py-2 text-[12.5px] border-b border-slate-700/50 cursor-pointer transition-colors ${
         selected ? 'bg-[#20c58f]/[0.05]' : 'bg-slate-950/25'
       } hover:bg-slate-700/20`}
-      title="Öppna faktura"
+      title={post.case_type === 'lead' ? 'Öppna leaden' : 'Öppna faktura'}
     >
       <input
         type="checkbox"
@@ -810,7 +820,7 @@ function PostRow({ post, selected, onToggle, onOpenInvoice, opening, showTechnic
       />
 
       <span className="font-mono text-[11.5px] font-semibold text-white w-[104px] flex-shrink-0 truncate">
-        {post.case_number || '—'}
+        {post.case_number || (post.case_type === 'lead' ? 'Tipsbonus' : '—')}
       </span>
 
       <span className="text-slate-300 truncate min-w-0 flex-1">
@@ -841,7 +851,7 @@ function PostRow({ post, selected, onToggle, onOpenInvoice, opening, showTechnic
         onClick={(e) => { e.stopPropagation(); onOpenInvoice() }}
         disabled={opening}
         className="p-1 text-slate-500 hover:text-[#20c58f] rounded transition-colors flex-shrink-0 disabled:opacity-50"
-        title="Öppna faktura"
+        title={post.case_type === 'lead' ? 'Öppna leaden' : 'Öppna faktura'}
       >
         {opening
           ? <RefreshCw className="w-3.5 h-3.5 animate-spin" />

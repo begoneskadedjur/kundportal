@@ -118,7 +118,8 @@ export class ProvisionExportService {
     const typeLabels: Record<string, string> = {
       private: 'Privat',
       business: 'Företag',
-      contract: 'Avtal'
+      contract: 'Avtal',
+      lead: 'Tipsbonus (lead)'
     }
 
     const statusLabels: Record<string, string> = {

@@ -18,7 +18,7 @@ export type LeadForlustorsak =
 
 export type LeadAktivitetSystem =
   | 'skapad' | 'stage' | 'agare' | 'varde' | 'nasta_steg' | 'parkerad' | 'forlorad' | 'delad' | 'delning_borttagen'
-  | 'kund_kopplad' | 'arende_kopplat' | 'offert_skickad' | 'offert_avbojd' | 'avtal_signerat'
+  | 'kund_kopplad' | 'arende_kopplat' | 'offert_skickad' | 'offert_avbojd' | 'avtal_signerat' | 'tipsbonus'
 export type LeadAktivitetManuell = 'anteckning' | 'samtal' | 'mejl' | 'mote'
 export type LeadAktivitetTyp = LeadAktivitetSystem | LeadAktivitetManuell
 
@@ -153,6 +153,7 @@ export const AKTIVITET_ETIKETT: Record<LeadAktivitetTyp, string> = {
   offert_skickad: 'Offert skickad',
   offert_avbojd: 'Offert avböjd',
   avtal_signerat: 'Avtal signerat',
+  tipsbonus: 'Tipsbonus',
   anteckning: 'Anteckning',
   samtal: 'Samtal',
   mejl: 'Mejl',
