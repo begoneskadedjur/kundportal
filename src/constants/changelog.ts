@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.44.0',
+    date: '2026-10-10',
+    title: 'Nya Leads (B2B): en arbetskö med nästa steg',
+    items: [
+      { kind: 'nyhet', text: 'Leads (B2B) är omgjord. Fliken Att göra visar försenade, dagens och leads utan nästa steg, plus parkerade som vaknar i dag. Pågående, Nya tips och Alla finns bredvid, och sök och filter sparas i adressen så att en länk visar samma urval.' },
+      { kind: 'nyhet', text: 'En lead öppnas med nästa steg överst. Klar, välj nästa loggar vad som gjordes och kräver ett nytt steg, parkering med datum eller förlorad med orsak. Samtal, mejl, möten och anteckningar loggas direkt i tidslinjen.' },
+      { kind: 'nyhet', text: 'Ägaren kan överlåta leaden och dela den med kollegor. Ny lead kräver bara fem fält och varnar om samma org.nr, telefon eller e-post redan finns.' },
+      { kind: 'andring', text: 'Tekniker hittar sina tips under Mina leads och tips och kan tipsa från mobilen med knappen längst ned.' },
+    ],
+  },
+  {
     version: '3.43.0',
     date: '2026-10-10',
     title: 'Leads: ägare, nästa steg och riktig behörighet',

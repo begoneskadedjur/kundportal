@@ -18,6 +18,8 @@ interface ModalProps {
   usePortal?: boolean
   headerActions?: React.ReactNode // Extra actions to show in header between title and close button
   className?: string
+  /** Helskärm under sm (mobil): ingen marginal, inga rundade hörn, full höjd. */
+  mobilHelskarm?: boolean
 }
 
 export default function Modal({
@@ -33,7 +35,8 @@ export default function Modal({
   zIndex = 100,
   usePortal = false,
   headerActions,
-  className
+  className,
+  mobilHelskarm = false
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
 
@@ -87,7 +90,7 @@ export default function Modal({
 
   const modalContent = (
     <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
+      className={`fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center ${mobilHelskarm ? 'p-0 sm:p-4' : 'p-2 sm:p-4'}`}
       style={{ 
         zIndex: usePortal ? 9999 : zIndex,
         pointerEvents: 'auto' // Återställ pointer events för modalen
@@ -103,6 +106,7 @@ export default function Modal({
           overflow-hidden flex flex-col
           bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl shadow-black/20
           animate-in zoom-in-95 duration-200
+          ${mobilHelskarm ? 'max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:rounded-none max-sm:border-0' : ''}
         `}
         style={{
           // min() gör att modalen aldrig blir högre än den synliga ytan på

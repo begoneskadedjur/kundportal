@@ -1,971 +1,392 @@
-// src/pages/admin/Leads.tsx - Lead Pipeline Management Page
+// src/pages/admin/Leads.tsx
+// Leads (B2B) sedan etapp 4 (2026-10-10). Samma motor som Leads (Webb): flikar och filter i adressen,
+// ?id= öppnar en lead (Bakåt stänger), tangentbord (pil upp/ned, Enter, N för ny lead).
+// Flikar: Att göra (Försenade, I dag, Saknar nästa steg, Parkerade som vaknar i dag), Pågående, Nya tips
+// (utan ägare eller nya med tipsare, koordinatorns fördelningskö) och Alla. Ingen KPI-rad: antal och
+// pipelinevärde står i sidfoten. Status som punkt och text, aldrig piller.
+// Används av /admin, /koordinator, /saljare och /technician (leads). RLS avgör vad var och en ser:
+// admin och koordinator allt, övriga det de äger, har tipsat om eller fått delat med sig.
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
-import { useAuth } from '../../contexts/AuthContext'
-import {
-  Target,
-  TrendingUp,
-  User,
-  Calendar,
-  XCircle,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-react'
-import { toast } from 'react-hot-toast'
-
-import Card from '../../components/ui/Card'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import toast from 'react-hot-toast'
+import { Plus, RefreshCw, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
-import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import EnhancedKpiCard from '../../components/shared/EnhancedKpiCard'
-import StaggeredGrid from '../../components/shared/StaggeredGrid'
-
+import { Icon } from '../../components/icons/Icon'
+import { SearchGlass } from '../../components/shared/search/SearchIcons'
+import { useAuth } from '../../contexts/AuthContext'
+import { LeadService } from '../../services/leadService'
+import type { Lead } from '../../types/database'
+import { KALLA_ETIKETT, LEAD_KALLOR, LEAD_STAGES, STAGE_ETIKETT, arOppen, type LeadPerson } from '../../types/leads'
+import LeadsTabell, { type LeadsSektion } from '../../components/admin/leads/LeadsTabell'
+import LeadModal from '../../components/admin/leads/LeadModal'
+import NyLeadModal from '../../components/admin/leads/NyLeadModal'
 import {
-  Lead,
-  calculateLeadScore
-} from '../../types/database'
-import CreateLeadModal from '../../components/admin/leads/CreateLeadModal'
-import LeadDetailModal from '../../components/admin/leads/LeadDetailModal'
-import EditLeadModal from '../../components/admin/leads/EditLeadModal'
-import { LeadFilters } from '../../components/admin/leads/LeadFilterPanel'
-import LeadsFilters from '../../components/admin/leads/LeadsFilters'
-import LeadsTable from '../../components/admin/leads/LeadsTable'
-import { useLeadColumnVisibility } from '../../components/admin/leads/LeadColumnSelector'
+  FILTER_NYCKLAR,
+  GRUPP_ORDNING,
+  arNyttTips,
+  filtrera,
+  gruppFor,
+  idagSv,
+  kr,
+  lasFilter,
+  lasFlik,
+  sorteraNasta,
+  type FilterNyckel,
+  type Flik,
+  type Mig,
+} from '../../components/admin/leads/leadLogik'
 
-interface LeadStats {
-  totalLeads: number
-  myActiveLeads: number
-  leadsThisWeek: number
-  followUpsToday: number
-  conversionRate: number
-  totalEstimatedValue: number
-  avgLeadScore: number
-}
+const FALT_BAS = 'h-9 px-3 bg-slate-800 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent'
+const falt = (aktiv: boolean) => `${FALT_BAS} ${aktiv ? 'border-[#20c58f]/60 text-white' : 'border-slate-700 text-slate-300'}`
 
-const Leads: React.FC = () => {
-  const navigate = useNavigate()
+export default function Leads() {
+  const location = useLocation()
+  const { profile, isAdmin, isKoordinator, isTechnician } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { user, profile, isAdmin, isKoordinator, isTechnician, activeView } = useAuth()
-  
-  const [loading, setLoading] = useState(true)
   const [leads, setLeads] = useState<Lead[]>([])
-  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([])
-  const [stats, setStats] = useState<LeadStats | null>(null)
-  // Load filters from localStorage or use defaults
-  const [filters, setFilters] = useState<LeadFilters>(() => {
-    // Tekniker ser alltid bara sina egna leads
-    if (activeView === 'technician') {
-      return {
-        search: '',
-        status: [],
-        priority: 'all',
-        assignedTo: 'me',
-        createdBy: 'all',
-        companySize: 'all',
-        contactMethod: 'all',
-        source: 'all',
-        estimatedValueMin: null,
-        estimatedValueMax: null,
-        dateRange: 'all',
-        customStartDate: '',
-        customEndDate: '',
-        followUpToday: false,
-        hasEstimatedValue: 'all'
-      }
-    }
-    const saved = localStorage.getItem('leadFilters')
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        // Migrate old single-value status to array format
-        if (typeof parsed.status === 'string') {
-          parsed.status = parsed.status === 'all' ? [] : [parsed.status]
-        }
-        return parsed
-      } catch (e) {
-        console.warn('Failed to parse saved filters:', e)
-      }
-    }
-    return {
-      search: '',
-      status: [],
-      priority: 'all',
-      assignedTo: 'all',
-      createdBy: 'all',
-      companySize: 'all',
-      contactMethod: 'all',
-      source: 'all',
-      estimatedValueMin: null,
-      estimatedValueMax: null,
-      dateRange: 'all',
-      customStartDate: '',
-      customEndDate: '',
-      followUpToday: false,
-      hasEstimatedValue: 'all'
-    }
-  })
-  const [showOnlyActive, setShowOnlyActive] = useState(() => {
-    const saved = localStorage.getItem('showOnlyActiveLeads')
-    return saved ? JSON.parse(saved) : true // Default to true
-  })
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(() => {
-    const saved = localStorage.getItem('showAdvancedLeadFilters')
-    return saved ? JSON.parse(saved) : false
-  })
-  const [error, setError] = useState<string | null>(null)
-  
-  const [showCreateModal, setShowCreateModal] = useState(false)
-  const [showDetailModal, setShowDetailModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
-  const [technicians, setTechnicians] = useState<{[key: string]: string}>({})
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
-  const [sortField, setSortField] = useState<string | null>(null)
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
-  const [deletingLead, setDeletingLead] = useState<string | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
-  const PAGE_SIZE = 50
-  const { visibleColumns, toggleColumn, resetToDefaults, isVisible } = useLeadColumnVisibility()
+  const [personal, setPersonal] = useState<LeadPerson[]>([])
+  const [delade, setDelade] = useState<Set<string>>(new Set())
+  const [loading, setLoading] = useState(true)
+  const [visaNy, setVisaNy] = useState(false)
 
-  useEffect(() => {
-    fetchLeads()
-    fetchTechnicians()
+  const base = location.pathname.startsWith('/koordinator')
+    ? '/koordinator'
+    : location.pathname.startsWith('/saljare')
+      ? '/saljare'
+      : location.pathname.startsWith('/technician')
+        ? '/technician'
+        : '/admin'
+  const minProfilId = profile?.id ?? null
+  const extra = (profile?.extra_roles ?? []) as string[]
+  const arLeadAdmin = isAdmin || isKoordinator || extra.includes('admin') || extra.includes('koordinator')
+  const arTekniker = isTechnician && !arLeadAdmin
+  const valtId = searchParams.get('id')
+  const flik = lasFlik(searchParams)
+  const filter = useMemo(() => lasFilter(searchParams), [searchParams])
+  const mig: Mig = useMemo(() => ({ profilId: minProfilId, delade }), [minProfilId, delade])
 
-    // Track timeout IDs so we can clear them on unmount
-    const timeoutIds: ReturnType<typeof setTimeout>[] = []
-
-    // Set up optimized real-time subscription for leads
-    const subscription = supabase
-      .channel('leads_realtime')
-      .on('postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'leads'
-        },
-        () => {
-          timeoutIds.push(setTimeout(() => fetchLeads(), 500))
-        }
-      )
-      .on('postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'leads'
-        },
-        (payload) => {
-          if (payload.new && payload.old) {
-            const updatedLead = payload.new as Lead
-            optimisticUpdateLead(updatedLead.id, updatedLead)
-            timeoutIds.push(setTimeout(() => fetchLeads(), 2000))
-          }
-        }
-      )
-      .on('postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'leads'
-        },
-        (payload) => {
-          if (payload.old) {
-            const deletedLead = payload.old as Lead
-            setLeads(prev => prev.filter(lead => lead.id !== deletedLead.id))
-          }
-          timeoutIds.push(setTimeout(() => fetchLeads(), 500))
-        }
-      )
-      .on('postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'lead_technicians'
-        },
-        () => {
-          timeoutIds.push(setTimeout(() => fetchLeads(), 500))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      timeoutIds.forEach(id => clearTimeout(id))
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  // Memoized filtered and sorted leads
-  const filteredAndSortedLeads = useMemo(() => {
-    let filtered = leads
-
-    // Search filter
-    if (filters.search) {
-      filtered = filtered.filter(lead =>
-        lead.company_name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        (lead.contact_person ?? '').toLowerCase().includes(filters.search.toLowerCase()) ||
-        (lead.email ?? '').toLowerCase().includes(filters.search.toLowerCase()) ||
-        (lead.organization_number && lead.organization_number.includes(filters.search))
-      )
-    }
-
-    // Status filter
-    if (filters.status.length > 0) {
-      filtered = filtered.filter(lead => filters.status.includes(lead.status))
-    }
-
-    // Priority filter
-    if (filters.priority !== 'all') {
-      filtered = filtered.filter(lead => lead.priority === filters.priority)
-    }
-
-    // Assigned to filter - updated to check lead_technicians table
-    if (filters.assignedTo !== 'all') {
-      if (filters.assignedTo === 'me') {
-        filtered = filtered.filter(lead => {
-          // Bara tekniker-rollen ska matcha "mina leads" via technician_id
-          if (activeView !== 'technician' || !profile?.technician_id) return false
-          const directlyAssigned = lead.assigned_to === profile.technician_id
-          const technicianAssigned = lead.lead_technicians?.some(
-            assignment => assignment.technician_id === profile.technician_id
-          )
-          return directlyAssigned || technicianAssigned
-        })
-      } else if (filters.assignedTo === 'unassigned') {
-        filtered = filtered.filter(lead => !lead.assigned_to && (!lead.lead_technicians || lead.lead_technicians.length === 0))
-      }
-    }
-
-    // Created by filter
-    if (filters.createdBy !== 'all') {
-      if (filters.createdBy === 'me') {
-        filtered = filtered.filter(lead => lead.created_by === user?.id)
-      }
-    }
-
-    // Company size filter
-    if (filters.companySize !== 'all') {
-      filtered = filtered.filter(lead => lead.company_size === filters.companySize)
-    }
-
-    // Contact method filter
-    if (filters.contactMethod !== 'all') {
-      filtered = filtered.filter(lead => lead.contact_method === filters.contactMethod)
-    }
-
-    // Source filter
-    if (filters.source !== 'all' && filters.source) {
-      filtered = filtered.filter(lead => 
-        lead.source && lead.source.toLowerCase().includes(filters.source.toLowerCase())
-      )
-    }
-
-    // Estimated value range
-    if (filters.estimatedValueMin !== null) {
-      filtered = filtered.filter(lead => 
-        lead.estimated_value && lead.estimated_value >= filters.estimatedValueMin!
-      )
-    }
-    if (filters.estimatedValueMax !== null) {
-      filtered = filtered.filter(lead => 
-        lead.estimated_value && lead.estimated_value <= filters.estimatedValueMax!
-      )
-    }
-
-    // Date range filter
-    if (filters.dateRange !== 'all') {
-      const now = new Date()
-      let startDate: Date
-      
-      switch (filters.dateRange) {
-        case 'today':
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-          break
-        case 'week':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          break
-        case 'month':
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1)
-          break
-        case 'custom':
-          if (filters.customStartDate) {
-            startDate = new Date(filters.customStartDate)
-            const endDate = filters.customEndDate ? new Date(filters.customEndDate) : now
-            filtered = filtered.filter(lead => {
-              const leadDate = new Date(lead.created_at)
-              return leadDate >= startDate && leadDate <= endDate
-            })
-          }
-          break
-        default:
-          startDate = new Date(0)
-      }
-      
-      if (filters.dateRange !== 'custom') {
-        filtered = filtered.filter(lead => {
-          const leadDate = new Date(lead.created_at)
-          return leadDate >= startDate
-        })
-      }
-    }
-
-    // Follow-up today filter
-    if (filters.followUpToday) {
-      const today = new Date().toISOString().split('T')[0]
-      filtered = filtered.filter(lead => 
-        lead.follow_up_date && lead.follow_up_date.startsWith(today)
-      )
-    }
-
-    // Has estimated value filter
-    if (filters.hasEstimatedValue !== 'all') {
-      filtered = filtered.filter(lead => 
-        filters.hasEstimatedValue ? lead.estimated_value && lead.estimated_value > 0 : !lead.estimated_value
-      )
-    }
-
-    // Show only active leads filter (exclude Affär and Förlorad)
-    if (showOnlyActive) {
-      filtered = filtered.filter(lead => 
-        lead.status !== 'green_deal' && lead.status !== 'red_lost'
-      )
-    }
-
-    // Sorting
-    if (sortField) {
-      filtered.sort((a, b) => {
-        let aValue: any
-        let bValue: any
-
-        switch (sortField) {
-          case 'lead_score':
-            aValue = calculateLeadScore(a)
-            bValue = calculateLeadScore(b)
-            break
-          case 'company_name':
-            aValue = a.company_name?.toLowerCase() || ''
-            bValue = b.company_name?.toLowerCase() || ''
-            break
-          case 'status':
-            aValue = a.status || ''
-            bValue = b.status || ''
-            break
-          case 'priority':
-            // Priority order: high=3, medium=2, low=1, null=0
-            const priorityValues = { high: 3, medium: 2, low: 1 }
-            aValue = priorityValues[a.priority as keyof typeof priorityValues] || 0
-            bValue = priorityValues[b.priority as keyof typeof priorityValues] || 0
-            break
-          case 'estimated_value':
-            aValue = a.estimated_value || 0
-            bValue = b.estimated_value || 0
-            break
-          case 'activity':
-            // Sort by total activity (comments + events)
-            aValue = (a.lead_comments?.[0]?.count || 0) + (a.lead_events?.[0]?.count || 0)
-            bValue = (b.lead_comments?.[0]?.count || 0) + (b.lead_events?.[0]?.count || 0)
-            break
-          case 'updated_at':
-            aValue = new Date(a.updated_at).getTime()
-            bValue = new Date(b.updated_at).getTime()
-            break
-          case 'comments_count':
-            aValue = a.lead_comments?.length || 0
-            bValue = b.lead_comments?.length || 0
-            break
-          case 'events_count':
-            aValue = a.lead_events?.length || 0
-            bValue = b.lead_events?.length || 0
-            break
-          case 'closing_date_estimate':
-            aValue = a.closing_date_estimate ? new Date(a.closing_date_estimate).getTime() : 0
-            bValue = b.closing_date_estimate ? new Date(b.closing_date_estimate).getTime() : 0
-            break
-          case 'follow_up_date':
-            aValue = a.follow_up_date ? new Date(a.follow_up_date).getTime() : 0
-            bValue = b.follow_up_date ? new Date(b.follow_up_date).getTime() : 0
-            break
-          case 'deal_velocity':
-            // Sort by lead age (days since created)
-            aValue = Math.floor((new Date().getTime() - new Date(a.created_at).getTime()) / (1000 * 60 * 60 * 24))
-            bValue = Math.floor((new Date().getTime() - new Date(b.created_at).getTime()) / (1000 * 60 * 60 * 24))
-            break
-          case 'activity_pulse':
-            // Sort by days since last activity (updated_at)
-            aValue = Math.floor((new Date().getTime() - new Date(a.updated_at).getTime()) / (1000 * 60 * 60 * 24))
-            bValue = Math.floor((new Date().getTime() - new Date(b.updated_at).getTime()) / (1000 * 60 * 60 * 24))
-            break
-          default:
-            return 0
-        }
-
-        if (sortDirection === 'asc') {
-          return aValue > bValue ? 1 : aValue < bValue ? -1 : 0
-        } else {
-          return aValue < bValue ? 1 : aValue > bValue ? -1 : 0
-        }
-      })
-    }
-
-    return filtered
-  }, [leads, filters, sortField, sortDirection, showOnlyActive, profile?.technician_id, user?.id])
-
-  // Memoized stats calculation
-  const statsData = useMemo(() => {
-    const totalLeads = leads.length
-    
-    // My active leads - bara för tekniker-rollen
-    const myActiveLeads = leads.filter(lead => {
-      if (activeView !== 'technician' || !profile?.technician_id) return false
-      const directlyAssigned = lead.assigned_to === profile.technician_id
-      const technicianAssigned = lead.lead_technicians?.some(
-        assignment => assignment.technician_id === profile.technician_id
-      )
-      return (directlyAssigned || technicianAssigned) && lead.status !== 'red_lost'
-    }).length
-    
-    // Leads created this week
-    const weekStart = new Date()
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-    weekStart.setHours(0, 0, 0, 0)
-    
-    const leadsThisWeek = leads.filter(lead => {
-      const createdDate = new Date(lead.created_at)
-      return createdDate >= weekStart
-    }).length
-    
-    // Follow-ups due today
-    const today = new Date().toISOString().split('T')[0]
-    const followUpsToday = leads.filter(lead => 
-      lead.follow_up_date && lead.follow_up_date.startsWith(today)
-    ).length
-    
-    // Conversion rate (deals / total leads)
-    const dealsWon = leads.filter(lead => lead.status === 'green_deal').length
-    const conversionRate = totalLeads > 0 ? Math.round((dealsWon / totalLeads) * 100) : 0
-    
-    // Calculate total estimated value - only from active leads (not lost)
-    const totalEstimatedValue = leads
-      .filter(lead => lead.status !== 'red_lost' && lead.estimated_value)
-      .reduce((sum, lead) => {
-        return sum + (lead.estimated_value || 0)
-      }, 0)
-    
-    // Calculate average lead score
-    const leadScores = leads.map(lead => calculateLeadScore(lead))
-    const avgLeadScore = leadScores.length > 0 ? Math.round(leadScores.reduce((a, b) => a + b, 0) / leadScores.length) : 0
-
-    return {
-      totalLeads,
-      myActiveLeads,
-      leadsThisWeek,
-      followUpsToday,
-      conversionRate,
-      totalEstimatedValue,
-      avgLeadScore
-    }
-  }, [leads, profile?.technician_id])
-
-  // Update filteredLeads when memoized value changes
-  useEffect(() => {
-    setFilteredLeads(filteredAndSortedLeads)
-  }, [filteredAndSortedLeads])
-
-  // Update stats when memoized value changes
-  useEffect(() => {
-    setStats(statsData)
-  }, [statsData])
-
-  const fetchLeads = async () => {
+  const ladda = useCallback(async () => {
     try {
-      setLoading(true)
-      setError(null)
-      
-      const { data, error } = await supabase
-        .from('leads')
-        .select(`
-          *,
-          created_by_profile:profiles!leads_created_by_fkey(display_name, email),
-          updated_by_profile:profiles!leads_updated_by_fkey(display_name, email),
-          lead_technicians(
-            id,
-            is_primary,
-            assigned_at,
-            technician_id,
-            technicians:technician_id(
-              id,
-              name,
-              email
-            )
-          ),
-          lead_comments(count),
-          lead_events(count)
-        `)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-
-      setLeads(data || [])
-      calculateStats(data || [])
-    } catch (err) {
-      console.error('Error fetching leads:', err)
-      setError(err instanceof Error ? err.message : 'Ett fel uppstod vid hämtning av leads')
-      toast.error('Kunde inte ladda leads')
+      const [rader, medl] = await Promise.all([LeadService.list(), LeadService.medlemmar()])
+      setLeads(rader)
+      setDelade(new Set(medl.filter((m) => m.profile_id === minProfilId).map((m) => m.lead_id)))
+    } catch {
+      toast.error('Leads kunde inte hämtas')
     } finally {
       setLoading(false)
     }
-  }
+  }, [minProfilId])
 
-  const fetchTechnicians = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('technicians')
-        .select('id, name')
-        .eq('is_active', true)
-
-      if (error) throw error
-
-      const techMap: {[key: string]: string} = {}
-      data.forEach(tech => {
-        techMap[tech.id] = tech.name
-      })
-      setTechnicians(techMap)
-    } catch (err) {
-      console.error('Error fetching technicians:', err)
-    }
-  }
-
-  const calculateStats = useCallback((leadsData: Lead[]) => {
-    const totalLeads = leadsData.length
-    
-    // My active leads - bara för tekniker-rollen
-    const myActiveLeads = leadsData.filter(lead => {
-      if (activeView !== 'technician' || !profile?.technician_id) return false
-      const directlyAssigned = lead.assigned_to === profile.technician_id
-      const technicianAssigned = lead.lead_technicians?.some(
-        assignment => assignment.technician_id === profile.technician_id
-      )
-      return (directlyAssigned || technicianAssigned) && lead.status !== 'red_lost'
-    }).length
-    
-    // Leads created this week
-    const weekStart = new Date()
-    weekStart.setDate(weekStart.getDate() - weekStart.getDay())
-    weekStart.setHours(0, 0, 0, 0)
-    
-    const leadsThisWeek = leadsData.filter(lead => {
-      const createdDate = new Date(lead.created_at)
-      return createdDate >= weekStart
-    }).length
-    
-    // Follow-ups due today
-    const today = new Date().toISOString().split('T')[0]
-    const followUpsToday = leadsData.filter(lead => 
-      lead.follow_up_date && lead.follow_up_date.startsWith(today)
-    ).length
-    
-    // Conversion rate (deals / total leads)
-    const dealsWon = leadsData.filter(lead => lead.status === 'green_deal').length
-    const conversionRate = totalLeads > 0 ? Math.round((dealsWon / totalLeads) * 100) : 0
-    
-    // Calculate total estimated value - only from active leads (not lost)
-    const totalEstimatedValue = leadsData
-      .filter(lead => lead.status !== 'red_lost' && lead.estimated_value)
-      .reduce((sum, lead) => {
-        return sum + (lead.estimated_value || 0)
-      }, 0)
-    
-    // Calculate average lead score
-    const leadScores = leadsData.map(lead => calculateLeadScore(lead))
-    const avgLeadScore = leadScores.length > 0 ? Math.round(leadScores.reduce((a, b) => a + b, 0) / leadScores.length) : 0
-
-    setStats({
-      totalLeads,
-      myActiveLeads,
-      leadsThisWeek,
-      followUpsToday,
-      conversionRate,
-      totalEstimatedValue,
-      avgLeadScore
-    })
-  }, [profile?.technician_id])
-
-  // Filter helper functions
-  const handleFiltersChange = useCallback((newFilters: LeadFilters) => {
-    setFilters(newFilters)
-    setCurrentPage(1)
-    localStorage.setItem('leadFilters', JSON.stringify(newFilters))
-  }, [])
-
-  const handleFiltersReset = useCallback(() => {
-    const defaultFilters = {
-      search: '',
-      status: 'all',
-      priority: 'all',
-      assignedTo: 'all',
-      createdBy: 'all',
-      companySize: 'all',
-      contactMethod: 'all',
-      source: 'all',
-      estimatedValueMin: null,
-      estimatedValueMax: null,
-      dateRange: 'all',
-      customStartDate: '',
-      customEndDate: '',
-      followUpToday: false,
-      hasEstimatedValue: 'all'
-    } as LeadFilters
-    setFilters(defaultFilters)
-    localStorage.setItem('leadFilters', JSON.stringify(defaultFilters))
-    setShowAdvancedFilters(false)
-    localStorage.setItem('showAdvancedLeadFilters', 'false')
-  }, [])
-
-  // Save advanced filters toggle state
-  const handleAdvancedFiltersToggle = useCallback(() => {
-    const newState = !showAdvancedFilters
-    setShowAdvancedFilters(newState)
-    localStorage.setItem('showAdvancedLeadFilters', JSON.stringify(newState))
-  }, [showAdvancedFilters])
-
-  // Save show only active leads toggle state
-  const handleShowOnlyActiveToggle = useCallback(() => {
-    const newState = !showOnlyActive
-    setShowOnlyActive(newState)
-    localStorage.setItem('showOnlyActiveLeads', JSON.stringify(newState))
-  }, [showOnlyActive])
-
-  const toggleExpandRow = useCallback((leadId: string) => {
-    setExpandedRows(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(leadId)) {
-        newSet.delete(leadId)
-      } else {
-        newSet.add(leadId)
-      }
-      return newSet
-    })
-  }, [])
-
-  const handleViewLead = useCallback((lead: Lead) => {
-    setSelectedLead(lead)
-    setShowDetailModal(true)
-  }, [])
-
-  const handleEditLead = useCallback((lead: Lead) => {
-    setSelectedLead(lead)
-    setShowEditModal(true)
-  }, [])
-
-  const handleDeleteLead = useCallback(async (lead: Lead) => {
-    if (deletingLead) return // Prevent multiple delete attempts
-    
-    const confirmed = window.confirm(
-      `Är du säker på att du vill radera leadet "${lead.company_name}"?\n\nDetta går inte att ångra.`
-    )
-    
-    if (!confirmed) return
-    
-    try {
-      setDeletingLead(lead.id)
-      
-      const { error } = await supabase
-        .from('leads')
-        .delete()
-        .eq('id', lead.id)
-      
-      if (error) throw error
-      
-      toast.success(`Lead "${lead.company_name}" har raderats`)
-      
-      // Remove from local state immediately for better UX
-      setLeads(prev => prev.filter(l => l.id !== lead.id))
-      
-    } catch (err) {
-      console.error('Error deleting lead:', err)
-      toast.error('Kunde inte radera leadet')
-    } finally {
-      setDeletingLead(null)
-    }
-  }, [deletingLead])
-
-  // Optimistic update for better UX
-  const optimisticUpdateLead = (leadId: string, updates: Partial<Lead>) => {
-    setLeads(prev => prev.map(lead => 
-      lead.id === leadId 
-        ? { ...lead, ...updates, updated_at: new Date().toISOString() }
-        : lead
-    ))
-  }
-
-  const handleSort = useCallback((field: string) => {
-    if (sortField === field) {
-      // Toggle direction if same field
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
-    } else {
-      // New field, default to desc
-      setSortField(field)
-      setSortDirection('desc')
-    }
-  }, [sortField, sortDirection])
-
-  // Öppna ett lead från URL-param (?id=<leadId>), t.ex. från söklådan.
-  // Parametern tas bort när leadet öppnats så att det inte öppnas igen.
   useEffect(() => {
-    const leadId = searchParams.get('id')
-    if (!leadId || loading) return
-    const lead = leads.find(l => l.id === leadId)
-    if (lead) handleViewLead(lead)
-    else toast.error('Leadet kunde inte hittas')
-    const next = new URLSearchParams(searchParams)
-    next.delete('id')
-    setSearchParams(next, { replace: true })
-  }, [searchParams, loading, leads, handleViewLead, setSearchParams])
+    void ladda()
+    LeadService.personal().then(setPersonal).catch(() => setPersonal([]))
+    // Ingen realtid på leads: ladda om när fönstret får fokus igen
+    const fokus = () => void ladda()
+    window.addEventListener('focus', fokus)
+    return () => window.removeEventListener('focus', fokus)
+  }, [ladda])
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-32">
-        <LoadingSpinner size="lg" />
-      </div>
+  // En lead som öppnas via länk men inte finns i listan hämtas för sig
+  useEffect(() => {
+    if (!valtId || loading || leads.some((l) => l.id === valtId)) return
+    LeadService.get(valtId)
+      .then((rad) => {
+        if (rad) setLeads((prev) => (prev.some((l) => l.id === rad.id) ? prev : [rad, ...prev]))
+        else toast.error('Leaden finns inte eller är inte delad med dig')
+      })
+      .catch(() => undefined)
+  }, [valtId, loading, leads])
+
+  const namnFor = useCallback(
+    (id: string | null) => {
+      if (!id) return ''
+      const p = personal.find((x) => x.id === id)
+      return p ? p.namn : ''
+    },
+    [personal],
+  )
+
+  const andraParam = (nyckel: FilterNyckel | 'flik', varde: string) => {
+    setSearchParams(
+      (p) => {
+        if (varde) p.set(nyckel, varde)
+        else p.delete(nyckel)
+        return p
+      },
+      { replace: nyckel === 'q' },
     )
   }
+  const rensaFilter = () =>
+    setSearchParams((p) => {
+      for (const k of FILTER_NYCKLAR) p.delete(k)
+      return p
+    })
+  const bytFlik = (f: Flik) => andraParam('flik', f === 'att-gora' ? '' : f)
+  const oppna = (id: string) => setSearchParams((p) => { p.set('id', id); return p })
+  const stang = () => setSearchParams((p) => { p.delete('id'); return p })
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center py-32">
-        <Card className="p-8 backdrop-blur-sm bg-slate-800/70 border-slate-700/50">
-          <div className="text-center">
-            <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white mb-2">Fel vid laddning</h3>
-            <p className="text-slate-400 mb-6">{error}</p>
-            <Button onClick={fetchLeads}>Försök igen</Button>
-          </div>
-        </Card>
-      </div>
-    )
+  // ?ny=1 (till exempel säljarens knapp Ny Lead i sidomenyn) öppnar Ny lead
+  useEffect(() => {
+    if (searchParams.get('ny') !== '1') return
+    setVisaNy(true)
+    setSearchParams((p) => { p.delete('ny'); return p }, { replace: true })
+  }, [searchParams, setSearchParams])
+
+  // N öppnar Ny lead (inte i fält och inte när en lead är öppen)
+  useEffect(() => {
+    const tangent = (e: KeyboardEvent) => {
+      if (e.key !== 'n' && e.key !== 'N') return
+      if (e.ctrlKey || e.metaKey || e.altKey || valtId || visaNy) return
+      const t = e.target as HTMLElement | null
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
+      e.preventDefault()
+      setVisaNy(true)
+    }
+    document.addEventListener('keydown', tangent)
+    return () => document.removeEventListener('keydown', tangent)
+  }, [valtId, visaNy])
+
+  const idag = idagSv()
+  const synliga = useMemo(() => filtrera(leads, filter, flik, mig), [leads, filter, flik, mig])
+
+  const sektioner: LeadsSektion[] = useMemo(() => {
+    if (flik === 'att-gora') {
+      return GRUPP_ORDNING.map((g) => ({ grupp: g, rader: synliga.filter((l) => gruppFor(l, idag) === g).sort(sorteraNasta) }))
+    }
+    if (flik === 'alla') {
+      return [{ grupp: null, rader: [...synliga].sort((a, b) => Number(arOppen(b.stage)) - Number(arOppen(a.stage)) || sorteraNasta(a, b)) }]
+    }
+    if (flik === 'nya-tips') return [{ grupp: null, rader: [...synliga].sort((a, b) => a.created_at.localeCompare(b.created_at)) }]
+    return [{ grupp: null, rader: [...synliga].sort(sorteraNasta) }]
+  }, [flik, synliga, idag])
+
+  const visasAntal = sektioner.reduce((s, x) => s + x.rader.length, 0)
+
+  // Antal i flikarna räknas med ägarfiltret men utan sök, källa och status
+  const agarUrval = useMemo(
+    () => filtrera(leads, { q: '', agare: filter.agare, kalla: '', status: '' }, 'alla', mig),
+    [leads, filter.agare, mig],
+  )
+  const attGoraAntal = useMemo(() => agarUrval.filter((l) => gruppFor(l, idag) !== null).length, [agarUrval, idag])
+  const nyaTipsAntal = useMemo(() => leads.filter(arNyttTips).length, [leads])
+  const oppnaIUrval = agarUrval.filter((l) => arOppen(l.stage))
+  const pipeline = oppnaIUrval.reduce((s, l) => s + (Number(l.estimated_value) || 0), 0)
+
+  const vald = useMemo(() => leads.find((l) => l.id === valtId) ?? null, [leads, valtId])
+
+  const ta = async (id: string) => {
+    if (!minProfilId) return
+    try {
+      const ny = await LeadService.update(id, { owner_profile_id: minProfilId })
+      setLeads((prev) => prev.map((l) => (l.id === ny.id ? ny : l)))
+      toast.success('Du är ägare till leaden')
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Det gick inte att ta leaden')
+    }
   }
+
+  const harFilter = !!(filter.q || filter.kalla || filter.status || filter.agare !== 'mina')
+  const tomText = harFilter
+    ? 'Inga leads matchar filtret.'
+    : flik === 'att-gora'
+      ? 'Inget att göra just nu. Alla leads har ett nästa steg framåt i tiden.'
+      : flik === 'nya-tips'
+        ? 'Inga nya tips att fördela.'
+        : 'Inga leads än. Tryck N eller Ny lead för att lägga till.'
+
+  const flikar: { id: Flik; label: string; antal?: number; varna?: boolean }[] = [
+    { id: 'att-gora', label: 'Att göra', antal: attGoraAntal, varna: true },
+    { id: 'pagaende', label: 'Pågående' },
+    { id: 'nya-tips', label: 'Nya tips', antal: nyaTipsAntal, varna: arLeadAdmin },
+    { id: 'alla', label: 'Alla' },
+  ]
+
+  const agarVal = [
+    { value: 'mina', label: 'Mina' },
+    { value: 'alla', label: arLeadAdmin ? 'Alla ägare' : 'Alla jag ser' },
+    ...personal.filter((p) => p.aktiv).map((p) => ({ value: p.id, label: p.namn })),
+  ]
+
+  const statusTom = flik === 'alla' ? 'Alla statusar' : 'Alla öppna'
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Leads (B2B)</h1>
-          <p className="text-sm text-slate-400 mt-1">Hantera potentiella kunder och lead-processen</p>
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 pb-24 md:pb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-white">{arTekniker ? 'Mina leads och tips' : 'Leads (B2B)'}</h1>
+            <button
+              type="button"
+              onClick={() => { setLoading(true); void ladda() }}
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+              aria-label="Uppdatera"
+              title="Uppdatera"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+          <p className="text-sm text-slate-400 mt-1">
+            {arTekniker ? 'Det du har tipsat om, äger eller fått delat med dig.' : 'Företag och föreningar som kan bli avtalskunder.'}
+          </p>
         </div>
+        <div className="hidden md:flex items-center gap-2">
+          {base !== '/technician' && (
+            <Link
+              to={`${base}/leadsstatistik`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+            >
+              <Icon name="allman.statistik" size={16} /> Statistik
+            </Link>
+          )}
+          <Button variant="primary" size="sm" onClick={() => setVisaNy(true)} title="Ny lead (N)">
+            <Plus className="w-4 h-4 mr-1.5" /> {arTekniker ? 'Nytt tips' : 'Ny lead'}
+          </Button>
+        </div>
+      </div>
 
-        {/* KPI Cards */}
-        <StaggeredGrid className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <EnhancedKpiCard
-            title="Mina aktiva leads"
-            value={stats?.myActiveLeads || 0}
-            icon={User}
-            trend="neutral"
-            trendValue={`av ${stats?.totalLeads || 0} totalt`}
-            delay={0}
-            onClick={() => setFilters(prev => ({ ...prev, assignedTo: 'me', status: 'all' }))}
-            className="cursor-pointer hover:scale-105 transition-transform"
-          />
-          
-          <EnhancedKpiCard
-            title="Leads denna vecka"
-            value={stats?.leadsThisWeek || 0}
-            icon={Calendar}
-            trend="up"
-            trendValue="nya leads"
-            delay={0.1}
-            onClick={() => setFilters(prev => ({ ...prev, dateRange: 'week' }))}
-            className="cursor-pointer hover:scale-105 transition-transform"
-          />
-          
-          <EnhancedKpiCard
-            title="Uppföljningar idag"
-            value={stats?.followUpsToday || 0}
-            icon={Target}
-            trend={stats?.followUpsToday > 0 ? "up" : "neutral"}
-            trendValue="att genomföra"
-            delay={0.2}
-            onClick={() => setFilters(prev => ({ ...prev, followUpToday: true }))}
-            className="cursor-pointer hover:scale-105 transition-transform"
-          />
-          
-          <EnhancedKpiCard
-            title="Konverteringsgrad"
-            value={stats?.conversionRate || 0}
-            suffix="%"
-            icon={TrendingUp}
-            trend={stats?.conversionRate > 10 ? "up" : stats?.conversionRate > 5 ? "neutral" : "down"}
-            trendValue="affärsavslut"
-            delay={0.3}
-            onClick={() => setFilters(prev => ({ ...prev, status: 'green_deal' }))}
-            className="cursor-pointer hover:scale-105 transition-transform"
-          />
-        </StaggeredGrid>
+      <div className="flex border-b border-slate-700/50 overflow-x-auto" role="tablist">
+        {flikar.map((f) => (
+          <button
+            key={f.id}
+            type="button"
+            role="tab"
+            aria-selected={flik === f.id}
+            onClick={() => bytFlik(f.id)}
+            className={`px-4 py-2 text-sm -mb-px border-b-2 whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${
+              flik === f.id ? 'border-[#20c58f] text-white font-medium' : 'border-transparent text-slate-400 hover:text-white'
+            }`}
+          >
+            {f.label}
+            {f.antal ? (
+              <span className={`ml-1.5 font-mono text-xs ${flik === f.id ? 'text-[#20c58f]' : f.varna ? 'text-amber-400' : 'text-slate-500'}`}>{f.antal}</span>
+            ) : null}
+          </button>
+        ))}
+      </div>
 
-        {/* Filters toolbar */}
-        <LeadsFilters
-          filters={filters}
-          onFiltersChange={handleFiltersChange}
-          onReset={handleFiltersReset}
-          isOpen={showAdvancedFilters}
-          onToggle={handleAdvancedFiltersToggle}
-          resultCount={filteredLeads.length}
-          showOnlyActive={showOnlyActive}
-          onShowOnlyActiveToggle={handleShowOnlyActiveToggle}
-          onNavigateToAnalytics={() => navigate('/admin/leadsstatistik')}
-          onCreateLead={() => setShowCreateModal(true)}
-          visibleColumns={visibleColumns}
-          onToggleColumn={toggleColumn}
-          onResetColumns={resetToDefaults}
-        />
+      {/* Filterrad */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
+              <SearchGlass className="w-4 h-4" />
+            </span>
+            <input
+              type="search"
+              value={filter.q}
+              onChange={(e) => andraParam('q', e.target.value)}
+              placeholder="Sök företag, kontakt, org.nr eller telefon"
+              aria-label="Sök leads"
+              className={`${falt(!!filter.q)} w-full pl-9 placeholder:text-slate-500`}
+            />
+          </div>
+          {flik !== 'nya-tips' && (
+            <select aria-label="Ägare" className={falt(filter.agare !== 'mina')} value={filter.agare} onChange={(e) => andraParam('agare', e.target.value === 'mina' ? '' : e.target.value)}>
+              {agarVal.map((o) => <option key={o.value} value={o.value}>{o.value === 'mina' || o.value === 'alla' ? `Ägare: ${o.label}` : o.label}</option>)}
+            </select>
+          )}
+          <select aria-label="Källa" className={falt(!!filter.kalla)} value={filter.kalla} onChange={(e) => andraParam('kalla', e.target.value)}>
+            <option value="">Alla källor</option>
+            {LEAD_KALLOR.map((k) => <option key={k} value={k}>{KALLA_ETIKETT[k]}</option>)}
+          </select>
+          <select aria-label="Status" className={falt(!!filter.status)} value={filter.status} onChange={(e) => andraParam('status', e.target.value)}>
+            <option value="">{statusTom}</option>
+            {flik === 'alla' && <option value="oppna">Alla öppna</option>}
+            {LEAD_STAGES.filter((s) => flik === 'alla' || arOppen(s)).map((s) => <option key={s} value={s}>{STAGE_ETIKETT[s]}</option>)}
+          </select>
+        </div>
+        {harFilter && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+            <span className="text-slate-500">Filter:</span>
+            {filter.q && <AktivtFilter text={`Sök: ${filter.q}`} onTa={() => andraParam('q', '')} />}
+            {filter.agare !== 'mina' && flik !== 'nya-tips' && (
+              <AktivtFilter text={`Ägare: ${filter.agare === 'alla' ? 'alla' : namnFor(filter.agare) || 'okänd'}`} onTa={() => andraParam('agare', '')} />
+            )}
+            {filter.kalla && <AktivtFilter text={`Källa: ${KALLA_ETIKETT[filter.kalla]}`} onTa={() => andraParam('kalla', '')} />}
+            {filter.status && <AktivtFilter text={`Status: ${filter.status === 'oppna' ? 'alla öppna' : STAGE_ETIKETT[filter.status]}`} onTa={() => andraParam('status', '')} />}
+            <button type="button" onClick={rensaFilter} className="text-[#20c58f] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded">
+              Rensa
+            </button>
+          </div>
+        )}
+      </div>
 
-        {/* Leads Table */}
-        <LeadsTable
-          leads={filteredLeads.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)}
-          expandedRows={expandedRows}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          deletingLead={deletingLead}
-          visibleColumns={visibleColumns}
-          onToggleExpandRow={toggleExpandRow}
-          onSort={handleSort}
-          onViewLead={handleViewLead}
-          onEditLead={handleEditLead}
-          onDeleteLead={handleDeleteLead}
-        />
+      <LeadsTabell
+        sektioner={sektioner}
+        laddar={loading}
+        namnFor={namnFor}
+        kanTa={arLeadAdmin}
+        onOppna={oppna}
+        onTa={(id) => void ta(id)}
+        tomText={tomText}
+        harFilter={harFilter}
+        onRensaFilter={rensaFilter}
+      />
 
-        {/* Pagination footer */}
-        {filteredLeads.length > PAGE_SIZE && (() => {
-          const totalPages = Math.ceil(filteredLeads.length / PAGE_SIZE)
-          const startItem = (currentPage - 1) * PAGE_SIZE + 1
-          const endItem = Math.min(currentPage * PAGE_SIZE, filteredLeads.length)
-          return (
-            <div className="flex items-center justify-between px-4 py-3 bg-slate-800/40 border border-slate-700/50 rounded-lg">
-              <span className="text-sm text-slate-400">
-                Visar {startItem}–{endItem} av {filteredLeads.length} leads
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
-                  .map((page, idx, arr) => (
-                    <React.Fragment key={page}>
-                      {idx > 0 && arr[idx - 1] !== page - 1 && (
-                        <span className="px-1 text-slate-500">...</span>
-                      )}
-                      <button
-                        onClick={() => setCurrentPage(page)}
-                        className={`w-8 h-8 rounded text-sm font-medium ${
-                          page === currentPage
-                            ? 'bg-purple-600 text-[#fff]'
-                            : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    </React.Fragment>
-                  ))
-                }
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )
-        })()}
+      {!(loading && leads.length === 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+          <span>
+            {visasAntal === 1 ? '1 lead visas' : `${visasAntal} leads visas`}
+            {' · '}
+            {oppnaIUrval.length} öppna
+            {pipeline > 0 && <> · <span className="font-mono text-slate-400">{kr(pipeline)}</span> i pipeline</>}
+          </span>
+          <span className="hidden md:inline">Pil upp och ned flyttar, Enter öppnar, N ny lead</span>
+        </div>
+      )}
 
+      {/* Fast knapp på mobil */}
+      <div className="md:hidden fixed bottom-4 inset-x-4 z-30">
+        <Button variant="primary" fullWidth onClick={() => setVisaNy(true)} className="min-h-[44px] shadow-lg">
+          <Plus className="w-4 h-4 mr-1.5" /> {arTekniker ? 'Tipsa om en lead' : 'Ny lead'}
+        </Button>
+      </div>
 
-        {/* Modals */}
-        <CreateLeadModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          onSuccess={fetchLeads}
-        />
+      <LeadModal
+        lead={vald}
+        personal={personal}
+        namnFor={namnFor}
+        minProfilId={minProfilId}
+        arLeadAdmin={arLeadAdmin}
+        basePath={base}
+        onClose={stang}
+        onChanged={(ny) => setLeads((prev) => (prev.some((l) => l.id === ny.id) ? prev.map((l) => (l.id === ny.id ? ny : l)) : [ny, ...prev]))}
+      />
 
-        <LeadDetailModal
-          lead={selectedLead}
-          isOpen={showDetailModal}
-          onClose={() => {
-            setShowDetailModal(false)
-            setSelectedLead(null)
-          }}
-          onSuccess={async () => {
-            // Uppdatera lead-listan
-            await fetchLeads()
-            
-            // Uppdatera selectedLead med nya data från listan
-            if (selectedLead?.id) {
-              // Hämta uppdaterade lead-data direkt från databasen för att säkerställa att vi har senaste versionen
-              try {
-                const { data: updatedLead, error } = await supabase
-                  .from('leads')
-                  .select(`
-                    *,
-                    created_by_profile:profiles!leads_created_by_fkey(display_name, email),
-                    updated_by_profile:profiles!leads_updated_by_fkey(display_name, email)
-                  `)
-                  .eq('id', selectedLead.id)
-                  .single()
-                
-                if (!error && updatedLead) {
-                  setSelectedLead(updatedLead)
-                }
-              } catch (err) {
-                console.error('Failed to refresh selected lead:', err)
-              }
-            }
-          }}
-        />
-
-        <EditLeadModal
-          lead={selectedLead}
-          isOpen={showEditModal}
-          onClose={() => {
-            setShowEditModal(false)
-            setSelectedLead(null)
-          }}
-          onSuccess={async () => {
-            // Optimistic update för bättre UX
-            if (selectedLead?.id) {
-              optimisticUpdateLead(selectedLead.id, { updated_at: new Date().toISOString() })
-            }
-            
-            setShowEditModal(false)
-            
-            // Uppdatera lead-listan
-            await fetchLeads()
-            
-            // Uppdatera selectedLead med nya data 
-            if (selectedLead?.id) {
-              try {
-                const { data: updatedLead, error } = await supabase
-                  .from('leads')
-                  .select(`
-                    *,
-                    created_by_profile:profiles!leads_created_by_fkey(display_name, email),
-                    updated_by_profile:profiles!leads_updated_by_fkey(display_name, email)
-                  `)
-                  .eq('id', selectedLead.id)
-                  .single()
-                
-                if (!error && updatedLead) {
-                  setSelectedLead(updatedLead)
-                }
-              } catch (err) {
-                console.error('Failed to refresh selected lead:', err)
-              }
-            }
-          }}
-        />
+      <NyLeadModal
+        isOpen={visaNy}
+        onClose={() => setVisaNy(false)}
+        personal={personal}
+        minProfilId={minProfilId}
+        arLeadAdmin={arLeadAdmin}
+        arTekniker={arTekniker}
+        onSkapad={(lead) => {
+          setVisaNy(false)
+          setLeads((prev) => [lead, ...prev])
+          oppna(lead.id)
+        }}
+        onOppnaBefintlig={(id) => {
+          setVisaNy(false)
+          oppna(id)
+        }}
+      />
     </div>
   )
 }
 
-export default Leads
+function AktivtFilter({ text, onTa }: { text: string; onTa: () => void }) {
+  return (
+    <span className="flex items-center gap-1 text-slate-300">
+      {text}
+      <button
+        type="button"
+        onClick={onTa}
+        className="p-0.5 text-slate-500 hover:text-white rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+        aria-label={`Ta bort filtret ${text}`}
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </span>
+  )
+}

@@ -76,7 +76,7 @@ export function SäljareSidebar({
       <div className="px-3 pt-3">
         {collapsed ? (
           <Link
-            to="/saljare/leads"
+            to="/saljare/leads?ny=1"
             className="w-full flex items-center justify-center p-2.5 bg-teal-500 hover:bg-teal-400 rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
             title="Ny Lead"
           >
@@ -84,7 +84,7 @@ export function SäljareSidebar({
           </Link>
         ) : (
           <Link
-            to="/saljare/leads"
+            to="/saljare/leads?ny=1"
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-500 hover:bg-teal-400 text-[#fff] font-semibold rounded-xl transition-colors duration-200 shadow-lg shadow-teal-500/25"
           >
             <Target className="w-4 h-4" />

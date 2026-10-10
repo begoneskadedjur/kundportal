@@ -94,4 +94,14 @@ export const leadIcons = {
       <path d="M17.5 20.5v-12M14.5 11.5l3-3 3 3" />
     </>
   ),
+  // Dela: två personer, den bakre med ett plus
+  'lead.dela': (
+    <>
+      <circle cx="9" cy="9" r="3.2" />
+      <path d="M3.5 20a5.5 5.5 0 0 1 11 0" />
+      <path d="M15.5 10.5a2.8 2.8 0 0 0 0-5.6" />
+      <path d="M17 14.2a5.5 5.5 0 0 1 3.5 5.3" />
+      <path d="M20 2.5v4M18 4.5h4" />
+    </>
+  ),
 } satisfies Record<`lead.${string}`, ReactNode>

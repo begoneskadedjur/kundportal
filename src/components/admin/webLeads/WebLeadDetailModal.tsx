@@ -16,7 +16,9 @@ const LANKKNAPP =
 import toast from 'react-hot-toast'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
-import CreateLeadModal from '../leads/CreateLeadModal'
+import NyLeadModal, { type NyLeadForval } from '../leads/NyLeadModal'
+import { LeadService } from '../../../services/leadService'
+import type { LeadPerson } from '../../../types/leads'
 import CreateCaseModal from '../coordinator/CreateCaseModal'
 import { useAuth } from '../../../contexts/AuthContext'
 import { WebInquiryService } from '../../../services/webInquiryService'
@@ -36,7 +38,7 @@ import {
   type WebInquiryEvent,
   type WebInquiryStatus,
 } from '../../../types/webInquiry'
-import type { BusinessCasesInsert, LeadInsert, PrivateCasesInsert, Technician } from '../../../types/database'
+import type { BusinessCasesInsert, PrivateCasesInsert, Technician } from '../../../types/database'
 import { formatSvTid, svDatum } from './format'
 import WebLeadUppgifter from './WebLeadUppgifter'
 import WebLeadBefintligKund from './WebLeadBefintligKund'
@@ -162,7 +164,8 @@ function arendeUrl(arendeSokPath: string | null, tabell: WebInquiryArendeTabell 
 }
 
 export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBasePath, arendeSokPath, onClose, onChanged }: Props) {
-  const { profile } = useAuth()
+  const { profile, isAdmin, isKoordinator } = useAuth()
+  const [leadPersonal, setLeadPersonal] = useState<LeadPerson[]>([])
   const navigate = useNavigate()
   const [events, setEvents] = useState<WebInquiryEvent[]>([])
   const [bilder, setBilder] = useState<{ path: string; url: string }[]>([])
@@ -307,15 +310,17 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
     }
   }
 
-  const leadData: Partial<LeadInsert> = {
+  const leadData: NyLeadForval = {
     company_name: inquiry.company_name || inquiry.name,
     contact_person: inquiry.name,
     phone_number: inquiry.phone,
-    email: inquiry.email || '',
-    organization_number: effektivtIdNummer(inquiry)?.typ === 'orgnr' ? inquiry.id_nummer || inquiry.organization_number || '' : '',
+    email: inquiry.email || null,
+    organization_number: effektivtIdNummer(inquiry)?.typ === 'orgnr' ? inquiry.id_nummer || inquiry.organization_number || null : null,
+    web_inquiry_id: inquiry.id,
+    customer_group: inquiry.kundgrupp === 'brf_fastighet' ? 'forening' : 'foretag',
     address: sattIhopAdress(inquiry),
     problem_type: tjanstLabel(inquiry.pest_type),
-    business_type: typeof inquiry.details.svar === 'string' && inquiry.customer_kind === 'foretag' ? inquiry.details.svar : '',
+    business_type: typeof inquiry.details.svar === 'string' && inquiry.customer_kind === 'foretag' ? inquiry.details.svar : null,
     source: 'webbforfragan',
     notes: [`Webbförfrågan ${inquiry.referens} (${formatSvTid(inquiry.created_at)})`, inquiry.message].filter(Boolean).join('\n\n'),
   }
@@ -571,15 +576,15 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
                 </a>
               )}
               {arForetag && !inquiry.lead_id && (
-                <Button variant="primary" size="sm" onClick={() => setVisaSkapaLead(true)}>
+                <Button variant="primary" size="sm" onClick={() => { LeadService.personal().then(setLeadPersonal).catch(() => setLeadPersonal([])); setVisaSkapaLead(true) }}>
                   <Target className="w-4 h-4 mr-1.5" />
                   Skapa B2B-lead
                 </Button>
               )}
               {inquiry.lead_id && (
-                <Link to={leadsBasePath} className={LANKKNAPP}>
+                <Link to={`${leadsBasePath}?id=${inquiry.lead_id}`} className={LANKKNAPP}>
                   <ExternalLink className="w-4 h-4 text-[#20c58f]" />
-                  B2B-lead skapad, öppna Leads (B2B)
+                  Öppna B2B-leaden
                 </Link>
               )}
               {inquiry.archived_at ? (
@@ -832,12 +837,22 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
         </div>
       )}
 
-      <CreateLeadModal
+      <NyLeadModal
         isOpen={visaSkapaLead}
         onClose={() => setVisaSkapaLead(false)}
-        onSuccess={() => undefined}
-        initialData={leadData}
-        onCreated={efterLead}
+        personal={leadPersonal}
+        minProfilId={profile?.id ?? null}
+        arLeadAdmin={isAdmin || isKoordinator}
+        arTekniker={false}
+        forval={leadData}
+        onSkapad={(lead) => {
+          setVisaSkapaLead(false)
+          void efterLead(lead.id)
+        }}
+        onOppnaBefintlig={(id) => {
+          setVisaSkapaLead(false)
+          navigate(`${leadsBasePath}?id=${id}`)
+        }}
       />
 
       {arendeUnderlag && (

@@ -63,6 +63,8 @@ export default tseslint.config(
       'src/components/icons/**/*.{ts,tsx}',
       'src/components/admin/leads/**/*.{ts,tsx}',
       'src/pages/admin/Leads*.tsx',
+      'src/services/leadService.ts',
+      'src/types/leads.ts',
     ],
     rules: {
       'no-restricted-imports': [
