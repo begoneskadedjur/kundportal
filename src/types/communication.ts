@@ -101,7 +101,7 @@ export interface Notification {
    * 'procurement' = upphandlingsnotis (case_id är upphandlingens id, eller null
    * för notisen om att man blivit upphandlingsansvarig).
    */
-  case_type: CaseType | 'customer' | 'procurement' | 'web_inquiry';
+  case_type: CaseType | 'customer' | 'procurement' | 'web_inquiry' | 'lead';
   title: string;
   preview: string;
   case_title: string | null;

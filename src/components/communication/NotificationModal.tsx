@@ -7,6 +7,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { Notification } from '../../types/communication';
 import NotificationItem from './NotificationItem';
 import { procurementPortalUrl } from '../../lib/procurementPortal';
+import { leadsSidaFor } from '../admin/leads/leadLogik';
 import {
   X,
   Bell,
@@ -132,6 +133,12 @@ export default function NotificationModal({
       if (notification.case_type === 'web_inquiry') {
         const base = window.location.pathname.includes('/koordinator') ? '/koordinator' : window.location.pathname.includes('/saljare') ? '/saljare' : '/admin';
         navigate(`${base}/leads-webb?id=${notification.case_id}`);
+        return;
+      }
+
+      // Lead (tipsarens notis om offert och vunnen): leadssidan med leaden öppen
+      if (notification.case_type === 'lead') {
+        navigate(`${leadsSidaFor(window.location.pathname)}?id=${notification.case_id}`);
         return;
       }
 

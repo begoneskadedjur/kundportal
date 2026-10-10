@@ -131,6 +131,8 @@ interface WizardData {
   web_inquiry_id?: string
   /** Leads (Webb): sidan guiden går tillbaka till efter en skickad offert. */
   returnPath?: string
+  /** Leads etapp 5: leaden som offerten eller avtalet skapas från (contracts.source_type 'lead'). */
+  lead_id?: string
 }
 
 const DEFAULT_AGREEMENT_TEXT = 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.'
@@ -548,6 +550,8 @@ export default function OneflowContractCreator() {
             renewalOfContractId: customerData.renewalOfContractId || undefined,
             // Leads (Webb): offert från en webbförfrågan
             web_inquiry_id: customerData.webInquiryId || undefined,
+            // Leads: offert eller avtal från en lead; triggern på contracts flyttar leaden
+            lead_id: customerData.leadId || undefined,
             returnPath: customerData.returnPath || undefined,
           }))
 
@@ -1057,6 +1061,7 @@ export default function OneflowContractCreator() {
           documentType: wizardData.documentType,
           fastighetsbeteckning, // Endast offerter använder fältet (hanteras i API:t)
           caseId: wizardData.case_id, // Skicka case_id för webhook-koppling
+          leadId: wizardData.lead_id || null,
           senderEmail: user?.email,
           senderName: wizardData.anstalld,
           selectedProducts: convertedProducts,
@@ -1223,7 +1228,7 @@ export default function OneflowContractCreator() {
       // Redirecta till offertuppföljning efter kort paus så bekräftelsen hinner registreras
       setTimeout(() => {
         navigate(
-          wizardData.web_inquiry_id && wizardData.returnPath
+          (wizardData.web_inquiry_id || wizardData.lead_id) && wizardData.returnPath
             ? wizardData.returnPath
             : getFollowUpRoute()
         )

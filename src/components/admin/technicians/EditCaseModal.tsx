@@ -76,6 +76,7 @@ import CaseHistoryPanel from '../../shared/CaseHistoryPanel'
 // Delade modal-byggstenar (visuell omgörning)
 import CaseModalSection from '../../shared/CaseModalSection'
 import CaseStatusStepper from '../../shared/CaseStatusStepper'
+import SkapaLeadKnapp from '../leads/SkapaLeadKnapp'
 
 // Provision
 import CommissionSection from '../../shared/CommissionSection'
@@ -1724,6 +1725,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           (currentCase as any).completed_date || null,
         ]}
       />
+
+      {/* Leads etapp 5: Skapa lead (eller Lead skapad · Företag →), bara engångsärenden */}
+      {(currentCase.case_type === 'private' || currentCase.case_type === 'business') && currentCase.id && (
+        <div className="flex items-center px-4 pt-2 min-w-0">
+          <SkapaLeadKnapp caseType={currentCase.case_type} caseId={currentCase.id} />
+        </div>
+      )}
 
       {/* Sticky flikrad */}
       <div className="sticky top-0 z-10 flex gap-1 px-4 py-2 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50">

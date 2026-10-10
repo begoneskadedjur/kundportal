@@ -1,7 +1,7 @@
 // src/types/database.ts - KOMPLETT UPPDATERAD med alla saknade exports och PestType integration + work_schedule
 
 import type * as P from './procurement'
-import type { LeadStage, LeadSource, LeadTyp, LeadKundgrupp, LeadUrsprungTabell, LeadForlustorsak, LeadAktivitet, LeadMedlem } from './leads'
+import type { LeadStage, LeadSource, LeadTyp, LeadKundgrupp, LeadUrsprungTabell, LeadBokatTabell, LeadForlustorsak, LeadAktivitet, LeadMedlem } from './leads'
 
 // 🆕 SCHEMA TYPER FÖR TEKNIKER-SCHEMA
 export type DaySchedule = {
@@ -619,7 +619,8 @@ export type Database = {
           id: string
           oneflow_contract_id: string
 
-          source_type: 'private_case' | 'business_case' | 'manual'
+          // 'lead' sedan leads etapp 5: source_id = leads.id
+          source_type: 'private_case' | 'business_case' | 'manual' | 'lead'
           source_id: string | null
 
           type: 'contract' | 'offer'
@@ -880,6 +881,9 @@ export type Database = {
           customer_id: string | null
           offer_contract_id: string | null
           agreement_contract_id: string | null
+          // Etapp 5: ärendet som bokades från leaden (RPC lead_koppla_besok)
+          booked_case_type: LeadBokatTabell | null
+          booked_case_id: string | null
           next_action: string | null
           next_action_at: string | null
           parked_until: string | null

@@ -210,3 +210,9 @@ export function segment(aktiv: boolean): string {
     aktiv ? 'border-[#20c58f] text-white font-medium' : 'border-transparent text-slate-400 hover:text-white'
   }`
 }
+
+/** Rollens leadssida utifrån adressen (admin, koordinator, säljare och tekniker har alla /leads). */
+export function leadsSidaFor(pathname: string): string {
+  const bas = ['/admin', '/koordinator', '/saljare', '/technician'].find((b) => pathname === b || pathname.startsWith(`${b}/`)) ?? '/admin'
+  return `${bas}/leads`
+}

@@ -485,7 +485,8 @@ export class ContractService {
 
       // Hämta källdata om det finns
       let source_case_data = undefined
-      if (data.source_id && data.source_type !== 'manual') {
+      // Bara ärenden; source_type 'lead' pekar på leads (etapp 5)
+      if (data.source_id && (data.source_type === 'private_case' || data.source_type === 'business_case')) {
         const tableName = data.source_type === 'private_case' ? 'private_cases' : 'business_cases'
         const { data: sourceData } = await supabase
           .from(tableName)

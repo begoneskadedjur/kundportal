@@ -23,6 +23,8 @@ interface ContractRequestBody {
   senderName?: string
   // NYTT: Case ID för koppling
   caseId?: string
+  // Leads etapp 5: offert eller avtal från en lead (source_type 'lead', source_id = leads.id)
+  leadId?: string | null
   // Prislista-ID för fakturering
   priceListId?: string | null
   // Produkter
@@ -320,6 +322,7 @@ export default async function handler(
     senderName,
     selectedProducts,
     caseId,
+    leadId,
     priceListId,
     customerGroupId,
     noticePeriodMonths,
@@ -340,6 +343,8 @@ export default async function handler(
       message: validationError.message 
     })
   }
+
+  const giltigtLeadId = typeof leadId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId) ? leadId : null
 
   const token = process.env.ONEFLOW_API_TOKEN!
   const workspaceId = process.env.ONEFLOW_WORKSPACE_ID!
@@ -549,8 +554,9 @@ export default async function handler(
     // Upsert kontrakt-metadata direkt (skapar raden om webhook inte hunnit)
     const upsertData: any = {
       oneflow_contract_id: createdContract.id.toString(),
-      source_type: caseId ? (partyType === 'company' ? 'business_case' : 'private_case') : 'manual',
-      source_id: caseId || null,
+      // Ärendet går före leaden; en lead-offert flyttar leaden via triggern contracts_lead_automatik
+      source_type: caseId ? (partyType === 'company' ? 'business_case' : 'private_case') : giltigtLeadId ? 'lead' : 'manual',
+      source_id: caseId || giltigtLeadId || null,
       type: documentType === 'offer' ? 'offer' : 'contract',
       status: sendForSigning ? 'pending' : 'draft',
       template_id: templateId,

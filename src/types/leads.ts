@@ -162,3 +162,54 @@ export const AKTIVITET_ETIKETT: Record<LeadAktivitetTyp, string> = {
 export const MANUELLA_AKTIVITETER: LeadAktivitetManuell[] = ['anteckning', 'samtal', 'mejl', 'mote']
 
 export const arOppen = (stage: LeadStage) => stage !== 'vunnen' && stage !== 'forlorad'
+
+// ---------------------------------------------------------------------------
+// Etapp 5: lead från engångsärende (RPC lead_arende_underlag och lead_fran_arende)
+// ---------------------------------------------------------------------------
+export type LeadArendeTabell = 'private_cases' | 'business_cases'
+export type LeadBokatTabell = 'private_cases' | 'business_cases' | 'cases'
+
+/** "Vad gäller det?" Företag: de tre första. Privat: de tre sista (forening och foretag kräver namn). */
+export type LeadGaller = 'lopande_avtal' | 'fler_adresser' | 'annan_tjanst' | 'hemmet' | 'forening' | 'foretag'
+
+export const GALLER_FORETAG: { varde: LeadGaller; etikett: string; hjalp: string }[] = [
+  { varde: 'lopande_avtal', etikett: 'Löpande avtal', hjalp: 'Kunden vill ha regelbunden kontroll' },
+  { varde: 'fler_adresser', etikett: 'Fler adresser', hjalp: 'Kunden har fler lokaler' },
+  { varde: 'annan_tjanst', etikett: 'Annan tjänst', hjalp: 'Till exempel sanering eller tätning' },
+]
+export const GALLER_PRIVAT: { varde: LeadGaller; etikett: string; hjalp: string }[] = [
+  { varde: 'hemmet', etikett: 'Löpande avtal för hemmet', hjalp: 'Kunden vill ha regelbunden kontroll' },
+  { varde: 'forening', etikett: 'Bostadsrättsföreningen', hjalp: 'Kunden sitter i styrelsen eller vet vem som gör det' },
+  { varde: 'foretag', etikett: 'Kundens företag', hjalp: 'Kunden driver eller arbetar på ett företag med behov' },
+]
+
+/** Lead som redan finns på ärendet (unikt per ursprungsärende). */
+export interface LeadPaArende {
+  id: string
+  company_name: string
+  stage: LeadStage
+  kan_oppna: boolean
+}
+
+/** Ärendets uppgifter för modalen. Personnummer lämnar aldrig databasen. */
+export interface LeadArendeUnderlag {
+  case_type: LeadArendeTabell
+  case_id: string
+  case_number: string | null
+  foretag: string | null
+  org_nr: string | null
+  kontakt: string | null
+  telefon: string | null
+  epost: string | null
+  adress: string | null
+  skadedjur: string | null
+  befintlig: LeadPaArende | null
+  dubbletter: LeadDubblett[]
+}
+
+export interface LeadFranArendeSvar {
+  lead_id: string
+  company_name: string
+  skapad: boolean
+  kan_oppna: boolean
+}

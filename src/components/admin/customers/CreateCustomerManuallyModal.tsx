@@ -27,7 +27,10 @@ registerLocale('sv', sv)
 interface CreateCustomerManuallyModalProps {
   isOpen: boolean
   onClose: () => void
-  onCustomerCreated: () => void
+  /** Får den nya kundens id (Leads etapp 5 kopplar kunden till en vunnen lead). */
+  onCustomerCreated: (customerId: string) => void
+  /** Förifyllda fält i steg 1, t.ex. från en vunnen lead. Läses när modalen öppnas. */
+  initialValues?: Partial<Pick<FormData, 'company_name' | 'organization_number' | 'contact_person' | 'contact_email' | 'contact_phone' | 'contact_address' | 'sales_person' | 'sales_person_email'>>
 }
 
 type Step = 1 | 2 | 3
@@ -81,6 +84,7 @@ export default function CreateCustomerManuallyModal({
   isOpen,
   onClose,
   onCustomerCreated,
+  initialValues,
 }: CreateCustomerManuallyModalProps) {
   const [step, setStep] = useState<Step>(1)
   const [form, setForm] = useState<FormData>(INITIAL_FORM)
@@ -94,6 +98,13 @@ export default function CreateCustomerManuallyModal({
   useEffect(() => {
     CustomerGroupService.getActiveGroups().then(setCustomerGroups).catch(console.error)
   }, [])
+
+  // Förifyllning när modalen öppnas (bara de fält som skickas in)
+  useEffect(() => {
+    if (!isOpen || !initialValues) return
+    setForm(prev => ({ ...prev, ...Object.fromEntries(Object.entries(initialValues).filter(([, v]) => v != null)) }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   const handleClose = () => {
     if (isSubmitting) return
@@ -225,7 +236,7 @@ export default function CreateCustomerManuallyModal({
       }
 
       toast.success(assigned != null ? `Kund skapad med kundnummer ${assigned}` : 'Kund skapad')
-      onCustomerCreated()
+      onCustomerCreated(inserted.id)
       handleClose()
     } catch (err: unknown) {
       toast.error('Kunde inte skapa kund: ' + ((err as { message?: string } | null)?.message ?? 'Okänt fel'))

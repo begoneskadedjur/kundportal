@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.45.0',
+    date: '2026-10-10',
+    title: 'Leads: tips från ärendet och statusen sätter sig själv',
+    items: [
+      { kind: 'nyhet', text: 'Skapa lead finns i engångsärenden för privatpersoner och företag, både på kontoret och i teknikerns vy. Välj vad det gäller och skriv en rad; kontakt, telefon, adress och skadedjur följer med från ärendet, och finns redan en öppen lead kan tipset läggas som anteckning där.' },
+      { kind: 'nyhet', text: 'Boka besök i en lead öppnar ärendemodalen förifylld, och när ärendet sparas blir leaden Besök bokat. Skapa offert öppnar Oneflow-guiden med leaden som källa.' },
+      { kind: 'nyhet', text: 'När offerten eller avtalet skickas blir leaden Offert skickad, avböjs det går den tillbaka till Kontaktad med ett nytt nästa steg, och signeras det blir den Vunnen. Den som tipsade får en notis vid offert och vunnen affär.' },
+      { kind: 'nyhet', text: 'En vunnen lead utan kund visar steget Koppla eller skapa kund med förslag från kundregistret.' },
+    ],
+  },
+  {
     version: '3.44.0',
     date: '2026-10-10',
     title: 'Nya Leads (B2B): en arbetskö med nästa steg',

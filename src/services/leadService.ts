@@ -6,7 +6,18 @@
 
 import { supabase } from '../lib/supabase'
 import type { Lead, LeadContact, LeadUpdate } from '../types/database'
-import type { LeadAktivitet, LeadAktivitetManuell, LeadDubblett, LeadMedlem, LeadPerson } from '../types/leads'
+import type {
+  LeadAktivitet,
+  LeadAktivitetManuell,
+  LeadArendeTabell,
+  LeadArendeUnderlag,
+  LeadBokatTabell,
+  LeadDubblett,
+  LeadFranArendeSvar,
+  LeadGaller,
+  LeadMedlem,
+  LeadPerson,
+} from '../types/leads'
 
 export type LeadNy = Partial<Omit<Lead, 'id' | 'created_at' | 'updated_at' | 'org_nr_norm' | 'phone_norm' | 'email_norm'>> & {
   company_name: string
@@ -113,6 +124,61 @@ export class LeadService {
   static async slutaDela(leadId: string, profil: string): Promise<void> {
     const { error } = await supabase.rpc('lead_sluta_dela', { p_lead: leadId, p_profil: profil })
     if (error) fel(error, 'Delningen kunde inte tas bort')
+  }
+
+  // -------------------------------------------------------------------------
+  // Etapp 5: lead från engångsärende, bokat besök och kundkoppling
+  // -------------------------------------------------------------------------
+
+  /** Ärendets uppgifter, befintlig lead på ärendet och öppna dubbletter. Kastar om anroparen inte ser ärendet. */
+  static async arendeUnderlag(caseType: LeadArendeTabell, caseId: string): Promise<LeadArendeUnderlag> {
+    const { data, error } = await supabase.rpc('lead_arende_underlag', { p_case_type: caseType, p_case_id: caseId })
+    if (error) fel(error, 'Ärendets uppgifter kunde inte hämtas')
+    return data as LeadArendeUnderlag
+  }
+
+  /** Skapar leaden från ärendet (eller returnerar den som redan finns, skapad = false). */
+  static async franArende(caseType: LeadArendeTabell, caseId: string, galler: LeadGaller, beskrivning: string, foretag?: string | null): Promise<LeadFranArendeSvar> {
+    const { data, error } = await supabase.rpc('lead_fran_arende', {
+      p_case_type: caseType,
+      p_case_id: caseId,
+      p_galler: galler,
+      p_beskrivning: beskrivning,
+      p_foretag: foretag?.trim() || null,
+    })
+    if (error) fel(error, 'Leaden kunde inte skapas')
+    return data as LeadFranArendeSvar
+  }
+
+  /** Tipset som anteckning på en befintlig lead (dubblett), med ärendet som referens. */
+  static async anteckningFranArende(leadId: string, caseType: LeadArendeTabell, caseId: string, text: string): Promise<void> {
+    const { error } = await supabase.rpc('lead_anteckning_fran_arende', { p_lead: leadId, p_case_type: caseType, p_case_id: caseId, p_text: text })
+    if (error) fel(error, 'Anteckningen kunde inte sparas')
+  }
+
+  /** Kopplar ett ärende som bokats från leaden. Ny eller Kontaktad blir Besök bokat. */
+  static async kopplaBesok(leadId: string, caseType: LeadBokatTabell, caseId: string): Promise<void> {
+    const { error } = await supabase.rpc('lead_koppla_besok', { p_lead: leadId, p_case_type: caseType, p_case_id: caseId })
+    if (error) fel(error, 'Ärendet kunde inte kopplas till leaden')
+  }
+
+  /** Kunder att koppla för hand: namn, org.nr eller kundnummer (aktiva, högst 8). */
+  static async sokKunder(q: string): Promise<{ id: string; company_name: string; organization_number: string | null; customer_number: number | null }[]> {
+    const t = q.trim()
+    if (t.length < 2) return []
+    const siffror = t.replace(/\D/g, '')
+    const villkor = [`company_name.ilike.%${t.replace(/[%,()]/g, ' ')}%`]
+    if (siffror.length >= 6) villkor.push(`organization_number.ilike.%${siffror.slice(0, 6)}%`)
+    if (/^\d{1,6}$/.test(t)) villkor.push(`customer_number.eq.${t}`)
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id, company_name, organization_number, customer_number')
+      .eq('is_active', true)
+      .or(villkor.join(','))
+      .order('company_name')
+      .limit(8)
+    if (error) fel(error, 'Kunderna kunde inte sökas')
+    return (data ?? []) as { id: string; company_name: string; organization_number: string | null; customer_number: number | null }[]
   }
 
   /** Kundens namn för Ursprung och kopplingar (null om RLS inte släpper igenom). */

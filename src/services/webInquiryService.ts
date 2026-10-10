@@ -151,7 +151,10 @@ export class WebInquiryService {
    * alla enheter) och annars kundradens avtal, med arv från huvudkontoret.
    * Inga kunduppgifter loggas.
    */
-  static async findCustomerMatches(inquiry: WebInquiry): Promise<KundMatchning[]> {
+  // Tar bara de fält som matchningen använder, så att Leads (etapp 5, vunnen lead) kan återanvända den
+  static async findCustomerMatches(
+    inquiry: Pick<WebInquiry, 'id_nummer' | 'id_nummer_typ' | 'organization_number' | 'kundgrupp' | 'email' | 'phone'>,
+  ): Promise<KundMatchning[]> {
     const { data, error } = await db
       .from('customers')
       .select('id, company_name, site_name, site_type, is_active, parent_customer_id, organization_number, contact_email, billing_email, contact_phone, contract_status, contract_end_date, customer_number')
