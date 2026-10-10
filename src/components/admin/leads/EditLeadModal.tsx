@@ -21,10 +21,9 @@ import {
   LEAD_STATUS_DISPLAY,
   CONTACT_METHOD_DISPLAY,
   COMPANY_SIZE_DISPLAY,
-  LEAD_PRIORITY_DISPLAY,
-  getPriorityLabel
+  LEAD_PRIORITY_DISPLAY
 } from '../../../types/database'
-import { LeadEventHelpers, logLeadEvent } from '../../../utils/leadEventLogger'
+import { logLeadEvent } from '../../../utils/leadEventLogger'
 import LeadTechnicianManager from './LeadTechnicianManager'
 import SNIBranchManager from './SNIBranchManager'
 
@@ -44,53 +43,88 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
   const [leadTechnicians, setLeadTechnicians] = useState<any[]>([])
   const [selectedSniCodes, setSelectedSniCodes] = useState<any[]>([])
 
-  // Initialize form data when lead changes
+  // Ursprungsvärdena i formuläret. Sparning skickar bara fält som skiljer sig
+  // från dessa, så att fält som formuläret inte rört aldrig skrivs över.
+  const [initialForm, setInitialForm] = useState<Partial<LeadUpdate>>({})
+  const [initialSniKey, setInitialSniKey] = useState('')
+
+  const buildFormData = (l: Lead): Partial<LeadUpdate> => ({
+    company_name: l.company_name || '',
+    contact_person: l.contact_person || '',
+    phone_number: l.phone_number || '',
+    email: l.email || '',
+    status: l.status,
+    organization_number: l.organization_number || '',
+    business_type: l.business_type || '',
+    problem_type: l.problem_type || '',
+    address: l.address || '',
+    website: l.website || '',
+    company_size: l.company_size,
+    business_description: l.business_description || '',
+    sni07_label: l.sni07_label || '',
+    notes: l.notes || '',
+    contact_method: l.contact_method,
+    contact_date: l.contact_date ? new Date(l.contact_date).toISOString().slice(0, 16) : '',
+    follow_up_date: l.follow_up_date ? new Date(l.follow_up_date).toISOString().slice(0, 16) : '',
+    interested_in_quote: l.interested_in_quote || false,
+    quote_provided_date: l.quote_provided_date ? new Date(l.quote_provided_date).toISOString().slice(0, 10) : '',
+    procurement: l.procurement || false,
+    contract_status: l.contract_status || false,
+    contract_with: l.contract_with || '',
+    contract_end_date: l.contract_end_date ? new Date(l.contract_end_date).toISOString().slice(0, 10) : '',
+    priority: l.priority,
+    source: l.source || '',
+    estimated_value: l.estimated_value,
+    probability: l.probability,
+    closing_date_estimate: l.closing_date_estimate ? new Date(l.closing_date_estimate).toISOString().slice(0, 10) : '',
+    competitor: l.competitor || '',
+    decision_maker: l.decision_maker || '',
+    budget_confirmed: l.budget_confirmed || false,
+    timeline_confirmed: l.timeline_confirmed || false,
+    authority_confirmed: l.authority_confirmed || false,
+    needs_confirmed: l.needs_confirmed || false,
+    tags: l.tags || []
+  })
+
+  // Initiera formuläret när modalen öppnas. Hela raden hämtas på id, så att
+  // formuläret aldrig bygger på ett ofullständigt listobjekt.
   useEffect(() => {
-    if (lead) {
-      setFormData({
-        company_name: lead.company_name || '',
-        contact_person: lead.contact_person || '',
-        phone_number: lead.phone_number || '',
-        email: lead.email || '',
-        status: lead.status,
-        organization_number: lead.organization_number || '',
-        business_type: lead.business_type || '',
-        problem_type: lead.problem_type || '',
-        address: lead.address || '',
-        website: lead.website || '',
-        company_size: lead.company_size,
-        business_description: lead.business_description || '',
-        sni07_label: lead.sni07_label || '',
-        notes: lead.notes || '',
-        contact_method: lead.contact_method,
-        contact_date: lead.contact_date ? new Date(lead.contact_date).toISOString().slice(0, 16) : '',
-        follow_up_date: lead.follow_up_date ? new Date(lead.follow_up_date).toISOString().slice(0, 16) : '',
-        interested_in_quote: lead.interested_in_quote || false,
-        quote_provided_date: lead.quote_provided_date ? new Date(lead.quote_provided_date).toISOString().slice(0, 10) : '',
-        procurement: lead.procurement || false,
-        contract_status: lead.contract_status || false,
-        contract_with: lead.contract_with || '',
-        contract_end_date: lead.contract_end_date ? new Date(lead.contract_end_date).toISOString().slice(0, 10) : '',
-        // Nya fält
-        priority: lead.priority,
-        source: lead.source || '',
-        estimated_value: lead.estimated_value,
-        probability: lead.probability,
-        closing_date_estimate: lead.closing_date_estimate ? new Date(lead.closing_date_estimate).toISOString().slice(0, 10) : '',
-        competitor: lead.competitor || '',
-        decision_maker: lead.decision_maker || '',
-        budget_confirmed: lead.budget_confirmed || false,
-        timeline_confirmed: lead.timeline_confirmed || false,
-        authority_confirmed: lead.authority_confirmed || false,
-        needs_confirmed: lead.needs_confirmed || false,
-        tags: lead.tags || []
-      })
-      setErrors({})
-      
-      // Fetch SNI codes for this lead
-      fetchLeadSniCodes()
+    if (!lead || !isOpen) return
+    let cancelled = false
+
+    const initial = buildFormData(lead)
+    setFormData(initial)
+    setInitialForm(initial)
+    setErrors({})
+
+    const loadFullLead = async () => {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('id', lead.id)
+        .single()
+      if (cancelled || error || !data) return
+      const full = buildFormData(data as Lead)
+      setFormData(full)
+      setInitialForm(full)
     }
-  }, [lead])
+    loadFullLead()
+
+    // Fetch SNI codes for this lead
+    fetchLeadSniCodes()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead?.id, isOpen])
+
+  const sniKey = (codes: Array<{ sni_code?: string | null; sni_description?: string | null; is_primary?: boolean | null }>) =>
+    JSON.stringify(
+      codes
+        .map(c => [String(c.sni_code || '').trim(), String(c.sni_description || '').trim(), !!c.is_primary])
+        .sort()
+    )
 
   const fetchLeadSniCodes = async () => {
     if (!lead?.id) return
@@ -104,6 +138,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
       
       if (error) throw error
       setSelectedSniCodes(data || [])
+      setInitialSniKey(sniKey(data || []))
     } catch (error) {
 
     }
@@ -158,9 +193,63 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
     return Object.keys(newErrors).length === 0
   }
 
+  const FIELD_LABELS: Record<string, string> = {
+    company_name: 'Företagsnamn',
+    contact_person: 'Kontaktperson',
+    phone_number: 'Telefon',
+    email: 'E-post',
+    status: 'Status',
+    organization_number: 'Organisationsnummer',
+    business_type: 'Verksamhetstyp',
+    problem_type: 'Problemtyp',
+    address: 'Adress',
+    website: 'Hemsida',
+    company_size: 'Företagsstorlek',
+    business_description: 'Verksamhetsbeskrivning',
+    sni07_label: 'Bransch (SNI)',
+    notes: 'Anteckningar',
+    contact_method: 'Kontaktsätt',
+    contact_date: 'Kontaktdatum',
+    follow_up_date: 'Uppföljningsdatum',
+    interested_in_quote: 'Intresserad av offert',
+    quote_provided_date: 'Offertdatum',
+    procurement: 'Upphandling',
+    contract_status: 'Har avtal',
+    contract_with: 'Avtal med',
+    contract_end_date: 'Avtalets slutdatum',
+    priority: 'Prioritet',
+    source: 'Källa',
+    estimated_value: 'Uppskattat värde',
+    probability: 'Sannolikhet',
+    closing_date_estimate: 'Beräknat avslut',
+    competitor: 'Konkurrent',
+    decision_maker: 'Beslutsfattare',
+    budget_confirmed: 'Budget bekräftad',
+    timeline_confirmed: 'Tidslinje bekräftad',
+    authority_confirmed: 'Befogenhet bekräftad',
+    needs_confirmed: 'Behov bekräftat',
+    tags: 'Taggar'
+  }
+
+  // Tomma strängar blir null så att jämförelse och sparning ser samma värde
+  const normalizeValue = (value: unknown) => {
+    if (typeof value === 'string') {
+      return value.trim() === '' ? null : value
+    }
+    return value === undefined ? null : value
+  }
+
+  const isValidValue = (key: string, value: unknown) => {
+    if (value === null) return true
+    if (['estimated_value', 'probability'].includes(key) && isNaN(Number(value))) return false
+    if (key.includes('date') && typeof value === 'string' &&
+        !value.match(/^\d{4}-\d{2}-\d{2}$|^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) return false
+    return true
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm() || !lead?.id || (!profile?.id && !user?.id)) {
       return
     }
@@ -168,142 +257,62 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
     try {
       setLoading(true)
 
-      // Clean data - remove empty strings and convert to null, handle specific types
-      const cleanData = { ...formData }
-      
-      // Clean string fields only
-      Object.keys(cleanData).forEach(key => {
-        const value = cleanData[key as keyof typeof cleanData]
-        if (typeof value === 'string' && value.trim() === '') {
-          cleanData[key as keyof typeof cleanData] = null
-        }
-      })
-
-      // Handle date fields specifically
-      if (cleanData.contact_date && cleanData.contact_date.trim() === '') {
-        cleanData.contact_date = null
-      }
-      if (cleanData.follow_up_date && cleanData.follow_up_date.trim() === '') {
-        cleanData.follow_up_date = null
-      }
-      if (cleanData.quote_provided_date && cleanData.quote_provided_date.trim() === '') {
-        cleanData.quote_provided_date = null
-      }
-      if (cleanData.contract_end_date && cleanData.contract_end_date.trim() === '') {
-        cleanData.contract_end_date = null
-      }
-      if (cleanData.closing_date_estimate && cleanData.closing_date_estimate.trim() === '') {
-        cleanData.closing_date_estimate = null
+      // Steg 1: räkna ut vilka fält som faktiskt ändrats mot ursprungsvärdet
+      const changes: Record<string, unknown> = {}
+      for (const key of Object.keys(formData)) {
+        const next = normalizeValue(formData[key as keyof LeadUpdate])
+        const prev = normalizeValue(initialForm[key as keyof LeadUpdate])
+        if (JSON.stringify(next) === JSON.stringify(prev)) continue
+        if (!isValidValue(key, next)) continue
+        changes[key] = next
       }
 
-      // Remove undefined fields and validate data integrity
-      const filteredData = Object.fromEntries(
-        Object.entries(cleanData).filter(([key, value]) => {
-          // Filter out undefined values
-          if (value === undefined) return false
-          
-          // Validate numeric fields
-          if (['estimated_value', 'probability'].includes(key) && value !== null) {
-            const numValue = Number(value)
-            if (isNaN(numValue)) {
+      const sniChanged = sniKey(selectedSniCodes) !== initialSniKey
+      const changedKeys = Object.keys(changes)
 
-              return false
-            }
-          }
-          
-          // Validate date fields format
-          if (key.includes('date') && value !== null && typeof value === 'string') {
-            if (value.trim() && !value.match(/^\d{4}-\d{2}-\d{2}$|^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)) {
+      if (changedKeys.length === 0 && !sniChanged) {
+        toast('Inga ändringar att spara')
+        onClose()
+        return
+      }
 
-              return false
-            }
-          }
-          
-          return true
-        })
-      )
-
-      // Add audit fields - updated_by hanteras automatiskt av trigger
-      const updateData: LeadUpdate = {
-        ...filteredData
-      } as LeadUpdate
-
-      // Debug log the update data
-
-
-
-
-      // Step 1: Update lead data first - split large updates for better performance
-      // Remove large text fields temporarily to reduce payload
-      const { sni07_label, notes, business_description, competitor, ...coreData } = updateData
-      
-      // First update core data
-      const { error } = await supabase
-        .from('leads')
-        .update(coreData)
-        .eq('id', lead.id)
-      
-      // Then update text fields separately if no error
-      if (!error && (sni07_label || notes || business_description || competitor)) {
-        const textFields = {}
-        if (sni07_label) textFields.sni07_label = sni07_label
-        if (notes) textFields.notes = notes  
-        if (business_description) textFields.business_description = business_description
-        if (competitor) textFields.competitor = competitor
-        
-        const { error: textError } = await supabase
+      // Steg 2: spara bara de ändrade fälten (updated_by sätts av triggern)
+      if (changedKeys.length > 0) {
+        const { error } = await supabase
           .from('leads')
-          .update(textFields)
+          .update(changes as LeadUpdate)
           .eq('id', lead.id)
-          
-        if (textError) {
 
-          // Core data still saved, warn user
-          toast.error('Lead uppdaterad men vissa textfält kunde inte sparas')
+        if (error) {
+          if (error.message?.includes('CORS') || error.message?.includes('cors')) {
+            throw new Error('Nätverksfel - kontrollera internetanslutning och försök igen')
+          }
+          if (error.message?.includes('timeout') || error.message?.includes('Timeout')) {
+            throw new Error('Timeout - försök igen med mindre data åt gången')
+          }
+          if (error.message?.includes('constraint') || error.message?.includes('violates')) {
+            throw new Error('Datavalidering misslyckades - kontrollera alla fält')
+          }
+          throw new Error(`Kunde inte spara lead: ${error.message}`)
         }
       }
 
-      if (error) {
-
-        
-        // More specific error handling
-        if (error.message?.includes('CORS') || error.message?.includes('cors')) {
-          throw new Error('Nätverksfel - kontrollera internetanslutning och försök igen')
-        }
-        
-        if (error.message?.includes('timeout') || error.message?.includes('Timeout')) {
-          throw new Error('Timeout - försök igen med mindre data åt gången')
-        }
-        
-        if (error.message?.includes('constraint') || error.message?.includes('violates')) {
-          throw new Error('Datavalidering misslyckades - kontrollera alla fält')
-        }
-        
-        throw new Error(`Kunde inte spara lead: ${error.message}`)
-      }
-
-      // Step 2: Update SNI codes separately with better error handling
-      if (selectedSniCodes.length > 0) {
+      // Steg 3: SNI-koder skrivs bara om när de ändrats
+      if (sniChanged) {
         try {
-          // Delete existing SNI codes
-          const { error: deleteError } = await supabase
+          await supabase
             .from('lead_sni_codes')
             .delete()
             .eq('lead_id', lead.id)
 
-          if (deleteError) {
-
-          }
-
-          // Insert new SNI codes with validation
           const sniCodeInserts = selectedSniCodes
-            .filter(sniCode => sniCode.sni_code && sniCode.sni_code.trim()) // Only valid codes
+            .filter(sniCode => sniCode.sni_code && sniCode.sni_code.trim())
             .map(sniCode => ({
               lead_id: lead.id,
               sni_code: sniCode.sni_code.trim(),
               sni_description: sniCode.sni_description?.trim() || '',
               is_primary: sniCode.is_primary,
-              created_by: user.id
+              created_by: user!.id
             }))
 
           if (sniCodeInserts.length > 0) {
@@ -312,255 +321,57 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
               .insert(sniCodeInserts)
 
             if (sniError) {
-
               toast.error('Lead uppdaterad men SNI-koder kunde inte sparas')
             } else {
-              // Update sni07_label with concatenated codes after successful insert
               const sniString = sniCodeInserts
                 .map(code => `${code.sni_code} ${code.sni_description}`)
                 .join(' ')
-              
-              const { error: labelError } = await supabase
+              await supabase
                 .from('leads')
                 .update({ sni07_label: sniString })
                 .eq('id', lead.id)
-                
-              if (labelError) {
-
-              }
             }
           }
-        } catch (sniErr) {
-
+        } catch {
           toast.error('Lead uppdaterad men SNI-koder kunde inte sparas')
         }
       }
 
-      // Step 3: Log comprehensive events for lead update
+      // Steg 4: en enda händelse per sparning med de fält som ändrats.
+      // Triggern log_lead_events loggar redan statusbyte, tilldelning och
+      // offertdatum (en sak per uppdatering, i den ordningen), så de tas inte med här.
       try {
-        const updatedFields = Object.keys(updateData).filter(key => key !== 'updated_by')
-        const userId = user!.id
-        
-        // Track which fields had events logged to avoid duplicate general events
-        let fieldsWithSpecificEvents: string[] = []
-        
-        // Check if status was changed to log specific status change event
-        if (updatedFields.includes('status') && updateData.status !== lead.status) {
-          const statusConfig = LEAD_STATUS_DISPLAY[updateData.status as LeadStatus]
-          const oldStatusConfig = LEAD_STATUS_DISPLAY[lead.status]
-          
-          await LeadEventHelpers.logStatusChange(
-            lead.id,
-            lead.status,
-            updateData.status as LeadStatus,
-            oldStatusConfig.label,
-            statusConfig.label,
-            user.id,
-            user.email
+        const statusChanged = changedKeys.includes('status')
+        const triggerLogsQuote = !statusChanged && changes.quote_provided_date != null
+        const loggedKeys = changedKeys.filter(key =>
+          key !== 'status' && !(key === 'quote_provided_date' && triggerLogsQuote)
+        )
+        const labels = loggedKeys.map(key => FIELD_LABELS[key] || key)
+        if (sniChanged && !loggedKeys.includes('sni07_label')) labels.push('SNI-koder')
+
+        if (labels.length > 0) {
+          const fieldChanges = Object.fromEntries(
+            loggedKeys.map(key => [
+              key,
+              { from: normalizeValue(initialForm[key as keyof LeadUpdate]), to: changes[key] }
+            ])
           )
-          fieldsWithSpecificEvents.push('status')
-        }
-        
-        // Check if priority was changed
-        if (updatedFields.includes('priority') && updateData.priority !== lead.priority) {
-          const newPriorityLabel = updateData.priority ? getPriorityLabel(updateData.priority) : 'Ingen'
-          const oldPriorityLabel = lead.priority ? getPriorityLabel(lead.priority) : 'Ingen'
-          
-          await logLeadEvent({
-            leadId: lead.id,
-            eventType: 'note_added',
-            title: `Prioritet ändrad till ${newPriorityLabel}`,
-            description: `Prioritet ändrad från "${oldPriorityLabel}" till "${newPriorityLabel}"`,
-            data: {
-              old_priority: lead.priority,
-              new_priority: updateData.priority,
-              old_priority_label: oldPriorityLabel,
-              new_priority_label: newPriorityLabel,
-              changed_by_profile: user.email
-            },
-            userId
-          })
-          fieldsWithSpecificEvents.push('priority')
-        }
-        
-        // Check if contact dates were changed
-        if (updatedFields.includes('contact_date') && updateData.contact_date !== lead.contact_date) {
-          const contactDate = updateData.contact_date ? new Date(updateData.contact_date).toLocaleDateString('sv-SE') : 'Ingen'
-          await logLeadEvent({
-            leadId: lead.id,
-            eventType: 'contacted',
-            title: `Kontaktdatum uppdaterat`,
-            description: `Kontaktdatum har uppdaterats till ${contactDate}`,
-            data: {
-              old_contact_date: lead.contact_date,
-              new_contact_date: updateData.contact_date,
-              changed_by_profile: user.email
-            },
-            userId
-          })
-          fieldsWithSpecificEvents.push('contact_date')
-        }
-        
-        if (updatedFields.includes('follow_up_date') && updateData.follow_up_date !== lead.follow_up_date) {
-          const followUpDate = updateData.follow_up_date ? new Date(updateData.follow_up_date).toLocaleDateString('sv-SE') : 'Ingen'
-          await logLeadEvent({
-            leadId: lead.id,
-            eventType: 'note_added',
-            title: `Uppföljningsdatum uppdaterat`,
-            description: `Uppföljningsdatum har uppdaterats till ${followUpDate}`,
-            data: {
-              old_follow_up_date: lead.follow_up_date,
-              new_follow_up_date: updateData.follow_up_date,
-              changed_by_profile: user.email
-            },
-            userId
-          })
-          fieldsWithSpecificEvents.push('follow_up_date')
-        }
-        
-        // Check if quote-related fields were changed
-        if (updatedFields.includes('quote_provided_date') && updateData.quote_provided_date !== lead.quote_provided_date) {
-          const quoteDate = updateData.quote_provided_date ? new Date(updateData.quote_provided_date).toLocaleDateString('sv-SE') : 'Ingen'
-          await logLeadEvent({
-            leadId: lead.id,
-            eventType: 'quote_sent',
-            title: `Offertdatum uppdaterat`,
-            description: `Offertdatum har uppdaterats till ${quoteDate}`,
-            data: {
-              old_quote_date: lead.quote_provided_date,
-              new_quote_date: updateData.quote_provided_date,
-              changed_by_profile: user.email
-            },
-            userId
-          })
-          fieldsWithSpecificEvents.push('quote_provided_date')
-        }
-        
-        // Check if estimated value was changed (important for sales tracking)
-        if (updatedFields.includes('estimated_value') && updateData.estimated_value !== lead.estimated_value) {
-          const oldValue = lead.estimated_value ? `${lead.estimated_value} SEK` : 'Ingen'
-          const newValue = updateData.estimated_value ? `${updateData.estimated_value} SEK` : 'Ingen'
           await logLeadEvent({
             leadId: lead.id,
             eventType: 'updated',
-            title: `Uppskattat värde ändrat`,
-            description: `Uppskattat värde ändrat från ${oldValue} till ${newValue}`,
+            title: 'Lead uppdaterad',
+            description: `Ändrade fält: ${labels.join(', ')}`,
             data: {
-              old_estimated_value: lead.estimated_value,
-              new_estimated_value: updateData.estimated_value,
-              changed_by_profile: user.email
+              changed_fields: loggedKeys,
+              changes: fieldChanges,
+              sni_changed: sniChanged,
+              changed_by_profile: user?.email
             },
-            userId
+            userId: user!.id
           })
-          fieldsWithSpecificEvents.push('estimated_value')
         }
-
-        // NEW: Check for BANT criteria changes
-        const bantFields = ['budget_confirmed', 'authority_confirmed', 'needs_confirmed', 'timeline_confirmed']
-        const bantMapping = {
-          budget_confirmed: 'budget',
-          authority_confirmed: 'authority', 
-          needs_confirmed: 'needs',
-          timeline_confirmed: 'timeline'
-        } as const
-
-        for (const field of bantFields) {
-          if (updatedFields.includes(field) && updateData[field as keyof typeof updateData] !== lead[field as keyof typeof lead]) {
-            const criteria = bantMapping[field as keyof typeof bantMapping]
-            const wasConfirmed = lead[field as keyof typeof lead] || false
-            const isConfirmed = updateData[field as keyof typeof updateData] || false
-            
-            await LeadEventHelpers.logBANTChange(
-              lead.id,
-              criteria,
-              wasConfirmed,
-              isConfirmed,
-              userId,
-              user.email
-            )
-            fieldsWithSpecificEvents.push(field)
-          }
-        }
-
-        // NEW: Check for business information changes
-        const businessFields = ['business_type', 'problem_type', 'company_size', 'business_description']
-        for (const field of businessFields) {
-          if (updatedFields.includes(field) && updateData[field as keyof typeof updateData] !== lead[field as keyof typeof lead]) {
-            await LeadEventHelpers.logBusinessInfoChange(
-              lead.id,
-              field,
-              lead[field as keyof typeof lead],
-              updateData[field as keyof typeof updateData],
-              userId,
-              user.email
-            )
-            fieldsWithSpecificEvents.push(field)
-          }
-        }
-
-        // NEW: Check for contact information changes  
-        const contactFields = ['phone_number', 'email', 'address', 'website']
-        for (const field of contactFields) {
-          if (updatedFields.includes(field) && updateData[field as keyof typeof updateData] !== lead[field as keyof typeof lead]) {
-            await LeadEventHelpers.logContactInfoChange(
-              lead.id,
-              field,
-              lead[field as keyof typeof lead],
-              updateData[field as keyof typeof updateData],
-              userId,
-              user.email
-            )
-            fieldsWithSpecificEvents.push(field)
-          }
-        }
-
-        // NEW: Check for contract information changes
-        const contractFields = ['contract_status', 'contract_with', 'contract_end_date', 'procurement']
-        for (const field of contractFields) {
-          if (updatedFields.includes(field) && updateData[field as keyof typeof updateData] !== lead[field as keyof typeof lead]) {
-            await LeadEventHelpers.logContractInfoChange(
-              lead.id,
-              field,
-              lead[field as keyof typeof lead],
-              updateData[field as keyof typeof updateData],
-              userId,
-              user.email
-            )
-            fieldsWithSpecificEvents.push(field)
-          }
-        }
-
-        // NEW: Check for business data changes
-        const businessDataFields = ['probability', 'decision_maker', 'closing_date_estimate', 'source']
-        for (const field of businessDataFields) {
-          if (updatedFields.includes(field) && updateData[field as keyof typeof updateData] !== lead[field as keyof typeof lead]) {
-            await LeadEventHelpers.logBusinessDataChange(
-              lead.id,
-              field,
-              lead[field as keyof typeof lead],
-              updateData[field as keyof typeof updateData],
-              userId,
-              user.email
-            )
-            fieldsWithSpecificEvents.push(field)
-          }
-        }
-
-        // Log general update event only for fields that didn't get specific events
-        const fieldsForGeneralEvent = updatedFields.filter(field => !fieldsWithSpecificEvents.includes(field))
-        if (fieldsForGeneralEvent.length > 0) {
-          await LeadEventHelpers.logGeneralUpdate(
-            lead.id,
-            'Lead information har uppdaterats',
-            fieldsForGeneralEvent,
-            userId,
-            user.email
-          )
-        }
-        
       } catch (eventError) {
         console.warn('Could not log lead update event:', eventError)
-        // Don't fail the main operation if event logging fails
       }
 
       toast.success('Lead uppdaterad framgångsrikt')

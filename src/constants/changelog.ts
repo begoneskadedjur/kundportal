@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.41.1',
+    date: '2026-10-10',
+    title: 'Leads: sparning tömmer inte längre fält',
+    items: [
+      { kind: 'buggfix', text: 'När en lead sparades i Redigera skrevs fält som hemsida, adress, verksamhetstyp, beslutsfattare, upphandling, offertdatum och kontaktdatum över med tomt. Nu sparas bara de fält du faktiskt ändrat.' },
+      { kind: 'buggfix', text: 'Historiken på en lead fylls inte längre av dubbla rader och "uppdaterad"-rader för fält som inte ändrats. Varje sparning ger en rad som listar de ändrade fälten.' },
+    ],
+  },
+  {
     version: '3.41.0',
     date: '2026-10-09',
     title: 'Avtalswizarden: tydligare val och en sammanfattning bredvid',

@@ -152,27 +152,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
 
         if (error) throw error
         
-        // Log automatic event for contact update
-        try {
-          await supabase
-            .from('lead_events')
-            .insert({
-              lead_id: leadId,
-              event_type: 'updated',
-              title: `Kontaktperson uppdaterad: ${cleanData.name}`,
-              description: `Kontaktperson "${cleanData.name}" har uppdaterats`,
-              data: {
-                contact_name: cleanData.name,
-                contact_email: cleanData.email,
-                contact_phone: cleanData.phone,
-                is_primary: cleanData.is_primary,
-                action: 'updated'
-              },
-              created_by: profile?.id || user.id
-            })
-        } catch (eventError) {
-          console.warn('Could not log contact update event:', eventError)
-        }
+        // Händelsen loggas av databastriggern log_lead_contact_events
         
         toast.success('Kontaktperson uppdaterad')
       } else {
@@ -190,27 +170,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
 
         if (error) throw error
         
-        // Log automatic event for contact creation
-        try {
-          await supabase
-            .from('lead_events')
-            .insert({
-              lead_id: leadId,
-              event_type: 'created',
-              title: `Ny kontaktperson tillagd: ${cleanData.name}`,
-              description: `Ny kontaktperson "${cleanData.name}" tillagd`,
-              data: {
-                contact_name: cleanData.name,
-                contact_email: cleanData.email,
-                contact_phone: cleanData.phone,
-                is_primary: cleanData.is_primary,
-                action: 'added'
-              },
-              created_by: profile?.id || user.id
-            })
-        } catch (eventError) {
-          console.warn('Could not log contact creation event:', eventError)
-        }
+        // Händelsen loggas av databastriggern log_lead_contact_events
         
         toast.success('Kontaktperson tillagd')
       }
@@ -246,27 +206,7 @@ const LeadContactsManager: React.FC<LeadContactsManagerProps> = ({
 
       if (error) throw error
 
-      // Log automatic event for contact deletion
-      try {
-        await supabase
-          .from('lead_events')
-          .insert({
-            lead_id: leadId,
-            event_type: 'updated',
-            title: `Kontaktperson borttagen: ${contact.name}`,
-            description: `Kontaktperson "${contact.name}" har tagits bort`,
-            data: {
-              contact_name: contact.name,
-              contact_email: contact.email,
-              contact_phone: contact.phone,
-              is_primary: contact.is_primary,
-              action: 'deleted'
-            },
-            created_by: profile?.id || user?.id
-          })
-      } catch (eventError) {
-        console.warn('Could not log contact deletion event:', eventError)
-      }
+      // Händelsen loggas av databastriggern log_lead_contact_events
 
       toast.success('Kontaktperson borttagen')
       onContactsChange()
