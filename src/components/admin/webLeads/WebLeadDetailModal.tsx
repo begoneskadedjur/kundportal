@@ -316,7 +316,7 @@ export default function WebLeadDetailModal({ inquiry, staff, basePath, leadsBase
     address: sattIhopAdress(inquiry),
     problem_type: tjanstLabel(inquiry.pest_type),
     business_type: typeof inquiry.details.svar === 'string' && inquiry.customer_kind === 'foretag' ? inquiry.details.svar : '',
-    source: 'Webbförfrågan',
+    source: 'webbforfragan',
     notes: [`Webbförfrågan ${inquiry.referens} (${formatSvTid(inquiry.created_at)})`, inquiry.message].filter(Boolean).join('\n\n'),
   }
 

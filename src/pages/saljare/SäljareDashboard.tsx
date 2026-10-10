@@ -56,14 +56,15 @@ export default function SäljareDashboard() {
       setLoading(true)
 
       const now = new Date()
-      const todayStr = now.toISOString().split('T')[0]
+      // Slutet av i dag i lokal tid (nästa steg till och med i dag)
+      const slutIdag = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59).toISOString()
       const weekAgo = new Date(now)
       weekAgo.setDate(weekAgo.getDate() - 7)
       const weekAgoStr = weekAgo.toISOString()
 
       // Hämta alla leads parallellt
       const [allLeadsRes, recentRes, followUpsRes] = await Promise.all([
-        supabase.from('leads').select('id, status, assigned_to'),
+        supabase.from('leads').select('id, status, stage, owner_profile_id'),
         supabase
           .from('leads')
           .select('*')
@@ -72,17 +73,17 @@ export default function SäljareDashboard() {
           .limit(10),
         supabase
           .from('leads')
-          .select('id, company_name, follow_up_date, status, contact_person')
-          .lte('follow_up_date', todayStr)
-          .not('status', 'in', '(red_lost,green_deal)')
-          .order('follow_up_date', { ascending: true })
+          .select('id, company_name, next_action, next_action_at, status, stage, contact_person')
+          .lte('next_action_at', slutIdag)
+          .not('stage', 'in', '(forlorad,vunnen)')
+          .order('next_action_at', { ascending: true })
           .limit(8),
       ])
 
       const allLeads = allLeadsRes.data || []
-      const activeStatuses: LeadStatus[] = ['blue_cold', 'yellow_warm', 'orange_hot']
+      // Mina = leads där jag är ägare (owner_profile_id), öppna steg
       const myActive = allLeads.filter(
-        l => l.assigned_to === profile?.user_id && activeStatuses.includes(l.status as LeadStatus)
+        l => l.owner_profile_id === profile?.id && l.stage !== 'vunnen' && l.stage !== 'forlorad'
       ).length
 
       // Leads skapade denna vecka
@@ -92,7 +93,7 @@ export default function SäljareDashboard() {
         .gte('created_at', weekAgoStr)
 
       const total = allLeads.length
-      const deals = allLeads.filter(l => l.status === 'green_deal').length
+      const deals = allLeads.filter(l => l.stage === 'vunnen').length
       const convRate = total > 0 ? Math.round((deals / total) * 100) : 0
 
       setStats({
@@ -275,8 +276,8 @@ export default function SäljareDashboard() {
                     <div className="min-w-0">
                       <p className="text-sm text-white truncate">{lead.company_name}</p>
                       <p className="text-xs text-slate-400">
-                        {lead.follow_up_date
-                          ? new Date(lead.follow_up_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+                        {lead.next_action_at
+                          ? new Date(lead.next_action_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
                           : '—'}
                       </p>
                     </div>

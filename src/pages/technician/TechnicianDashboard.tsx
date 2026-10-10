@@ -122,17 +122,23 @@ export default function TechnicianDashboard() {
   }
 
   const fetchLeadsSummary = async () => {
-    if (!technicianId) return
+    const profileId = profile?.id
+    if (!profileId) return
     try {
-      const today = new Date().toISOString().slice(0, 10)
+      // Mina leads och tips: ägare eller tipsare (RLS släpper bara igenom dessa plus delade)
       const { data: leads } = await supabase
         .from('leads')
-        .select('id, status, follow_up_date')
-        .eq('assigned_to', technicianId)
-        .in('status', ['blue_cold', 'yellow_warm', 'orange_hot', 'green_deal'])
+        .select('id, stage, next_action_at, owner_profile_id')
+        .or(`owner_profile_id.eq.${profileId},tipped_by_profile_id.eq.${profileId}`)
+        .not('stage', 'in', '(vunnen,forlorad)')
 
       if (leads) {
-        const followupsToday = leads.filter(l => l.follow_up_date && l.follow_up_date.slice(0, 10) === today).length
+        // Nästa steg till och med i dag, på leads jag äger
+        const slutIdag = new Date()
+        slutIdag.setHours(23, 59, 59, 999)
+        const followupsToday = leads.filter(l =>
+          l.owner_profile_id === profileId && l.next_action_at && new Date(l.next_action_at) <= slutIdag
+        ).length
         setLeadsSummary({ active: leads.length, followupsToday })
       }
     } catch {

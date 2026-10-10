@@ -73,7 +73,7 @@ export default function EditLeadModal({ lead, isOpen, onClose, onSuccess }: Edit
     contract_with: l.contract_with || '',
     contract_end_date: l.contract_end_date ? new Date(l.contract_end_date).toISOString().slice(0, 10) : '',
     priority: l.priority,
-    source: l.source || '',
+    source: l.source || null,
     estimated_value: l.estimated_value,
     probability: l.probability,
     closing_date_estimate: l.closing_date_estimate ? new Date(l.closing_date_estimate).toISOString().slice(0, 10) : '',

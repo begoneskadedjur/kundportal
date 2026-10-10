@@ -67,7 +67,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess, initialDat
     contract_end_date: null,
     // Nya fält
     priority: null,
-    source: '',
+    source: null,
     estimated_value: null,
     probability: null,
     closing_date_estimate: null,
@@ -240,7 +240,7 @@ export default function CreateLeadModal({ isOpen, onClose, onSuccess, initialDat
         contract_with: '',
         contract_end_date: null,
         priority: null,
-        source: '',
+        source: null,
         estimated_value: null,
         probability: null,
         closing_date_estimate: null,

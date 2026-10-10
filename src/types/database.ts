@@ -1,6 +1,7 @@
 // src/types/database.ts - KOMPLETT UPPDATERAD med alla saknade exports och PestType integration + work_schedule
 
 import type * as P from './procurement'
+import type { LeadStage, LeadSource, LeadTyp, LeadKundgrupp, LeadUrsprungTabell, LeadForlustorsak, LeadAktivitet, LeadMedlem } from './leads'
 
 // 🆕 SCHEMA TYPER FÖR TEKNIKER-SCHEMA
 export type DaySchedule = {
@@ -814,11 +815,13 @@ export type Database = {
           id: string
           // Obligatorisk huvudinformation
           company_name: string
-          contact_person: string
-          phone_number: string
-          email: string
+          contact_person: string | null
+          phone_number: string | null
+          email: string | null
+          // GAMMAL statusskala, hålls i synk med stage av databasen. Läs stage.
           status: 'red_lost' | 'blue_cold' | 'yellow_warm' | 'orange_hot' | 'green_deal'
-          
+          legacy_status: 'red_lost' | 'blue_cold' | 'yellow_warm' | 'orange_hot' | 'green_deal' | null
+
           // Frivillig företagsinformation
           organization_number: string | null
           business_type: string | null
@@ -850,9 +853,9 @@ export type Database = {
           
           // 🆕 Utökade fält för lead-hantering
           priority: 'low' | 'medium' | 'high' | 'urgent' | null
-          source: string | null // Var leadet kom ifrån (webb, telefon, referral, etc.)
-          assigned_to: string | null // FK till profiles - vem som är ansvarig för leadet
-          estimated_value: number | null // Uppskattat affärsvärde
+          source_fritext: string | null // Gammal fritextkälla (före 2026-10-10)
+          assigned_to: string | null // Oanvänd (technicians-FK), ersatt av owner_profile_id
+          estimated_value: number | null // Uppskattad årspremie i kr
           probability: number | null // Sannolikhet för affär (0-100%)
           closing_date_estimate: string | null // Uppskattat slutdatum för affär
           competitor: string | null // Konkurrent som leadet jämför med
@@ -862,9 +865,44 @@ export type Database = {
           authority_confirmed: boolean
           needs_confirmed: boolean
           tags: string[] | null // Array av tags för kategorisering
+
+          // Etapp 3 (2026-10-10): ny modell, se src/types/leads.ts
+          stage: LeadStage
+          stage_changed_at: string | null
+          owner_profile_id: string | null
+          tipped_by_profile_id: string | null
+          source: LeadSource | null
+          lead_type: LeadTyp
+          customer_group: LeadKundgrupp | null
+          origin_case_type: LeadUrsprungTabell | null
+          origin_case_id: string | null
+          web_inquiry_id: string | null
+          customer_id: string | null
+          offer_contract_id: string | null
+          agreement_contract_id: string | null
+          next_action: string | null
+          next_action_at: string | null
+          parked_until: string | null
+          lost_reason: LeadForlustorsak | null
+          lost_note: string | null
+          won_at: string | null
+          lost_at: string | null
+          org_nr_norm: string | null
+          phone_norm: string | null
+          email_norm: string | null
         }
-        Insert: Omit<Database['public']['Tables']['leads']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['leads']['Insert']>
+        Insert: Partial<Omit<Database['public']['Tables']['leads']['Row'], 'id' | 'created_at' | 'updated_at' | 'org_nr_norm' | 'phone_norm' | 'email_norm'>> & { company_name: string }
+        Update: Partial<Omit<Database['public']['Tables']['leads']['Row'], 'id' | 'created_at' | 'org_nr_norm' | 'phone_norm' | 'email_norm'>>
+      }
+      lead_activities: {
+        Row: LeadAktivitet
+        Insert: Pick<LeadAktivitet, 'lead_id' | 'kind' | 'profile_id'> & Partial<Pick<LeadAktivitet, 'text' | 'occurred_at' | 'ref_table' | 'ref_id'>>
+        Update: Partial<Pick<LeadAktivitet, 'text' | 'occurred_at'>>
+      }
+      lead_members: {
+        Row: LeadMedlem
+        Insert: never
+        Update: never
       }
       // 🆕 LEAD CONTACTS TABELL - för kontaktpersoner till leads
       lead_contacts: {

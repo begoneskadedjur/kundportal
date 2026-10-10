@@ -1,0 +1,164 @@
+// src/types/leads.ts
+// Leads (B2B) sedan etapp 3 (2026-10-10): steg, källa, aktiviteter och delning.
+// Databasen: supabase/migrations/20261010_leads_datamodell.sql. Sammanfattning: docs/leads/ETAPP-3-4.md.
+
+export type LeadStage = 'ny' | 'kontaktad' | 'besok_bokat' | 'offert_skickad' | 'vunnen' | 'forlorad' | 'parkerad'
+
+export type LeadSource =
+  | 'tekniker_tips' | 'engangsarende' | 'webbforfragan' | 'telefon' | 'mejl'
+  | 'rekommendation' | 'befintlig_kund' | 'upphandling' | 'kall_bearbetning' | 'ovrigt'
+
+export type LeadTyp = 'nytt_avtal' | 'utokning'
+export type LeadKundgrupp = 'foretag' | 'privat' | 'forening'
+export type LeadUrsprungTabell = 'private_cases' | 'business_cases' | 'cases' | 'station_inspection_sessions'
+
+export type LeadForlustorsak =
+  | 'pris' | 'annan_leverantor' | 'ingen_budget' | 'inget_behov'
+  | 'ingen_kontakt' | 'fel_tidpunkt' | 'dubblett' | 'ovrigt'
+
+export type LeadAktivitetSystem =
+  | 'skapad' | 'stage' | 'agare' | 'varde' | 'nasta_steg' | 'parkerad' | 'forlorad' | 'delad' | 'delning_borttagen'
+  | 'kund_kopplad' | 'arende_kopplat' | 'offert_skickad' | 'offert_avbojd' | 'avtal_signerat'
+export type LeadAktivitetManuell = 'anteckning' | 'samtal' | 'mejl' | 'mote'
+export type LeadAktivitetTyp = LeadAktivitetSystem | LeadAktivitetManuell
+
+export interface LeadAktivitet {
+  id: string
+  lead_id: string
+  kind: LeadAktivitetTyp
+  text: string | null
+  fran_varde: string | null
+  till_varde: string | null
+  ref_table: string | null
+  ref_id: string | null
+  occurred_at: string
+  profile_id: string | null
+  created_at: string
+}
+
+export interface LeadMedlem {
+  id: string
+  lead_id: string
+  profile_id: string
+  added_by: string | null
+  created_at: string
+  removed_at: string | null
+  removed_by: string | null
+}
+
+/** Personal från RPC lead_personal (alla anställda kan äga en lead). */
+export interface LeadPerson {
+  id: string
+  namn: string
+  roll: string
+  aktiv: boolean
+}
+
+/** Träff från RPC lead_dubbletter. */
+export interface LeadDubblett {
+  id: string
+  company_name: string
+  stage: LeadStage
+  agare: string | null
+  traff: 'org.nr' | 'telefon' | 'e-post'
+  kan_oppna: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Etiketter och färger (status som färgad punkt + text, aldrig piller)
+// ---------------------------------------------------------------------------
+export const LEAD_STAGES: LeadStage[] = ['ny', 'kontaktad', 'besok_bokat', 'offert_skickad', 'vunnen', 'forlorad', 'parkerad']
+export const OPPNA_STAGES: LeadStage[] = ['ny', 'kontaktad', 'besok_bokat', 'offert_skickad', 'parkerad']
+/** Steg som säljaren sätter för hand. Övriga sätts av systemet (etapp 5); admin/koordinator kan sätta dem i ⋯-menyn. */
+export const MANUELLA_STAGES: LeadStage[] = ['ny', 'kontaktad']
+export const AUTOMATISKA_STAGES: LeadStage[] = ['besok_bokat', 'offert_skickad', 'vunnen']
+
+export const STAGE_ETIKETT: Record<LeadStage, string> = {
+  ny: 'Ny',
+  kontaktad: 'Kontaktad',
+  besok_bokat: 'Besök bokat',
+  offert_skickad: 'Offert skickad',
+  vunnen: 'Vunnen',
+  forlorad: 'Förlorad',
+  parkerad: 'Parkerad',
+}
+
+/** Punktfärg (bg) och textfärg per steg. */
+export const STAGE_FARG: Record<LeadStage, { punkt: string; text: string }> = {
+  ny: { punkt: 'bg-blue-400', text: 'text-blue-300' },
+  kontaktad: { punkt: 'bg-amber-400', text: 'text-amber-300' },
+  besok_bokat: { punkt: 'bg-cyan-400', text: 'text-cyan-300' },
+  offert_skickad: { punkt: 'bg-orange-400', text: 'text-orange-300' },
+  vunnen: { punkt: 'bg-[#20c58f]', text: 'text-[#20c58f]' },
+  forlorad: { punkt: 'bg-red-400', text: 'text-red-300' },
+  parkerad: { punkt: 'bg-slate-400', text: 'text-slate-300' },
+}
+
+export const KALLA_ETIKETT: Record<LeadSource, string> = {
+  tekniker_tips: 'Teknikertips',
+  engangsarende: 'Engångsärende',
+  webbforfragan: 'Webbförfrågan',
+  telefon: 'Telefon',
+  mejl: 'Mejl',
+  rekommendation: 'Rekommendation',
+  befintlig_kund: 'Befintlig kund',
+  upphandling: 'Upphandling',
+  kall_bearbetning: 'Kall bearbetning',
+  ovrigt: 'Övrigt',
+}
+export const LEAD_KALLOR = Object.keys(KALLA_ETIKETT) as LeadSource[]
+
+export const TYP_ETIKETT: Record<LeadTyp, string> = {
+  nytt_avtal: 'Nytt avtal',
+  utokning: 'Utökning',
+}
+
+export const KUNDGRUPP_ETIKETT: Record<LeadKundgrupp, string> = {
+  foretag: 'Företag',
+  privat: 'Privatperson',
+  forening: 'Förening',
+}
+
+export const FORLUSTORSAK_ETIKETT: Record<LeadForlustorsak, string> = {
+  pris: 'Pris',
+  annan_leverantor: 'Valde annan leverantör',
+  ingen_budget: 'Ingen budget',
+  inget_behov: 'Inget behov',
+  ingen_kontakt: 'Fick aldrig kontakt',
+  fel_tidpunkt: 'Fel tidpunkt',
+  dubblett: 'Dubblett',
+  ovrigt: 'Övrigt',
+}
+export const FORLUSTORSAKER = Object.keys(FORLUSTORSAK_ETIKETT) as LeadForlustorsak[]
+
+export const URSPRUNG_ETIKETT: Record<LeadUrsprungTabell, string> = {
+  private_cases: 'privat engångsärende',
+  business_cases: 'företagsärende',
+  cases: 'avtalsärende',
+  station_inspection_sessions: 'stationskontroll',
+}
+
+export const AKTIVITET_ETIKETT: Record<LeadAktivitetTyp, string> = {
+  skapad: 'Lead skapad',
+  stage: 'Status ändrad',
+  agare: 'Ny ägare',
+  varde: 'Årspremie ändrad',
+  nasta_steg: 'Nästa steg',
+  parkerad: 'Parkerad',
+  forlorad: 'Förlorad',
+  delad: 'Delad med',
+  delning_borttagen: 'Delning borttagen',
+  kund_kopplad: 'Kund kopplad',
+  arende_kopplat: 'Ärende kopplat',
+  offert_skickad: 'Offert skickad',
+  offert_avbojd: 'Offert avböjd',
+  avtal_signerat: 'Avtal signerat',
+  anteckning: 'Anteckning',
+  samtal: 'Samtal',
+  mejl: 'Mejl',
+  mote: 'Möte',
+}
+
+export const MANUELLA_AKTIVITETER: LeadAktivitetManuell[] = ['anteckning', 'samtal', 'mejl', 'mote']
+
+export const arOppen = (stage: LeadStage) => stage !== 'vunnen' && stage !== 'forlorad'

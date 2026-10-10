@@ -202,8 +202,8 @@ const Leads: React.FC = () => {
     if (filters.search) {
       filtered = filtered.filter(lead =>
         lead.company_name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        lead.contact_person.toLowerCase().includes(filters.search.toLowerCase()) ||
-        lead.email.toLowerCase().includes(filters.search.toLowerCase()) ||
+        (lead.contact_person ?? '').toLowerCase().includes(filters.search.toLowerCase()) ||
+        (lead.email ?? '').toLowerCase().includes(filters.search.toLowerCase()) ||
         (lead.organization_number && lead.organization_number.includes(filters.search))
       )
     }

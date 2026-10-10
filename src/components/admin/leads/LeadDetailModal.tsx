@@ -316,7 +316,7 @@ const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
             <span>{currentLead.company_name}</span>
           </div>
         }
-        subtitle={currentLead.contact_person}
+        subtitle={currentLead.contact_person ?? undefined}
         headerActions={
           <Button
             onClick={() => setShowEditModal(true)}

@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.43.0',
+    date: '2026-10-10',
+    title: 'Leads: ägare, nästa steg och riktig behörighet',
+    items: [
+      { kind: 'nyhet', text: 'Varje lead har nu en ägare, ett steg (Ny, Kontaktad, Besök bokat, Offert skickad, Vunnen, Förlorad eller Parkerad), en källa ur en fast lista och ett nästa steg med datum. De 23 befintliga leadsen är överflyttade med den som skapade dem som ägare.' },
+      { kind: 'nyhet', text: 'En lead kan delas med kollegor och överlåtas till någon annan. Tekniker och säljare ser bara leads de äger, har tipsat om eller fått delade med sig. Admin och koordinator ser alla.' },
+      { kind: 'andring', text: 'Historiken på en lead skrivs nu av systemet med före och efter, och samtal, mejl, möten och anteckningar ligger i samma tidslinje. De gamla "uppdaterad"-raderna följer inte med.' },
+      { kind: 'buggfix', text: 'Startsidan för tekniker och säljare räknar nu egna leads och dagens uppföljningar rätt. Förut visade de alltid 0.' },
+    ],
+  },
+  {
     version: '3.42.0',
     date: '2026-10-10',
     title: 'Ett eget ikonset för hela portalen',
