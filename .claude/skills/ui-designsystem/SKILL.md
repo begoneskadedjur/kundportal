@@ -64,6 +64,29 @@ Etablerad standard för alla nya modaler. `ConfirmModal.tsx` är den mest discip
 | Aktiva tabbar/filter | `bg-[#20c58f]` (aldrig lila/blå) |
 | Primärknappar | `<Button variant="primary">` (aldrig `bg-blue-600`/`bg-purple-600`) |
 
+## Ikoner
+
+Gemensam ikonstandard sedan 2026-10 (v3.42.0, underlag `docs/leads/leads-ux.md` avsnitt 4).
+
+**Spec**
+- `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, rundade ändar och hörn, 2 px marginal (rityta 20 × 20), hörnradie 2.
+- Streck 1,6 sätts i `Icon.tsx`, ALDRIG i ritningen. `strokeWidth`-propen är en nödutgång (bara `SearchGlass` använder den, 1,8).
+- En färg via `currentColor`; färgen sätts av sammanhanget. Små fyllda detaljer (ögon, punkter) får `fill="currentColor" stroke="none"` i ritningen.
+- Storlekar: 16 i text och tabellrader, 20 i knappar och flikar, 24 i rubriker, 32 i tomma lägen. Inga andra.
+
+**Filer**
+- `src/components/icons/Icon.tsx`: `<Icon name="lead.tips" size={16} className? title? />`. `aria-hidden` som standard, med `title` blir den `role="img"` + `<title>`. Exporterar `IconName` och `IconSize`. En `className` med `w-`/`h-` vinner över `size`.
+- Ritningar per domän i `src/components/icons/set/`: `allman`, `lead`, `arende`, `kontakt`, `dok`, `tjanst`, `kalla`, `sok`. Varje fil exporterar ett objekt med bara path-fragment (JSX) och `satisfies Record<\`domän.${string}\`, ReactNode>`. `set/index.ts` slår ihop dem; `IconName` är unionen av nycklarna.
+- Namn: `domän.namn` på svenska utan å, ä, ö, bindestreck mellan ord (`lead.nasta-steg`, `kalla.google-ads`). Ny domän = ny fil i `set/` + spridning i `set/index.ts`.
+- `WebLeadIcons.tsx` (TjanstIcon/KallaIcon/LeadIcon) och `SearchIcons.tsx` (SearchIcon/SearchGlass/SearchIconTile) är tunna alias som mappar gamla namn till registret. Ny kod använder `<Icon>` direkt.
+
+**Lucide**
+- Domänbegrepp (lead, ärende, avtal, offert, station med flera) ritas ALLTID som egna ikoner i ny kod.
+- Lucide får användas tills vidare bara för generiska kontroller: ChevronDown/Up/Left/Right, ChevronsUpDown, X, Plus, Check, Search, MoreHorizontal, MoreVertical, RefreshCw, ExternalLink, Loader2.
+- `eslint.config.mjs` varnar (`no-restricted-imports` med `allowImportNames`) för övriga lucide-namn i `src/components/icons/**`, `src/components/admin/leads/**` och `src/pages/admin/Leads*.tsx`. Lägg till sökvägar där när en vy byggs om. Byt ut lucide fil för fil när en vy ändå byggs om, aldrig i ett svep.
+
+**Granskning**: `/admin/ikoner` (bara admin, `src/pages/admin/IconReview.tsx`) visar alla ikoner i 16/20/24/32, sök på namn, växling ljust/mörkt. Kolla nya ritningar där i båda temana innan leverans.
+
 ## Vanliga uppgifter
 
 **Bygga en ny stor formulärmodal (med karta/bilder eller mycket innehåll):**

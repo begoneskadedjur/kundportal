@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.42.0',
+    date: '2026-10-10',
+    title: 'Ett eget ikonset för hela portalen',
+    items: [
+      { kind: 'nyhet', text: 'Portalen har fått en gemensam ikonstandard med egna ikoner för leads, ärenden, kontakt, dokument, skadedjur och källor. De tas i bruk vy för vy, först i nya Leads. Ikonerna i Leads (Webb) och söklådan ingår redan och ser ut som förut.' },
+      { kind: 'nyhet', text: 'Admin kan granska alla ikoner i alla storlekar på sidan Ikoner (/admin/ikoner), söka på namn och växla mellan ljust och mörkt tema.' },
+    ],
+  },
+  {
     version: '3.41.1',
     date: '2026-10-10',
     title: 'Leads: sparning tömmer inte längre fält',

@@ -54,4 +54,33 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Ikonstandard 2026-10 (docs/leads/leads-ux.md avsnitt 4, skill ui-designsystem):
+    // domänbegrepp ritas som egna ikoner via <Icon>. Lucide får användas tills
+    // vidare bara för generiska kontroller. Varningen gäller vyer som byggs om;
+    // lägg till fler sökvägar här när en vy byggs om, byt aldrig i ett svep.
+    files: [
+      'src/components/icons/**/*.{ts,tsx}',
+      'src/components/admin/leads/**/*.{ts,tsx}',
+      'src/pages/admin/Leads*.tsx',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'warn',
+        {
+          paths: [
+            {
+              name: 'lucide-react',
+              allowImportNames: [
+                'ChevronDown', 'ChevronUp', 'ChevronLeft', 'ChevronRight', 'ChevronsUpDown',
+                'X', 'Plus', 'Check', 'Search', 'MoreHorizontal', 'MoreVertical',
+                'RefreshCw', 'ExternalLink', 'Loader2',
+              ],
+              message: 'Använd <Icon> från src/components/icons (ikonstandard 2026-10). Lucide bara för generiska kontroller.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 )
