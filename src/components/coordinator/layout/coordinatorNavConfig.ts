@@ -63,7 +63,6 @@ export const navGroups: NavGroup[] = [
       { label: 'Försäljningsmöjligheter', icon: TrendingUp, path: '/koordinator/forsaljningsmojligheter' },
       { label: 'Leads (B2B)', icon: Target, path: '/koordinator/leads' },
       { label: 'Leads (Webb)', icon: Inbox, path: '/koordinator/leads-webb', badgeKey: 'webLeads' },
-      { label: 'Leadsstatistik', icon: BarChart3, path: '/koordinator/leadsstatistik' },
       { label: 'Dokumentsignering', icon: FileSignature, path: '/koordinator/dokumentsignering' },
     ],
   },
@@ -115,7 +114,6 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/leads': 'Leads (B2B)',
   '/koordinator/leads-webb': 'Leads (Webb)',
   '/koordinator/leads-webb/marknad': 'Marknad',
-  '/koordinator/leadsstatistik': 'Leadsstatistik',
   // Fakturering
   '/koordinator/fakturering': 'Fakturering',
 

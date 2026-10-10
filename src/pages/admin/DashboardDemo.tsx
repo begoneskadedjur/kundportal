@@ -77,7 +77,6 @@ const navGroups: NavGroup[] = [
       { label: 'Forsaljningspipeline', icon: Receipt, path: '/admin/forsaljningspipeline' },
       { label: 'Forsaljningsmojligheter', icon: TrendingUp, path: '/admin/forsaljningsmojligheter' },
       { label: 'Kundprognos', icon: BarChart3, path: '/admin/kundprognos' },
-      { label: 'Leadsstatistik', icon: BarChart3, path: '/admin/leadsstatistik' },
     ]
   },
   {

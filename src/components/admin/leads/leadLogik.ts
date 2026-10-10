@@ -1,6 +1,6 @@
 // src/components/admin/leads/leadLogik.ts
 // Leads (B2B): filter i adressen, flikar, grupperingen i Att göra och format.
-// Parametrar: flik (att-gora | pagaende | nya-tips | alla), q, agare (mina | alla | profil-id), kalla, status.
+// Parametrar: flik (att-gora | pagaende | nya-tips | alla | statistik), q, agare (mina | alla | profil-id), kalla, status.
 // id öppnar en lead och hör inte till filtret.
 
 import type { Lead } from '../../../types/database'
@@ -8,8 +8,8 @@ import { KALLA_ETIKETT, STAGE_ETIKETT, URSPRUNG_ETIKETT, arOppen, type LeadSourc
 import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 import { formatSvTid, svDatum } from '../webLeads/format'
 
-export type Flik = 'att-gora' | 'pagaende' | 'nya-tips' | 'alla'
-export const FLIKAR: Flik[] = ['att-gora', 'pagaende', 'nya-tips', 'alla']
+export type Flik = 'att-gora' | 'pagaende' | 'nya-tips' | 'alla' | 'statistik'
+export const FLIKAR: Flik[] = ['att-gora', 'pagaende', 'nya-tips', 'alla', 'statistik']
 
 export interface LeadsFilter {
   q: string

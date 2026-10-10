@@ -8,7 +8,7 @@
 // admin och koordinator allt, övriga det de äger, har tipsat om eller fått delat med sig.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useLocation, useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Plus, RefreshCw, X } from 'lucide-react'
 import Button from '../../components/ui/Button'
@@ -21,6 +21,7 @@ import { KALLA_ETIKETT, LEAD_KALLOR, LEAD_STAGES, STAGE_ETIKETT, arOppen, type L
 import LeadsTabell, { type LeadsSektion } from '../../components/admin/leads/LeadsTabell'
 import LeadModal from '../../components/admin/leads/LeadModal'
 import NyLeadModal from '../../components/admin/leads/NyLeadModal'
+import LeadsStatistik from '../../components/admin/leads/statistik/LeadsStatistik'
 import {
   FILTER_NYCKLAR,
   GRUPP_ORDNING,
@@ -195,11 +196,12 @@ export default function Leads() {
         ? 'Inga nya tips att fördela.'
         : 'Inga leads än. Tryck N eller Ny lead för att lägga till.'
 
-  const flikar: { id: Flik; label: string; antal?: number; varna?: boolean }[] = [
+  const flikar: { id: Flik; label: string; antal?: number; varna?: boolean; ikon?: boolean }[] = [
     { id: 'att-gora', label: 'Att göra', antal: attGoraAntal, varna: true },
     { id: 'pagaende', label: 'Pågående' },
     { id: 'nya-tips', label: 'Nya tips', antal: nyaTipsAntal, varna: arLeadAdmin },
     { id: 'alla', label: 'Alla' },
+    ...(arTekniker ? [] : [{ id: 'statistik' as Flik, label: 'Statistik', ikon: true }]),
   ]
 
   const agarVal = [
@@ -231,14 +233,6 @@ export default function Leads() {
           </p>
         </div>
         <div className="hidden md:flex items-center gap-2">
-          {base !== '/technician' && (
-            <Link
-              to={`${base}/leadsstatistik`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
-            >
-              <Icon name="allman.statistik" size={16} /> Statistik
-            </Link>
-          )}
           <Button variant="primary" size="sm" onClick={() => setVisaNy(true)} title="Ny lead (N)">
             <Plus className="w-4 h-4 mr-1.5" /> {arTekniker ? 'Nytt tips' : 'Ny lead'}
           </Button>
@@ -257,7 +251,13 @@ export default function Leads() {
               flik === f.id ? 'border-[#20c58f] text-white font-medium' : 'border-transparent text-slate-400 hover:text-white'
             }`}
           >
-            {f.label}
+            {f.ikon ? (
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="allman.statistik" size={16} /> {f.label}
+              </span>
+            ) : (
+              f.label
+            )}
             {f.antal ? (
               <span className={`ml-1.5 font-mono text-xs ${flik === f.id ? 'text-[#20c58f]' : f.varna ? 'text-amber-400' : 'text-slate-500'}`}>{f.antal}</span>
             ) : null}
@@ -265,6 +265,10 @@ export default function Leads() {
         ))}
       </div>
 
+      {flik === 'statistik' ? (
+        <LeadsStatistik personal={personal} />
+      ) : (
+      <>
       {/* Filterrad */}
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -334,6 +338,8 @@ export default function Leads() {
           </span>
           <span className="hidden md:inline">Pil upp och ned flyttar, Enter öppnar, N ny lead</span>
         </div>
+      )}
+      </>
       )}
 
       {/* Fast knapp på mobil */}

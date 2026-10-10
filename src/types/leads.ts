@@ -213,3 +213,109 @@ export interface LeadFranArendeSvar {
   skapad: boolean
   kan_oppna: boolean
 }
+
+// ---------------------------------------------------------------------------
+// Etapp 6: statistik (RPC lead_statistik). Pipeline och hygien är läget nu, resten gäller perioden.
+// ---------------------------------------------------------------------------
+export interface LeadStatSumma {
+  skapade: number
+  tips: number
+  vunna: number
+  forlorade: number
+  vunnen_premie: number
+  vunnen_nytt: number
+  vunnen_utokning: number
+  oppna: number
+  pipeline: number
+  parkerade: number
+  ledtid_vunnen_median: number | null
+  ledtid_vunnen_antal: number
+}
+
+export interface LeadStatPipelineSteg {
+  steg: LeadStage
+  antal: number
+  varde: number
+}
+
+export interface LeadStatAgare {
+  profile_id: string | null
+  namn: string
+  antal: number
+  varde: number
+  ny: number
+  kontaktad: number
+  besok_bokat: number
+  offert_skickad: number
+  varde_offert: number
+}
+
+export interface LeadStatManad {
+  manad: string
+  skapade: number
+  tips: number
+  vunna: number
+  forlorade: number
+  vunnen_nytt: number
+  vunnen_utokning: number
+}
+
+/** En rad i kedjan skapade, kontaktade, besök, offert, vunnen (per källa eller ursprung). */
+export interface LeadStatKedja {
+  nyckel: string
+  skapade: number
+  kontaktade: number
+  besok: number
+  offert: number
+  vunna: number
+  forlorade: number
+  oppna: number
+  vunnen_premie: number
+}
+
+export interface LeadStatTidISteg {
+  steg: LeadStage
+  antal: number
+  median_dagar: number | null
+  p75_dagar: number | null
+}
+
+export interface LeadStatHygien {
+  profile_id: string | null
+  namn: string
+  oppna: number
+  forsenade: number
+  saknar_nasta: number
+  /** Leads skapade i perioden där tvådagarsfristen gått ut eller kontakt tagits (tidpunkt känd). */
+  nya_bedomda: number
+  nya_inom: number
+  nya_sena: number
+  nya_ej: number
+}
+
+export interface LeadStatTips {
+  profile_id: string
+  namn: string
+  roll: string | null
+  tips: number
+  oppna: number
+  vunna: number
+  forlorade: number
+  vunnen_premie: number
+}
+
+export interface LeadStatistik {
+  behorighet: 'alla' | 'egna'
+  fran: string
+  till: string
+  summa: LeadStatSumma
+  pipeline_steg: LeadStatPipelineSteg[]
+  pipeline_agare: LeadStatAgare[]
+  manader: LeadStatManad[]
+  kedja_kalla: LeadStatKedja[]
+  kedja_ursprung: LeadStatKedja[]
+  tid_i_steg: LeadStatTidISteg[]
+  forlustorsaker: { orsak: LeadForlustorsak; antal: number }[]
+  hygien: LeadStatHygien[]
+  tips: LeadStatTips[]
+}

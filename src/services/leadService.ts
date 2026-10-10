@@ -17,6 +17,7 @@ import type {
   LeadGaller,
   LeadMedlem,
   LeadPerson,
+  LeadStatistik,
 } from '../types/leads'
 
 export type LeadNy = Partial<Omit<Lead, 'id' | 'created_at' | 'updated_at' | 'org_nr_norm' | 'phone_norm' | 'email_norm'>> & {
@@ -97,6 +98,13 @@ export class LeadService {
     const { data, error } = await supabase.rpc('lead_personal')
     if (error) fel(error, 'Personalen kunde inte hämtas')
     return (data ?? []) as LeadPerson[]
+  }
+
+  /** Statistik för perioden (etapp 6). Räknas i databasen; admin/koordinator ser alla, övriga sina leads. */
+  static async statistik(fran: string, till: string, agare: string | null): Promise<LeadStatistik> {
+    const { data, error } = await supabase.rpc('lead_statistik', { p_fran: fran, p_till: till, p_agare: agare })
+    if (error) fel(error, 'Statistiken kunde inte hämtas')
+    return data as LeadStatistik
   }
 
   static async dubbletter(org: string, telefon: string, epost: string, utom?: string | null): Promise<LeadDubblett[]> {

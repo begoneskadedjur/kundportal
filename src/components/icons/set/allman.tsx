@@ -50,6 +50,13 @@ export const allmanIcons = {
       <path d="M7 16.5v-4M12 16.5V7M17 16.5v-7" />
     </>
   ),
+  // Ladda ner (export): pil ned i ett tråg
+  'allman.ladda-ner': (
+    <>
+      <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" />
+      <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+    </>
+  ),
   // Filter: tre streck som blir kortare
   'allman.filter': <path d="M4 7h16M7 12h10M10 17h4" />,
   // Sök: lupp

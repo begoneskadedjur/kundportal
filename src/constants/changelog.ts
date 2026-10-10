@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.46.0',
+    date: '2026-10-10',
+    title: 'Leads: statistiken flyttar in på Leads-sidan',
+    items: [
+      { kind: 'nyhet', text: 'Fliken Statistik på Leads-sidan visar pipeline per steg och ägare, vinstgrad, vunnen årspremie per månad (nya avtal och utökning för sig), kedjan från lead till affär per källa och ursprung, tid i steg, förlustorsaker och tips per tipsare.' },
+      { kind: 'nyhet', text: 'Hygien per ägare visar försenade och saknade nästa steg och hur många nya leads som kontaktades inom två arbetsdagar. Kedjan, hygienen och tipsen kan exporteras till CSV.' },
+      { kind: 'andring', text: 'Den gamla sidan Leadsstatistik är borttagen ur menyn; gamla länkar öppnar fliken Statistik. Admin och koordinator ser alla leads, övriga ser statistik över sina egna, tipsade och delade.' },
+    ],
+  },
+  {
     version: '3.45.0',
     date: '2026-10-10',
     title: 'Leads: tips från ärendet och statusen sätter sig själv',

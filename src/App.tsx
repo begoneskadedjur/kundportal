@@ -49,7 +49,6 @@ import InspectionStatusLabelsPage from './pages/admin/settings/InspectionStatusL
 import InvoicingPage from './pages/admin/invoicing';
 import DiscountApprovals from './pages/admin/DiscountApprovals';
 import Leads from './pages/admin/Leads';
-import LeadAnalytics from './pages/admin/LeadAnalytics';
 import WebLeads from './pages/admin/WebLeads';
 import Marknad from './pages/admin/Marknad';
 import IconReview from './pages/admin/IconReview';
@@ -197,7 +196,8 @@ function App() {
               <Route path="leads-webb" element={<ProtectedRoute requiredRole="admin"><WebLeads /></ProtectedRoute>} />
               <Route path="leads-webb/marknad" element={<ProtectedRoute requiredRole="admin"><Marknad /></ProtectedRoute>} />
               <Route path="ikoner" element={<ProtectedRoute requiredRole="admin"><IconReview /></ProtectedRoute>} />
-              <Route path="leadsstatistik" element={<ProtectedRoute requiredRole={["admin", "koordinator", "technician"] as any}><LeadAnalytics /></ProtectedRoute>} />
+              {/* Leadsstatistiken är fliken Statistik på Leads-sidan sedan etapp 6 (2026-10-10) */}
+              <Route path="leadsstatistik" element={<Navigate to="/admin/leads?flik=statistik" replace />} />
               <Route path="ekonomi" element={<ProtectedRoute requiredRole="admin"><Economics /></ProtectedRoute>} />
               <Route path="teknikerstatistik" element={<ProtectedRoute requiredRole="admin"><Technicians /></ProtectedRoute>} />
               <Route path="anvandarkonton-personal" element={<ProtectedRoute requiredRole="admin"><TechnicianManagement /></ProtectedRoute>} />
@@ -273,7 +273,7 @@ function App() {
               <Route path="customers/analytics" element={<Navigate to="/admin/kundprognos" replace />} />
               <Route path="customer-access" element={<Navigate to="/admin/anvandarkonton-kund" replace />} />
               <Route path="contracts-overview" element={<Navigate to="/admin/forsaljningspipeline" replace />} />
-              <Route path="leads/analytics" element={<Navigate to="/admin/leadsstatistik" replace />} />
+              <Route path="leads/analytics" element={<Navigate to="/admin/leads?flik=statistik" replace />} />
               <Route path="technician-management" element={<Navigate to="/admin/anvandarkonton-personal" replace />} />
               <Route path="team-chat" element={<Navigate to="/admin/ai-assistent" replace />} />
               <Route path="image-bank" element={<Navigate to="/admin/bildbank" replace />} />
@@ -312,7 +312,7 @@ function App() {
               <Route path="leads" element={<ProtectedRoute requiredRole="koordinator"><Leads /></ProtectedRoute>} />
               <Route path="leads-webb" element={<ProtectedRoute requiredRole="koordinator"><WebLeads /></ProtectedRoute>} />
               <Route path="leads-webb/marknad" element={<ProtectedRoute requiredRole="koordinator"><Marknad /></ProtectedRoute>} />
-              <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="koordinator"><LeadAnalytics /></ProtectedRoute>} />
+              <Route path="leadsstatistik" element={<Navigate to="/koordinator/leads?flik=statistik" replace />} />
               <Route path="offertuppfoljning" element={<Navigate to="/koordinator/dokumentsignering" replace />} />
 
               {/* Fakturering */}
@@ -377,7 +377,7 @@ function App() {
               <Route path="leads" element={<ProtectedRoute requiredRole="säljare"><Leads /></ProtectedRoute>} />
               <Route path="leads-webb" element={<ProtectedRoute requiredRole="säljare"><WebLeads /></ProtectedRoute>} />
               <Route path="leads-webb/marknad" element={<ProtectedRoute requiredRole="säljare"><Marknad /></ProtectedRoute>} />
-              <Route path="leadsstatistik" element={<ProtectedRoute requiredRole="säljare"><LeadAnalytics /></ProtectedRoute>} />
+              <Route path="leadsstatistik" element={<Navigate to="/saljare/leads?flik=statistik" replace />} />
               <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="säljare"><OfferFollowUp /></ProtectedRoute>} />
               <Route path="offerthantering" element={<Navigate to="/saljare/dokumentsignering" replace />} />
               <Route path="kundresa" element={<ProtectedRoute requiredRole="säljare"><CustomerJourney /></ProtectedRoute>} />
