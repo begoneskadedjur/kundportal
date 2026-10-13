@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.48.3',
+    date: '2026-10-13',
+    title: 'Provisionsinställningar bara för admin',
+    items: [
+      { kind: 'buggfix', text: 'Bara admin kan ändra provisionsinställningarna och tipsbonusen.' },
+    ],
+  },
+  {
     version: '3.48.2',
     date: '2026-10-13',
     title: 'Svart skärm från ärendet',
