@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.48.2',
+    date: '2026-10-13',
+    title: 'Svart skärm från ärendet',
+    items: [
+      { kind: 'buggfix', text: 'Avtal och Offert i ett engångsärende gav svart skärm i stället för att öppna avtalsguiden. Nu öppnas guiden med kundens uppgifter som vanligt, och Skapa lead fungerar som förut.' },
+    ],
+  },
+  {
     version: '3.48.1',
     date: '2026-10-10',
     title: 'Handboken: hoppa till avsnitt',

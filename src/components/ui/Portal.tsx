@@ -9,6 +9,12 @@ interface PortalProps {
   containerId?: string;
 }
 
+// Antal monterade portaler per container. Flera portaler delar samma container
+// (t.ex. ärendemodalen och Skapa lead inuti den) och avmonteras ofta i samma
+// commit; containern får bara tas bort av den sista, annars försöker den andra
+// ta bort en nod som redan är borta (removeChild-fel → svart skärm).
+const anvandare = new Map<string, number>();
+
 const Portal: React.FC<PortalProps> = ({ children, containerId = 'modal-root' }) => {
   const [container, setContainer] = useState<HTMLElement | null>(null);
 
@@ -42,12 +48,19 @@ const Portal: React.FC<PortalProps> = ({ children, containerId = 'modal-root' })
       document.body.appendChild(modalContainer);
     }
     
+    anvandare.set(containerId, (anvandare.get(containerId) ?? 0) + 1);
     setContainer(modalContainer);
-    
+
     return () => {
-      // Cleanup - ta bara bort om den är tom
-      if (modalContainer && modalContainer.children.length === 0) {
-        document.body.removeChild(modalContainer);
+      const kvar = (anvandare.get(containerId) ?? 1) - 1;
+      if (kvar > 0) {
+        anvandare.set(containerId, kvar);
+        return;
+      }
+      anvandare.delete(containerId);
+      // Cleanup - ta bara bort om den är tom och fortfarande sitter i DOM:en
+      if (modalContainer.children.length === 0 && modalContainer.parentNode) {
+        modalContainer.parentNode.removeChild(modalContainer);
       }
     };
   }, [containerId]);
