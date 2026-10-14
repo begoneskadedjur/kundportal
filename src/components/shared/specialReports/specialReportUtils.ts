@@ -8,6 +8,7 @@ import { useAuth } from '../../../contexts/AuthContext'
 import type { IconName } from '../../icons/Icon'
 import {
   SECTION_COLORS,
+  atgardsRader,
   type LatLng,
   type SpecialReportDocType,
   type SpecialReportEventType,
@@ -80,7 +81,7 @@ export function klarAttSkicka(r: SpecialReportFull): KlarPunkt[] {
       mal: medHandelseblock ? { vy: medHandelseblock.id, falt: `del:${medHandelseblock.id}:handelser` } : { laggTillDel: true },
     },
     { key: 'bedomning', text: 'Bedömning skriven', saknas: 'bedömning', klar: harText(r.assessment), mal: { vy: 'samm', falt: 'rapport:assessment' } },
-    { key: 'rekommendationer', text: 'Rekommendationer skrivna', saknas: 'rekommendationer', klar: harText(r.recommendations), mal: { vy: 'samm', falt: 'rapport:recommendations' } },
+    { key: 'rekommendationer', text: 'Rekommenderade åtgärder skrivna', saknas: 'rekommenderade åtgärder', klar: atgardsRader(r.recommendations).length > 0, mal: { vy: 'samm', falt: 'rapport:recommendations' } },
   ]
 }
 
@@ -160,6 +161,7 @@ export const EVENT_ICON: Record<SpecialReportEventType, IconName> = {
   atgard: 'rapport.atgard',
   underlev: 'rapport.underlev',
   notering: 'rapport.notering',
+  avvikelse: 'rapport.avvikelse',
 }
 
 /** Primär handling: brandgrön yta med mörk text (skissen), text + ikon */
@@ -410,6 +412,7 @@ export const EVENT_TON: Record<SpecialReportEventType, string> = {
   atgard: 'bg-violet-500/10 text-violet-400',
   underlev: 'bg-slate-500/10 text-slate-300',
   notering: 'bg-slate-500/10 text-slate-400',
+  avvikelse: 'bg-red-500/10 text-red-400',
 }
 
 const MANAD_KORT = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']

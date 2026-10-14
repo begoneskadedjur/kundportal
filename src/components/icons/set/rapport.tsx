@@ -247,4 +247,23 @@ export const rapportIcons = {
       <path d="M4.5 19.5h15" />
     </>
   ),
+
+  // 3.54.0: avvikelser och rekommenderade åtgärder
+  // Avvikelse: varningstriangel med utropstecken
+  'rapport.avvikelse': (
+    <>
+      <path d="M10.3 4.5a2 2 0 0 1 3.4 0l7 12.2a2 2 0 0 1-1.7 3H5a2 2 0 0 1-1.7-3z" />
+      <path d="M12 9.5v4.5" />
+      <circle cx="12" cy="16.8" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // Åtgärder: checklista med två bockar och rader
+  'rapport.atgarder': (
+    <>
+      <path d="M3.5 6.5l1.5 1.5 3-3" />
+      <path d="M3.5 13.5l1.5 1.5 3-3" />
+      <path d="M11.5 6.5h9M11.5 13.5h9" />
+      <path d="M4.5 19.5h2M11.5 19.5h6" />
+    </>
+  ),
 } satisfies Record<`rapport.${string}`, ReactNode>

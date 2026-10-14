@@ -4,6 +4,8 @@
 // i raden. Gemknappen bifogar bilder: de kopplas till händelsen (event_id) och
 // hamnar i delens bildblock, som skapas om det saknas. Under listan: Ny händelse,
 // snabbknappar per typ och "Hämta från ärendet".
+// 3.54.0: en avvikelse får röd kant, ljust röd yta, röd datumruta och typen med
+// varningsikon, och en egen snabbknapp i röd ton.
 
 import { useMemo, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
@@ -11,12 +13,12 @@ import { Icon } from '../../icons/Icon'
 import Select from '../../ui/Select'
 import { EVENT_TYPES, type SpecialReportEvent, type SpecialReportEventType, type SpecialReportImage } from '../../../types/specialReport'
 import type { EventPatch, FullSection, SectionOps } from './sectionOps'
-import { EVENT_TON, FALT, IKON_KNAPP, IKON_KNAPP_LATT, PRIMAR_KNAPP, TEXTFALT, dagOchManad } from './specialReportUtils'
+import { EVENT_ICON, EVENT_TON, FALT, IKON_KNAPP, IKON_KNAPP_LATT, PRIMAR_KNAPP, TEXTFALT, dagOchManad } from './specialReportUtils'
 import ImportEventsModal from './ImportEventsModal'
 
 const TYPER = Object.keys(EVENT_TYPES) as SpecialReportEventType[]
 /** Snabbknapparna under listan */
-const SNABBA: SpecialReportEventType[] = ['inspektion', 'besok', 'betning', 'atgard']
+const SNABBA: SpecialReportEventType[] = ['inspektion', 'besok', 'betning', 'atgard', 'avvikelse']
 
 interface EventsBlockProps {
   reportId: string
@@ -111,9 +113,11 @@ export default function EventsBlock({ reportId, section, ops }: EventsBlockProps
             type="button"
             onClick={() => nyHandelse(t)}
             disabled={lagger !== null}
-            className={`inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-50 ${EVENT_TON[t]}`}
+            className={`inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-50 ${EVENT_TON[t]} ${t === 'avvikelse' ? 'ring-1 ring-inset ring-red-500/40' : ''}`}
           >
-            {lagger === t && <Loader2 className="h-4 w-4 animate-spin" />}
+            {lagger === t
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : t === 'avvikelse' && <Icon name={EVENT_ICON.avvikelse} size={16} />}
             {EVENT_TYPES[t].label}
           </button>
         ))}
@@ -257,21 +261,35 @@ function HandelseKort({ ev, bilder, oppen, bifogar, onOppna, onStang, onAndra, o
     )
   }
 
+  // Avvikelse: röd kant, ljust röd yta, röd datumruta och typen med varningsikon
+  const avvikelse = ev.type === 'avvikelse'
+  const kortKlass = avvikelse
+    ? 'border-red-500/60 bg-red-500/10'
+    : `bg-slate-800/30 ${bilder.length > 0 ? '' : 'border-slate-800'}`
+  const datumKlass = avvikelse ? 'bg-red-600 text-[#fff]' : ton
+
   return (
     <li
-      className={`flex gap-3 rounded-2xl border-[1.5px] bg-slate-800/30 p-3 sm:gap-3.5 sm:p-3.5 ${bilder.length > 0 ? '' : 'border-slate-800'}`}
-      style={bilder.length > 0 ? { borderColor: `${typ.color}66` } : undefined}
+      className={`flex gap-3 rounded-2xl border-[1.5px] p-3 sm:gap-3.5 sm:p-3.5 ${kortKlass}`}
+      style={!avvikelse && bilder.length > 0 ? { borderColor: `${typ.color}66` } : undefined}
     >
       <button type="button" onClick={onOppna} className="flex min-w-0 flex-1 gap-3 rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60 sm:gap-3.5" aria-label={`Redigera ${ev.title || 'händelsen'}, ${ev.event_date}`}>
-        <span className={`flex h-[58px] w-[54px] flex-shrink-0 flex-col items-center justify-center rounded-xl ${ton}`}>
+        <span className={`flex h-[58px] w-[54px] flex-shrink-0 flex-col items-center justify-center rounded-xl ${datumKlass}`}>
           <span className="text-xl font-extrabold leading-none">{dag}</span>
           <span className="text-[11px] font-semibold uppercase">{manad}</span>
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className={`flex items-center gap-1.5 text-xs font-semibold ${ton.split(' ').find(c => c.startsWith('text-'))}`}>
-            <span className="h-[7px] w-[7px] rounded-full bg-current" />
-            {typ.label}
-          </span>
+          {avvikelse ? (
+            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-red-400">
+              <Icon name={EVENT_ICON.avvikelse} size={16} />
+              {typ.label}
+            </span>
+          ) : (
+            <span className={`flex items-center gap-1.5 text-xs font-semibold ${ton.split(' ').find(c => c.startsWith('text-'))}`}>
+              <span className="h-[7px] w-[7px] rounded-full bg-current" />
+              {typ.label}
+            </span>
+          )}
           <span className="text-[15px] font-bold text-white">{ev.title || 'Utan rubrik'}</span>
           {ev.description?.trim() && <span className="whitespace-pre-line text-sm leading-snug text-slate-400">{ev.description.trim()}</span>}
           {bilder.length > 0 && <Miniatyrer bilder={bilder} farg={typ.color} />}

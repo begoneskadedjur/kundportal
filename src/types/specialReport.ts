@@ -16,6 +16,7 @@ export type SpecialReportEventType =
   | 'atgard'
   | 'underlev'
   | 'notering'
+  | 'avvikelse'
 
 export type SpecialReportDocType = 'Saneringsrapport' | 'Inspektionsrapport' | 'Åtgärdsrapport'
 
@@ -202,13 +203,44 @@ export const BLOCK_LABELS: Record<SpecialReportBlockType, string> = {
   map: 'Kartutsnitt',
 }
 
-export const EVENT_TYPES: Record<SpecialReportEventType, { label: string; color: string; defaultTitle: string }> = {
+export const EVENT_TYPES: Record<SpecialReportEventType, { label: string; color: string; defaultTitle: string; ton?: string }> = {
   inspektion: { label: 'Inspektion', color: '#60a5fa', defaultTitle: 'Inspektion' },
   besok: { label: 'Besök', color: '#20c58f', defaultTitle: 'Besök' },
   betning: { label: 'Betning', color: '#f59e0b', defaultTitle: 'Betning' },
   atgard: { label: 'Åtgärd', color: '#c084fc', defaultTitle: 'Åtgärd' },
   underlev: { label: 'Underleverantör', color: '#cbd5e1', defaultTitle: 'Arbete av underleverantör' },
   notering: { label: 'Notering', color: '#94a3b8', defaultTitle: 'Notering' },
+  // 3.54.0: något som kunden behöver åtgärda, lyfts fram i redigeraren och i PDF:en
+  avvikelse: { label: 'Avvikelse', color: '#dc2626', defaultTitle: 'Avvikelse', ton: '#fef2f2' },
+}
+
+/** Avvikelsernas accent (röd) och ton (ljust röd) på papper och i PDF:en */
+export const AVVIKELSE_FARG = '#dc2626'
+export const AVVIKELSE_TON = '#fef2f2'
+
+/**
+ * Rekommenderade åtgärder lagras som rader i recommendations (en åtgärd per
+ * rad). Tomma rader hoppas över och en inledande punkt eller siffra från äldre
+ * fritext tas bort, så att listan numreras på samma sätt överallt.
+ */
+export function atgardsRader(text: string | null | undefined): string[] {
+  if (!text) return []
+  return text
+    .split('\n')
+    .map(rad => rad.trim().replace(/^(?:[-•*]|\d{1,2}[.)])\s+/, '').trim())
+    .filter(rad => rad.length > 0)
+}
+
+/** Rapportens avvikelser i delarnas ordning, med delens nummer (2.x) och rubrik */
+export function avvikelserIRapporten<E extends Pick<SpecialReportEvent, 'type' | 'event_date' | 'created_at'>>(
+  sections: { title: string; label: SpecialReportSectionLabel; events: E[] }[],
+): { del: number; delTitel: string; event: E }[] {
+  return sections.flatMap((s, i) =>
+    s.events
+      .filter(e => e.type === 'avvikelse')
+      .sort((a, b) => a.event_date.localeCompare(b.event_date) || a.created_at.localeCompare(b.created_at))
+      .map(event => ({ del: i + 1, delTitel: s.title.trim() || SECTION_LABELS[s.label] || 'Del', event })),
+  )
 }
 
 /** Färger för delar: syns mot satellitbild och på vitt papper. Ny del får nästa lediga */

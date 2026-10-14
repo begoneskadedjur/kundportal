@@ -38,6 +38,7 @@ import AddSectionModal from '../../components/shared/specialReports/AddSectionMo
 import ReportPreview, { Bladdring } from '../../components/shared/specialReports/ReportPreview'
 import PolishReviewModal from '../../components/shared/specialReports/PolishReviewModal'
 import OmRapporten from '../../components/shared/specialReports/OmRapporten'
+import AtgardsLista from '../../components/shared/specialReports/AtgardsLista'
 import type { EventPatch, FullSection, PolishTarget, SectionOps } from '../../components/shared/specialReports/sectionOps'
 import { POLISH_MAX_CHARS, POLISH_MAX_FIELDS, type PolishChange, type PolishField } from '../../types/textPolish'
 import {
@@ -75,7 +76,7 @@ type RapportTextFalt = 'intro' | 'assessment' | 'recommendations'
 const RAPPORT_TEXT_NAMN: Record<RapportTextFalt, string> = {
   intro: 'Inledning',
   assessment: 'Bedömning',
-  recommendations: 'Rekommendationer',
+  recommendations: 'Rekommenderade åtgärder',
 }
 const SKICKA_KNAPP = PRIMAR_KNAPP.replace('px-4', 'w-11 sm:w-auto sm:px-4')
 
@@ -1121,7 +1122,7 @@ export default function SpecialReportEditorPage() {
                   <h2 className="text-xl font-semibold text-white">Bedömning och åtgärder</h2>
                   <p className="text-sm text-slate-400">Din slutsats till kunden.</p>
                 </div>
-                <button type="button" aria-label="Snygga till bedömning och rekommendationer" title="Snygga till bedömning och rekommendationer" onClick={() => oppnaPolish({ typ: 'samm' })} className={SNYGGA_KNAPP}>
+                <button type="button" aria-label="Snygga till bedömning och rekommenderade åtgärder" title="Snygga till bedömning och rekommenderade åtgärder" onClick={() => oppnaPolish({ typ: 'samm' })} className={SNYGGA_KNAPP}>
                   <Icon name="rapport.snygga" size={16} />
                   <span className="hidden sm:inline">Snygga till</span>
                 </button>
@@ -1136,16 +1137,22 @@ export default function SpecialReportEditorPage() {
                   className={TEXTFALT}
                 />
               </label>
-              <label className="block" data-falt="rapport:recommendations">
-                <span className="block text-sm text-slate-300 mb-1">Rekommendationer till kunden</span>
-                <textarea
-                  value={report.recommendations ?? ''}
-                  onChange={e => sparaRapportFalt('recommendations', e.target.value || null)}
-                  rows={5}
-                  placeholder="Vad kunden själv kan göra för att hålla problemet borta."
-                  className={TEXTFALT}
+              {/* Rekommenderade åtgärder: framträdande kort, en åtgärd per rad */}
+              <section data-falt="rapport:recommendations" className="space-y-3 rounded-2xl border-[1.5px] border-emerald-500/40 bg-emerald-500/5 p-3.5 sm:p-4">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400">
+                    <Icon name="rapport.atgarder" size={20} />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="text-base font-semibold text-white">Rekommenderade åtgärder</h3>
+                    <p className="text-sm text-slate-400">Det här ska kunden göra. En åtgärd per rad.</p>
+                  </div>
+                </div>
+                <AtgardsLista
+                  text={report.recommendations}
+                  onChange={t => sparaRapportFalt('recommendations', t)}
                 />
-              </label>
+              </section>
             </div>
           )}
 

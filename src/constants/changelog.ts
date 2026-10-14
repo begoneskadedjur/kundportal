@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.54.0',
+    date: '2026-10-14',
+    title: 'Specialrapporter: avvikelser och rekommenderade åtgärder syns tydligt',
+    items: [
+      { kind: 'nyhet', text: 'Ny händelsetyp Avvikelse för sådant kunden behöver åtgärda. Den har en egen röd snabbknapp och syns som ett rött kort med varningsikon i redigeraren.' },
+      { kind: 'nyhet', text: 'I rapporten får avvikelser en röd markering i händelsetabellen, en ruta överst i delen och en sammanfattning på översikten med vilken del varje avvikelse hör till.' },
+      { kind: 'andring', text: 'Rekommendationer heter nu Rekommenderade åtgärder och skrivs som en numrerad lista, en åtgärd per rad. Enter ger nästa rad, och raderna kan flyttas upp och ned eller tas bort. Det du redan skrivit delas upp i rader automatiskt.' },
+      { kind: 'andring', text: 'Kunden ser åtgärderna som numrerade punkter i en grön panel, och översikten visar de tre första under Det här rekommenderar vi.' },
+    ],
+  },
+  {
     version: '3.53.0',
     date: '2026-10-14',
     title: 'Specialrapporter: tydligare redigerare och bilder kopplade till händelser',

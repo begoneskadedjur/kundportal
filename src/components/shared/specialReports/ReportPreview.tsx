@@ -4,6 +4,8 @@
 // sparning). Sidorna: Om rapporten, Översikt (om kartan är med), en per del och
 // Bedömning och åtgärder. Fältet som har fokus ramas in i delens färg, och
 // klick på något på sidan väljer motsvarande fält i redigeraren.
+// 3.54.0: avvikelser (röd accent i tabellen, ruta per del, sammanfattning på
+// översikten) och rekommenderade åtgärder som numrerad lista i grön panel, som i PDF:en.
 // Allt här föreställer papper: bara fasta färger, aldrig slate-klasser (de
 // byter färg med temat).
 
@@ -11,7 +13,15 @@ import { createContext, useContext, type CSSProperties, type ReactNode } from 'r
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { BEGONE_LOGO_DATA_URI } from '../../../lib/begoneLogo'
 import { Icon } from '../../icons/Icon'
-import { EVENT_TYPES, SECTION_LABELS, type SpecialReportFull } from '../../../types/specialReport'
+import {
+  AVVIKELSE_FARG,
+  AVVIKELSE_TON,
+  EVENT_TYPES,
+  SECTION_LABELS,
+  atgardsRader,
+  avvikelserIRapporten,
+  type SpecialReportFull,
+} from '../../../types/specialReport'
 import type { FullSection } from './sectionOps'
 import AreaMiniMap from './AreaMiniMap'
 import { byggSidor, fargForDel, sidaForVy, type PreviewPage } from './specialReportUtils'
@@ -22,6 +32,10 @@ const RUBRIK = '#0f172a'
 const GRA = '#6b7280'
 const LINJE = '#e5e7eb'
 const TOM = '#9ca3af'
+/** Ljust grön yta och tunn grön ram för rekommenderade åtgärder */
+const ATGARD_TON = '#f0fdf9'
+const ATGARD_RAM = '#a7f3d0'
+const AVVIKELSE_RAM = '#fecaca'
 const MANADER = ['januari', 'februari', 'mars', 'april', 'maj', 'juni', 'juli', 'augusti', 'september', 'oktober', 'november', 'december']
 
 function manadsspann(fran: string | null, till: string | null): string {
@@ -128,11 +142,17 @@ export default function ReportPreview({ report, vy, fokus, onValj, onBladdra, vi
           lineHeight: 1.45,
         }}
       >
-        {sida.key === 'om' && <SidaOm report={report} />}
+        {sida.key === 'om' && (
+          <>
+            <SidaOm report={report} />
+            {!report.map_view && <Sammanfattning report={report} />}
+          </>
+        )}
         {sida.key === 'oversikt' && (
           <>
             {sidhuvud}
             <SidaOversikt report={report} />
+            <Sammanfattning report={report} />
           </>
         )}
         {del && (
@@ -149,9 +169,8 @@ export default function ReportPreview({ report, vy, fokus, onValj, onBladdra, vi
               <span style={{ display: 'block', fontWeight: 700, color: RUBRIK, marginBottom: 2 }}>Vår bedömning</span>
               {report.assessment?.trim() ? <Stycken text={report.assessment} /> : tomt('Här hamnar din bedömning')}
             </Ram>
-            <Ram falt="rapport:recommendations" etikett="Redigera rekommendationerna">
-              <span style={{ display: 'block', fontSize: 10, fontWeight: 700, color: RUBRIK, marginBottom: 2 }}>Rekommenderade åtgärder</span>
-              {report.recommendations?.trim() ? <Stycken text={report.recommendations} /> : tomt('Här hamnar dina rekommendationer')}
+            <Ram falt="rapport:recommendations" etikett="Redigera de rekommenderade åtgärderna" style={{ margin: 0, padding: 0 }}>
+              <AtgardsPanel rader={atgardsRader(report.recommendations)} />
             </Ram>
           </>
         )}
@@ -285,6 +304,7 @@ function SidaDel({ del, nr, farg }: { del: FullSection; nr: number; farg: string
   const bildNr = new Map(bilder.map((b, i) => [b.id, i + 1]))
   const handelseFor = new Map(del.events.map(e => [e.id, e]))
   const kolumner = '58px 62px 1fr 34px'
+  const avvikelser = handelser.filter(e => e.type === 'avvikelse')
 
   const handelseTabell = (
     <Ram key="handelser" falt={`del:${del.id}:handelser`} etikett="Redigera händelserna">
@@ -297,19 +317,37 @@ function SidaDel({ del, nr, farg }: { del: FullSection; nr: number; farg: string
       </div>
       {handelser.length === 0 ? (
         <div style={{ padding: '6px 5px', borderTop: `1px solid ${LINJE}` }}>{tomt('Här hamnar dina händelser')}</div>
-      ) : handelser.map(e => (
-        <div key={e.id} className="grid" style={{ gridTemplateColumns: kolumner, borderTop: `1px solid ${LINJE}` }}>
-          <span style={{ padding: '3px 5px', fontVariantNumeric: 'tabular-nums' }}>{e.event_date}</span>
-          <span style={{ padding: '3px 5px' }}>{EVENT_TYPES[e.type]?.label ?? e.type}</span>
-          <span style={{ padding: '3px 5px' }}>
-            <b>{e.title}</b>
-            {e.description?.trim() && <span style={{ whiteSpace: 'pre-line' }}> {e.description.trim()}</span>}
-          </span>
-          <span style={{ padding: '3px 5px', color: GRA }}>
-            {bilder.filter(b => b.event_id === e.id).map(b => bildNr.get(b.id)).join(', ')}
-          </span>
-        </div>
-      ))}
+      ) : handelser.map(e => {
+        const avv = e.type === 'avvikelse'
+        return (
+          <div
+            key={e.id}
+            className="grid"
+            style={{
+              gridTemplateColumns: kolumner,
+              borderTop: `1px solid ${LINJE}`,
+              ...(avv ? { background: AVVIKELSE_TON, boxShadow: `inset 3px 0 0 ${AVVIKELSE_FARG}` } : {}),
+            }}
+          >
+            <span style={{ padding: '3px 5px', fontVariantNumeric: 'tabular-nums' }}>{e.event_date}</span>
+            {avv ? (
+              <span className="flex items-start" style={{ padding: '3px 5px', gap: 3, color: AVVIKELSE_FARG, fontWeight: 700 }}>
+                <Icon name="rapport.avvikelse" size={16} className="h-[10px] w-[10px] flex-shrink-0" />
+                {EVENT_TYPES.avvikelse.label}
+              </span>
+            ) : (
+              <span style={{ padding: '3px 5px' }}>{EVENT_TYPES[e.type]?.label ?? e.type}</span>
+            )}
+            <span style={{ padding: '3px 5px' }}>
+              <b>{e.title}</b>
+              {e.description?.trim() && <span style={{ whiteSpace: 'pre-line' }}> {e.description.trim()}</span>}
+            </span>
+            <span style={{ padding: '3px 5px', color: GRA }}>
+              {bilder.filter(b => b.event_id === e.id).map(b => bildNr.get(b.id)).join(', ')}
+            </span>
+          </div>
+        )
+      })}
     </Ram>
   )
 
@@ -382,7 +420,125 @@ function SidaDel({ del, nr, farg }: { del: FullSection; nr: number; farg: string
         </div>
         {underrubrik && <div style={{ color: GRA, marginLeft: 10 }}>{underrubrik}</div>}
       </Ram>
+      {avvikelser.length > 0 && (
+        <Ram falt={`del:${del.id}:handelser`} etikett="Redigera avvikelserna" style={{ margin: 0, padding: 0 }}>
+          <AvvikelseRuta
+            rubrik={`Avvikelser i den här delen (${avvikelser.length})`}
+            rader={avvikelser.map(e => ({ key: e.id, datum: e.event_date, text: e.title.trim() || 'Avvikelse' }))}
+          />
+        </Ram>
+      )}
       {innehall.length > 0 ? innehall : tomt('Delen har inget innehåll än')}
     </>
+  )
+}
+
+/** Klickbar yta som leder till en annan vy i redigeraren (rutorna på översikten) */
+function Lank({ vy, falt, etikett, children, style }: { vy: string; falt: string | null; etikett: string; children: ReactNode; style?: CSSProperties }) {
+  const { onValj } = useContext(RamKontext)
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={etikett}
+      onClick={() => onValj(vy, falt)}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onValj(vy, falt) } }}
+      className="cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+      style={style}
+    >
+      {children}
+    </div>
+  )
+}
+
+/**
+ * Översiktens rutor (3.54.0): "Avvikelser att åtgärda" och "Det här
+ * rekommenderar vi" bredvid varandra, under varandra när det är trångt.
+ * Visas bara när det finns något att visa, som i PDF:en.
+ */
+function Sammanfattning({ report }: { report: SpecialReportFull }) {
+  const avvikelser = avvikelserIRapporten(report.sections)
+  const atgarder = atgardsRader(report.recommendations)
+  if (avvikelser.length === 0 && atgarder.length === 0) return null
+  const ruta: CSSProperties = { flex: '1 1 150px', minWidth: 0 }
+  // Klick på avvikelserna leder till den första delen som har en
+  const forstaDel = avvikelser.length > 0 ? report.sections[avvikelser[0].del - 1] : undefined
+  return (
+    <div className="flex flex-wrap" style={{ gap: 6 }}>
+      {avvikelser.length > 0 && (
+        <Lank vy={forstaDel?.id ?? 'om'} falt={forstaDel ? `del:${forstaDel.id}:handelser` : null} etikett="Gå till avvikelserna" style={ruta}>
+          <AvvikelseRuta
+            rubrik={`Avvikelser att åtgärda (${avvikelser.length})`}
+            rader={avvikelser.map(a => ({ key: a.event.id, datum: a.event.event_date, text: a.event.title.trim() || 'Avvikelse', del: `2.${a.del} ${a.delTitel}` }))}
+          />
+        </Lank>
+      )}
+      {atgarder.length > 0 && (
+        <Lank vy="samm" falt="rapport:recommendations" etikett="Gå till de rekommenderade åtgärderna" style={ruta}>
+          <div style={{ height: '100%', background: ATGARD_TON, border: `1px solid ${ATGARD_RAM}`, borderRadius: 3, padding: '6px 8px' }}>
+            <span className="flex items-center" style={{ gap: 4, fontWeight: 700, color: RUBRIK, marginBottom: 3 }}>
+              <span style={{ color: BRAND, display: 'inline-flex' }}><Icon name="rapport.atgarder" size={16} className="h-[11px] w-[11px]" /></span>
+              Det här rekommenderar vi
+            </span>
+            <Numrerad rader={atgarder.slice(0, 3)} liten />
+            <span style={{ display: 'block', marginTop: 2, color: GRA, fontSize: 7.5 }}>
+              {atgarder.length > 3 ? `Ytterligare ${atgarder.length - 3} i avsnitt 3. ` : ''}Se avsnitt 3.
+            </span>
+          </div>
+        </Lank>
+      )}
+    </div>
+  )
+}
+
+/** Röd ruta med avvikelser: tunn röd ram, röd accent till vänster, ljust röd yta */
+function AvvikelseRuta({ rubrik, rader }: { rubrik: string; rader: { key: string; datum: string; text: string; del?: string }[] }) {
+  return (
+    <div style={{ height: '100%', background: AVVIKELSE_TON, border: `1px solid ${AVVIKELSE_RAM}`, borderLeft: `3px solid ${AVVIKELSE_FARG}`, borderRadius: 3, padding: '6px 8px' }}>
+      <span className="flex items-center" style={{ gap: 4, fontWeight: 700, color: AVVIKELSE_FARG, marginBottom: 3 }}>
+        <Icon name="rapport.avvikelse" size={16} className="h-[11px] w-[11px] flex-shrink-0" />
+        {rubrik}
+      </span>
+      {rader.map(r => (
+        <span key={r.key} style={{ display: 'block', paddingTop: 2 }}>
+          {r.del && <span style={{ display: 'block', fontSize: 7.5, color: GRA }}>{r.del}</span>}
+          <span style={{ fontVariantNumeric: 'tabular-nums', color: GRA }}>{r.datum}</span>{' '}
+          <span style={{ fontWeight: 600, color: RUBRIK }}>{r.text}</span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** Numrerade punkter med runda gröna nummer */
+function Numrerad({ rader, liten = false }: { rader: string[]; liten?: boolean }) {
+  const storlek = liten ? 11 : 14
+  return (
+    <ol style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+      {rader.map((r, i) => (
+        <li key={i} className="flex items-start" style={{ gap: 5, padding: liten ? '1px 0' : '2px 0' }}>
+          <span
+            className="flex flex-shrink-0 items-center justify-center"
+            style={{ width: storlek, height: storlek, borderRadius: '50%', background: BRAND, color: '#ffffff', fontSize: liten ? 6.5 : 7.5, fontWeight: 700, marginTop: 1 }}
+          >
+            {i + 1}
+          </span>
+          <span style={{ minWidth: 0, color: TEXT }}>{r}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/** Avsnitt 3: Rekommenderade åtgärder som framträdande panel */
+function AtgardsPanel({ rader }: { rader: string[] }) {
+  return (
+    <div style={{ background: ATGARD_TON, border: `1px solid ${ATGARD_RAM}`, borderRadius: 3, padding: '8px 10px' }}>
+      <span className="flex items-center" style={{ gap: 5, fontSize: 10, fontWeight: 700, color: RUBRIK, marginBottom: 4 }}>
+        <span style={{ color: BRAND, display: 'inline-flex' }}><Icon name="rapport.atgarder" size={16} className="h-[13px] w-[13px]" /></span>
+        Rekommenderade åtgärder
+      </span>
+      {rader.length > 0 ? <Numrerad rader={rader} /> : tomt('Här hamnar dina rekommenderade åtgärder')}
+    </div>
   )
 }

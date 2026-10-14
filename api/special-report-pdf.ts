@@ -1,5 +1,7 @@
 // api/special-report-pdf.ts
 // Specialrapporter (3.50.0): PDF enligt dokumentstandarden och utskick till kund.
+// 3.54.0: avvikelser lyfts fram (röd accent i tabellen, ruta per del och på
+// översikten) och rekommenderade åtgärder visas som numrerad lista i en grön panel.
 // Sedan 3.51.0 har varje del en egen färg (special_report_sections.color): numret
 // och strecket vid rubriken, polygonerna och numren på kartorna. Reserv: paletten
 // i tur och ordning, som i redigeraren.
@@ -26,8 +28,12 @@ import nodemailer from 'nodemailer'
 import { requireAuthenticated } from './_lib/auth'
 import { BEGONE_LOGO_DATA_URI } from './_lib/begoneLogo'
 import {
+  AVVIKELSE_FARG,
+  AVVIKELSE_TON,
   EVENT_TYPES,
   SECTION_COLORS,
+  atgardsRader,
+  avvikelserIRapporten,
   SECTION_LABELS,
   type LatLng,
   type SpecialReport,
@@ -95,6 +101,31 @@ function richText(text: string | null | undefined): string {
     }
     return `<p>${esc(lines.join('\n')).replace(/\n/g, '<br>')}</p>`
   }).join('')
+}
+
+/**
+ * Ikoner som inline-SVG (samma ritningar som rapport.avvikelse och
+ * rapport.atgarder i src/components/icons/set/rapport.tsx). Färgen är en fast
+ * konstant och kommer aldrig från användaren.
+ */
+function iconSvg(name: 'avvikelse' | 'atgarder', color: string, size: number): string {
+  const paths = name === 'avvikelse'
+    ? `<path d="M10.3 4.5a2 2 0 0 1 3.4 0l7 12.2a2 2 0 0 1-1.7 3H5a2 2 0 0 1-1.7-3z"/><path d="M12 9.5v4.5"/><circle cx="12" cy="16.8" r="1" fill="${color}" stroke="none"/>`
+    : '<path d="M3.5 6.5l1.5 1.5 3-3"/><path d="M3.5 13.5l1.5 1.5 3-3"/><path d="M11.5 6.5h9M11.5 13.5h9"/><path d="M4.5 19.5h2M11.5 19.5h6"/>'
+  return `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`
+}
+
+/** Röd ruta med avvikelser: rubrik med ikon och en rad per avvikelse (delen, datum och rubrik) */
+function deviationBox(title: string, rows: { date: string; text: string; part?: string }[]): string {
+  const items = rows.map(r =>
+    `<li>${r.part ? `<span class="part">${esc(r.part)}</span>` : ''}<span class="date">${esc(r.date)}</span> <b>${esc(r.text)}</b></li>`,
+  ).join('')
+  return `<div class="deviation-box"><span class="box-title">${iconSvg('avvikelse', AVVIKELSE_FARG, 15)}${esc(title)}</span><ul>${items}</ul></div>`
+}
+
+/** Numrerad lista med runda gröna nummer */
+function numberedList(rows: string[]): string {
+  return `<ol class="numbered">${rows.map((r, i) => `<li><span class="n">${i + 1}</span><span class="t">${esc(r)}</span></li>`).join('')}</ol>`
 }
 
 function todaySwedish(): string {
@@ -456,7 +487,24 @@ function buildHtml(data: ReportData, maps: Map<string, string>, version: number,
   const sectionHtml = sections.map((s, i) => renderSection(s, i + 1, maps, report)).join('')
 
   const hasAssessment = !!(report.assessment && report.assessment.trim())
-  const hasRecommendations = !!(report.recommendations && report.recommendations.trim())
+  const actions = atgardsRader(report.recommendations)
+  const hasRecommendations = actions.length > 0
+
+  // Översiktens rutor: avvikelser att åtgärda och de tre första åtgärderna
+  const deviations = avvikelserIRapporten(sections)
+  const summaryBoxes = [
+    deviations.length > 0
+      ? deviationBox(`Avvikelser att åtgärda (${deviations.length})`, deviations.map(d => ({
+        part: `2.${d.del} ${d.delTitel}`,
+        date: d.event.event_date,
+        text: d.event.title?.trim() || 'Avvikelse',
+      })))
+      : '',
+    hasRecommendations
+      ? `<div class="action-box"><span class="box-title">${iconSvg('atgarder', BRAND, 15)}Det här rekommenderar vi</span>${numberedList(actions.slice(0, 3))}<span class="see">${actions.length > 3 ? `Ytterligare ${actions.length - 3} i avsnitt 3. ` : ''}Se avsnitt 3.</span></div>`
+      : '',
+  ].filter(Boolean)
+  const summaryHtml = summaryBoxes.length > 0 ? `<div class="summary">${summaryBoxes.join('')}</div>` : ''
 
   return `<!DOCTYPE html>
 <html lang="sv">
@@ -521,6 +569,34 @@ function buildHtml(data: ReportData, maps: Map<string, string>, version: number,
   .callout { padding: 10px 14px; background: #f0fdf9; border-left: 4px solid ${BRAND}; margin-bottom: 14px; page-break-inside: avoid; }
   .callout strong { display: block; color: #0f172a; margin-bottom: 4px; }
   .muted { color: #6b7280; }
+  .ico { display: inline-block; flex-shrink: 0; vertical-align: -2px; }
+  /* Avvikelser: röd bara som accent, ljust röd yta */
+  tr.deviation td { background: ${AVVIKELSE_TON}; }
+  tr.deviation td:first-child { box-shadow: inset 3px 0 0 ${AVVIKELSE_FARG}; }
+  td.dev-type { color: ${AVVIKELSE_FARG}; font-weight: 700; white-space: nowrap; }
+  td.dev-type .ico { margin-right: 4px; }
+  .box-title { display: flex; align-items: center; gap: 6px; font-weight: 700; margin-bottom: 6px; }
+  .deviation-box { background: ${AVVIKELSE_TON}; border: 1px solid #fecaca; border-left: 3px solid ${AVVIKELSE_FARG}; border-radius: 4px; padding: 10px 14px; margin: 0 0 14px; page-break-inside: avoid; }
+  .deviation-box .box-title { color: ${AVVIKELSE_FARG}; }
+  .deviation-box ul { list-style: none; margin: 0; padding: 0; }
+  .deviation-box li { margin: 0; padding: 3px 0; border-top: 1px solid #fde2e2; }
+  .deviation-box li:first-child { border-top: none; padding-top: 0; }
+  .deviation-box .part { display: block; font-size: 9.5px; color: #6b7280; }
+  .deviation-box .date { color: #6b7280; white-space: nowrap; }
+  .deviation-box b { color: #0f172a; font-weight: 600; }
+  .action-box, .action-panel { background: #f0fdf9; border: 1px solid #a7f3d0; border-radius: 4px; page-break-inside: avoid; }
+  .action-box { padding: 10px 14px; margin: 0 0 14px; }
+  .action-box .box-title, .action-panel .box-title { color: #0f172a; }
+  .action-box .see { display: block; margin-top: 4px; font-size: 10px; color: #6b7280; }
+  .action-panel { padding: 14px 18px; margin-bottom: 14px; }
+  .action-panel .box-title { font-size: 13px; margin-bottom: 10px; }
+  ol.numbered { list-style: none; margin: 0; padding: 0; }
+  ol.numbered li { display: flex; align-items: flex-start; gap: 9px; margin: 0; padding: 3px 0; page-break-inside: avoid; }
+  ol.numbered .n { flex-shrink: 0; width: 19px; height: 19px; border-radius: 50%; background: ${BRAND}; color: #ffffff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 0; }
+  ol.numbered .t { min-width: 0; padding-top: 1px; }
+  .action-panel ol.numbered li { padding: 5px 0; }
+  .summary { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
+  .summary > div { flex: 1 1 240px; min-width: 0; margin: 0; }
 </style>
 </head>
 <body>
@@ -555,6 +631,7 @@ function buildHtml(data: ReportData, maps: Map<string, string>, version: number,
     <thead><tr><th style="width:40px">Nr</th><th>Del</th><th>Gäller</th><th>Senast</th><th style="width:64px">Avsnitt</th></tr></thead>
     <tbody>${overviewRows}</tbody>
   </table>` : ''}
+  ${summaryHtml}
 </section>
 
 ${sectionHtml}
@@ -565,7 +642,7 @@ ${hasAssessment || hasRecommendations ? `
   <h3><span class="num">3.</span> Bedömning och åtgärder</h3>
   <div style="height:12px"></div>
   ${hasAssessment ? `<div class="callout"><strong>Vår bedömning</strong>${paragraphs(report.assessment, 'margin:0 0 6px')}</div>` : ''}
-  ${hasRecommendations ? `<span class="block-title">Rekommenderade åtgärder</span>${richText(report.recommendations)}` : ''}
+  ${hasRecommendations ? `<div class="action-panel"><span class="box-title">${iconSvg('atgarder', BRAND, 18)}Rekommenderade åtgärder</span>${numberedList(actions)}</div>` : ''}
 </section>` : ''}
 
 </body>
@@ -598,9 +675,13 @@ function renderSection(s: SectionFull, nr: number, maps: Map<string, string>, re
       const description = e.description && e.description.trim()
         ? ` ${esc(e.description.trim()).replace(/\n/g, '<br>')}`
         : ''
-      return `<tr${i % 2 === 1 ? ' class="alt"' : ''}>
+      const deviation = e.type === 'avvikelse'
+      const classes = [i % 2 === 1 ? 'alt' : '', deviation ? 'deviation' : ''].filter(Boolean).join(' ')
+      return `<tr${classes ? ` class="${classes}"` : ''}>
         <td class="date">${esc(e.event_date)}</td>
-        <td>${esc(typeLabel)}</td>
+        ${deviation
+          ? `<td class="dev-type">${iconSvg('avvikelse', AVVIKELSE_FARG, 13)}${esc(typeLabel)}</td>`
+          : `<td>${esc(typeLabel)}</td>`}
         <td><b>${esc(e.title)}</b>${description}</td>
         <td class="imgref">${esc(refs)}</td>
       </tr>`
@@ -649,10 +730,20 @@ function renderSection(s: SectionFull, nr: number, maps: Map<string, string>, re
   if (!eventsShown) rendered += eventsHtml()
   if (!imagesShown) rendered += imagesHtml()
 
+  // Delens avvikelser överst, i datumordning som tabellen
+  const deviations = s.events.filter(e => e.type === 'avvikelse')
+  const deviationsHtml = deviations.length > 0
+    ? deviationBox(`Avvikelser i den här delen (${deviations.length})`, deviations.map(e => ({
+      date: e.event_date,
+      text: e.title?.trim() || 'Avvikelse',
+    })))
+    : ''
+
   return `<section class="page">
     ${pageHead(report)}
     <h3><span class="bar" style="background:${color}"></span><span><span class="num" style="color:${color}">2.${nr}</span> ${esc(sectionTitle(s))}</span></h3>
     ${subtitleParts.length > 0 ? `<p class="subtitle">${esc(subtitleParts.join(' · '))}</p>` : '<div style="height:12px"></div>'}
+    ${deviationsHtml}
     ${rendered || '<p class="muted">Inget innehåll i delen än.</p>'}
   </section>`
 }
