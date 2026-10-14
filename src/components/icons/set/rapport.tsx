@@ -266,4 +266,12 @@ export const rapportIcons = {
       <path d="M4.5 19.5h2M11.5 19.5h6" />
     </>
   ),
+  // 3.54.1: Bedömning, skrivplatta med en bock
+  'rapport.bedomning': (
+    <>
+      <path d="M8 5H6.5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H16" />
+      <path d="M9.5 3h5a1 1 0 0 1 1 1v1.5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+      <path d="M8.5 13.5l2.5 2.5 4.5-5" />
+    </>
+  ),
 } satisfies Record<`rapport.${string}`, ReactNode>

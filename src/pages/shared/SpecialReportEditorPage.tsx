@@ -38,14 +38,12 @@ import AddSectionModal from '../../components/shared/specialReports/AddSectionMo
 import ReportPreview, { Bladdring } from '../../components/shared/specialReports/ReportPreview'
 import PolishReviewModal from '../../components/shared/specialReports/PolishReviewModal'
 import OmRapporten from '../../components/shared/specialReports/OmRapporten'
-import AtgardsLista from '../../components/shared/specialReports/AtgardsLista'
+import BedomningOchAtgarder from '../../components/shared/specialReports/BedomningOchAtgarder'
 import type { EventPatch, FullSection, PolishTarget, SectionOps } from '../../components/shared/specialReports/sectionOps'
 import { POLISH_MAX_CHARS, POLISH_MAX_FIELDS, type PolishChange, type PolishField } from '../../types/textPolish'
 import {
   PRIMAR_KNAPP,
   SEKUNDAR_KNAPP,
-  SNYGGA_KNAPP,
-  TEXTFALT,
   byggSidor,
   fargForDel,
   idagISO,
@@ -1116,43 +1114,14 @@ export default function SpecialReportEditorPage() {
           )}
 
           {vy === 'samm' && (
-            <div className="max-w-[640px] space-y-3.5">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-xl font-semibold text-white">Bedömning och åtgärder</h2>
-                  <p className="text-sm text-slate-400">Din slutsats till kunden.</p>
-                </div>
-                <button type="button" aria-label="Snygga till bedömning och rekommenderade åtgärder" title="Snygga till bedömning och rekommenderade åtgärder" onClick={() => oppnaPolish({ typ: 'samm' })} className={SNYGGA_KNAPP}>
-                  <Icon name="rapport.snygga" size={16} />
-                  <span className="hidden sm:inline">Snygga till</span>
-                </button>
-              </div>
-              <label className="block" data-falt="rapport:assessment">
-                <span className="block text-sm text-slate-300 mb-1">Bedömning</span>
-                <textarea
-                  value={report.assessment ?? ''}
-                  onChange={e => sparaRapportFalt('assessment', e.target.value || null)}
-                  rows={5}
-                  placeholder="Hur ser läget ut nu, och hur har det utvecklats?"
-                  className={TEXTFALT}
-                />
-              </label>
-              {/* Rekommenderade åtgärder: framträdande kort, en åtgärd per rad */}
-              <section data-falt="rapport:recommendations" className="space-y-3 rounded-2xl border-[1.5px] border-emerald-500/40 bg-emerald-500/5 p-3.5 sm:p-4">
-                <div className="flex items-start gap-3">
-                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400">
-                    <Icon name="rapport.atgarder" size={20} />
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-white">Rekommenderade åtgärder</h3>
-                    <p className="text-sm text-slate-400">Det här ska kunden göra. En åtgärd per rad.</p>
-                  </div>
-                </div>
-                <AtgardsLista
-                  text={report.recommendations}
-                  onChange={t => sparaRapportFalt('recommendations', t)}
-                />
-              </section>
+            <div className="max-w-[880px]">
+              <BedomningOchAtgarder
+                report={report}
+                onAssessment={t => sparaRapportFalt('assessment', t)}
+                onRecommendations={t => sparaRapportFalt('recommendations', t)}
+                onPolish={() => oppnaPolish({ typ: 'samm' })}
+                onGaTillDel={sectionId => gaTill(sectionId, `del:${sectionId}:handelser`)}
+              />
             </div>
           )}
 

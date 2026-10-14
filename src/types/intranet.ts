@@ -6,7 +6,7 @@ import {
   BookOpen, ShieldCheck, HeartPulse, Leaf, FileText,
   MessageSquareText, ClipboardList, MapPin, AlertTriangle, Users,
   Calculator, Receipt, Wallet, CalendarPlus, CalendarDays, Repeat, PackagePlus, Search,
-  Lightbulb, Handshake, Target,
+  Lightbulb, Handshake, Target, FileStack,
 } from 'lucide-react'
 
 // ─── Innehållsblock (jsonb i intranet_documents.content) ───
@@ -145,6 +145,7 @@ export const INTRANET_SLUG_ICONS: Record<string, LucideIcon> = {
   'guide-leads-tekniker': Lightbulb,
   'guide-leads-saljare': Handshake,
   'guide-leads-kontor': Target,
+  'guide-specialrapporter': FileStack,
 }
 
 // ─── Anslagstavla ───
@@ -203,6 +204,8 @@ export const ONBOARDING_SLUGS: { slug: string; label: string }[] = [
   { slug: 'guide-rapportera-tillbud', label: 'Guide: Rapportera tillbud' },
   // Syns bara för tekniker (audience_roles), andra roller hoppar över steget
   { slug: 'guide-leads-tekniker', label: 'Guide: Tipsa om en lead' },
+  // Syns för tekniker, koordinator och admin, inte för säljare
+  { slug: 'guide-specialrapporter', label: 'Guide: Specialrapporter' },
 ]
 
 /** Ungefärlig lästid i minuter utifrån innehållsblocken */

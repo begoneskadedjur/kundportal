@@ -44,6 +44,8 @@ import SkapaLeadOvning from './intranet/interactive/leads/SkapaLeadOvning'
 import NastaStegOvning from './intranet/interactive/leads/NastaStegOvning'
 import TipsbonusRaknare from './intranet/interactive/leads/TipsbonusRaknare'
 import LeadsRollKarta from './intranet/interactive/leads/LeadsRollKarta'
+import SpecialrapportDelarDemo from './intranet/interactive/specialrapporter/DelarDemo'
+import SnyggaTillOvning from './intranet/interactive/specialrapporter/SnyggaTillOvning'
 import AudienceModal from './intranet/AudienceModal'
 import { describeAudience } from '../../types/intranet'
 import { Eye } from 'lucide-react'
@@ -69,6 +71,8 @@ const INTERACTIVE_COMPONENTS: Record<string, ComponentType<{ variant?: string }>
   'leads-nasta-steg': NastaStegOvning,
   'leads-tipsbonus': TipsbonusRaknare,
   'leads-roller': LeadsRollKarta,
+  'specialrapport-delar': SpecialrapportDelarDemo,
+  'specialrapport-snygga-till': SnyggaTillOvning,
 }
 
 // ─── Blockrendering ────────────────────────────────

@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.54.1',
+    date: '2026-10-14',
+    title: 'Specialrapporter: tydligare slutsats och en guide i handboken',
+    items: [
+      { kind: 'andring', text: 'Bedömning och åtgärder har samma kort som Om rapporten: en banderoll med antal avvikelser, händelser och åtgärder, ett kort för bedömningen, en lista över rapportens avvikelser som leder till rätt del och ett tydligt kort för de rekommenderade åtgärderna.' },
+      { kind: 'nyhet', text: 'Handboken har en ny guide, Specialrapporter: en rapport för krångliga uppdrag, för tekniker, koordinator och admin. Den går igenom hela vägen från ny rapport till utskick, med en klickbar bild av rapportens delar och en övning i Snygga till.' },
+    ],
+  },
+  {
     version: '3.54.0',
     date: '2026-10-14',
     title: 'Specialrapporter: avvikelser och rekommenderade åtgärder syns tydligt',
