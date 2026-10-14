@@ -238,6 +238,8 @@ export interface IndoorStationInspection {
   status: InspectionStatus;
   findings: string | null;
   photo_path: string | null;
+  /** Typen stationen hade vid kontrollen (sätts av DB-trigger, 3.49.0) */
+  station_type_id?: string | null;
   created_at: string;
 }
 

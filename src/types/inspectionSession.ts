@@ -107,6 +107,8 @@ export interface OutdoorStationInspection {
   measurement_value: number | null
   measurement_unit: string | null
   preparation_id: string | null
+  /** Typen stationen hade vid kontrollen (sätts av DB-trigger, 3.49.0) */
+  station_type_id?: string | null
   created_at: string
 }
 

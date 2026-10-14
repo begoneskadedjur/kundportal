@@ -412,8 +412,9 @@ export default function TechnicianEquipment() {
     try {
       if (editingEquipment) {
         // Uppdatera befintlig
+        // Typen skickas inte: den byts bara via Byt typ
+        // (RPC change_station_type, som sätter station_type_id)
         const result = await EquipmentService.updateEquipment(editingEquipment.id, {
-          equipment_type: formData.equipment_type,
           serial_number: formData.serial_number || null,
           latitude: formData.latitude,
           longitude: formData.longitude,
@@ -1266,6 +1267,7 @@ export default function TechnicianEquipment() {
                         existingStations={customerExistingStations}
                         otherCustomerStations={otherCustomerStations}
                         inspections={editingEquipment ? outdoorInspections : []}
+                        onTypeChanged={() => { void refreshData() }}
                         onSubmit={handleFormSubmit}
                         onCancel={handleFinishBatch}
                         onLocationCapture={handleLocationCapture}

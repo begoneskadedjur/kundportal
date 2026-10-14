@@ -249,6 +249,27 @@ export function CustomerStationsModal({
     setEditingOutdoorStation(false)
   }
 
+  // Efter typbyte via Byt typ i redigeringsformuläret: ladda om listorna och
+  // byt ut den valda stationen mot den färska raden (typ, nummer, produkt)
+  const reloadAfterTypeChange = async (kind: 'outdoor' | 'indoor', stationId: string) => {
+    if (!customer) return
+    try {
+      const { outdoor, indoor } = await EquipmentService.getStationsByCustomer(customer.customer_id)
+      setOutdoorStations(outdoor)
+      setIndoorStations(indoor)
+      if (kind === 'outdoor') {
+        const fresh = outdoor.find(s => s.id === stationId)
+        if (fresh) setSelectedOutdoorStation(prev => (prev && prev.id === stationId ? fresh : prev))
+      } else {
+        const fresh = indoor.find(s => s.id === stationId)
+        if (fresh) setSelectedIndoorStation(prev => (prev && prev.id === stationId ? fresh : prev))
+        if (selectedFloorPlan) await loadStationsForFloorPlan(selectedFloorPlan.id)
+      }
+    } catch (error) {
+      console.error('Fel vid omladdning efter typbyte:', error)
+    }
+  }
+
   const loadAllData = async () => {
     if (!customer) return
 
@@ -1019,6 +1040,7 @@ export function CustomerStationsModal({
                             position={{ x: selectedIndoorStation.position_x_percent, y: selectedIndoorStation.position_y_percent }}
                             existingStation={selectedIndoorStation}
                             inspections={indoorInspections}
+                            onTypeChanged={(result) => { void reloadAfterTypeChange('indoor', result.station_id) }}
                             onSubmit={async (input) => {
                               try {
                                 await IndoorStationService.updateStation(
@@ -1118,11 +1140,13 @@ export function CustomerStationsModal({
                             technicianId={profile?.technician_id || ''}
                             existingEquipment={selectedOutdoorStation}
                             inspections={outdoorInspections}
+                            onTypeChanged={(result) => { void reloadAfterTypeChange('outdoor', result.station_id) }}
                             onSubmit={async (formData: EquipmentFormData) => {
                               try {
                                 setIsSubmitting(true)
+                                // Typen skickas inte: den byts bara via Byt typ
+                                // (RPC change_station_type, som sätter station_type_id)
                                 const result = await EquipmentService.updateEquipment(selectedOutdoorStation.id, {
-                                  equipment_type: formData.equipment_type,
                                   serial_number: formData.serial_number || null,
                                   latitude: formData.latitude,
                                   longitude: formData.longitude,

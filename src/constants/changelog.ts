@@ -45,6 +45,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.49.0',
+    date: '2026-10-14',
+    title: 'Byt stationstyp och ny kontrollrunda',
+    items: [
+      { kind: 'nyhet', text: 'Byt typ på en utplacerad station, till exempel mekanisk fälla till betesstation, direkt i kontrollrundan eller från utrustningsvyn. Produkt och serienummer väljs för den nya typen, tidigare kontroller står kvar med typen stationen hade då och inomhusstationer får nytt nummer i den nya typens serie.' },
+      { kind: 'nyhet', text: 'Byter en tilläggsstation som inte är fakturerad typ gäller den nya typens årspris, och den som godkänner fakturor får en notis. Betald framåt kan den inte byta typ.' },
+      { kind: 'andring', text: 'Kontrollrundan har fått egna ikoner i stället för textknappar: verktygsrad med Flytta, Byt typ, Historik och Hämta upp, stationstypens ikon i listan och på kartan, OK som bockknapp och antal med minus och plus.' },
+      { kind: 'andring', text: 'Flyttläget på kartan och planritningen visar hur långt stationen flyttas.' },
+      { kind: 'buggfix', text: 'På telefon hamnade kartans förklaring och knappar ovanpå kommentarer och flikar när man scrollade i kontrollrundan. Nu stannar de i kartan, och bara rubriken och förloppet ligger kvar överst så att stationslistan får plats.' },
+      { kind: 'buggfix', text: 'Byte av typ i utrustningsvyns redigeringsformulär slog inte igenom i kartor, rapporter och fakturering.' },
+    ],
+  },
+  {
     version: '3.48.3',
     date: '2026-10-13',
     title: 'Provisionsinställningar bara för admin',

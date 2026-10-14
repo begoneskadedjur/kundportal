@@ -32,7 +32,11 @@ import {
   generateStationNumber
 } from '../../../types/indoor'
 import { MAX_STATION_PHOTO_SIZE, ALLOWED_PHOTO_TYPES } from '../../../services/indoorStationService'
-import { StationTypeService } from '../../../services/stationTypeService'
+import { StationTypeService, type ChangeStationTypeResult } from '../../../services/stationTypeService'
+import { StationTypeTile, ChangeStationTypeModal, type ChangeStationTypeChoice } from '../stations'
+import { Icon as SvgIcon } from '../../icons/Icon'
+import { createPortal } from 'react-dom'
+import toast from 'react-hot-toast'
 import type { StationType } from '../../../types/stationTypes'
 import { CasePreparationService } from '../../../services/casePreparationService'
 import type { Preparation } from '../../../types/preparations'
@@ -58,6 +62,11 @@ interface IndoorStationFormProps {
   onCancel: () => void
   onDelete?: () => void
   isSubmitting?: boolean
+  /**
+   * Efter typbyte på befintlig station (RPC change_station_type). Formuläret
+   * har redan uppdaterat sina fält; föräldern laddar om stationen/listan.
+   */
+  onTypeChanged?: (result: ChangeStationTypeResult, newType: StationType, choice: ChangeStationTypeChoice) => void
 }
 
 export function IndoorStationForm({
@@ -76,9 +85,13 @@ export function IndoorStationForm({
   onSubmit,
   onCancel,
   onDelete,
-  isSubmitting = false
+  isSubmitting = false,
+  onTypeChanged
 }: IndoorStationFormProps) {
   const isEditing = !!existingStation
+  // Befintlig station: typen byts bara via RPC:n (Byt typ), aldrig via spara
+  const [showChangeType, setShowChangeType] = useState(false)
+  const [editTypeId, setEditTypeId] = useState<string | null>(existingStation?.station_type_id ?? null)
 
   // Dynamiska stationstyper från DB
   const [dynamicStationTypes, setDynamicStationTypes] = useState<StationType[]>([])
@@ -294,11 +307,9 @@ export function IndoorStationForm({
 
     try {
       if (isEditing) {
-        // Hitta station_type_id från dynamiska typer
-        const matchedType = dynamicStationTypes.find(t => t.code === stationType)
+        // Typen skickas inte: den byts bara via RPC:n change_station_type
+        // (Byt typ), som också sätter station_type_id och numret
         const updateInput: UpdateIndoorStationInput = {
-          station_type: stationType,
-          station_type_id: matchedType?.id || null,
           station_number: stationNumber.trim() || undefined,
           position_x_percent: position.x,
           position_y_percent: position.y,
@@ -358,6 +369,35 @@ export function IndoorStationForm({
   // Aktuell typ-config för formulärvalidering
   const currentTypeConfig = getCurrentTypeConfig(stationType)
 
+  // Befintlig station: FK:n först, textkoden som reserv (äldre rader saknar FK)
+  const editType = isEditing
+    ? (editTypeId ? dynamicStationTypes.find(t => t.id === editTypeId) : undefined)
+      ?? dynamicStationTypes.find(t => t.code === stationType)
+      ?? null
+    : null
+  const editTypeName = editType?.name
+    ?? existingStation?.station_type_data?.name
+    ?? currentTypeConfig?.label
+    ?? stationType
+
+  // Efter lyckat typbyte: fälten visar det nya, preparatet nollställs
+  const handleTypeChanged = (
+    result: ChangeStationTypeResult,
+    newType: StationType,
+    choice: ChangeStationTypeChoice
+  ) => {
+    setEditTypeId(newType.id)
+    setStationType(newType.code)
+    if (result.new_station_number) setStationNumber(result.new_station_number)
+    setArticleId(choice.article ? choice.article.articleId : null)
+    setPreparationId(null)
+    setPreparationQuantity(null)
+    setError(null)
+    setShowChangeType(false)
+    toast.success(`Typen ändrad till ${newType.name}`)
+    onTypeChanged?.(result, newType, choice)
+  }
+
   // Bestäm vilka typer som ska visas (dynamiska om tillgängliga, annars legacy)
   const typesToRender = dynamicStationTypes.length > 0
     ? dynamicStationTypes
@@ -398,9 +438,63 @@ export function IndoorStationForm({
       {/* Station type */}
       <div>
           <label className="block text-sm font-medium text-slate-300 mb-2">
-            Stationstyp *
+            Stationstyp {!isEditing && '*'}
           </label>
-          {loadingTypes ? (
+          {isEditing && existingStation ? (
+            // Befintlig station: typen visas och byts via RPC:n, inte via spara
+            <div className="flex items-center gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+              {loadingTypes ? (
+                <Loader2 className="w-5 h-5 text-[#20c58f] animate-spin" />
+              ) : (
+                <StationTypeTile
+                  size={44}
+                  color={editType?.color ?? existingStation.station_type_data?.color ?? currentTypeConfig?.color}
+                  icon={editType?.icon ?? existingStation.station_type_data?.icon ?? currentTypeConfig?.icon}
+                  addon={isAddon}
+                />
+              )}
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-slate-200 truncate">{editTypeName}</span>
+                {stationNumber && <span className="block text-xs text-slate-400 truncate">{stationNumber}</span>}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowChangeType(true)}
+                disabled={loadingTypes}
+                aria-label="Byt typ"
+                title="Byt typ"
+                className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-lg border border-slate-700 text-slate-300 hover:text-[#fff] hover:border-[#20c58f] hover:bg-slate-800 transition-colors disabled:opacity-50"
+              >
+                <SvgIcon name="station.byttyp" size={20} />
+              </button>
+              {/* Portal: utanför formuläret (Enter i modalen ska inte spara
+                  formuläret) och utanför bottenarkets transform/overflow */}
+              {createPortal(
+                <div onClick={(e) => e.stopPropagation()}>
+                  <ChangeStationTypeModal
+                    isOpen={showChangeType}
+                    station={{
+                      id: existingStation.id,
+                      kind: 'indoor',
+                      typeId: editType?.id ?? existingStation.station_type_id ?? null,
+                      typeName: editTypeName,
+                      typeColor: editType?.color ?? existingStation.station_type_data?.color ?? null,
+                      typeIcon: editType?.icon ?? existingStation.station_type_data?.icon ?? null,
+                      is_addon: existingStation.is_addon,
+                      addon_billing_model: existingStation.addon_billing_model,
+                      addon_contract_mode: existingStation.addon_contract_mode,
+                      article_id: articleId,
+                      label: stationNumber || null,
+                    }}
+                    stationTypes={dynamicStationTypes.length > 0 ? dynamicStationTypes : undefined}
+                    onChanged={handleTypeChanged}
+                    onCancel={() => setShowChangeType(false)}
+                  />
+                </div>,
+                document.body
+              )}
+            </div>
+          ) : loadingTypes ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="w-6 h-6 text-[#20c58f] animate-spin" />
             </div>

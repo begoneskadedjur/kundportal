@@ -314,4 +314,72 @@ export class StationTypeService {
       throw error
     }
   }
+
+  /**
+   * Byter typ på en befintlig station via RPC change_station_type
+   * (SECURITY DEFINER, låser raden, loggar i station_type_changes).
+   * Tillåtna produkter per typ: AddonStationBillingService.getStationTypeArticles.
+   */
+  static async changeStationType(
+    input: ChangeStationTypeInput
+  ): Promise<{ success: boolean; error?: string; data?: ChangeStationTypeResult }> {
+    const { data, error } = await supabase.rpc('change_station_type', {
+      p_station_id: input.stationId,
+      p_kind: input.kind,
+      p_new_type_id: input.newTypeId,
+      p_article_id: input.articleId ?? null,
+      p_serial_number: input.serialNumber?.trim() ? input.serialNumber.trim() : null,
+      p_session_id: input.sessionId ?? null,
+    })
+
+    if (error) {
+      const message = error.message ?? ''
+      const code = Object.keys(CHANGE_STATION_TYPE_ERRORS).find((k) => message.includes(k))
+      if (!code) console.error('StationTypeService.changeStationType fel:', error)
+      return {
+        success: false,
+        error: code ? CHANGE_STATION_TYPE_ERRORS[code] : `Kunde inte byta stationstyp: ${message}`,
+      }
+    }
+
+    return { success: true, data: data as unknown as ChangeStationTypeResult }
+  }
+}
+
+// ============================================================================
+// BYTE AV STATIONSTYP (3.49.0)
+// ============================================================================
+
+export type StationKind = 'outdoor' | 'indoor'
+
+export interface ChangeStationTypeInput {
+  stationId: string
+  kind: StationKind
+  newTypeId: string
+  /** Produkt för nya typen. Utelämnad: behåll nuvarande om den är tillåten, annars ingen. */
+  articleId?: string | null
+  /** Krävs om nya typen har requires_serial_number och stationen saknar serienummer. */
+  serialNumber?: string | null
+  /** Pågående kontrollsession, loggas för spårbarhet. */
+  sessionId?: string | null
+}
+
+export interface ChangeStationTypeResult {
+  station_id: string
+  old_type_id: string | null
+  new_type_id: string
+  old_station_number: string | null
+  new_station_number: string | null
+  /** true = tilläggets frysta pris nollades och fick nya typens pris. */
+  price_reset: boolean
+}
+
+// Felkoderna som change_station_type kastar (RAISE EXCEPTION '<KOD>: ...')
+const CHANGE_STATION_TYPE_ERRORS: Record<string, string> = {
+  ADDON_PAID_LOCKED: 'Tilläggsstationen är betald framåt och kan inte byta typ',
+  SERIAL_REQUIRED: 'Den nya typen kräver serienummer',
+  SAME_TYPE: 'Stationen har redan den typen',
+  ARTICLE_NOT_ALLOWED: 'Produkten hör inte till den nya typen',
+  NOT_FOUND: 'Stationen eller stationstypen hittades inte',
+  FORBIDDEN: 'Du saknar behörighet att byta stationstyp',
 }

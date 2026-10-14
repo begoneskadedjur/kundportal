@@ -22,6 +22,24 @@ import {
 import type { IndoorStationWithRelations, IndoorStationInspectionWithRelations } from '../types/indoor'
 import type { InspectionStatus } from '../types/indoor'
 
+/**
+ * Stationstypen en kontroll gjordes som. Kontrollens egen station_type_id
+ * (sätts vid insert sedan 3.49.0, då typbyte blev möjligt) går först,
+ * sedan stationens nuvarande FK, sist textkoden (typesByCode-fallbacken).
+ */
+function resolveInspectionStationType<T extends { id: string; code: string }>(
+  types: T[] | null | undefined,
+  inspectionTypeId: string | null | undefined,
+  stationTypeId: string | null | undefined,
+  stationCode: string | null | undefined
+): T | null {
+  const list = types ?? []
+  return (inspectionTypeId ? list.find(t => t.id === inspectionTypeId) : undefined)
+    ?? (stationTypeId ? list.find(t => t.id === stationTypeId) : undefined)
+    ?? (stationCode ? list.find(t => t.code === stationCode) : undefined)
+    ?? null
+}
+
 // ============================================
 // SESSION FUNCTIONS
 // ============================================
@@ -247,7 +265,8 @@ export async function getSessionInspectionSummary(
       .select(`
         id,
         measurement_value,
-        station:equipment_placements(equipment_type),
+        station_type_id,
+        station:equipment_placements(equipment_type, station_type_id),
         preparation:preparations!preparation_id(threshold_warning, threshold_critical, threshold_direction)
       `)
       .eq('session_id', sessionId),
@@ -256,7 +275,8 @@ export async function getSessionInspectionSummary(
       .select(`
         id,
         measurement_value,
-        station:indoor_stations(station_type),
+        station_type_id,
+        station:indoor_stations(station_type, station_type_id),
         preparation:preparations!preparation_id(threshold_warning, threshold_critical, threshold_direction)
       `)
       .eq('session_id', sessionId)
@@ -268,15 +288,13 @@ export async function getSessionInspectionSummary(
     .select('id, code, threshold_warning, threshold_critical, threshold_direction, threshold_source')
     .eq('is_active', true)
 
-  const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
-
   const counts: InspectionLevelSummary = { none: 0, low: 0, medium: 0, high: 0, total: 0 }
 
   // Räkna outdoor
   outdoorInspections?.forEach(insp => {
     counts.total++
     const station = insp.station as any
-    const stationType = station?.equipment_type ? typesByCode.get(station.equipment_type) : null
+    const stationType = resolveInspectionStationType(stationTypes, insp.station_type_id, station?.station_type_id, station?.equipment_type)
     const measurementValue = insp.measurement_value
 
     if (measurementValue === null || measurementValue === 0 || !stationType) {
@@ -302,7 +320,7 @@ export async function getSessionInspectionSummary(
   indoorInspections?.forEach(insp => {
     counts.total++
     const station = insp.station as any
-    const stationType = station?.station_type ? typesByCode.get(station.station_type) : null
+    const stationType = resolveInspectionStationType(stationTypes, insp.station_type_id, station?.station_type_id, station?.station_type)
     const measurementValue = insp.measurement_value
 
     if (measurementValue === null || measurementValue === 0 || !stationType) {
@@ -679,14 +697,12 @@ export async function getOutdoorInspectionsForSession(
     .select('id, code, name, color, icon, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
     .eq('is_active', true)
 
-  // Skapa map för snabb lookup på code
-  const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
-
-  // Berika inspektioner med station_type_data och photo_url
+  // Berika inspektioner med station_type_data och photo_url.
+  // Kontrollens typ först (typbyte), stationens som reserv.
   return Promise.all(data.map(async inspection => {
     const station = inspection.station as any
-    if (station && station.equipment_type) {
-      const matchedType = typesByCode.get(station.equipment_type)
+    if (station) {
+      const matchedType = resolveInspectionStationType(stationTypes, inspection.station_type_id, station.station_type_id, station.equipment_type)
       if (matchedType) station.station_type_data = matchedType
     }
     return {
@@ -843,14 +859,12 @@ export async function getOutdoorInspectionsByStation(
     .select('id, code, name, color, measurement_unit, measurement_label')
     .eq('is_active', true)
 
-  // Skapa map för snabb lookup på code
-  const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
-
-  // Berika inspektioner med station_type_data och photo_url
+  // Berika inspektioner med station_type_data och photo_url.
+  // Kontrollens typ först (typbyte), stationens som reserv.
   return Promise.all(data.map(async inspection => {
     const station = inspection.station as any
-    if (station && station.equipment_type) {
-      const matchedType = typesByCode.get(station.equipment_type)
+    if (station) {
+      const matchedType = resolveInspectionStationType(stationTypes, inspection.station_type_id, station.station_type_id, station.equipment_type)
       if (matchedType) station.station_type_data = matchedType
     }
     return {
@@ -914,14 +928,12 @@ export async function getIndoorInspectionsForSession(
     .select('id, code, name, color, icon, measurement_unit, measurement_label, threshold_warning, threshold_critical, threshold_direction, threshold_source')
     .eq('is_active', true)
 
-  // Skapa map för snabb lookup på code
-  const typesByCode = new Map(stationTypes?.map(t => [t.code, t]) || [])
-
-  // Berika inspektioner med station_type_data och photo_url
+  // Berika inspektioner med station_type_data och photo_url.
+  // Kontrollens typ först (typbyte), stationens som reserv.
   return Promise.all(data.map(async inspection => {
     const station = inspection.station as any
-    if (station && station.station_type) {
-      const matchedType = typesByCode.get(station.station_type)
+    if (station) {
+      const matchedType = resolveInspectionStationType(stationTypes, inspection.station_type_id, station.station_type_id, station.station_type)
       if (matchedType) station.station_type_data = matchedType
     }
     return {

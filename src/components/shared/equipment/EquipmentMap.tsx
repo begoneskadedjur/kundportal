@@ -22,6 +22,8 @@ import { buildStationMarkerIcon, buildClusterIcon, stationMarkerSvg } from './st
 import { stationIconPaths } from '../stationIcons'
 import { numberStations } from '../../../shared/stationNumbering'
 import { createFanOut, type FanOutEntry, type FanOutHandle } from './markerFanOut'
+import RelocateBar from '../stations/RelocateBar'
+import { distanceMeters } from '../../../utils/equipmentMapUtils'
 
 interface EquipmentMapProps {
   equipment: EquipmentPlacementWithRelations[]
@@ -141,6 +143,14 @@ export function EquipmentMap({
   const [pendingRelocatePos, setPendingRelocatePos] = useState<{ lat: number; lng: number } | null>(null)
   // Antal högar som just nu är utspridda med linje till verklig plats
   const [spreadGroups, setSpreadGroups] = useState(0)
+
+  // Flyttläget: avstånd i meter från stationens sparade plats till den nya
+  const relocateDistance = useMemo(() => {
+    if (!relocatingStationId || !pendingRelocatePos) return null
+    const from = equipment.find(e => e.id === relocatingStationId)
+    if (!from || from.latitude == null || from.longitude == null) return null
+    return distanceMeters(from.latitude, from.longitude, pendingRelocatePos.lat, pendingRelocatePos.lng)
+  }, [relocatingStationId, pendingRelocatePos, equipment])
 
   // Hämta stationstyper
   useEffect(() => {
@@ -812,51 +822,31 @@ export function EquipmentMap({
   }
 
   return (
-    <div className="relative" style={{ height }}>
+    <div className="relative isolate" style={{ height }}>
       <div ref={mapContainerRef} style={{ height: '100%', width: '100%' }} className="rounded-lg" />
 
-      {/* Flytta-station-banner */}
+      {/* Flyttläget: samma rad och panel som planritningen (RelocateBar) */}
       {relocatingStationId && (
-        <div className="absolute top-0 left-0 right-0 z-40 bg-amber-600/95 backdrop-blur-sm px-4 py-3 flex items-center justify-between rounded-t-lg">
-          <div className="flex items-center gap-2">
-            <Navigation className="w-5 h-5 text-white" />
-            <div>
-              <p className="text-white font-medium text-sm">
-                {pendingRelocatePos ? 'Ny position vald' : `Dra ${relocatingStationName || 'stationen'} till ny plats`}
-              </p>
-              <p className="text-amber-100 text-xs">
-                {pendingRelocatePos ? 'Bekräfta för att spara' : 'Håll och dra den gula markören'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {pendingRelocatePos && (
-              <button
-                onClick={() => {
-                  onRelocateClick?.(pendingRelocatePos.lat, pendingRelocatePos.lng)
-                  setPendingRelocatePos(null)
-                }}
-                className="px-3 py-1.5 bg-white text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 transition-colors"
-              >
-                Bekräfta
-              </button>
-            )}
-            <button
-              onClick={() => {
-                setPendingRelocatePos(null)
-                onCancelRelocate?.()
-              }}
-              className="px-3 py-1.5 text-white hover:bg-white/20 text-sm rounded-lg transition-colors"
-            >
-              Avbryt
-            </button>
-          </div>
-        </div>
+        <RelocateBar
+          title={`Flytta ${relocatingStationName || 'stationen'}`}
+          hint={pendingRelocatePos ? 'Ny plats vald. Spara eller dra igen.' : 'Håll och dra stationen till rätt plats'}
+          distanceMeters={relocateDistance}
+          canSave={!!pendingRelocatePos}
+          onSave={() => {
+            if (!pendingRelocatePos) return
+            onRelocateClick?.(pendingRelocatePos.lat, pendingRelocatePos.lng)
+            setPendingRelocatePos(null)
+          }}
+          onCancel={() => {
+            setPendingRelocatePos(null)
+            onCancelRelocate?.()
+          }}
+        />
       )}
 
       {/* Kontroller */}
       {showControls && (
-        <div className="absolute bottom-3 right-3 z-40 flex flex-col gap-2">
+        <div className={`absolute right-3 z-40 flex flex-col gap-2 ${relocatingStationId ? 'bottom-[150px]' : 'bottom-3'}`}>
           <button
             onClick={centerOnUserLocation}
             className="p-2.5 bg-white rounded-lg shadow-md hover:bg-slate-50 active:bg-slate-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -868,7 +858,7 @@ export function EquipmentMap({
       )}
 
       {/* Legend */}
-      {showLegend && (
+      {showLegend && !relocatingStationId && (
       <div className="absolute bottom-3 left-3 z-40 bg-white/95 backdrop-blur-sm rounded-lg shadow-md p-3">
         <p className="text-xs font-semibold text-slate-700 mb-2">Utrustningstyper</p>
         <div className="flex flex-col gap-1">

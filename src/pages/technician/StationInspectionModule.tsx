@@ -10,32 +10,17 @@ import {
   Building2,
   CheckCircle2,
   AlertCircle,
-  Play,
   Check,
   Loader2,
   X,
   ChevronRight,
   ChevronLeft,
   ChevronDown,
-  ChevronUp,
   Camera,
-  History,
-  Map,
-  List,
-  Upload,
   Trash2,
-  Image as ImageIcon,
-  Clock,
-  User,
   FileText,
-  Phone,
   Navigation,
-  Copy,
   AlertTriangle,
-  Calendar,
-  Info,
-  ExternalLink,
-  BarChart2,
   SkipForward,
   Unlock,
   Beaker
@@ -94,8 +79,59 @@ import type { InspectionStatus } from '../../types/indoor'
 import { INSPECTION_STATUS_CONFIG, calculateInspectionStatus } from '../../types/indoor'
 import type { EquipmentPlacementWithRelations } from '../../types/database'
 import type { IndoorStationWithRelations } from '../../types/indoor'
-import { useAddonRemovalGuard } from '../../hooks/useAddonRemovalGuard'
+import { useAddonRemovalGuard, useAddonPaidLock } from '../../hooks/useAddonRemovalGuard'
 import AddonRemovalNotice from '../../components/shared/equipment/AddonRemovalNotice'
+import { Icon } from '../../components/icons/Icon'
+import { resolveStationIcon } from '../../components/shared/stationIcons'
+import StationTypeTile from '../../components/shared/stations/StationTypeTile'
+import StationToolbar from '../../components/shared/stations/StationToolbar'
+import ChangeStationTypeSheet from '../../components/shared/stations/ChangeStationTypeSheet'
+import type { ChangeStationTypeResult } from '../../services/stationTypeService'
+import type { StationType } from '../../types/stationTypes'
+import type { StationTypeArticle } from '../../types/addonStations'
+
+// Statuspunktens färg per aktivitetsnivå (ersätter teckenikonerna ✓ ↑ ! !!)
+const STATUS_DOT_CLASS: Record<string, string> = {
+  none: 'bg-[#20c58f]',
+  ok: 'bg-[#20c58f]',
+  low: 'bg-yellow-400',
+  medium: 'bg-orange-400',
+  activity: 'bg-amber-400',
+  high: 'bg-red-500',
+  needs_service: 'bg-orange-400',
+  replaced: 'bg-blue-400',
+}
+
+function StatusDot({ status, className = '' }: { status: string; className?: string }) {
+  return (
+    <span
+      className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT_CLASS[status] ?? 'bg-slate-500'} ${className}`}
+      aria-hidden="true"
+    />
+  )
+}
+
+// Kort enhet för mätvärden (gram → g, procent → %)
+function unitShort(unit: string | null | undefined): string {
+  if (!unit) return ''
+  if (unit === 'gram') return 'g'
+  if (unit === 'procent') return '%'
+  return unit
+}
+
+// Statusens etikett i gemener för löptext ("ingen aktivitet")
+function statusText(status: string): string {
+  const label = INSPECTION_STATUS_CONFIG[status as InspectionStatus]?.label || status
+  return label.charAt(0).toLowerCase() + label.slice(1)
+}
+
+// Senaste kontrollen per station från förra avslutade rundan (listans andra rad)
+interface PreviousInspection {
+  inspected_at: string
+  status: string
+  measurement_value: number | null
+  measurement_unit: string | null
+}
 
 // Hjälpfunktion för att bestämma färg baserat på mätvärde och tröskelvärden
 // direction: 'above' = värden över tröskel är dåliga (standard för förbrukning)
@@ -134,8 +170,13 @@ interface StationData {
   station_type?: string | null
   is_addon?: boolean
   addon_billing_model?: 'per_year' | 'per_month' | 'per_round' | null
+  addon_contract_mode?: string | null
   // Preparat satt vid utplacering — förvälj i kontrollformuläret
   preparation_id?: string | null
+  // Produkten och dess ikon (personalvy: produktens ikon går före typens)
+  article_id?: string | null
+  article?: { icon: string | null } | null
+  station_type_id?: string | null
   status: string
   latitude?: number
   longitude?: number
@@ -148,6 +189,8 @@ interface StationData {
     name: string
     color: string
     code?: string
+    icon?: string | null
+    prefix?: string | null
     measurement_unit?: string | null
     measurement_label?: string | null
     threshold_warning?: number | null
@@ -206,8 +249,13 @@ export default function StationInspectionModule() {
   // markerar stationen Borttagen i ETT moment — rätt ordning kan inte bli fel
   const [pickUpAfterSave, setPickUpAfterSave] = useState(false)
   const selectedStationId = selectedStation?.id
+  // Stationsmodalens läge: kontrollen eller byt typ (ersätter innehållet)
+  const [modalView, setModalView] = useState<'kontroll' | 'byttyp'>('kontroll')
+  // Anteckningsfältet fälls ut från ikonrutan
+  const [showNotesField, setShowNotesField] = useState(false)
   useEffect(() => {
     setPickUpAfterSave(false)
+    setModalView('kontroll')
   }, [selectedStationId])
   // Tilläggsstation per år/månad som redan är betald framåt: förtydligande
   // under kryssrutan och två klick på Spara när den ska hämtas upp
@@ -217,10 +265,20 @@ export default function StationInspectionModule() {
       : null,
     pickUpAfterSave
   )
+  // Förskottsbetald tilläggsstation: typen får inte bytas (Byt typ avstängd)
+  const typePaidLock = useAddonPaidLock(
+    selectedStation
+      ? { ...selectedStation, indoor: !outdoorStations.some(s => s.id === selectedStation.id) }
+      : null
+  )
+  // Senaste kontrollen per station från förra avslutade rundan
+  const [previousInspections, setPreviousInspections] = useState<Record<string, PreviousInspection>>({})
   // Upphämtade tilläggsstationer i denna runda (för auto-arbetsrapporten)
   const [pickedUpCount, setPickedUpCount] = useState(0)
   // Senast använda preparat i rundan — fallback-förval för nästa station
   const lastUsedPreparationRef = useRef<string | null>(null)
+  // Räknas upp vid typbyte, så ett sent preparatförslag för gamla typen hoppas över
+  const typeChangeCountRef = useRef(0)
 
   // Preparatdata
   const [preparations, setPreparations] = useState<Preparation[]>([])
@@ -264,6 +322,15 @@ export default function StationInspectionModule() {
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null)
   const [editingCaptionValue, setEditingCaptionValue] = useState('')
   const sessionPhotoInputRef = useRef<HTMLInputElement>(null)
+  // Kommentarfältet är en rad som växer med texten
+  const sessionNotesRef = useRef<HTMLTextAreaElement>(null)
+  useEffect(() => {
+    const el = sessionNotesRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+    el.style.overflowY = el.scrollHeight > 160 ? 'auto' : 'hidden'
+  }, [sessionNotes, loading])
 
   // Bekräftelsedialog för att avsluta inspektion
   const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
@@ -307,6 +374,8 @@ export default function StationInspectionModule() {
   const [expandedFloorPlan, setExpandedFloorPlan] = useState<any | null>(null)
 
   // Flytta station-läge
+  // Kartan eller planritningen, rullas fram när flyttläget startar
+  const relocateAreaRef = useRef<HTMLDivElement>(null)
   const [relocatingStation, setRelocatingStation] = useState<StationData | null>(null)
 
   // Auto-dismiss återupptagande-banner efter 10 sekunder
@@ -385,6 +454,41 @@ export default function StationInspectionModule() {
         ])
         setLastInspection(lastInsp)
         setActivityStationIds(activityIds)
+
+        // Listans "Senast ..."-rad: förra avslutade rundans kontroller.
+        // Laddas i bakgrunden och får aldrig stoppa sidan.
+        const currentSessionId = sessionData.id
+        const customerIdForPrev = sessionData.customer_id
+        void (async () => {
+          try {
+            const { data: prevSession } = await supabase
+              .from('station_inspection_sessions')
+              .select('id')
+              .eq('customer_id', customerIdForPrev)
+              .eq('status', 'completed')
+              .neq('id', currentSessionId)
+              .order('completed_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+            if (!prevSession?.id) return
+            const [prevOutdoor, prevIndoor] = await Promise.all([
+              getOutdoorInspectionsForSession(prevSession.id),
+              getIndoorInspectionsForSession(prevSession.id)
+            ])
+            const map: Record<string, PreviousInspection> = {}
+            ;[...prevOutdoor, ...prevIndoor].forEach(insp => {
+              map[insp.station_id] = {
+                inspected_at: insp.inspected_at,
+                status: insp.status,
+                measurement_value: insp.measurement_value ?? null,
+                measurement_unit: insp.measurement_unit ?? null
+              }
+            })
+            setPreviousInspections(map)
+          } catch (prevErr) {
+            console.error('Kunde inte hämta förra rundans kontroller:', prevErr)
+          }
+        })()
 
         // ======================================================
         // Ladda befintliga inspektioner för pågående och avslutade sessioner
@@ -566,13 +670,16 @@ export default function StationInspectionModule() {
         placed_at: s.placed_at || new Date().toISOString(),
         notes: null,
         station_type_id: s.station_type_data?.id || null,
+        // Tillägg (plusbricka) och produktens ikon i kartans cirklar
+        is_addon: s.is_addon === true,
+        article: s.article ?? null,
         station_type_data: s.station_type_data ? {
           id: s.station_type_data.id,
           code: s.station_type_data.code || '',
           name: s.station_type_data.name,
           color: s.station_type_data.color,
-          icon: 'target',
-          prefix: '',
+          icon: s.station_type_data.icon || 'target',
+          prefix: s.station_type_data.prefix || '',
           description: null,
           is_active: true,
           measurement_unit: s.station_type_data.measurement_unit as any,
@@ -602,13 +709,15 @@ export default function StationInspectionModule() {
       placed_by: null,
       station_type_id: s.station_type_data?.id || null,
       calculated_status: null,
+      is_addon: s.is_addon === true,
+      article: s.article ?? null,
       station_type_data: s.station_type_data ? {
         id: s.station_type_data.id,
         code: s.station_type_data.code || '',
         name: s.station_type_data.name,
         color: s.station_type_data.color,
-        icon: 'target',
-        prefix: '',
+        icon: s.station_type_data.icon || 'target',
+        prefix: s.station_type_data.prefix || '',
         description: null,
         is_active: true,
         measurement_unit: s.station_type_data.measurement_unit as any,
@@ -665,6 +774,7 @@ export default function StationInspectionModule() {
     }
 
     setSelectedStation(station)
+    const typeChangesAtOpen = typeChangeCountRef.current
 
     // Ladda befintlig data om stationen redan inspekterats i denna session
     const existing = inspectionResults[station.id]
@@ -682,7 +792,10 @@ export default function StationInspectionModule() {
       setPhotoPreview(null)
     }
     setPhotoFile(null)
-    setShowHistory(true) // Visa historik inline automatiskt
+    // Historiken laddas alltid (kompakt "Senast"-rad), panelen fälls ut via verktygsraden
+    setShowHistory(false)
+    setExpandedHistoryId(null)
+    setShowNotesField(!!existing?.findings)
     setStationHistory([])
     setHistoryLoading(true)
 
@@ -744,7 +857,7 @@ export default function StationInspectionModule() {
           validPrep((data as { preparation_id?: string | null }[] | null)?.[0]?.preparation_id) ??
           validPrep(station.preparation_id) ??
           validPrep(lastUsedPreparationRef.current)
-        if (suggested) setSelectedPreparationId(suggested)
+        if (suggested && typeChangeCountRef.current === typeChangesAtOpen) setSelectedPreparationId(suggested)
       }
 
       // Hämta foto-URLs
@@ -968,6 +1081,50 @@ export default function StationInspectionModule() {
       toast.error('Kunde inte flytta stationen')
     }
   }, [relocatingStation])
+
+  // Efter typbyte: uppdatera stationen lokalt (typ, mätfält, kartfärg och
+  // nummer inomhus), nollställ mätvärde och preparat och gå tillbaka till kontrollen
+  const handleStationTypeChanged = useCallback((
+    result: ChangeStationTypeResult,
+    newType: StationType,
+    choice: { article: StationTypeArticle | null; serialNumber: string | null }
+  ) => {
+    const patch = (s: StationData): StationData => {
+      if (s.id !== result.station_id) return s
+      const isOutdoorStation = outdoorStations.some(o => o.id === s.id)
+      return {
+        ...s,
+        station_type_id: newType.id,
+        station_type_data: newType,
+        ...(isOutdoorStation ? { equipment_type: newType.code } : { station_type: newType.code }),
+        ...(result.new_station_number ? { station_number: result.new_station_number } : {}),
+        ...(choice.serialNumber ? { serial_number: choice.serialNumber } : {}),
+        // Utan produktval behåller servern bara en produkt som hör till nya
+        // typen; typens ikon visas tills sidan laddas om
+        ...(choice.article
+          ? { article_id: choice.article.articleId, article: { icon: choice.article.icon ?? null } }
+          : { article: null })
+      }
+    }
+    setOutdoorStations(prev => prev.map(patch))
+    setIndoorStations(prev => prev.map(patch))
+    setSelectedStation(prev => (prev ? patch(prev) : prev))
+    // Servern nollar mätvärde och preparat på rundans kontroll; gör samma här
+    setInspectionResults(prev => {
+      const current = prev[result.station_id]
+      if (!current) return prev
+      return {
+        ...prev,
+        [result.station_id]: { ...current, measurementValue: null, measurementUnit: null, preparationId: null, preparationName: null }
+      }
+    })
+    // Ett preparatförslag som laddas efter bytet gäller gamla typen
+    typeChangeCountRef.current += 1
+    setMeasurementValue('')
+    setSelectedPreparationId(null)
+    setModalView('kontroll')
+    toast.success(`Typen ändrad till ${newType.name}`)
+  }, [outdoorStations])
 
   // Auto-progress till nästa efter lyckad inspektion (om wizard är aktiv)
   useEffect(() => {
@@ -1580,32 +1737,124 @@ export default function StationInspectionModule() {
     })
   }
 
+  // En rad i stationslistan: typruta (med tilläggsbricka), nummer och typ,
+  // senaste kontrollen och OK som bockknapp. Hela raden öppnar stationen.
+  const renderStationRow = (station: StationData, stationNumber: number | string) => {
+    const isInspected = inspectedStationIds.has(station.id)
+    const typeName = station.station_type_data?.name || station.equipment_type || station.station_type || 'Station'
+    const hadActivity = activityStationIds.has(station.id)
+    const current = inspectionResults[station.id]
+    const previous = previousInspections[station.id]
+    const canQuickOk = !isInspected && session?.status !== 'completed'
+
+    let detail: React.ReactNode = null
+    if (isInspected) {
+      const v = current?.measurementValue
+      const unit = unitShort(current?.measurementUnit)
+      detail = (
+        <span className="text-[#20c58f]">
+          Kontrollerad nu{v !== null && v !== undefined ? ` · ${v}${unit ? ` ${unit}` : ''}` : ''}
+        </span>
+      )
+    } else if (previous) {
+      detail = (
+        <span className={hadActivity ? 'text-amber-400' : 'text-slate-500'}>
+          Senast {new Date(previous.inspected_at).toLocaleDateString('sv-SE')} · {statusText(previous.status)}
+        </span>
+      )
+    } else if (hadActivity) {
+      detail = <span className="text-amber-400">Aktivitet senast</span>
+    }
+
+    return (
+      <div
+        key={station.id}
+        role="button"
+        tabIndex={0}
+        onClick={() => handleSelectStation(station)}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleSelectStation(station)
+          }
+        }}
+        className={`w-full flex items-center gap-3 rounded-xl border bg-slate-900 py-2 pr-2 pl-2.5 text-left cursor-pointer transition-colors hover:bg-slate-800/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${
+          isInspected ? 'border-[#20c58f]/35' : hadActivity ? 'border-amber-500/40' : 'border-slate-800'
+        }`}
+      >
+        <StationTypeTile
+          size={40}
+          color={station.station_type_data?.color}
+          icon={resolveStationIcon(station.article?.icon, station.station_type_data?.icon)}
+          addon={station.is_addon === true}
+          title={typeName}
+        />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-[#fff] truncate">
+            {stationNumber} <span className="font-normal text-slate-400">{typeName}</span>
+          </p>
+          {detail && <p className="text-[11px] truncate">{detail}</p>}
+        </div>
+        {isInspected ? (
+          <span
+            role="img"
+            aria-label="Kontrollerad"
+            className="w-11 h-11 flex-shrink-0 rounded-xl bg-[#20c58f] text-[#04140d] flex items-center justify-center"
+          >
+            <Icon name="station.ok" size={20} />
+          </span>
+        ) : canQuickOk ? (
+          <button
+            type="button"
+            onClick={(e) => handleQuickOk(station, e)}
+            aria-label={`Station ${stationNumber} OK`}
+            className="w-11 h-11 flex-shrink-0 rounded-xl border border-[#20c58f]/40 bg-[#20c58f]/10 text-[#20c58f] hover:bg-[#20c58f]/20 flex items-center justify-center transition-colors"
+          >
+            <Icon name="station.ok" size={20} />
+          </button>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="min-h-[calc(100vh-3.5rem)]"
     >
-      {/* Header - Kompakt för aktiv inspektion */}
+      {/* Sidhuvud: bara rubrik och förlopp är sticky. Kommentar, sammanställning
+          och områdesväxeln scrollar med sidan, annars täcker sidhuvudet större
+          delen av en telefonskärm */}
       <div className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur border-b border-slate-800">
-        <div className="max-w-4xl mx-auto p-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <h1 className="text-lg font-bold text-white">Stationskontroll</h1>
-                <p className="text-slate-400 text-sm">{session?.customer?.company_name}</p>
-              </div>
+        <div className="max-w-4xl mx-auto px-4 py-3">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              aria-label="Tillbaka"
+              className="w-11 h-11 -ml-2 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-300 hover:text-[#fff] hover:bg-slate-800 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-[17px] font-bold text-[#fff] leading-tight">Stationskontroll</h1>
+              <p className="text-xs text-slate-400 truncate">{session?.customer?.company_name}</p>
             </div>
 
-            {/* Session status - bara visa när aktiv */}
+            {/* Klarmarkera: bara när rundan pågår och minst en station är kontrollerad */}
             {session?.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
-              <Button onClick={() => setShowCompleteConfirm(true)} loading={isSubmitting}>
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                Klarmarkera ärende
-              </Button>
+              <button
+                type="button"
+                onClick={() => setShowCompleteConfirm(true)}
+                disabled={isSubmitting}
+                aria-label="Klarmarkera ärende"
+                title="Klarmarkera ärende"
+                className="w-11 h-11 flex-shrink-0 rounded-xl bg-[#20c58f] hover:bg-[#1bb07f] text-[#04140d] flex items-center justify-center transition-colors disabled:opacity-60"
+              >
+                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon name="station.klar" size={20} />}
+              </button>
             )}
 
             {/* Lås upp-knapp för avslutade inspektioner */}
@@ -1621,64 +1870,160 @@ export default function StationInspectionModule() {
             )}
           </div>
 
-          {/* Progress - visa för både in_progress och completed */}
+          {/* Förlopp */}
           {session && progress && (
-            <div className="mb-4">
-              {/* Avslutad-badge */}
-              {session.status === 'completed' && (
-                <div className="flex items-center gap-2 mb-3">
-                  <CheckCircle2 className="w-5 h-5 text-green-400" />
-                  <span className="text-green-400 font-medium">Inspektion avslutad</span>
-                  {session.completed_at && (
-                    <span className="text-slate-500 text-sm">
-                      {new Date(session.completed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })} kl {new Date(session.completed_at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="flex justify-between text-sm text-slate-400 mb-1">
+            <div className="mt-2 space-y-1.5">
+              <div className="flex justify-between text-xs text-slate-300">
                 <span>{progress.inspectedStations} av {progress.totalStations} stationer</span>
-                <span>{progress.percentComplete}%</span>
+                <span className="tabular-nums">{progress.percentComplete} %</span>
               </div>
-              <div className="w-full bg-slate-700 rounded-full h-2">
+              <div className="w-full bg-slate-700 rounded-full h-1.5">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${progress.percentComplete}%` }}
-                  className="bg-green-500 h-2 rounded-full"
+                  className="bg-[#20c58f] h-1.5 rounded-full"
                 />
               </div>
+            </div>
+          )}
+        </div>
+      </div>
 
-              {/* Återupptagande-info - visas om det redan finns inspekterade stationer vid sidladdning, försvinner efter 10s */}
-              {showResumeNotice && inspectedStationIds.size > 0 && session?.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="mt-3 bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 flex items-center gap-2"
-                >
-                  <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
-                  <span className="text-amber-200 text-sm">
-                    Du fortsätter en påbörjad inspektion. {inspectedStationIds.size} stationer är redan kontrollerade.
-                  </span>
-                </motion.div>
+      {/* Det som scrollar med sidan */}
+      {session && (
+        <div className="max-w-4xl mx-auto px-4 pt-3 space-y-3">
+          {/* Avslutad */}
+          {session.status === 'completed' && (
+            <div className="flex items-center gap-2 text-sm">
+              <StatusDot status="none" />
+              <span className="text-[#20c58f] font-medium">Inspektion avslutad</span>
+              {session.completed_at && (
+                <span className="text-slate-500">
+                  {new Date(session.completed_at).toLocaleDateString('sv-SE')} kl {new Date(session.completed_at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                </span>
               )}
+            </div>
+          )}
 
-              {/* Sammanställningsknapp - visa endast om det finns inspekterade stationer */}
-              {inspectedStationIds.size > 0 && (
-                <button
-                  onClick={() => setShowSummary(!showSummary)}
-                  className="mt-2 flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors"
-                >
-                  <BarChart2 className="w-4 h-4" />
-                  <span>Sammanställning ({inspectedStationIds.size} st)</span>
-                  {showSummary ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
+          {/* Återupptagande-info - visas om det redan finns inspekterade stationer vid sidladdning, försvinner efter 10s */}
+          {showResumeNotice && inspectedStationIds.size > 0 && session.status === 'in_progress' && progress && progress.inspectedStations > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-3 py-2 flex items-center gap-2"
+            >
+              <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <span className="text-amber-200 text-sm">
+                Du fortsätter en påbörjad inspektion. {inspectedStationIds.size} stationer är redan kontrollerade.
+              </span>
+            </motion.div>
+          )}
+
+          {/* Kommentar om besöket: enradsfält som växer, kamera och sammanställning bredvid */}
+          <div className="flex gap-2 items-start">
+            <label className="flex-1 min-w-0 flex items-start gap-2 min-h-[44px] px-3 py-[11px] bg-slate-900 border border-slate-800 rounded-xl text-slate-500 focus-within:border-[#20c58f] focus-within:ring-1 focus-within:ring-[#20c58f]">
+              <Icon name="allman.anteckning" size={16} className="mt-0.5 flex-shrink-0" />
+              <textarea
+                ref={sessionNotesRef}
+                rows={1}
+                value={sessionNotes}
+                onChange={e => setSessionNotes(e.target.value)}
+                onBlur={handleSessionNotesBlur}
+                disabled={session.status === 'completed'}
+                placeholder={session.status === 'completed' ? 'Inga kommentarer' : 'Kommentar om besöket'}
+                aria-label="Kommentar om besöket"
+                className="flex-1 min-w-0 bg-transparent border-0 p-0 text-sm leading-5 text-slate-200 placeholder-slate-500 resize-none overflow-hidden focus:outline-none focus:ring-0 disabled:cursor-not-allowed"
+              />
+            </label>
+            {session.status !== 'completed' && (
+              <button
+                type="button"
+                onClick={() => sessionPhotoInputRef.current?.click()}
+                disabled={sessionPhotoUploading || sessionPhotos.length >= 10}
+                aria-label={`Lägg till bild, ${sessionPhotos.length} av 10`}
+                title={`Bilder ${sessionPhotos.length} av 10`}
+                className="w-11 h-11 flex-shrink-0 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-[#fff] hover:border-slate-700 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {sessionPhotoUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon name="allman.foto" size={20} />}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowSummary(!showSummary)}
+              disabled={inspectedStationIds.size === 0}
+              aria-label={`Sammanställning, ${inspectedStationIds.size} kontrollerade`}
+              aria-pressed={showSummary}
+              title="Sammanställning"
+              className={`w-11 h-11 flex-shrink-0 rounded-xl border flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                showSummary
+                  ? 'bg-[#20c58f]/10 border-[#20c58f]/60 text-[#20c58f]'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-[#fff] hover:border-slate-700'
+              }`}
+            >
+              <Icon name="station.summa" size={20} />
+            </button>
+            <input
+              ref={sessionPhotoInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={handleSessionPhotoUpload}
+            />
+          </div>
+
+          {/* Bildminiatyrer */}
+          {sessionPhotos.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {sessionPhotos.map(photo => (
+                <div key={photo.id} className="relative flex-shrink-0 w-24 group">
+                  <img
+                    src={photo.url}
+                    alt={photo.caption || 'Sessionsbild'}
+                    className="w-24 h-24 object-cover rounded-lg border border-slate-700 cursor-pointer"
+                    onClick={() => setLightboxPhoto(photo.url || null)}
+                  />
+                  {session.status !== 'completed' && (
+                    <button
+                      onClick={() => handleDeleteSessionPhoto(photo)}
+                      aria-label="Ta bort bilden"
+                      className="absolute top-1 right-1 bg-red-500/90 hover:bg-red-500 text-[#fff] rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
                   )}
-                </button>
-              )}
+                  {/* Bildtext */}
+                  {editingCaptionId === photo.id ? (
+                    <div className="mt-1 flex gap-1">
+                      <input
+                        autoFocus
+                        value={editingCaptionValue}
+                        onChange={e => setEditingCaptionValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleSaveCaption(photo.id)
+                          if (e.key === 'Escape') setEditingCaptionId(null)
+                        }}
+                        className="flex-1 bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:border-[#20c58f] w-0"
+                      />
+                      <button onClick={() => handleSaveCaption(photo.id)} className="text-[#20c58f]" aria-label="Spara bildtext"><Check className="w-3 h-3" /></button>
+                    </div>
+                  ) : (
+                    <p
+                      onClick={() => {
+                        if (session.status !== 'completed') {
+                          setEditingCaptionId(photo.id)
+                          setEditingCaptionValue(photo.caption || '')
+                        }
+                      }}
+                      className={`text-xs text-slate-400 mt-1 text-center truncate ${session.status !== 'completed' ? 'cursor-pointer hover:text-slate-300' : ''}`}
+                      title={photo.caption || undefined}
+                    >
+                      {photo.caption || (session.status !== 'completed' ? <span className="italic text-slate-600">Lägg till text</span> : '')}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
@@ -1689,7 +2034,7 @@ export default function StationInspectionModule() {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden mb-4"
+                className="overflow-hidden"
               >
                 <div className="bg-slate-800/50 rounded-xl p-4 max-h-64 overflow-y-auto">
                   <h3 className="font-medium text-white mb-3 flex items-center gap-2">
@@ -1713,16 +2058,13 @@ export default function StationInspectionModule() {
                             const stationNumber = outdoorNumberMap[station.id] || '?'
                             return (
                               <div key={station.id} className="flex items-center gap-2 text-sm bg-slate-900/50 rounded-lg px-3 py-2">
-                                <div
-                                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                  style={{ backgroundColor: '#22c55e' }}
-                                >
-                                  ✓
-                                </div>
+                                <span className="w-5 h-5 rounded-full flex items-center justify-center bg-[#20c58f] text-[#04140d] flex-shrink-0">
+                                  <Icon name="station.ok" size={16} />
+                                </span>
                                 <span className="text-white">Station {stationNumber}</span>
                                 {result && (
                                   <>
-                                    <span className="text-lg">{INSPECTION_STATUS_CONFIG[result.status]?.icon}</span>
+                                    <StatusDot status={result.status} />
                                     {result.measurementValue !== null && (
                                       <span className="text-slate-400 text-xs">
                                         {result.measurementValue} {result.measurementUnit === 'gram' ? 'g' : result.measurementUnit}
@@ -1766,19 +2108,16 @@ export default function StationInspectionModule() {
                             const floorPlan = floorPlans.find(fp => fp.id === station.floor_plan_id)
                             return (
                               <div key={station.id} className="flex items-center gap-2 text-sm bg-slate-900/50 rounded-lg px-3 py-2">
-                                <div
-                                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                  style={{ backgroundColor: '#22c55e' }}
-                                >
-                                  ✓
-                                </div>
+                                <span className="w-5 h-5 rounded-full flex items-center justify-center bg-[#20c58f] text-[#04140d] flex-shrink-0">
+                                  <Icon name="station.ok" size={16} />
+                                </span>
                                 <span className="text-white">Station {stationNumber}</span>
                                 {floorPlan && (
                                   <span className="text-slate-500 text-xs">({floorPlan.name})</span>
                                 )}
                                 {result && (
                                   <>
-                                    <span className="text-lg">{INSPECTION_STATUS_CONFIG[result.status]?.icon}</span>
+                                    <StatusDot status={result.status} />
                                     {result.measurementValue !== null && (
                                       <span className="text-slate-400 text-xs">
                                         {result.measurementValue} {result.measurementUnit === 'gram' ? 'g' : result.measurementUnit}
@@ -1831,143 +2170,50 @@ export default function StationInspectionModule() {
             )}
           </AnimatePresence>
 
-          {/* Övriga kommentarer + bilder - visas alltid när session finns */}
-          {session && (
-            <div className="bg-slate-800/50 rounded-xl p-4 space-y-3">
-              <h3 className="font-medium text-white flex items-center gap-2 text-sm">
-                <FileText className="w-4 h-4 text-[#20c58f]" />
-                Övriga kommentarer
-              </h3>
-
-              {/* Kommentarfält */}
-              <textarea
-                value={sessionNotes}
-                onChange={e => setSessionNotes(e.target.value)}
-                onBlur={handleSessionNotesBlur}
-                disabled={session.status === 'completed'}
-                placeholder={session.status === 'completed' ? 'Inga kommentarer' : 'Lägg till kommentarer om besöket...'}
-                rows={3}
-                className="w-full bg-slate-900/60 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f] disabled:opacity-60 disabled:cursor-not-allowed"
-              />
-
-              {/* Bilder */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-slate-400 flex items-center gap-1">
-                    <Camera className="w-3.5 h-3.5" />
-                    Bilder ({sessionPhotos.length}/10)
-                  </span>
-                  {session.status !== 'completed' && (
-                    <button
-                      onClick={() => sessionPhotoInputRef.current?.click()}
-                      disabled={sessionPhotoUploading || sessionPhotos.length >= 10}
-                      className="flex items-center gap-1.5 px-3 py-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors"
-                    >
-                      {sessionPhotoUploading ? (
-                        <>
-                          <div className="w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                          Laddar upp...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-3.5 h-3.5" />
-                          Lägg till bild
-                        </>
-                      )}
-                    </button>
-                  )}
-                  <input
-                    ref={sessionPhotoInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={handleSessionPhotoUpload}
-                  />
-                </div>
-
-                {sessionPhotos.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {sessionPhotos.map(photo => (
-                      <div key={photo.id} className="relative flex-shrink-0 w-24 group">
-                        <img
-                          src={photo.url}
-                          alt={photo.caption || 'Sessionsbild'}
-                          className="w-24 h-24 object-cover rounded-lg border border-slate-700 cursor-pointer"
-                          onClick={() => setLightboxPhoto(photo.url || null)}
-                        />
-                        {session.status !== 'completed' && (
-                          <button
-                            onClick={() => handleDeleteSessionPhoto(photo)}
-                            className="absolute top-1 right-1 bg-red-500/90 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        )}
-                        {/* Bildtext */}
-                        {editingCaptionId === photo.id ? (
-                          <div className="mt-1 flex gap-1">
-                            <input
-                              autoFocus
-                              value={editingCaptionValue}
-                              onChange={e => setEditingCaptionValue(e.target.value)}
-                              onKeyDown={e => {
-                                if (e.key === 'Enter') handleSaveCaption(photo.id)
-                                if (e.key === 'Escape') setEditingCaptionId(null)
-                              }}
-                              className="flex-1 bg-slate-900 border border-slate-600 rounded px-1.5 py-0.5 text-xs text-white focus:outline-none focus:border-[#20c58f] w-0"
-                            />
-                            <button onClick={() => handleSaveCaption(photo.id)} className="text-[#20c58f]"><Check className="w-3 h-3" /></button>
-                          </div>
-                        ) : (
-                          <p
-                            onClick={() => {
-                              if (session.status !== 'completed') {
-                                setEditingCaptionId(photo.id)
-                                setEditingCaptionValue(photo.caption || '')
-                              }
-                            }}
-                            className={`text-xs text-slate-400 mt-1 text-center truncate ${session.status !== 'completed' ? 'cursor-pointer hover:text-slate-300' : ''}`}
-                            title={photo.caption || undefined}
-                          >
-                            {photo.caption || (session.status !== 'completed' ? <span className="italic text-slate-600">Lägg till text</span> : '')}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+          {/* Ute/Inne och Starta runda */}
+          <div className="flex items-center gap-2">
+            <div role="tablist" aria-label="Område" className="flex-1 grid grid-cols-2 gap-1 p-1 bg-slate-900 border border-slate-800 rounded-xl">
+              {(['outdoor', 'indoor'] as const).map(tab => {
+                const isSelectedTab = activeTab === tab
+                const list = tab === 'outdoor' ? outdoorStations : indoorStations
+                const done = list.filter(s => inspectedStationIds.has(s.id)).length
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="tab"
+                    aria-selected={isSelectedTab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`h-9 rounded-[9px] text-[13px] flex items-center justify-center gap-1.5 transition-colors ${
+                      isSelectedTab
+                        ? 'bg-[#20c58f] text-[#04140d] font-semibold'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <Icon name={tab === 'outdoor' ? 'station.ute' : 'station.inne'} size={16} />
+                    {tab === 'outdoor' ? 'Ute' : 'Inne'}
+                    <span className="tabular-nums">{done}/{list.length}</span>
+                  </button>
+                )
+              })}
             </div>
-          )}
-
-          {/* Tabs - visas alltid */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab('outdoor')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === 'outdoor'
-                  ? 'bg-[#20c58f] text-[#fff]'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <MapPin className="w-4 h-4" />
-              Utomhus ({inspectedStationIds.size > 0 ? outdoorStations.filter(s => inspectedStationIds.has(s.id)).length : 0}/{outdoorStations.length})
-            </button>
-            <button
-              onClick={() => setActiveTab('indoor')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                activeTab === 'indoor'
-                  ? 'bg-[#20c58f] text-[#fff]'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-              }`}
-            >
-              <Building2 className="w-4 h-4" />
-              Inomhus ({inspectedStationIds.size > 0 ? indoorStations.filter(s => inspectedStationIds.has(s.id)).length : 0}/{indoorStations.length})
-            </button>
+            {session.status !== 'completed' && (
+              activeTab === 'outdoor'
+                ? wizardMode !== 'outdoor' && outdoorStations.some(s => !inspectedStationIds.has(s.id))
+                : wizardMode !== 'indoor' && !!selectedFloorPlanId && filteredIndoorStations.some(s => !inspectedStationIds.has(s.id))
+            ) && (
+              <button
+                type="button"
+                onClick={activeTab === 'outdoor' ? startOutdoorWizard : startIndoorWizard}
+                className="h-[46px] px-3.5 flex-shrink-0 rounded-xl bg-[#20c58f] hover:bg-[#1bb07f] text-[#04140d] text-[13px] font-semibold flex items-center gap-1.5 transition-colors"
+              >
+                <Icon name="station.runda" size={20} />
+                Starta runda
+              </button>
+            )}
           </div>
         </div>
-      </div>
+      )}
 
       {/* Main content - visas alltid (sessionen startas automatiskt vid första sparning) */}
       {session && (
@@ -2023,23 +2269,11 @@ export default function StationInspectionModule() {
                 </div>
               )}
 
-              {/* Knapp för att starta kontrollrunda utomhus */}
-              {wizardMode !== 'outdoor' && outdoorStations.length > 0 && outdoorStations.some(s => !inspectedStationIds.has(s.id)) && (
-                <div className="flex justify-end">
-                  <button
-                    onClick={startOutdoorWizard}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-[#fff] rounded-lg text-sm font-medium transition-colors"
-                  >
-                    <Navigation className="w-4 h-4" />
-                    Starta kontrollrunda
-                  </button>
-                </div>
-              )}
-
               {/* Redigeringstext när alla utomhusstationer är klara */}
               {wizardMode !== 'outdoor' && outdoorStations.length > 0 && outdoorStations.every(s => inspectedStationIds.has(s.id)) && (
-                <p className="text-sm text-green-400 text-right">
-                  ✓ Alla stationer kontrollerade – klicka på en station för att redigera
+                <p className="flex items-center justify-end gap-2 text-sm text-[#20c58f]">
+                  <StatusDot status="none" />
+                  Alla stationer kontrollerade. Tryck på en station för att ändra.
                 </p>
               )}
 
@@ -2051,7 +2285,7 @@ export default function StationInspectionModule() {
               ) : (
                 <>
                   {/* Karta */}
-                  <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
+                  <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden" ref={relocateAreaRef}>
                     <EquipmentMap
                       showProductIcons
                       equipment={outdoorEquipment}
@@ -2064,83 +2298,16 @@ export default function StationInspectionModule() {
                       inspectedStationIds={inspectedStationIds}
                       highlightedStationId={wizardMode === 'outdoor' ? currentWizardStationId : null}
                       relocatingStationId={relocatingStation && outdoorStations.some(s => s.id === relocatingStation?.id) ? relocatingStation.id : null}
-                      relocatingStationName={relocatingStation?.station_type_data?.name || relocatingStation?.equipment_type || null}
+                      relocatingStationName={relocatingStation ? `station ${outdoorNumberMap[relocatingStation.id] ?? ''}`.trim() : null}
                       onRelocateClick={handleRelocateOutdoor}
                       onCancelRelocate={() => setRelocatingStation(null)}
                     />
                   </div>
 
                   {/* Lista under kartan */}
-                  <div className="space-y-3 mt-4">
+                  <div className="space-y-2 mt-4">
                     <p className="text-sm text-slate-400 px-1">{outdoorStations.length} utomhusstationer</p>
-                    {outdoorStations.map((station) => {
-                      const isInspected = inspectedStationIds.has(station.id)
-                      const stationNumber = outdoorNumberMap[station.id] || '?'
-                      const typeName = station.station_type_data?.name || station.equipment_type || station.station_type
-                      const hadActivity = activityStationIds.has(station.id)
-
-                      return (
-                        <motion.button
-                          key={station.id}
-                          onClick={() => handleSelectStation(station)}
-                          className={`w-full bg-slate-800/30 border border-slate-700 rounded-xl p-4 text-left transition-all hover:bg-slate-800/50 cursor-pointer ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
-                          whileHover={{ scale: 1.01 }}
-                          whileTap={{ scale: 0.99 }}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {isInspected ? (
-                                <CheckCircle2 className="w-6 h-6 text-green-500" />
-                              ) : hadActivity ? (
-                                <div className="relative">
-                                  <div
-                                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                    style={{ backgroundColor: station.station_type_data?.color || '#6b7280' }}
-                                  >
-                                    {stationNumber}
-                                  </div>
-                                  <AlertTriangle className="absolute -top-1 -right-1 w-3.5 h-3.5 text-amber-400" />
-                                </div>
-                              ) : (
-                                <div
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                  style={{
-                                    backgroundColor: station.station_type_data?.color || '#6b7280'
-                                  }}
-                                >
-                                  {stationNumber}
-                                </div>
-                              )}
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <p className="font-medium text-white">Station {stationNumber}</p>
-                                  {hadActivity && !isInspected && (
-                                    <span className="text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">
-                                      Aktivitet senast
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-sm text-slate-400">{typeName}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {/* Snabb-OK-knapp */}
-                              {!isInspected && session?.status !== 'completed' && (
-                                <button
-                                  onClick={(e) => handleQuickOk(station, e)}
-                                  className="flex items-center gap-1.5 px-3 py-2.5 bg-green-500/20 hover:bg-green-500/40 text-green-400 rounded-lg transition-colors"
-                                  aria-label="Markera station som OK"
-                                >
-                                  <Check className="w-5 h-5" />
-                                  <span className="text-xs font-bold">OK</span>
-                                </button>
-                              )}
-                              <ChevronRight className="w-5 h-5 text-slate-500" />
-                            </div>
-                          </div>
-                        </motion.button>
-                      )
-                    })}
+                    {outdoorStations.map(station => renderStationRow(station, outdoorNumberMap[station.id] || '?'))}
                   </div>
                 </>
               )}
@@ -2200,19 +2367,10 @@ export default function StationInspectionModule() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-slate-400">Planritningar</span>
-                    {/* Knapp för att starta kontrollrunda inomhus */}
-                    {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && filteredIndoorStations.some(s => !inspectedStationIds.has(s.id)) && (
-                      <button
-                        onClick={startIndoorWizard}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-[#20c58f] hover:bg-[#1ba876] text-[#fff] rounded-lg text-sm font-medium transition-colors"
-                      >
-                        <Navigation className="w-4 h-4" />
-                        Starta kontrollrunda
-                      </button>
-                    )}
                     {wizardMode !== 'indoor' && selectedFloorPlanId && filteredIndoorStations.length > 0 && filteredIndoorStations.every(s => inspectedStationIds.has(s.id)) && (
-                      <p className="text-sm text-green-400">
-                        ✓ Alla klara – klicka på en station för att redigera
+                      <p className="flex items-center gap-2 text-sm text-[#20c58f]">
+                        <StatusDot status="none" />
+                        Alla klara. Tryck på en station för att ändra.
                       </p>
                     )}
                   </div>
@@ -2284,7 +2442,7 @@ export default function StationInspectionModule() {
                 </div>
               ) : (
                 // Floor plan viewer - ökad höjd för bättre mobil UX
-                <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden">
+                <div className="bg-slate-800/30 border border-slate-700 rounded-xl overflow-hidden" ref={relocateAreaRef}>
                   <FloorPlanViewer
                     showProductIcons
                     imageUrl={floorPlanImageUrl}
@@ -2299,84 +2457,18 @@ export default function StationInspectionModule() {
                     inspectedStationIds={inspectedStationIds}
                     highlightedStationId={wizardMode === 'indoor' ? currentWizardStationId : null}
                     relocatingStationId={relocatingStation && indoorStations.some(s => s.id === relocatingStation?.id) ? relocatingStation.id : null}
-                    relocatingStationName={relocatingStation?.station_type_data?.name || relocatingStation?.station_type || null}
+                    relocatingStationName={relocatingStation ? `station ${indoorNumberMap[relocatingStation.id] ?? ''}`.trim() : null}
                   />
                 </div>
               )}
 
               {/* Indoor stations list */}
               {filteredIndoorStations.length > 0 && (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   <p className="text-sm text-slate-500">
                     {filteredIndoorStations.length} stationer på denna planritning
                   </p>
-                  {filteredIndoorStations.map((station) => {
-                    const isInspected = inspectedStationIds.has(station.id)
-                    const stationNumber = indoorNumberMap[station.id] || '?'
-                    const typeName = station.station_type_data?.name || station.station_type
-                    const hadActivity = activityStationIds.has(station.id)
-
-                    return (
-                      <motion.button
-                        key={station.id}
-                        onClick={() => handleSelectStation(station)}
-                        className={`w-full bg-slate-800/30 border border-slate-700 rounded-xl p-4 text-left transition-all hover:bg-slate-800/50 cursor-pointer ${isInspected ? 'border-l-4 border-green-500' : hadActivity ? 'border-l-4 border-amber-500' : ''}`}
-                        whileHover={{ scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            {isInspected ? (
-                              <CheckCircle2 className="w-6 h-6 text-green-500" />
-                            ) : hadActivity ? (
-                              <div className="relative">
-                                <div
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                  style={{ backgroundColor: station.station_type_data?.color || '#6b7280' }}
-                                >
-                                  {stationNumber}
-                                </div>
-                                <AlertTriangle className="absolute -top-1 -right-1 w-3.5 h-3.5 text-amber-400" />
-                              </div>
-                            ) : (
-                              <div
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                style={{
-                                  backgroundColor: station.station_type_data?.color || '#6b7280'
-                                }}
-                              >
-                                {stationNumber}
-                              </div>
-                            )}
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-white">Station {stationNumber}</p>
-                                {hadActivity && !isInspected && (
-                                  <span className="text-xs bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">
-                                    Aktivitet senast
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-sm text-slate-400">{typeName}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {/* Snabb-OK-knapp */}
-                            {!isInspected && session?.status !== 'completed' && (
-                              <button
-                                onClick={(e) => handleQuickOk(station, e)}
-                                className="p-2 bg-green-500/20 hover:bg-green-500/40 text-green-400 rounded-lg transition-colors"
-                                title="Markera som OK"
-                              >
-                                <Check className="w-5 h-5" />
-                              </button>
-                            )}
-                            <ChevronRight className="w-5 h-5 text-slate-500" />
-                          </div>
-                        </div>
-                      </motion.button>
-                    )
-                  })}
+                  {filteredIndoorStations.map(station => renderStationRow(station, indoorNumberMap[station.id] || '?'))}
                 </div>
               )}
             </motion.div>
@@ -2597,385 +2689,512 @@ export default function StationInspectionModule() {
         )}
       </AnimatePresence>
 
-      {/* Inspection Modal */}
+      {/* Stationsmodalen: kontrollen, eller byt typ som ersätter innehållet */}
       <AnimatePresence>
-        {selectedStation && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-4 overflow-y-auto"
-            onClick={() => setSelectedStation(null)}
-          >
+        {selectedStation && (() => {
+          const isOutdoorSel = outdoorStations.some(s => s.id === selectedStation.id)
+          const selNumber = outdoorNumberMap[selectedStation.id] || indoorNumberMap[selectedStation.id] || '?'
+          const selTypeName = selectedStation.station_type_data?.name || selectedStation.equipment_type || selectedStation.station_type || 'Station'
+          const selIcon = resolveStationIcon(selectedStation.article?.icon, selectedStation.station_type_data?.icon)
+          const canEdit = session?.status !== 'completed'
+          const canPickUp = selectedStation.is_addon === true && selectedStation.status === 'active' && canEdit
+          const lastHistory = stationHistory[0]
+
+          return (
             <motion.div
-              initial={{ y: 100, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 100, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
+              key="station-modal"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-4 overflow-y-auto"
+              onClick={() => setSelectedStation(null)}
             >
-              {/* Rubrik: bara namn och stäng. Knapparna ligger i foten, i full bredd på mobil */}
-              <div className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur border-b border-slate-700 px-4 py-3 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-lg font-bold text-white truncate">
-                    Station {outdoorNumberMap[selectedStation.id] || indoorNumberMap[selectedStation.id] || '?'}
-                  </h2>
-                  <p className="text-sm text-slate-400 truncate">
-                    {selectedStation.station_type_data?.name || selectedStation.equipment_type || selectedStation.station_type}
-                    {selectedStation.is_addon === true && <span className="text-violet-400"> · tillägg</span>}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedStation(null)}
-                  aria-label="Stäng"
-                  className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              <motion.div
+                initial={{ y: 100, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 100, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
+              >
+                {modalView === 'byttyp' ? (
+                  <ChangeStationTypeSheet
+                    station={{
+                      id: selectedStation.id,
+                      kind: isOutdoorSel ? 'outdoor' : 'indoor',
+                      typeId: selectedStation.station_type_data?.id ?? selectedStation.station_type_id ?? null,
+                      typeName: selTypeName,
+                      typeColor: selectedStation.station_type_data?.color ?? null,
+                      typeIcon: selectedStation.station_type_data?.icon ?? null,
+                      is_addon: selectedStation.is_addon,
+                      addon_billing_model: selectedStation.addon_billing_model,
+                      addon_contract_mode: selectedStation.addon_contract_mode,
+                      article_id: selectedStation.article_id,
+                      serial_number: selectedStation.serial_number,
+                      label: `Station ${selNumber}`
+                    }}
+                    sessionId={session?.id ?? null}
+                    onChanged={handleStationTypeChanged}
+                    onCancel={() => setModalView('kontroll')}
+                  />
+                ) : (
+                  <>
+                    {/* Rubrik: typruta, nummer och typ */}
+                    <div className="flex items-center gap-3 border-b border-slate-800 py-3.5 pl-4 pr-3">
+                      <StationTypeTile
+                        size={44}
+                        color={selectedStation.station_type_data?.color}
+                        icon={selIcon}
+                        addon={selectedStation.is_addon === true}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <h2 className="text-lg font-bold text-[#fff] truncate">Station {selNumber}</h2>
+                        <p className="text-[13px] text-slate-400 truncate">
+                          {selTypeName}
+                          {selectedStation.is_addon === true && <span className="text-violet-400"> · tillägg</span>}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedStation(null)}
+                        aria-label="Stäng"
+                        className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#fff] hover:bg-slate-800 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
 
-              {/* Scrollbart innehåll */}
-              <div className="flex-1 overflow-y-auto p-6">
+                    {/* Verktygsraden */}
+                    <div className="px-4 py-3 border-b border-slate-800 space-y-2">
+                      <StationToolbar
+                        move={{
+                          visible: canEdit,
+                          onClick: () => {
+                            setRelocatingStation(selectedStation)
+                            setSelectedStation(null)
+                            // Rulla fram kartan eller planritningen där flyttläget visas
+                            setTimeout(() => relocateAreaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+                          }
+                        }}
+                        changeType={{
+                          visible: canEdit,
+                          onClick: () => setModalView('byttyp'),
+                          disabled: typePaidLock.locked,
+                          disabledReason: typePaidLock.paidThrough ? `Betald till och med ${typePaidLock.paidThrough}` : undefined
+                        }}
+                        history={{
+                          onClick: () => setShowHistory(v => !v),
+                          active: showHistory
+                        }}
+                        pickUp={{
+                          visible: canPickUp,
+                          onClick: () => setPickUpAfterSave(v => !v),
+                          active: pickUpAfterSave
+                        }}
+                      />
+                      {typePaidLock.locked && (
+                        <p className="flex items-start gap-2 text-xs text-slate-400">
+                          <span className="mt-1 w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" aria-hidden />
+                          <span>Typen kan inte bytas, kunden har betalat för stationen till och med {typePaidLock.paidThrough}.</span>
+                        </p>
+                      )}
+                    </div>
 
-              {/* History Panel - expanderbar med findings/foto/tekniker */}
-              {historyLoading ? (
-                <div className="mb-4 bg-slate-800/50 rounded-lg p-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
-                    <span className="text-xs text-slate-400">Laddar historik...</span>
-                  </div>
-                </div>
-              ) : stationHistory.length > 0 ? (
-                <div className="mb-4 bg-slate-800/50 rounded-lg p-3">
-                  <h4 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1">
-                    <History className="w-3 h-3" />
-                    Senaste inspektioner
-                  </h4>
-                  <div className="space-y-2">
-                    {stationHistory.slice(0, 5).map((item) => {
-                      const isExpanded = expandedHistoryId === item.id
-                      const hasDetails = item.findings || item.photo_url || item.technician
+                    {/* Scrollbart innehåll */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-5">
 
-                      return (
-                        <div key={item.id} className="bg-slate-900/50 rounded-lg overflow-hidden">
-                          {/* Klickbar rubrikrad */}
+                      {/* Historik: panelen när den är utfälld, annars en kompakt rad */}
+                      {showHistory ? (
+                        historyLoading ? (
+                          <div className="flex items-center gap-2 text-xs text-slate-400">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Laddar historik...
+                          </div>
+                        ) : stationHistory.length > 0 ? (
+                          <div className="space-y-1.5">
+                            {stationHistory.slice(0, 5).map((item) => {
+                              const isExpanded = expandedHistoryId === item.id
+                              const hasDetails = item.findings || item.photo_url || item.technician
+
+                              return (
+                                <div key={item.id} className="bg-slate-800/60 rounded-xl overflow-hidden">
+                                  {/* Klickbar rubrikrad */}
+                                  <button
+                                    type="button"
+                                    onClick={() => hasDetails && setExpandedHistoryId(isExpanded ? null : item.id)}
+                                    aria-expanded={hasDetails ? isExpanded : undefined}
+                                    className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 text-xs text-left ${
+                                      hasDetails ? 'hover:bg-slate-800 cursor-pointer' : 'cursor-default'
+                                    }`}
+                                  >
+                                    <StatusDot status={item.status} />
+                                    <span className="flex-1 min-w-0 truncate text-slate-200">
+                                      {INSPECTION_STATUS_CONFIG[item.status]?.label || item.status}
+                                      {item.measurement_value !== null && (() => {
+                                        const histColor = getMeasurementColor(
+                                          item.measurement_value,
+                                          selectedStation?.station_type_data?.threshold_warning,
+                                          selectedStation?.station_type_data?.threshold_critical,
+                                          selectedStation?.station_type_data?.threshold_direction
+                                        )
+                                        const histColorClass = {
+                                          green: 'text-green-400',
+                                          amber: 'text-amber-400',
+                                          red: 'text-red-400',
+                                          default: 'text-slate-300'
+                                        }[histColor]
+                                        const u = unitShort(item.measurement_unit)
+                                        return (
+                                          <span className={`${histColorClass} font-mono`}>
+                                            {', '}{item.measurement_value}{u ? (u === '%' ? '%' : ` ${u}`) : ''}
+                                          </span>
+                                        )
+                                      })()}
+                                      {item.technician && <span className="text-slate-500"> · {item.technician.name}</span>}
+                                    </span>
+                                    <span className="text-slate-500 tabular-nums">
+                                      {new Date(item.inspected_at).toLocaleDateString('sv-SE')}
+                                    </span>
+                                    {hasDetails && (
+                                      <ChevronDown className={`w-3 h-3 text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                    )}
+                                  </button>
+
+                                  {/* Expanderad sektion */}
+                                  {isExpanded && (
+                                    <div className="px-2.5 pb-2.5 space-y-2 border-t border-slate-700/50">
+                                      {item.findings && (
+                                        <p className="text-xs text-slate-400 italic mt-2">
+                                          "{item.findings}"
+                                        </p>
+                                      )}
+                                      {item.photo_url && (
+                                        <img
+                                          src={item.photo_url}
+                                          alt="Tidigare foto"
+                                          className="w-24 h-24 object-cover rounded-lg mt-2 cursor-pointer hover:opacity-80 transition-opacity"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setLightboxPhoto(item.photo_url)
+                                          }}
+                                        />
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-slate-400">Ingen tidigare kontroll</p>
+                        )
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setShowHistory(true)}
+                          className="w-full flex items-center gap-2 text-left text-xs text-slate-400 hover:text-slate-300 transition-colors"
+                        >
+                          {historyLoading ? (
+                            <>
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Laddar historik...
+                            </>
+                          ) : lastHistory ? (
+                            <>
+                              <StatusDot status={lastHistory.status} />
+                              <span className="truncate">
+                                Senast {new Date(lastHistory.inspected_at).toLocaleDateString('sv-SE')} · {statusText(lastHistory.status)}
+                                {lastHistory.measurement_value !== null ? `, ${lastHistory.measurement_value}${unitShort(lastHistory.measurement_unit) ? ` ${unitShort(lastHistory.measurement_unit)}` : ''}` : ''}
+                                {lastHistory.technician?.name ? ` · ${lastHistory.technician.name}` : ''}
+                              </span>
+                            </>
+                          ) : (
+                            <span>Ingen tidigare kontroll</span>
+                          )}
+                        </button>
+                      )}
+
+                      {/* Mätvärde med stora − och + runt ett numeriskt fält */}
+                      {selectedStation.station_type_data?.measurement_label && (() => {
+                        const stType = selectedStation.station_type_data
+                        const selectedPrep = selectedPreparationId
+                          ? preparations.find(p => p.id === selectedPreparationId) ?? null
+                          : null
+                        const usePreparationThresholds =
+                          (stType as any)?.threshold_source === 'preparation' && selectedPrep
+                        const activeThresholds = {
+                          warning: usePreparationThresholds
+                            ? (selectedPrep!.threshold_warning ?? stType?.threshold_warning ?? null)
+                            : stType?.threshold_warning ?? null,
+                          critical: usePreparationThresholds
+                            ? (selectedPrep!.threshold_critical ?? stType?.threshold_critical ?? null)
+                            : stType?.threshold_critical ?? null,
+                          direction: usePreparationThresholds
+                            ? (selectedPrep!.threshold_direction ?? stType?.threshold_direction ?? 'above')
+                            : stType?.threshold_direction ?? 'above',
+                          label: usePreparationThresholds
+                            ? (selectedPrep!.measurement_label ?? stType?.measurement_label ?? null)
+                            : stType?.measurement_label ?? null,
+                        }
+
+                        const numValue = measurementValue ? parseFloat(measurementValue) : null
+                        const color = getMeasurementColor(
+                          numValue,
+                          activeThresholds.warning,
+                          activeThresholds.critical,
+                          activeThresholds.direction
+                        )
+                        const boxColorClass = {
+                          green: 'border-green-500',
+                          amber: 'border-amber-500',
+                          red: 'border-red-500',
+                          default: 'border-slate-700'
+                        }[color]
+                        const valueColorClass = {
+                          green: 'text-green-400',
+                          amber: 'text-amber-400',
+                          red: 'text-red-400',
+                          default: 'text-[#fff]'
+                        }[color]
+                        const unit = unitShort(stType.measurement_unit)
+                        // Steg 5 för gram, annars 1 (st och övriga enheter)
+                        const step = stType.measurement_unit === 'gram' ? 5 : 1
+                        const bump = (dir: 1 | -1) => {
+                          const cur = parseFloat(measurementValue)
+                          const base = Number.isNaN(cur) ? 0 : cur
+                          // Avrunda bara bort flyttalsbrus, behåll inmatade decimaler
+                          const next = Math.max(0, Math.round((base + dir * step) * 1000) / 1000)
+                          setMeasurementValue(String(next))
+                        }
+                        const inputId = `matt-${selectedStation.id}`
+
+                        return (
+                          <div className="space-y-2">
+                            <label htmlFor={inputId} className="block text-[13px] font-medium text-slate-300">
+                              {activeThresholds.label ?? stType.measurement_label}{unit ? ` (${unit})` : ''}
+                            </label>
+                            <div className="flex items-stretch gap-2">
+                              <button
+                                type="button"
+                                onClick={() => bump(-1)}
+                                aria-label={`Minska med ${step}`}
+                                className="w-16 h-[60px] flex-shrink-0 rounded-2xl border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 flex items-center justify-center transition-colors"
+                              >
+                                <svg viewBox="0 0 24 24" width={24} height={24} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true"><path d="M5 12h14" /></svg>
+                              </button>
+                              <div className={`flex-1 min-w-0 h-[60px] rounded-2xl border bg-slate-950 flex items-center justify-center gap-1.5 px-2 focus-within:ring-1 focus-within:ring-[#20c58f] ${boxColorClass}`}>
+                                <input
+                                  id={inputId}
+                                  type="number"
+                                  inputMode="decimal"
+                                  value={measurementValue}
+                                  onChange={(e) => setMeasurementValue(e.target.value)}
+                                  placeholder="0"
+                                  step="any"
+                                  min="0"
+                                  className={`w-full min-w-0 bg-transparent border-0 p-0 text-center text-[28px] font-bold tabular-nums placeholder-slate-600 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${valueColorClass}`}
+                                />
+                                {unit && <span className="text-sm text-slate-400 flex-shrink-0">{unit}</span>}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => bump(1)}
+                                aria-label={`Öka med ${step}`}
+                                className="w-16 h-[60px] flex-shrink-0 rounded-2xl border border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700 flex items-center justify-center transition-colors"
+                              >
+                                <svg viewBox="0 0 24 24" width={24} height={24} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+                              </button>
+                            </div>
+                            {/* Tröskelvärden */}
+                            {(activeThresholds.warning != null || activeThresholds.critical != null) && (
+                              <div className="flex items-center gap-4 text-xs">
+                                {activeThresholds.warning != null && (
+                                  <span className="text-amber-400">
+                                    Varning: {activeThresholds.warning}
+                                  </span>
+                                )}
+                                {activeThresholds.critical != null && (
+                                  <span className="text-red-400">
+                                    Kritisk: {activeThresholds.critical}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+
+                      {/* Preparatval: filtrerat efter stationstyp */}
+                      {(() => {
+                        const stationTypeId = selectedStation.station_type_data?.id
+                        const filteredPreparations = preparations.filter(p =>
+                          stationTypeId && p.station_type_ids?.length > 0 && p.station_type_ids.includes(stationTypeId)
+                        )
+                        if (filteredPreparations.length === 0) return null
+                        return (
+                          <div className="space-y-2">
+                            <label htmlFor={`prep-${selectedStation.id}`} className="flex items-center gap-1.5 text-[13px] font-medium text-slate-300">
+                              <Beaker className="w-4 h-4" />
+                              Preparat (valfritt)
+                            </label>
+                            <select
+                              id={`prep-${selectedStation.id}`}
+                              value={selectedPreparationId || ''}
+                              onChange={(e) => setSelectedPreparationId(e.target.value || null)}
+                              className="w-full h-12 bg-slate-800 border border-slate-700 rounded-xl px-3 text-sm text-[#fff] focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                            >
+                              <option value="">Inget preparat</option>
+                              {(['biocidprodukt', 'giftfritt', 'desinfektionsmedel'] as const).map(cat => {
+                                const catPreps = filteredPreparations.filter(p => p.category === cat)
+                                if (catPreps.length === 0) return null
+                                const catLabel = cat === 'biocidprodukt' ? 'Biocidprodukt' : cat === 'giftfritt' ? 'Giftfritt' : 'Desinfektionsmedel'
+                                return (
+                                  <optgroup key={cat} label={catLabel}>
+                                    {catPreps.map(p => (
+                                      <option key={p.id} value={p.id}>
+                                        {p.name}{p.registration_number ? ` (${p.registration_number})` : ''}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )
+                              })}
+                            </select>
+                            {selectedPreparationId && (() => {
+                              const prep = preparations.find(p => p.id === selectedPreparationId)
+                              if (!prep) return null
+                              return (
+                                <div className="text-xs text-slate-400 space-y-0.5">
+                                  {prep.active_substances && <p>Verksamt ämne: {prep.active_substances}</p>}
+                                  {prep.dosage && <p>Dosering: {prep.dosage}</p>}
+                                </div>
+                              )
+                            })()}
+                          </div>
+                        )
+                      })()}
+
+                      {/* Foto och anteckning som två ikonrutor */}
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
                           <button
-                            onClick={() => hasDetails && setExpandedHistoryId(isExpanded ? null : item.id)}
-                            className={`w-full flex items-center justify-between p-2 text-xs ${
-                              hasDetails ? 'hover:bg-slate-800/50 cursor-pointer' : ''
+                            type="button"
+                            onClick={handlePhotoCapture}
+                            aria-label={photoPreview ? 'Byt foto' : 'Ta foto'}
+                            className={`h-14 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-[13px] transition-colors ${
+                              photoPreview
+                                ? 'border-[#20c58f] text-[#20c58f]'
+                                : 'border-slate-600 text-slate-300 hover:border-slate-500 hover:text-[#fff]'
                             }`}
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="text-base">{INSPECTION_STATUS_CONFIG[item.status]?.icon}</span>
-                              <span className="text-slate-300">
-                                {INSPECTION_STATUS_CONFIG[item.status]?.label || item.status}
-                              </span>
-                              {item.measurement_value !== null && (() => {
-                                const histColor = getMeasurementColor(
-                                  item.measurement_value,
-                                  selectedStation?.station_type_data?.threshold_warning,
-                                  selectedStation?.station_type_data?.threshold_critical,
-                                  selectedStation?.station_type_data?.threshold_direction
-                                )
-                                const histColorClass = {
-                                  green: 'text-green-400',
-                                  amber: 'text-amber-400',
-                                  red: 'text-red-400',
-                                  default: 'text-slate-300'
-                                }[histColor]
-                                return (
-                                  <span className={`${histColorClass} font-mono`}>
-                                    {item.measurement_value}{item.measurement_unit === 'gram' ? 'g' : item.measurement_unit === 'st' ? ' st' : item.measurement_unit === 'ml' ? ' ml' : item.measurement_unit === 'kg' ? ' kg' : item.measurement_unit === 'procent' ? '%' : item.measurement_unit ? ` ${item.measurement_unit}` : 'g'}
-                                  </span>
-                                )
-                              })()}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {item.technician && (
-                                <span className="text-slate-500 text-[10px]">{item.technician.name}</span>
-                              )}
-                              <span className="text-slate-600">
-                                {new Date(item.inspected_at).toLocaleDateString('sv-SE')}
-                              </span>
-                              {hasDetails && (
-                                <ChevronDown className={`w-3 h-3 text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                              )}
-                            </div>
+                            <Icon name="allman.foto" size={20} />
+                            Foto
                           </button>
-
-                          {/* Expanderad sektion */}
-                          {isExpanded && (
-                            <div className="px-2 pb-2 space-y-2 border-t border-slate-700/50">
-                              {item.findings && (
-                                <p className="text-xs text-slate-400 italic mt-2">
-                                  "{item.findings}"
-                                </p>
-                              )}
-                              {item.photo_url && (
-                                <img
-                                  src={item.photo_url}
-                                  alt="Tidigare foto"
-                                  className="w-24 h-24 object-cover rounded-lg mt-2 cursor-pointer hover:opacity-80 transition-opacity"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setLightboxPhoto(item.photo_url)
-                                  }}
-                                />
-                              )}
-                            </div>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => setShowNotesField(v => !v)}
+                            aria-label="Anteckning"
+                            aria-pressed={showNotesField}
+                            className={`h-14 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-[13px] transition-colors ${
+                              showNotesField || inspectionNotes
+                                ? 'border-[#20c58f] text-[#20c58f]'
+                                : 'border-slate-600 text-slate-300 hover:border-slate-500 hover:text-[#fff]'
+                            }`}
+                          >
+                            <Icon name="allman.anteckning" size={20} />
+                            Anteckning
+                          </button>
                         </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              ) : null}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={handlePhotoChange}
+                          className="hidden"
+                        />
 
-
-              {/* Measurement field - dynamic based on station type */}
-              {selectedStation.station_type_data?.measurement_label && (() => {
-                const stType = selectedStation.station_type_data
-                const selectedPrep = selectedPreparationId
-                  ? preparations.find(p => p.id === selectedPreparationId) ?? null
-                  : null
-                const usePreparationThresholds =
-                  (stType as any)?.threshold_source === 'preparation' && selectedPrep
-                const activeThresholds = {
-                  warning: usePreparationThresholds
-                    ? (selectedPrep!.threshold_warning ?? stType?.threshold_warning ?? null)
-                    : stType?.threshold_warning ?? null,
-                  critical: usePreparationThresholds
-                    ? (selectedPrep!.threshold_critical ?? stType?.threshold_critical ?? null)
-                    : stType?.threshold_critical ?? null,
-                  direction: usePreparationThresholds
-                    ? (selectedPrep!.threshold_direction ?? stType?.threshold_direction ?? 'above')
-                    : stType?.threshold_direction ?? 'above',
-                  label: usePreparationThresholds
-                    ? (selectedPrep!.measurement_label ?? stType?.measurement_label ?? null)
-                    : stType?.measurement_label ?? null,
-                }
-
-                const numValue = measurementValue ? parseFloat(measurementValue) : null
-                const color = getMeasurementColor(
-                  numValue,
-                  activeThresholds.warning,
-                  activeThresholds.critical,
-                  activeThresholds.direction
-                )
-                const inputColorClass = {
-                  green: 'border-green-500 text-green-400',
-                  amber: 'border-amber-500 text-amber-400',
-                  red: 'border-red-500 text-red-400',
-                  default: 'border-slate-600 text-white'
-                }[color]
-
-                return (
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      {activeThresholds.label ?? stType.measurement_label}
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={measurementValue}
-                        onChange={(e) => setMeasurementValue(e.target.value)}
-                        placeholder="0"
-                        step="0.1"
-                        min="0"
-                        className={`flex-1 bg-slate-800 border rounded-xl p-3 placeholder-slate-500 focus:outline-none focus:ring-1 ${inputColorClass}`}
-                      />
-                      <span className="text-slate-400 text-sm">
-                        {selectedStation.station_type_data.measurement_unit === 'gram' ? 'g' :
-                         selectedStation.station_type_data.measurement_unit === 'st' ? 'st' :
-                         selectedStation.station_type_data.measurement_unit || ''}
-                      </span>
-                    </div>
-                    {/* Threshold indicators */}
-                    {(activeThresholds.warning != null || activeThresholds.critical != null) && (
-                      <div className="mt-2 flex items-center gap-4 text-xs">
-                        {activeThresholds.warning != null && (
-                          <span className="text-amber-400">
-                            Varning: {activeThresholds.warning}
-                          </span>
+                        {photoPreview && (
+                          <div className="relative">
+                            <img
+                              src={photoPreview}
+                              alt="Förhandsvisning"
+                              className="w-full h-48 object-cover rounded-xl"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleRemovePhoto}
+                              aria-label="Ta bort fotot"
+                              className="absolute top-2 right-2 w-11 h-11 flex items-center justify-center bg-red-500 rounded-full text-[#fff] hover:bg-red-600 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         )}
-                        {activeThresholds.critical != null && (
-                          <span className="text-red-400">
-                            Kritisk: {activeThresholds.critical}
-                          </span>
+
+                        {showNotesField && (
+                          <textarea
+                            value={inspectionNotes}
+                            onChange={(e) => setInspectionNotes(e.target.value)}
+                            placeholder="Beskriv eventuella fynd"
+                            aria-label="Anteckning"
+                            rows={3}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-[#fff] placeholder-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                          />
                         )}
                       </div>
-                    )}
-                  </div>
-                )
-              })()}
 
-              {/* Preparatval — filtrerat efter stationstyp */}
-              {(() => {
-                const stationTypeId = selectedStation.station_type_data?.id
-                const filteredPreparations = preparations.filter(p =>
-                  stationTypeId && p.station_type_ids?.length > 0 && p.station_type_ids.includes(stationTypeId)
-                )
-                if (filteredPreparations.length === 0) return null
-                return (
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-1.5">
-                      <Beaker className="w-4 h-4" />
-                      Preparat (valfritt)
-                    </label>
-                    <select
-                      value={selectedPreparationId || ''}
-                      onChange={(e) => setSelectedPreparationId(e.target.value || null)}
-                      className="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-                    >
-                      <option value="">Inget preparat</option>
-                      {(['biocidprodukt', 'giftfritt', 'desinfektionsmedel'] as const).map(cat => {
-                        const catPreps = filteredPreparations.filter(p => p.category === cat)
-                        if (catPreps.length === 0) return null
-                        const catLabel = cat === 'biocidprodukt' ? 'Biocidprodukt' : cat === 'giftfritt' ? 'Giftfritt' : 'Desinfektionsmedel'
-                        return (
-                          <optgroup key={cat} label={catLabel}>
-                            {catPreps.map(p => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}{p.registration_number ? ` (${p.registration_number})` : ''}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )
-                      })}
-                    </select>
-                    {selectedPreparationId && (() => {
-                      const prep = preparations.find(p => p.id === selectedPreparationId)
-                      if (!prep) return null
-                      return (
-                        <div className="mt-2 text-xs text-slate-400 space-y-0.5">
-                          {prep.active_substances && <p>Verksamt ämne: {prep.active_substances}</p>}
-                          {prep.dosage && <p>Dosering: {prep.dosage}</p>}
+                      {/* Hämta upp (tilläggsstation): kort förklaring och betald-framåt-varningen */}
+                      {pickUpAfterSave && canPickUp && (
+                        <div className="space-y-3">
+                          <p className="flex gap-2.5 p-3 rounded-xl bg-violet-500/10 border border-violet-500/30 text-xs leading-relaxed text-violet-200">
+                            <Icon name="station.hamtaupp" size={16} className="flex-shrink-0 mt-px" />
+                            <span>
+                              {(selectedStation.addon_billing_model ?? 'per_round') === 'per_round'
+                                ? 'Stationen tas bort när du sparar. Den faktureras en sista gång i den här rundan.'
+                                : 'Stationen tas bort när du sparar. Den slutar räknas vid nästa debitering.'}
+                            </span>
+                          </p>
+                          <AddonRemovalNotice guard={pickupGuard} />
                         </div>
-                      )
-                    })()}
-                  </div>
-                )
-              })()}
-
-              {/* Photo capture */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Foto (valfritt)
-                </label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handlePhotoChange}
-                  className="hidden"
-                />
-
-                {photoPreview ? (
-                  <div className="relative">
-                    <img
-                      src={photoPreview}
-                      alt="Förhandsvisning"
-                      className="w-full h-48 object-cover rounded-xl"
-                    />
-                    <button
-                      onClick={handleRemovePhoto}
-                      className="absolute top-2 right-2 p-2 bg-red-500 rounded-full text-[#fff] hover:bg-red-600 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handlePhotoCapture}
-                    className="w-full h-32 border-2 border-dashed border-slate-600 rounded-xl flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-green-500 hover:text-green-400 transition-colors"
-                  >
-                    <Camera className="w-8 h-8" />
-                    <span className="text-sm">Ta foto eller välj bild</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Anteckningar (valfritt)
-                </label>
-                <textarea
-                  value={inspectionNotes}
-                  onChange={(e) => setInspectionNotes(e.target.value)}
-                  placeholder="Beskriv eventuella fynd..."
-                  rows={3}
-                  className="w-full bg-slate-800 border border-slate-600 rounded-xl p-3 text-white placeholder-slate-500 focus:outline-none focus:border-green-500"
-                />
-              </div>
-
-              {/* Kontrollera + hämta upp — endast tilläggsstationer */}
-              {selectedStation.is_addon === true && selectedStation.status === 'active' && session?.status !== 'completed' && (
-                <label className="mt-4 flex items-start gap-3 p-3 bg-violet-500/10 border border-violet-500/30 rounded-xl cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={pickUpAfterSave}
-                    onChange={(e) => setPickUpAfterSave(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f]"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-slate-200">Hämta upp stationen efter kontrollen</span>
-                    <span className="block text-xs text-slate-400 mt-0.5">
-                      Tilläggsstationen markeras Borttagen när kontrollen sparas. Per kontroll faktureras den en sista gång i denna runda; per år eller månad slutar den räknas vid nästa debitering.
-                    </span>
-                  </span>
-                </label>
-              )}
-              {pickUpAfterSave && <AddonRemovalNotice guard={pickupGuard} className="mt-3" />}
-
-              </div>{/* Slut på scrollbart innehåll */}
-
-              {/* Fot: Flytta + Spara i full bredd. Med "Hämta upp" ikryssat heter
-                  knappen Spara och ta bort; är stationen betald framåt krävs ett
-                  andra tryck (Ta bort ändå) */}
-              {session?.status !== 'completed' && (
-                <div className="border-t border-slate-700 bg-slate-900 px-4 pt-3 pb-4 flex flex-col gap-2.5">
-                  {pickupGuard.armed && (
-                    <p className="text-sm text-amber-400 text-center">
-                      Tryck en gång till för att spara och ta bort stationen
-                    </p>
-                  )}
-                  <div className="flex gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRelocatingStation(selectedStation)
-                        setSelectedStation(null)
-                      }}
-                      className="h-12 px-4 flex-shrink-0 rounded-xl border border-slate-600 text-sm font-medium text-slate-200 hover:bg-slate-800 transition-colors"
-                    >
-                      Flytta
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveInspection}
-                      disabled={isSubmitting}
-                      className={`h-12 flex-1 rounded-xl text-[15px] font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-60 ${
-                        pickupGuard.armed
-                          ? 'bg-amber-500 hover:bg-amber-400 text-[#1c1003]'
-                          : 'bg-[#20c58f] hover:bg-[#1bb07f] text-[#04140d]'
-                      }`}
-                    >
-                      {isSubmitting ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Check className="w-4 h-4" />
                       )}
-                      {pickupGuard.armed ? 'Ta bort ändå' : pickUpAfterSave ? 'Spara och ta bort' : 'Spara'}
-                    </button>
-                  </div>
-                </div>
-              )}
+
+                    </div>{/* Slut på scrollbart innehåll */}
+
+                    {/* Fot: bara Spara. Med Hämta upp heter knappen Spara och hämta upp;
+                        är stationen betald framåt krävs ett andra tryck (Ta bort ändå) */}
+                    {canEdit && (
+                      <div className="border-t border-slate-800 bg-slate-900 px-4 pt-3 pb-4 flex flex-col gap-2.5">
+                        {pickupGuard.armed && (
+                          <p className="text-sm text-amber-400 text-center">
+                            Tryck en gång till för att spara och ta bort stationen
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleSaveInspection}
+                          disabled={isSubmitting}
+                          className={`w-full h-[52px] rounded-2xl text-[15px] font-bold flex items-center justify-center gap-2 transition-colors disabled:opacity-60 ${
+                            pickupGuard.armed
+                              ? 'bg-amber-500 hover:bg-amber-400 text-[#1c1003]'
+                              : pickUpAfterSave
+                                ? 'bg-violet-400 hover:bg-violet-300 text-[#04140d]'
+                                : 'bg-[#20c58f] hover:bg-[#1bb07f] text-[#04140d]'
+                          }`}
+                        >
+                          {isSubmitting ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Icon name="station.ok" size={20} />
+                          )}
+                          {pickupGuard.armed ? 'Ta bort ändå' : pickUpAfterSave ? 'Spara och hämta upp' : 'Spara'}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
+          )
+        })()}
       </AnimatePresence>
     </motion.div>
   )

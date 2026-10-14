@@ -3,11 +3,12 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch'
-import { ZoomIn, ZoomOut, Maximize, Move, Plus, X, Check, Navigation } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize, Move, Plus, X, Check } from 'lucide-react'
 import type { IndoorStationWithRelations, PlacementMode, IndoorStationType } from '../../../types/indoor'
 import { INDOOR_STATION_TYPE_CONFIG } from '../../../types/indoor'
 import { IndoorStationMarker } from './IndoorStationMarker'
 import { numberStations } from '../../../shared/stationNumbering'
+import RelocateBar from '../stations/RelocateBar'
 import type { StationType } from '../../../types/stationTypes'
 
 interface FloorPlanViewerProps {
@@ -293,46 +294,25 @@ export function FloorPlanViewer({
   const isPlacementActive = placementMode === 'place' || placementMode === 'move'
 
   return (
-    <div className="relative w-full" style={{ height }} ref={containerRef}>
-      {/* Flytta befintlig station-banner */}
+    <div className="relative isolate w-full" style={{ height }} ref={containerRef}>
+      {/* Flyttläget: samma rad och panel som utomhuskartan (RelocateBar) */}
       {relocatingStationId && !isPlacementActive && (
-        <div className="absolute top-0 left-0 right-0 z-30 bg-amber-600/95 backdrop-blur-sm px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Navigation className="w-5 h-5 text-white" />
-            <div>
-              <p className="text-white font-medium text-sm">
-                {pendingRelocatePos ? 'Ny position vald' : `Dra ${relocatingStationName || 'stationen'} till ny plats`}
-              </p>
-              <p className="text-amber-100 text-xs">
-                {pendingRelocatePos ? 'Bekräfta för att spara' : 'Håll och dra den gula markören'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {pendingRelocatePos && (
-              <button
-                onClick={() => {
-                  onImageClick?.(pendingRelocatePos.x, pendingRelocatePos.y)
-                  setPendingRelocatePos(null)
-                  setRelocateDragPos(null)
-                }}
-                className="px-3 py-1.5 bg-white text-amber-700 text-sm font-medium rounded-lg hover:bg-amber-50 transition-colors"
-              >
-                Bekräfta
-              </button>
-            )}
-            <button
-              onClick={() => {
-                setPendingRelocatePos(null)
-                setRelocateDragPos(null)
-                onCancelPlacement?.()
-              }}
-              className="px-3 py-1.5 text-white hover:bg-white/20 text-sm rounded-lg transition-colors"
-            >
-              Avbryt
-            </button>
-          </div>
-        </div>
+        <RelocateBar
+          title={`Flytta ${relocatingStationName || 'stationen'}`}
+          hint={pendingRelocatePos ? 'Ny plats vald. Spara eller dra igen.' : 'Håll och dra stationen till rätt plats'}
+          canSave={!!pendingRelocatePos}
+          onSave={() => {
+            if (!pendingRelocatePos) return
+            onImageClick?.(pendingRelocatePos.x, pendingRelocatePos.y)
+            setPendingRelocatePos(null)
+            setRelocateDragPos(null)
+          }}
+          onCancel={() => {
+            setPendingRelocatePos(null)
+            setRelocateDragPos(null)
+            onCancelPlacement?.()
+          }}
+        />
       )}
 
       {/* Placement mode header */}
@@ -382,7 +362,7 @@ export function FloorPlanViewer({
       )}
 
       {/* Zoom controls */}
-      <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-2">
+      <div className={`absolute right-4 z-10 flex flex-col gap-2 ${relocatingStationId && !isPlacementActive ? 'bottom-[120px]' : 'bottom-4'}`}>
         <button
           onClick={() => transformRef.current?.zoomIn()}
           className="p-2 bg-slate-800/90 hover:bg-slate-700 text-white rounded-lg shadow-lg backdrop-blur-sm transition-colors"

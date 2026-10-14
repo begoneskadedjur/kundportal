@@ -85,6 +85,9 @@ const getStatusLabel = (status: string, dynamicLabels?: Record<string, string>) 
 // ------------------------------------------------------------------
 // Stationstyp per station: färg, ikon och namn ur station_types (samma
 // regel som stationskartan: station_type_id först, sedan fritextkoden).
+// Kontrollens egen station_type_id (typen vid kontrollen, 3.49.0) går före
+// stationens nuvarande typ, så att en station som bytt typ visas rätt i
+// äldre rapporter.
 // Rapporten visar aldrig produktens ikon, bara stationstypens.
 // ------------------------------------------------------------------
 
@@ -102,15 +105,16 @@ interface ResolvedStation extends LegendStation {
 function resolveReportStation(insp: any, number: number, types: ReportTypeRow[]): ResolvedStation {
   const st = insp.station || {}
   const legacy: string | null = st.equipment_type || st.station_type || null
+  const inspRow = insp.station_type_id ? types.find(t => t.id === insp.station_type_id) : undefined
   const typeId: string | null = st.station_type_id || st.station_type_data?.id || null
   const row = (typeId ? types.find(t => t.id === typeId) : undefined)
     || (legacy ? types.find(t => canonicalTypeCode(t.code) === canonicalTypeCode(legacy)) : undefined)
   return {
     number,
-    typeName: st.station_type_data?.name || row?.name || legacy || 'Okänd typ',
-    color: st.station_type_data?.color || row?.color || null,
+    typeName: inspRow?.name || st.station_type_data?.name || row?.name || legacy || 'Okänd typ',
+    color: inspRow?.color || st.station_type_data?.color || row?.color || null,
     // Produktens ikon får synas för kunden, namnet är alltid typens
-    icon: st.product_icon || row?.icon || st.station_type_data?.icon || null,
+    icon: st.product_icon || inspRow?.icon || row?.icon || st.station_type_data?.icon || null,
     status: st.status || null,
     addon: st.is_addon === true,
   }
@@ -400,7 +404,7 @@ async function generateInspectionReportHTML(data: {
     return `
       <tr>
         <td><strong>${stationNumber}</strong></td>
-        <td>${insp.station?.station_type_data?.name || insp.station?.equipment_type || '-'}${insp.station?.is_addon ? `<br/><span style="font-size:8px;color:#7c3aed;">Tillägg utöver avtal</span>` : ''}</td>
+        <td>${resolveReportStation(insp, 0, stationTypes).typeName}${insp.station?.is_addon ? `<br/><span style="font-size:8px;color:#7c3aed;">Tillägg utöver avtal</span>` : ''}</td>
         <td><span class="status-badge" style="background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${getStatusLabel(insp.status, dynamicLabels)}</span></td>
         <td>${insp.station?.station_type_data?.measurement_label || '-'}</td>
         <td class="text-right">${insp.measurement_value !== null && insp.measurement_value !== undefined ? insp.measurement_value : '-'}</td>
@@ -477,7 +481,7 @@ async function generateInspectionReportHTML(data: {
       return `
         <tr>
           <td><strong>${stationNumber}</strong></td>
-          <td>${insp.station?.station_type_data?.name || insp.station?.station_type || '-'}${insp.station?.is_addon ? `<br/><span style="font-size:8px;color:#7c3aed;">Tillägg utöver avtal</span>` : ''}</td>
+          <td>${resolveReportStation(insp, 0, stationTypes).typeName}${insp.station?.is_addon ? `<br/><span style="font-size:8px;color:#7c3aed;">Tillägg utöver avtal</span>` : ''}</td>
           <td><span class="status-badge" style="background: ${statusColor}20; color: ${statusColor}; border: 1px solid ${statusColor}40;">${getStatusLabel(insp.status, dynamicLabels)}</span></td>
           <td>${insp.station?.station_type_data?.measurement_label || '-'}</td>
           <td class="text-right">${insp.measurement_value !== null && insp.measurement_value !== undefined ? insp.measurement_value : '-'}</td>

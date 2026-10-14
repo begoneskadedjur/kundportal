@@ -3,6 +3,7 @@ import { AddonModelPicker } from './AddonModelPicker'
 import { getStationIconComponent } from '../stationIcons'
 import { defaultAddonBillingModel, type AddonBillingModel, type AddonPrices } from '../../../types/addonStations'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   EquipmentType,
@@ -16,7 +17,10 @@ import { useGpsLocation } from '../../../hooks/useGpsLocation'
 import { useAddonRemovalGuard, useAddonPaidLock } from '../../../hooks/useAddonRemovalGuard'
 import AddonRemovalNotice, { AddonPaidLockNotice } from './AddonRemovalNotice'
 import { MapLocationPicker, type ExistingStation } from './MapLocationPicker'
-import { StationTypeService } from '../../../services/stationTypeService'
+import { StationTypeService, type ChangeStationTypeResult } from '../../../services/stationTypeService'
+import { StationTypeTile, ChangeStationTypeModal, type ChangeStationTypeChoice } from '../stations'
+import { Icon as SvgIcon } from '../../icons/Icon'
+import toast from 'react-hot-toast'
 import type { StationType } from '../../../types/stationTypes'
 import { AddonStationBillingService } from '../../../services/addonStationBillingService'
 import type { StationTypeArticle } from '../../../types/addonStations'
@@ -87,6 +91,11 @@ interface EquipmentPlacementFormProps {
   otherCustomerStations?: ExistingStation[]
   // Kontrollhistorik
   inspections?: OutdoorInspectionWithRelations[]
+  /**
+   * Efter typbyte på befintlig station (RPC change_station_type). Formuläret
+   * har redan uppdaterat sina fält; föräldern laddar om stationen/listan.
+   */
+  onTypeChanged?: (result: ChangeStationTypeResult, newType: StationType, choice: ChangeStationTypeChoice) => void
 }
 
 export interface FormData {
@@ -135,9 +144,13 @@ export function EquipmentPlacementForm({
   initialArticleId = null,
   existingStations,
   otherCustomerStations,
-  inspections = []
+  inspections = [],
+  onTypeChanged
 }: EquipmentPlacementFormProps) {
   const isEditing = !!existingEquipment
+  // Befintlig station: typen byts bara via RPC:n (Byt typ), aldrig via spara
+  const [showChangeType, setShowChangeType] = useState(false)
+  const [editTypeId, setEditTypeId] = useState<string | null>(existingEquipment?.station_type_id ?? null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Dynamiska stationstyper från DB
@@ -399,30 +412,54 @@ export function EquipmentPlacementForm({
   }, [gpsLat, gpsLng, onLocationCapture])
 
   // Hjälpfunktion för att kontrollera om aktuell typ kräver serienummer
-  // Vald typ, för den nya stationens utseende i kartväljaren
+  // Vald typ, för den nya stationens utseende i kartväljaren. Befintlig
+  // station: FK:n först, textkoden som reserv (äldre rader saknar FK).
   const currentTypeData = useMemo(
-    () => dynamicStationTypes.find(t => t.code === formData.equipment_type) ?? null,
-    [dynamicStationTypes, formData.equipment_type]
+    () => (isEditing && editTypeId ? dynamicStationTypes.find(t => t.id === editTypeId) : undefined)
+      ?? dynamicStationTypes.find(t => t.code === formData.equipment_type)
+      ?? null,
+    [dynamicStationTypes, formData.equipment_type, isEditing, editTypeId]
   )
+
+  // Efter lyckat typbyte: fälten visar det nya, preparatet nollställs
+  const handleTypeChanged = (
+    result: ChangeStationTypeResult,
+    newType: StationType,
+    choice: ChangeStationTypeChoice
+  ) => {
+    setEditTypeId(newType.id)
+    setFormData(prev => ({
+      ...prev,
+      equipment_type: newType.code as EquipmentType,
+      preparation_id: null,
+      preparation_quantity: null,
+      article_id: choice.article ? choice.article.articleId : null,
+      serial_number: choice.serialNumber ?? prev.serial_number
+    }))
+    setErrors(prev => ({ ...prev, serial_number: undefined }))
+    setShowChangeType(false)
+    toast.success(`Typen ändrad till ${newType.name}`)
+    onTypeChanged?.(result, newType, choice)
+  }
 
   const currentTypeRequiresSerial = useMemo(() => {
     // Kolla dynamiska typer först
-    const dynamicType = dynamicStationTypes.find(t => t.code === formData.equipment_type)
-    if (dynamicType) {
-      return dynamicType.requires_serial_number
+    if (currentTypeData) {
+      return currentTypeData.requires_serial_number
     }
     // Fallback till legacy-funktion
     return requiresSerialNumber(formData.equipment_type)
-  }, [dynamicStationTypes, formData.equipment_type])
+  }, [currentTypeData, formData.equipment_type])
 
   // Hämta aktuell stationstyps namn för felmeddelanden
   const currentTypeName = useMemo(() => {
-    const dynamicType = dynamicStationTypes.find(t => t.code === formData.equipment_type)
-    if (dynamicType) {
-      return dynamicType.name
+    if (currentTypeData) {
+      return currentTypeData.name
     }
-    return EQUIPMENT_TYPE_CONFIG[formData.equipment_type]?.label || formData.equipment_type
-  }, [dynamicStationTypes, formData.equipment_type])
+    return existingEquipment?.station_type_data?.name
+      || EQUIPMENT_TYPE_CONFIG[formData.equipment_type]?.label
+      || formData.equipment_type
+  }, [currentTypeData, formData.equipment_type, existingEquipment])
 
   // Validera formulär
   const validateForm = (): boolean => {
@@ -607,9 +644,63 @@ export function EquipmentPlacementForm({
       {/* Utrustningstyp */}
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-3">
-          Utrustningstyp *
+          Utrustningstyp {!isEditing && '*'}
         </label>
-        {loadingTypes ? (
+        {isEditing && existingEquipment ? (
+          // Befintlig station: typen visas och byts via RPC:n, inte via spara
+          <div className="flex items-center gap-3 p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
+            {loadingTypes ? (
+              <Loader2 className="w-5 h-5 text-[#20c58f] animate-spin" />
+            ) : (
+              <StationTypeTile
+                size={44}
+                color={currentTypeData?.color ?? existingEquipment.station_type_data?.color}
+                icon={currentTypeData?.icon ?? existingEquipment.station_type_data?.icon}
+                addon={formData.is_addon}
+              />
+            )}
+            <span className="flex-1 min-w-0 text-sm font-medium text-slate-200 truncate">
+              {currentTypeName}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowChangeType(true)}
+              disabled={loadingTypes}
+              aria-label="Byt typ"
+              title="Byt typ"
+              className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-lg border border-slate-700 text-slate-300 hover:text-[#fff] hover:border-[#20c58f] hover:bg-slate-800 transition-colors disabled:opacity-50"
+            >
+              <SvgIcon name="station.byttyp" size={20} />
+            </button>
+            {/* Portal: utanför formuläret (Enter i serienumret ska inte spara
+                formuläret) och utanför bottenarkets transform/overflow */}
+            {createPortal(
+              <div onClick={(e) => e.stopPropagation()}>
+                <ChangeStationTypeModal
+                  isOpen={showChangeType}
+                  station={{
+                    id: existingEquipment.id,
+                    kind: 'outdoor',
+                    typeId: currentTypeData?.id ?? existingEquipment.station_type_id ?? null,
+                    typeName: currentTypeName,
+                    typeColor: currentTypeData?.color ?? existingEquipment.station_type_data?.color ?? null,
+                    typeIcon: currentTypeData?.icon ?? existingEquipment.station_type_data?.icon ?? null,
+                    is_addon: existingEquipment.is_addon,
+                    addon_billing_model: existingEquipment.addon_billing_model,
+                    addon_contract_mode: existingEquipment.addon_contract_mode,
+                    article_id: formData.article_id ?? null,
+                    serial_number: formData.serial_number || null,
+                    label: formData.serial_number || null,
+                  }}
+                  stationTypes={dynamicStationTypes.length > 0 ? dynamicStationTypes : undefined}
+                  onChanged={handleTypeChanged}
+                  onCancel={() => setShowChangeType(false)}
+                />
+              </div>,
+              document.body
+            )}
+          </div>
+        ) : loadingTypes ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 text-[#20c58f] animate-spin" />
           </div>
