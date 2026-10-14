@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.54.2',
+    date: '2026-10-14',
+    title: 'Specialrapporter: nya ikoner för händelsetyperna',
+    items: [
+      { kind: 'andring', text: 'Händelsetyperna har fått egna ikoner i samma stil som avtalswizarden, i snabbknapparna, typväljaren, händelsekorten, hämtningen från ärendet och i mobilen. Snabbknapparna är nu en lugn grupp där typen syns i ikonen, och Avvikelse känns igen på sin röda varningstriangel.' },
+    ],
+  },
+  {
     version: '3.54.1',
     date: '2026-10-14',
     title: 'Specialrapporter: tydligare slutsats och en guide i handboken',

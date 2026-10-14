@@ -9,7 +9,8 @@ import Modal from '../../ui/Modal'
 import { Icon } from '../../icons/Icon'
 import { SpecialReportService } from '../../../services/specialReportService'
 import { EVENT_TYPES, type SpecialReportEvent, type SpecialReportImportCandidate } from '../../../types/specialReport'
-import { EVENT_ICON, PRIMAR_KNAPP, SEKUNDAR_KNAPP } from './specialReportUtils'
+import { PRIMAR_KNAPP, SEKUNDAR_KNAPP } from './specialReportUtils'
+import { HandelseIkon } from './handelseIkoner'
 
 interface ImportEventsModalProps {
   isOpen: boolean
@@ -121,7 +122,7 @@ export default function ImportEventsModal({ isOpen, onClose, reportId, sectionId
                       <span className="flex items-center gap-2 text-xs">
                         <span className="tabular-nums text-white">{c.event_date}</span>
                         <span className="flex items-center gap-1" style={{ color: typ.color }}>
-                          <Icon name={EVENT_ICON[c.type]} size={16} />
+                          <HandelseIkon typ={c.type} size={18} />
                           {typ.label}
                         </span>
                         {c.already_imported && <span className="text-slate-400">Finns redan i rapporten</span>}

@@ -11,7 +11,6 @@ import { SpecialReportService } from '../../../services/specialReportService'
 import { EVENT_TYPES, type SpecialReportEventType } from '../../../types/specialReport'
 import type { FullSection } from './sectionOps'
 import {
-  EVENT_ICON,
   FALT,
   PRIMAR_KNAPP,
   TEXTFALT,
@@ -21,6 +20,7 @@ import {
   punktIOmrade,
   skrivLokalt,
 } from './specialReportUtils'
+import { HandelseIkon } from './handelseIkoner'
 
 const TYPER = Object.keys(EVENT_TYPES) as SpecialReportEventType[]
 const KORT: Partial<Record<SpecialReportEventType, string>> = { underlev: 'Underlev.' }
@@ -209,7 +209,7 @@ export default function MobileAddEventSheet({
                   className="flex h-[66px] flex-col items-center justify-center gap-1 rounded-xl border-[1.5px] text-xs text-slate-200"
                   style={vald ? { borderColor: farg, background: `${farg}1a` } : { borderColor: 'rgb(51 65 85 / 0.6)' }}
                 >
-                  <span style={{ color: farg }}><Icon name={EVENT_ICON[t]} size={20} /></span>
+                  <HandelseIkon typ={t} size={24} />
                   {KORT[t] ?? EVENT_TYPES[t].label}
                 </button>
               )

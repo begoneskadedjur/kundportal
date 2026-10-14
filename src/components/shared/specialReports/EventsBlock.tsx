@@ -6,6 +6,8 @@
 // snabbknappar per typ och "Hämta från ärendet".
 // 3.54.0: en avvikelse får röd kant, ljust röd yta, röd datumruta och typen med
 // varningsikon, och en egen snabbknapp i röd ton.
+// 3.54.2: duotona händelseikoner (handelseIkoner.tsx) i snabbknappar, typväljare
+// och kort. Snabbknapparna är en grupp neutrala knappar, typen syns i ikonen.
 
 import { useMemo, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
@@ -13,8 +15,9 @@ import { Icon } from '../../icons/Icon'
 import Select from '../../ui/Select'
 import { EVENT_TYPES, type SpecialReportEvent, type SpecialReportEventType, type SpecialReportImage } from '../../../types/specialReport'
 import type { EventPatch, FullSection, SectionOps } from './sectionOps'
-import { EVENT_ICON, EVENT_TON, FALT, IKON_KNAPP, IKON_KNAPP_LATT, PRIMAR_KNAPP, TEXTFALT, dagOchManad } from './specialReportUtils'
+import { EVENT_TON, FALT, IKON_KNAPP, IKON_KNAPP_LATT, PRIMAR_KNAPP, TEXTFALT, dagOchManad } from './specialReportUtils'
 import ImportEventsModal from './ImportEventsModal'
+import { HandelseIkon } from './handelseIkoner'
 
 const TYPER = Object.keys(EVENT_TYPES) as SpecialReportEventType[]
 /** Snabbknapparna under listan */
@@ -107,20 +110,23 @@ export default function EventsBlock({ reportId, section, ops }: EventsBlockProps
           Ny händelse
         </button>
         <span className="hidden text-xs text-slate-500 sm:inline">eller snabbt:</span>
-        {SNABBA.map(t => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => nyHandelse(t)}
-            disabled={lagger !== null}
-            className={`inline-flex h-11 items-center gap-1.5 rounded-xl px-3 text-xs font-semibold transition-opacity hover:opacity-80 disabled:opacity-50 ${EVENT_TON[t]} ${t === 'avvikelse' ? 'ring-1 ring-inset ring-red-500/40' : ''}`}
-          >
-            {lagger === t
-              ? <Loader2 className="h-4 w-4 animate-spin" />
-              : t === 'avvikelse' && <Icon name={EVENT_ICON.avvikelse} size={16} />}
-            {EVENT_TYPES[t].label}
-          </button>
-        ))}
+        {/* 3.54.2: snabbknapparna som en grupp neutrala knappar med gemensam kant, typen syns i ikonen */}
+        <div role="group" aria-label="Snabbval av händelsetyp" className="inline-flex flex-wrap divide-x divide-slate-700 overflow-hidden rounded-xl border border-slate-700 bg-slate-900">
+          {SNABBA.map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => nyHandelse(t)}
+              disabled={lagger !== null}
+              className="inline-flex h-9 items-center gap-1.5 px-2.5 text-xs font-medium text-slate-200 transition-colors hover:bg-slate-800 disabled:opacity-50"
+            >
+              {lagger === t
+                ? <Loader2 className="h-[18px] w-[18px] animate-spin" />
+                : <HandelseIkon typ={t} size={18} />}
+              {EVENT_TYPES[t].label}
+            </button>
+          ))}
+        </div>
         <span className="hidden flex-1 sm:block" />
         <button
           type="button"
@@ -206,11 +212,15 @@ function HandelseKort({ ev, bilder, oppen, bifogar, onOppna, onStang, onAndra, o
           </label>
           <div>
             <span className="mb-1 block text-xs font-medium text-slate-400">Typ</span>
-            <Select
-              value={ev.type}
-              onChange={v => onAndra({ type: v as SpecialReportEventType })}
-              options={TYPER.map(t => ({ value: t, label: EVENT_TYPES[t].label }))}
-            />
+            <div className="flex items-center gap-2">
+              <HandelseIkon typ={ev.type} size={24} />
+              <Select
+                value={ev.type}
+                onChange={v => onAndra({ type: v as SpecialReportEventType })}
+                options={TYPER.map(t => ({ value: t, label: EVENT_TYPES[t].label }))}
+                className="min-w-0 flex-1"
+              />
+            </div>
           </div>
         </div>
         <label className="block">
@@ -281,12 +291,12 @@ function HandelseKort({ ev, bilder, oppen, bifogar, onOppna, onStang, onAndra, o
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           {avvikelse ? (
             <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-red-400">
-              <Icon name={EVENT_ICON.avvikelse} size={16} />
+              <HandelseIkon typ="avvikelse" size={18} />
               {typ.label}
             </span>
           ) : (
             <span className={`flex items-center gap-1.5 text-xs font-semibold ${ton.split(' ').find(c => c.startsWith('text-'))}`}>
-              <span className="h-[7px] w-[7px] rounded-full bg-current" />
+              <HandelseIkon typ={ev.type} size={18} />
               {typ.label}
             </span>
           )}

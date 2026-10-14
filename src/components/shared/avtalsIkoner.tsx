@@ -38,7 +38,8 @@ export interface IkonProps {
 
 type IkonKomponent = (p: IkonProps) => ReactElement
 
-function Svg({ size = 48, className = '', streck, strokeWidth = 1.75, children }: IkonProps & {
+/** Gemensam SVG-ram för ikonserien (används även av händelseikonerna i Specialrapporter). */
+export function Svg({ size = 48, className = '', streck, strokeWidth = 1.75, children }: IkonProps & {
   streck: string
   strokeWidth?: number
   children: ReactNode
