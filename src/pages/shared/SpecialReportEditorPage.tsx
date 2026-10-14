@@ -18,6 +18,7 @@ import { Icon } from '../../components/icons/Icon'
 import { SpecialReportService, nextSectionColor } from '../../services/specialReportService'
 import {
   EVENT_TYPES,
+  handelseOrdning,
   SECTION_LABELS,
   type LatLng,
   type SpecialReport,
@@ -35,7 +36,8 @@ import SectionEditor from '../../components/shared/specialReports/SectionEditor'
 import SendSpecialReportModal from '../../components/shared/specialReports/SendSpecialReportModal'
 import MobileAddEventSheet from '../../components/shared/specialReports/MobileAddEventSheet'
 import AddSectionModal from '../../components/shared/specialReports/AddSectionModal'
-import ReportPreview, { Bladdring } from '../../components/shared/specialReports/ReportPreview'
+import ReportPreview from '../../components/shared/specialReports/ReportPreview'
+import HelaPdfModal from '../../components/shared/specialReports/HelaPdfModal'
 import PolishReviewModal from '../../components/shared/specialReports/PolishReviewModal'
 import OmRapporten from '../../components/shared/specialReports/OmRapporten'
 import BedomningOchAtgarder from '../../components/shared/specialReports/BedomningOchAtgarder'
@@ -44,14 +46,12 @@ import { POLISH_MAX_CHARS, POLISH_MAX_FIELDS, type PolishChange, type PolishFiel
 import {
   PRIMAR_KNAPP,
   SEKUNDAR_KNAPP,
-  byggSidor,
   fargForDel,
   idagISO,
   klarAttSkicka,
   klockslag,
   laddaNed,
   senastAndrad,
-  sidaForVy,
   useArDesktop,
   useDebouncedSaver,
   useSpecialReportBase,
@@ -127,6 +127,10 @@ export default function SpecialReportEditorPage() {
   const skaparDelRef = useRef(false)
   // Bildblock som håller på att skapas per del (bilder bifogade från en händelse)
   const bildblockSkapas = useRef(new Map<string, Promise<SpecialReportBlock>>())
+  // 3.55.0: händelsernas ordning sparas i tur och ordning
+  const ordningsKo = useRef<Promise<void>>(Promise.resolve())
+  // 3.55.0: Hela PDF:en (förhandsvisningen i helskärm)
+  const [visaHelaPdf, setVisaHelaPdf] = useState(false)
 
   // Fältet som har fokus (data-falt) och en begäran att flytta fokus dit
   const [fokus, setFokus] = useState<string | null>(null)
@@ -520,6 +524,18 @@ export default function SpecialReportEditorPage() {
         toast.error(felText(e, 'Kunde inte ta bort händelsen'))
       }
     },
+    reorderEvents: (sectionId, orderedIds) => {
+      // 3.55.0: position skrivs lokalt direkt och sparas utan fördröjning, som blockens ordning
+      const plats = new Map(orderedIds.map((eid, n) => [eid, n]))
+      andraSektion(sectionId, s => ({
+        ...s,
+        events: s.events.map(e => (plats.has(e.id) ? { ...e, position: plats.get(e.id)! } : e)),
+      }))
+      // En flytt i taget mot databasen: två snabba flyttar får inte blandas ihop
+      const steg = ordningsKo.current.then(() => SpecialReportService.reorderEvents(sectionId, orderedIds))
+      ordningsKo.current = steg.catch(() => { /* felet visas nedan */ })
+      saver.now(() => steg).catch(sparfel)
+    },
     eventsImported: (sectionId, events) => {
       andraSektion(sectionId, s => ({ ...s, events: [...s.events, ...events] }))
     },
@@ -613,7 +629,7 @@ export default function SpecialReportEditorPage() {
           lagg(`block:${s.id}:${b.id}`, `${prefix} · Text${n}`, b.content.text)
         }
         if (b.type === 'events' && (vad === 'hela' || vad === 'handelser')) {
-          const handelser = [...s.events].sort((a, b2) => a.event_date.localeCompare(b2.event_date) || a.created_at.localeCompare(b2.created_at))
+          const handelser = [...s.events].sort(handelseOrdning)
           for (const ev of handelser) {
             const namn = `${prefix} · Händelse ${ev.event_date}`
             lagg(`handelse:${s.id}:${ev.id}:title`, `${namn} · Rubrik`, ev.title)
@@ -792,8 +808,6 @@ export default function SpecialReportEditorPage() {
   const antalOmraden = sektioner.filter(s => s.area && s.area.length >= 3).length
   const klar = klarAttSkicka(report)
   const klarAntal = klar.filter(p => p.klar).length
-  const sidor = byggSidor(report)
-  const sidIndex = sidaForVy(sidor, vy)
 
   const statusText = saver.status === 'sparar'
     ? 'Sparar...'
@@ -1145,7 +1159,7 @@ export default function SpecialReportEditorPage() {
         {/* ── Så ser kunden rapporten: egen spalt när redigeringen ändå får plats ── */}
         {forhandSomSpalt && (
           <aside
-            className="flex flex-shrink-0 flex-col items-center gap-2 overflow-y-auto border-l border-slate-800 bg-slate-950/40 px-4 py-4"
+            className="flex flex-shrink-0 flex-col items-center gap-2 overflow-y-auto border-l border-slate-800 bg-slate-950/40 px-4 pb-4"
             style={{ width: bredder.forhand }}
           >
             <ReportPreview
@@ -1153,7 +1167,7 @@ export default function SpecialReportEditorPage() {
               vy={vy}
               fokus={fokus}
               onValj={(nyVy, falt) => gaTill(nyVy, falt)}
-              onBladdra={nyVy => gaTill(nyVy)}
+              onHelaPdf={() => setVisaHelaPdf(true)}
             />
             <span className="text-[11px] text-slate-500">Tryck på något på sidan för att redigera det</span>
           </aside>
@@ -1182,13 +1196,13 @@ export default function SpecialReportEditorPage() {
                   <Icon name="allman.stang" size={20} />
                 </button>
               </div>
-              <div className="flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto px-5 py-4">
+              <div className="flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto px-5 pb-4">
                 <ReportPreview
                   report={report}
                   vy={vy}
                   fokus={fokus}
                   onValj={(nyVy, falt) => { setVisaPanel(false); gaTill(nyVy, falt) }}
-                  onBladdra={nyVy => gaTill(nyVy)}
+                  onHelaPdf={() => { setVisaPanel(false); setVisaHelaPdf(true) }}
                 />
                 <span className="text-[11px] text-slate-500">Tryck på något på sidan för att redigera det</span>
               </div>
@@ -1198,25 +1212,14 @@ export default function SpecialReportEditorPage() {
 
         {/* ── Mobil: Visa som kund i helskärm ── */}
         {!arDesktop && mobilFlik === 'kund' && (
-          <section className="flex w-full flex-col items-center gap-3 px-4 pb-48 pt-2" aria-label="Så ser kunden rapporten">
-            <div className="flex w-full items-center justify-between">
-              <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-white">
-                {sidor[sidIndex].farg && (
-                  <span className="flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[5px] text-[11px] font-extrabold text-[#fff]" style={{ background: sidor[sidIndex].farg }}>
-                    {sidor[sidIndex].nr}
-                  </span>
-                )}
-                <span className="truncate">{sidor[sidIndex].namn}</span>
-              </span>
-              <Bladdring sidor={sidor} index={sidIndex} onBladdra={nyVy => { gaTill(nyVy); setMobilFlik('kund') }} stor />
-            </div>
+          <section className="flex w-full flex-col items-center gap-3 px-4 pb-48" aria-label="Så ser kunden rapporten">
+            {/* 3.55.0: samma rulle som på desktop, alla sidor under varandra */}
             <ReportPreview
               report={report}
               vy={vy}
               fokus={null}
               onValj={(nyVy, falt) => gaTill(nyVy, falt)}
-              onBladdra={nyVy => { gaTill(nyVy); setMobilFlik('kund') }}
-              visaHuvud={false}
+              onHelaPdf={() => setVisaHelaPdf(true)}
             />
             <button type="button" onClick={() => setMobilFlik('redigera')} className={SEKUNDAR_KNAPP}>
               <Icon name="allman.anteckning" size={16} />
@@ -1277,6 +1280,15 @@ export default function SpecialReportEditorPage() {
         report={report}
         onSent={() => { void ladda() }}
         beforeRender={() => saver.flush()}
+      />
+      <HelaPdfModal
+        isOpen={visaHelaPdf}
+        onClose={() => setVisaHelaPdf(false)}
+        report={report}
+        vy={vy}
+        hamtarPdf={hamtarPdf}
+        onLaddaNer={laddaNedPdf}
+        onSkicka={() => { setVisaHelaPdf(false); setVisaSkicka(true) }}
       />
       <PolishReviewModal
         isOpen={!!polish}

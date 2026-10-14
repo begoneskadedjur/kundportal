@@ -43,6 +43,7 @@ reorderBlocks(sectionId: string, orderedIds: string[]): Promise<void>
 addEvent(sectionId: string, input: { event_date: string; type: SpecialReportEventType; title: string; description?: string | null }): Promise<SpecialReportEvent>   // skapar events-block i sektionen om det saknas
 updateEvent(eventId: string, patch: Partial<Pick<SpecialReportEvent, 'event_date'|'type'|'title'|'description'>>): Promise<void>
 deleteEvent(eventId: string): Promise<void>
+reorderEvents(sectionId: string, orderedIds: string[]): Promise<void>   // 3.55.0: skriver position 0..n-1
 getImportCandidates(reportId: string): Promise<SpecialReportImportCandidate[]>   // visits för ärendet + station_inspection_sessions (bara contract)
 importEvents(sectionId: string, candidates: SpecialReportImportCandidate[]): Promise<SpecialReportEvent[]>
 uploadImage(reportId: string, sectionId: string, file: File, opts?: { eventId?: string | null; caption?: string | null }): Promise<SpecialReportImage>
@@ -80,3 +81,11 @@ Skiss: V4-OmRapporten och V4-Del (sessionens scratchpad).
 - `avvikelserIRapporten(sections)` ger avvikelserna i delarnas ordning med delens nummer (2.x) och rubrik. Används av förhandsvisningen och PDF:en: röd markering i händelsetabellen, rutan "Avvikelser i den här delen (N)" överst i delen och "Avvikelser att åtgärda (N)" på översikten (bara när det finns avvikelser).
 - `recommendations` heter Rekommenderade åtgärder i gränssnittet och lagras som rader avskilda med radbrytning (schemat oförändrat). `atgardsRader(text)` ger raderna utan tomma rader och utan inledande punkt eller siffra. Redigeraren (`AtgardsLista.tsx`) har lägg till, ta bort, flytta och Enter för nästa rad. PDF:en visar en grön panel med numrerade punkter och översikten "Det här rekommenderar vi" med de tre första.
 - Snygga till stoppar förslag som delar eller slår ihop rader i `rapport:recommendations`.
+
+## Händelseordning, täthet och förhandsvisningen som rulle (3.55.0)
+Skiss: Handelser, Bilder, Forhandsvisning och HelaPdf (sessionens scratchpad, mappen tatare).
+- `special_report_events.position integer not null default 0` (migration `supabase/migrations/20261014_specialrapporter_handelse_ordning.sql`). Händelser sorteras på position och sedan created_at överallt: `get`, PDF:en, förhandsvisningen, Snygga till och `avvikelserIRapporten` (hjälpen `handelseOrdning` i `src/types/specialReport.ts`). `addEvent` och `importEvents` sätter max + 1 (import i datumordning). Datumet styr inte längre ordningen.
+- Händelseblocket är en tät lista: grepp för dra och släpp (HTML5, linje före eller efter raden), ⋯-meny med Redigera, Flytta upp, Flytta ned och Ta bort (med bekräftelse), Alt och pil upp eller ned på raden. Ny ordning sparas direkt med `reorderEvents`, en flytt i taget (kö i redigeraren).
+- Bildblocket är ett tätt rutnät (2 till 5 i bredd efter behållaren) med uppladdningsruta. Ladda upp i blockets huvud öppnar samma filväljare.
+- Förhandsvisningen (`ReportPreview.tsx`) är en rulle med alla sidor. Sidbrytningen finns i `rapportSidor.tsx`: bitarna mäts i en osynlig behållare (sidan ritas i 420 x 594 px och skalas med transform) och fördelas i ett varv. Varje bit placeras en gång, en för hög bit klipps. Fortsättningssidor får "2.x Namn, fortsättning" och upprepat tabellhuvud. Sidbrytningen är en uppskattning; PDF:en från servern bryter själv.
+- Hela PDF:en (`HelaPdfModal.tsx`): egen portal i helskärm med miniatyrer, stor sida, piltangenter, Ladda ner PDF och Skicka till kund.

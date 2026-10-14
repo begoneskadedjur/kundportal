@@ -400,9 +400,29 @@ export function useDebouncedSaver(delay = 600) {
 export const SNYGGA_KNAPP =
   'inline-flex items-center justify-center gap-1.5 h-11 min-w-11 flex-shrink-0 rounded-lg px-2 text-xs font-semibold text-emerald-400 hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60 disabled:opacity-40 disabled:cursor-not-allowed'
 
-/** Kort med mjuk skugga (3.53.0): vit yta i ljust läge, slate-900 i mörkt */
-export const KORT =
-  'bg-slate-900 ring-1 ring-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_6px_20px_rgba(15,23,42,0.05)]'
+/**
+ * Kort (3.55.0): tunn kant i stället för skugga. Vit yta i ljust läge,
+ * slate-900 i mörkt
+ */
+export const KORT = 'bg-slate-900 border border-slate-800'
+
+/** 3.55.0: liten ikonknapp utan ram i täta rader och blockhuvuden (32 px) */
+export const LITEN_IKON_KNAPP =
+  'inline-flex items-center justify-center w-8 h-8 flex-shrink-0 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60 disabled:opacity-30 disabled:cursor-not-allowed'
+
+/** 3.55.0: liten textknapp utan ram (28 px), till exempel Snygga till och Hämta från ärendet */
+export const LITEN_TEXT_KNAPP =
+  'inline-flex items-center justify-center gap-1.5 h-7 flex-shrink-0 rounded-lg px-2 text-xs transition-colors hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60 disabled:opacity-40 disabled:cursor-not-allowed'
+
+/** 3.55.0: litet fält (32 px) i den täta redigeringen */
+export const LITET_FALT =
+  'h-8 px-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white text-[13px] placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50 focus:border-[#20c58f]'
+
+/** Kort datum ur ÅÅÅÅ-MM-DD: "14 okt" */
+export function kortDatum(datum: string): string {
+  const { dag, manad } = dagOchManad(datum)
+  return `${dag} ${manad}`
+}
 
 /** Tonad yta och text per händelsetyp, följer temat (-400 mörknas i ljust läge) */
 export const EVENT_TON: Record<SpecialReportEventType, string> = {

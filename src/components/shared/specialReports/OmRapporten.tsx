@@ -109,7 +109,7 @@ export default function OmRapporten({ report, onTitle, onDocType, onIntro, onPol
   }
 
   return (
-    <div className="@container space-y-4">
+    <div className="@container space-y-2.5">
       {/* ── Framsidesbanderoll: fasta färger ── */}
       <section
         aria-label="Rapportens framsida"
@@ -167,9 +167,9 @@ export default function OmRapporten({ report, onTitle, onDocType, onIntro, onPol
         </div>
       </section>
 
-      <div className="grid grid-cols-1 gap-4 @2xl:grid-cols-[1.1fr_1fr]">
+      <div className="grid grid-cols-1 gap-2.5 @2xl:grid-cols-[1.1fr_1fr]">
         {/* ── Kunden ── */}
-        <section aria-label="Kunden" className={`@container flex flex-col gap-3.5 rounded-[18px] p-4 @2xl:px-5 @2xl:py-[18px] ${KORT}`}>
+        <section aria-label="Kunden" className={`@container flex flex-col gap-3.5 rounded-xl p-3 @2xl:px-3.5 @2xl:py-3 ${KORT}`}>
           <span className="text-[13px] font-bold text-white">Kunden</span>
           <div className="flex items-center gap-3.5">
             <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[14px] bg-indigo-500/10 text-base font-extrabold text-indigo-400" aria-hidden="true">
@@ -204,7 +204,7 @@ export default function OmRapporten({ report, onTitle, onDocType, onIntro, onPol
         </section>
 
         {/* ── Typ av rapport ── */}
-        <section aria-label="Typ av rapport" data-falt="rapport:doc_type" className={`flex flex-col gap-3 rounded-[18px] p-4 @2xl:px-5 @2xl:py-[18px] ${KORT}`}>
+        <section aria-label="Typ av rapport" data-falt="rapport:doc_type" className={`flex flex-col gap-3 rounded-xl p-3 @2xl:px-3.5 @2xl:py-3 ${KORT}`}>
           <span className="text-[13px] font-bold text-white" id="typ-av-rapport">Typ av rapport</span>
           <div role="radiogroup" aria-labelledby="typ-av-rapport" className="flex flex-col gap-2">
             {DOC_TYPES.map((d, i) => {
@@ -239,7 +239,7 @@ export default function OmRapporten({ report, onTitle, onDocType, onIntro, onPol
       </div>
 
       {/* ── Inledning ── */}
-      <section aria-label="Inledning" className={`flex flex-col gap-2.5 rounded-[18px] p-4 @2xl:px-5 @2xl:py-[18px] ${KORT}`}>
+      <section aria-label="Inledning" className={`flex flex-col gap-2.5 rounded-xl p-3 @2xl:px-3.5 @2xl:py-3 ${KORT}`}>
         <div className="flex items-start justify-between gap-2">
           <span className="flex min-w-0 flex-col">
             <span className="text-[13px] font-bold text-white">Inledning</span>

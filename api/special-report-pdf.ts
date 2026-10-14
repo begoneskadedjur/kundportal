@@ -255,7 +255,7 @@ async function loadReportData(report: SpecialReport): Promise<ReportData> {
       : Promise.resolve({ data: [], error: null }),
     sectionIds.length > 0
       ? supabase.from('special_report_events').select('*').in('section_id', sectionIds)
-        .order('event_date', { ascending: true }).order('created_at', { ascending: true })
+        .order('position', { ascending: true }).order('created_at', { ascending: true })
       : Promise.resolve({ data: [], error: null }),
     supabase.from('special_report_images').select('*').eq('report_id', report.id)
       .order('position', { ascending: true }).order('created_at', { ascending: true }),

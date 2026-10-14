@@ -24,6 +24,8 @@ export interface SectionOps {
   addEvent: (sectionId: string, type: SpecialReportEventType) => Promise<SpecialReportEvent | null>
   updateEvent: (sectionId: string, eventId: string, patch: EventPatch) => void
   deleteEvent: (sectionId: string, eventId: string) => Promise<void>
+  /** 3.55.0: ny ordning på delens händelser (alla id:n i den nya ordningen) */
+  reorderEvents: (sectionId: string, orderedIds: string[]) => void
   eventsImported: (sectionId: string, events: SpecialReportEvent[]) => void
   /** Laddar upp bilder till delen. Med eventId kopplas de till händelsen och bildblocket skapas om det saknas */
   uploadImages: (sectionId: string, files: File[], eventId?: string | null) => Promise<void>

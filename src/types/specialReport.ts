@@ -89,6 +89,8 @@ export interface SpecialReportBlock {
 export interface SpecialReportEvent {
   id: string
   section_id: string
+  /** 3.55.0: ordningen i delen (dra och släpp), inte datumet */
+  position: number
   /** ÅÅÅÅ-MM-DD */
   event_date: string
   type: SpecialReportEventType
@@ -231,14 +233,32 @@ export function atgardsRader(text: string | null | undefined): string[] {
     .filter(rad => rad.length > 0)
 }
 
+/**
+ * Händelsernas ordning i en del (3.55.0): position, sedan när de skapades.
+ * Saknas position (äldre data) gäller datumet.
+ */
+export function handelseOrdning(
+  a: Pick<SpecialReportEvent, 'event_date' | 'created_at'> & { position?: number | null },
+  b: Pick<SpecialReportEvent, 'event_date' | 'created_at'> & { position?: number | null },
+): number {
+  const pa = typeof a.position === 'number' ? a.position : null
+  const pb = typeof b.position === 'number' ? b.position : null
+  if (pa !== null && pb !== null && pa !== pb) return pa - pb
+  if (pa === null || pb === null) {
+    const d = a.event_date.localeCompare(b.event_date)
+    if (d !== 0) return d
+  }
+  return a.created_at.localeCompare(b.created_at)
+}
+
 /** Rapportens avvikelser i delarnas ordning, med delens nummer (2.x) och rubrik */
-export function avvikelserIRapporten<E extends Pick<SpecialReportEvent, 'type' | 'event_date' | 'created_at'>>(
+export function avvikelserIRapporten<E extends Pick<SpecialReportEvent, 'type' | 'event_date' | 'created_at'> & { position?: number | null }>(
   sections: { title: string; label: SpecialReportSectionLabel; events: E[] }[],
 ): { del: number; delTitel: string; event: E }[] {
   return sections.flatMap((s, i) =>
     s.events
       .filter(e => e.type === 'avvikelse')
-      .sort((a, b) => a.event_date.localeCompare(b.event_date) || a.created_at.localeCompare(b.created_at))
+      .sort(handelseOrdning)
       .map(event => ({ del: i + 1, delTitel: s.title.trim() || SECTION_LABELS[s.label] || 'Del', event })),
   )
 }

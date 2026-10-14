@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.55.0',
+    date: '2026-10-14',
+    title: 'Specialrapporter: tätare redigering och hela rapporten i förhandsvisningen',
+    items: [
+      { kind: 'nyhet', text: 'Händelserna går att sortera själv: dra i greppet, använd Flytta upp och Flytta ned i menyn eller Alt och piltangenterna. Ordningen följer med till rapporten och PDF:en.' },
+      { kind: 'andring', text: 'Händelser och bilder visas mycket tätare: en rad per händelse som öppnas för redigering med ett klick, och bilderna i ett rutnät med upp till fem i bredd. Delens rubrik och egenskaper tar mindre plats.' },
+      { kind: 'nyhet', text: 'Förhandsvisningen visar alla sidor under varandra med sidbrytningar och sidnummer, och följer med till delen du redigerar. Med Hela PDF:en ser du rapporten sida för sida i helskärm och kan ladda ner eller skicka direkt.' },
+    ],
+  },
+  {
     version: '3.54.2',
     date: '2026-10-14',
     title: 'Specialrapporter: nya ikoner för händelsetyperna',

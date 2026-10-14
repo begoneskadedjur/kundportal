@@ -581,7 +581,7 @@ export class SpecialReportService {
         : Promise.resolve(empty),
       sectionIds.length > 0
         ? db.from('special_report_events').select('*').in('section_id', sectionIds)
-          .order('event_date', { ascending: true }).order('created_at', { ascending: true })
+          .order('position', { ascending: true }).order('created_at', { ascending: true })
         : Promise.resolve(empty),
       db.from('special_report_images').select('*').eq('report_id', id)
         .order('position', { ascending: true }).order('created_at', { ascending: true }),
@@ -768,10 +768,13 @@ export class SpecialReportService {
     if (!title) throw new Error('Händelsen behöver en rubrik')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(input.event_date)) throw new Error('Ange datum som ÅÅÅÅ-MM-DD')
     await SpecialReportService.ensureEventsBlock(sectionId)
+    // 3.55.0: ny händelse hamnar sist i delens ordning
+    const position = await nextPosition('special_report_events', 'section_id', sectionId)
     const { data, error } = await db
       .from('special_report_events')
       .insert({
         section_id: sectionId,
+        position,
         event_date: input.event_date,
         type: input.type,
         title,
@@ -793,6 +796,15 @@ export class SpecialReportService {
     }
     const { error } = await db.from('special_report_events').update(patch).eq('id', eventId)
     if (error) fel(error, 'Händelsen kunde inte sparas')
+  }
+
+  /** 3.55.0: händelsernas ordning i delen, samma stil som reorderBlocks */
+  static async reorderEvents(sectionId: string, orderedIds: string[]): Promise<void> {
+    const results = await Promise.all(orderedIds.map((id, position) =>
+      db.from('special_report_events').update({ position }).eq('id', id).eq('section_id', sectionId)
+    ))
+    const failed = results.find(r => r.error)
+    if (failed?.error) fel(failed.error, 'Ordningen kunde inte sparas')
   }
 
   static async deleteEvent(eventId: string): Promise<void> {
@@ -928,9 +940,14 @@ export class SpecialReportService {
     if (rows.length === 0) return []
 
     await SpecialReportService.ensureEventsBlock(sectionId)
-    const { data, error } = await db.from('special_report_events').insert(rows).select('*')
+    // 3.55.0: inhämtade händelser läggs sist, i datumordning
+    const start = await nextPosition('special_report_events', 'section_id', sectionId)
+    const ordnade = [...rows]
+      .sort((a, b) => a.event_date.localeCompare(b.event_date))
+      .map((r, i) => ({ ...r, position: start + i }))
+    const { data, error } = await db.from('special_report_events').insert(ordnade).select('*')
     if (error) fel(error, 'Händelserna kunde inte hämtas in')
-    return ((data ?? []) as SpecialReportEvent[]).sort((a, b) => a.event_date.localeCompare(b.event_date))
+    return ((data ?? []) as SpecialReportEvent[]).sort((a, b) => a.position - b.position)
   }
 
   // ==========================================================================

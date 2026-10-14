@@ -10,12 +10,12 @@ import { atgardsRader, avvikelserIRapporten, type SpecialReportFull } from '../.
 import AtgardsLista from './AtgardsLista'
 import { KORT, SNYGGA_KNAPP, TEXTFALT, fargForDel } from './specialReportUtils'
 
-/** Kort med grön accent: samma yta och skugga som KORT men grön kant */
+/** Kort med grön accent: samma yta och tunna kant som KORT men grön */
 const KORT_GRON =
-  'bg-slate-900 ring-[1.5px] ring-emerald-500/40 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_6px_20px_rgba(15,23,42,0.05)]'
+  'bg-slate-900 border border-emerald-500/40'
 /** Kort med röd accent för avvikelserna */
 const KORT_ROD =
-  'bg-slate-900 ring-[1.5px] ring-red-500/30 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_6px_20px_rgba(15,23,42,0.05)]'
+  'bg-slate-900 border border-red-500/30'
 
 interface BedomningOchAtgarderProps {
   report: SpecialReportFull
@@ -38,7 +38,7 @@ export default function BedomningOchAtgarder({ report, onAssessment, onRecommend
   ]
 
   return (
-    <div className="@container space-y-4">
+    <div className="@container space-y-2.5">
       {/* ── Banderoll: fasta färger som framsidan ── */}
       <section
         aria-label="Din slutsats till kunden"
@@ -63,7 +63,7 @@ export default function BedomningOchAtgarder({ report, onAssessment, onRecommend
       </section>
 
       {/* ── Bedömning ── */}
-      <section aria-label="Bedömning" className={`flex flex-col gap-3 rounded-[18px] p-4 @2xl:px-5 @2xl:py-[18px] ${KORT}`}>
+      <section aria-label="Bedömning" className={`flex flex-col gap-3 rounded-xl p-3 @2xl:px-3.5 @2xl:py-3 ${KORT}`}>
         <div className="flex items-start gap-3">
           <span className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[11px] bg-indigo-500/10 text-indigo-400">
             <Icon name="rapport.bedomning" size={20} />
@@ -97,7 +97,7 @@ export default function BedomningOchAtgarder({ report, onAssessment, onRecommend
 
       {/* ── Avvikelser att åtgärda: bara när det finns några ── */}
       {avvikelser.length > 0 && (
-        <section aria-label="Avvikelser att åtgärda" className={`flex flex-col gap-3 rounded-[18px] p-4 @2xl:px-5 @2xl:py-[18px] ${KORT_ROD}`}>
+        <section aria-label="Avvikelser att åtgärda" className={`flex flex-col gap-3 rounded-xl p-3 @2xl:px-3.5 @2xl:py-3 ${KORT_ROD}`}>
           <div className="flex items-start gap-3">
             <span className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[11px] bg-red-500/10 text-red-400">
               <Icon name="rapport.avvikelse" size={20} />
@@ -146,7 +146,7 @@ export default function BedomningOchAtgarder({ report, onAssessment, onRecommend
       <section
         aria-label="Rekommenderade åtgärder"
         data-falt="rapport:recommendations"
-        className={`flex flex-col gap-3 rounded-[18px] p-4 @2xl:px-5 @2xl:py-[18px] ${KORT_GRON}`}
+        className={`flex flex-col gap-3 rounded-xl p-3 @2xl:px-3.5 @2xl:py-3 ${KORT_GRON}`}
       >
         <div className="flex items-start gap-3">
           <span className="flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[11px] bg-emerald-500/10 text-emerald-400">
