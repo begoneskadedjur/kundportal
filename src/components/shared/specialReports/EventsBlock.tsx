@@ -109,8 +109,10 @@ export default function EventsBlock({ reportId, section, ops }: EventsBlockProps
           {lagger === 'ny' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon name="allman.plus" size={20} />}
           Ny händelse
         </button>
+        {/* 3.54.2: snabbknapparna som en grupp neutrala knappar med gemensam kant, typen syns i ikonen.
+            Etiketten och gruppen hålls ihop så att etiketten aldrig blir ensam på en rad */}
+        <div className="inline-flex flex-wrap items-center gap-2">
         <span className="hidden text-xs text-slate-500 sm:inline">eller snabbt:</span>
-        {/* 3.54.2: snabbknapparna som en grupp neutrala knappar med gemensam kant, typen syns i ikonen */}
         <div role="group" aria-label="Snabbval av händelsetyp" className="inline-flex flex-wrap divide-x divide-slate-700 overflow-hidden rounded-xl border border-slate-700 bg-slate-900">
           {SNABBA.map(t => (
             <button
@@ -127,11 +129,12 @@ export default function EventsBlock({ reportId, section, ops }: EventsBlockProps
             </button>
           ))}
         </div>
+        </div>
         <span className="hidden flex-1 sm:block" />
         <button
           type="button"
           onClick={() => setVisaImport(true)}
-          className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900 px-3 text-xs text-slate-200 hover:bg-slate-800"
+          className="inline-flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-xs text-slate-300 hover:bg-slate-800"
         >
           <Icon name="rapport.hamta" size={16} />
           Hämta från ärendet
