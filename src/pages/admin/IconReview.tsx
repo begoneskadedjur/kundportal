@@ -20,6 +20,7 @@ const DOMAN_RUBRIK: Record<string, string> = {
   tjanst: 'Tjänster (skadedjur)',
   kalla: 'Källor (webbförfrågningar)',
   sok: 'Söklådan',
+  rapport: 'Specialrapporter',
 }
 
 export default function IconReview() {

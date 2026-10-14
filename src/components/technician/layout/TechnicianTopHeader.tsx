@@ -16,7 +16,8 @@ interface TechnicianTopHeaderProps {
 export function TechnicianTopHeader({ userName }: TechnicianTopHeaderProps) {
   const location = useLocation()
   const { profile } = useAuth()
-  const currentLabel = breadcrumbMap[location.pathname] || 'Översikt'
+  // Undersidor (t.ex. /specialrapporter/:id) ärver förälderns namn
+  const currentLabel = breadcrumbMap[location.pathname] || breadcrumbMap[location.pathname.replace(/\/[^/]+$/, '')] || 'Översikt'
   const [ticketCount, setTicketCount] = useState(0)
 
   useEffect(() => {

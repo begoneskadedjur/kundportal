@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.50.0',
+    date: '2026-10-14',
+    title: 'Specialrapporter',
+    items: [
+      { kind: 'nyhet', text: 'Specialrapporter: en egen rapport kopplad till ett ärende, för uppdrag som inte passar i en vanlig rapport. Dela in den i sektioner per område, besök, underleverantör eller fritt, och bygg varje sektion av text, händelser med datum, bilder och kartutsnitt.' },
+      { kind: 'nyhet', text: 'Rita områden på en satellitkarta, så blir varje område en egen sektion. Händelser kan läggas till ute på plats i mobilen, och besök och kontroller kan hämtas från ärendet.' },
+      { kind: 'nyhet', text: 'Rapporten blir en PDF enligt vår dokumentstandard och mejlas till kunden. Varje skickad version låses och sparas, och du kan fortsätta arbeta i nästa version när något nytt har hänt.' },
+      { kind: 'nyhet', text: 'Teknikerna på ärendet och koordinatorerna arbetar i samma rapport. Specialrapporter finns i menyn och under Utförande i ärendet.' },
+    ],
+  },
+  {
     version: '3.49.0',
     date: '2026-10-14',
     title: 'Byt stationstyp och ny kontrollrunda',

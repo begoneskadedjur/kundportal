@@ -15,6 +15,7 @@ import {
   FileSignature,
   Package,
   GitBranch,
+  FileText,
 } from 'lucide-react'
 
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
@@ -33,6 +34,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Mina ärenden', icon: ClipboardList, path: '/technician/cases' },
       { label: 'Schema', icon: Calendar, path: '/technician/schedule' },
+      { label: 'Specialrapporter', icon: FileText, path: '/technician/specialrapporter' },
       { label: 'Utrustning', icon: Package, path: '/technician/equipment' },
       { label: 'Tickets', icon: MessageSquareText, path: '/technician/tickets', badgeKey: 'tickets' },
     ],
@@ -70,6 +72,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/technician/cases': 'Mina ärenden',
   '/technician/schedule': 'Schema',
   '/technician/equipment': 'Utrustning',
+  '/technician/specialrapporter': 'Specialrapporter',
   '/technician/commissions': 'Provisioner',
   '/technician/leads': 'Mina leads och tips',
   '/technician/oneflow': 'Skapa Avtal & Offerter',

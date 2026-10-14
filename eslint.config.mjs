@@ -66,6 +66,8 @@ export default tseslint.config(
       'src/services/leadService.ts',
       'src/types/leads.ts',
       'src/components/admin/provisions/TipsbonusPanel.tsx',
+      'src/components/shared/specialReports/**/*.{ts,tsx}',
+      'src/pages/shared/SpecialReport*.tsx',
     ],
     rules: {
       'no-restricted-imports': [

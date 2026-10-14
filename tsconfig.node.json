@@ -22,6 +22,8 @@
     "src/lib/begoneLogo.ts",
     "src/types/database.ts",
     "src/types/leads.ts",
+    // Specialrapporter (api/special-report-pdf)
+    "src/types/specialReport.ts",
 
     // Delad schemagenerator (extend-recurring-schedules-cronen) — samma
     // algoritm som klientens wizard, med timeZone-parameter för servern

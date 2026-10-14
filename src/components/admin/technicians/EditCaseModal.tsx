@@ -75,6 +75,7 @@ import CaseHistoryPanel from '../../shared/CaseHistoryPanel'
 
 // Delade modal-byggstenar (visuell omgörning)
 import CaseModalSection from '../../shared/CaseModalSection'
+import CaseSpecialReportsSection from '../../shared/specialReports/CaseSpecialReportsSection'
 import CaseStatusStepper from '../../shared/CaseStatusStepper'
 import SkapaLeadKnapp from '../leads/SkapaLeadKnapp'
 
@@ -2153,6 +2154,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   placeholder="Metoder, resultat, rekommendationer..."
                 />
               </CaseModalSection>
+            )}
+
+            {/* Specialrapport: fri rapport kopplad till ärendet (3.50.0) */}
+            {currentCase?.id && (
+              <CaseSpecialReportsSection caseId={currentCase.id} caseNumber={currentCase.case_number} />
             )}
 
             {/* Använda preparat - Visas INTE för Inspektion */}

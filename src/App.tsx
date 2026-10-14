@@ -136,6 +136,10 @@ import InternAdministration from './pages/shared/InternAdministration';
 // Intranät (start, policys med läskvittens, handbok, kontakter)
 import IntranetPage from './pages/shared/IntranetPage';
 
+// Specialrapporter (tekniker, koordinator och admin via koordinatorns sökväg)
+import SpecialReportsPage from './pages/shared/SpecialReportsPage';
+import SpecialReportEditorPage from './pages/shared/SpecialReportEditorPage';
+
 // Global styles
 import './styles/globals.css';
 
@@ -339,6 +343,8 @@ function App() {
               <Route path="offerthantering" element={<Navigate to="/koordinator/dokumentsignering" replace />} />
               <Route path="sok-arenden" element={<ProtectedRoute requiredRole="koordinator"><CaseSearch /></ProtectedRoute>} />
               <Route path="arenden" element={<ProtectedRoute requiredRole="koordinator"><CasesPage /></ProtectedRoute>} />
+              <Route path="specialrapporter" element={<ProtectedRoute requiredRole="koordinator"><SpecialReportsPage /></ProtectedRoute>} />
+              <Route path="specialrapporter/:id" element={<ProtectedRoute requiredRole="koordinator"><SpecialReportEditorPage /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="koordinator"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="analytics" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorAnalytics /></ProtectedRoute>} />
 
@@ -408,6 +414,8 @@ function App() {
               <Route path="cases" element={<ProtectedRoute requiredRole="technician"><TechnicianCases /></ProtectedRoute>} />
               <Route path="schedule" element={<ProtectedRoute requiredRole="technician"><TechnicianSchedule /></ProtectedRoute>} />
               <Route path="inspection/:caseId" element={<ProtectedRoute requiredRole="technician"><StationInspectionModule /></ProtectedRoute>} />
+              <Route path="specialrapporter" element={<ProtectedRoute requiredRole="technician"><SpecialReportsPage /></ProtectedRoute>} />
+              <Route path="specialrapporter/:id" element={<ProtectedRoute requiredRole="technician"><SpecialReportEditorPage /></ProtectedRoute>} />
               <Route path="leads" element={<ProtectedRoute requiredRole="technician"><Leads /></ProtectedRoute>} />
               <Route path="oneflow" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />

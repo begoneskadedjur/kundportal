@@ -37,6 +37,7 @@ import CustomerAcknowledgmentIndicator from '../shared/CustomerAcknowledgmentInd
 import Input from '../ui/Input'
 import CaseModalSection from '../shared/CaseModalSection'
 import InspectionReportSection from '../shared/InspectionReportSection'
+import CaseSpecialReportsSection from '../shared/specialReports/CaseSpecialReportsSection'
 import CaseStatusStepper from '../shared/CaseStatusStepper'
 
 // Fakturering - ad-hoc billing för avtalskunder vid ärendeavslut
@@ -2193,6 +2194,11 @@ export default function EditContractCaseModal({
               fallbackEmail={customerData?.contact_email || formData.contact_email}
               fallbackContactName={customerData?.contact_person || formData.contact_person}
             />
+          )}
+
+          {/* Specialrapport: fri rapport kopplad till ärendet (3.50.0) */}
+          {caseData?.id && !isCustomerView && (
+            <CaseSpecialReportsSection caseId={caseData.id} caseNumber={formData.case_number} />
           )}
 
           {/* Bilder sektion — inte för stationskontroll (foton tas per station i kontrollrundan) */}
