@@ -1,5 +1,5 @@
 // src/components/shared/specialReports/MobileAddEventSheet.tsx
-// Ny händelse i mobilen: välj sektion (förvald efter området telefonen står i,
+// Ny händelse i mobilen: välj del (förvald efter området telefonen står i,
 // annars den senast använda), typ, datum, rubrik, beskrivning och foton.
 
 import { useEffect, useRef, useState } from 'react'
@@ -15,6 +15,7 @@ import {
   FALT,
   PRIMAR_KNAPP,
   TEXTFALT,
+  fargForDel,
   idagISO,
   lasLokalt,
   punktIOmrade,
@@ -31,7 +32,7 @@ interface MobileAddEventSheetProps {
   reportTitle: string
   caseNumber: string | null
   sections: FullSection[]
-  /** Föreslagen sektion om ingen position finns (t.ex. den som är öppen) */
+  /** Föreslagen del om ingen position finns (t.ex. den som är öppen) */
   preferredSectionId?: string | null
   onSaved: () => void
 }
@@ -53,7 +54,7 @@ export default function MobileAddEventSheet({
   const fotonRef = useRef(foton)
   useEffect(() => { fotonRef.current = foton }, [foton])
 
-  // Nollställ och föreslå sektion när arket öppnas
+  // Nollställ och föreslå del när arket öppnas
   useEffect(() => {
     if (!isOpen) return
     setTyp(null)
@@ -156,15 +157,16 @@ export default function MobileAddEventSheet({
       }
     >
       <div className="p-4 space-y-5">
-        {/* Sektion */}
+        {/* Del */}
         <section className="space-y-2">
-          <p className="text-sm font-medium text-slate-300">Sektion</p>
+          <p className="text-sm font-medium text-slate-300">Del</p>
           {sections.length === 0 ? (
-            <p className="text-sm text-slate-500">Rapporten har inga sektioner än. Lägg till en sektion först.</p>
+            <p className="text-sm text-slate-500">Rapporten har inga delar än. Lägg till en del först.</p>
           ) : (
             <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-5">
               {sections.map((s, i) => {
                 const vald = sektion === s.id
+                const farg = fargForDel(s.color, i)
                 return (
                   <button
                     key={s.id}
@@ -172,11 +174,12 @@ export default function MobileAddEventSheet({
                     aria-pressed={vald}
                     onClick={() => { setSektion(s.id); setFranPosition(false) }}
                     className={`flex h-[60px] flex-col items-center justify-center gap-0.5 rounded-xl border-[1.5px] px-1 ${
-                      vald ? 'border-[#20c58f] bg-[#20c58f]/10 text-white' : 'border-slate-700/60 bg-slate-800/40 text-slate-200'
+                      vald ? 'text-white' : 'border-slate-700/60 bg-slate-800/40 text-slate-200'
                     }`}
+                    style={vald ? { borderColor: farg, background: `${farg}1a` } : undefined}
                   >
-                    <span className={`text-lg font-extrabold ${vald ? 'text-[#20c58f]' : ''}`}>{i + 1}</span>
-                    <span className="w-full truncate text-center text-[11px] text-slate-400">{s.title}</span>
+                    <span className="text-lg font-extrabold" style={{ color: farg }}>{i + 1}</span>
+                    <span className="w-full truncate text-center text-[11px] text-slate-400">{s.title.trim() || 'Utan rubrik'}</span>
                   </button>
                 )
               })}

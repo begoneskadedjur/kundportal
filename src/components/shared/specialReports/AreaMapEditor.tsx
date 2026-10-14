@@ -1,8 +1,9 @@
 // src/components/shared/specialReports/AreaMapEditor.tsx
-// Översiktskartan i specialrapporten: Google Maps satellit med alla sektioners
-// områden som polygoner med nummer. "Rita område" klickar ut hörn (markörer +
-// linje), ångra punkt, avsluta med "Skapa sektion" eller klick på första hörnet.
-// Vald sektions område kan redigeras direkt (dra i hörnen). Utan sparat utsnitt
+// Översiktskartan i specialrapporten: Google Maps satellit med alla delars
+// områden som polygoner i delens färg med nummer. "Rita område" klickar ut hörn
+// (markörer + linje), ångra punkt, avsluta med "Skapa del" eller klick på första
+// hörnet. Efter en ny ritning frågar en liten ruta efter namn och färg.
+// Vald dels område kan redigeras direkt (dra i hörnen). Utan sparat utsnitt
 // centreras kartan på ärendets adress (geokodning) eller på Sverige, och
 // utsnittet sparas när användaren panorerar eller zoomar.
 // Överläggen ligger i en isolate-behållare (känd iPhone-bugg med staplingen).
@@ -11,14 +12,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { Icon } from '../../icons/Icon'
 import type { LatLng, SpecialReportMapView } from '../../../types/specialReport'
-import { mittpunkt } from './specialReportUtils'
+import { FALT, PRIMAR_KNAPP, SEKUNDAR_KNAPP, mittpunkt } from './specialReportUtils'
 import { useMapsReady } from './useMapsReady'
+import SectionColorPicker from './SectionColorPicker'
 
 export interface AreaSection {
   id: string
   nr: number
   title: string
   area: LatLng[] | null
+  /** Delens färg (#rrggbb) */
+  color: string
 }
 
 interface AreaMapEditorProps {
@@ -40,6 +44,14 @@ interface AreaMapEditorProps {
   focusRequest?: { sectionId: string; token: number } | null
   /** Fylls med en funktion som ger kartans aktuella utsnitt */
   currentViewRef?: { current: (() => SpecialReportMapView | null) | null }
+  /** Nyss ritad del som ska namnges: rutan "Vad heter området?" visas */
+  namingSectionId?: string | null
+  /** Spara namnet (och gå vidare) */
+  onNamingSave?: (sectionId: string, title: string) => void
+  /** Hoppa över namnet */
+  onNamingSkip?: (sectionId: string) => void
+  /** Färgval i namnrutan */
+  onColorChange?: (sectionId: string, color: string) => void
   className?: string
 }
 
@@ -51,13 +63,16 @@ type Etikett = google.maps.OverlayView & {
   setRitlage: (v: boolean) => void
   setText: (nr: number, namn: string) => void
   setPos: (p: LatLng) => void
+  setFarg: (farg: string) => void
 }
 
-/** HTML-etikett på kartan (nummer + namn), skapas när google finns */
-function skapaEtikett(map: google.maps.Map, pos: LatLng, nr: number, namn: string, onClick: () => void): Etikett {
+/** HTML-etikett på kartan (nummer i delens färg + namn), skapas när google finns */
+function skapaEtikett(map: google.maps.Map, pos: LatLng, nr: number, namn: string, farg: string, onClick: () => void): Etikett {
   class Lapp extends google.maps.OverlayView {
     div: HTMLButtonElement
     pos: google.maps.LatLng
+    fargNu = farg
+    vald = false
     constructor() {
       super()
       this.pos = new google.maps.LatLng(pos.lat, pos.lng)
@@ -66,7 +81,7 @@ function skapaEtikett(map: google.maps.Map, pos: LatLng, nr: number, namn: strin
       this.div.style.position = 'absolute'
       this.div.style.transform = 'translate(-50%, -50%)'
       this.div.style.whiteSpace = 'nowrap'
-      this.div.className = 'flex items-center gap-1.5 h-8 pl-1 pr-2.5 rounded-full border-2 border-white text-xs font-semibold shadow-lg'
+      this.div.className = 'flex items-center gap-1.5 h-8 pl-1 pr-2.5 rounded-full text-xs font-semibold shadow-lg'
       this.div.addEventListener('click', e => { e.stopPropagation(); onClick() })
       google.maps.OverlayView.preventMapHitsAndGesturesFrom(this.div)
       this.setText(nr, namn)
@@ -80,15 +95,26 @@ function skapaEtikett(map: google.maps.Map, pos: LatLng, nr: number, namn: strin
       const namnSpan = document.createElement('span')
       namnSpan.textContent = t
       this.div.append(nrSpan, namnSpan)
-      this.div.setAttribute('aria-label', `Sektion ${n}, ${t}`)
+      this.div.setAttribute('aria-label', `Del ${n}, ${t}`)
+      this.uppdatera()
     }
     setVald(v: boolean) {
-      this.div.style.background = v ? BRAND : 'rgba(15,23,42,0.9)'
-      this.div.style.color = v ? '#04140d' : '#fff'
+      this.vald = v
+      this.uppdatera()
+    }
+    setFarg(f: string) {
+      this.fargNu = f
+      this.uppdatera()
+    }
+    /** Vald: vit lapp med mörk text. Annars mörk lapp. Numret alltid i delens färg */
+    uppdatera() {
+      this.div.style.background = this.vald ? '#ffffff' : 'rgba(15,23,42,0.9)'
+      this.div.style.color = this.vald ? '#0f172a' : '#ffffff'
+      this.div.style.border = `2px solid ${this.vald ? this.fargNu : '#ffffff'}`
       const nrSpan = this.div.querySelector<HTMLSpanElement>('.etikett-nr')
       if (nrSpan) {
-        nrSpan.style.background = v ? '#04140d' : BRAND
-        nrSpan.style.color = v ? BRAND : '#04140d'
+        nrSpan.style.background = this.fargNu
+        nrSpan.style.color = '#ffffff'
       }
     }
     setPos(p: LatLng) {
@@ -128,6 +154,10 @@ export default function AreaMapEditor({
   drawRequest,
   focusRequest,
   currentViewRef,
+  namingSectionId = null,
+  onNamingSave,
+  onNamingSkip,
+  onColorChange,
   className = 'h-[500px]',
 }: AreaMapEditorProps) {
   const { ready, error } = useMapsReady()
@@ -305,11 +335,11 @@ export default function AreaMapEditor({
         post.lyssnare = bind(post.poly)
       }
       post.poly.setOptions({
-        strokeColor: vald ? '#ffffff' : BRAND,
+        strokeColor: vald ? '#ffffff' : s.color,
         strokeOpacity: 1,
         strokeWeight: vald ? 4 : 3,
-        fillColor: BRAND,
-        fillOpacity: vald ? 0.38 : 0.22,
+        fillColor: s.color,
+        fillOpacity: vald ? 0.4 : 0.25,
         editable: vald && !ritar,
         clickable: !ritar,
         zIndex: vald ? 3 : 2,
@@ -318,11 +348,12 @@ export default function AreaMapEditor({
       const mitt = mittpunkt(s.area)
       let lapp = etiketter.get(s.id)
       if (!lapp) {
-        lapp = skapaEtikett(map, mitt, s.nr, s.title || 'Utan rubrik', () => cb.current.onSelect(s.id))
+        lapp = skapaEtikett(map, mitt, s.nr, s.title || 'Utan rubrik', s.color, () => cb.current.onSelect(s.id))
         etiketter.set(s.id, lapp)
       } else {
         lapp.setText(s.nr, s.title || 'Utan rubrik')
         lapp.setPos(mitt)
+        lapp.setFarg(s.color)
       }
       lapp.setVald(vald)
       lapp.setRitlage(ritar)
@@ -530,7 +561,7 @@ export default function AreaMapEditor({
   const ritHjalp = antalHorn === 0
     ? 'Tryck ut områdets hörn ett i taget'
     : klar
-      ? `${antalHorn} hörn. Dra i ett hörn för att justera. Stäng med första hörnet eller ${ritMal ? 'Spara området' : 'Skapa sektion'}`
+      ? `${antalHorn} hörn. Dra i ett hörn för att justera. Stäng med första hörnet eller ${ritMal ? 'Spara området' : 'Skapa del'}`
       : `${antalHorn} hörn. Fortsätt, minst tre behövs`
 
   return (
@@ -587,16 +618,68 @@ export default function AreaMapEditor({
               klar ? 'bg-[#20c58f] text-[#04140d]' : 'bg-slate-800 text-slate-500'
             }`}
           >
-            {ritMal ? 'Spara området' : 'Skapa sektion'}
+            {ritMal ? 'Spara området' : 'Skapa del'}
           </button>
         </div>
       )}
+
+      {namingSectionId && !ritar && (() => {
+        const del = sections.find(x => x.id === namingSectionId)
+        if (!del) return null
+        return (
+          <NamnRuta
+            key={del.id}
+            farg={del.color}
+            onFarg={f => onColorChange?.(del.id, f)}
+            onSpara={t => onNamingSave?.(del.id, t)}
+            onHoppa={() => onNamingSkip?.(del.id)}
+          />
+        )
+      })()}
 
       {skapar && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/40">
           <Loader2 className="w-6 h-6 animate-spin text-[#20c58f]" />
         </div>
       )}
+    </div>
+  )
+}
+
+/** Rutan "Vad heter området?" efter en ny ritning: namn, färg, Spara eller Hoppa över */
+function NamnRuta({ farg, onFarg, onSpara, onHoppa }: {
+  farg: string
+  onFarg: (f: string) => void
+  onSpara: (titel: string) => void
+  onHoppa: () => void
+}) {
+  const [titel, setTitel] = useState('')
+  return (
+    <div
+      role="dialog"
+      aria-labelledby="namnruta-titel"
+      className="absolute inset-x-3 bottom-3 z-20 space-y-2.5 rounded-2xl border border-slate-700 bg-slate-900 p-3.5 shadow-2xl shadow-black/50 sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[340px]"
+      onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onHoppa() } }}
+    >
+      <p id="namnruta-titel" className="text-sm font-semibold text-white">Vad heter området?</p>
+      <input
+        aria-label="Områdets namn"
+        value={titel}
+        onChange={e => setTitel(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onSpara(titel) } }}
+        placeholder="Till exempel Förrådet eller Baksidan"
+        className={FALT}
+        style={{ borderColor: farg }}
+        autoFocus
+      />
+      <div>
+        <span className="mb-0.5 block text-xs text-slate-400">Färg</span>
+        <SectionColorPicker value={farg} onChange={onFarg} size={36} label="Färg på området" />
+      </div>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onHoppa} className={SEKUNDAR_KNAPP}>Hoppa över</button>
+        <button type="button" onClick={() => onSpara(titel)} className={PRIMAR_KNAPP}>Spara</button>
+      </div>
     </div>
   )
 }

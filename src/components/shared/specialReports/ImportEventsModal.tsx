@@ -1,6 +1,6 @@
 // src/components/shared/specialReports/ImportEventsModal.tsx
 // Hämta händelser från ärendet (besök och, för avtalsärenden, kontrollrundor)
-// till en sektion. Det som redan finns i rapporten visas gråat.
+// till en del. Det som redan finns i rapporten visas gråat.
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
@@ -71,7 +71,7 @@ export default function ImportEventsModal({ isOpen, onClose, reportId, sectionId
       isOpen={isOpen}
       onClose={onClose}
       title="Hämta från ärendet"
-      subtitle={`Till sektionen ${sectionTitle}`}
+      subtitle={`Till delen ${sectionTitle.trim() || 'Utan rubrik'}`}
       size="md"
       usePortal
       mobilHelskarm

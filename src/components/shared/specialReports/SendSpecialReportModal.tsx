@@ -21,8 +21,10 @@ import {
   TEXTFALT,
   arEpost,
   datumAv,
+  klarAttSkicka,
   laddaNed,
   oppnaINyFlik,
+  uppraknad,
 } from './specialReportUtils'
 
 interface SendSpecialReportModalProps {
@@ -47,13 +49,14 @@ function nyttSedan(report: SpecialReportFull, sedan: string | null): string[] {
   const grans = new Date(sedan).getTime()
   const rader: string[] = []
   report.sections.forEach(s => {
+    const namn = s.title.trim() || 'Utan rubrik'
     if (new Date(s.created_at).getTime() > grans) {
-      rader.push(`${s.title}: ny sektion`)
+      rader.push(`${namn}: ny del`)
     }
     s.events
       .filter(e => new Date(e.created_at).getTime() > grans)
       .sort((a, b) => a.event_date.localeCompare(b.event_date))
-      .forEach(e => rader.push(`${s.title}: ${e.title.charAt(0).toLowerCase()}${e.title.slice(1)} (${e.event_date})`))
+      .forEach(e => rader.push(`${namn}: ${e.title.charAt(0).toLowerCase()}${e.title.slice(1)} (${e.event_date})`))
   })
   return rader
 }
@@ -62,6 +65,8 @@ export default function SendSpecialReportModal({ isOpen, onClose, report, onSent
   const { profile } = useAuth()
   const forra = useMemo(() => senasteSkickade(report.versions), [report.versions])
   const nytt = useMemo(() => nyttSedan(report, forra?.sent_at ?? null), [report, forra])
+  // Det som saknas enligt "Klar att skicka". Hindrar inte utskicket
+  const saknas = useMemo(() => klarAttSkicka(report).filter(p => !p.klar).map(p => p.saknas), [report])
 
   const [mottagare, setMottagare] = useState<string[]>([])
   const [ny, setNy] = useState('')
@@ -196,6 +201,14 @@ export default function SendSpecialReportModal({ isOpen, onClose, report, onSent
       <div className="flex flex-col lg:flex-row lg:min-h-full">
         {/* Vänster: mejlet */}
         <div className="flex-1 p-4 space-y-4">
+          {saknas.length > 0 && (
+            <p className="flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+              <span className="mt-1.5 h-[7px] w-[7px] flex-shrink-0 rounded-full bg-amber-400" aria-hidden="true" />
+              <span>
+                {saknas.length === 1 ? '1 sak saknas' : `${saknas.length} saker saknas`}: {uppraknad(saknas)}. Du kan ändå skicka rapporten.
+              </span>
+            </p>
+          )}
           <div className="space-y-2">
             <p className="text-sm text-slate-300">Till</p>
             {mottagare.map(m => {

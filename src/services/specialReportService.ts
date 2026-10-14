@@ -1,6 +1,6 @@
 // src/services/specialReportService.ts
-// Specialrapporter (3.50.0): en fri rapport kopplad till ett ärende, uppbyggd av
-// sektioner med block (text, händelser, bilder, kartutsnitt). Kontrakt:
+// Specialrapporter (3.50.0, delar med färg 3.51.0): en fri rapport kopplad till
+// ett ärende, uppbyggd av delar (tabellen special_report_sections) med block (text, händelser, bilder, kartutsnitt). Kontrakt:
 // docs/specialrapporter/KONTRAKT.md. Behörigheten sköts av RLS
 // (can_access_special_report: admin, koordinator, tekniker på ärendet och skaparen).
 // PDF och utskick går via api/special-report-pdf.ts.
@@ -31,6 +31,7 @@ import type {
   SpecialReportVersion,
   LatLng,
 } from '../types/specialReport'
+import { SECTION_COLORS } from '../types/specialReport'
 
 // Tabellerna finns inte i de genererade typerna; otypad klient för just dessa anrop
 const db = supabase as unknown as SupabaseClient
@@ -50,6 +51,37 @@ type SectionWithContent = SpecialReportSection & {
   blocks: SpecialReportBlock[]
   events: SpecialReportEvent[]
   images: SpecialReportImage[]
+}
+
+/** Delens färg: #rrggbb (samma regel som check-constrainten) */
+function isColor(value: unknown): value is string {
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)
+}
+
+/**
+ * Nästa färg för en ny del: första i SECTION_COLORS som inte används i
+ * rapporten, annars i tur och ordning efter antalet delar.
+ */
+export function nextSectionColor(used: (string | null | undefined)[]): string {
+  const taken = new Set(used.filter(isColor).map(c => c.toLowerCase()))
+  const free = SECTION_COLORS.find(c => !taken.has(c.value.toLowerCase()))
+  return (free ?? SECTION_COLORS[used.length % SECTION_COLORS.length]).value
+}
+
+/**
+ * Färgerna som redan används av rapportens delar. En del utan färg räknas med
+ * den färg den visas i (paletten i tur och ordning, som fargForDel)
+ */
+async function usedSectionColors(reportId: string): Promise<string[]> {
+  const { data } = await db
+    .from('special_report_sections')
+    .select('color, position, created_at')
+    .eq('report_id', reportId)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true })
+  return ((data ?? []) as { color: string | null }[]).map((r, i) =>
+    isColor(r.color) ? r.color : SECTION_COLORS[i % SECTION_COLORS.length].value
+  )
 }
 
 function fel(error: { message?: string } | null | undefined, standard: string): never {
@@ -183,7 +215,7 @@ export class SpecialReportService {
       db.from('special_report_sections').select('id, report_id').in('report_id', reportIds),
       db.from('special_report_versions').select('report_id, version, sent_at').in('report_id', reportIds),
     ])
-    if (sectionsRes.error) fel(sectionsRes.error, 'Rapporternas sektioner kunde inte hämtas')
+    if (sectionsRes.error) fel(sectionsRes.error, 'Rapporternas delar kunde inte hämtas')
     const sections = (sectionsRes.data ?? []) as { id: string; report_id: string }[]
     const sectionReport = new Map(sections.map(s => [s.id, s.report_id]))
 
@@ -430,31 +462,73 @@ export class SpecialReportService {
 
   private static async createSectionsPerVisit(reportId: string): Promise<void> {
     const candidates = await SpecialReportService.getImportCandidates(reportId)
+    await SpecialReportService.createSectionsFromCandidates(reportId, candidates)
+  }
+
+  /**
+   * En del per kandidat (etikett besok, rubrik "Besök ÅÅÅÅ-MM-DD") med ett
+   * händelseblock och händelsen. Läggs sist i rapporten med nästa lediga färg.
+   */
+  private static async createSectionsFromCandidates(
+    reportId: string,
+    candidates: SpecialReportImportCandidate[]
+  ): Promise<SectionWithContent[]> {
     const sorted = [...candidates].sort((a, b) => a.event_date.localeCompare(b.event_date))
+    if (sorted.length === 0) return []
+    const startPosition = await nextPosition('special_report_sections', 'report_id', reportId)
+    const used = await usedSectionColors(reportId)
+    const created: SectionWithContent[] = []
     for (let i = 0; i < sorted.length; i++) {
       const c = sorted[i]
+      const color = nextSectionColor(used)
+      used.push(color)
       const { data: section, error } = await db
         .from('special_report_sections')
-        .insert({ report_id: reportId, position: i, title: `Besök ${c.event_date}`, label: 'besok' })
-        .select('id')
+        .insert({ report_id: reportId, position: startPosition + i, title: `Besök ${c.event_date}`, label: 'besok', color })
+        .select('*')
         .single()
-      if (error || !section) fel(error, 'Sektionen för besöket kunde inte skapas')
-      const sectionId = (section as { id: string }).id
-      const { error: blockError } = await db
+      if (error || !section) fel(error, 'Delen för besöket kunde inte skapas')
+      const sectionRow = section as SpecialReportSection
+      const { data: block, error: blockError } = await db
         .from('special_report_blocks')
-        .insert({ section_id: sectionId, position: 0, type: 'events', content: {} })
-      if (blockError) fel(blockError, 'Händelseblocket kunde inte skapas')
-      const { error: eventError } = await db.from('special_report_events').insert({
-        section_id: sectionId,
-        event_date: c.event_date,
-        type: c.type,
-        title: c.title,
-        description: c.description,
-        source: c.source,
-        source_id: c.source_id,
+        .insert({ section_id: sectionRow.id, position: 0, type: 'events', content: {} })
+        .select('*')
+        .single()
+      if (blockError || !block) fel(blockError, 'Händelseblocket kunde inte skapas')
+      const { data: event, error: eventError } = await db
+        .from('special_report_events')
+        .insert({
+          section_id: sectionRow.id,
+          event_date: c.event_date,
+          type: c.type,
+          title: c.title,
+          description: c.description,
+          source: c.source,
+          source_id: c.source_id,
+        })
+        .select('*')
+        .single()
+      if (eventError || !event) fel(eventError, 'Händelsen kunde inte sparas')
+      created.push({
+        ...sectionRow,
+        blocks: [block as SpecialReportBlock],
+        events: [event as SpecialReportEvent],
+        images: [],
       })
-      if (eventError) fel(eventError, 'Händelsen kunde inte sparas')
     }
+    return created
+  }
+
+  /**
+   * "Skapa en del per besök" i redigeraren: ärendets besök som inte finns i
+   * rapporten än blir en del var. Returnerar de nya delarna i ordning.
+   */
+  static async createSectionsForVisits(reportId: string): Promise<SectionWithContent[]> {
+    const candidates = await SpecialReportService.getImportCandidates(reportId)
+    return SpecialReportService.createSectionsFromCandidates(
+      reportId,
+      candidates.filter(c => c.source === 'visit' && !c.already_imported)
+    )
   }
 
   private static async copySections(reportId: string, source: SpecialReportFull): Promise<void> {
@@ -468,16 +542,17 @@ export class SpecialReportService {
           subtitle: s.subtitle,
           label: s.label,
           area: s.area,
+          color: isColor(s.color) ? s.color : null,
         })
         .select('id')
         .single()
-      if (error || !section) fel(error, 'Sektionen kunde inte kopieras')
+      if (error || !section) fel(error, 'Delen kunde inte kopieras')
       const sectionId = (section as { id: string }).id
       if (s.blocks.length > 0) {
         const { error: blockError } = await db.from('special_report_blocks').insert(
           s.blocks.map(b => ({ section_id: sectionId, position: b.position, type: b.type, content: b.content ?? {} }))
         )
-        if (blockError) fel(blockError, 'Sektionens block kunde inte kopieras')
+        if (blockError) fel(blockError, 'Delens block kunde inte kopieras')
       }
     }
   }
@@ -494,7 +569,7 @@ export class SpecialReportService {
       .eq('report_id', id)
       .order('position', { ascending: true })
       .order('created_at', { ascending: true })
-    if (sectionsError) fel(sectionsError, 'Sektionerna kunde inte hämtas')
+    if (sectionsError) fel(sectionsError, 'Delarna kunde inte hämtas')
     const sections = (sectionRows ?? []) as SpecialReportSection[]
     const sectionIds = sections.map(s => s.id)
 
@@ -546,16 +621,18 @@ export class SpecialReportService {
   // Sektioner
   // ==========================================================================
 
+  /** Ny del sist i rapporten. Tom rubrik är tillåten; färgen blir nästa lediga om ingen anges */
   static async addSection(reportId: string, input: {
     title: string
     subtitle?: string | null
     label: SpecialReportSectionLabel
     area?: LatLng[] | null
     blocks?: SpecialReportBlockType[]
+    color?: string | null
   }): Promise<SectionWithContent> {
     const title = input.title.trim()
-    if (!title) throw new Error('Sektionen behöver en rubrik')
     const position = await nextPosition('special_report_sections', 'report_id', reportId)
+    const color = isColor(input.color) ? input.color : nextSectionColor(await usedSectionColors(reportId))
     const { data: section, error } = await db
       .from('special_report_sections')
       .insert({
@@ -565,13 +642,14 @@ export class SpecialReportService {
         subtitle: input.subtitle ?? null,
         label: input.label,
         area: input.area && input.area.length > 0 ? input.area : null,
+        color,
       })
       .select('*')
       .single()
-    if (error || !section) fel(error, 'Sektionen kunde inte skapas')
+    if (error || !section) fel(error, 'Delen kunde inte skapas')
 
     const blockTypes = input.blocks ?? (input.area && input.area.length > 0 ? ['map', 'events'] as SpecialReportBlockType[] : [])
-    // Högst ett händelseblock per sektion
+    // Högst ett händelseblock per del
     const seenEvents = { value: false }
     const rows = blockTypes
       .filter(t => {
@@ -585,29 +663,31 @@ export class SpecialReportService {
     let blocks: SpecialReportBlock[] = []
     if (rows.length > 0) {
       const { data: blockRows, error: blockError } = await db.from('special_report_blocks').insert(rows).select('*')
-      if (blockError) fel(blockError, 'Sektionens block kunde inte skapas')
+      if (blockError) fel(blockError, 'Delens block kunde inte skapas')
       blocks = ((blockRows ?? []) as SpecialReportBlock[]).sort((a, b) => a.position - b.position)
     }
 
     return { ...(section as SpecialReportSection), blocks, events: [], images: [] }
   }
 
+  /** Tom rubrik är tillåten (visas som "Utan rubrik" i redigeraren) */
   static async updateSection(
     sectionId: string,
-    patch: Partial<Pick<SpecialReportSection, 'title' | 'subtitle' | 'label' | 'area'>>
+    patch: Partial<Pick<SpecialReportSection, 'title' | 'subtitle' | 'label' | 'area' | 'color'>>
   ): Promise<void> {
-    if (patch.title !== undefined && !patch.title.trim()) throw new Error('Sektionen behöver en rubrik')
     const clean = { ...patch }
+    if (clean.title !== undefined) clean.title = clean.title.trim()
     if (clean.area !== undefined && clean.area !== null && clean.area.length === 0) clean.area = null
+    if (clean.color !== undefined && clean.color !== null && !isColor(clean.color)) throw new Error('Ogiltig färg')
     const { error } = await db.from('special_report_sections').update(clean).eq('id', sectionId)
-    if (error) fel(error, 'Sektionen kunde inte sparas')
+    if (error) fel(error, 'Delen kunde inte sparas')
   }
 
-  /** Tar bort sektionen med block, händelser och bilder (även filerna) */
+  /** Tar bort delen med block, händelser och bilder (även filerna) */
   static async deleteSection(sectionId: string): Promise<void> {
     const { data: images } = await db.from('special_report_images').select('storage_path').eq('section_id', sectionId)
     const { error } = await db.from('special_report_sections').delete().eq('id', sectionId)
-    if (error) fel(error, 'Sektionen kunde inte tas bort')
+    if (error) fel(error, 'Delen kunde inte tas bort')
     const paths = ((images ?? []) as { storage_path: string }[]).map(i => i.storage_path)
     if (paths.length > 0) await db.storage.from(BUCKET).remove(paths)
   }
@@ -817,7 +897,7 @@ export class SpecialReportService {
     if (wanted.length === 0) return []
 
     const { data: section } = await db.from('special_report_sections').select('report_id').eq('id', sectionId).maybeSingle()
-    if (!section) throw new Error('Sektionen finns inte eller så saknar du behörighet')
+    if (!section) throw new Error('Delen finns inte eller så saknar du behörighet')
     const { data: sections } = await db
       .from('special_report_sections')
       .select('id')

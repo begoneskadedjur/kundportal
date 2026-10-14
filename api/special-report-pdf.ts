@@ -1,5 +1,8 @@
 // api/special-report-pdf.ts
 // Specialrapporter (3.50.0): PDF enligt dokumentstandarden och utskick till kund.
+// Sedan 3.51.0 har varje del en egen färg (special_report_sections.color): numret
+// och strecket vid rubriken, polygonerna och numren på kartorna. Reserv: paletten
+// i tur och ordning, som i redigeraren.
 // Kontrakt: docs/specialrapporter/KONTRAKT.md
 //
 // POST { reportId, action: 'download' | 'send', recipients?, subject?, message?, saveToCase? }
@@ -24,6 +27,7 @@ import { requireAuthenticated } from './_lib/auth'
 import { BEGONE_LOGO_DATA_URI } from './_lib/begoneLogo'
 import {
   EVENT_TYPES,
+  SECTION_COLORS,
   SECTION_LABELS,
   type LatLng,
   type SpecialReport,
@@ -131,6 +135,14 @@ function centroid(area: LatLng[]): LatLng {
   }
 }
 
+/**
+ * Delens färg (#rrggbb). Saknas den: samma reserv som redigeraren (fargForDel),
+ * paletten i tur och ordning efter delens plats, så att PDF och skärm stämmer
+ */
+function sectionColor(s: { color?: string | null }, index: number): string {
+  return s.color && /^#[0-9a-fA-F]{6}$/.test(s.color) ? s.color : SECTION_COLORS[index % SECTION_COLORS.length].value
+}
+
 function validArea(area: unknown): area is LatLng[] {
   return Array.isArray(area) && area.length >= 3 &&
     area.every(p => p && typeof p.lat === 'number' && typeof p.lng === 'number')
@@ -201,7 +213,7 @@ async function loadReportData(report: SpecialReport): Promise<ReportData> {
     .eq('report_id', report.id)
     .order('position', { ascending: true })
     .order('created_at', { ascending: true })
-  if (sectionsError) throw new Error(`Sektionerna kunde inte hämtas: ${sectionsError.message}`)
+  if (sectionsError) throw new Error(`Delarna kunde inte hämtas: ${sectionsError.message}`)
   const sections = (sectionRows || []) as SpecialReportSection[]
   const sectionIds = sections.map(s => s.id)
 
@@ -284,13 +296,13 @@ interface MapShot {
   height: number
   /** Fast utsnitt (översikten) eller anpassa till områdena */
   view: { lat: number; lng: number; zoom: number } | null
-  areas: { path: LatLng[]; label: string | null; highlight: boolean }[]
+  areas: { path: LatLng[]; label: string | null; highlight: boolean; color: string }[]
 }
 
-function numberMarkerSvg(label: string): string {
+function numberMarkerSvg(label: string, color: string): string {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">
-<circle cx="17" cy="17" r="14" fill="${BRAND}" stroke="#ffffff" stroke-width="3"/>
-<text x="17" y="22" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="800" fill="#04140d">${esc(label)}</text>
+<circle cx="17" cy="17" r="14" fill="${color}" stroke="#ffffff" stroke-width="3"/>
+<text x="17" y="22" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="800" fill="#ffffff">${esc(label)}</text>
 </svg>`
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
 }
@@ -321,8 +333,8 @@ async function renderMapShots(browser: Browser, shots: MapShot[]): Promise<Map<s
       a.path.forEach(function (p) { bounds.extend(p); });
       overlays.push(new google.maps.Polygon({
         paths: a.path, map: map,
-        strokeColor: a.highlight ? '${BRAND}' : '#0f766e', strokeWeight: a.highlight ? 3 : 2, strokeOpacity: 1,
-        fillColor: '${BRAND}', fillOpacity: a.highlight ? 0.18 : 0.22
+        strokeColor: a.color, strokeWeight: 3, strokeOpacity: 1,
+        fillColor: a.color, fillOpacity: a.highlight ? 0.2 : 0.25
       }));
       if (a.label) {
         overlays.push(new google.maps.Marker({
@@ -365,8 +377,9 @@ async function renderMapShots(browser: Browser, shots: MapShot[]): Promise<Map<s
             path: a.path,
             center: centroid(a.path),
             label: a.label,
-            icon: a.label ? numberMarkerSvg(a.label) : null,
+            icon: a.label ? numberMarkerSvg(a.label, a.color) : null,
             highlight: a.highlight,
+            color: a.color,
           })),
         }
         await page.evaluate((s: unknown) => (window as unknown as { __show: (v: unknown) => void }).__show(s), spec)
@@ -395,7 +408,7 @@ function buildMapShots(data: ReportData): MapShot[] {
       width: 1000,
       height: 440,
       view: data.report.map_view,
-      areas: numbered.map(x => ({ path: x.s.area as LatLng[], label: String(x.nr), highlight: false })),
+      areas: numbered.map(x => ({ path: x.s.area as LatLng[], label: String(x.nr), highlight: false, color: sectionColor(x.s, x.nr - 1) })),
     })
   }
   for (const x of numbered) {
@@ -405,7 +418,7 @@ function buildMapShots(data: ReportData): MapShot[] {
       width: 640,
       height: 400,
       view: null,
-      areas: [{ path: x.s.area as LatLng[], label: String(x.nr), highlight: true }],
+      areas: [{ path: x.s.area as LatLng[], label: String(x.nr), highlight: true, color: sectionColor(x.s, x.nr - 1) }],
     })
   }
   return shots
@@ -434,7 +447,7 @@ function buildHtml(data: ReportData, maps: Map<string, string>, version: number,
     const last = s.events.map(e => e.event_date).sort().pop() || '-'
     const label = s.label === 'omrade' ? 'Område på kartan' : SECTION_LABELS[s.label] || s.label
     return `<tr${i % 2 === 1 ? ' class="alt"' : ''}>
-      <td class="nr">${i + 1}</td><td>${esc(s.title)}</td><td>${esc(label)}</td><td>${esc(last)}</td><td>2.${i + 1}</td>
+      <td class="nr" style="color:${sectionColor(s, i)}">${i + 1}</td><td>${esc(sectionTitle(s))}</td><td>${esc(label)}</td><td>${esc(last)}</td><td>2.${i + 1}</td>
     </tr>`
   }).join('')
 
@@ -478,7 +491,8 @@ function buildHtml(data: ReportData, maps: Map<string, string>, version: number,
   .meta-value { font-weight: 600; color: #0f172a; word-break: break-word; }
   h2 { margin: 26px 0 12px; font-size: 17px; color: #0f172a; padding-bottom: 6px; border-bottom: 1px solid #e5e7eb; page-break-after: avoid; }
   h2 .num, h3 .num { color: ${BRAND}; }
-  h3 { margin: 0 0 2px; font-size: 18px; color: #0f172a; page-break-after: avoid; }
+  h3 { margin: 0 0 2px; font-size: 18px; color: #0f172a; page-break-after: avoid; display: flex; align-items: center; gap: 8px; }
+  h3 .bar { display: inline-block; width: 5px; height: 22px; flex-shrink: 0; }
   .subtitle { margin: 0 0 12px; color: #6b7280; }
   .intro { margin-bottom: 12px; color: #374151; }
   .map { display: block; width: 100%; border-radius: 4px; margin: 4px 0 12px; }
@@ -537,7 +551,7 @@ function buildHtml(data: ReportData, maps: Map<string, string>, version: number,
   ${overviewMap ? `<img class="map" src="${overviewMap}" alt="Översiktskarta">` : ''}
   ${sections.length > 0 ? `
   <table>
-    <thead><tr><th style="width:40px">Nr</th><th>Sektion</th><th>Gäller</th><th>Senast</th><th style="width:64px">Avsnitt</th></tr></thead>
+    <thead><tr><th style="width:40px">Nr</th><th>Del</th><th>Gäller</th><th>Senast</th><th style="width:64px">Avsnitt</th></tr></thead>
     <tbody>${overviewRows}</tbody>
   </table>` : ''}
 </section>
@@ -562,8 +576,14 @@ function pageHead(report: SpecialReport): string {
   return `<div class="page-head"><img src="${BEGONE_LOGO_DATA_URI}" alt="BeGone"><span>${esc(right)}</span></div>`
 }
 
+/** Delens rubrik i PDF:en. Utan rubrik: typen av del, så att kunden ser något begripligt */
+function sectionTitle(s: SpecialReportSection): string {
+  return s.title?.trim() || SECTION_LABELS[s.label] || 'Del'
+}
+
 function renderSection(s: SectionFull, nr: number, maps: Map<string, string>, report: SpecialReport): string {
-  // Bilder numreras inom sektionen i ordning
+  const color = sectionColor(s, nr - 1)
+  // Bilder numreras inom delen i ordning
   const imageNumber = new Map(s.images.map((img, i) => [img.id, i + 1]))
   const eventsById = new Map(s.events.map(e => [e.id, e]))
 
@@ -628,9 +648,9 @@ function renderSection(s: SectionFull, nr: number, maps: Map<string, string>, re
 
   return `<section class="page">
     ${pageHead(report)}
-    <h3><span class="num">2.${nr}</span> ${esc(s.title)}</h3>
+    <h3><span class="bar" style="background:${color}"></span><span><span class="num" style="color:${color}">2.${nr}</span> ${esc(sectionTitle(s))}</span></h3>
     ${subtitleParts.length > 0 ? `<p class="subtitle">${esc(subtitleParts.join(' · '))}</p>` : '<div style="height:12px"></div>'}
-    ${rendered || '<p class="muted">Inget innehåll i sektionen än.</p>'}
+    ${rendered || '<p class="muted">Inget innehåll i delen än.</p>'}
   </section>`
 }
 

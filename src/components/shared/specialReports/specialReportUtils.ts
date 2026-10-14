@@ -6,11 +6,103 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../../contexts/AuthContext'
 import type { IconName } from '../../icons/Icon'
-import type {
-  LatLng,
-  SpecialReportEventType,
-  SpecialReportListItem,
+import {
+  SECTION_COLORS,
+  type LatLng,
+  type SpecialReportDocType,
+  type SpecialReportEventType,
+  type SpecialReportFull,
+  type SpecialReportListItem,
 } from '../../../types/specialReport'
+
+export interface PreviewPage {
+  key: string
+  namn: string
+  /** Delens nummer och färg för delsidor */
+  nr?: number
+  farg?: string
+}
+
+/** Rapportens sidor i ordning, samma som i PDF:en */
+export function byggSidor(r: SpecialReportFull): PreviewPage[] {
+  return [
+    { key: 'om', namn: 'Om rapporten' },
+    ...(r.map_view ? [{ key: 'oversikt', namn: 'Översikt' }] : []),
+    ...r.sections.map((s, i) => ({ key: s.id, namn: s.title.trim() || 'Utan rubrik', nr: i + 1, farg: fargForDel(s.color, i) })),
+    { key: 'samm', namn: 'Bedömning och åtgärder' },
+  ]
+}
+
+/** Vilken sida en vy i redigeraren visar. Kartan utan översikt visar första sidan */
+export function sidaForVy(sidor: PreviewPage[], vy: string): number {
+  const i = sidor.findIndex(p => p.key === vy)
+  return i >= 0 ? i : 0
+}
+
+/** Delens färg, med reserv i tur och ordning om färgen saknas */
+export function fargForDel(color: string | null | undefined, index: number): string {
+  return color && /^#[0-9a-fA-F]{6}$/.test(color) ? color : SECTION_COLORS[index % SECTION_COLORS.length].value
+}
+
+/** Föreslagen typ av rapport utifrån ärendets titel och tjänst */
+export function foreslaDokumenttyp(...texter: (string | null | undefined)[]): SpecialReportDocType {
+  const t = texter.filter(Boolean).join(' ').toLowerCase()
+  if (t.includes('inspektion')) return 'Inspektionsrapport'
+  return 'Saneringsrapport'
+}
+
+/** Vart en punkt i "Klar att skicka" leder: en vy och ett fält, eller valet Lägg till del */
+export type KlarMal = { vy: string; falt: string | null } | { laggTillDel: true }
+
+export interface KlarPunkt {
+  key: 'intro' | 'delar' | 'handelser' | 'bedomning' | 'rekommendationer'
+  text: string
+  /** Kort form i "2 saker saknas: ..." */
+  saknas: string
+  klar: boolean
+  mal: KlarMal
+}
+
+/** De fem punkterna i "Klar att skicka", räknade från rapportens lokala tillstånd */
+export function klarAttSkicka(r: SpecialReportFull): KlarPunkt[] {
+  const harText = (v: string | null | undefined) => !!v && v.trim().length > 0
+  const sorterade = [...r.sections].sort((a, b) => a.position - b.position)
+  const forsta = sorterade[0]
+  const medHandelseblock = sorterade.find(s => s.blocks.some(b => b.type === 'events')) ?? forsta
+  return [
+    { key: 'intro', text: 'Inledning skriven', saknas: 'inledning', klar: harText(r.intro), mal: { vy: 'om', falt: 'rapport:intro' } },
+    { key: 'delar', text: 'Minst ett område eller besök', saknas: 'minst en del', klar: sorterade.length > 0, mal: forsta ? { vy: forsta.id, falt: `del:${forsta.id}:rubrik` } : { laggTillDel: true } },
+    {
+      key: 'handelser',
+      text: 'Händelser registrerade',
+      saknas: 'händelser',
+      klar: sorterade.some(s => s.events.length > 0),
+      mal: medHandelseblock ? { vy: medHandelseblock.id, falt: `del:${medHandelseblock.id}:handelser` } : { laggTillDel: true },
+    },
+    { key: 'bedomning', text: 'Bedömning skriven', saknas: 'bedömning', klar: harText(r.assessment), mal: { vy: 'samm', falt: 'rapport:assessment' } },
+    { key: 'rekommendationer', text: 'Rekommendationer skrivna', saknas: 'rekommendationer', klar: harText(r.recommendations), mal: { vy: 'samm', falt: 'rapport:recommendations' } },
+  ]
+}
+
+/** "a", "a och b", "a, b och c" */
+export function uppraknad(lista: string[]): string {
+  if (lista.length <= 1) return lista[0] ?? ''
+  return `${lista.slice(0, -1).join(', ')} och ${lista[lista.length - 1]}`
+}
+
+/** Sant från lg (1024 px), följer fönsterbredden */
+export function useArDesktop(): boolean {
+  const fraga = '(min-width: 1024px)'
+  const [ar, setAr] = useState(() => typeof window !== 'undefined' && window.matchMedia(fraga).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(fraga)
+    const andrad = () => setAr(mq.matches)
+    andrad()
+    mq.addEventListener('change', andrad)
+    return () => mq.removeEventListener('change', andrad)
+  }, [])
+  return ar
+}
 
 /** Dagens datum som ÅÅÅÅ-MM-DD i lokal tid (aldrig toISOString, den ger UTC-datum) */
 export function idagISO(d: Date = new Date()): string {
@@ -192,27 +284,38 @@ export type SparStatus = 'vilar' | 'sparar' | 'sparad' | 'fel'
 export function useDebouncedSaver(delay = 600) {
   const timers = useRef(new Map<string, { t: ReturnType<typeof setTimeout>; fn: () => Promise<void> }>())
   const pagaende = useRef(0)
+  // Sparningar som körs just nu, så att flush kan vänta in även dem
+  const aktiva = useRef(new Set<Promise<void>>())
+  // Räknas upp vid varje ändring, så att en hämtning kan se om något ändrats under tiden
+  const andringar = useRef(0)
   const [status, setStatus] = useState<SparStatus>('vilar')
   const [sparadTid, setSparadTid] = useState<Date | null>(null)
 
-  const kor = useCallback(async (fn: () => Promise<void>) => {
+  const kor = useCallback((fn: () => Promise<void>): Promise<void> => {
     pagaende.current += 1
     setStatus('sparar')
-    try {
-      await fn()
-      pagaende.current -= 1
-      if (pagaende.current === 0) {
-        setStatus('sparad')
-        setSparadTid(new Date())
+    const p = (async () => {
+      try {
+        await fn()
+        pagaende.current -= 1
+        if (pagaende.current === 0) {
+          setStatus('sparad')
+          setSparadTid(new Date())
+        }
+      } catch (e) {
+        pagaende.current -= 1
+        setStatus('fel')
+        throw e
       }
-    } catch (e) {
-      pagaende.current -= 1
-      setStatus('fel')
-      throw e
-    }
+    })()
+    const klar = p.then(() => {}, () => {})
+    aktiva.current.add(klar)
+    void klar.then(() => { aktiva.current.delete(klar) })
+    return p
   }, [])
 
   const schedule = useCallback((nyckel: string, fn: () => Promise<void>, onError?: (e: unknown) => void) => {
+    andringar.current += 1
     const gammal = timers.current.get(nyckel)
     if (gammal) clearTimeout(gammal.t)
     setStatus('sparar')
@@ -232,20 +335,30 @@ export function useDebouncedSaver(delay = 600) {
   }, [])
 
   /** Kör en sparning direkt (t.ex. borttag eller ny händelse) och uppdatera statusen */
-  const now = useCallback((fn: () => Promise<void>) => kor(fn), [kor])
+  const now = useCallback((fn: () => Promise<void>) => {
+    andringar.current += 1
+    return kor(fn)
+  }, [kor])
 
-  /** Kör allt som väntar direkt och vänta in det (t.ex. före PDF) */
+  /**
+   * Kör allt som väntar direkt och vänta in det, även sparningar som redan
+   * hunnit starta (t.ex. före PDF, annars kan den sista ändringen saknas)
+   */
   const flush = useCallback(async (): Promise<void> => {
     const vantande = [...timers.current.values()]
     timers.current.clear()
-    await Promise.all(vantande.map(v => {
+    vantande.forEach(v => {
       clearTimeout(v.t)
-      return kor(v.fn).catch(() => { /* rapporteras redan via status */ })
-    }))
+      kor(v.fn).catch(() => { /* rapporteras redan via status */ })
+    })
+    await Promise.all([...aktiva.current])
   }, [kor])
 
   /** Finns det sparningar som väntar eller pågår */
   const harVantande = useCallback(() => timers.current.size > 0 || pagaende.current > 0, [])
+
+  /** Antal ändringar hittills (ökar vid schedule och now) */
+  const andringsNr = useCallback(() => andringar.current, [])
 
   // Sidan stängs eller göms: spara direkt, och varna vid stängning om något inte hunnit sparas
   useEffect(() => {
@@ -278,5 +391,5 @@ export function useDebouncedSaver(delay = 600) {
     timers.current.clear()
   }, [])
 
-  return { schedule, cancel, now, flush, harVantande, status, sparadTid }
+  return { schedule, cancel, now, flush, harVantande, andringsNr, status, sparadTid }
 }

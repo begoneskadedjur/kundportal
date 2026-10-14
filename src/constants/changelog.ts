@@ -45,6 +45,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.51.0',
+    date: '2026-10-14',
+    title: 'Specialrapporter: se rapporten som kunden medan du skriver',
+    items: [
+      { kind: 'nyhet', text: 'Bredvid det du skriver syns nu en sida som ser ut som rapporten kunden får. Den uppdateras medan du skriver, fältet du står i ramas in, och trycker du på något på sidan hamnar du i rätt fält. På smalare skärmar öppnas sidan med Visa som kund i en panel från höger, så att skrivytan aldrig blir för smal. I mobilen finns samma sida under Visa som kund.' },
+      { kind: 'nyhet', text: 'Varje del har en egen färg som syns i listan, på kartan och i PDF:en, så det är lätt att se vilket område som är vilket. Färgen går att byta.' },
+      { kind: 'nyhet', text: 'Klar att skicka visar vad som återstår: inledning, minst en del, händelser, bedömning och rekommendationer. Tryck på en rad för att komma dit. Du kan alltid skicka, men utskicket påminner om det som saknas.' },
+      { kind: 'nyhet', text: 'Lägg till del frågar vad delen ska handla om: område, besök, underleverantör eller fritt. Har ärendet besök som inte finns i rapporten kan du skapa en del per besök med ett tryck. När du ritat ett område på kartan får du namnge det och välja färg direkt.' },
+      { kind: 'andring', text: 'Sektion heter nu del, och försättssidan heter Om rapporten med kort för kund, ärende, kontaktperson och adress. Nya delar och textblock är tomma med exempel i stället för ifylld text, och typ av rapport föreslås utifrån ärendet när du skapar en rapport.' },
+      { kind: 'andring', text: 'I mobilen finns en flikrad längst ned med Delar, Redigera och Visa som kund, och varje del kan flyttas upp eller ned från menyn vid delen.' },
+    ],
+  },
+  {
     version: '3.50.1',
     date: '2026-10-14',
     title: 'Specialrapporter: bättre ritning av områden',

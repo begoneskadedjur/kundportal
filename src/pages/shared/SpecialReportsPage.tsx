@@ -187,7 +187,7 @@ export default function SpecialReportsPage() {
                   </span>
                 </span>
                 <span className="text-sm text-slate-300">
-                  {r.section_count} {r.section_count === 1 ? 'sektion' : 'sektioner'}
+                  {r.section_count} {r.section_count === 1 ? 'del' : 'delar'}
                   <span className="block text-slate-500">{r.event_count} {r.event_count === 1 ? 'händelse' : 'händelser'}</span>
                 </span>
                 <span className="text-sm text-slate-300">
@@ -214,7 +214,7 @@ export default function SpecialReportsPage() {
                       {r.customer_name || 'Okänd kund'}{r.case_number ? ` · ${r.case_number}` : ''}
                     </span>
                     <span className="block text-xs text-slate-500">
-                      {r.section_count} {r.section_count === 1 ? 'sektion' : 'sektioner'}, {r.event_count} {r.event_count === 1 ? 'händelse' : 'händelser'} · {senastAndrad(r.updated_at)}
+                      {r.section_count} {r.section_count === 1 ? 'del' : 'delar'}, {r.event_count} {r.event_count === 1 ? 'händelse' : 'händelser'} · {senastAndrad(r.updated_at)}
                     </span>
                   </span>
                 </button>

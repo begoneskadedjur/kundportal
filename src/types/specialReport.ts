@@ -69,6 +69,8 @@ export interface SpecialReportSection {
   label: SpecialReportSectionLabel
   /** Ritat område, yttre ring utan upprepad startpunkt. null = inget område */
   area: LatLng[] | null
+  /** Delens färg (#rrggbb) på kartan, i redigeraren och i PDF:en */
+  color: string | null
   created_at: string
   updated_at: string
 }
@@ -208,3 +210,15 @@ export const EVENT_TYPES: Record<SpecialReportEventType, { label: string; color:
   underlev: { label: 'Underleverantör', color: '#cbd5e1', defaultTitle: 'Arbete av underleverantör' },
   notering: { label: 'Notering', color: '#94a3b8', defaultTitle: 'Notering' },
 }
+
+/** Färger för delar: syns mot satellitbild och på vitt papper. Ny del får nästa lediga */
+export const SECTION_COLORS: { value: string; name: string }[] = [
+  { value: '#20c58f', name: 'Grön' },
+  { value: '#3b82f6', name: 'Blå' },
+  { value: '#f59e0b', name: 'Orange' },
+  { value: '#ec4899', name: 'Rosa' },
+  { value: '#8b5cf6', name: 'Lila' },
+  { value: '#06b6d4', name: 'Cyan' },
+  { value: '#ef4444', name: 'Röd' },
+  { value: '#eab308', name: 'Gul' },
+]

@@ -1,7 +1,11 @@
 // src/pages/shared/SpecialReportEditorPage.tsx
 // Redigeraren för en specialrapport (/technician|/koordinator/specialrapporter/:id).
-// Desktop: tre kolumner, struktur (312 px) | innehåll | rapportens sidor (248 px).
-// Mobil: en kolumn där strukturen är startvyn och "Ny händelse" alltid nås.
+// Desktop (från lg): rapportens delar | redigering | levande förhandsvisning
+// ("Så ser kunden rapporten") som byggs från lokalt tillstånd. Förhandsvisningen
+// blir egen högerspalt bara när redigeringen ändå får minst 520 px (sidans bredd
+// mäts med ResizeObserver, appens sidomeny kan vara utfälld). Annars öppnar
+// "Visa som kund" i rubrikraden den i en utfällbar panel ovanpå.
+// Mobil: fast flikrad längst ned med Delar, Redigera och Visa som kund.
 // Allt sparas löpande, per fält med ~600 ms fördröjning.
 // Ligger under pages/shared eftersom samma sida används av tekniker,
 // koordinator och admin (via koordinatorns sökväg).
@@ -9,10 +13,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Loader2 } from 'lucide-react'
+import { Loader2, MoreVertical } from 'lucide-react'
 import Select from '../../components/ui/Select'
 import { Icon } from '../../components/icons/Icon'
-import { SpecialReportService } from '../../services/specialReportService'
+import { SpecialReportService, nextSectionColor } from '../../services/specialReportService'
 import {
   EVENT_TYPES,
   SECTION_LABELS,
@@ -25,30 +29,63 @@ import {
   type SpecialReportFull,
   type SpecialReportMapView,
   type SpecialReportSection,
+  type SpecialReportSectionLabel,
 } from '../../types/specialReport'
 import AreaMapEditor from '../../components/shared/specialReports/AreaMapEditor'
 import SectionEditor from '../../components/shared/specialReports/SectionEditor'
 import SendSpecialReportModal from '../../components/shared/specialReports/SendSpecialReportModal'
 import MobileAddEventSheet from '../../components/shared/specialReports/MobileAddEventSheet'
+import AddSectionModal from '../../components/shared/specialReports/AddSectionModal'
+import ReportPreview, { Bladdring } from '../../components/shared/specialReports/ReportPreview'
 import type { EventPatch, FullSection, SectionOps } from '../../components/shared/specialReports/sectionOps'
 import {
   DOC_TYPES,
-  IKON_KNAPP,
   PRIMAR_KNAPP,
+  SEKUNDAR_KNAPP,
   TEXTFALT,
+  byggSidor,
+  fargForDel,
   idagISO,
+  klarAttSkicka,
   klockslag,
   laddaNed,
-  oppnaINyFlik,
   senastAndrad,
+  sidaForVy,
+  useArDesktop,
   useDebouncedSaver,
   useSpecialReportBase,
+  type KlarMal,
 } from '../../components/shared/specialReports/specialReportUtils'
 
-type Vy = 'forsatt' | 'oversikt' | 'samm' | string
+/** 'om' | 'oversikt' | 'samm' | en dels id */
+type Vy = string
+type MobilFlik = 'delar' | 'redigera' | 'kund'
+
+/** Knapparna i rubrikraden: bara ikon på smala skärmar, text från md (Skicka från sm) */
+const HUVUD_KNAPP = SEKUNDAR_KNAPP.replace('px-4', 'w-11 md:w-auto md:px-3.5')
+const SKICKA_KNAPP = PRIMAR_KNAPP.replace('px-4', 'w-11 sm:w-auto sm:px-4')
+
+/** Redigeringen ska alltid få minst så här mycket bredd när förhandsvisningen är spalt */
+const MIN_REDIGERING = 520
+
+/** Delarnas spalt och förhandsvisningens spalt (0 = ingen spalt, panel i stället) */
+function spaltBredder(rotBredd: number): { delar: number; forhand: number } {
+  const delar = rotBredd >= 1280 ? 300 : 264
+  if (rotBredd - delar - 460 >= MIN_REDIGERING + 80) return { delar, forhand: 460 }
+  if (rotBredd - delar - 380 >= MIN_REDIGERING) return { delar, forhand: 380 }
+  return { delar, forhand: 0 }
+}
 
 const felText = (e: unknown, reserv: string) => (e instanceof Error ? e.message : reserv)
 const sorteraSektioner = (s: FullSection[]) => [...s].sort((a, b) => a.position - b.position)
+
+/** Block som en ny del får, per typ */
+const NYA_BLOCK: Record<SpecialReportSectionLabel, SpecialReportBlockType[]> = {
+  omrade: ['map', 'text', 'events'],
+  besok: ['text', 'events'],
+  underlev: ['text', 'events'],
+  fritt: ['text', 'images'],
+}
 
 export default function SpecialReportEditorPage() {
   const { id } = useParams<{ id: string }>()
@@ -56,42 +93,93 @@ export default function SpecialReportEditorPage() {
   const base = useSpecialReportBase()
   const [searchParams, setSearchParams] = useSearchParams()
   const saver = useDebouncedSaver(600)
+  const arDesktop = useArDesktop()
 
   const [report, setReport] = useState<SpecialReportFull | null>(null)
   const [laddarFel, setLaddarFel] = useState<string | null>(null)
   const [vy, setVy] = useState<Vy>('oversikt')
-  const [mobilInnehall, setMobilInnehall] = useState(false)
+  const [mobilFlik, setMobilFlik] = useState<MobilFlik>('delar')
   const [visaSkicka, setVisaSkicka] = useState(false)
   const [visaNyHandelse, setVisaNyHandelse] = useState(false)
-  const [hamtarPdf, setHamtarPdf] = useState<'forhand' | 'ladda' | null>(null)
-  const [laggerSektion, setLaggerSektion] = useState(false)
+  const [visaLaggTill, setVisaLaggTill] = useState(false)
+  const [hamtarPdf, setHamtarPdf] = useState(false)
+  // Förhandsvisningen som utfällbar panel (desktop utan plats för spalten)
+  const [visaPanel, setVisaPanel] = useState(false)
+  // Hindrar dubbla delar vid dubbelklick (Lägg till del, Skapa en del per besök)
+  const skaparDelRef = useRef(false)
 
-  // Karta: valt område, rit- och fokusbegäran. Utsnittet sparas bara när
-  // översiktskartan är med i rapporten (map_view satt)
+  // Fältet som har fokus (data-falt) och en begäran att flytta fokus dit
+  const [fokus, setFokus] = useState<string | null>(null)
+  const [fokusFalt, setFokusFalt] = useState<{ falt: string; token: number } | null>(null)
+  // Ny del: rubrikfältet får fokus direkt
+  const [nyDelId, setNyDelId] = useState<string | null>(null)
+  const rotRef = useRef<HTMLDivElement | null>(null)
+
+  // Sidans bredd (inom appens layout), avgör om förhandsvisningen får en egen spalt.
+  // Callback-ref eftersom behållaren monteras först när rapporten är hämtad
+  const [rotBredd, setRotBredd] = useState(0)
+  const observatorRef = useRef<ResizeObserver | null>(null)
+  const satRot = useCallback((el: HTMLDivElement | null) => {
+    rotRef.current = el
+    observatorRef.current?.disconnect()
+    observatorRef.current = null
+    if (!el || typeof ResizeObserver === 'undefined') return
+    setRotBredd(Math.round(el.getBoundingClientRect().width))
+    const ro = new ResizeObserver(poster => {
+      const post = poster[0]
+      if (post) setRotBredd(Math.round(post.contentRect.width))
+    })
+    ro.observe(el)
+    observatorRef.current = ro
+  }, [])
+  useEffect(() => () => observatorRef.current?.disconnect(), [])
+  const bredder = spaltBredder(rotBredd)
+  const forhandSomSpalt = arDesktop && bredder.forhand > 0
+  const forhandSomPanel = arDesktop && !forhandSomSpalt
+
+  // Panelen stängs när spalten får plats igen eller när vi lämnar desktop
+  useEffect(() => {
+    if (!forhandSomPanel) setVisaPanel(false)
+  }, [forhandSomPanel])
+
+  // Escape stänger panelen
+  useEffect(() => {
+    if (!visaPanel) return
+    const stang = (e: KeyboardEvent) => { if (e.key === 'Escape') setVisaPanel(false) }
+    document.addEventListener('keydown', stang)
+    return () => document.removeEventListener('keydown', stang)
+  }, [visaPanel])
+
+  // Karta: valt område, rit- och fokusbegäran, nyss ritad del som ska namnges.
+  // Utsnittet sparas bara när översiktskartan är med i rapporten (map_view satt)
   const [kartValt, setKartValt] = useState<string | null>(null)
   const [ritBegaran, setRitBegaran] = useState<{ sectionId: string | null; token: number } | null>(null)
   const [fokusBegaran, setFokusBegaran] = useState<{ sectionId: string; token: number } | null>(null)
+  const [namnger, setNamnger] = useState<string | null>(null)
   const kartVyRef = useRef<(() => SpecialReportMapView | null) | null>(null)
 
-  // Dra och släpp i strukturen
+  // Dra och släpp och flyttmenyn i listan
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
+  const [menyFor, setMenyFor] = useState<string | null>(null)
   const radRefs = useRef(new Map<string, HTMLButtonElement>())
 
   const reportId = report?.id
 
   // ── Laddning ──
-  const { flush: sparaVantande, harVantande } = saver
+  const { flush: sparaVantande, harVantande, andringsNr } = saver
   const ladda = useCallback(async (forsta = false) => {
     if (!id) return
     try {
       // Spara det som väntar först. Ändras något under hämtningen hämtas det igen,
-      // annars skulle serverns svar skriva över text som just skrivits
+      // annars skulle serverns svar skriva över text som just skrivits. Räknaren
+      // fångar även en ändring som hann sparas klart medan hämtningen pågick
       let r: SpecialReportFull | null = null
       for (let forsok = 0; forsok < 5; forsok++) {
         await sparaVantande()
+        const fore = andringsNr()
         const hamtad = await SpecialReportService.get(id)
-        if (!harVantande()) { r = hamtad; break }
+        if (!harVantande() && andringsNr() === fore) { r = hamtad; break }
       }
       // Användaren skriver fortfarande: behåll det lokala, nästa laddning tar resten
       if (!r) return
@@ -105,7 +193,7 @@ export default function SpecialReportEditorPage() {
       if (forsta) setLaddarFel(felText(e, 'Kunde inte hämta rapporten'))
       else toast.error(felText(e, 'Kunde inte uppdatera rapporten'))
     }
-  }, [id, sparaVantande, harVantande])
+  }, [id, sparaVantande, harVantande, andringsNr])
 
   useEffect(() => { void ladda(true) }, [ladda])
 
@@ -123,12 +211,62 @@ export default function SpecialReportEditorPage() {
   }, [report])
 
   const sektioner = useMemo(() => report?.sections ?? [], [report])
-  // Kartans vy av sektionerna, ny bara när nummer, rubrik eller område ändras
+  // Kartans vy av delarna, ny bara när nummer, rubrik, färg eller område ändras
   const kartSektioner = useMemo(
-    () => sektioner.map((s, i) => ({ id: s.id, nr: i + 1, title: s.title, area: s.area })),
+    () => sektioner.map((s, i) => ({ id: s.id, nr: i + 1, title: s.title, area: s.area, color: fargForDel(s.color, i) })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(sektioner.map(s => [s.id, s.title, s.area]))],
+    [JSON.stringify(sektioner.map(s => [s.id, s.title, s.area, s.color]))],
   )
+
+  // ── Fokus: flytta skrivmarkören till ett fält (klick i förhandsvisningen, Klar att skicka) ──
+  useEffect(() => {
+    if (!fokusFalt) return
+    let ram = 0
+    const prova = (kvar: number) => {
+      ram = requestAnimationFrame(() => {
+        const el = rotRef.current?.querySelector<HTMLElement>(`[data-falt="${fokusFalt.falt}"]`)
+        if (!el || el.offsetParent === null) {
+          // Fältet finns inte än (vyn monteras): försök några bilder till, sedan
+          // släpps begäran så att fokus inte hoppar dit långt senare
+          if (kvar > 0) prova(kvar - 1)
+          else setFokusFalt(null)
+          return
+        }
+        const mal = el.matches('input, textarea, select, button')
+          ? el
+          : el.querySelector<HTMLElement>('input:not([disabled]), textarea, select, button:not([disabled]), [tabindex]:not([tabindex="-1"])')
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        mal?.focus({ preventScroll: true })
+        setFokus(fokusFalt.falt)
+        setFokusFalt(null)
+      })
+    }
+    prova(30)
+    return () => cancelAnimationFrame(ram)
+  }, [fokusFalt])
+
+  /** Vilket fält användaren arbetar i, från närmaste data-falt */
+  const folj = (e: { target: EventTarget }) => {
+    const el = (e.target as HTMLElement | null)?.closest?.('[data-falt]')
+    const falt = el?.getAttribute('data-falt')
+    if (falt) setFokus(falt)
+  }
+
+  // Flyttmenyn stängs vid klick utanför och Escape
+  useEffect(() => {
+    if (!menyFor) return
+    const stang = (e: Event) => {
+      if (e instanceof KeyboardEvent && e.key !== 'Escape') return
+      if (e instanceof PointerEvent && (e.target as HTMLElement | null)?.closest('[data-flyttmeny]')) return
+      setMenyFor(null)
+    }
+    document.addEventListener('pointerdown', stang)
+    document.addEventListener('keydown', stang)
+    return () => {
+      document.removeEventListener('pointerdown', stang)
+      document.removeEventListener('keydown', stang)
+    }
+  }, [menyFor])
 
   // ── Lokala uppdateringar ──
   const andraRapport = useCallback((patch: Partial<SpecialReport>) => {
@@ -151,38 +289,87 @@ export default function SpecialReportEditorPage() {
   }, [reportId, andraRapport, saver, sparfel])
 
   // ── Navigering i redigeraren ──
-  const gaTill = useCallback((nyVy: Vy) => {
+  const gaTill = useCallback((nyVy: Vy, falt: string | null = null) => {
     setVy(nyVy)
     setRitBegaran(null)
     setFokusBegaran(null)
+    setNamnger(null)
+    setNyDelId(null)
     if (nyVy !== 'oversikt') setKartValt(null)
-    setMobilInnehall(true)
+    setMobilFlik('redigera')
+    setFokus(falt)
+    setFokusFalt(falt ? { falt, token: Date.now() } : null)
   }, [])
 
-  // ── Sektioner ──
-  const laggTillSektion = async () => {
-    if (!reportId) return
-    setLaggerSektion(true)
+  const gaTillMal = (mal: KlarMal) => {
+    if ('laggTillDel' in mal) setVisaLaggTill(true)
+    else gaTill(mal.vy, mal.falt)
+  }
+
+  // ── Delar ──
+  // Nästa lediga färg räknas från det lokala tillståndet (färgbyten som inte hunnit
+  // sparas räknas med), med samma reserv som visas för delar utan färg
+  const nastaFarg = () => nextSectionColor(sektioner.map((s, i) => fargForDel(s.color, i)))
+
+  const laggTillDel = async (label: SpecialReportSectionLabel) => {
+    if (!reportId || skaparDelRef.current) return
+    if (label === 'omrade') {
+      // Område: kartan öppnas och ritningen startar, delen skapas när området är klart
+      setVisaLaggTill(false)
+      gaTill('oversikt')
+      setRitBegaran({ sectionId: null, token: Date.now() })
+      return
+    }
+    skaparDelRef.current = true
     try {
-      const s = await SpecialReportService.addSection(reportId, { title: 'Ny sektion', label: 'fritt', blocks: ['text'] })
+      const s = await SpecialReportService.addSection(reportId, { title: '', label, blocks: NYA_BLOCK[label], color: nastaFarg() })
       setReport(r => (r ? { ...r, sections: [...r.sections, s] } : r))
+      setVisaLaggTill(false)
       gaTill(s.id)
+      setNyDelId(s.id)
     } catch (e) {
-      toast.error(felText(e, 'Kunde inte lägga till sektionen'))
+      toast.error(felText(e, 'Kunde inte lägga till delen'))
     } finally {
-      setLaggerSektion(false)
+      skaparDelRef.current = false
     }
   }
 
-  const skapaOmradesSektion = async (area: LatLng[]) => {
-    if (!reportId) return
+  const skapaDelPerBesok = async () => {
+    if (!reportId || skaparDelRef.current) return
+    skaparDelRef.current = true
     try {
-      const s = await SpecialReportService.addSection(reportId, { title: 'Nytt område', label: 'omrade', area, blocks: ['map', 'events'] })
-      setReport(r => (r ? { ...r, sections: [...r.sections, s] } : r))
-      gaTill(s.id)
-      toast.success('Området blev en ny sektion')
+      // Färgbyten som väntar ska vara sparade, tjänsten väljer färg ur databasen
+      await saver.flush()
+      const nya = await SpecialReportService.createSectionsForVisits(reportId)
+      if (nya.length === 0) { toast('Alla besök finns redan i rapporten'); return }
+      setReport(r => {
+        if (!r) return r
+        const finns = new Set(r.sections.map(s => s.id))
+        return { ...r, sections: sorteraSektioner([...r.sections, ...nya.filter(s => !finns.has(s.id))]) }
+      })
+      setVisaLaggTill(false)
+      gaTill(nya[0].id)
+      toast.success(nya.length === 1 ? 'En del skapades för besöket' : `${nya.length} delar skapades, en per besök`)
     } catch (e) {
-      toast.error(felText(e, 'Kunde inte skapa sektionen'))
+      toast.error(felText(e, 'Kunde inte skapa delarna'))
+    } finally {
+      skaparDelRef.current = false
+    }
+  }
+
+  const skapaOmradesDel = async (area: LatLng[]) => {
+    if (!reportId || skaparDelRef.current) return
+    skaparDelRef.current = true
+    try {
+      const s = await SpecialReportService.addSection(reportId, { title: '', label: 'omrade', area, blocks: NYA_BLOCK.omrade, color: nastaFarg() })
+      setReport(r => (r ? { ...r, sections: [...r.sections, s] } : r))
+      // Kvar på kartan: rutan "Vad heter området?" tar namn och färg
+      setKartValt(s.id)
+      setNamnger(s.id)
+    } catch (e) {
+      toast.error(felText(e, 'Kunde inte skapa delen'))
+    } finally {
+      skaparDelRef.current = false
     }
   }
 
@@ -214,14 +401,13 @@ export default function SpecialReportEditorPage() {
     requestAnimationFrame(() => radRefs.current.get(sectionId)?.focus())
   }
 
-  // ── Handlingar för sektionsvyn ──
+  // ── Handlingar för delvyn ──
   const ops: SectionOps = {
     updateSection: (sectionId, patch) => {
       andraSektion(sectionId, s => ({ ...s, ...patch }))
       ;(Object.keys(patch) as (keyof typeof patch)[]).forEach(k => {
-        const delpatch = { [k]: patch[k] } as Partial<Pick<SpecialReportSection, 'title' | 'subtitle' | 'label' | 'area'>>
-        if (k === 'title' && !(patch.title ?? '').trim()) { saver.cancel(`sektion:${sectionId}:${k}`); return }
-        saver.schedule(`sektion:${sectionId}:${k}`,() => SpecialReportService.updateSection(sectionId, delpatch), sparfel)
+        const delpatch = { [k]: patch[k] } as Partial<Pick<SpecialReportSection, 'title' | 'subtitle' | 'label' | 'area' | 'color'>>
+        saver.schedule(`sektion:${sectionId}:${k}`, () => SpecialReportService.updateSection(sectionId, delpatch), sparfel)
       })
     },
     deleteSection: async sectionId => {
@@ -229,10 +415,10 @@ export default function SpecialReportEditorPage() {
         await saver.now(() => SpecialReportService.deleteSection(sectionId))
         setReport(r => (r ? { ...r, sections: r.sections.filter(s => s.id !== sectionId) } : r))
         gaTill('oversikt')
-        setMobilInnehall(false)
-        toast.success('Sektionen är borttagen')
+        setMobilFlik('delar')
+        toast.success('Delen är borttagen')
       } catch (e) {
-        toast.error(felText(e, 'Kunde inte ta bort sektionen'))
+        toast.error(felText(e, 'Kunde inte ta bort delen'))
       }
     },
     addBlock: async (sectionId, type: SpecialReportBlockType) => {
@@ -346,24 +532,9 @@ export default function SpecialReportEditorPage() {
   }
 
   // ── PDF ──
-  const forhandsgranska = async () => {
-    if (!reportId) return
-    setHamtarPdf('forhand')
-    try {
-      await oppnaINyFlik(async () => {
-        await saver.flush()
-        return (await SpecialReportService.downloadPdf(reportId)).url
-      })
-    } catch (e) {
-      toast.error(felText(e, 'Kunde inte ta fram PDF:en'))
-    } finally {
-      setHamtarPdf(null)
-    }
-  }
-
   const laddaNedPdf = async () => {
     if (!reportId) return
-    setHamtarPdf('ladda')
+    setHamtarPdf(true)
     try {
       await saver.flush()
       const { url, filename } = await SpecialReportService.downloadPdf(reportId)
@@ -371,7 +542,7 @@ export default function SpecialReportEditorPage() {
     } catch (e) {
       toast.error(felText(e, 'Kunde inte ta fram PDF:en'))
     } finally {
-      setHamtarPdf(null)
+      setHamtarPdf(false)
     }
   }
 
@@ -403,11 +574,13 @@ export default function SpecialReportEditorPage() {
     )
   }
 
-  const aktuell = sektioner.find(s => s.id === vy) ?? null
-  const aktuellNr = aktuell ? sektioner.indexOf(aktuell) + 1 : 0
+  const aktuellIndex = sektioner.findIndex(s => s.id === vy)
+  const aktuell = aktuellIndex >= 0 ? sektioner[aktuellIndex] : null
   const antalOmraden = sektioner.filter(s => s.area && s.area.length >= 3).length
-  const allaDatum = sektioner.flatMap(s => s.events.map(e => e.event_date)).sort()
-  const period = allaDatum.length ? `${allaDatum[0]} till ${allaDatum[allaDatum.length - 1]}` : 'Inga händelser än'
+  const klar = klarAttSkicka(report)
+  const klarAntal = klar.filter(p => p.klar).length
+  const sidor = byggSidor(report)
+  const sidIndex = sidaForVy(sidor, vy)
 
   const statusText = saver.status === 'sparar'
     ? 'Sparar...'
@@ -418,26 +591,21 @@ export default function SpecialReportEditorPage() {
         : `Sparad ${senastAndrad(report.updated_at).replace('I dag ', '')}`
   const statusPunkt = saver.status === 'fel' ? 'bg-red-500' : saver.status === 'sparar' ? 'bg-amber-400' : 'bg-[#20c58f]'
 
-  const sidor = [
-    { key: 'forsatt', namn: 'Försättssida', karta: false },
-    ...(report.map_view ? [{ key: 'oversikt', namn: 'Översikt', karta: true }] : []),
-    ...sektioner.map((s, i) => ({ key: s.id, namn: `${i + 1}. ${s.title}`, karta: !!s.area && s.area.length >= 3 })),
-    { key: 'samm', namn: 'Bedömning', karta: false },
-  ]
-
-  const strukturKnapp = (aktiv: boolean) =>
-    `flex min-h-[44px] w-full items-center gap-2.5 rounded-xl border px-3 text-left text-sm transition-colors ${
-      aktiv ? 'border-[#20c58f] bg-[#20c58f]/10 text-white' : 'border-slate-700/60 bg-slate-900/60 text-slate-300 hover:border-slate-600'
+  const listKnapp = (aktiv: boolean) =>
+    `flex min-h-[48px] w-full items-center gap-2.5 rounded-xl border px-3 py-1.5 text-left transition-colors ${
+      aktiv ? 'border-[#20c58f] bg-[#20c58f]/10' : 'border-slate-700/60 bg-slate-900/60 hover:border-slate-600'
     }`
 
+  const adressDelar = (report.address ?? '').split(',').map(x => x.trim()).filter(Boolean)
+
   return (
-    <div className="flex w-full min-w-0 flex-col lg:h-[calc(100dvh-3rem)]">
+    <div ref={satRot} className="flex w-full min-w-0 flex-col lg:h-[calc(100dvh-3rem)]">
       {/* ── Rubrikrad ── */}
-      <header className="flex min-w-0 flex-shrink-0 items-center gap-2 border-b border-slate-800 bg-slate-900/80 py-2 pl-1 pr-3 sm:gap-3 sm:pl-2 sm:pr-5">
+      <header className="flex min-w-0 flex-shrink-0 items-center gap-2 border-b border-slate-800 bg-slate-900/80 py-2 pl-1 pr-3 sm:gap-2.5 sm:pl-2 sm:pr-5">
         <button
           type="button"
-          aria-label={mobilInnehall ? 'Tillbaka till strukturen' : 'Tillbaka till rapporterna'}
-          onClick={() => (mobilInnehall && window.innerWidth < 1024 ? setMobilInnehall(false) : navigate(base))}
+          aria-label={mobilFlik !== 'delar' && !arDesktop ? 'Tillbaka till delarna' : 'Tillbaka till rapporterna'}
+          onClick={() => (mobilFlik !== 'delar' && !arDesktop ? setMobilFlik('delar') : navigate(base))}
           className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800"
         >
           <Icon name="rapport.tillbaka" size={20} />
@@ -445,68 +613,113 @@ export default function SpecialReportEditorPage() {
         <div className="min-w-0 flex-1">
           <input
             aria-label="Rapportens titel"
+            data-falt="rapport:title"
             value={report.title}
             onChange={e => sparaRapportFalt('title', e.target.value)}
+            onFocus={() => setFokus('rapport:title')}
             className="w-full truncate rounded bg-transparent text-base font-bold text-white outline-none focus:ring-2 focus:ring-[#20c58f]/40 sm:text-[17px]"
           />
           <p className="flex items-center gap-2 truncate text-xs text-slate-400">
             <span className={`h-[7px] w-[7px] flex-shrink-0 rounded-full ${statusPunkt}`} />
-            <span className="truncate">{statusText} · version {report.current_version} pågår</span>
+            <span className="truncate">{statusText} · {report.doc_type} · version {report.current_version} pågår</span>
           </p>
         </div>
-        <button type="button" aria-label="Förhandsgranska" title="Förhandsgranska" onClick={forhandsgranska} disabled={hamtarPdf !== null} className={`${IKON_KNAPP} hidden sm:inline-flex`}>
-          {hamtarPdf === 'forhand' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon name="rapport.forhandsgranska" size={20} />}
+        {/* Visa som kund: mobilen byter flik, desktop utan spalt fäller ut panelen */}
+        {!forhandSomSpalt && (
+          <button
+            type="button"
+            aria-label="Visa som kund"
+            aria-expanded={forhandSomPanel ? visaPanel : undefined}
+            title="Visa som kund"
+            onClick={() => (forhandSomPanel ? setVisaPanel(v => !v) : setMobilFlik('kund'))}
+            className={HUVUD_KNAPP}
+          >
+            <Icon name="rapport.forhandsgranska" size={20} />
+            <span className="hidden md:inline">Visa som kund</span>
+          </button>
+        )}
+        <button
+          type="button"
+          aria-label="Ladda ner PDF"
+          title="Ladda ner PDF"
+          onClick={laddaNedPdf}
+          disabled={hamtarPdf}
+          className={HUVUD_KNAPP}
+        >
+          {hamtarPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon name="rapport.ladda" size={20} />}
+          <span className="hidden md:inline">Ladda ner PDF</span>
         </button>
-        <button type="button" aria-label="Ladda ned PDF" title="Ladda ned PDF" onClick={laddaNedPdf} disabled={hamtarPdf !== null} className={IKON_KNAPP}>
-          {hamtarPdf === 'ladda' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon name="rapport.ladda" size={20} />}
-        </button>
-        <button type="button" onClick={() => setVisaSkicka(true)} className={PRIMAR_KNAPP}>
+        <button type="button" aria-label="Skicka till kund" onClick={() => setVisaSkicka(true)} className={SKICKA_KNAPP}>
           <Icon name="rapport.skicka" size={20} />
-          <span className="sm:hidden">Skicka</span>
           <span className="hidden sm:inline">Skicka till kund</span>
         </button>
       </header>
 
       <div className="flex min-h-0 min-w-0 flex-1">
-        {/* ── Struktur ── */}
-        <aside className={`${mobilInnehall ? 'hidden' : 'flex'} w-full flex-col gap-3.5 overflow-y-auto border-slate-800 p-4 pb-32 lg:flex lg:w-[312px] lg:flex-shrink-0 lg:border-r lg:pb-4`}>
-          <div className="flex gap-3 rounded-xl border border-slate-700/60 bg-slate-800/30 p-3">
-            <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-[#20c58f]/15 text-[#20c58f]">
-              <Icon name="rapport.lank" size={20} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-semibold text-white">{report.customer_name || 'Okänd kund'}</span>
-              <span className="block truncate font-mono text-xs text-slate-400">
-                {[report.case_number, report.customer_number ? `kundnr ${report.customer_number}` : null].filter(Boolean).join(' · ')}
-              </span>
-              {report.contact_name && <span className="block truncate text-xs text-slate-500">{report.contact_name}</span>}
-            </span>
+        {/* ── Rapportens delar ── */}
+        <aside
+          className={`${mobilFlik === 'delar' ? 'flex' : 'hidden'} w-full flex-col gap-3.5 overflow-y-auto border-slate-800 p-4 pb-48 lg:flex lg:flex-shrink-0 lg:border-r lg:pb-4`}
+          style={arDesktop ? { width: bredder.delar } : undefined}
+        >
+          {/* Klar att skicka */}
+          <div className="space-y-2 rounded-xl border border-[#20c58f]/30 bg-[#20c58f]/5 p-3">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm font-bold text-white">Klar att skicka</span>
+              <span className="text-xs text-[#20c58f]">{klarAntal} av {klar.length}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-[#20c58f]/20" role="progressbar" aria-valuemin={0} aria-valuemax={klar.length} aria-valuenow={klarAntal} aria-label="Klar att skicka">
+              <div className="h-1.5 rounded-full bg-[#20c58f] transition-all" style={{ width: `${(klarAntal / klar.length) * 100}%` }} />
+            </div>
+            <ul>
+              {klar.map(p => (
+                <li key={p.key}>
+                  <button
+                    type="button"
+                    onClick={() => gaTillMal(p.mal)}
+                    className={`flex min-h-[44px] w-full items-center gap-2 rounded-lg px-1 text-left text-xs hover:bg-slate-800/60 lg:min-h-[32px] ${p.klar ? 'text-slate-300' : 'text-slate-400'}`}
+                  >
+                    <span className={`h-2 w-2 flex-shrink-0 rounded-full ${p.klar ? 'bg-[#20c58f]' : 'bg-slate-600'}`} aria-hidden="true" />
+                    {p.text}
+                    <span className="sr-only">{p.klar ? ', klar' : ', saknas'}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div className="flex items-baseline justify-between">
-            <span className="text-xs uppercase tracking-wider text-slate-500">Struktur</span>
+            <span className="text-xs uppercase tracking-wider text-slate-500">Rapportens delar</span>
             <span className="hidden text-[11px] text-slate-600 lg:inline">Dra för att ändra ordning</span>
           </div>
 
-          <nav className="flex flex-col gap-1.5" aria-label="Rapportens struktur">
-            <button type="button" onClick={() => gaTill('forsatt')} className={strukturKnapp(vy === 'forsatt')}>
-              <Icon name="rapport.rapport" size={20} className="text-slate-400" />
-              <span className="flex-1">Försättssida</span>
+          <nav className="flex flex-col gap-1.5" aria-label="Rapportens delar">
+            <button type="button" onClick={() => gaTill('om')} className={listKnapp(vy === 'om')}>
+              <Icon name="rapport.rapport" size={20} className="flex-shrink-0 text-slate-400" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-white">Om rapporten</span>
+                <span className="block text-[11px] text-slate-400">Kund, adress och inledning</span>
+              </span>
             </button>
-            <button type="button" onClick={() => gaTill('oversikt')} className={strukturKnapp(vy === 'oversikt')}>
-              <Icon name="rapport.karta" size={20} className="text-slate-400" />
-              <span className="flex-1">Översiktskarta</span>
-              <span className="text-[11px] text-slate-500">{antalOmraden} {antalOmraden === 1 ? 'område' : 'områden'}</span>
+            <button type="button" onClick={() => gaTill('oversikt')} className={listKnapp(vy === 'oversikt')}>
+              <Icon name="rapport.karta" size={20} className="flex-shrink-0 text-slate-400" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-white">Översiktskarta</span>
+                <span className="block text-[11px] text-slate-400">
+                  {antalOmraden} {antalOmraden === 1 ? 'område' : 'områden'}{report.map_view ? '' : ' · inte med i rapporten'}
+                </span>
+              </span>
             </button>
 
             {sektioner.map((s, i) => {
               const vald = vy === s.id
+              const farg = fargForDel(s.color, i)
               const markerad = overId === s.id && dragId && dragId !== s.id
+              const harOmrade = !!s.area && s.area.length >= 3
+              const visaRitaOmrade = !harOmrade && !!report.map_view
+              const namn = s.title.trim()
               return (
-                <button
+                <div
                   key={s.id}
-                  ref={el => { if (el) radRefs.current.set(s.id, el); else radRefs.current.delete(s.id) }}
-                  type="button"
                   draggable
                   onDragStart={e => {
                     try { e.dataTransfer.setData('text/plain', s.id); e.dataTransfer.effectAllowed = 'move' } catch { /* äldre webbläsare */ }
@@ -515,55 +728,122 @@ export default function SpecialReportEditorPage() {
                   onDragOver={e => { e.preventDefault(); if (overId !== s.id) setOverId(s.id) }}
                   onDrop={e => { e.preventDefault(); flytta(dragId, s.id) }}
                   onDragEnd={() => { setDragId(null); setOverId(null) }}
-                  onClick={() => gaTill(s.id)}
-                  onKeyDown={e => {
-                    if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); flyttaSteg(s.id, -1) }
-                    if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); flyttaSteg(s.id, 1) }
-                  }}
-                  aria-label={`${i + 1} ${s.title}. Alt och pil upp eller ned flyttar.`}
-                  className={`flex min-h-[52px] w-full cursor-grab items-center gap-2.5 rounded-xl border py-1.5 pl-1.5 pr-2.5 text-left transition-colors ${
-                    vald ? 'border-[#20c58f] bg-[#20c58f]/10' : 'border-slate-700/60 bg-slate-900/60 hover:border-slate-600'
+                  className={`relative flex min-h-[52px] items-center rounded-xl border-[1.5px] transition-colors ${
+                    vald ? '' : 'border-slate-700/60 bg-slate-900/60 hover:border-slate-600'
                   } ${markerad ? 'border-t-2 border-t-[#20c58f]' : ''} ${dragId === s.id ? 'opacity-40' : ''}`}
+                  style={vald ? { borderColor: farg, background: `${farg}1a` } : undefined}
                 >
-                  <Icon name="rapport.dra" size={16} className="flex-shrink-0 text-slate-600" />
-                  <span className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-sm font-bold ${vald ? 'bg-[#20c58f] text-[#04140d]' : 'bg-slate-800 text-slate-200'}`}>
-                    {i + 1}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-white">{s.title || 'Utan rubrik'}</span>
-                    <span className="block truncate text-[11px] text-slate-400">
-                      {SECTION_LABELS[s.label]} · {s.events.length} {s.events.length === 1 ? 'händelse' : 'händelser'}
+                  {/* Hela raden är knappen; "Rita område" och menyn ligger ovanpå */}
+                  <button
+                    ref={el => { if (el) radRefs.current.set(s.id, el); else radRefs.current.delete(s.id) }}
+                    type="button"
+                    onClick={() => gaTill(s.id)}
+                    onKeyDown={e => {
+                      if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); flyttaSteg(s.id, -1) }
+                      if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); flyttaSteg(s.id, 1) }
+                    }}
+                    aria-label={`Del ${i + 1}, ${namn || 'utan rubrik'}. Alt och pil upp eller ned flyttar.`}
+                    aria-current={vald ? 'true' : undefined}
+                    className="absolute inset-0 cursor-grab rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60"
+                  />
+                  <span className="pointer-events-none flex min-w-0 flex-1 items-center gap-2.5 py-1.5 pl-1.5">
+                    <Icon name="rapport.dra" size={16} className="hidden flex-shrink-0 text-slate-600 lg:block" />
+                    <span className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-lg text-sm font-extrabold text-[#fff]" style={{ background: farg }}>
+                      {i + 1}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className={`block truncate text-sm font-semibold ${namn ? 'text-white' : 'text-slate-500'}`}>{namn || 'Utan rubrik'}</span>
+                      {visaRitaOmrade ? (
+                        <span className="flex items-center gap-1 text-[11px] text-amber-400">
+                          Ingen plats ritad ·
+                          <button
+                            type="button"
+                            onClick={() => ops.drawArea(s.id)}
+                            className="pointer-events-auto relative z-10 -my-2 py-2 font-semibold underline-offset-2 hover:underline"
+                          >
+                            Rita område
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="block truncate text-[11px] text-slate-400">
+                          {SECTION_LABELS[s.label]} · {s.events.length} {s.events.length === 1 ? 'händelse' : 'händelser'}
+                        </span>
+                      )}
                     </span>
                   </span>
-                </button>
+                  <span className="relative z-10 flex-shrink-0" data-flyttmeny>
+                    <button
+                      type="button"
+                      aria-label={`Fler val för del ${i + 1}`}
+                      aria-haspopup="menu"
+                      aria-expanded={menyFor === s.id}
+                      onClick={() => setMenyFor(m => (m === s.id ? null : s.id))}
+                      className="flex h-11 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                    {menyFor === s.id && (
+                      <span role="menu" className="absolute right-0 top-full z-30 mt-1 flex w-44 flex-col rounded-xl border border-slate-700 bg-slate-900 p-1 shadow-xl shadow-black/40">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={i === 0}
+                          onClick={() => { setMenyFor(null); flyttaSteg(s.id, -1) }}
+                          className="flex h-11 items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+                        >
+                          Flytta upp
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          disabled={i === sektioner.length - 1}
+                          onClick={() => { setMenyFor(null); flyttaSteg(s.id, 1) }}
+                          className="flex h-11 items-center gap-2 rounded-lg px-3 text-left text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40"
+                        >
+                          Flytta ned
+                        </button>
+                      </span>
+                    )}
+                  </span>
+                </div>
               )
             })}
 
             <button
               type="button"
-              onClick={laggTillSektion}
-              disabled={laggerSektion}
-              className="flex min-h-[44px] items-center gap-2.5 rounded-xl border border-dashed border-slate-600 px-3 text-sm text-slate-400 hover:border-[#20c58f] hover:text-slate-200"
+              onClick={() => setVisaLaggTill(true)}
+              className="flex min-h-[44px] items-center gap-2.5 rounded-xl border-[1.5px] border-dashed border-slate-600 px-3 text-sm text-slate-300 hover:border-[#20c58f] hover:text-white"
             >
-              {laggerSektion ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon name="allman.plus" size={20} />}
-              Lägg till sektion
+              <Icon name="allman.plus" size={20} />
+              Lägg till del
             </button>
 
-            <button type="button" onClick={() => gaTill('samm')} className={strukturKnapp(vy === 'samm')}>
-              <Icon name="allman.bock" size={20} className="text-slate-400" />
-              <span className="flex-1">Bedömning och åtgärder</span>
+            <button type="button" onClick={() => gaTill('samm')} className={listKnapp(vy === 'samm')}>
+              <Icon name="allman.bock" size={20} className="flex-shrink-0 text-slate-400" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-white">Bedömning och åtgärder</span>
+                <span className="block text-[11px] text-slate-400">Din slutsats till kunden</span>
+              </span>
             </button>
           </nav>
         </aside>
 
-        {/* ── Innehåll ── */}
-        <main className={`${mobilInnehall ? 'block' : 'hidden'} min-w-0 flex-1 overflow-y-auto p-4 pb-32 lg:block lg:px-6 lg:py-5 lg:pb-8`}>
+        {/* ── Redigering ── */}
+        <main
+          className={`${mobilFlik === 'redigera' ? 'block' : 'hidden'} min-w-0 flex-1 overflow-y-auto p-4 pb-48 lg:block lg:px-6 lg:py-5 lg:pb-8`}
+          onFocus={folj}
+          onPointerDownCapture={folj}
+        >
           {vy === 'oversikt' && (
             <div className="space-y-3.5">
               <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-semibold text-white">Översiktskarta</h2>
-                  <p className="text-sm text-slate-400">Rita ett område, så blir det en egen sektion. Tryck på ett område för att öppna sektionen. Kartan är valfri.</p>
+                  <p className="text-sm text-slate-400">
+                    {sektioner.length > 0
+                      ? `${antalOmraden} av ${sektioner.length} ${sektioner.length === 1 ? 'del' : 'delar'} har ett ritat område. Varje område får sin egen färg, i kartan och i rapporten.`
+                      : 'Rita ett område, så blir det en egen del. Kartan är valfri.'}
+                  </p>
                 </div>
                 <label className="flex min-h-[44px] items-center gap-2.5 text-sm text-slate-300">
                   <input
@@ -581,51 +861,76 @@ export default function SpecialReportEditorPage() {
                 mapView={report.map_view}
                 address={report.address}
                 onSelect={sectionId => gaTill(sectionId)}
-                onCreateArea={skapaOmradesSektion}
+                onCreateArea={skapaOmradesDel}
                 onUpdateArea={(sectionId, area) => ops.updateSection(sectionId, { area })}
                 onMapViewChange={v => sparaRapportFalt('map_view', v)}
                 saveView={!!report.map_view}
                 drawRequest={ritBegaran}
                 focusRequest={fokusBegaran}
                 currentViewRef={kartVyRef}
+                namingSectionId={namnger}
+                onNamingSave={(sectionId, titel) => {
+                  if (titel.trim()) ops.updateSection(sectionId, { title: titel })
+                  gaTill(sectionId)
+                }}
+                onNamingSkip={() => setNamnger(null)}
+                onColorChange={(sectionId, farg) => ops.updateSection(sectionId, { color: farg })}
                 className="h-[60dvh] min-h-[360px] lg:h-[calc(100dvh-14rem)] lg:min-h-[420px]"
               />
             </div>
           )}
 
-          {vy === 'forsatt' && (
-            <div className="max-w-2xl space-y-3.5">
+          {vy === 'om' && (
+            <div className="max-w-[720px] space-y-4">
               <div>
-                <h2 className="text-xl font-semibold text-white">Försättssida</h2>
-                <p className="text-sm text-slate-400">Hämtas från ärendet när rapporten skapades. Perioden räknas fram ur händelsernas datum.</p>
+                <h2 className="text-xl font-semibold text-white">Om rapporten</h2>
+                <p className="text-sm text-slate-400">Det här står först i rapporten. Kund, kontakt och adress hämtas från ärendet.</p>
               </div>
-              <dl className="grid grid-cols-1 gap-2.5 text-sm sm:grid-cols-2">
-                {[
-                  ['Kund', report.customer_name || 'Okänd kund'],
-                  ['Kundnummer och ärende', [report.customer_number, report.case_number].filter(Boolean).join(' · ') || 'Saknas'],
-                  ['Kontakt', [report.contact_name, report.contact_email, report.contact_phone].filter(Boolean).join(', ') || 'Saknas'],
-                  ['Adress', report.address || 'Saknas'],
-                  ['Period', period],
-                  ['Sektioner', `${sektioner.length} st`],
-                  ['Version', String(report.current_version)],
-                ].map(([etikett, varde]) => (
-                  <div key={etikett} className="rounded-xl border border-slate-700/50 bg-slate-800/20 p-3">
-                    <dt className="text-slate-400">{etikett}</dt>
-                    <dd className="text-white break-words">{varde}</dd>
-                  </div>
-                ))}
-              </dl>
-              <div>
-                <span className="block text-xs font-medium text-slate-400 mb-1">Dokumenttyp</span>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1 rounded-xl border border-slate-700/50 bg-slate-800/20 p-3.5">
+                  <span className="text-xs text-slate-400">Kund</span>
+                  <span className="text-[15px] font-semibold text-white break-words">{report.customer_name || 'Okänd kund'}</span>
+                  {report.customer_number ? (
+                    <span className="text-sm text-slate-300">Kundnummer <span className="font-mono">{report.customer_number}</span></span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-sm text-amber-400">
+                      <span className="h-[7px] w-[7px] rounded-full bg-amber-400" />
+                      Kundnummer saknas i Fortnox
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1 rounded-xl border border-slate-700/50 bg-slate-800/20 p-3.5">
+                  <span className="text-xs text-slate-400">Ärende</span>
+                  <span className="font-mono text-[15px] font-semibold text-white">{report.case_number || 'Saknas'}</span>
+                </div>
+                <div className="flex min-w-0 flex-col gap-1 rounded-xl border border-slate-700/50 bg-slate-800/20 p-3.5">
+                  <span className="text-xs text-slate-400">Kontaktperson</span>
+                  <span className="text-[15px] font-semibold text-white break-words">{report.contact_name || 'Saknas'}</span>
+                  {report.contact_email && (
+                    <a href={`mailto:${report.contact_email}`} className="truncate text-sm text-[#20c58f] hover:underline">{report.contact_email}</a>
+                  )}
+                  {report.contact_phone && (
+                    <a href={`tel:${report.contact_phone.replace(/\s+/g, '')}`} className="text-sm text-[#20c58f] hover:underline">{report.contact_phone}</a>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1 rounded-xl border border-slate-700/50 bg-slate-800/20 p-3.5">
+                  <span className="text-xs text-slate-400">Adress</span>
+                  <span className="text-[15px] font-semibold text-white break-words">{adressDelar[0] || 'Saknas'}</span>
+                  {adressDelar.length > 1 && <span className="text-sm text-slate-300">{adressDelar.slice(1).join(', ')}</span>}
+                </div>
+              </div>
+              <div data-falt="rapport:doc_type">
+                <span className="block text-sm text-slate-300 mb-1">Typ av rapport</span>
                 <Select
                   value={report.doc_type}
                   onChange={v => sparaRapportFalt('doc_type', v as SpecialReportDocType)}
                   options={DOC_TYPES.map(d => ({ value: d, label: d }))}
                   className="max-w-xs"
                 />
+                <span className="mt-1 block text-xs text-slate-500">Står överst på första sidan.</span>
               </div>
-              <label className="block">
-                <span className="block text-xs font-medium text-slate-400 mb-1">Inledning</span>
+              <label className="block" data-falt="rapport:intro">
+                <span className="block text-sm text-slate-300 mb-1">Inledning</span>
                 <textarea
                   value={report.intro ?? ''}
                   onChange={e => sparaRapportFalt('intro', e.target.value || null)}
@@ -638,9 +943,12 @@ export default function SpecialReportEditorPage() {
           )}
 
           {vy === 'samm' && (
-            <div className="max-w-3xl space-y-3.5">
-              <h2 className="text-xl font-semibold text-white">Bedömning och åtgärder</h2>
-              <label className="block">
+            <div className="max-w-[640px] space-y-3.5">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Bedömning och åtgärder</h2>
+                <p className="text-sm text-slate-400">Din slutsats till kunden.</p>
+              </div>
+              <label className="block" data-falt="rapport:assessment">
                 <span className="block text-sm text-slate-300 mb-1">Bedömning</span>
                 <textarea
                   value={report.assessment ?? ''}
@@ -650,7 +958,7 @@ export default function SpecialReportEditorPage() {
                   className={TEXTFALT}
                 />
               </label>
-              <label className="block">
+              <label className="block" data-falt="rapport:recommendations">
                 <span className="block text-sm text-slate-300 mb-1">Rekommendationer till kunden</span>
                 <textarea
                   value={report.recommendations ?? ''}
@@ -664,56 +972,150 @@ export default function SpecialReportEditorPage() {
           )}
 
           {aktuell && (
-            <SectionEditor key={aktuell.id} reportId={report.id} section={aktuell} nr={aktuellNr} ops={ops} />
+            <div className="max-w-[640px]">
+              <SectionEditor
+                key={aktuell.id}
+                reportId={report.id}
+                section={aktuell}
+                nr={aktuellIndex + 1}
+                color={fargForDel(aktuell.color, aktuellIndex)}
+                ops={ops}
+                fokus={fokus}
+                autoFokusRubrik={nyDelId === aktuell.id}
+              />
+            </div>
           )}
         </main>
 
-        {/* ── Rapportens sidor ── */}
-        <aside className="hidden w-[248px] flex-shrink-0 flex-col gap-3 overflow-y-auto border-l border-slate-800 bg-slate-950/40 p-4 xl:flex">
-          <div className="flex items-baseline justify-between">
-            <span className="text-xs uppercase tracking-wider text-slate-500">Rapporten</span>
-            <span className="text-xs text-slate-400">{sidor.length} sidor</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5">
-            {sidor.map(p => {
-              const aktiv = p.key === vy
-              return (
-                <button key={p.key} type="button" onClick={() => gaTill(p.key)} className="flex flex-col gap-1 text-left" aria-label={`Gå till ${p.namn}`}>
-                  <span className={`flex h-[120px] flex-col gap-1 rounded border-2 bg-slate-50 p-2 ${aktiv ? 'border-[#20c58f]' : 'border-transparent'}`}>
-                    <span className="h-[3px] w-[22px] bg-[#20c58f]" />
-                    <span className="h-[5px] w-[78%] rounded-sm bg-slate-800" />
-                    {p.karta && <span className="h-[38px] rounded-sm bg-[#b9c4b5]" />}
-                    <span className="h-[3px] w-[92%] bg-slate-300" />
-                    <span className="h-[3px] w-[86%] bg-slate-300" />
-                    <span className="h-[3px] w-[60%] bg-slate-300" />
-                  </span>
-                  <span className={`truncate text-[11px] ${aktiv ? 'text-[#20c58f]' : 'text-slate-400'}`}>{p.namn}</span>
-                </button>
-              )
-            })}
-          </div>
-          <button
-            type="button"
-            onClick={forhandsgranska}
-            disabled={hamtarPdf !== null}
-            className="mt-auto inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-700 text-sm text-slate-200 hover:bg-slate-800"
+        {/* ── Så ser kunden rapporten: egen spalt när redigeringen ändå får plats ── */}
+        {forhandSomSpalt && (
+          <aside
+            className="flex flex-shrink-0 flex-col items-center gap-2 overflow-y-auto border-l border-slate-800 bg-slate-950/40 px-4 py-4"
+            style={{ width: bredder.forhand }}
           >
-            {hamtarPdf === 'forhand' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon name="rapport.forhandsgranska" size={16} />}
-            Förhandsgranska
-          </button>
-        </aside>
+            <ReportPreview
+              report={report}
+              vy={vy}
+              fokus={fokus}
+              onValj={(nyVy, falt) => gaTill(nyVy, falt)}
+              onBladdra={nyVy => gaTill(nyVy)}
+            />
+            <span className="text-[11px] text-slate-500">Tryck på något på sidan för att redigera det</span>
+          </aside>
+        )}
+
+        {/* ── Så ser kunden rapporten: utfällbar panel när spalten inte får plats ── */}
+        {forhandSomPanel && visaPanel && (
+          <>
+            <div className="fixed inset-0 z-50 bg-black/40" aria-hidden="true" onClick={() => setVisaPanel(false)} />
+            <aside
+              role="dialog"
+              aria-modal="true"
+              aria-label="Så ser kunden rapporten"
+              className="fixed inset-y-0 right-0 z-50 flex w-[min(480px,100vw)] flex-col border-l border-slate-800 bg-slate-950 shadow-2xl shadow-black/50"
+            >
+              <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-800 py-2 pl-4 pr-2">
+                <span className="text-sm font-semibold text-white">Visa som kund</span>
+                <button
+                  type="button"
+                  aria-label="Stäng förhandsvisningen"
+                  title="Stäng"
+                  onClick={() => setVisaPanel(false)}
+                  autoFocus
+                  className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800"
+                >
+                  <Icon name="allman.stang" size={20} />
+                </button>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col items-center gap-2 overflow-y-auto px-5 py-4">
+                <ReportPreview
+                  report={report}
+                  vy={vy}
+                  fokus={fokus}
+                  onValj={(nyVy, falt) => { setVisaPanel(false); gaTill(nyVy, falt) }}
+                  onBladdra={nyVy => gaTill(nyVy)}
+                />
+                <span className="text-[11px] text-slate-500">Tryck på något på sidan för att redigera det</span>
+              </div>
+            </aside>
+          </>
+        )}
+
+        {/* ── Mobil: Visa som kund i helskärm ── */}
+        {!arDesktop && mobilFlik === 'kund' && (
+          <section className="flex w-full flex-col items-center gap-3 px-4 pb-48 pt-2" aria-label="Så ser kunden rapporten">
+            <div className="flex w-full items-center justify-between">
+              <span className="flex min-w-0 items-center gap-2 text-sm font-semibold text-white">
+                {sidor[sidIndex].farg && (
+                  <span className="flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[5px] text-[11px] font-extrabold text-[#fff]" style={{ background: sidor[sidIndex].farg }}>
+                    {sidor[sidIndex].nr}
+                  </span>
+                )}
+                <span className="truncate">{sidor[sidIndex].namn}</span>
+              </span>
+              <Bladdring sidor={sidor} index={sidIndex} onBladdra={nyVy => { gaTill(nyVy); setMobilFlik('kund') }} stor />
+            </div>
+            <ReportPreview
+              report={report}
+              vy={vy}
+              fokus={null}
+              onValj={(nyVy, falt) => gaTill(nyVy, falt)}
+              onBladdra={nyVy => { gaTill(nyVy); setMobilFlik('kund') }}
+              visaHuvud={false}
+            />
+            <button type="button" onClick={() => setMobilFlik('redigera')} className={SEKUNDAR_KNAPP}>
+              <Icon name="allman.anteckning" size={16} />
+              Redigera den här delen
+            </button>
+          </section>
+        )}
       </div>
 
-      {/* Mobil: Ny händelse nås alltid */}
-      <button
-        type="button"
-        onClick={() => setVisaNyHandelse(true)}
-        className={`${PRIMAR_KNAPP} fixed bottom-[88px] right-4 z-30 h-[52px] px-5 shadow-lg shadow-black/40 lg:hidden`}
-      >
-        <Icon name="allman.plus" size={20} />
-        Ny händelse
-      </button>
+      {/* Mobil: Ny händelse nås alltid utom i förhandsvisningen */}
+      {!arDesktop && mobilFlik !== 'kund' && (
+        <button
+          type="button"
+          onClick={() => setVisaNyHandelse(true)}
+          className={`${PRIMAR_KNAPP} fixed bottom-[140px] right-4 z-30 h-[52px] px-5 shadow-lg shadow-black/40`}
+        >
+          <Icon name="allman.plus" size={20} />
+          Ny händelse
+        </button>
+      )}
 
+      {/* Mobil: flikrad ovanför appens egen meny */}
+      {!arDesktop && (
+        <nav role="tablist" aria-label="Läge" className="fixed inset-x-0 bottom-16 z-30 grid grid-cols-3 border-t border-slate-800 bg-slate-900">
+          {([
+            ['delar', 'Delar', 'allman.lista'],
+            ['redigera', 'Redigera', 'allman.anteckning'],
+            ['kund', 'Visa som kund', 'rapport.forhandsgranska'],
+          ] as const).map(([flik, namn, ikon]) => {
+            const aktiv = mobilFlik === flik
+            return (
+              <button
+                key={flik}
+                type="button"
+                role="tab"
+                aria-selected={aktiv}
+                onClick={() => setMobilFlik(flik)}
+                className={`flex h-[60px] flex-col items-center justify-center gap-1 text-[11px] ${aktiv ? 'font-bold text-[#20c58f]' : 'text-slate-400'}`}
+              >
+                <Icon name={ikon} size={20} />
+                {namn}
+              </button>
+            )
+          })}
+        </nav>
+      )}
+
+      <AddSectionModal
+        isOpen={visaLaggTill}
+        onClose={() => setVisaLaggTill(false)}
+        reportId={report.id}
+        onChoose={laggTillDel}
+        onCreatePerVisit={skapaDelPerBesok}
+      />
       <SendSpecialReportModal
         isOpen={visaSkicka}
         onClose={() => setVisaSkicka(false)}

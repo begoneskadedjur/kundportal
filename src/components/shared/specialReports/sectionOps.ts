@@ -1,5 +1,5 @@
 // src/components/shared/specialReports/sectionOps.ts
-// Handlingarna som sektionsvyn och dess block anropar. Redigeraren äger
+// Handlingarna som delvyn och dess block anropar. Redigeraren äger
 // rapportens tillstånd och sparar via SpecialReportService.
 
 import type {
@@ -15,7 +15,7 @@ export type FullSection = SpecialReportFull['sections'][number]
 export type EventPatch = Partial<Pick<SpecialReportEvent, 'event_date' | 'type' | 'title' | 'description'>>
 
 export interface SectionOps {
-  updateSection: (sectionId: string, patch: Partial<Pick<SpecialReportSection, 'title' | 'subtitle' | 'label' | 'area'>>) => void
+  updateSection: (sectionId: string, patch: Partial<Pick<SpecialReportSection, 'title' | 'subtitle' | 'label' | 'area' | 'color'>>) => void
   deleteSection: (sectionId: string) => Promise<void>
   addBlock: (sectionId: string, type: SpecialReportBlockType) => Promise<void>
   updateBlockText: (sectionId: string, blockId: string, text: string) => void
@@ -28,8 +28,8 @@ export interface SectionOps {
   uploadImages: (sectionId: string, files: File[]) => Promise<void>
   updateImageCaption: (sectionId: string, imageId: string, caption: string) => void
   deleteImage: (sectionId: string, imageId: string) => Promise<void>
-  /** Gå till översiktskartan och visa sektionens område */
+  /** Gå till översiktskartan och visa delens område */
   showArea: (sectionId: string) => void
-  /** Gå till översiktskartan och rita (om) sektionens område */
+  /** Gå till översiktskartan och rita (om) delens område */
   drawArea: (sectionId: string) => void
 }

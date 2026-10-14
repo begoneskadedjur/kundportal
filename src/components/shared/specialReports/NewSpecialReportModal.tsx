@@ -1,6 +1,7 @@
 // src/components/shared/specialReports/NewSpecialReportModal.tsx
 // Ny specialrapport: sök och koppla ett ärende, välj upplägg (tomt, karta,
-// en sektion per besök eller kopia av tidigare rapport), titel och dokumenttyp.
+// en del per besök eller kopia av tidigare rapport), titel och typ av rapport.
+// Typen föreslås utifrån ärendets titel och tjänst tills användaren väljer själv.
 // Skapa leder direkt till redigeraren.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -17,7 +18,7 @@ import type {
   SpecialReportListItem,
   SpecialReportStart,
 } from '../../../types/specialReport'
-import { DOC_TYPES, FALT, PRIMAR_KNAPP, SEKUNDAR_KNAPP, useSpecialReportBase } from './specialReportUtils'
+import { DOC_TYPES, FALT, PRIMAR_KNAPP, SEKUNDAR_KNAPP, foreslaDokumenttyp, useSpecialReportBase } from './specialReportUtils'
 
 interface NewSpecialReportModalProps {
   isOpen: boolean
@@ -29,9 +30,9 @@ interface NewSpecialReportModalProps {
 }
 
 const STARTVAL: { id: SpecialReportStart; icon: IconName; rubrik: string; text: string }[] = [
-  { id: 'tom', icon: 'rapport.tom', rubrik: 'Börja tomt', text: 'Lägg till sektioner efter hand' },
-  { id: 'karta', icon: 'rapport.omrade', rubrik: 'Börja med kartan', text: 'Varje område du ritar blir en sektion' },
-  { id: 'per_besok', icon: 'rapport.besok', rubrik: 'En sektion per besök', text: 'Ärendets besök hämtas in' },
+  { id: 'tom', icon: 'rapport.tom', rubrik: 'Börja tomt', text: 'Lägg till delar efter hand' },
+  { id: 'karta', icon: 'rapport.omrade', rubrik: 'Börja med kartan', text: 'Varje område du ritar blir en del' },
+  { id: 'per_besok', icon: 'rapport.besok', rubrik: 'En del per besök', text: 'Ärendets besök hämtas in' },
   { id: 'kopia', icon: 'rapport.kopia', rubrik: 'Utgå från tidigare rapport', text: 'Samma struktur, nya händelser' },
 ]
 
@@ -50,6 +51,7 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
   const [titel, setTitel] = useState('')
   const titelRord = useRef(false)
   const [docType, setDocType] = useState<SpecialReportDocType>('Saneringsrapport')
+  const docTypeRord = useRef(false)
   const [skapar, setSkapar] = useState(false)
 
   // Nollställ när modalen öppnas
@@ -63,6 +65,7 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
     setTitel('')
     titelRord.current = false
     setDocType('Saneringsrapport')
+    docTypeRord.current = false
   }, [isOpen, initialQuery])
 
   // Sök ärenden med fördröjning
@@ -107,6 +110,8 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
       const namn = a.customer_name || a.title || ''
       setTitel(namn ? `${a.service ? `${a.service} hos ` : ''}${namn}` : '')
     }
+    // Inspektion ger Inspektionsrapport, annars Saneringsrapport
+    if (!docTypeRord.current) setDocType(foreslaDokumenttyp(a.title, a.service))
   }
 
   const kopiaAlternativ = useMemo(
@@ -264,7 +269,7 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
               />
             </div>
           )}
-          <p className="text-xs text-slate-500">Startvalet låser ingenting. Sektioner av alla slag kan blandas i samma rapport.</p>
+          <p className="text-xs text-slate-500">Startvalet låser ingenting. Delar av alla slag kan blandas i samma rapport.</p>
         </section>
 
         {/* 3. Rapporten */}
@@ -281,12 +286,13 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
               />
             </label>
             <div>
-              <span className="block text-xs font-medium text-slate-400 mb-1">Dokumenttyp</span>
+              <span className="block text-xs font-medium text-slate-400 mb-1">Typ av rapport</span>
               <Select
                 value={docType}
-                onChange={v => setDocType(v as SpecialReportDocType)}
+                onChange={v => { docTypeRord.current = true; setDocType(v as SpecialReportDocType) }}
                 options={DOC_TYPES.map(d => ({ value: d, label: d }))}
               />
+              {valt && !docTypeRord.current && <span className="mt-1 block text-xs text-slate-500">Föreslagen utifrån ärendet</span>}
             </div>
           </div>
         </section>

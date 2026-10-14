@@ -1,5 +1,5 @@
 // src/components/shared/specialReports/ImagesBlock.tsx
-// Bildblocket: sektionens bilder som miniatyrer med bildtext. Uppladdning av
+// Bildblocket: delens bilder som miniatyrer med bildtext. Uppladdning av
 // flera filer, och på mobil direkt från kameran.
 
 import { useMemo, useRef, useState } from 'react'
