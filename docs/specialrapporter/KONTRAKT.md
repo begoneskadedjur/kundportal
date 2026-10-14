@@ -27,6 +27,8 @@ Alla metoder kastar `Error` med svensk text vid fel.
 
 ```ts
 list(): Promise<SpecialReportListItem[]>
+listForCase(caseId: string, caseType: SpecialReportCaseType): Promise<SpecialReportListItem[]>   // 3.56.0, filtreras i databasen; list och listForCase delar berika(rows)
+getCaseOption(caseId: string, caseType: SpecialReportCaseType): Promise<SpecialReportCaseOption | null>   // 3.56.0, känt ärende utan fritextsök (förval i Ny specialrapport)
 searchCases(query: string): Promise<SpecialReportCaseOption[]>   // BE-nummer, kundnamn, kontaktperson; bara ärenden användaren når
 create(input: { caseOption: SpecialReportCaseOption; title: string; docType: SpecialReportDocType; start: SpecialReportStart; copyFromReportId?: string }): Promise<string>  // returnerar id; 'per_besok' skapar en del per besök med händelser och färger i tur och ordning, 'kopia' kopierar delar/block (med färg) utan händelser
 get(id: string): Promise<SpecialReportFull>                        // bilder med signerade URL:er, delarna med color
@@ -89,3 +91,11 @@ Skiss: Handelser, Bilder, Forhandsvisning och HelaPdf (sessionens scratchpad, ma
 - Bildblocket är ett tätt rutnät (2 till 5 i bredd efter behållaren) med uppladdningsruta. Ladda upp i blockets huvud öppnar samma filväljare.
 - Förhandsvisningen (`ReportPreview.tsx`) är en rulle med alla sidor. Sidbrytningen finns i `rapportSidor.tsx`: bitarna mäts i en osynlig behållare (sidan ritas i 420 x 594 px och skalas med transform) och fördelas i ett varv. Varje bit placeras en gång, en för hög bit klipps. Fortsättningssidor får "2.x Namn, fortsättning" och upprepat tabellhuvud. Sidbrytningen är en uppskattning; PDF:en från servern bryter själv.
 - Hela PDF:en (`HelaPdfModal.tsx`): egen portal i helskärm med miniatyrer, stor sida, piltangenter, Ladda ner PDF och Skicka till kund.
+
+## Specialrapporter i ärendemodalerna (3.56.0)
+- `CaseSpecialReportsSection` (props `caseId`, `caseType`, `caseNumber?`, `readOnly?`, `osparat?`) ligger i EditCaseModal (`private`/`business`), EditContractCaseModal (`contract`, inte i kundvyn), RonderingCaseModal (`contract`, delbesök visar huvudärendets rapporter via `parent_case_id ?? id`), EgenkontrollCaseModal (`contract`) och som läsvy (`readOnly`, ingen plusknapp) i admins kundkort (`CaseDetailPanel`). Kundvyer har inte listan.
+- Hämtas med `listForCase` och igen när fliken blir synlig. `SpecialReportListItem` har `last_sent_to: string[]` och `last_sent_version_id` från senaste versionen.
+- Rad: statuspunkt, titel, Skickad / Ändrad sedan utskicket / Utkast i statusfärg, senaste utskick (första mottagaren + "och N till"), antal delar och händelser. Ikonknappar 44 px: Ladda ner PDF (skickad = låsta versionens PDF via `getVersionPdfUrl`, annars `downloadPdf`, toast.loading under tiden) och Öppna rapporten (`rapport.ladda-pdf`, `rapport.oppna`).
+- Öppna skickar `state.tillbaka = { pathname, caseId, caseType }`. Redigeraren sparar det per rapport i sessionStorage (`specialrapport-tillbaka:<id>`) och tillbaka-knappen går till sidan med `?openCase=<id>&caseType=<typ>&comm=0`. Kundkortet skickar bara sidan.
+- Osparade ändringar: modalen ger `osparat = { finns, spara }`. `useOsparatArende(formData, fält)` i `specialReportUtils.ts` jämför de fält användaren redigerar mot det som senast lästs eller sparats. Finns ändringar frågar listan: Spara och öppna / Öppna utan att spara / Avbryt.
+- `NewSpecialReportModal` tar `initialCaseType` (och valfritt `initialCase`) och väljer ärendet via `getCaseOption`, med sökningen som reserv.

@@ -274,4 +274,23 @@ export const rapportIcons = {
       <path d="M8.5 13.5l2.5 2.5 4.5-5" />
     </>
   ),
+
+  // 3.56.0: specialrapporter i ärendemodalerna
+  // Ladda ner PDF: dokument med hörnvik och nedåtpil
+  'rapport.ladda-pdf': (
+    <>
+      <path d="M6 3.5h8l4 4v13H6z" />
+      <path d="M14 3.5v4h4" />
+      <path d="M12 10.5v6.5" />
+      <path d="M9.5 14.5 12 17l2.5-2.5" />
+    </>
+  ),
+  // Öppna rapporten: ruta med pil ut
+  'rapport.oppna': (
+    <>
+      <path d="M19 13.5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4.5" />
+      <path d="M14 4h6v6" />
+      <path d="M20 4l-9 9" />
+    </>
+  ),
 } satisfies Record<`rapport.${string}`, ReactNode>

@@ -38,6 +38,7 @@ import Input from '../ui/Input'
 import CaseModalSection from '../shared/CaseModalSection'
 import InspectionReportSection from '../shared/InspectionReportSection'
 import CaseSpecialReportsSection from '../shared/specialReports/CaseSpecialReportsSection'
+import { useOsparatArende } from '../shared/specialReports/specialReportUtils'
 import CaseStatusStepper from '../shared/CaseStatusStepper'
 
 // Fakturering - ad-hoc billing för avtalskunder vid ärendeavslut
@@ -81,6 +82,16 @@ interface EditContractCaseModalProps {
 }
 
 import { CaseNumberService } from '../../services/caseNumberService'
+
+/** Fält som användaren redigerar och som räknas som osparade ändringar (3.56.0) */
+const OSPARAT_FALT = [
+  'title', 'description', 'status', 'contact_person', 'contact_phone', 'contact_email',
+  'alternative_contact_person', 'alternative_contact_phone', 'alternative_contact_email',
+  'address', 'pest_type', 'other_pest_type', 'service_id', 'scheduled_start', 'scheduled_end',
+  'primary_technician_id', 'secondary_technician_id', 'tertiary_technician_id',
+  'work_report', 'recommendations', 'materials_used', 'material_cost', 'price',
+  'pest_level', 'problem_rating', 'work_order_number', 'work_object', 'room_number', 'invoice_marking',
+] as const
 
 export default function EditContractCaseModal({
   isOpen,
@@ -187,6 +198,9 @@ export default function EditContractCaseModal({
   const [loadingRecipients, setLoadingRecipients] = useState(false)
   const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
   const [hasPendingImageChanges, setHasPendingImageChanges] = useState(false)
+  // 3.56.0: osparade ändringar innan en specialrapport öppnas (fälten användaren redigerar)
+  const { markeraSparat, harOsparat } = useOsparatArende(formData, OSPARAT_FALT)
+  const sparatOkRef = useRef(false)
   const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
 
   // Radering state
@@ -414,7 +428,7 @@ export default function EditContractCaseModal({
 
   useEffect(() => {
     if (caseData && isOpen) {
-      setFormData({
+      const init = {
         case_number: caseData.case_number || '',
         title: caseData.title || '',
         description: caseData.description || '',
@@ -460,7 +474,9 @@ export default function EditContractCaseModal({
         room_number: caseData.room_number || '',
         // 🧾 Märkning faktura
         invoice_marking: caseData.invoice_marking || '',
-      })
+      }
+      setFormData(init)
+      markeraSparat(init)
       
       // Check if timer was running
       if (caseData.work_started_at) {
@@ -567,7 +583,8 @@ export default function EditContractCaseModal({
 
       if (data) {
         setLocalCaseData(data)
-        setFormData(prev => ({
+        setFormData(prev => {
+          const next = {
           ...prev,
           case_number: data.case_number || prev.case_number,
           title: data.title || prev.title,
@@ -594,7 +611,11 @@ export default function EditContractCaseModal({
           work_order_number: data.work_order_number ?? prev.work_order_number,
           work_object: data.work_object ?? prev.work_object,
           room_number: data.room_number ?? prev.room_number,
-        }))
+          }
+          // Det hämtade är det som ligger sparat
+          markeraSparat(next)
+          return next
+        })
         return data
       }
     } catch (error) {
@@ -1159,6 +1180,7 @@ export default function EditContractCaseModal({
   }
 
   const handleSubmit = async () => {
+    sparatOkRef.current = false
     if (!localCaseData?.id) return
 
     // SPÄRR: rabattrader utan motivering blockerar avslut. Körs FÖRE alla
@@ -1437,6 +1459,8 @@ export default function EditContractCaseModal({
       // Visa visuell bekräftelse på knappen
       setShowSaveSuccess(true)
       setTimeout(() => setShowSaveSuccess(false), 2000)
+      sparatOkRef.current = true
+      markeraSparat(formData)
       // Refresha data istället för att stänga - tekniker kan nu boka återbesök direkt
       const refreshed = await refreshCaseData()
       // Skicka ny data till parent så att useEffect inte återställer formData med gammal data
@@ -2198,7 +2222,18 @@ export default function EditContractCaseModal({
 
           {/* Specialrapport: fri rapport kopplad till ärendet (3.50.0) */}
           {caseData?.id && !isCustomerView && (
-            <CaseSpecialReportsSection caseId={caseData.id} caseNumber={formData.case_number} />
+            <CaseSpecialReportsSection
+              caseId={caseData.id}
+              caseType="contract"
+              caseNumber={formData.case_number}
+              osparat={{
+                finns: () => harOsparat() || hasPendingImageChanges,
+                spara: async () => {
+                  await handleSubmit()
+                  return sparatOkRef.current
+                },
+              }}
+            />
           )}
 
           {/* Bilder sektion — inte för stationskontroll (foton tas per station i kontrollrundan) */}

@@ -130,6 +130,12 @@ async function mirrorNumbersByDigits(digitsList: string[]): Promise<Map<string, 
   return result
 }
 
+const LIST_COLUMNS = 'id, title, doc_type, case_id, case_type, case_number, customer_name, customer_number, current_version, updated_at, updated_by'
+
+type ListRow = Pick<SpecialReport,
+  'id' | 'title' | 'doc_type' | 'case_id' | 'case_type' | 'case_number' | 'customer_name' |
+  'customer_number' | 'current_version' | 'updated_at' | 'updated_by'>
+
 interface CaseRowContract {
   id: string
   case_number: string | null
@@ -192,6 +198,62 @@ async function readApiError(res: Response, standard: string): Promise<never> {
   throw new Error(message)
 }
 
+/** Ärendealternativ ur råa rader från de tre ärendetabellerna */
+async function caseOptionsFromRows(
+  contractRows: CaseRowContract[],
+  privateRows: CaseRowClickUp[],
+  businessRows: CaseRowClickUp[],
+): Promise<(SpecialReportCaseOption & { created_at: string })[]> {
+  // Kundnummer för privat- och företagsärenden via Fortnox-spegeln (org.nr/personnummer)
+  const digitsFor = (row: CaseRowClickUp) => orgDigits(row.org_nr ?? row.personnummer ?? null)
+  const mirror = await mirrorNumbersByDigits(
+    [...privateRows, ...businessRows].map(digitsFor).filter((d): d is string => !!d)
+  ).catch(() => new Map<string, string>())
+
+  const options: (SpecialReportCaseOption & { created_at: string })[] = []
+  for (const r of contractRows) {
+    options.push({
+      case_id: r.id,
+      case_type: 'contract',
+      case_number: r.case_number,
+      title: r.title,
+      customer_id: r.customer_id,
+      customer_name: r.customer?.company_name ?? null,
+      customer_number: r.customer?.customer_number != null ? String(r.customer.customer_number) : null,
+      contact_name: r.contact_person,
+      contact_email: r.contact_email,
+      contact_phone: r.contact_phone,
+      address: nonEmpty(formatAddress(r.address)),
+      service: nonEmpty(r.service_type) ?? nonEmpty(r.pest_type),
+      created_at: r.created_at,
+    })
+  }
+  const pushClickUp = (r: CaseRowClickUp, caseType: SpecialReportCaseType) => {
+    const digits = digitsFor(r)
+    options.push({
+      case_id: r.id,
+      case_type: caseType,
+      case_number: r.case_number,
+      title: r.title,
+      customer_id: null,
+      customer_name: caseType === 'business' ? nonEmpty(r.company_name) ?? r.kontaktperson : r.kontaktperson,
+      customer_number: digits ? mirror.get(digits) ?? null : null,
+      contact_name: r.kontaktperson,
+      contact_email: r.e_post_kontaktperson,
+      contact_phone: r.telefon_kontaktperson,
+      address: nonEmpty(formatAddress(r.adress)),
+      service: nonEmpty(r.skadedjur),
+      created_at: r.created_at,
+    })
+  }
+  privateRows.forEach(r => pushClickUp(r, 'private'))
+  businessRows.forEach(r => pushClickUp(r, 'business'))
+  return options
+}
+
+const CONTRACT_CASE_COLUMNS = 'id, case_number, title, customer_id, contact_person, contact_email, contact_phone, address, service_type, pest_type, created_at, customer:customers(company_name, customer_number)'
+const CLICKUP_CASE_COLUMNS = 'id, case_number, title, kontaktperson, e_post_kontaktperson, telefon_kontaktperson, adress, skadedjur, created_at'
+
 export class SpecialReportService {
   // ==========================================================================
   // Lista och sök
@@ -201,19 +263,33 @@ export class SpecialReportService {
   static async list(): Promise<SpecialReportListItem[]> {
     const { data: reports, error } = await db
       .from('special_reports')
-      .select('id, title, doc_type, case_id, case_type, case_number, customer_name, customer_number, current_version, updated_at, updated_by')
+      .select(LIST_COLUMNS)
       .order('updated_at', { ascending: false })
       .limit(1000)
     if (error) fel(error, 'Rapporterna kunde inte hämtas')
-    const rows = (reports ?? []) as (Pick<SpecialReport,
-      'id' | 'title' | 'doc_type' | 'case_id' | 'case_type' | 'case_number' | 'customer_name' |
-      'customer_number' | 'current_version' | 'updated_at' | 'updated_by'>)[]
+    return SpecialReportService.berika((reports ?? []) as ListRow[])
+  }
+
+  /** Rapporterna för ett ärende (filtreras i databasen), senast ändrad först */
+  static async listForCase(caseId: string, caseType: SpecialReportCaseType): Promise<SpecialReportListItem[]> {
+    const { data: reports, error } = await db
+      .from('special_reports')
+      .select(LIST_COLUMNS)
+      .eq('case_id', caseId)
+      .eq('case_type', caseType)
+      .order('updated_at', { ascending: false })
+    if (error) fel(error, 'Ärendets specialrapporter kunde inte hämtas')
+    return SpecialReportService.berika((reports ?? []) as ListRow[])
+  }
+
+  /** Antal delar och händelser, senaste utskick och namn på den som ändrade senast */
+  private static async berika(rows: ListRow[]): Promise<SpecialReportListItem[]> {
     if (rows.length === 0) return []
 
     const reportIds = rows.map(r => r.id)
     const [sectionsRes, versionsRes] = await Promise.all([
       db.from('special_report_sections').select('id, report_id').in('report_id', reportIds),
-      db.from('special_report_versions').select('report_id, version, sent_at').in('report_id', reportIds),
+      db.from('special_report_versions').select('id, report_id, version, sent_at, sent_to').in('report_id', reportIds),
     ])
     if (sectionsRes.error) fel(sectionsRes.error, 'Rapporternas delar kunde inte hämtas')
     const sections = (sectionsRes.data ?? []) as { id: string; report_id: string }[]
@@ -235,10 +311,11 @@ export class SpecialReportService {
     const sectionCounts = new Map<string, number>()
     for (const s of sections) sectionCounts.set(s.report_id, (sectionCounts.get(s.report_id) ?? 0) + 1)
 
-    const lastSent = new Map<string, { version: number; sent_at: string | null }>()
-    for (const v of (versionsRes.data ?? []) as { report_id: string; version: number; sent_at: string | null }[]) {
+    type VersionRow = { id: string; report_id: string; version: number; sent_at: string | null; sent_to: string[] | null }
+    const lastSent = new Map<string, VersionRow>()
+    for (const v of (versionsRes.data ?? []) as VersionRow[]) {
       const current = lastSent.get(v.report_id)
-      if (!current || v.version > current.version) lastSent.set(v.report_id, { version: v.version, sent_at: v.sent_at })
+      if (!current || v.version > current.version) lastSent.set(v.report_id, v)
     }
 
     // Namn på den som ändrade senast, bara de profiler användaren får läsa
@@ -269,6 +346,8 @@ export class SpecialReportService {
       current_version: r.current_version,
       last_sent_at: lastSent.get(r.id)?.sent_at ?? null,
       last_sent_version: lastSent.get(r.id)?.version ?? null,
+      last_sent_to: lastSent.get(r.id)?.sent_to ?? [],
+      last_sent_version_id: lastSent.get(r.id)?.id ?? null,
       updated_at: r.updated_at,
       updated_by_name: r.updated_by ? names.get(r.updated_by) ?? null : null,
     }))
@@ -307,20 +386,19 @@ export class SpecialReportService {
       `bestallare.ilike.${like}`,
     ].join(',')
 
-    const clickUpColumns = 'id, case_number, title, kontaktperson, e_post_kontaktperson, telefon_kontaktperson, adress, skadedjur, created_at'
     const [contractRes, privateRes, businessRes] = await Promise.all([
       db.from('cases')
-        .select('id, case_number, title, customer_id, contact_person, contact_email, contact_phone, address, service_type, pest_type, created_at, customer:customers(company_name, customer_number)')
+        .select(CONTRACT_CASE_COLUMNS)
         .or(contractFilter)
         .order('created_at', { ascending: false })
         .limit(20),
       db.from('private_cases')
-        .select(`${clickUpColumns}, personnummer`)
+        .select(`${CLICKUP_CASE_COLUMNS}, personnummer`)
         .or(privateFilter)
         .order('created_at', { ascending: false })
         .limit(20),
       db.from('business_cases')
-        .select(`${clickUpColumns}, company_name, org_nr`)
+        .select(`${CLICKUP_CASE_COLUMNS}, company_name, org_nr`)
         .or(businessFilter)
         .order('created_at', { ascending: false })
         .limit(20),
@@ -333,50 +411,7 @@ export class SpecialReportService {
     const privateRows = (privateRes.data ?? []) as unknown as CaseRowClickUp[]
     const businessRows = (businessRes.data ?? []) as unknown as CaseRowClickUp[]
 
-    // Kundnummer för privat- och företagsärenden via Fortnox-spegeln (org.nr/personnummer)
-    const digitsFor = (row: CaseRowClickUp) => orgDigits(row.org_nr ?? row.personnummer ?? null)
-    const mirror = await mirrorNumbersByDigits(
-      [...privateRows, ...businessRows].map(digitsFor).filter((d): d is string => !!d)
-    ).catch(() => new Map<string, string>())
-
-    const options: (SpecialReportCaseOption & { created_at: string })[] = []
-    for (const r of contractRows) {
-      options.push({
-        case_id: r.id,
-        case_type: 'contract',
-        case_number: r.case_number,
-        title: r.title,
-        customer_id: r.customer_id,
-        customer_name: r.customer?.company_name ?? null,
-        customer_number: r.customer?.customer_number != null ? String(r.customer.customer_number) : null,
-        contact_name: r.contact_person,
-        contact_email: r.contact_email,
-        contact_phone: r.contact_phone,
-        address: nonEmpty(formatAddress(r.address)),
-        service: nonEmpty(r.service_type) ?? nonEmpty(r.pest_type),
-        created_at: r.created_at,
-      })
-    }
-    const pushClickUp = (r: CaseRowClickUp, caseType: SpecialReportCaseType) => {
-      const digits = digitsFor(r)
-      options.push({
-        case_id: r.id,
-        case_type: caseType,
-        case_number: r.case_number,
-        title: r.title,
-        customer_id: null,
-        customer_name: caseType === 'business' ? nonEmpty(r.company_name) ?? r.kontaktperson : r.kontaktperson,
-        customer_number: digits ? mirror.get(digits) ?? null : null,
-        contact_name: r.kontaktperson,
-        contact_email: r.e_post_kontaktperson,
-        contact_phone: r.telefon_kontaktperson,
-        address: nonEmpty(formatAddress(r.adress)),
-        service: nonEmpty(r.skadedjur),
-        created_at: r.created_at,
-      })
-    }
-    privateRows.forEach(r => pushClickUp(r, 'private'))
-    businessRows.forEach(r => pushClickUp(r, 'business'))
+    const options = await caseOptionsFromRows(contractRows, privateRows, businessRows)
 
     return options
       .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
@@ -386,6 +421,30 @@ export class SpecialReportService {
         delete rest.created_at
         return rest
       })
+  }
+
+  /** Ett känt ärende som alternativ för en ny rapport, utan fritextsök. Null om det inte nås (RLS). */
+  static async getCaseOption(caseId: string, caseType: SpecialReportCaseType): Promise<SpecialReportCaseOption | null> {
+    let options: (SpecialReportCaseOption & { created_at: string })[] = []
+    if (caseType === 'contract') {
+      const { data, error } = await db.from('cases').select(CONTRACT_CASE_COLUMNS).eq('id', caseId).maybeSingle()
+      if (error) fel(error, 'Ärendet kunde inte hämtas')
+      if (!data) return null
+      options = await caseOptionsFromRows([data as unknown as CaseRowContract], [], [])
+    } else {
+      const table = caseType === 'private' ? 'private_cases' : 'business_cases'
+      const extra = caseType === 'private' ? 'personnummer' : 'company_name, org_nr'
+      const { data, error } = await db.from(table).select(`${CLICKUP_CASE_COLUMNS}, ${extra}`).eq('id', caseId).maybeSingle()
+      if (error) fel(error, 'Ärendet kunde inte hämtas')
+      if (!data) return null
+      const row = data as unknown as CaseRowClickUp
+      options = await caseOptionsFromRows([], caseType === 'private' ? [row] : [], caseType === 'business' ? [row] : [])
+    }
+    const first = options[0]
+    if (!first) return null
+    const rest: SpecialReportCaseOption & { created_at?: string } = { ...first }
+    delete rest.created_at
+    return rest
   }
 
   // ==========================================================================

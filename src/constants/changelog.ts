@@ -45,6 +45,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.56.0',
+    date: '2026-10-14',
+    title: 'Specialrapporter i ärendena',
+    items: [
+      { kind: 'nyhet', text: 'Specialrapporter syns i alla ärenden: privat, företag, avtal, rondering och egenkontroll, med knappar för att öppna rapporten och ladda ner PDF:en.' },
+      { kind: 'andring', text: 'Tillbaka från en specialrapport leder till ärendet du kom ifrån.' },
+      { kind: 'andring', text: 'Varning om osparade ändringar i ärendet när du öppnar en specialrapport.' },
+      { kind: 'buggfix', text: 'Ny specialrapport från ett ärende väljer alltid rätt ärende.' },
+      { kind: 'buggfix', text: 'Rondering: bilder som inte sparats sparas nu när ärendet stängs, i stället för att stängningen kunde fastna.' },
+    ],
+  },
+  {
     version: '3.55.0',
     date: '2026-10-14',
     title: 'Specialrapporter: tätare redigering och hela rapporten i förhandsvisningen',

@@ -330,11 +330,13 @@ export default function CoordinatorSchedule() {
     if (!openCaseId || allCases.length === 0) return
     const foundCase = allCases.find(c => c.id === openCaseId)
     if (foundCase) {
-      setOpenCommunicationOnLoad(true)
-      if (foundCase.case_type === 'contract') {
-        const cc = contractCases.find(c => c.id === foundCase.id)
-        if (cc) { setSelectedContractCase(cc); setIsEditContractModalOpen(true) }
-      } else {
+      // comm=0 öppnar bara ärendet (t.ex. tillbaka från en specialrapport)
+      if (searchParams.get('comm') !== '0') setOpenCommunicationOnLoad(true)
+      // Avtalsärenden (även rondering och egenkontroll) får sin egen modal via openContractCase
+      const cc = contractCases.find(c => c.id === foundCase.id)
+      if (cc) {
+        openContractCase(cc)
+      } else if (foundCase.case_type !== 'contract') {
         setSelectedCase(foundCase); setIsEditModalOpen(true)
       }
       setSearchParams({})

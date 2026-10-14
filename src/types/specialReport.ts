@@ -157,6 +157,10 @@ export interface SpecialReportListItem {
   current_version: number
   last_sent_at: string | null
   last_sent_version: number | null
+  /** Mottagarna för senast skickade versionen, tom om ingen skickats */
+  last_sent_to: string[]
+  /** Id för senast skickade versionen, för att hämta dess låsta PDF */
+  last_sent_version_id: string | null
   updated_at: string
   updated_by_name: string | null
 }

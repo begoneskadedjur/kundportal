@@ -34,8 +34,16 @@ import { EgenkontrollService, EgenkontrollStationReview, EgenkontrollQuestion } 
 import { CaseImageService } from '../../services/caseImageService'
 import type { CaseImageWithUrl } from '../../services/caseImageService'
 import ImageLightbox from '../shared/ImageLightbox'
+import CaseSpecialReportsSection from '../shared/specialReports/CaseSpecialReportsSection'
+import { useOsparatArende } from '../shared/specialReports/specialReportUtils'
 
 registerLocale('sv', sv)
+
+/** Fält som användaren redigerar och som räknas som osparade ändringar (3.56.0) */
+const OSPARAT_FALT = [
+  'description', 'status', 'contact_person', 'contact_phone', 'contact_email',
+  'scheduled_start', 'scheduled_end', 'primary_technician_id', 'secondary_technician_id', 'work_report',
+] as const
 
 interface EgenkontrollCaseModalProps {
   isOpen: boolean
@@ -110,6 +118,11 @@ export default function EgenkontrollCaseModal({
     work_report: '',
   })
 
+  // 3.56.0: osparade ändringar innan en specialrapport öppnas (fälten användaren redigerar).
+  // Stationsgranskningen sparas direkt och räknas inte.
+  const { markeraSparat, harOsparat } = useOsparatArende(formData, OSPARAT_FALT)
+  const sparatOkRef = useRef(false)
+
   const [technicians, setTechnicians] = useState<any[]>([])
 
   // Alla stationer i regionen (för stationsval)
@@ -170,7 +183,7 @@ export default function EgenkontrollCaseModal({
     if (!isOpen || !caseData) return
 
     const load = async () => {
-      setFormData({
+      const init = {
         case_number: caseData.case_number || caseData.title || '',
         title: caseData.title || '',
         description: caseData.description || '',
@@ -185,7 +198,9 @@ export default function EgenkontrollCaseModal({
         secondary_technician_id: caseData.secondary_technician_id || '',
         secondary_technician_name: caseData.secondary_technician_name || '',
         work_report: caseData.work_report || '',
-      })
+      }
+      setFormData(init)
+      markeraSparat(init)
 
       if (caseData.customer_id) {
         const { data: customer } = await supabase
@@ -285,6 +300,7 @@ export default function EgenkontrollCaseModal({
   }, [caseData?.id, reviews.map(r => r.station_id).join(',')])
 
   const handleSubmit = async () => {
+    sparatOkRef.current = false
     setLoading(true)
     try {
       const { data: updatedRows, error } = await supabase
@@ -312,6 +328,8 @@ export default function EgenkontrollCaseModal({
       }
 
       toast.success('Egenkontrollen sparad')
+      sparatOkRef.current = true
+      markeraSparat(formData)
       onSuccess?.()
       onClose()
     } catch (e: any) {
@@ -1083,6 +1101,22 @@ export default function EgenkontrollCaseModal({
                 className="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f] resize-none"
               />
             </div>
+
+            {/* Specialrapporter (3.56.0) */}
+            {caseData?.id && (
+              <CaseSpecialReportsSection
+                caseId={caseData.id}
+                caseType="contract"
+                caseNumber={formData.case_number}
+                osparat={{
+                  finns: harOsparat,
+                  spara: async () => {
+                    await handleSubmit()
+                    return sparatOkRef.current
+                  },
+                }}
+              />
+            )}
 
           </div>
         </div>

@@ -36,6 +36,8 @@ import DuplicateCaseDialog from '../shared/DuplicateCaseDialog'
 import { CaseNumberService } from '../../services/caseNumberService'
 // Fakturering + provision (samma flöde som EditContractCaseModal)
 import CaseServiceSelector from '../shared/CaseServiceSelector'
+import CaseSpecialReportsSection from '../shared/specialReports/CaseSpecialReportsSection'
+import { useOsparatArende } from '../shared/specialReports/specialReportUtils'
 import CommissionSection from '../shared/CommissionSection'
 import { ProvisionService } from '../../services/provisionService'
 import { CaseBillingService } from '../../services/caseBillingService'
@@ -90,6 +92,13 @@ function formatDateTime(iso: string): string {
   return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }) +
     ' ' + d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
 }
+
+/** Fält som användaren redigerar och som räknas som osparade ändringar (3.56.0) */
+const OSPARAT_FALT = [
+  'description', 'status', 'contact_person', 'contact_phone', 'contact_email',
+  'scheduled_start', 'scheduled_end', 'primary_technician_id', 'secondary_technician_id',
+  'tertiary_technician_id', 'work_report',
+] as const
 
 // ─── AddSubVisitModal ────────────────────────────────────────────────────────
 
@@ -444,6 +453,9 @@ export default function RonderingCaseModal({
   const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
   const [hasPendingImageChanges, setHasPendingImageChanges] = useState(false)
   const imageGalleryRef = useRef<CaseImageGalleryRef>(null)
+  // 3.56.0: osparade ändringar innan en specialrapport öppnas (fälten användaren redigerar)
+  const { markeraSparat, harOsparat } = useOsparatArende(formData, OSPARAT_FALT)
+  const sparatOkRef = useRef(false)
 
   const reportData = {
     ...(caseData || {}),
@@ -464,7 +476,7 @@ export default function RonderingCaseModal({
 
   const handleClose = useCallback(() => {
     if (hasPendingImageChanges && imageGalleryRef.current) {
-      imageGalleryRef.current.commitPendingChanges()
+      imageGalleryRef.current.commitChanges().catch(err => console.error('Kunde inte spara bilder vid stängning:', err))
     }
     onClose()
   }, [onClose, hasPendingImageChanges])
@@ -475,7 +487,7 @@ export default function RonderingCaseModal({
 
     const load = async () => {
       // Formdata
-      setFormData({
+      const init = {
         case_number: caseData.case_number || caseData.title || '',
         title: caseData.title || '',
         description: caseData.description || '',
@@ -492,7 +504,9 @@ export default function RonderingCaseModal({
         tertiary_technician_id: caseData.tertiary_technician_id || '',
         tertiary_technician_name: caseData.tertiary_technician_name || '',
         work_report: caseData.work_report || '',
-      })
+      }
+      setFormData(init)
+      markeraSparat(init)
 
       // Provision-init (samma mönster som EditContractCaseModal)
       originalStatusRef.current = caseData.status || 'Öppen'
@@ -588,6 +602,7 @@ export default function RonderingCaseModal({
 
   // Spara ändringar
   const handleSubmit = async () => {
+    sparatOkRef.current = false
     // SPÄRR: rabattrader utan motivering blockerar avslut. Körs FÖRE alla
     // skrivningar (statusändring, ad-hoc-fakturering, provision).
     // Avtalstilläggsrader räknas inte som rabatt (exkluderas i servicen).
@@ -710,6 +725,8 @@ export default function RonderingCaseModal({
 
       setShowSaveSuccess(true)
       setTimeout(() => setShowSaveSuccess(false), 2000)
+      sparatOkRef.current = true
+      markeraSparat(formData)
       onSuccess?.(caseData)
     } catch (e: any) {
       toast.error(e.message || 'Kunde inte spara')
@@ -1323,6 +1340,30 @@ export default function RonderingCaseModal({
                 placeholder="Beskriv utfört arbete, avvikelser och observationer..."
               />
             </div>
+
+            {/* Specialrapporter (3.56.0). Delbesök visar huvudärendets rapporter */}
+            {caseData?.id && (
+              <CaseSpecialReportsSection
+                caseId={caseData.parent_case_id ?? caseData.id}
+                caseType="contract"
+                caseNumber={caseData.parent_case_id ? null : formData.case_number}
+                osparat={{
+                  finns: () => harOsparat() || hasPendingImageChanges,
+                  spara: async () => {
+                    await handleSubmit()
+                    if (!sparatOkRef.current) return false
+                    if (imageGalleryRef.current?.hasPendingChanges()) {
+                      const bilder = await imageGalleryRef.current.commitChanges()
+                      if (!bilder.success) {
+                        toast.error('Ärendet sparades men några bildändringar kunde inte sparas')
+                        return false
+                      }
+                    }
+                    return true
+                  },
+                }}
+              />
+            )}
 
             {/* Utförda tjänster/artiklar för fakturering */}
             {caseData?.id && (

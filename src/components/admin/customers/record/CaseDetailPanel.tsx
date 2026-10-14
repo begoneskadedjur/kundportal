@@ -20,6 +20,7 @@ import { formatDateSv, formatKr, type RecordCase } from '../../../../hooks/useCu
 import { getCaseKindLabel } from '../../../../constants/caseTypeLabels'
 import { caseCategory, daysSince, sessionLateness, LATENESS_STYLE } from '../../../../utils/caseCategory'
 import { RecurringGlyph, ExtraGlyph, EstablishmentGlyph, MissedGlyph } from './CaseCategoryGlyph'
+import CaseSpecialReportsSection from '../../../shared/specialReports/CaseSpecialReportsSection'
 
 /** Ett ärende med fältnamnen normaliserade oavsett källtabell. */
 interface CaseDetail {
@@ -639,6 +640,13 @@ export default function CaseDetailPanel({ caseRow, onClose }: Props) {
                 {detail.recommendations && <Prose label="Rekommendationer" text={detail.recommendations} />}
               </Section>
             )}
+
+            {/* Specialrapporter (3.56.0): bara läsning, öppna och PDF fungerar */}
+            <CaseSpecialReportsSection
+              caseId={caseRow.id}
+              caseType={caseRow.origin === 'business' ? 'business' : 'contract'}
+              readOnly
+            />
 
             {/* Ekonomi visas bara när det FINNS ett pris. cases.price och
                 material_cost är NULL på hela databasen — en sektion som alltid

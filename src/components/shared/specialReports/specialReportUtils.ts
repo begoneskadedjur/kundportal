@@ -442,3 +442,33 @@ export function dagOchManad(datum: string): { dag: string; manad: string } {
   const [, m, d] = datum.split('-').map(Number)
   return { dag: d ? String(d) : '?', manad: m ? MANAD_KORT[m - 1] ?? '' : '' }
 }
+
+/** Värde som jämförs i osparat-kontrollen: tomt, null och 0 räknas lika, datum som tid */
+function jamforbart(v: unknown): string {
+  if (v === null || v === undefined || v === '' || v === 0) return ''
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? '' : String(v.getTime())
+  if (typeof v === 'string') return v.trim()
+  if (typeof v === 'object') return JSON.stringify(v)
+  return String(v)
+}
+
+/**
+ * 3.56.0: osparade ändringar i en ärendemodal. markeraSparat tar emot det som
+ * ligger i databasen (vid laddning, hämtning och efter sparning, gärna bara
+ * några fält åt gången) och harOsparat jämför formuläret mot det, bara för de
+ * fält som användaren själv redigerar. Fält som räknas fram (timer, grupp)
+ * ska inte stå med i listan.
+ */
+export function useOsparatArende(formData: object, falt: readonly string[]) {
+  const sparat = useRef<Record<string, unknown> | null>(null)
+  const markeraSparat = useCallback((data: object) => {
+    sparat.current = { ...(sparat.current ?? {}), ...(data as Record<string, unknown>) }
+  }, [])
+  const harOsparat = (): boolean => {
+    const s = sparat.current
+    if (!s) return false
+    const f = formData as Record<string, unknown>
+    return falt.some(k => jamforbart(f[k]) !== jamforbart(s[k]))
+  }
+  return { markeraSparat, harOsparat }
+}

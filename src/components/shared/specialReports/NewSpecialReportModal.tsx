@@ -14,6 +14,7 @@ import { Icon, type IconName } from '../../icons/Icon'
 import { SpecialReportService } from '../../../services/specialReportService'
 import type {
   SpecialReportCaseOption,
+  SpecialReportCaseType,
   SpecialReportDocType,
   SpecialReportListItem,
   SpecialReportStart,
@@ -27,6 +28,10 @@ interface NewSpecialReportModalProps {
   initialQuery?: string
   /** Välj ärendet direkt om det finns bland träffarna */
   initialCaseId?: string
+  /** Ärendets typ. Tillsammans med initialCaseId hämtas ärendet direkt, utan sökning */
+  initialCaseType?: SpecialReportCaseType
+  /** Färdigt ärendealternativ som väljs direkt när modalen öppnas */
+  initialCase?: SpecialReportCaseOption
 }
 
 const STARTVAL: { id: SpecialReportStart; icon: IconName; rubrik: string; text: string }[] = [
@@ -37,7 +42,14 @@ const STARTVAL: { id: SpecialReportStart; icon: IconName; rubrik: string; text: 
 ]
 
 
-export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = '', initialCaseId }: NewSpecialReportModalProps) {
+export default function NewSpecialReportModal({
+  isOpen,
+  onClose,
+  initialQuery = '',
+  initialCaseId,
+  initialCaseType,
+  initialCase,
+}: NewSpecialReportModalProps) {
   const navigate = useNavigate()
   const base = useSpecialReportBase()
 
@@ -53,6 +65,8 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
   const [docType, setDocType] = useState<SpecialReportDocType>('Saneringsrapport')
   const docTypeRord = useRef(false)
   const [skapar, setSkapar] = useState(false)
+  // Förvalet från ärendet görs en gång per öppning, sedan styr användaren
+  const forvalKlart = useRef(false)
 
   // Nollställ när modalen öppnas
   useEffect(() => {
@@ -66,7 +80,25 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
     titelRord.current = false
     setDocType('Saneringsrapport')
     docTypeRord.current = false
-  }, [isOpen, initialQuery])
+    forvalKlart.current = false
+
+    // Öppnad från ett ärende: välj det direkt, oberoende av fritextsökningen
+    if (initialCase) {
+      forvalKlart.current = true
+      valjArende(initialCase)
+      return
+    }
+    if (!initialCaseId || !initialCaseType) return
+    let aktuell = true
+    SpecialReportService.getCaseOption(initialCaseId, initialCaseType)
+      .then(alt => {
+        if (!aktuell || !alt || forvalKlart.current) return
+        forvalKlart.current = true
+        valjArende(alt)
+      })
+      .catch(() => { /* sökningen nedan är reserv */ })
+    return () => { aktuell = false }
+  }, [isOpen, initialQuery, initialCase, initialCaseId, initialCaseType])
 
   // Sök ärenden med fördröjning
   useEffect(() => {
@@ -81,9 +113,12 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
         if (!aktuell) return
         setTraffar(res)
         // Öppnad från ett ärende: välj det direkt
-        if (initialCaseId && !valt) {
-          const traff = res.find(r => r.case_id === initialCaseId)
-          if (traff) valjArende(traff)
+        if (initialCaseId && !forvalKlart.current) {
+          const traff = res.find(r => r.case_id === initialCaseId && (!initialCaseType || r.case_type === initialCaseType))
+          if (traff) {
+            forvalKlart.current = true
+            valjArende(traff)
+          }
         }
       } catch (e) {
         if (aktuell) toast.error(e instanceof Error ? e.message : 'Kunde inte söka ärenden')
@@ -92,9 +127,9 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
       }
     }, 300)
     return () => { aktuell = false; clearTimeout(t) }
-    // valjArende är stabil nog; valt läses bara för förvalet
+    // valjArende läser bara refs och sätter state
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, isOpen, initialCaseId])
+  }, [query, isOpen, initialCaseId, initialCaseType])
 
   // Tidigare rapporter laddas först när kopia väljs
   useEffect(() => {
@@ -174,7 +209,7 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
             <input
               aria-label="Sök ärende"
               value={query}
-              onChange={e => { setQuery(e.target.value); setValt(null) }}
+              onChange={e => { forvalKlart.current = true; setQuery(e.target.value); setValt(null) }}
               placeholder="BE-nummer, kund eller kontaktperson"
               className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
               autoFocus={!initialQuery}
@@ -199,7 +234,7 @@ export default function NewSpecialReportModal({ isOpen, onClose, initialQuery = 
               </div>
               <button
                 type="button"
-                onClick={() => setValt(null)}
+                onClick={() => { forvalKlart.current = true; setValt(null) }}
                 aria-label="Byt ärende"
                 className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white"
               >

@@ -76,6 +76,7 @@ import CaseHistoryPanel from '../../shared/CaseHistoryPanel'
 // Delade modal-byggstenar (visuell omgörning)
 import CaseModalSection from '../../shared/CaseModalSection'
 import CaseSpecialReportsSection from '../../shared/specialReports/CaseSpecialReportsSection'
+import { useOsparatArende } from '../../shared/specialReports/specialReportUtils'
 import CaseStatusStepper from '../../shared/CaseStatusStepper'
 import SkapaLeadKnapp from '../leads/SkapaLeadKnapp'
 
@@ -139,6 +140,16 @@ interface TechnicianCase {
   service_id?: string | null;
   service_group_id?: string | null; // transient, sparas ej i DB
 }
+
+/** Fält som användaren redigerar och som räknas som osparade ändringar (3.56.0) */
+const OSPARAT_FALT = [
+  'title', 'status', 'description', 'kontaktperson', 'telefon_kontaktperson', 'e_post_kontaktperson',
+  'case_price', 'skadedjur', 'service_id', 'org_nr', 'personnummer',
+  'primary_assignee_id', 'secondary_assignee_id', 'tertiary_assignee_id',
+  'material_cost', 'start_date', 'due_date', 'adress', 'rapport',
+  'r_rot_rut', 'r_fastighetsbeteckning', 'r_arbetskostnad', 'r_material_utrustning', 'r_servicebil',
+  'bestallare', 'company_name', 'markning_faktura', 'e_post_faktura',
+] as const
 
 interface EditCaseModalProps {
   isOpen: boolean
@@ -439,6 +450,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [formData, setFormData] = useState<Partial<TechnicianCase>>({})
   const [imageRefreshTrigger, setImageRefreshTrigger] = useState(0)
   const [hasPendingImageChanges, setHasPendingImageChanges] = useState(false)
+  // 3.56.0: osparade ändringar innan en specialrapport öppnas (fälten användaren redigerar)
+  const { markeraSparat, harOsparat } = useOsparatArende(formData, OSPARAT_FALT)
+  const sparatOkRef = useRef(false)
 
   // Följeärende-states
   const [showFollowUpDialog, setShowFollowUpDialog] = useState(false)
@@ -885,7 +899,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       // Endast resetta formData om det är ett NYTT ärende
       // Detta förhindrar att formuläret resettas när tidloggning uppdaterar caseData
       if (!currentCase || currentCase.id !== caseData.id) {
-        setFormData({
+        const init: Partial<TechnicianCase> = {
           title: caseData.title || '',
           status: caseData.status || '',
           description: caseData.description || '',
@@ -923,7 +937,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           company_name: caseData.company_name || '',
           markning_faktura: caseData.markning_faktura || '',
           e_post_faktura: caseData.e_post_faktura || '',
-        });
+        };
+        setFormData(init);
+        markeraSparat(init);
         setError(null);
         setTimeTrackingLoading(false);
         setLoading(false);
@@ -1035,6 +1051,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    sparatOkRef.current = false;
     const tableName = getTableName();
     if (!tableName || !currentCase) return;
 
@@ -1184,6 +1201,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       }
 
       onSuccess(updatedCaseFromDb);
+      sparatOkRef.current = true;
+      markeraSparat(formData);
 
       // ═══════════════════════════════════════════════════════════════════════════
       // BESÖKSSNAPSHOT: slutbesöket måste finnas INNAN fakturering och provision,
@@ -2158,7 +2177,18 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
             {/* Specialrapport: fri rapport kopplad till ärendet (3.50.0) */}
             {currentCase?.id && (
-              <CaseSpecialReportsSection caseId={currentCase.id} caseNumber={currentCase.case_number} />
+              <CaseSpecialReportsSection
+                caseId={currentCase.id}
+                caseType={currentCase.case_type}
+                caseNumber={currentCase.case_number}
+                osparat={{
+                  finns: () => harOsparat() || hasPendingImageChanges,
+                  spara: async () => {
+                    await handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+                    return sparatOkRef.current
+                  },
+                }}
+              />
             )}
 
             {/* Använda preparat - Visas INTE för Inspektion */}
@@ -2399,6 +2429,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             due_date: updatedCase.due_date,
             status: updatedCase.status
           }))
+          markeraSparat({ start_date: updatedCase.start_date, due_date: updatedCase.due_date, status: updatedCase.status })
           onSuccess(updatedCase)
         }}
         onClose={() => setShowRevisitModal(false)}

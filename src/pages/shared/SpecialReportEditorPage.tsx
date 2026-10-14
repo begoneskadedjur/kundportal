@@ -11,7 +11,7 @@
 // koordinator och admin (via koordinatorns sökväg).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Loader2, MoreVertical } from 'lucide-react'
 import { Icon } from '../../components/icons/Icon'
@@ -57,6 +57,7 @@ import {
   useSpecialReportBase,
   type KlarMal,
 } from '../../components/shared/specialReports/specialReportUtils'
+import type { SpecialReportTillbaka } from '../../components/shared/specialReports/CaseSpecialReportsSection'
 
 /** 'om' | 'oversikt' | 'samm' | en dels id */
 type Vy = string
@@ -100,10 +101,48 @@ const NYA_BLOCK: Record<SpecialReportSectionLabel, SpecialReportBlockType[]> = {
   fritt: ['text', 'images'],
 }
 
+/**
+ * 3.56.0: vart tillbaka-knappen leder. Öppnad från ett ärende följer
+ * location.state.tillbaka med (sidan och ärendet); den sparas i sessionStorage
+ * per rapport eftersom sidans egna sökparametrar (t.ex. ?skicka=1) tappar
+ * state. Ärendesidorna öppnar ärendet igen via ?openCase=<id>&caseType=<typ>
+ * (comm=0: utan att hoppa till kommunikationen). Null = rapportlistan.
+ */
+function useTillbakaMal(reportId: string | undefined): string | null {
+  const location = useLocation()
+  const [mal] = useState<string | null>(() => {
+    const nyckel = `specialrapport-tillbaka:${reportId ?? ''}`
+    const franState = (location.state as { tillbaka?: SpecialReportTillbaka } | null)?.tillbaka
+    let t: SpecialReportTillbaka | null = null
+    if (franState && typeof franState.pathname === 'string') {
+      t = franState
+      try { sessionStorage.setItem(nyckel, JSON.stringify(franState)) } catch { /* privat läge */ }
+    } else {
+      try {
+        const sparad = sessionStorage.getItem(nyckel)
+        if (sparad) t = JSON.parse(sparad) as SpecialReportTillbaka
+      } catch { /* trasigt eller blockerat */ }
+    }
+    // Bara sökvägar inom appen
+    if (!t || !t.pathname.startsWith('/') || t.pathname.startsWith('//')) return null
+    const [sokvag, sok = ''] = t.pathname.split('?')
+    const params = new URLSearchParams(sok)
+    if (t.caseId && (t.caseType === 'private' || t.caseType === 'business' || t.caseType === 'contract')) {
+      params.set('openCase', t.caseId)
+      params.set('caseType', t.caseType)
+      params.set('comm', '0')
+    }
+    const q = params.toString()
+    return q ? `${sokvag}?${q}` : sokvag
+  })
+  return mal
+}
+
 export default function SpecialReportEditorPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const base = useSpecialReportBase()
+  const tillbakaMal = useTillbakaMal(id)
   const [searchParams, setSearchParams] = useSearchParams()
   const saver = useDebouncedSaver(600)
   const arDesktop = useArDesktop()
@@ -829,8 +868,8 @@ export default function SpecialReportEditorPage() {
       <header className="flex min-w-0 flex-shrink-0 items-center gap-2 border-b border-slate-800 bg-slate-900/80 py-2 pl-1 pr-3 sm:gap-2.5 sm:pl-2 sm:pr-5">
         <button
           type="button"
-          aria-label={mobilFlik !== 'delar' && !arDesktop ? 'Tillbaka till delarna' : 'Tillbaka till rapporterna'}
-          onClick={() => (mobilFlik !== 'delar' && !arDesktop ? setMobilFlik('delar') : navigate(base))}
+          aria-label={mobilFlik !== 'delar' && !arDesktop ? 'Tillbaka till delarna' : tillbakaMal ? 'Tillbaka till ärendet' : 'Tillbaka till rapporterna'}
+          onClick={() => (mobilFlik !== 'delar' && !arDesktop ? setMobilFlik('delar') : navigate(tillbakaMal ?? base))}
           className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-800"
         >
           <Icon name="rapport.tillbaka" size={20} />
