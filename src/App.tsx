@@ -139,6 +139,8 @@ import IntranetPage from './pages/shared/IntranetPage';
 // Specialrapporter (tekniker, koordinator och admin via koordinatorns sökväg)
 import SpecialReportsPage from './pages/shared/SpecialReportsPage';
 import SpecialReportEditorPage from './pages/shared/SpecialReportEditorPage';
+// Ordlistan för Snygga till (koordinator och admin)
+import GlossaryPage from './pages/shared/GlossaryPage';
 
 // Global styles
 import './styles/globals.css';
@@ -212,6 +214,7 @@ function App() {
               <Route path="stationer-fallor" element={<ProtectedRoute requiredRole="admin"><StationTypesPage /></ProtectedRoute>} />
               <Route path="preparat" element={<ProtectedRoute requiredRole="admin"><PreparationsPage /></ProtectedRoute>} />
               <Route path="artiklar" element={<ProtectedRoute requiredRole="admin"><ArticlesPage /></ProtectedRoute>} />
+              <Route path="ordlista" element={<ProtectedRoute requiredRole="admin"><GlossaryPage /></ProtectedRoute>} />
               <Route path="prislistor" element={<ProtectedRoute requiredRole="admin"><PriceListsPage /></ProtectedRoute>} />
               <Route path="tjansteutbud" element={<ProtectedRoute requiredRole="admin"><ServiceCatalogPage /></ProtectedRoute>} />
               <Route path="fakturering" element={<ProtectedRoute requiredRole="admin"><InvoicingPage /></ProtectedRoute>} />
@@ -345,6 +348,7 @@ function App() {
               <Route path="arenden" element={<ProtectedRoute requiredRole="koordinator"><CasesPage /></ProtectedRoute>} />
               <Route path="specialrapporter" element={<ProtectedRoute requiredRole="koordinator"><SpecialReportsPage /></ProtectedRoute>} />
               <Route path="specialrapporter/:id" element={<ProtectedRoute requiredRole="koordinator"><SpecialReportEditorPage /></ProtectedRoute>} />
+              <Route path="ordlista" element={<ProtectedRoute requiredRole="koordinator"><GlossaryPage /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="koordinator"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="analytics" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorAnalytics /></ProtectedRoute>} />
 

@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.52.0',
+    date: '2026-10-14',
+    title: 'Specialrapporter: Snygga till texten',
+    items: [
+      { kind: 'nyhet', text: 'Snygga till läser igenom texten i en specialrapport och föreslår rättelser av stavning, stor bokstav, skiljetecken och stycken. Knappen finns på varje textblock, händelseblock och bildblock, i Om rapporten och i Bedömning och åtgärder, och i rubrikraden för hela rapporten på en gång.' },
+      { kind: 'nyhet', text: 'Du ser alla förslag innan något ändras: borttaget rött och överstruket, nytt i grönt. Bocka i eller ur per förslag eller per grupp. Förslag om formulering är avbockade från början. Ångra finns direkt efteråt.' },
+      { kind: 'nyhet', text: 'Siffror, datum, mängder, kundens namn och adress och alla namn på artiklar, tjänster, produkter, preparat och stationstyper ändras aldrig, utom för att skriva ett produktnamn exakt som i listan. Är ett ord rätt stavat kan du lägga till det i ordlistan direkt från förslaget.' },
+      { kind: 'nyhet', text: 'Ordlistan (för koordinator och admin) visar alla skyddade ord. Lägg till egna ord, ta bort dem igen eller stäng av ett namn som hämtats automatiskt.' },
+    ],
+  },
+  {
     version: '3.51.0',
     date: '2026-10-14',
     title: 'Specialrapporter: se rapporten som kunden medan du skriver',

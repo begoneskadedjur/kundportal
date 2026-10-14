@@ -1,4 +1,4 @@
-# Specialrapporter: kontrakt mellan databas/tjänst och gränssnitt (3.50.0, uppdaterat 3.51.0)
+# Specialrapporter: kontrakt mellan databas/tjänst och gränssnitt (3.50.0, uppdaterat 3.52.0)
 
 Godkänd skiss: https://claude.ai/artifact/4trQgTPQZJBTM45aofwoJN (lokala källfiler i sessionens scratchpad, se uppdraget).
 Typer: `src/types/specialReport.ts` (gemensam, ändras bara i samförstånd).
@@ -59,3 +59,11 @@ POST `{ reportId, action: 'download' | 'send', recipients?, subject?, message?, 
 - Bygger HTML, renderar PDF med puppeteer-core + @sparticuz/chromium, laddar upp till `special-reports/{report_id}/versioner/...` och svarar med en signerad URL (aldrig base64 i svaret, Vercels gräns 4,5 MB).
 - `download`: `{ url, filename, pageCount }` för pågående version (fil `.../utkast.pdf`, skrivs över).
 - `send`: mejlar via Resend SMTP (`BeGone Rapporter <noreply@begone.se>`, replyTo info@begone.se) med PDF som bilaga (över 8 MB: länk i stället), skapar rad i `special_report_versions`, räknar upp `current_version`, svarar `{ version }`. Sparas INTE i `sanitation_reports` (triggern där markerar ärendets saneringsrapport som ersatt); rapporten hör redan till ärendet.
+
+## Snygga till och ordlistan (3.52.0)
+Skiss: V3-Granska, V3-Knappar och V3-Ordlista (sessionens scratchpad).
+- Migration `supabase/migrations/20261014_ordlista.sql`: tabellen `text_glossary` (term, source `artikel|tjanst|produkt|preparat|stationstyp|manuell`, source_id **text** eftersom `products.id` är text, active, added_by, created_at), unikt index på `lower(term)`. RLS: personal (admin, koordinator, tekniker) läser och lägger till manuella ord; admin och koordinator ändrar och tar bort manuella ord. Triggers `text_glossary_sync_trg` på `articles`, `services`, `products`, `preparations` och `station_types` lägger till nya namn och följer namnbyten, men rör aldrig avstängda rader.
+- API `api/polish-text.ts`: POST `{ fields: { id, label, text }[], context?: { customerName?, address? } }` (högst 30 fält och 20 000 tecken, annars 413) svarar `{ changes, blocked, protectedTerms }`. Gemini (`gemini-3-flash-preview`) föreslår, servern kontrollerar: entydig plats, samma siffror, skyddade termer orörda (utom exakt ordlistans stavning), ingen överlappning, inga tankstreck. Typer i `src/types/textPolish.ts`.
+- Klient: `src/services/textPolishService.ts` (`polish`, `addToGlossary`, `listGlossary`, `setActive`, `deleteTerm`), granskningsrutan `PolishReviewModal.tsx` och sidan `src/pages/shared/GlossaryPage.tsx` (`/koordinator/ordlista`, `/admin/ordlista`).
+- Tillämpningen sker i redigeraren via de vanliga sparvägarna (fördröjd sparning, förhandsvisningen följer med). Fältets text måste vara oförändrad sedan genomläsningen, annars hoppas fältet över. Ångra i toasten återställer originaltexterna.
+- Fältens id i granskningen: `rapport:intro|assessment|recommendations`, `del:<del>:title|subtitle`, `block:<del>:<block>`, `handelse:<del>:<händelse>:title|description`, `bild:<del>:<bild>`.

@@ -24,6 +24,8 @@
     "src/types/leads.ts",
     // Specialrapporter (api/special-report-pdf)
     "src/types/specialReport.ts",
+    // Snygga till (api/polish-text)
+    "src/types/textPolish.ts",
 
     // Delad schemagenerator (extend-recurring-schedules-cronen) — samma
     // algoritm som klientens wizard, med timeZone-parameter för servern

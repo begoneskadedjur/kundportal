@@ -33,3 +33,12 @@ export interface SectionOps {
   /** Gå till översiktskartan och rita (om) delens område */
   drawArea: (sectionId: string) => void
 }
+
+/** Vad Snygga till ska läsa igenom (3.52.0) */
+export type PolishTarget =
+  | { typ: 'hela' }
+  | { typ: 'om' }
+  | { typ: 'samm' }
+  | { typ: 'block'; sectionId: string; blockId: string }
+  | { typ: 'handelser'; sectionId: string }
+  | { typ: 'bilder'; sectionId: string }

@@ -65,7 +65,7 @@ export default function ImagesBlock({ section, ops }: ImagesBlockProps) {
           <input
             aria-label="Bildtext"
             placeholder="Bildtext"
-            defaultValue={b.caption ?? ''}
+            value={b.caption ?? ''}
             onChange={e => ops.updateImageCaption(section.id, b.id, e.target.value)}
             className="w-full h-9 rounded-lg border border-slate-700/60 bg-slate-800/40 px-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f]/50"
           />

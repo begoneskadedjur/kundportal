@@ -34,6 +34,7 @@ import {
   BadgeCheck,
   Gavel,
   Inbox,
+  BookCheck,
 } from 'lucide-react'
 import { PROCUREMENT_PORTAL_URL } from '../../../lib/procurementPortal'
 
@@ -125,6 +126,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Prislistor', icon: Receipt, path: '/admin/prislistor' },
       { label: 'Stationer & Fällor', icon: Target, path: '/admin/stationer-fallor' },
       { label: 'Preparat', icon: Beaker, path: '/admin/preparat' },
+      { label: 'Ordlistan', icon: BookCheck, path: '/admin/ordlista' },
     ]
   },
   {
@@ -191,6 +193,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/stationer-fallor': 'Stationer & Fällor',
   '/admin/preparat': 'Preparat',
   '/admin/artiklar': 'Artiklar (Inköp)',
+  '/admin/ordlista': 'Ordlistan',
   '/admin/prislistor': 'Prislistor',
   '/admin/kundgrupper': 'Kundgrupper',
   '/admin/installningar/fortnox': 'Fortnox',

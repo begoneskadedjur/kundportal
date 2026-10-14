@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Inbox,
   FileText,
+  BookCheck,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
@@ -40,6 +41,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Ärenden', icon: ClipboardList, path: '/koordinator/arenden' },
       { label: 'Specialrapporter', icon: FileText, path: '/koordinator/specialrapporter' },
+      { label: 'Ordlistan', icon: BookCheck, path: '/koordinator/ordlista' },
       { label: 'Rondering & Schema', icon: CalendarRange, path: '/koordinator/rondering-schema' },
       { label: 'Schemaoptimerare', icon: Wand2, path: '/koordinator/booking-assistant' },
       { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets', badgeKey: 'tickets' },
@@ -139,6 +141,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/sok-arenden': 'Sök Ärenden',
   '/koordinator/arenden': 'Ärenden',
   '/koordinator/specialrapporter': 'Specialrapporter',
+  '/koordinator/ordlista': 'Ordlistan',
   '/koordinator/oneflow-contract-creator': 'Avtal & Offerter',
   '/koordinator/analytics': 'Analytics & Insights',
 

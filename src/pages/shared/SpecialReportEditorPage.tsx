@@ -37,11 +37,14 @@ import SendSpecialReportModal from '../../components/shared/specialReports/SendS
 import MobileAddEventSheet from '../../components/shared/specialReports/MobileAddEventSheet'
 import AddSectionModal from '../../components/shared/specialReports/AddSectionModal'
 import ReportPreview, { Bladdring } from '../../components/shared/specialReports/ReportPreview'
-import type { EventPatch, FullSection, SectionOps } from '../../components/shared/specialReports/sectionOps'
+import PolishReviewModal from '../../components/shared/specialReports/PolishReviewModal'
+import type { EventPatch, FullSection, PolishTarget, SectionOps } from '../../components/shared/specialReports/sectionOps'
+import { POLISH_MAX_CHARS, POLISH_MAX_FIELDS, type PolishChange, type PolishField } from '../../types/textPolish'
 import {
   DOC_TYPES,
   PRIMAR_KNAPP,
   SEKUNDAR_KNAPP,
+  SNYGGA_KNAPP,
   TEXTFALT,
   byggSidor,
   fargForDel,
@@ -63,6 +66,18 @@ type MobilFlik = 'delar' | 'redigera' | 'kund'
 
 /** Knapparna i rubrikraden: bara ikon på smala skärmar, text från md (Skicka från sm) */
 const HUVUD_KNAPP = SEKUNDAR_KNAPP.replace('px-4', 'w-11 md:w-auto md:px-3.5')
+/** Snygga till hela rapporten: grön ram och text, bara ikon under xl */
+const SNYGGA_HELA_KNAPP = SEKUNDAR_KNAPP
+  .replace('px-4', 'w-11 xl:w-auto xl:px-3.5')
+  .replace('border-slate-700 text-slate-200', 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400 font-semibold')
+
+/** Rapportens textfält som Snygga till kan ändra (fältets id i granskningen) */
+type RapportTextFalt = 'intro' | 'assessment' | 'recommendations'
+const RAPPORT_TEXT_NAMN: Record<RapportTextFalt, string> = {
+  intro: 'Inledning',
+  assessment: 'Bedömning',
+  recommendations: 'Rekommendationer',
+}
 const SKICKA_KNAPP = PRIMAR_KNAPP.replace('px-4', 'w-11 sm:w-auto sm:px-4')
 
 /** Redigeringen ska alltid få minst så här mycket bredd när förhandsvisningen är spalt */
@@ -105,6 +120,11 @@ export default function SpecialReportEditorPage() {
   const [hamtarPdf, setHamtarPdf] = useState(false)
   // Förhandsvisningen som utfällbar panel (desktop utan plats för spalten)
   const [visaPanel, setVisaPanel] = useState(false)
+  // Snygga till: fälten som läses igenom och vad granskningsrutan heter
+  const [polish, setPolish] = useState<{ fields: PolishField[]; scopeLabel: string } | null>(null)
+  // Senaste rapporten, för Ångra efter Snygga till (toasten har en gammal closure)
+  const reportRef = useRef<SpecialReportFull | null>(null)
+  useEffect(() => { reportRef.current = report }, [report])
   // Hindrar dubbla delar vid dubbelklick (Lägg till del, Skapa en del per besök)
   const skaparDelRef = useRef(false)
 
@@ -531,6 +551,168 @@ export default function SpecialReportEditorPage() {
     },
   }
 
+  // ── Snygga till ──
+  // Fältens id: rapport:<fält>, del:<del>:title|subtitle, block:<del>:<block>,
+  // handelse:<del>:<händelse>:title|description, bild:<del>:<bild>
+  const polishKontext = useMemo(
+    () => ({ customerName: report?.customer_name ?? null, address: report?.address ?? null }),
+    [report?.customer_name, report?.address],
+  )
+
+  /** Fälten som ett Snygga till-val läser igenom, i rapportens ordning. Tomma fält hoppas över */
+  const samlaFalt = (mal: PolishTarget): { fields: PolishField[]; scopeLabel: string } => {
+    const r = report
+    if (!r) return { fields: [], scopeLabel: '' }
+    const falt: PolishField[] = []
+    const lagg = (id: string, label: string, text: string | null | undefined) => {
+      if (text && text.trim()) falt.push({ id, label, text })
+    }
+    const rapportFalt = (k: RapportTextFalt) => lagg(`rapport:${k}`, RAPPORT_TEXT_NAMN[k], r[k])
+    const delFalt = (s: FullSection, i: number, vad: 'hela' | 'text' | 'handelser' | 'bilder', blockId?: string) => {
+      const prefix = `Del ${i + 1} · ${s.title.trim() || 'Utan rubrik'}`
+      const block = [...s.blocks].sort((a, b) => a.position - b.position)
+      if (vad === 'hela') {
+        lagg(`del:${s.id}:title`, `${prefix} · Rubrik`, s.title)
+        lagg(`del:${s.id}:subtitle`, `${prefix} · Underrubrik`, s.subtitle)
+      }
+      const textblock = block.filter(b => b.type === 'text')
+      for (const b of block) {
+        if (b.type === 'text' && (vad === 'hela' || (vad === 'text' && b.id === blockId))) {
+          const n = textblock.length > 1 ? ` ${textblock.indexOf(b) + 1}` : ''
+          lagg(`block:${s.id}:${b.id}`, `${prefix} · Text${n}`, b.content.text)
+        }
+        if (b.type === 'events' && (vad === 'hela' || vad === 'handelser')) {
+          const handelser = [...s.events].sort((a, b2) => a.event_date.localeCompare(b2.event_date) || a.created_at.localeCompare(b2.created_at))
+          for (const ev of handelser) {
+            const namn = `${prefix} · Händelse ${ev.event_date}`
+            lagg(`handelse:${s.id}:${ev.id}:title`, `${namn} · Rubrik`, ev.title)
+            lagg(`handelse:${s.id}:${ev.id}:description`, `${namn} · Beskrivning`, ev.description)
+          }
+        }
+        if (b.type === 'images' && (vad === 'hela' || vad === 'bilder')) {
+          const bilder = [...s.images].sort((a, b2) => a.position - b2.position)
+          bilder.forEach((bild, n) => lagg(`bild:${s.id}:${bild.id}`, `${prefix} · Bildtext ${n + 1}`, bild.caption))
+        }
+      }
+      return prefix
+    }
+
+    switch (mal.typ) {
+      case 'hela':
+        rapportFalt('intro')
+        sektioner.forEach((s, i) => delFalt(s, i, 'hela'))
+        rapportFalt('assessment')
+        rapportFalt('recommendations')
+        return { fields: falt, scopeLabel: 'Hela rapporten' }
+      case 'om':
+        rapportFalt('intro')
+        return { fields: falt, scopeLabel: 'Om rapporten · Inledning' }
+      case 'samm':
+        rapportFalt('assessment')
+        rapportFalt('recommendations')
+        return { fields: falt, scopeLabel: 'Bedömning och åtgärder' }
+      default: {
+        const i = sektioner.findIndex(s => s.id === mal.sectionId)
+        if (i < 0) return { fields: [], scopeLabel: '' }
+        const vad = mal.typ === 'block' ? 'text' : mal.typ
+        const prefix = delFalt(sektioner[i], i, vad, mal.typ === 'block' ? mal.blockId : undefined)
+        const namn = mal.typ === 'block' ? 'Text' : mal.typ === 'handelser' ? 'Händelser' : 'Bildtexter'
+        return { fields: falt, scopeLabel: `${prefix} · ${namn}` }
+      }
+    }
+  }
+
+  const oppnaPolish = (mal: PolishTarget) => {
+    const { fields, scopeLabel } = samlaFalt(mal)
+    if (fields.length === 0) {
+      toast('Det finns ingen text att snygga till här')
+      return
+    }
+    const tecken = fields.reduce((n, f) => n + f.text.length, 0)
+    if (fields.length > POLISH_MAX_FIELDS || tecken > POLISH_MAX_CHARS) {
+      toast.error(mal.typ === 'hela'
+        ? 'Rapporten har för mycket text för en genomläsning. Snygga till en del i taget.'
+        : 'Det är för mycket text för en genomläsning. Dela upp texten och försök igen.')
+      return
+    }
+    setPolish({ fields, scopeLabel })
+  }
+
+  /** Fältets aktuella text i redigeraren, null om fältet inte finns längre */
+  const lasFalt = (id: string, r: SpecialReportFull | null = report): string | null => {
+    if (!r) return null
+    const [typ, a, b, c] = id.split(':')
+    if (typ === 'rapport') return (r[a as RapportTextFalt] as string | null) ?? ''
+    const s = r.sections.find(x => x.id === a)
+    if (!s) return null
+    if (typ === 'del') return b === 'title' ? s.title : s.subtitle ?? ''
+    if (typ === 'block') {
+      const blk = s.blocks.find(x => x.id === b)
+      return blk ? blk.content.text ?? '' : null
+    }
+    if (typ === 'handelse') {
+      const ev = s.events.find(x => x.id === b)
+      return ev ? (c === 'title' ? ev.title : ev.description ?? '') : null
+    }
+    if (typ === 'bild') {
+      const bild = s.images.find(x => x.id === b)
+      return bild ? bild.caption ?? '' : null
+    }
+    return null
+  }
+
+  /** Skriver fältet via samma sparväg som när man skriver (fördröjd sparning och förhandsvisning följer med) */
+  const skrivFalt = (id: string, text: string) => {
+    const [typ, a, b, c] = id.split(':')
+    if (typ === 'rapport') sparaRapportFalt(a as RapportTextFalt, text || null)
+    else if (typ === 'del') ops.updateSection(a, b === 'title' ? { title: text } : { subtitle: text || null })
+    else if (typ === 'block') ops.updateBlockText(a, b, text)
+    else if (typ === 'handelse') ops.updateEvent(a, b, c === 'title' ? { title: text } : { description: text || null })
+    else if (typ === 'bild') ops.updateImageCaption(a, b, text)
+  }
+
+  const tillampaPolish = (falt: PolishField[], valda: PolishChange[]) => {
+    const original: { id: string; text: string; ny: string }[] = []
+    let antal = 0
+    let andrade = 0
+    for (const f of falt) {
+      const egna = valda.filter(c => c.fieldId === f.id)
+      if (egna.length === 0) continue
+      // Texten får inte ha ändrats sedan genomläsningen, annars hamnar ändringarna fel
+      if (lasFalt(f.id) !== f.text) { andrade += 1; continue }
+      let text = f.text
+      for (const c of [...egna].sort((x, y) => y.start - x.start || y.end - x.end)) {
+        text = text.slice(0, c.start) + c.to + text.slice(c.end)
+      }
+      original.push({ id: f.id, text: f.text, ny: text })
+      skrivFalt(f.id, text)
+      antal += egna.length
+    }
+    setPolish(null)
+    if (andrade > 0) toast.error('Texten har ändrats sedan genomläsningen, kör Snygga till igen', { duration: 6000 })
+    if (antal === 0) return
+    toast(t => (
+      <span className="flex items-center gap-3">
+        <Icon name="allman.bock" size={20} className="flex-shrink-0 text-[#20c58f]" />
+        <span className="text-sm">{antal === 1 ? '1 ändring gjord' : `${antal} ändringar gjorda`}</span>
+        <button
+          type="button"
+          onClick={() => {
+            // Fält som skrivits i efter Snygga till lämnas orörda, annars försvinner det nya
+            const senare = original.filter(o => lasFalt(o.id, reportRef.current) !== o.ny)
+            original.filter(o => !senare.includes(o)).forEach(o => skrivFalt(o.id, o.text))
+            toast.dismiss(t.id)
+            if (senare.length === 0) toast.success('Ändringarna är ångrade')
+            else toast.error(`${senare.length === 1 ? 'Ett fält har' : `${senare.length} fält har`} ändrats efteråt och ångrades inte`, { duration: 6000 })
+          }}
+          className="h-11 rounded-lg border border-slate-600 px-3 text-sm hover:bg-slate-800"
+        >
+          Ångra
+        </button>
+      </span>
+    ), { duration: 10000 })
+  }
+
   // ── PDF ──
   const laddaNedPdf = async () => {
     if (!reportId) return
@@ -624,6 +806,16 @@ export default function SpecialReportEditorPage() {
             <span className="truncate">{statusText} · {report.doc_type} · version {report.current_version} pågår</span>
           </p>
         </div>
+        <button
+          type="button"
+          aria-label="Snygga till hela rapporten"
+          title="Snygga till hela rapporten"
+          onClick={() => oppnaPolish({ typ: 'hela' })}
+          className={SNYGGA_HELA_KNAPP}
+        >
+          <Icon name="rapport.snygga" size={20} />
+          <span className="hidden xl:inline">Snygga till hela rapporten</span>
+        </button>
         {/* Visa som kund: mobilen byter flik, desktop utan spalt fäller ut panelen */}
         {!forhandSomSpalt && (
           <button
@@ -882,9 +1074,15 @@ export default function SpecialReportEditorPage() {
 
           {vy === 'om' && (
             <div className="max-w-[720px] space-y-4">
-              <div>
-                <h2 className="text-xl font-semibold text-white">Om rapporten</h2>
-                <p className="text-sm text-slate-400">Det här står först i rapporten. Kund, kontakt och adress hämtas från ärendet.</p>
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl font-semibold text-white">Om rapporten</h2>
+                  <p className="text-sm text-slate-400">Det här står först i rapporten. Kund, kontakt och adress hämtas från ärendet.</p>
+                </div>
+                <button type="button" aria-label="Snygga till inledningen" title="Snygga till inledningen" onClick={() => oppnaPolish({ typ: 'om' })} className={SNYGGA_KNAPP}>
+                  <Icon name="rapport.snygga" size={16} />
+                  <span className="hidden sm:inline">Snygga till</span>
+                </button>
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-1 rounded-xl border border-slate-700/50 bg-slate-800/20 p-3.5">
@@ -944,9 +1142,15 @@ export default function SpecialReportEditorPage() {
 
           {vy === 'samm' && (
             <div className="max-w-[640px] space-y-3.5">
-              <div>
-                <h2 className="text-xl font-semibold text-white">Bedömning och åtgärder</h2>
-                <p className="text-sm text-slate-400">Din slutsats till kunden.</p>
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-xl font-semibold text-white">Bedömning och åtgärder</h2>
+                  <p className="text-sm text-slate-400">Din slutsats till kunden.</p>
+                </div>
+                <button type="button" aria-label="Snygga till bedömning och rekommendationer" title="Snygga till bedömning och rekommendationer" onClick={() => oppnaPolish({ typ: 'samm' })} className={SNYGGA_KNAPP}>
+                  <Icon name="rapport.snygga" size={16} />
+                  <span className="hidden sm:inline">Snygga till</span>
+                </button>
               </div>
               <label className="block" data-falt="rapport:assessment">
                 <span className="block text-sm text-slate-300 mb-1">Bedömning</span>
@@ -982,6 +1186,7 @@ export default function SpecialReportEditorPage() {
                 ops={ops}
                 fokus={fokus}
                 autoFokusRubrik={nyDelId === aktuell.id}
+                onPolish={oppnaPolish}
               />
             </div>
           )}
@@ -1122,6 +1327,15 @@ export default function SpecialReportEditorPage() {
         report={report}
         onSent={() => { void ladda() }}
         beforeRender={() => saver.flush()}
+      />
+      <PolishReviewModal
+        isOpen={!!polish}
+        onClose={() => setPolish(null)}
+        scopeLabel={polish?.scopeLabel ?? ''}
+        fields={polish?.fields ?? []}
+        context={polishKontext}
+        glossaryHref={base.startsWith('/technician') ? null : '/koordinator/ordlista'}
+        onApply={tillampaPolish}
       />
       <MobileAddEventSheet
         isOpen={visaNyHandelse}

@@ -187,4 +187,27 @@ export const rapportIcons = {
       <path d="M8.5 12h7M8.5 15.5h5" />
     </>
   ),
+  // Snygga till: penna med två gnistor (3.52.0)
+  'rapport.snygga': (
+    <>
+      <path d="M3.5 20.5l1-4L14 7a2.1 2.1 0 0 1 3 3l-9.5 9.5z" />
+      <path d="M12.5 8.5l3 3" />
+      <path d="M19 13.5v4M17 15.5h4" />
+      <path d="M6.5 3.5v3M5 5h3" />
+    </>
+  ),
+  // Ordlista: bok med bock
+  'rapport.ordlista': (
+    <>
+      <path d="M5 4.5h11a2 2 0 0 1 2 2v13l-3.5-2-3.5 2-3.5-2-2.5 1.5z" />
+      <path d="M8.5 10.5l2 2 3.5-4" />
+    </>
+  ),
+  // Skyddat: sköld med bock
+  'rapport.skyddat': (
+    <>
+      <path d="M12 3.5l7 3v5c0 4.2-2.9 7.8-7 9-4.1-1.2-7-4.8-7-9v-5z" />
+      <path d="M9 12l2 2 4-4" />
+    </>
+  ),
 } satisfies Record<`rapport.${string}`, ReactNode>

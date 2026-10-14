@@ -15,8 +15,8 @@ import {
   type SpecialReportBlockType,
   type SpecialReportSectionLabel,
 } from '../../../types/specialReport'
-import type { FullSection, SectionOps } from './sectionOps'
-import { FALT, IKON_KNAPP, IKON_KNAPP_LATT, TEXTFALT } from './specialReportUtils'
+import type { FullSection, PolishTarget, SectionOps } from './sectionOps'
+import { FALT, IKON_KNAPP, IKON_KNAPP_LATT, SNYGGA_KNAPP, TEXTFALT } from './specialReportUtils'
 import EventsBlock from './EventsBlock'
 import ImagesBlock from './ImagesBlock'
 import AreaMiniMap from './AreaMiniMap'
@@ -58,9 +58,19 @@ interface SectionEditorProps {
   fokus: string | null
   /** Ny del: fokus i rubrikfältet direkt */
   autoFokusRubrik?: boolean
+  /** Snygga till ett block (text, händelser eller bildtexter) */
+  onPolish?: (mal: PolishTarget) => void
 }
 
-export default function SectionEditor({ reportId, section, nr, color, ops, fokus, autoFokusRubrik = false }: SectionEditorProps) {
+/** Vad Snygga till läser i ett block, och knappens text för skärmläsare */
+function polishFor(sectionId: string, b: SpecialReportBlock): { mal: PolishTarget; aria: string } | null {
+  if (b.type === 'text') return { mal: { typ: 'block', sectionId, blockId: b.id }, aria: 'Snygga till texten' }
+  if (b.type === 'events') return { mal: { typ: 'handelser', sectionId }, aria: 'Snygga till händelsernas text' }
+  if (b.type === 'images') return { mal: { typ: 'bilder', sectionId }, aria: 'Snygga till bildtexterna' }
+  return null
+}
+
+export default function SectionEditor({ reportId, section, nr, color, ops, fokus, autoFokusRubrik = false, onPolish }: SectionEditorProps) {
   const [bekraftaSektion, setBekraftaSektion] = useState(false)
   const [bekraftaBlock, setBekraftaBlock] = useState<SpecialReportBlock | null>(null)
   const [bekraftaOmrade, setBekraftaOmrade] = useState(false)
@@ -226,6 +236,7 @@ export default function SectionEditor({ reportId, section, nr, color, ops, fokus
         {block.map((b, i) => {
           const falt = faltFor(b)
           const harFokus = fokus === falt
+          const polish = onPolish ? polishFor(section.id, b) : null
           return (
             <div
               key={b.id}
@@ -238,6 +249,12 @@ export default function SectionEditor({ reportId, section, nr, color, ops, fokus
                 <span className="ml-1.5 text-xs text-slate-300">{BLOCK_LABELS[b.type]}</span>
                 <span className="ml-1.5 hidden flex-1 truncate text-xs text-slate-500 sm:inline">{BLOCK_HINT[b.type]}</span>
                 <span className="flex-1 sm:hidden" />
+                {polish && (
+                  <button type="button" aria-label={polish.aria} title={polish.aria} onClick={() => onPolish?.(polish.mal)} className={SNYGGA_KNAPP}>
+                    <Icon name="rapport.snygga" size={16} />
+                    <span className="hidden sm:inline">Snygga till</span>
+                  </button>
+                )}
                 <button type="button" aria-label="Flytta blocket uppåt" disabled={i === 0} onClick={() => ops.moveBlock(section.id, b.id, -1)} className={IKON_KNAPP_LATT}>
                   <ChevronUp className="w-4 h-4" />
                 </button>

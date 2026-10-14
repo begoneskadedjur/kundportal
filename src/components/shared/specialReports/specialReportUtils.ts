@@ -393,3 +393,7 @@ export function useDebouncedSaver(delay = 600) {
 
   return { schedule, cancel, now, flush, harVantande, andringsNr, status, sparadTid }
 }
+
+/** Snygga till i blockhuvuden och rubriker: grön text, ikon + text (bara ikon på mobil), minst 44 px */
+export const SNYGGA_KNAPP =
+  'inline-flex items-center justify-center gap-1.5 h-11 min-w-11 flex-shrink-0 rounded-lg px-2 text-xs font-semibold text-emerald-400 hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60 disabled:opacity-40 disabled:cursor-not-allowed'
