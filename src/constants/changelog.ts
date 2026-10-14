@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.50.1',
+    date: '2026-10-14',
+    title: 'Specialrapporter: bättre ritning av områden',
+    items: [
+      { kind: 'andring', text: 'När du ritar ett område syns en streckad linje från sista hörnet till pekaren och tillbaka till första hörnet, så du ser hur området blir innan du klickar. Hörnen går att dra för att justera, och området stängs bara när du trycker på första hörnet eller Skapa sektion.' },
+      { kind: 'andring', text: 'Områdena på kartan syns tydligt i grönt, och det valda området har vit kant.' },
+      { kind: 'buggfix', text: 'Redigeraren blev bredare än skärmen, så att knapparna för förhandsgranskning, nedladdning, skicka och ta bort sektion hamnade utanför. Nu får allt plats.' },
+    ],
+  },
+  {
     version: '3.50.0',
     date: '2026-10-14',
     title: 'Specialrapporter',

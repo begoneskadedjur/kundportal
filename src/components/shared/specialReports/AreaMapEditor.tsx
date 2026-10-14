@@ -157,6 +157,9 @@ export default function AreaMapEditor({
   const [kartlager, setKartlager] = useState<'satellite' | 'hybrid'>('satellite')
   const hornRef = useRef<google.maps.Marker[]>([])
   const linjeRef = useRef<google.maps.Polyline | null>(null)
+  // Streckad förhandsvisning: från sista hörnet till pekaren och vidare till första hörnet
+  const forhandRef = useRef<google.maps.Polyline | null>(null)
+  const pekareRef = useRef<google.maps.LatLng | null>(null)
   const ritLyssnareRef = useRef<google.maps.MapsEventListener[]>([])
   const ritMalRef = useRef<string | null>(null)
   useEffect(() => { ritMalRef.current = ritMal }, [ritMal])
@@ -302,11 +305,11 @@ export default function AreaMapEditor({
         post.lyssnare = bind(post.poly)
       }
       post.poly.setOptions({
-        strokeColor: vald ? BRAND : '#e2e8f0',
-        strokeOpacity: vald ? 1 : 0.85,
-        strokeWeight: vald ? 2.5 : 1.5,
-        fillColor: vald ? BRAND : '#ffffff',
-        fillOpacity: vald ? 0.25 : 0.12,
+        strokeColor: vald ? '#ffffff' : BRAND,
+        strokeOpacity: 1,
+        strokeWeight: vald ? 4 : 3,
+        fillColor: BRAND,
+        fillOpacity: vald ? 0.38 : 0.22,
         editable: vald && !ritar,
         clickable: !ritar,
         zIndex: vald ? 3 : 2,
@@ -362,6 +365,9 @@ export default function AreaMapEditor({
     hornRef.current = []
     linjeRef.current?.setMap(null)
     linjeRef.current = null
+    forhandRef.current?.setMap(null)
+    forhandRef.current = null
+    pekareRef.current = null
     ritLyssnareRef.current.forEach(l => google.maps.event.removeListener(l))
     ritLyssnareRef.current = []
     setAntalHorn(0)
@@ -372,19 +378,32 @@ export default function AreaMapEditor({
     const map = mapRef.current
     if (!map) return
     const punkter = hornRef.current.map(m => m.getPosition()!)
-    const vag = punkter.length > 2 ? [...punkter, punkter[0]] : punkter
     if (!linjeRef.current) {
-      linjeRef.current = new google.maps.Polyline({ map, path: vag, strokeColor: BRAND, strokeWeight: 2.5, clickable: false, zIndex: 10 })
+      linjeRef.current = new google.maps.Polyline({ map, path: punkter, strokeColor: BRAND, strokeWeight: 3, clickable: false, zIndex: 10 })
     } else {
-      linjeRef.current.setPath(vag)
+      linjeRef.current.setPath(punkter)
+    }
+    // Förhandslinje: sista hörnet → pekaren → första hörnet (streckad)
+    const pekare = pekareRef.current
+    const forhand = pekare && punkter.length > 0
+      ? (punkter.length >= 2 ? [punkter[punkter.length - 1], pekare, punkter[0]] : [punkter[0], pekare])
+      : (punkter.length >= 3 ? [punkter[punkter.length - 1], punkter[0]] : [])
+    if (!forhandRef.current) {
+      forhandRef.current = new google.maps.Polyline({
+        map, path: forhand, clickable: false, zIndex: 9, strokeOpacity: 0,
+        icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, strokeColor: '#ffffff', strokeWeight: 2.5, scale: 3 }, offset: '0', repeat: '12px' }],
+      })
+    } else {
+      forhandRef.current.setPath(forhand)
     }
     setAntalHorn(punkter.length)
     // Första hörnet blir större och klickbart när området kan stängas
     const forsta = hornRef.current[0]
     if (forsta) {
       const kanStanga = punkter.length >= 3
-      forsta.setIcon({ path: google.maps.SymbolPath.CIRCLE, scale: kanStanga ? 9 : 6, fillColor: BRAND, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 })
-      forsta.setClickable(kanStanga)
+      forsta.setIcon({ path: google.maps.SymbolPath.CIRCLE, scale: kanStanga ? 10 : 7, fillColor: kanStanga ? '#ffffff' : BRAND, fillOpacity: 1, strokeColor: BRAND, strokeWeight: kanStanga ? 4 : 2 })
+      forsta.setTitle(kanStanga ? 'Tryck för att stänga området' : 'Första hörnet')
+      forsta.setCursor(kanStanga ? 'pointer' : 'move')
     }
   }, [])
 
@@ -415,14 +434,21 @@ export default function AreaMapEditor({
     map.setOptions({ draggableCursor: 'crosshair' })
     const klick = map.addListener('click', (e: google.maps.MapMouseEvent) => {
       if (!e.latLng) return
+      const forstaHornet = hornRef.current.length === 0
       const marker = new google.maps.Marker({
         position: e.latLng,
         map,
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 6, fillColor: BRAND, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
-        zIndex: 20,
-        clickable: false,
+        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 7, fillColor: BRAND, fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
+        zIndex: forstaHornet ? 21 : 20,
+        clickable: true,
+        draggable: true,
+        cursor: 'move',
+        title: forstaHornet ? 'Första hörnet' : 'Dra för att flytta hörnet',
       })
-      if (hornRef.current.length === 0) {
+      marker.addListener('drag', () => uppdateraLinje())
+      marker.addListener('dragend', () => uppdateraLinje())
+      if (forstaHornet) {
+        // Stänger bara på uttryckligt klick på första hörnet, aldrig av sig själv
         marker.addListener('click', () => {
           if (hornRef.current.length >= 3) void avslutaRitningRef.current()
         })
@@ -430,7 +456,16 @@ export default function AreaMapEditor({
       hornRef.current.push(marker)
       uppdateraLinje()
     })
-    ritLyssnareRef.current = [klick]
+    const rorelse = map.addListener('mousemove', (e: google.maps.MapMouseEvent) => {
+      if (!e.latLng || hornRef.current.length === 0) return
+      pekareRef.current = e.latLng
+      uppdateraLinje()
+    })
+    const ut = map.addListener('mouseout', () => {
+      pekareRef.current = null
+      uppdateraLinje()
+    })
+    ritLyssnareRef.current = [klick, rorelse, ut]
   }, [rensaRitning, uppdateraLinje])
 
   const avbrytRitning = useCallback(() => {
@@ -478,6 +513,7 @@ export default function AreaMapEditor({
   useEffect(() => () => {
     hornRef.current.forEach(m => m.setMap(null))
     linjeRef.current?.setMap(null)
+    forhandRef.current?.setMap(null)
     ritLyssnareRef.current.forEach(l => google.maps.event.removeListener(l))
   }, [])
 
@@ -492,10 +528,10 @@ export default function AreaMapEditor({
 
   const klar = antalHorn >= 3
   const ritHjalp = antalHorn === 0
-    ? 'Tryck ut hörnen på området'
+    ? 'Tryck ut områdets hörn ett i taget'
     : klar
-      ? `${antalHorn} hörn. Tryck på första hörnet eller ${ritMal ? 'Spara området' : 'Skapa sektion'}`
-      : 'Minst tre hörn'
+      ? `${antalHorn} hörn. Dra i ett hörn för att justera. Stäng med första hörnet eller ${ritMal ? 'Spara området' : 'Skapa sektion'}`
+      : `${antalHorn} hörn. Fortsätt, minst tre behövs`
 
   return (
     <div className={`relative isolate overflow-hidden rounded-2xl border border-slate-700 bg-slate-800 ${className}`}>
@@ -533,7 +569,7 @@ export default function AreaMapEditor({
 
       {ritar && (
         <div className="absolute bottom-4 left-1/2 z-10 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-2 rounded-2xl border border-[#20c58f] bg-slate-900/95 py-1.5 pl-4 pr-1.5 text-sm text-slate-200">
-          <span className="truncate">{ritHjalp}</span>
+          <span className="min-w-0 text-xs leading-snug sm:text-sm">{ritHjalp}</span>
           <button
             type="button"
             onClick={angraPunkt}

@@ -431,9 +431,9 @@ export default function SpecialReportEditorPage() {
     }`
 
   return (
-    <div className="flex flex-col lg:h-[calc(100dvh-3rem)]">
+    <div className="flex w-full min-w-0 flex-col lg:h-[calc(100dvh-3rem)]">
       {/* ── Rubrikrad ── */}
-      <header className="flex flex-shrink-0 items-center gap-2 border-b border-slate-800 bg-slate-900/80 py-2 pl-1 pr-3 sm:gap-3 sm:pl-2 sm:pr-5">
+      <header className="flex min-w-0 flex-shrink-0 items-center gap-2 border-b border-slate-800 bg-slate-900/80 py-2 pl-1 pr-3 sm:gap-3 sm:pl-2 sm:pr-5">
         <button
           type="button"
           aria-label={mobilInnehall ? 'Tillbaka till strukturen' : 'Tillbaka till rapporterna'}
@@ -467,7 +467,7 @@ export default function SpecialReportEditorPage() {
         </button>
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1">
         {/* ── Struktur ── */}
         <aside className={`${mobilInnehall ? 'hidden' : 'flex'} w-full flex-col gap-3.5 overflow-y-auto border-slate-800 p-4 pb-32 lg:flex lg:w-[312px] lg:flex-shrink-0 lg:border-r lg:pb-4`}>
           <div className="flex gap-3 rounded-xl border border-slate-700/60 bg-slate-800/30 p-3">
