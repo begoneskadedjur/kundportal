@@ -45,6 +45,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.53.0',
+    date: '2026-10-14',
+    title: 'Specialrapporter: tydligare redigerare och bilder kopplade till händelser',
+    items: [
+      { kind: 'nyhet', text: 'Bifoga bilder direkt från en händelse med gemknappen. Bilden hamnar i delens bildblock, händelsen visar miniatyrerna och rapportens händelsetabell hänvisar till bildens nummer.' },
+      { kind: 'nyhet', text: 'Varje bild kan kopplas till en händelse i bildblocket med valet Hör till händelse. I PDF:en står det vilken händelse bilden hör till.' },
+      { kind: 'andring', text: 'Om rapporten visar rapportens framsida med titel, period, siffror och karta, ett kundkort med klickbar telefon, e-post och adress för alla sorters kunder, typ av rapport som tre kort och startfraser för inledningen.' },
+      { kind: 'andring', text: 'En del har nu ett rubrikband i delens färg, typ, färg och plats samlade på en rad, och blocken som kort där flytta och ta bort finns under menyn med tre punkter.' },
+      { kind: 'andring', text: 'Bilder till en händelse kan tas med kameran eller väljas ur bildbiblioteket i mobilen, även i Ny händelse.' },
+    ],
+  },
+  {
     version: '3.52.0',
     date: '2026-10-14',
     title: 'Specialrapporter: Snygga till texten',

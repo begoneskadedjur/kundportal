@@ -210,4 +210,41 @@ export const rapportIcons = {
       <path d="M9 12l2 2 4-4" />
     </>
   ),
+
+  // 3.53.0: Om rapporten och delens egenskaper
+  // Person: huvud och axlar (kontaktperson)
+  'rapport.person': (
+    <>
+      <circle cx="12" cy="8.5" r="3.5" />
+      <path d="M5 20a7 7 0 0 1 14 0" />
+    </>
+  ),
+  // Adress: kartnål
+  'rapport.adress': (
+    <>
+      <path d="M12 21s6.5-5.6 6.5-11a6.5 6.5 0 0 0-13 0c0 5.4 6.5 11 6.5 11z" />
+      <circle cx="12" cy="10" r="2.3" />
+    </>
+  ),
+  // Gem: bifoga en bild till en händelse
+  'rapport.gem': (
+    <path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7-7l8-8a3.3 3.3 0 0 1 4.7 4.7l-8 8a1.7 1.7 0 0 1-2.4-2.4l7.3-7.3" />
+  ),
+  // Sanering: sköld
+  'rapport.sanering': <path d="M12 3.5l7 3v5c0 4.2-2.9 7.8-7 9-4.1-1.2-7-4.8-7-9v-5z" />,
+  // Rita om: penna med skarv
+  'rapport.penna': (
+    <>
+      <path d="M4 20l1-4L15.5 5.5a2.1 2.1 0 0 1 3 3L8 19z" />
+      <path d="M13.5 7.5l3 3" />
+    </>
+  ),
+  // Ladda upp: pil upp mot en linje
+  'rapport.ladda-upp': (
+    <>
+      <path d="M12 15V4" />
+      <path d="M7.5 8.5 12 4l4.5 4.5" />
+      <path d="M4.5 19.5h15" />
+    </>
+  ),
 } satisfies Record<`rapport.${string}`, ReactNode>

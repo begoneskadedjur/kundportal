@@ -3,7 +3,7 @@
 // varje område i sin dels färg. Ingen interaktion; PDF:en tar sin egen
 // skärmdump av samma utsnitt. Används i kartutsnittblocket och i förhandsvisningen.
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { LatLng, SpecialReportMapView } from '../../../types/specialReport'
 import { useMapsReady } from './useMapsReady'
@@ -31,13 +31,25 @@ export default function AreaMiniMap({ area, color = BRAND, areas, view, classNam
   const divRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<google.maps.Map | null>(null)
   const polyRef = useRef<google.maps.Polygon[]>([])
+  const ramRef = useRef<HTMLDivElement>(null)
+  // Kartan skapas först när rutan syns (eller nästan syns): en vy kan ha flera
+  // miniatyrer och varje Google-karta kostar laddning och minne
+  const [synlig, setSynlig] = useState(() => typeof IntersectionObserver === 'undefined')
+  useEffect(() => {
+    if (synlig || !ramRef.current) return
+    const obs = new IntersectionObserver(poster => {
+      if (poster.some(p => p.isIntersecting)) { setSynlig(true); obs.disconnect() }
+    }, { rootMargin: '200px' })
+    obs.observe(ramRef.current)
+    return () => obs.disconnect()
+  }, [synlig])
 
   const lista: MiniMapArea[] = areas ?? (area ? [{ area, color }] : [])
   // Ny ritning bara när områdena eller färgerna faktiskt ändras
   const nyckel = JSON.stringify([lista, view ?? null])
 
   useEffect(() => {
-    if (!ready || !divRef.current) return
+    if (!ready || !synlig || !divRef.current) return
     if (!mapRef.current) {
       mapRef.current = new google.maps.Map(divRef.current, {
         mapTypeId: 'satellite',
@@ -75,14 +87,14 @@ export default function AreaMiniMap({ area, color = BRAND, areas, view, classNam
     }
     // Allt som ritas finns i nyckeln (områden, färger och utsnitt)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, nyckel])
+  }, [ready, synlig, nyckel])
 
   useEffect(() => () => { polyRef.current.forEach(p => p.setMap(null)) }, [])
 
   return (
-    <div className={`relative isolate flex-shrink-0 overflow-hidden ${className}`}>
+    <div ref={ramRef} className={`relative isolate flex-shrink-0 overflow-hidden ${className}`}>
       <div ref={divRef} className="absolute inset-0" />
-      {!ready && (
+      {(!ready || !synlig) && (
         <div className="absolute inset-0 flex items-center justify-center">
           {/* Fast färg: kartan visas även på förhandsvisningens vita papper */}
           <Loader2 className="w-5 h-5 animate-spin text-[#94a3b8]" />

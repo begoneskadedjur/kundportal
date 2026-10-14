@@ -14,7 +14,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Loader2, MoreVertical } from 'lucide-react'
-import Select from '../../components/ui/Select'
 import { Icon } from '../../components/icons/Icon'
 import { SpecialReportService, nextSectionColor } from '../../services/specialReportService'
 import {
@@ -22,8 +21,8 @@ import {
   SECTION_LABELS,
   type LatLng,
   type SpecialReport,
+  type SpecialReportBlock,
   type SpecialReportBlockType,
-  type SpecialReportDocType,
   type SpecialReportEvent,
   type SpecialReportEventType,
   type SpecialReportFull,
@@ -38,10 +37,10 @@ import MobileAddEventSheet from '../../components/shared/specialReports/MobileAd
 import AddSectionModal from '../../components/shared/specialReports/AddSectionModal'
 import ReportPreview, { Bladdring } from '../../components/shared/specialReports/ReportPreview'
 import PolishReviewModal from '../../components/shared/specialReports/PolishReviewModal'
+import OmRapporten from '../../components/shared/specialReports/OmRapporten'
 import type { EventPatch, FullSection, PolishTarget, SectionOps } from '../../components/shared/specialReports/sectionOps'
 import { POLISH_MAX_CHARS, POLISH_MAX_FIELDS, type PolishChange, type PolishField } from '../../types/textPolish'
 import {
-  DOC_TYPES,
   PRIMAR_KNAPP,
   SEKUNDAR_KNAPP,
   SNYGGA_KNAPP,
@@ -127,6 +126,8 @@ export default function SpecialReportEditorPage() {
   useEffect(() => { reportRef.current = report }, [report])
   // Hindrar dubbla delar vid dubbelklick (Lägg till del, Skapa en del per besök)
   const skaparDelRef = useRef(false)
+  // Bildblock som håller på att skapas per del (bilder bifogade från en händelse)
+  const bildblockSkapas = useRef(new Map<string, Promise<SpecialReportBlock>>())
 
   // Fältet som har fokus (data-falt) och en begäran att flytta fokus dit
   const [fokus, setFokus] = useState<string | null>(null)
@@ -244,7 +245,9 @@ export default function SpecialReportEditorPage() {
     let ram = 0
     const prova = (kvar: number) => {
       ram = requestAnimationFrame(() => {
-        const el = rotRef.current?.querySelector<HTMLElement>(`[data-falt="${fokusFalt.falt}"]`)
+        // Fält i redigeringsytan först: titeln finns även i rubrikraden, men bandet i Om rapporten är målet
+        const el = rotRef.current?.querySelector<HTMLElement>(`main [data-falt="${fokusFalt.falt}"]`)
+          ?? rotRef.current?.querySelector<HTMLElement>(`[data-falt="${fokusFalt.falt}"]`)
         if (!el || el.offsetParent === null) {
           // Fältet finns inte än (vyn monteras): försök några bilder till, sedan
           // släpps begäran så att fokus inte hoppar dit långt senare
@@ -444,7 +447,8 @@ export default function SpecialReportEditorPage() {
     addBlock: async (sectionId, type: SpecialReportBlockType) => {
       try {
         const b = await SpecialReportService.addBlock(sectionId, type)
-        andraSektion(sectionId, s => ({ ...s, blocks: [...s.blocks, b] }))
+        // Händelse- och bildblock kan komma tillbaka som det befintliga: lägg inte till det två gånger
+        andraSektion(sectionId, s => (s.blocks.some(x => x.id === b.id) ? s : { ...s, blocks: [...s.blocks, b] }))
       } catch (e) {
         toast.error(felText(e, 'Kunde inte lägga till blocket'))
       }
@@ -504,8 +508,15 @@ export default function SpecialReportEditorPage() {
     },
     deleteEvent: async (sectionId, eventId) => {
       try {
+        // Väntande sparningar först, så att en bildkoppling till händelsen inte sparas efter borttaget
+        await saver.flush()
         await saver.now(() => SpecialReportService.deleteEvent(eventId))
-        andraSektion(sectionId, s => ({ ...s, events: s.events.filter(e => e.id !== eventId) }))
+        // Databasen sätter event_id till null på kopplade bilder (on delete set null), här samma sak lokalt
+        andraSektion(sectionId, s => ({
+          ...s,
+          events: s.events.filter(e => e.id !== eventId),
+          images: s.images.map(b => (b.event_id === eventId ? { ...b, event_id: null } : b)),
+        }))
       } catch (e) {
         toast.error(felText(e, 'Kunde inte ta bort händelsen'))
       }
@@ -513,12 +524,29 @@ export default function SpecialReportEditorPage() {
     eventsImported: (sectionId, events) => {
       andraSektion(sectionId, s => ({ ...s, events: [...s.events, ...events] }))
     },
-    uploadImages: async (sectionId, files) => {
+    uploadImages: async (sectionId, files, eventId = null) => {
       if (!reportId) return
+      // Bilder från en händelse hamnar i delens bildblock, som skapas om det saknas
+      if (eventId && !reportRef.current?.sections.find(x => x.id === sectionId)?.blocks.some(b => b.type === 'images')) {
+        try {
+          // Två händelser som bifogar samtidigt delar på samma skapande, annars blir det två bildblock
+          let skapas = bildblockSkapas.current.get(sectionId)
+          if (!skapas) {
+            skapas = SpecialReportService.addBlock(sectionId, 'images')
+            bildblockSkapas.current.set(sectionId, skapas)
+            skapas.finally(() => bildblockSkapas.current.delete(sectionId)).catch(() => { /* felet hanteras nedan */ })
+          }
+          const blk = await skapas
+          andraSektion(sectionId, s => (s.blocks.some(b => b.id === blk.id) ? s : { ...s, blocks: [...s.blocks, blk] }))
+        } catch (e) {
+          toast.error(felText(e, 'Kunde inte skapa bildblocket'))
+          return
+        }
+      }
       let fel = 0
       for (const fil of files) {
         try {
-          const bild = await SpecialReportService.uploadImage(reportId, sectionId, fil)
+          const bild = await SpecialReportService.uploadImage(reportId, sectionId, fil, { eventId })
           andraSektion(sectionId, s => ({ ...s, images: [...s.images, bild] }))
         } catch (e) {
           fel += 1
@@ -530,6 +558,10 @@ export default function SpecialReportEditorPage() {
     updateImageCaption: (sectionId, imageId, caption) => {
       andraSektion(sectionId, s => ({ ...s, images: s.images.map(b => (b.id === imageId ? { ...b, caption } : b)) }))
       saver.schedule(`bild:${imageId}`, () => SpecialReportService.updateImage(imageId, { caption: caption || null }), sparfel)
+    },
+    updateImageEvent: (sectionId, imageId, eventId) => {
+      andraSektion(sectionId, s => ({ ...s, images: s.images.map(b => (b.id === imageId ? { ...b, event_id: eventId } : b)) }))
+      saver.schedule(`bildhandelse:${imageId}`, () => SpecialReportService.updateImage(imageId, { event_id: eventId }), sparfel)
     },
     deleteImage: async (sectionId, imageId) => {
       try {
@@ -778,8 +810,6 @@ export default function SpecialReportEditorPage() {
       aktiv ? 'border-[#20c58f] bg-[#20c58f]/10' : 'border-slate-700/60 bg-slate-900/60 hover:border-slate-600'
     }`
 
-  const adressDelar = (report.address ?? '').split(',').map(x => x.trim()).filter(Boolean)
-
   return (
     <div ref={satRot} className="flex w-full min-w-0 flex-col lg:h-[calc(100dvh-3rem)]">
       {/* ── Rubrikrad ── */}
@@ -1022,7 +1052,7 @@ export default function SpecialReportEditorPage() {
 
         {/* ── Redigering ── */}
         <main
-          className={`${mobilFlik === 'redigera' ? 'block' : 'hidden'} min-w-0 flex-1 overflow-y-auto p-4 pb-48 lg:block lg:px-6 lg:py-5 lg:pb-8`}
+          className={`${mobilFlik === 'redigera' ? 'block' : 'hidden'} min-w-0 flex-1 overflow-y-auto bg-slate-950 p-4 pb-48 lg:block lg:px-6 lg:py-5 lg:pb-8`}
           onFocus={folj}
           onPointerDownCapture={folj}
         >
@@ -1073,70 +1103,14 @@ export default function SpecialReportEditorPage() {
           )}
 
           {vy === 'om' && (
-            <div className="max-w-[720px] space-y-4">
-              <div className="flex items-start gap-2">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-xl font-semibold text-white">Om rapporten</h2>
-                  <p className="text-sm text-slate-400">Det här står först i rapporten. Kund, kontakt och adress hämtas från ärendet.</p>
-                </div>
-                <button type="button" aria-label="Snygga till inledningen" title="Snygga till inledningen" onClick={() => oppnaPolish({ typ: 'om' })} className={SNYGGA_KNAPP}>
-                  <Icon name="rapport.snygga" size={16} />
-                  <span className="hidden sm:inline">Snygga till</span>
-                </button>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1 rounded-xl border border-slate-700/50 bg-slate-800/20 p-3.5">
-                  <span className="text-xs text-slate-400">Kund</span>
-                  <span className="text-[15px] font-semibold text-white break-words">{report.customer_name || 'Okänd kund'}</span>
-                  {report.customer_number ? (
-                    <span className="text-sm text-slate-300">Kundnummer <span className="font-mono">{report.customer_number}</span></span>
-                  ) : (
-                    <span className="flex items-center gap-1.5 text-sm text-amber-400">
-                      <span className="h-[7px] w-[7px] rounded-full bg-amber-400" />
-                      Kundnummer saknas i Fortnox
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1 rounded-xl border border-slate-700/50 bg-slate-800/20 p-3.5">
-                  <span className="text-xs text-slate-400">Ärende</span>
-                  <span className="font-mono text-[15px] font-semibold text-white">{report.case_number || 'Saknas'}</span>
-                </div>
-                <div className="flex min-w-0 flex-col gap-1 rounded-xl border border-slate-700/50 bg-slate-800/20 p-3.5">
-                  <span className="text-xs text-slate-400">Kontaktperson</span>
-                  <span className="text-[15px] font-semibold text-white break-words">{report.contact_name || 'Saknas'}</span>
-                  {report.contact_email && (
-                    <a href={`mailto:${report.contact_email}`} className="truncate text-sm text-[#20c58f] hover:underline">{report.contact_email}</a>
-                  )}
-                  {report.contact_phone && (
-                    <a href={`tel:${report.contact_phone.replace(/\s+/g, '')}`} className="text-sm text-[#20c58f] hover:underline">{report.contact_phone}</a>
-                  )}
-                </div>
-                <div className="flex flex-col gap-1 rounded-xl border border-slate-700/50 bg-slate-800/20 p-3.5">
-                  <span className="text-xs text-slate-400">Adress</span>
-                  <span className="text-[15px] font-semibold text-white break-words">{adressDelar[0] || 'Saknas'}</span>
-                  {adressDelar.length > 1 && <span className="text-sm text-slate-300">{adressDelar.slice(1).join(', ')}</span>}
-                </div>
-              </div>
-              <div data-falt="rapport:doc_type">
-                <span className="block text-sm text-slate-300 mb-1">Typ av rapport</span>
-                <Select
-                  value={report.doc_type}
-                  onChange={v => sparaRapportFalt('doc_type', v as SpecialReportDocType)}
-                  options={DOC_TYPES.map(d => ({ value: d, label: d }))}
-                  className="max-w-xs"
-                />
-                <span className="mt-1 block text-xs text-slate-500">Står överst på första sidan.</span>
-              </div>
-              <label className="block" data-falt="rapport:intro">
-                <span className="block text-sm text-slate-300 mb-1">Inledning</span>
-                <textarea
-                  value={report.intro ?? ''}
-                  onChange={e => sparaRapportFalt('intro', e.target.value || null)}
-                  rows={4}
-                  placeholder="Kort om uppdraget: vad kunden bad om och vad rapporten omfattar."
-                  className={TEXTFALT}
-                />
-              </label>
+            <div className="max-w-[1040px]">
+              <OmRapporten
+                report={report}
+                onTitle={t => sparaRapportFalt('title', t)}
+                onDocType={d => sparaRapportFalt('doc_type', d)}
+                onIntro={t => sparaRapportFalt('intro', t)}
+                onPolish={() => oppnaPolish({ typ: 'om' })}
+              />
             </div>
           )}
 
@@ -1176,7 +1150,7 @@ export default function SpecialReportEditorPage() {
           )}
 
           {aktuell && (
-            <div className="max-w-[640px]">
+            <div className="max-w-[880px]">
               <SectionEditor
                 key={aktuell.id}
                 reportId={report.id}

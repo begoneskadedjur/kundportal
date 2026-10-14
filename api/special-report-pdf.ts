@@ -517,6 +517,7 @@ function buildHtml(data: ReportData, maps: Map<string, string>, version: number,
   .image img { width: 100%; height: 130px; object-fit: cover; border-radius: 2px; background: #e5e7eb; }
   .image .missing { height: 130px; background: #e5e7eb; }
   .image span { font-size: 9.5px; color: #4b5563; }
+  .image span.belongs { font-size: 8.5px; color: #6b7280; }
   .callout { padding: 10px 14px; background: #f0fdf9; border-left: 4px solid ${BRAND}; margin-bottom: 14px; page-break-inside: avoid; }
   .callout strong { display: block; color: #0f172a; margin-bottom: 4px; }
   .muted { color: #6b7280; }
@@ -615,10 +616,12 @@ function renderSection(s: SectionFull, nr: number, maps: Map<string, string>, re
     if (s.images.length === 0) return ''
     const items = s.images.map(img => {
       const event = img.event_id ? eventsById.get(img.event_id) : undefined
-      const caption = [img.caption?.trim() || null, event ? event.event_date : null].filter(Boolean).join(', ')
+      const caption = img.caption?.trim() || ''
+      // Kopplad bild: vilken händelse den hör till, med datum
+      const belongs = event ? `<br><span class="belongs">Hör till: ${esc(event.title?.trim() || 'Utan rubrik')}, ${esc(event.event_date)}</span>` : ''
       return `<div class="image">
         ${img.dataUri ? `<img src="${img.dataUri}" alt="">` : '<div class="missing"></div>'}
-        <span><b>Bild ${imageNumber.get(img.id)}.</b>${caption ? ` ${esc(caption)}` : ''}</span>
+        <span><b>Bild ${imageNumber.get(img.id)}.</b>${caption ? ` ${esc(caption)}` : ''}${belongs}</span>
       </div>`
     }).join('')
     return `<span class="block-title">Bilder</span><div class="images">${items}</div>`

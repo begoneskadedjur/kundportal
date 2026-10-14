@@ -36,7 +36,7 @@ updateSection(sectionId: string, patch: Partial<Pick<SpecialReportSection, 'titl
 createSectionsForVisits(reportId: string): Promise<FullSection[]>  // en del per besök (source visit) som inte finns i rapporten, rubrik "Besök ÅÅÅÅ-MM-DD", etikett besok, med händelsen
 deleteSection(sectionId: string): Promise<void>
 reorderSections(reportId: string, orderedIds: string[]): Promise<void>
-addBlock(sectionId: string, type: SpecialReportBlockType): Promise<SpecialReportBlock>
+addBlock(sectionId: string, type: SpecialReportBlockType): Promise<SpecialReportBlock>  // events och images finns högst en gång: befintligt block returneras
 updateBlock(blockId: string, content: { text?: string }): Promise<void>
 deleteBlock(blockId: string): Promise<void>
 reorderBlocks(sectionId: string, orderedIds: string[]): Promise<void>
@@ -46,7 +46,7 @@ deleteEvent(eventId: string): Promise<void>
 getImportCandidates(reportId: string): Promise<SpecialReportImportCandidate[]>   // visits för ärendet + station_inspection_sessions (bara contract)
 importEvents(sectionId: string, candidates: SpecialReportImportCandidate[]): Promise<SpecialReportEvent[]>
 uploadImage(reportId: string, sectionId: string, file: File, opts?: { eventId?: string | null; caption?: string | null }): Promise<SpecialReportImage>
-updateImage(imageId: string, patch: { caption?: string | null }): Promise<void>
+updateImage(imageId: string, patch: { caption?: string | null; event_id?: string | null }): Promise<void>  // event_id null = okopplad (3.53.0)
 deleteImage(imageId: string): Promise<void>
 downloadPdf(reportId: string): Promise<{ url: string; filename: string }>  // förhandsgranskning av pågående version, ingen låsning
 send(reportId: string, input: { recipients: string[]; subject: string; message: string; saveToCase: boolean }): Promise<SpecialReportVersion>
@@ -67,3 +67,10 @@ Skiss: V3-Granska, V3-Knappar och V3-Ordlista (sessionens scratchpad).
 - Klient: `src/services/textPolishService.ts` (`polish`, `addToGlossary`, `listGlossary`, `setActive`, `deleteTerm`), granskningsrutan `PolishReviewModal.tsx` och sidan `src/pages/shared/GlossaryPage.tsx` (`/koordinator/ordlista`, `/admin/ordlista`).
 - Tillämpningen sker i redigeraren via de vanliga sparvägarna (fördröjd sparning, förhandsvisningen följer med). Fältets text måste vara oförändrad sedan genomläsningen, annars hoppas fältet över. Ångra i toasten återställer originaltexterna.
 - Fältens id i granskningen: `rapport:intro|assessment|recommendations`, `del:<del>:title|subtitle`, `block:<del>:<block>`, `handelse:<del>:<händelse>:title|description`, `bild:<del>:<bild>`.
+
+## Redigeraren och bildkoppling (3.53.0)
+Skiss: V4-OmRapporten och V4-Del (sessionens scratchpad).
+- Om rapporten (`OmRapporten.tsx`): framsidesbanderoll med fasta färger (#0f2a22), kundkort per ärendetyp (`contract` Avtalskund, varning om kundnummer saknas; `business` Företag, engångsuppdrag, kundnummer bara om det finns; `private` Privatperson, inget kundnummer, namn från `customer_name` eller `contact_name`), typ av rapport som radiogrupp med förslaget från `foreslaDokumenttyp(report.title)`, inledning med startfraser.
+- Del (`SectionEditor.tsx`): rubrikband i delens färg, egenskapsrad (typ, färg, plats) med menyer i `Meny.tsx` (popover från sm, bottenark på mobil, Escape och klick utanför stänger), block som kort med ⋯-meny. Layouten styrs av container queries.
+- Bilder och händelser: `special_report_images.event_id` (on delete set null). Gemknappen på en händelse laddar upp med `eventId`; tjänsten och redigeraren skapar delens bildblock om det saknas. Bildblockets val "Hör till händelse" sparas med `updateImage(id, { event_id })`. Tas en händelse bort blir bilderna okopplade, även lokalt.
+- Bilderna numreras löpande per del (`position`). Förhandsvisningen och PDF:en visar numren i händelsetabellens kolumn Bild och "Hör till: <rubrik>" under bildtexten.

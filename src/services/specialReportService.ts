@@ -704,9 +704,10 @@ export class SpecialReportService {
   // Block
   // ==========================================================================
 
+  /** Händelse- och bildblock finns högst en gång per del: finns det redan returneras det */
   static async addBlock(sectionId: string, type: SpecialReportBlockType): Promise<SpecialReportBlock> {
-    if (type === 'events') {
-      const existing = await SpecialReportService.findEventsBlock(sectionId)
+    if (type === 'events' || type === 'images') {
+      const existing = await SpecialReportService.findBlock(sectionId, type)
       if (existing) return existing
     }
     const position = await nextPosition('special_report_blocks', 'section_id', sectionId)
@@ -737,19 +738,20 @@ export class SpecialReportService {
     if (failed?.error) fel(failed.error, 'Ordningen kunde inte sparas')
   }
 
-  private static async findEventsBlock(sectionId: string): Promise<SpecialReportBlock | null> {
+  /** Första blocket av typen i delen (äldre delar kan ha fler bildblock) */
+  private static async findBlock(sectionId: string, type: SpecialReportBlockType): Promise<SpecialReportBlock | null> {
     const { data } = await db
       .from('special_report_blocks')
       .select('*')
       .eq('section_id', sectionId)
-      .eq('type', 'events')
-      .maybeSingle()
-    return (data as SpecialReportBlock | null) ?? null
+      .eq('type', type)
+      .order('position', { ascending: true })
+      .limit(1)
+    return ((data as SpecialReportBlock[] | null) ?? [])[0] ?? null
   }
 
   private static async ensureEventsBlock(sectionId: string): Promise<void> {
-    const existing = await SpecialReportService.findEventsBlock(sectionId)
-    if (!existing) await SpecialReportService.addBlock(sectionId, 'events')
+    await SpecialReportService.addBlock(sectionId, 'events')
   }
 
   // ==========================================================================
@@ -956,6 +958,10 @@ export class SpecialReportService {
     if (!ext) throw new Error('Bildformatet stöds inte. Använd JPEG, PNG eller WebP.')
     const path = `${reportId}/${crypto.randomUUID()}.${ext}`
 
+    // En bild som bifogas en händelse hamnar i delens bildblock, som skapas om det saknas.
+    // Före uppladdningen, så att ett fel här inte lämnar en fil utan rad i lagringen
+    if (opts?.eventId) await SpecialReportService.addBlock(sectionId, 'images')
+
     const { error: uploadError } = await db.storage.from(BUCKET).upload(path, blob, {
       contentType: ext === 'jpg' ? 'image/jpeg' : type,
       cacheControl: '3600',
@@ -984,12 +990,14 @@ export class SpecialReportService {
     return signed
   }
 
-  static async updateImage(imageId: string, patch: { caption?: string | null }): Promise<void> {
-    const { error } = await db
-      .from('special_report_images')
-      .update({ caption: patch.caption === undefined ? undefined : nonEmpty(patch.caption) })
-      .eq('id', imageId)
-    if (error) fel(error, 'Bildtexten kunde inte sparas')
+  /** Bildtext och/eller vilken händelse bilden hör till (null = ingen) */
+  static async updateImage(imageId: string, patch: { caption?: string | null; event_id?: string | null }): Promise<void> {
+    const update: { caption?: string | null; event_id?: string | null } = {}
+    if (patch.caption !== undefined) update.caption = nonEmpty(patch.caption)
+    if (patch.event_id !== undefined) update.event_id = patch.event_id || null
+    if (Object.keys(update).length === 0) return
+    const { error } = await db.from('special_report_images').update(update).eq('id', imageId)
+    if (error) fel(error, update.event_id !== undefined ? 'Bildens koppling kunde inte sparas' : 'Bildtexten kunde inte sparas')
   }
 
   static async deleteImage(imageId: string): Promise<void> {

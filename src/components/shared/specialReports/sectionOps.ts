@@ -25,8 +25,11 @@ export interface SectionOps {
   updateEvent: (sectionId: string, eventId: string, patch: EventPatch) => void
   deleteEvent: (sectionId: string, eventId: string) => Promise<void>
   eventsImported: (sectionId: string, events: SpecialReportEvent[]) => void
-  uploadImages: (sectionId: string, files: File[]) => Promise<void>
+  /** Laddar upp bilder till delen. Med eventId kopplas de till händelsen och bildblocket skapas om det saknas */
+  uploadImages: (sectionId: string, files: File[], eventId?: string | null) => Promise<void>
   updateImageCaption: (sectionId: string, imageId: string, caption: string) => void
+  /** Vilken händelse bilden hör till, null = ingen (3.53.0) */
+  updateImageEvent: (sectionId: string, imageId: string, eventId: string | null) => void
   deleteImage: (sectionId: string, imageId: string) => Promise<void>
   /** Gå till översiktskartan och visa delens område */
   showArea: (sectionId: string) => void

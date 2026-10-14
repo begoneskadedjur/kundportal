@@ -1,43 +1,40 @@
 // src/components/shared/specialReports/SectionEditor.tsx
-// Delvyn i redigeraren: rubrik, underrubrik, typ av del, färg, område på kartan
-// och blocken i ordning (flytta upp/ned, ta bort, lägg till).
+// Delvyn i redigeraren (3.53.0): ett rubrikband tonat i delens färg med stor
+// siffra, rubrik och underrubrik, en egenskapsrad (typ, färg och plats på
+// kartan) och blocken som kort med en ⋯-meny för flytta och ta bort.
 // Fält och block bär data-falt så att redigeraren vet vad som har fokus (ramen
 // i förhandsvisningen) och kan flytta fokus hit vid klick på sidan.
+// Layouten följer behållarens bredd (container queries), inte fönstrets.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
+import { ChevronDown, Loader2 } from 'lucide-react'
 import ConfirmModal from '../../ui/ConfirmModal'
 import { Icon, type IconName } from '../../icons/Icon'
 import {
   BLOCK_LABELS,
+  SECTION_COLORS,
   SECTION_LABELS,
   type SpecialReportBlock,
   type SpecialReportBlockType,
   type SpecialReportSectionLabel,
 } from '../../../types/specialReport'
 import type { FullSection, PolishTarget, SectionOps } from './sectionOps'
-import { FALT, IKON_KNAPP, IKON_KNAPP_LATT, SNYGGA_KNAPP, TEXTFALT } from './specialReportUtils'
+import { IKON_KNAPP, IKON_KNAPP_LATT, KORT, SNYGGA_KNAPP, TEXTFALT } from './specialReportUtils'
 import EventsBlock from './EventsBlock'
 import ImagesBlock from './ImagesBlock'
 import AreaMiniMap from './AreaMiniMap'
 import SectionColorPicker from './SectionColorPicker'
+import Meny from './Meny'
 
-const BLOCK_ICON: Record<SpecialReportBlockType, IconName> = {
-  text: 'rapport.text',
-  events: 'rapport.handelser',
-  images: 'rapport.bilder',
-  map: 'rapport.karta',
+/** Blockets ikon, ton och förklaring i kortets huvud */
+const BLOCK_INFO: Record<SpecialReportBlockType, { ikon: IconName; ton: string; hint: string }> = {
+  text: { ikon: 'rapport.text', ton: 'bg-emerald-500/10 text-emerald-400', hint: 'Beskriv läget med egna ord.' },
+  events: { ikon: 'rapport.handelser', ton: 'bg-blue-500/10 text-blue-400', hint: 'Fynd och åtgärder med datum. Bifoga bilder till varje händelse.' },
+  images: { ikon: 'rapport.bilder', ton: 'bg-pink-500/10 text-pink-400', hint: 'Koppla en bild till en händelse, så hänvisar rapporten till den.' },
+  map: { ikon: 'rapport.karta', ton: 'bg-cyan-500/10 text-cyan-400', hint: 'Området inzoomat på kartan.' },
 }
 
-/** Kort hjälptext i blockets huvud */
-const BLOCK_HINT: Record<SpecialReportBlockType, string> = {
-  text: 'Beskriv läget',
-  events: 'Fynd och åtgärder med datum',
-  images: 'Foton från platsen',
-  map: 'Området inzoomat',
-}
-
-/** Knapparna under "Lägg till i delen" */
+/** Korten under "Lägg till i delen" */
 const NYTT_BLOCK: Record<SpecialReportBlockType, { rubrik: string; text: string }> = {
   text: { rubrik: 'Mer text', text: 'Ett stycke till' },
   events: { rubrik: 'Händelser', text: 'Fynd och åtgärder med datum' },
@@ -45,7 +42,21 @@ const NYTT_BLOCK: Record<SpecialReportBlockType, { rubrik: string; text: string 
   map: { rubrik: 'Kartutsnitt', text: 'Området inzoomat' },
 }
 
+/** Delens typer med ikon och förklaring i typmenyn */
+const TYP_INFO: Record<SpecialReportSectionLabel, { ikon: IconName; text: string }> = {
+  omrade: { ikon: 'rapport.omrade', text: 'En plats på kartan' },
+  besok: { ikon: 'rapport.besok', text: 'Vad som gjordes en viss dag' },
+  underlev: { ikon: 'rapport.underlev', text: 'Arbete som någon annan utförde' },
+  fritt: { ikon: 'rapport.text', text: 'Valfri text och bilder' },
+}
+
 const TYPER = Object.keys(SECTION_LABELS) as SpecialReportSectionLabel[]
+
+/** Liten rubrik över ett fält i egenskapsraden */
+const FALTETIKETT = 'text-[11px] uppercase tracking-wider text-slate-500'
+/** Knappen som öppnar typ- eller färgmenyn */
+const EGENSKAP_KNAPP =
+  'flex h-11 max-w-full items-center gap-2.5 rounded-xl pr-2 text-[15px] font-semibold text-white hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60'
 
 interface SectionEditorProps {
   reportId: string
@@ -75,8 +86,11 @@ export default function SectionEditor({ reportId, section, nr, color, ops, fokus
   const [bekraftaBlock, setBekraftaBlock] = useState<SpecialReportBlock | null>(null)
   const [bekraftaOmrade, setBekraftaOmrade] = useState(false)
   const [arbetar, setArbetar] = useState<string | null>(null)
+  const [meny, setMeny] = useState<'typ' | 'farg' | null>(null)
   const rotRef = useRef<HTMLDivElement>(null)
   const rubrikRef = useRef<HTMLInputElement>(null)
+  const typKnappRef = useRef<HTMLButtonElement>(null)
+  const fargKnappRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     if (autoFokusRubrik) rubrikRef.current?.focus()
@@ -85,6 +99,7 @@ export default function SectionEditor({ reportId, section, nr, color, ops, fokus
   const block = useMemo(() => [...section.blocks].sort((a, b) => a.position - b.position), [section.blocks])
   const harTyp = (t: SpecialReportBlockType) => block.some(b => b.type === t)
   const harOmrade = !!section.area && section.area.length >= 3
+  const fargNamn = SECTION_COLORS.find(c => c.value.toLowerCase() === color.toLowerCase())?.name ?? 'Egen färg'
 
   const tillgangliga: SpecialReportBlockType[] = [
     ...(!harTyp('events') ? ['events' as const] : []),
@@ -114,205 +129,240 @@ export default function SectionEditor({ reportId, section, nr, color, ops, fokus
     try { await ops.deleteBlock(section.id, b.id) } finally { setArbetar(null); setBekraftaBlock(null) }
   }
 
-  // Block med innehåll som döljs bekräftas först
-  const begarTaBortBlock = (b: SpecialReportBlock) => {
-    const doljer = (b.type === 'events' && section.events.length > 0)
-      || (b.type === 'images' && section.images.length > 0)
-      || (b.type === 'text' && (b.content.text ?? '').trim().length > 0)
-    if (doljer) setBekraftaBlock(b)
-    else void taBortBlock(b)
-  }
-
   const bekraftaBlockText = bekraftaBlock?.type === 'events'
-    ? 'Händelserna finns kvar i delen och visas igen om du lägger till ett händelseblock.'
+    ? (section.events.length > 0 ? 'Händelserna finns kvar i delen och visas igen om du lägger till ett händelseblock.' : 'Blocket tas bort från delen.')
     : bekraftaBlock?.type === 'images'
-      ? 'Bilderna finns kvar i delen och visas igen om du lägger till ett bildblock.'
-      : 'Texten i blocket försvinner.'
+      ? (section.images.length > 0 ? 'Bilderna finns kvar i delen och visas igen om du lägger till ett bildblock.' : 'Blocket tas bort från delen.')
+      : bekraftaBlock?.type === 'text' && (bekraftaBlock.content.text ?? '').trim()
+        ? 'Texten i blocket försvinner.'
+        : 'Blocket tas bort från delen.'
 
   // data-falt per block: händelser och bilder har ett fält per del, text och karta ett per block
   const faltFor = (b: SpecialReportBlock) =>
     b.type === 'events' ? `del:${section.id}:handelser` : b.type === 'images' ? `del:${section.id}:bilder` : `block:${b.id}`
 
-  const rubrikFokus = fokus === `del:${section.id}:rubrik` || fokus === `del:${section.id}:underrubrik`
-
   return (
-    <div ref={rotRef} className="space-y-4">
-      {/* Rubrik */}
-      <div className="flex flex-wrap items-end gap-3">
-        <span
-          className="flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-xl text-xl font-extrabold text-[#fff]"
-          style={{ background: color }}
-          aria-hidden="true"
-        >
-          {nr}
-        </span>
-        <label className="min-w-[180px] flex-[1.3]" data-falt={`del:${section.id}:rubrik`}>
-          <span className="block text-xs font-medium text-slate-400 mb-1">Rubrik</span>
-          <input
-            ref={rubrikRef}
-            value={section.title}
-            onChange={e => ops.updateSection(section.id, { title: e.target.value })}
-            placeholder="Till exempel Källaren, Gårdshuset eller Besök 3 maj"
-            className={`${FALT} text-[15px] font-semibold`}
-            style={rubrikFokus ? { borderColor: color } : undefined}
-          />
-        </label>
-        <label className="min-w-[160px] flex-1" data-falt={`del:${section.id}:underrubrik`}>
-          <span className="block text-xs font-medium text-slate-400 mb-1">Underrubrik</span>
-          <input
-            value={section.subtitle ?? ''}
-            onChange={e => ops.updateSection(section.id, { subtitle: e.target.value || null })}
-            placeholder="Till exempel adress eller datum"
-            className={FALT}
-            style={rubrikFokus ? { borderColor: color } : undefined}
-          />
-        </label>
-        <button type="button" aria-label="Ta bort delen" title="Ta bort delen" onClick={() => setBekraftaSektion(true)} className={IKON_KNAPP}>
-          <Icon name="allman.radera" size={20} />
-        </button>
-      </div>
+    <div ref={rotRef} className="@container space-y-4" style={{ ['--del' as string]: color }}>
+      {/* ── Rubrikband och egenskaper ── */}
+      <div className={`rounded-[22px] ${KORT}`}>
+        <div className="flex items-center gap-3.5 rounded-t-[22px] px-4 py-4 @lg:gap-[18px] @lg:px-6 @lg:pb-[18px] @lg:pt-[22px]" style={{ background: `${color}1a` }}>
+          <span
+            className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl text-[22px] font-extrabold text-[#fff] @lg:h-16 @lg:w-16 @lg:rounded-[18px] @lg:text-[28px]"
+            style={{ background: color, boxShadow: `0 6px 16px ${color}55` }}
+            aria-hidden="true"
+          >
+            {nr}
+          </span>
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <label data-falt={`del:${section.id}:rubrik`} className="block">
+              <span className="sr-only">Delens rubrik</span>
+              <input
+                ref={rubrikRef}
+                value={section.title}
+                onChange={e => ops.updateSection(section.id, { title: e.target.value })}
+                placeholder="Till exempel Källaren eller Besök 3 maj"
+                className="w-full border-0 border-b-2 border-transparent bg-transparent px-0 py-0.5 text-[21px] font-extrabold text-white placeholder-slate-500 outline-none focus:border-[var(--del)] focus:ring-0 @lg:text-[26px]"
+              />
+            </label>
+            <label data-falt={`del:${section.id}:underrubrik`} className="block">
+              <span className="sr-only">Underrubrik</span>
+              <input
+                value={section.subtitle ?? ''}
+                onChange={e => ops.updateSection(section.id, { subtitle: e.target.value || null })}
+                placeholder="Lägg till adress eller datum"
+                className="w-full border-0 border-b border-transparent bg-transparent px-0 py-0.5 text-[15px] text-slate-400 placeholder-slate-500 outline-none focus:border-[var(--del)] focus:ring-0"
+              />
+            </label>
+          </div>
+          <button
+            type="button"
+            aria-label="Ta bort delen"
+            title="Ta bort delen"
+            onClick={() => setBekraftaSektion(true)}
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center self-start rounded-xl bg-slate-900/70 text-slate-400 transition-colors hover:text-red-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60"
+          >
+            <Icon name="allman.radera" size={20} />
+          </button>
+        </div>
 
-      {/* Typ av del och färg */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-400">Typ av del</span>
-          <div role="radiogroup" aria-label="Typ av del" className="flex flex-wrap gap-1 rounded-xl border border-slate-700/60 bg-slate-900/60 p-1">
-            {TYPER.map(l => {
-              const vald = section.label === l
-              return (
-                <button
-                  key={l}
-                  type="button"
-                  role="radio"
-                  aria-checked={vald}
-                  onClick={() => ops.updateSection(section.id, { label: l })}
-                  className={`h-9 rounded-lg px-3 text-xs transition-colors ${vald ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  {SECTION_LABELS[l]}
+        <div className="grid grid-cols-1 border-t border-slate-800 @md:grid-cols-2 @3xl:grid-cols-[1fr_1fr_1.4fr]">
+          {/* Typ */}
+          <div className="relative flex flex-col gap-1 border-b border-slate-800 px-4 py-3 @md:border-r @lg:px-5 @3xl:border-b-0">
+            <span className={FALTETIKETT}>Typ</span>
+            <button
+              ref={typKnappRef}
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={meny === 'typ'}
+              onClick={() => setMeny(m => (m === 'typ' ? null : 'typ'))}
+              className={EGENSKAP_KNAPP}
+            >
+              <span className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-[9px] bg-emerald-500/10 text-emerald-400">
+                <Icon name={TYP_INFO[section.label].ikon} size={16} />
+              </span>
+              <span className="truncate">{SECTION_LABELS[section.label]}</span>
+              <ChevronDown className="h-4 w-4 flex-shrink-0 text-slate-500" />
+            </button>
+            <Meny open={meny === 'typ'} onClose={() => setMeny(null)} anchorRef={typKnappRef} label="Typ av del" className="sm:w-72">
+              {TYPER.map(l => {
+                const vald = section.label === l
+                return (
+                  <button
+                    key={l}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={vald}
+                    onClick={() => { ops.updateSection(section.id, { label: l }); setMeny(null); typKnappRef.current?.focus() }}
+                    className={`flex min-h-[48px] w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left outline-none hover:bg-slate-800 focus:bg-slate-800 ${vald ? 'bg-[#20c58f]/10' : ''}`}
+                  >
+                    <Icon name={TYP_INFO[l].ikon} size={20} className={vald ? 'text-emerald-400' : 'text-slate-400'} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold text-white">{SECTION_LABELS[l]}</span>
+                      <span className="block text-xs text-slate-400">{TYP_INFO[l].text}</span>
+                    </span>
+                    {vald && <Icon name="allman.bock" size={16} className="text-emerald-400" />}
+                  </button>
+                )
+              })}
+            </Meny>
+          </div>
+
+          {/* Färg */}
+          <div className="relative flex flex-col gap-1 border-b border-slate-800 px-4 py-3 @lg:px-5 @3xl:border-b-0 @3xl:border-r">
+            <span className={FALTETIKETT}>Färg</span>
+            <button
+              ref={fargKnappRef}
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded={meny === 'farg'}
+              onClick={() => setMeny(m => (m === 'farg' ? null : 'farg'))}
+              className={EGENSKAP_KNAPP}
+            >
+              <span
+                className="h-[26px] w-[26px] flex-shrink-0 rounded-full"
+                style={{ background: color, boxShadow: '0 0 0 3px var(--color-slate-900, #0f172a), 0 0 0 4px var(--color-slate-700, #334155)' }}
+              />
+              <span className="truncate">{fargNamn}</span>
+              <ChevronDown className="h-4 w-4 flex-shrink-0 text-slate-500" />
+            </button>
+            <Meny open={meny === 'farg'} onClose={() => setMeny(null)} anchorRef={fargKnappRef} label="Färg på delen" role="dialog">
+              {/* Klick (och Enter) väljer och stänger, piltangenterna flyttar utan att stänga */}
+              <div onClick={() => { setMeny(null); fargKnappRef.current?.focus() }} className="px-1 sm:w-[176px]">
+                <SectionColorPicker value={color} onChange={c => ops.updateSection(section.id, { color: c })} size={44} />
+              </div>
+            </Meny>
+          </div>
+
+          {/* Plats */}
+          <div className="flex flex-wrap items-center gap-3 px-4 py-3 @md:col-span-2 @lg:px-5 @3xl:col-span-1">
+            {harOmrade ? (
+              <AreaMiniMap area={section.area!} color={color} className="h-[52px] w-[84px] rounded-[10px] bg-slate-800" />
+            ) : (
+              <span className="flex h-[52px] w-[84px] flex-shrink-0 items-center justify-center rounded-[10px] border-[1.5px] border-dashed border-slate-700 text-slate-500" aria-hidden="true">
+                <Icon name="rapport.omrade" size={20} />
+              </span>
+            )}
+            <span className="flex min-w-[120px] flex-1 flex-col gap-0.5">
+              <span className={FALTETIKETT}>Plats</span>
+              <span className="text-sm font-semibold text-white">{harOmrade ? 'Ritat område på kartan' : 'Ingen plats ritad'}</span>
+            </span>
+            {harOmrade ? (
+              <span className="flex gap-1.5">
+                <button type="button" aria-label="Visa på kartan" title="Visa på kartan" onClick={() => ops.showArea(section.id)} className={IKON_KNAPP}>
+                  <Icon name="rapport.karta" size={16} />
                 </button>
-              )
-            })}
+                <button type="button" aria-label="Rita om området" title="Rita om" onClick={() => ops.drawArea(section.id)} className={IKON_KNAPP}>
+                  <Icon name="rapport.penna" size={16} />
+                </button>
+                <button type="button" aria-label="Ta bort området" title="Ta bort området" onClick={() => setBekraftaOmrade(true)} className={IKON_KNAPP}>
+                  <Icon name="allman.radera" size={16} />
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => ops.drawArea(section.id)}
+                className="inline-flex h-11 items-center gap-1.5 rounded-xl border border-slate-700 px-3 text-sm font-semibold text-emerald-400 hover:bg-slate-800"
+              >
+                <Icon name="rapport.penna" size={16} />
+                Rita område
+              </button>
+            )}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1">
-          <span className="mr-1 text-xs text-slate-400">Färg</span>
-          <SectionColorPicker value={color} onChange={c => ops.updateSection(section.id, { color: c })} size={36} />
-        </div>
       </div>
 
-      {/* Område på kartan */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-xs text-slate-400">Område på kartan</span>
-        {harOmrade ? (
-          <>
-            <span className="flex items-center gap-1.5 text-xs text-slate-200">
-              <span className="h-[7px] w-[7px] rounded-full" style={{ background: color }} />
-              Ritat
-            </span>
-            <button type="button" aria-label="Visa området på kartan" title="Visa på kartan" onClick={() => ops.showArea(section.id)} className={IKON_KNAPP_LATT}>
-              <Icon name="rapport.karta" size={16} />
-            </button>
-            <button type="button" aria-label="Rita om området" title="Rita om" onClick={() => ops.drawArea(section.id)} className={IKON_KNAPP_LATT}>
-              <Icon name="rapport.omrade" size={16} />
-            </button>
-            <button type="button" aria-label="Ta bort området" title="Ta bort området" onClick={() => setBekraftaOmrade(true)} className={IKON_KNAPP_LATT}>
-              <Icon name="allman.radera" size={16} />
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => ops.drawArea(section.id)}
-            className="inline-flex h-11 items-center gap-1.5 rounded-lg px-2 text-xs text-[#20c58f] hover:bg-slate-800"
+      {/* ── Block ── */}
+      {block.map((b, i) => {
+        const falt = faltFor(b)
+        const harFokus = fokus === falt
+        const polish = onPolish ? polishFor(section.id, b) : null
+        return (
+          <div
+            key={b.id}
+            data-falt={falt}
+            className={`rounded-[20px] transition-shadow ${KORT}`}
+            style={harFokus ? { boxShadow: `0 0 0 2px ${color}` } : undefined}
           >
-            <Icon name="rapport.omrade" size={16} />
-            Rita område
-          </button>
-        )}
-      </div>
-
-      {/* Block */}
-      <div className="space-y-2.5">
-        {block.map((b, i) => {
-          const falt = faltFor(b)
-          const harFokus = fokus === falt
-          const polish = onPolish ? polishFor(section.id, b) : null
-          return (
-            <div
-              key={b.id}
-              data-falt={falt}
-              className="overflow-hidden rounded-xl border-[1.5px] border-slate-700/60 bg-slate-900/60 transition-colors"
-              style={harFokus ? { borderColor: color } : undefined}
-            >
-              <div className="flex items-center gap-1 border-b border-slate-700/60 py-0.5 pl-3.5 pr-1">
-                <Icon name={BLOCK_ICON[b.type]} size={16} className="text-slate-500" />
-                <span className="ml-1.5 text-xs text-slate-300">{BLOCK_LABELS[b.type]}</span>
-                <span className="ml-1.5 hidden flex-1 truncate text-xs text-slate-500 sm:inline">{BLOCK_HINT[b.type]}</span>
-                <span className="flex-1 sm:hidden" />
-                {polish && (
-                  <button type="button" aria-label={polish.aria} title={polish.aria} onClick={() => onPolish?.(polish.mal)} className={SNYGGA_KNAPP}>
-                    <Icon name="rapport.snygga" size={16} />
-                    <span className="hidden sm:inline">Snygga till</span>
-                  </button>
-                )}
-                <button type="button" aria-label="Flytta blocket uppåt" disabled={i === 0} onClick={() => ops.moveBlock(section.id, b.id, -1)} className={IKON_KNAPP_LATT}>
-                  <ChevronUp className="w-4 h-4" />
-                </button>
-                <button type="button" aria-label="Flytta blocket nedåt" disabled={i === block.length - 1} onClick={() => ops.moveBlock(section.id, b.id, 1)} className={IKON_KNAPP_LATT}>
-                  <ChevronDown className="w-4 h-4" />
-                </button>
-                <button type="button" aria-label="Ta bort blocket" disabled={arbetar === b.id} onClick={() => begarTaBortBlock(b)} className={IKON_KNAPP_LATT}>
-                  {arbetar === b.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Icon name="allman.stang" size={16} />}
-                </button>
-              </div>
-              <div className="p-3.5">
-                {b.type === 'text' && (
-                  <TextBlock
-                    initial={b.content.text ?? ''}
-                    onChange={t => ops.updateBlockText(section.id, b.id, t)}
-                  />
-                )}
-                {b.type === 'events' && <EventsBlock reportId={reportId} section={section} ops={ops} />}
-                {b.type === 'images' && <ImagesBlock section={section} ops={ops} />}
-                {b.type === 'map' && (
-                  harOmrade ? (
-                    <div className="flex flex-wrap items-center gap-3">
-                      <AreaMiniMap area={section.area!} color={color} />
-                      <p className="max-w-xs text-sm leading-relaxed text-slate-400">Utsnitt av området på översiktskartan. Det här kommer med i rapporten.</p>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-500">
-                      Delen har inget område.{' '}
-                      <button type="button" onClick={() => ops.drawArea(section.id)} className="text-[#20c58f] hover:underline">Rita ett på kartan</button>
-                    </p>
-                  )
-                )}
-              </div>
+            <BlockHuvud
+              typ={b.type}
+              polish={polish ? { aria: polish.aria, onClick: () => onPolish?.(polish.mal) } : null}
+              forsta={i === 0}
+              sista={i === block.length - 1}
+              arbetar={arbetar === b.id}
+              onFlytta={steg => ops.moveBlock(section.id, b.id, steg)}
+              onTaBort={() => setBekraftaBlock(b)}
+            />
+            <div className="px-4 pb-4 @lg:px-[18px] @lg:pb-[18px]">
+              {b.type === 'text' && (
+                <TextBlock
+                  initial={b.content.text ?? ''}
+                  onChange={t => ops.updateBlockText(section.id, b.id, t)}
+                />
+              )}
+              {b.type === 'events' && <EventsBlock reportId={reportId} section={section} ops={ops} />}
+              {b.type === 'images' && <ImagesBlock section={section} ops={ops} />}
+              {b.type === 'map' && (
+                harOmrade ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <AreaMiniMap area={section.area!} color={color} className="h-40 w-full max-w-[320px] rounded-2xl bg-slate-800" />
+                    <p className="max-w-xs text-sm leading-relaxed text-slate-400">Utsnitt av området på översiktskartan. Det här kommer med i rapporten.</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500">
+                    Delen har inget område.{' '}
+                    <button type="button" onClick={() => ops.drawArea(section.id)} className="inline-flex min-h-[44px] items-center text-emerald-400 hover:underline">Rita ett på kartan</button>
+                  </p>
+                )
+              )}
             </div>
-          )
-        })}
-      </div>
+          </div>
+        )
+      })}
 
-      {/* Lägg till i delen */}
-      <div className="flex flex-wrap gap-2">
-        <span className="w-full text-xs text-slate-400">Lägg till i delen</span>
-        {tillgangliga.map(t => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => laggTillBlock(t)}
-            disabled={arbetar !== null}
-            className="inline-flex min-h-[52px] items-center gap-2.5 rounded-xl border-[1.5px] border-dashed border-slate-600 px-3.5 text-left hover:border-[#20c58f] disabled:opacity-50"
-          >
-            {arbetar === `nytt-${t}`
-              ? <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
-              : <Icon name={BLOCK_ICON[t]} size={20} className="text-slate-400" />}
-            <span>
-              <span className="block text-sm font-semibold text-slate-100">{NYTT_BLOCK[t].rubrik}</span>
-              <span className="block text-[11px] text-slate-400">{NYTT_BLOCK[t].text}</span>
-            </span>
-          </button>
-        ))}
+      {/* ── Lägg till i delen ── */}
+      <div className="space-y-2">
+        <span className="block text-xs uppercase tracking-wider text-slate-500">Lägg till i delen</span>
+        <div className="grid grid-cols-1 gap-2.5 @md:grid-cols-2">
+          {tillgangliga.map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => laggTillBlock(t)}
+              disabled={arbetar !== null}
+              className={`flex min-h-[64px] items-center gap-3 rounded-2xl p-3 text-left transition-shadow hover:ring-[#20c58f] disabled:opacity-50 ${KORT}`}
+            >
+              <span className={`flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[11px] ${BLOCK_INFO[t].ton}`}>
+                {arbetar === `nytt-${t}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon name={BLOCK_INFO[t].ikon} size={20} />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-white">{NYTT_BLOCK[t].rubrik}</span>
+                <span className="block text-xs text-slate-400">{NYTT_BLOCK[t].text}</span>
+              </span>
+              <Icon name="allman.plus" size={20} className="flex-shrink-0 text-slate-500" />
+            </button>
+          ))}
+        </div>
       </div>
 
       <ConfirmModal
@@ -351,6 +401,69 @@ export default function SectionEditor({ reportId, section, nr, color, ops, fokus
   )
 }
 
+interface BlockHuvudProps {
+  typ: SpecialReportBlockType
+  polish: { aria: string; onClick: () => void } | null
+  forsta: boolean
+  sista: boolean
+  arbetar: boolean
+  onFlytta: (steg: -1 | 1) => void
+  onTaBort: () => void
+}
+
+/** Blockets huvud: ikonruta, rubrik och förklaring, Snygga till och ⋯-menyn */
+function BlockHuvud({ typ, polish, forsta, sista, arbetar, onFlytta, onTaBort }: BlockHuvudProps) {
+  const [oppen, setOppen] = useState(false)
+  const knappRef = useRef<HTMLButtonElement>(null)
+  const info = BLOCK_INFO[typ]
+  const val = 'flex h-11 w-full items-center gap-2.5 rounded-xl px-3 text-left text-sm outline-none hover:bg-slate-800 focus:bg-slate-800 disabled:opacity-40'
+
+  return (
+    <div className="flex items-center gap-3 py-3 pl-4 pr-2 @lg:pl-[18px]">
+      <span className={`flex h-[38px] w-[38px] flex-shrink-0 items-center justify-center rounded-[11px] ${info.ton}`}>
+        <Icon name={info.ikon} size={20} />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="text-base font-bold text-white">{BLOCK_LABELS[typ]}</span>
+        <span className="hidden text-xs text-slate-400 @md:block">{info.hint}</span>
+      </span>
+      {polish && (
+        <button type="button" aria-label={polish.aria} title={polish.aria} onClick={polish.onClick} className={SNYGGA_KNAPP}>
+          <Icon name="rapport.snygga" size={16} />
+          <span className="hidden @md:inline">Snygga till</span>
+        </button>
+      )}
+      <span className="relative">
+        <button
+          ref={knappRef}
+          type="button"
+          aria-label={`Fler val för blocket ${BLOCK_LABELS[typ].toLowerCase()}`}
+          aria-haspopup="menu"
+          aria-expanded={oppen}
+          onClick={() => setOppen(o => !o)}
+          className={IKON_KNAPP_LATT}
+        >
+          {arbetar ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon name="allman.meny" size={20} />}
+        </button>
+        <Meny open={oppen} onClose={() => setOppen(false)} anchorRef={knappRef} label={`Blocket ${BLOCK_LABELS[typ].toLowerCase()}`} align="right" className="sm:w-52">
+          <button type="button" role="menuitem" disabled={forsta} onClick={() => { setOppen(false); onFlytta(-1) }} className={`${val} text-slate-200`}>
+            <Icon name="allman.chevron" size={16} className="-rotate-90 text-slate-400" />
+            Flytta upp
+          </button>
+          <button type="button" role="menuitem" disabled={sista} onClick={() => { setOppen(false); onFlytta(1) }} className={`${val} text-slate-200`}>
+            <Icon name="allman.chevron" size={16} className="rotate-90 text-slate-400" />
+            Flytta ned
+          </button>
+          <button type="button" role="menuitem" onClick={() => { setOppen(false); onTaBort() }} className={`${val} text-red-400`}>
+            <Icon name="allman.radera" size={16} />
+            Ta bort blocket
+          </button>
+        </Meny>
+      </span>
+    </div>
+  )
+}
+
 /** Textblock med eget lokalt värde så markören aldrig hoppar */
 function TextBlock({ initial, onChange }: { initial: string; onChange: (t: string) => void }) {
   const [text, setText] = useState(initial)
@@ -360,9 +473,9 @@ function TextBlock({ initial, onChange }: { initial: string; onChange: (t: strin
       aria-label="Text"
       value={text}
       onChange={e => { setText(e.target.value); onChange(e.target.value) }}
-      rows={3}
+      rows={4}
       placeholder="Beskriv vad du såg, till exempel spår, ingångar och skador."
-      className={`${TEXTFALT} border-transparent bg-transparent px-0 focus:ring-0 focus:border-transparent`}
+      className={`${TEXTFALT} rounded-[14px] px-4 py-3 text-[15px]`}
     />
   )
 }

@@ -250,7 +250,8 @@ export default function MobileAddEventSheet({
         <section className="flex flex-wrap gap-2">
           <button
             type="button"
-            aria-label="Ta foto"
+            aria-label="Lägg till foton"
+            title="Ta foto eller välj ur biblioteket"
             onClick={() => kameraRef.current?.click()}
             className="flex h-[72px] w-[72px] items-center justify-center rounded-xl border-[1.5px] border-dashed border-slate-600 text-slate-300"
           >
@@ -269,7 +270,8 @@ export default function MobileAddEventSheet({
               </button>
             </div>
           ))}
-          <input ref={kameraRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={e => nyaFoton(e.target.files)} />
+          {/* Utan capture: mobilen erbjuder både kamera och bildbibliotek */}
+          <input ref={kameraRef} type="file" accept="image/*" multiple className="hidden" onChange={e => nyaFoton(e.target.files)} />
         </section>
       </div>
     </Modal>

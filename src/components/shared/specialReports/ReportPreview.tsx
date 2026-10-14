@@ -281,24 +281,32 @@ function SidaDel({ del, nr, farg }: { del: FullSection; nr: number; farg: string
   const handelser = [...del.events].sort((a, b) => a.event_date.localeCompare(b.event_date) || a.created_at.localeCompare(b.created_at))
   const bilder = [...del.images].sort((a, b) => a.position - b.position)
   const harOmrade = !!del.area && del.area.length >= 3
+  // Bilderna numreras löpande i delen, händelsetabellen hänvisar till numren (som PDF:en)
+  const bildNr = new Map(bilder.map((b, i) => [b.id, i + 1]))
+  const handelseFor = new Map(del.events.map(e => [e.id, e]))
+  const kolumner = '58px 62px 1fr 34px'
 
   const handelseTabell = (
     <Ram key="handelser" falt={`del:${del.id}:handelser`} etikett="Redigera händelserna">
       <span style={{ display: 'block', fontSize: 10, fontWeight: 700, color: RUBRIK, marginBottom: 4 }}>Händelser</span>
-      <div className="grid" style={{ gridTemplateColumns: '58px 62px 1fr', background: '#f0fdf9', fontWeight: 600 }}>
+      <div className="grid" style={{ gridTemplateColumns: kolumner, background: '#f0fdf9', fontWeight: 600 }}>
         <span style={{ padding: '3px 5px' }}>Datum</span>
         <span style={{ padding: '3px 5px' }}>Typ</span>
         <span style={{ padding: '3px 5px' }}>Vad vi gjorde och såg</span>
+        <span style={{ padding: '3px 5px' }}>Bild</span>
       </div>
       {handelser.length === 0 ? (
         <div style={{ padding: '6px 5px', borderTop: `1px solid ${LINJE}` }}>{tomt('Här hamnar dina händelser')}</div>
       ) : handelser.map(e => (
-        <div key={e.id} className="grid" style={{ gridTemplateColumns: '58px 62px 1fr', borderTop: `1px solid ${LINJE}` }}>
+        <div key={e.id} className="grid" style={{ gridTemplateColumns: kolumner, borderTop: `1px solid ${LINJE}` }}>
           <span style={{ padding: '3px 5px', fontVariantNumeric: 'tabular-nums' }}>{e.event_date}</span>
           <span style={{ padding: '3px 5px' }}>{EVENT_TYPES[e.type]?.label ?? e.type}</span>
           <span style={{ padding: '3px 5px' }}>
             <b>{e.title}</b>
             {e.description?.trim() && <span style={{ whiteSpace: 'pre-line' }}> {e.description.trim()}</span>}
+          </span>
+          <span style={{ padding: '3px 5px', color: GRA }}>
+            {bilder.filter(b => b.event_id === e.id).map(b => bildNr.get(b.id)).join(', ')}
           </span>
         </div>
       ))}
@@ -315,7 +323,12 @@ function SidaDel({ del, nr, farg }: { del: FullSection; nr: number; farg: string
               {b.url
                 ? <img src={b.url} alt="" style={{ width: '100%', height: 54, objectFit: 'cover', borderRadius: 1, background: LINJE }} />
                 : <span style={{ height: 54, background: LINJE }} />}
-              <span style={{ fontSize: 7, color: '#4b5563' }}><b>Bild {i + 1}.</b>{b.caption?.trim() ? ` ${b.caption.trim()}` : ''}</span>
+              <span style={{ fontSize: 7, color: '#4b5563' }}>
+                <b>Bild {i + 1}.</b>{b.caption?.trim() ? ` ${b.caption.trim()}` : ''}
+                {b.event_id && handelseFor.get(b.event_id) && (
+                  <span style={{ display: 'block', color: GRA }}>Hör till: {handelseFor.get(b.event_id)!.title?.trim() || 'Utan rubrik'}, {handelseFor.get(b.event_id)!.event_date}</span>
+                )}
+              </span>
             </span>
           ))}
         </div>

@@ -397,3 +397,25 @@ export function useDebouncedSaver(delay = 600) {
 /** Snygga till i blockhuvuden och rubriker: grön text, ikon + text (bara ikon på mobil), minst 44 px */
 export const SNYGGA_KNAPP =
   'inline-flex items-center justify-center gap-1.5 h-11 min-w-11 flex-shrink-0 rounded-lg px-2 text-xs font-semibold text-emerald-400 hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]/60 disabled:opacity-40 disabled:cursor-not-allowed'
+
+/** Kort med mjuk skugga (3.53.0): vit yta i ljust läge, slate-900 i mörkt */
+export const KORT =
+  'bg-slate-900 ring-1 ring-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.06),0_6px_20px_rgba(15,23,42,0.05)]'
+
+/** Tonad yta och text per händelsetyp, följer temat (-400 mörknas i ljust läge) */
+export const EVENT_TON: Record<SpecialReportEventType, string> = {
+  inspektion: 'bg-blue-500/10 text-blue-400',
+  besok: 'bg-emerald-500/10 text-emerald-400',
+  betning: 'bg-amber-500/10 text-amber-400',
+  atgard: 'bg-violet-500/10 text-violet-400',
+  underlev: 'bg-slate-500/10 text-slate-300',
+  notering: 'bg-slate-500/10 text-slate-400',
+}
+
+const MANAD_KORT = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec']
+
+/** Dag och månad med tre bokstäver ur ÅÅÅÅ-MM-DD, till datumrutan */
+export function dagOchManad(datum: string): { dag: string; manad: string } {
+  const [, m, d] = datum.split('-').map(Number)
+  return { dag: d ? String(d) : '?', manad: m ? MANAD_KORT[m - 1] ?? '' : '' }
+}
