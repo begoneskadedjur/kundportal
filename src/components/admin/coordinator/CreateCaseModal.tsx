@@ -1524,7 +1524,15 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               ? Math.round(calculatePricePerDosageUnit(base, it.article!.total_content!) * 100) / 100
               : base
           }
-          for (const item of draftBillingItems) {
+          // ROT/RUT-arbetsrader pekar på sin tjänsterads LOKALA id
+          // (labor_for_item_id). Tjänsteraderna skapas först och får nya id:n,
+          // arbetsraderna sist med kopplingen omskriven till det nya id:t.
+          const draftIdMap = new Map<string, string>()
+          const orderedDraftItems = [
+            ...draftBillingItems.filter(i => !i.labor_for_item_id),
+            ...draftBillingItems.filter(i => !!i.labor_for_item_id),
+          ]
+          for (const item of orderedDraftItems) {
             let createdItem: { id: string } | null = null
             if (item.item_type === 'service' && item.service_id) {
               createdItem = await CaseBillingService.addServiceToCase({
@@ -1538,6 +1546,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 unit_price: item.unit_price,
                 discount_percent: item.discount_percent || 0,
                 vat_rate: item.vat_rate || 25,
+                rot_rut_type: item.rot_rut_type ?? null,
+                fastighetsbeteckning: item.rot_rut_type ? (item.fastighetsbeteckning ?? null) : null,
+                labor_for_item_id: item.labor_for_item_id ? (draftIdMap.get(item.labor_for_item_id) ?? null) : null,
               })
             } else if (item.article_id) {
               createdItem = await CaseBillingService.addArticleToCase({
@@ -1555,6 +1566,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 customer_unit_price: customerUnitPriceFor(item),
               })
             }
+            if (createdItem) draftIdMap.set(item.id, createdItem.id)
             // Rabattmotivering från draft-läget följer med raden in i DB
             if (createdItem && (item.discount_percent || 0) > 0 && item.discount_motivation?.trim()) {
               await CaseBillingService.setDiscountMotivation(createdItem.id, item.discount_motivation)

@@ -169,9 +169,12 @@ export default function CaseServiceSelector({
   // "Dela upp för ROT/RUT": vilken tjänsterad formuläret är öppet för + inmatning
   const [splitItemId, setSplitItemId] = useState<string | null>(null)
   const [splitAmount, setSplitAmount] = useState('')
+  const [splitHours, setSplitHours] = useState('')
   const [splitType, setSplitType] = useState<'ROT' | 'RUT' | null>(null)
   // Felet visas i formuläret: en toast uppe till höger missas lätt
   const [splitError, setSplitError] = useState<string | null>(null)
+  // Fel vid en tjänsterads prisruta (t.ex. totalpris lägre än arbetskostnaden)
+  const [rowPriceError, setRowPriceError] = useState<Record<string, string>>({})
 
   // Inline price editing (service item id → input string)
   const [editingPrice, setEditingPrice] = useState<Record<string, string>>({})
@@ -403,7 +406,27 @@ export default function CaseServiceSelector({
   // Arbetstidstjänsten i katalogen (t.ex. "135 Skadedjurstekniker timpris").
   // ROT/RUT-avdrag får bara ligga på sådana tjänster — avdraget beräknas på
   // arbetskostnaden, inte på paketpris där material/preparat ingår.
-  const laborService = addonServices.find(s => s.rot_eligible || s.rut_eligible) ?? null
+  // Tjänsten som är markerad som arbetstidstjänst (used_for_addon_labour) i
+  // första hand, annars första avdragsberättigade tjänsten.
+  const laborService = addonServices.find(s => s.used_for_addon_labour)
+    ?? addonServices.find(s => s.rot_eligible || s.rut_eligible)
+    ?? null
+
+  // ROT/RUT-arbetsrader kopplade till sin tjänsterad (labor_for_item_id).
+  // De visas inskjutna under tjänsten, inte som egna rader, och tjänsten visas
+  // med totalpriset (tjänsterad + arbetsrad). Saknas föräldern bland raderna
+  // visas arbetsraden som en vanlig rad. Gamla uppdelningar (135-rad utan
+  // koppling) visas som förut.
+  const ownServiceIds = new Set(ownServiceItems.map(i => i.id))
+  const laborChildByParent = new Map<string, CaseBillingItemWithRelations>()
+  for (const i of ownServiceItems) {
+    const parentId = i.labor_for_item_id
+    if (parentId && parentId !== i.id && ownServiceIds.has(parentId) && !laborChildByParent.has(parentId)) {
+      laborChildByParent.set(parentId, i)
+    }
+  }
+  const nestedLaborIds = new Set(Array.from(laborChildByParent.values(), i => i.id))
+  const listedServiceItems = ownServiceItems.filter(i => !nestedLaborIds.has(i.id))
 
   // Marginalberäkning — räknas ALLTID på exkl.-basen (momsen är aldrig bolagets intäkt).
   // serviceCost = summa av item.total_price som redan är exkl. i DB, så samma formel funkar för privat + företag.
@@ -726,7 +749,7 @@ export default function CaseServiceSelector({
       return
     }
     // Privat: input är inkl. moms → spara exkl.
-    const newPrice = isPrivate ? parsed / (1 + VAT_RATE) : parsed
+    const parsedExkl = isPrivate ? parsed / (1 + VAT_RATE) : parsed
     const item = allItems.find(i => i.id === id)
     if (!item) return
     // Skydd: kundprislista-låsta och härlett låsta tjänster får inte ändras här
@@ -734,6 +757,24 @@ export default function CaseServiceSelector({
       setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
       return
     }
+    // Uppdelad tjänst: rutan bär radens TOTALPRIS (tjänsterad + arbetsrad,
+    // antal och rabatt inräknade). Arbetsraden rörs inte; tjänsteraden får
+    // resten (materialdelen), omräknad till à-pris via antal och rabatt.
+    const laborChild = laborChildByParent.get(id) ?? null
+    let newPrice = parsedExkl
+    if (laborChild) {
+      const laborTotal = Number(laborChild.total_price || 0)
+      if (parsedExkl + 0.005 < laborTotal) {
+        setEditingPrice(prev => { const n = { ...prev }; delete n[id]; return n })
+        setRowPriceError(prev => ({
+          ...prev,
+          [id]: `Totalpriset kan inte vara lägre än arbetskostnaden ${formatPrice(laborTotal * priceMultiplier)}. Ändra arbetskostnaden först.`,
+        }))
+        return
+      }
+      newPrice = unitForRowTotal(item, parsedExkl - laborTotal)
+    }
+    setRowPriceError(prev => { if (!(id in prev)) return prev; const n = { ...prev }; delete n[id]; return n })
     const discounted = calculateDiscountedPrice(newPrice, item.discount_percent)
     const total = calculateTotalPrice(discounted, item.quantity)
     if (draftMode && !caseId) {
@@ -793,18 +834,55 @@ export default function CaseServiceSelector({
   }
 
   // ──────────────────────────────────────────────────────────────
-  // "Dela upp för ROT/RUT": flytta arbetskostnaden från en paketprisad
-  // tjänsterad till en egen arbetstidsrad som bär avdraget.
+  // "Dela upp för ROT/RUT": arbetskostnaden blir en egen rad (arbetstids-
+  // tjänsten, t.ex. 135) kopplad till tjänsteraden via labor_for_item_id.
+  // Tjänsten visas med totalpriset och arbetsandelen inskjuten under.
   // Totalen mot kund är oförändrad — bara fördelningen ändras.
   // ──────────────────────────────────────────────────────────────
-  const openSplitForm = (item: CaseBillingItemWithRelations) => {
-    // Föreslå arbetskostnad: timmar från mappade Arbetstid-artiklar × timpris (om känt)
-    const mappedArticles = articleItems.filter(a =>
-      priceAssignments[a.id] === item.id || a.mapped_service_id === item.id
-    )
-    const hours = mappedArticles
-      .filter(a => a.article?.category === 'Arbetstid')
+
+  /**
+   * Arbetsradens à-pris och summa (exkl. moms). Antal = timmar. À-priset
+   * avrundas till öre; går beloppet inte jämnt ut på timmarna (t.ex. 2 000 kr
+   * inkl. moms på 3 h) blir summan à-pris × timmar och kan skilja någon öre
+   * från inmatningen. Öret hamnar då på tjänstens materialdel, så totalen mot
+   * kund är oförändrad, och Fortnox (antal × à-pris) får samma summa som vi.
+   */
+  const buildLaborLine = (laborExkl: number, hours: number) => {
+    const unit = Math.round((laborExkl / hours) * 100) / 100
+    const discounted = calculateDiscountedPrice(unit, 0)
+    const total = Math.round(calculateTotalPrice(discounted, hours) * 100) / 100
+    return { unit, discounted, total }
+  }
+
+  /** Tjänsteradens à-pris så att radens summa blir rowTotal (kompenserat för antal och rabatt). */
+  function unitForRowTotal(item: CaseBillingItemWithRelations, rowTotal: number): number {
+    const discFactor = 1 - (item.discount_percent || 0) / 100
+    if (discFactor <= 0 || !(item.quantity > 0)) return 0
+    return Math.round((Math.max(0, rowTotal) / item.quantity / discFactor) * 100) / 100
+  }
+
+  /** Timmar från mappade Arbetstid-artiklar (intern kalkyl) för en tjänsterad. */
+  const mappedLaborHours = (item: CaseBillingItemWithRelations) =>
+    articleItems
+      .filter(a => (priceAssignments[a.id] === item.id || a.mapped_service_id === item.id) && a.article?.category === 'Arbetstid')
       .reduce((s, a) => s + a.quantity, 0)
+
+  const formatHoursSv = (h: number) => h.toLocaleString('sv-SE', { maximumFractionDigits: 2 })
+
+  const openSplitForm = (item: CaseBillingItemWithRelations) => {
+    const child = laborChildByParent.get(item.id) ?? null
+    setSplitError(null)
+    if (child) {
+      // "Ändra": förifyll med nuvarande arbete, timmar och avdragstyp
+      setSplitAmount(String(Math.round(Number(child.total_price || 0) * priceMultiplier)))
+      setSplitHours(formatHoursSv(Number(child.quantity || 1)))
+      setSplitType(child.rot_rut_type ?? null)
+      setSplitItemId(item.id)
+      return
+    }
+    // Ny uppdelning: timmar från mappade Arbetstid-artiklar, annars 1.
+    // Föreslå arbetskostnad = timmar × timpris (om känt), högst radens pris.
+    const hours = mappedLaborHours(item)
     let suggested = ''
     if (laborService && hours > 0) {
       const hourPrice = customerServicePrices[laborService.id] ?? laborService.base_price
@@ -814,7 +892,7 @@ export default function CaseServiceSelector({
       }
     }
     setSplitAmount(suggested)
-    setSplitError(null)
+    setSplitHours(formatHoursSv(hours > 0 ? hours : 1))
     // Förvälj avdragstyp bara när arbetstjänsten är berättigad för exakt en typ
     setSplitType(
       laborService?.rot_eligible && !laborService?.rut_eligible ? 'ROT'
@@ -827,103 +905,152 @@ export default function CaseServiceSelector({
   const closeSplitForm = () => {
     setSplitItemId(null)
     setSplitAmount('')
+    setSplitHours('')
     setSplitType(null)
     setSplitError(null)
   }
 
+  const parseDecimal = (raw: string) => parseFloat(raw.replace(/\s/g, '').replace(',', '.'))
+
   const handleConfirmSplit = async (item: CaseBillingItemWithRelations) => {
     if (saving || !laborService) return
-    const raw = parseFloat(splitAmount.replace(',', '.'))
+    const child = laborChildByParent.get(item.id) ?? null
+    const raw = parseDecimal(splitAmount)
     if (isNaN(raw) || raw <= 0) {
       setSplitError('Ange arbetskostnaden i kronor.')
+      return
+    }
+    const hours = parseDecimal(splitHours)
+    if (isNaN(hours) || hours <= 0) {
+      setSplitError('Ange antal timmar (större än 0).')
       return
     }
     if (!splitType) {
       setSplitError('Välj ROT eller RUT.')
       return
     }
+    if ((splitType === 'ROT' && !laborService.rot_eligible) || (splitType === 'RUT' && !laborService.rut_eligible)) {
+      setSplitError(`${laborService.name} är inte berättigad till ${splitType}.`)
+      return
+    }
+    // Totalen (exkl. moms) som fördelas: tjänsteraden + ev. befintlig arbetsrad
+    const totalExkl = Number(item.total_price || 0) + Number(child?.total_price || 0)
     // Privat: input är inkl. moms → räkna om till exkl. (lagringsformatet)
     const laborExkl = raw / priceMultiplier
-    if (laborExkl > item.total_price + 0.01) {
-      const max = (item.total_price * priceMultiplier).toLocaleString('sv-SE', { maximumFractionDigits: 2 })
-      setSplitError(`Arbetskostnaden kan vara högst ${max} kr ${isPrivate ? 'inkl.' : 'exkl.'} moms, det vill säga radens pris. Ändra radens pris först om arbetet ska vara större.`)
+    if (laborExkl > totalExkl + 0.005) {
+      // Formuläret stoppar redan detta live; skydd om värdet ändå skickas
+      setSplitError(`Arbetskostnaden kan inte vara högre än totalpriset ${formatPrice(totalExkl * priceMultiplier)}.`)
       return
     }
 
-    // Timmar från mappade Arbetstid-artiklar styr antalet på arbetsraden
-    const mappedArticles = articleItems.filter(a =>
-      priceAssignments[a.id] === item.id || a.mapped_service_id === item.id
-    )
-    const laborHours = mappedArticles
-      .filter(a => a.article?.category === 'Arbetstid')
-      .reduce((s, a) => s + a.quantity, 0)
-    const hours = laborHours > 0 ? laborHours : 1
-
-    const laborUnit = Math.round((laborExkl / hours) * 100) / 100
-    const laborDiscounted = calculateDiscountedPrice(laborUnit, 0)
-    const laborTotal = calculateTotalPrice(laborDiscounted, hours)
-
-    // Huvudraden sänks med arbetsdelen (kompenserat för ev. rabatt så totalen stämmer)
-    const remainingTotal = Math.max(0, item.total_price - laborTotal)
-    const discFactor = 1 - (item.discount_percent || 0) / 100
-    const newMainUnit = discFactor > 0
-      ? Math.round((remainingTotal / item.quantity / discFactor) * 100) / 100
-      : 0
+    const labor = buildLaborLine(laborExkl, hours)
+    // Tjänsteraden får resten (materialdelen), kompenserat för rabatt och antal
+    const newMainUnit = unitForRowTotal(item, totalExkl - labor.total)
+    const mainDiscounted = calculateDiscountedPrice(newMainUnit, item.discount_percent)
+    const mainTotal = calculateTotalPrice(mainDiscounted, item.quantity)
+    const fastighet = child?.fastighetsbeteckning ?? item.fastighetsbeteckning ?? null
+    const nowIso = new Date().toISOString()
 
     if (draftMode && !caseId) {
-      const laborRow: CaseBillingItemWithRelations = {
-        id: crypto.randomUUID(),
-        case_id: '',
-        case_type: caseType,
-        customer_id: customerId ?? null,
-        article_id: null,
-        article_code: null,
-        article_name: laborService.name,
-        service_id: laborService.id,
-        service_code: laborService.code ?? null,
-        service_name: laborService.name,
-        item_type: 'service',
-        quantity: hours,
-        unit_price: laborUnit,
-        discount_percent: 0,
-        discounted_price: laborDiscounted,
-        total_price: laborTotal,
-        vat_rate: 25,
-        price_source: 'standard',
-        added_by_technician_id: technicianId ?? null,
-        added_by_technician_name: technicianName ?? null,
-        status: 'pending',
-        requires_approval: false,
-        notes: null,
-        rot_rut_type: splitType,
-        fastighetsbeteckning: item.fastighetsbeteckning ?? null,
-        min_quantity: null,
-        mapped_service_id: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        service: laborService,
-      }
-      const updated = allItems.map(i => {
-        if (i.id !== item.id) return i
-        const merged = { ...i, unit_price: newMainUnit, rot_rut_type: null, fastighetsbeteckning: null }
-        merged.discounted_price = calculateDiscountedPrice(merged.unit_price, merged.discount_percent)
-        merged.total_price = calculateTotalPrice(merged.discounted_price, merged.quantity)
-        return merged
+      const updated: CaseBillingItemWithRelations[] = allItems.map(i => {
+        if (i.id === item.id) {
+          return { ...i, unit_price: newMainUnit, discounted_price: mainDiscounted, total_price: mainTotal, rot_rut_type: null, fastighetsbeteckning: null }
+        }
+        if (child && i.id === child.id) {
+          return {
+            ...i,
+            quantity: hours,
+            unit_price: labor.unit,
+            discounted_price: labor.discounted,
+            total_price: labor.total,
+            rot_rut_type: splitType,
+            fastighetsbeteckning: fastighet,
+            updated_at: nowIso,
+          }
+        }
+        return i
       })
-      updated.push(laborRow)
+      if (!child) {
+        updated.push({
+          id: crypto.randomUUID(),
+          case_id: '',
+          case_type: caseType,
+          customer_id: customerId ?? null,
+          article_id: null,
+          article_code: null,
+          article_name: laborService.name,
+          service_id: laborService.id,
+          service_code: laborService.code ?? null,
+          service_name: laborService.name,
+          item_type: 'service',
+          quantity: hours,
+          unit_price: labor.unit,
+          discount_percent: 0,
+          discounted_price: labor.discounted,
+          total_price: labor.total,
+          vat_rate: 25,
+          price_source: 'standard',
+          added_by_technician_id: technicianId ?? null,
+          added_by_technician_name: technicianName ?? null,
+          status: 'pending',
+          requires_approval: false,
+          notes: null,
+          rot_rut_type: splitType,
+          fastighetsbeteckning: fastighet,
+          min_quantity: null,
+          mapped_service_id: null,
+          // Föräldrans lokala id; CreateCaseModal mappar om till det nya id:t vid sparning
+          labor_for_item_id: item.id,
+          created_at: nowIso,
+          updated_at: nowIso,
+          service: laborService,
+        })
+      }
       setAllItems(updated)
       notifyChange(updated)
       closeSplitForm()
-      toast.success(`Arbetskostnaden flyttad till ${laborService.name} (${splitType})`)
+      toast.success(child ? 'Arbetskostnaden uppdaterad' : `Arbetskostnaden uppdelad (${splitType})`)
       return
     }
 
     if (!caseId) return
     setSaving(true)
     try {
-      const mainDiscounted = calculateDiscountedPrice(newMainUnit, item.discount_percent)
-      const mainTotal = calculateTotalPrice(mainDiscounted, item.quantity)
-      await supabase
+      if (child) {
+        const { error: childError } = await supabase
+          .from('case_billing_items')
+          .update({
+            quantity: hours,
+            unit_price: labor.unit,
+            discount_percent: 0,
+            discounted_price: labor.discounted,
+            total_price: labor.total,
+            requires_approval: false,
+            rot_rut_type: splitType,
+            fastighetsbeteckning: fastighet,
+            updated_at: nowIso,
+          })
+          .eq('id', child.id)
+        if (childError) throw new Error(`Databasfel: ${childError.message}`)
+      } else {
+        await CaseBillingService.addServiceToCase({
+          case_id: caseId,
+          case_type: caseType,
+          customer_id: customerId,
+          service_id: laborService.id,
+          service_code: laborService.code,
+          service_name: laborService.name,
+          quantity: hours,
+          unit_price: labor.unit,
+          vat_rate: 25,
+          added_by_technician_id: technicianId || undefined,
+          added_by_technician_name: technicianName || undefined,
+          labor_for_item_id: item.id,
+          rot_rut_type: splitType,
+          fastighetsbeteckning: fastighet,
+        })
+      }
+      const { error: mainError } = await supabase
         .from('case_billing_items')
         .update({
           unit_price: newMainUnit,
@@ -931,31 +1058,65 @@ export default function CaseServiceSelector({
           total_price: mainTotal,
           rot_rut_type: null,
           fastighetsbeteckning: null,
+          updated_at: nowIso,
+        })
+        .eq('id', item.id)
+      if (mainError) throw new Error(`Databasfel: ${mainError.message}`)
+      await reloadItems()
+      closeSplitForm()
+      toast.success(child ? 'Arbetskostnaden uppdaterad' : `Arbetskostnaden uppdelad (${splitType})`)
+    } catch (err) {
+      // Ladda om så att UI:t visar det som faktiskt sparades
+      await reloadItems().catch(() => {})
+      setSplitError(err instanceof Error ? err.message : 'Kunde inte spara uppdelningen.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** "Ta bort uppdelning": arbetsraden raderas och beloppet läggs tillbaka på tjänsteraden. */
+  const handleRemoveSplit = async (item: CaseBillingItemWithRelations) => {
+    if (saving) return
+    const child = laborChildByParent.get(item.id)
+    if (!child) return
+    const totalExkl = Number(item.total_price || 0) + Number(child.total_price || 0)
+    const newMainUnit = unitForRowTotal(item, totalExkl)
+    const mainDiscounted = calculateDiscountedPrice(newMainUnit, item.discount_percent)
+    const mainTotal = calculateTotalPrice(mainDiscounted, item.quantity)
+
+    if (draftMode && !caseId) {
+      const updated = allItems
+        .filter(i => i.id !== child.id)
+        .map(i => i.id === item.id
+          ? { ...i, unit_price: newMainUnit, discounted_price: mainDiscounted, total_price: mainTotal }
+          : i)
+      setAllItems(updated)
+      notifyChange(updated)
+      if (splitItemId === item.id) closeSplitForm()
+      toast.success('Uppdelningen borttagen')
+      return
+    }
+    if (!caseId) return
+    setSaving(true)
+    try {
+      const { error: mainError } = await supabase
+        .from('case_billing_items')
+        .update({
+          unit_price: newMainUnit,
+          discounted_price: mainDiscounted,
+          total_price: mainTotal,
+          requires_approval: itemRequiresApproval(item.discount_percent),
           updated_at: new Date().toISOString(),
         })
         .eq('id', item.id)
-      const created = await CaseBillingService.addServiceToCase({
-        case_id: caseId,
-        case_type: caseType,
-        customer_id: customerId,
-        service_id: laborService.id,
-        service_code: laborService.code,
-        service_name: laborService.name,
-        quantity: hours,
-        unit_price: laborUnit,
-        vat_rate: 25,
-        added_by_technician_id: technicianId || undefined,
-        added_by_technician_name: technicianName || undefined,
-      })
-      await CaseBillingService.updateCaseArticle(created.id, {
-        rot_rut_type: splitType,
-        fastighetsbeteckning: item.fastighetsbeteckning ?? null,
-      })
+      if (mainError) throw new Error(`Databasfel: ${mainError.message}`)
+      await CaseBillingService.removeCaseArticle(child.id)
       await reloadItems()
-      closeSplitForm()
-      toast.success(`Arbetskostnaden flyttad till ${laborService.name} (${splitType})`)
-    } catch (err: any) {
-      toast.error(err.message)
+      if (splitItemId === item.id) closeSplitForm()
+      toast.success('Uppdelningen borttagen')
+    } catch (err) {
+      await reloadItems().catch(() => {})
+      toast.error(err instanceof Error ? err.message : 'Kunde inte ta bort uppdelningen')
     } finally {
       setSaving(false)
     }
@@ -1019,8 +1180,14 @@ export default function CaseServiceSelector({
   // ──────────────────────────────────────────────────────────────
   const handleRemove = async (id: string) => {
     if (saving) return
+    // ROT/RUT-arbetsrader som hör till raden försvinner med den. I DB sköter
+    // on delete cascade det, men de tas bort först via removeCaseArticle så att
+    // ev. invoice_items-koppling lossas (den FK:n har ingen cascade).
+    const childIds = allItems.filter(i => i.labor_for_item_id === id && i.id !== id).map(i => i.id)
+    const removedIds = new Set([id, ...childIds])
+    if (splitItemId && removedIds.has(splitItemId)) closeSplitForm()
     if (draftMode && !caseId) {
-      const updated = allItems.filter(i => i.id !== id)
+      const updated = allItems.filter(i => !removedIds.has(i.id))
       setAllItems(updated)
       notifyChange(updated)
       return
@@ -1028,8 +1195,11 @@ export default function CaseServiceSelector({
     if (!caseId) return
     setSaving(true)
     try {
+      for (const childId of childIds) {
+        await CaseBillingService.removeCaseArticle(childId)
+      }
       await CaseBillingService.removeCaseArticle(id)
-      const updated = allItems.filter(i => i.id !== id)
+      const updated = allItems.filter(i => !removedIds.has(i.id))
       setAllItems(updated)
       notifyChange(updated)
     } catch (err: any) {
@@ -1085,6 +1255,21 @@ export default function CaseServiceSelector({
       // Tilläggsrader styrs av stationerna och RPC:n, aldrig av prisguiden
       if (addonLineIds.has(itemId)) return
       if (it?.service_id && customerServicePrices[it.service_id] !== undefined) return
+      // ROT/RUT-arbetsrader styrs av uppdelningen, aldrig av prisguiden
+      if (nestedLaborIds.has(itemId)) return
+      // Uppdelad tjänst: prisguidens à-pris gäller hela tjänsten (material +
+      // arbete). Tjänsteraden får resten efter arbetsraden så totalen blir rätt.
+      const child = it ? laborChildByParent.get(itemId) : undefined
+      if (it && child) {
+        const targetTotal = calculateTotalPrice(calculateDiscountedPrice(price, it.discount_percent), it.quantity)
+        const laborTotal = Number(child.total_price || 0)
+        if (targetTotal + 0.005 < laborTotal) {
+          toast.error(`${it.service_name || 'Tjänsten'}: priset från prisguiden är lägre än arbetskostnaden ${formatPrice(laborTotal * priceMultiplier)}. Ändra arbetskostnaden först.`)
+          return
+        }
+        filteredPrices[itemId] = unitForRowTotal(it, targetTotal - laborTotal)
+        return
+      }
       filteredPrices[itemId] = price
     })
     prices = filteredPrices
@@ -1097,7 +1282,11 @@ export default function CaseServiceSelector({
 
     // ROT/RUT-val per tjänsterad: applicera på alla tjänsterader, inte bara de som fick ny prissättning.
     // Anledning: användaren kan ändra avdrag utan att flytta sliders, och vi vill att valet sparas ändå.
-    const serviceItemIds = allItems.filter(i => i.item_type === 'service' && !addonLineIds.has(i.id)).map(i => i.id)
+    // ROT/RUT-arbetsrader (kopplade till en tjänsterad) undantas: deras avdragstyp
+    // sätts i uppdelningsformuläret och prisguidens val saknas för dem.
+    const serviceItemIds = allItems
+      .filter(i => i.item_type === 'service' && !addonLineIds.has(i.id) && !nestedLaborIds.has(i.id))
+      .map(i => i.id)
 
     if (draftMode && !caseId) {
       let updated = [...allItems]
@@ -1116,7 +1305,7 @@ export default function CaseServiceSelector({
       })
       // Applicera ROT/RUT-val per tjänsterad i draft
       updated = updated.map(i => {
-        if (i.item_type !== 'service') return i
+        if (i.item_type !== 'service' || nestedLaborIds.has(i.id)) return i
         const newType = priceRotRutSelections[i.id] ?? null
         if (i.rot_rut_type === newType) return i
         return {
@@ -1275,9 +1464,22 @@ export default function CaseServiceSelector({
           <p className="text-xs text-slate-500 py-2 text-center">Inga tjänster tillagda än</p>
         ) : (
           <div className="space-y-2 mb-2">
-            {ownServiceItems.map(item => {
+            {listedServiceItems.map(item => {
               const isEditing = editingPrice[item.id] !== undefined
-              const displayUnitPrice = isPrivate ? Math.round(item.unit_price * priceMultiplier) : item.unit_price
+              // ROT/RUT-arbetsrad kopplad till tjänsten: visas inskjuten under raden
+              const laborChild = laborChildByParent.get(item.id) ?? null
+              // Uppdelad tjänst: prisrutan visar och redigerar radens TOTALPRIS
+              // (tjänsterad + arbetsrad, antal och rabatt inräknade) i stället för
+              // à-pris. Arbetsdelen är ett fast belopp som inte skalar med antal,
+              // så ett à-pris för hela tjänsten vore missvisande. Antal +/- ändrar
+              // fortfarande materialdelen (à-pris × antal) och därmed totalen.
+              const splitTotalExkl = laborChild
+                ? Number(item.total_price || 0) + Number(laborChild.total_price || 0)
+                : null
+              const displayUnitPrice = splitTotalExkl != null
+                ? (isPrivate ? Math.round(splitTotalExkl * priceMultiplier) : Math.round(splitTotalExkl * 100) / 100)
+                : isPrivate ? Math.round(item.unit_price * priceMultiplier) : item.unit_price
+              const priceUnitLabel = splitTotalExkl != null ? 'kr totalt' : 'kr/st'
               const displayPrice = isEditing ? editingPrice[item.id] : String(displayUnitPrice)
               const svc = item.service ?? addonServices.find(s => s.id === item.service_id) ?? null
               // ROT/RUT-val visas BARA på tjänster som själva är avdragsberättigade
@@ -1291,14 +1493,18 @@ export default function CaseServiceSelector({
               const showRotRut = caseType === 'private' && (showRot || showRut || misplacedDeduction)
               // "Dela upp för ROT/RUT" — bara privatärenden, ej på arbetstidsraden själv,
               // ej på prislistelåsta rader (deras pris får inte ändras här)
-              const canSplit = caseType === 'private'
+              const splittable = caseType === 'private'
                 && !readOnly
                 && !showRot && !showRut
-                && !!laborService
-                && item.service_id !== laborService.id
                 && item.total_price > 0
                 && !(item.service_id && customerServicePrices[item.service_id] !== undefined)
                 && !derivedLockedServiceIds.has(item.id)
+              const canSplit = splittable
+                && !laborChild
+                && !!laborService
+                && item.service_id !== laborService.id
+              // Arbetstidstjänsten saknas i katalogen: förklara i stället för knappen
+              const laborServiceMissing = splittable && !laborChild && !laborService
               const rotPct = getEffectiveRotPercent(svc)
               const rutPct = getEffectiveRutPercent(svc)
               const hasFixedPrice = !!item.service_id && customerServicePrices[item.service_id] !== undefined
@@ -1391,7 +1597,7 @@ export default function CaseServiceSelector({
                     {/* Pris */}
                     {readOnly ? (
                       <span className="text-sm font-semibold text-[#20c58f] whitespace-nowrap ml-auto">
-                        {formatPrice(item.total_price * priceMultiplier)}
+                        {formatPrice((splitTotalExkl ?? item.total_price) * priceMultiplier)}
                       </span>
                     ) : hasFixedPrice || isDerivedLocked ? (
                       <div className="flex items-center gap-1 ml-auto">
@@ -1403,7 +1609,7 @@ export default function CaseServiceSelector({
                         >
                           {displayUnitPrice}
                         </span>
-                        <span className="text-xs text-slate-400">kr/st</span>
+                        <span className="text-xs text-slate-400">{priceUnitLabel}</span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1 ml-auto">
@@ -1413,13 +1619,14 @@ export default function CaseServiceSelector({
                           value={displayPrice}
                           onChange={e => setEditingPrice(prev => ({ ...prev, [item.id]: e.target.value }))}
                           onFocus={() => {
+                            setRowPriceError(prev => { if (!(item.id in prev)) return prev; const n = { ...prev }; delete n[item.id]; return n })
                             if (editingPrice[item.id] === undefined)
                               setEditingPrice(prev => ({ ...prev, [item.id]: String(displayUnitPrice) }))
                           }}
                           onBlur={() => handleServicePriceBlur(item.id)}
                           className="w-24 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                         />
-                        <span className="text-xs text-slate-400">kr/st</span>
+                        <span className="text-xs text-slate-400">{priceUnitLabel}</span>
                       </div>
                     )}
                     {!readOnly && (
@@ -1428,6 +1635,12 @@ export default function CaseServiceSelector({
                       </button>
                     )}
                   </div>
+                  {rowPriceError[item.id] && (
+                    <p role="alert" className="mt-1 flex items-start gap-1.5 text-xs text-red-400">
+                      <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-px" />
+                      {rowPriceError[item.id]}
+                    </p>
+                  )}
 
                   {/* ROT/RUT-val (endast privatärenden + arbetstidstjänster) */}
                   {showRotRut && !readOnly && (
@@ -1506,93 +1719,223 @@ export default function CaseServiceSelector({
                     </div>
                   )}
 
-                  {/* Dela upp för ROT/RUT: flytta arbetskostnaden till en egen arbetstidsrad */}
-                  {canSplit && (
-                    splitItemId === item.id ? (
-                      <div className="mt-2 p-2 bg-slate-800/30 border border-slate-700/50 rounded-md space-y-1.5">
+                  {/* ROT/RUT-uppdelning: arbetsandelen (egen rad, tjänst 135) inskjuten under tjänsten */}
+                  {laborChild && (() => {
+                    const laborInkl = Number(laborChild.total_price || 0) * priceMultiplier
+                    const materialInkl = Number(item.total_price || 0) * priceMultiplier
+                    const fastighetValue = editingFastighet[laborChild.id] ?? laborChild.fastighetsbeteckning ?? ''
+                    const fastighetMissing = highlightMissingFastighet && String(fastighetValue).trim() === ''
+                    return (
+                      <div className="mt-2 ml-1 pl-3 border-l-2 border-[#20c58f]/40 space-y-1">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span className="text-xs text-slate-300">
+                            <span className="text-[#20c58f] mr-1.5">●</span>
+                            Varav arbetskostnad <b className="font-semibold text-white">{formatPrice(laborInkl)}</b>, {formatHoursSv(Number(laborChild.quantity || 0))} h{laborChild.rot_rut_type ? `, ${laborChild.rot_rut_type}` : ''}
+                          </span>
+                          {!readOnly && splitItemId !== item.id && (
+                            <div className="flex items-center gap-3 ml-auto">
+                              <button
+                                type="button"
+                                onClick={() => openSplitForm(item)}
+                                disabled={saving || !laborService}
+                                className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#20c58f] transition-colors disabled:opacity-50"
+                              >
+                                <Icon name="allman.anteckning" className="w-3.5 h-3.5" />
+                                Ändra
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSplit(item)}
+                                disabled={saving}
+                                className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-400 transition-colors disabled:opacity-50"
+                              >
+                                <Icon name="allman.radera" className="w-3.5 h-3.5" />
+                                Ta bort uppdelning
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500">Material och övrigt {formatPrice(materialInkl)}</p>
+                        {laborChild.rot_rut_type && (
+                          readOnly ? (
+                            laborChild.fastighetsbeteckning ? (
+                              <p className="text-xs text-slate-500">Fastighetsbeteckning {laborChild.fastighetsbeteckning}</p>
+                            ) : null
+                          ) : (
+                            <div>
+                              <input
+                                type="text"
+                                value={fastighetValue}
+                                onChange={e => setEditingFastighet(prev => ({ ...prev, [laborChild.id]: e.target.value }))}
+                                onBlur={() => handleFastighetBlur(laborChild.id)}
+                                placeholder="Fastighetsbeteckning *"
+                                className={`w-full px-2 py-1 text-xs bg-slate-800 border rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 ${
+                                  fastighetMissing
+                                    ? 'border-red-500 focus:ring-red-500'
+                                    : 'border-slate-600 focus:ring-[#20c58f]'
+                                }`}
+                              />
+                              {fastighetMissing && (
+                                <p className="text-[10px] text-red-400 mt-0.5">
+                                  Fastighetsbeteckning krävs för ROT/RUT
+                                </p>
+                              )}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Formulär: ny uppdelning eller "Ändra" på en befintlig */}
+                  {splitItemId === item.id && !!laborService && (canSplit || (!!laborChild && !readOnly)) && (() => {
+                    const totalExkl = Number(item.total_price || 0) + Number(laborChild?.total_price || 0)
+                    const totalIncl = totalExkl * priceMultiplier
+                    const amount = parseDecimal(splitAmount)
+                    const laborIncl = isNaN(amount) || amount < 0 ? 0 : amount
+                    // Live: arbetet får aldrig vara större än totalpriset
+                    const overTotal = laborIncl > totalIncl + 0.005
+                    const pct = splitType === 'ROT'
+                      ? getEffectiveRotPercent(laborService)
+                      : splitType === 'RUT'
+                        ? getEffectiveRutPercent(laborService)
+                        : null
+                    const deduction = pct != null ? laborIncl * pct / 100 : 0
+                    const hintHours = laborChild ? 0 : mappedLaborHours(item)
+                    return (
+                      <div className="mt-2 p-2 bg-slate-800/30 border border-slate-700/50 rounded-md space-y-2">
                         <p className="text-xs text-slate-400">
-                          ROT/RUT gäller bara arbetskostnaden. Ange hur stor del av priset som är
-                          arbete – den flyttas till en egen rad "{laborService!.name}" som bär
-                          avdraget. Totalen mot kund ändras inte.
-                          {(() => {
-                            const h = articleItems
-                              .filter(a => (priceAssignments[a.id] === item.id || a.mapped_service_id === item.id) && a.article?.category === 'Arbetstid')
-                              .reduce((s, a) => s + a.quantity, 0)
-                            return h > 0 ? ` Ärendet har ${h} h arbetstid i interna kostnader.` : ''
-                          })()}
+                          ROT/RUT gäller bara arbetskostnaden. Ange hur stor del av totalpriset {formatPrice(totalIncl)} som
+                          är arbete. Arbetet blir en egen rad "{laborService.name}" som bär avdraget. Totalen mot kund ändras inte.
+                          {hintHours > 0 ? ` Ärendet har ${formatHoursSv(hintHours)} h arbetstid i interna kostnader.` : ''}
                         </p>
-                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              inputMode="decimal"
-                              autoFocus
-                              value={splitAmount}
-                              onChange={e => { setSplitAmount(e.target.value); setSplitError(null) }}
-                              placeholder="Arbetskostnad"
-                              className="w-28 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
-                            />
-                            <span className="text-xs text-slate-400">kr {isPrivate ? 'inkl. moms' : 'exkl. moms'}</span>
-                          </div>
-                          {laborService!.rot_eligible && (
-                            <label className="flex items-center gap-1 cursor-pointer">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          <label className="block">
+                            <span className="block text-[11px] text-slate-400 mb-0.5">Varav arbetskostnad</span>
+                            <span className="flex items-center gap-1">
                               <input
-                                type="radio"
-                                name={`split-type-${item.id}`}
-                                checked={splitType === 'ROT'}
-                                onChange={() => { setSplitType('ROT'); setSplitError(null) }}
-                                className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
+                                type="text"
+                                inputMode="decimal"
+                                autoFocus
+                                value={splitAmount}
+                                onChange={e => { setSplitAmount(e.target.value); setSplitError(null) }}
+                                placeholder="0"
+                                className={`w-full min-w-0 px-2 py-0.5 text-sm text-right bg-slate-700 border rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 ${
+                                  overTotal ? 'border-red-500 focus:ring-red-500' : 'border-slate-600 focus:ring-[#20c58f]'
+                                }`}
                               />
-                              <span className="text-xs text-slate-300">ROT ({getEffectiveRotPercent(laborService)}%)</span>
-                            </label>
-                          )}
-                          {laborService!.rut_eligible && (
-                            <label className="flex items-center gap-1 cursor-pointer">
+                              <span className="text-xs text-slate-400 whitespace-nowrap">kr</span>
+                            </span>
+                            <span className="block text-[10px] text-slate-500 mt-0.5">{isPrivate ? 'inkl. moms' : 'exkl. moms'}</span>
+                          </label>
+                          <label className="block">
+                            <span className="block text-[11px] text-slate-400 mb-0.5">Timmar</span>
+                            <span className="flex items-center gap-1">
                               <input
-                                type="radio"
-                                name={`split-type-${item.id}`}
-                                checked={splitType === 'RUT'}
-                                onChange={() => { setSplitType('RUT'); setSplitError(null) }}
-                                className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
+                                type="text"
+                                inputMode="decimal"
+                                value={splitHours}
+                                onChange={e => { setSplitHours(e.target.value); setSplitError(null) }}
+                                placeholder="1"
+                                className="w-full min-w-0 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                               />
-                              <span className="text-xs text-slate-300">RUT ({getEffectiveRutPercent(laborService)}%)</span>
-                            </label>
-                          )}
-                          <div className="flex items-center gap-2 ml-auto">
-                            <button
-                              type="button"
-                              onClick={() => handleConfirmSplit(item)}
-                              disabled={saving}
-                              className="px-2.5 py-1 text-xs font-medium bg-[#20c58f] hover:bg-[#1bab7c] text-[#fff] rounded-md transition-colors disabled:opacity-50"
-                            >
-                              Dela upp
-                            </button>
-                            <button
-                              type="button"
-                              onClick={closeSplitForm}
-                              className="text-xs text-slate-400 hover:text-white transition-colors"
-                            >
-                              Avbryt
-                            </button>
+                              <span className="text-xs text-slate-400">h</span>
+                            </span>
+                          </label>
+                          <div className="col-span-2 sm:col-span-1">
+                            <span className="block text-[11px] text-slate-400 mb-0.5">Avdrag</span>
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
+                              {laborService.rot_eligible && (
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    name={`split-type-${item.id}`}
+                                    checked={splitType === 'ROT'}
+                                    onChange={() => { setSplitType('ROT'); setSplitError(null) }}
+                                    className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
+                                  />
+                                  <span className="text-xs text-slate-300">ROT ({getEffectiveRotPercent(laborService)} %)</span>
+                                </label>
+                              )}
+                              {laborService.rut_eligible && (
+                                <label className="flex items-center gap-1 cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    name={`split-type-${item.id}`}
+                                    checked={splitType === 'RUT'}
+                                    onChange={() => { setSplitType('RUT'); setSplitError(null) }}
+                                    className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
+                                  />
+                                  <span className="text-xs text-slate-300">RUT ({getEffectiveRutPercent(laborService)} %)</span>
+                                </label>
+                              )}
+                            </div>
                           </div>
                         </div>
+
+                        {/* Direkt uträkning, samma momsläge som prisrutan */}
+                        <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 text-xs">
+                          <dt className="text-slate-400">Material och övrigt</dt>
+                          <dd className="text-right text-slate-200 tabular-nums">{overTotal ? '–' : formatPrice(totalIncl - laborIncl)}</dd>
+                          <dt className="text-slate-400">Arbetskostnad</dt>
+                          <dd className="text-right text-slate-200 tabular-nums">{formatPrice(laborIncl)}</dd>
+                          <dt className="text-slate-400">{splitType ? `${splitType}-avdrag (${pct} %)` : 'ROT- eller RUT-avdrag'}</dt>
+                          <dd className={`text-right tabular-nums ${splitType ? 'text-[#20c58f]' : 'text-slate-500'}`}>
+                            {splitType ? `-${formatPrice(deduction)}` : 'Välj ROT eller RUT'}
+                          </dd>
+                          <dt className="text-slate-300 font-medium border-t border-slate-700/50 pt-1 mt-0.5">Kunden betalar</dt>
+                          <dd className="text-right font-semibold text-white tabular-nums border-t border-slate-700/50 pt-1 mt-0.5">
+                            {formatPrice(totalIncl - deduction)}
+                          </dd>
+                        </dl>
+
+                        {overTotal && (
+                          <p role="alert" className="flex items-start gap-1.5 text-xs text-red-400">
+                            <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-px" />
+                            Arbetskostnaden kan inte vara högre än totalpriset {formatPrice(totalIncl)}. Ändra tjänstens pris först om arbetet ska vara större.
+                          </p>
+                        )}
                         {splitError && (
                           <p role="alert" className="flex items-start gap-1.5 text-xs text-red-400">
                             <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-px" />
                             {splitError}
                           </p>
                         )}
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={closeSplitForm}
+                            className="text-xs text-slate-400 hover:text-white transition-colors"
+                          >
+                            Avbryt
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleConfirmSplit(item)}
+                            disabled={saving || overTotal}
+                            className="px-2.5 py-1 text-xs font-medium bg-[#20c58f] hover:bg-[#1bab7c] text-[#fff] rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {laborChild ? 'Spara' : 'Dela upp'}
+                          </button>
+                        </div>
                       </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => openSplitForm(item)}
-                        className="mt-2 flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#20c58f] transition-colors"
-                      >
-                        <Icon name="allman.kalkyl" className="w-3.5 h-3.5" />
-                        Dela upp för ROT/RUT
-                      </button>
                     )
+                  })()}
+
+                  {canSplit && splitItemId !== item.id && (
+                    <button
+                      type="button"
+                      onClick={() => openSplitForm(item)}
+                      className="mt-2 flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#20c58f] transition-colors"
+                    >
+                      <Icon name="allman.kalkyl" className="w-3.5 h-3.5" />
+                      Dela upp för ROT/RUT
+                    </button>
+                  )}
+                  {laborServiceMissing && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      Arbetstidstjänsten saknas i tjänstekatalogen, ROT/RUT kan inte delas upp.
+                    </p>
                   )}
 
                   {/* Rabattmotivering - krävs vid avslut (avtalstilläggsrader undantagna) */}
@@ -2140,13 +2483,17 @@ export default function CaseServiceSelector({
           rut_eligible: !!i.article?.rut_eligible,
         }))}
         customerArticlePrices={customerArticlePrices}
-        serviceItems={ownServiceItems.map(i => {
+        serviceItems={listedServiceItems.map(i => {
           const svc = i.service ?? addonServices.find(s => s.id === i.service_id) ?? null
+          // Uppdelad tjänst: prisguiden ser hela tjänstens à-pris (material + arbete)
+          const laborChild = laborChildByParent.get(i.id)
           return {
             id: i.id,
             service_name: i.service_name,
             service_code: i.service_code,
-            unit_price: i.unit_price,
+            unit_price: laborChild
+              ? unitForRowTotal(i, Number(i.total_price || 0) + Number(laborChild.total_price || 0))
+              : i.unit_price,
             quantity: i.quantity,
             discount_percent: i.discount_percent,
             rot_eligible: !!svc?.rot_eligible,

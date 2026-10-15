@@ -119,6 +119,12 @@ export interface CaseBillingItem {
    * ALLTID tilläggsraden via denna, aldrig via namn eller service_id.
    */
   is_addon_station_line?: boolean
+  /**
+   * Arbetsrad för ROT/RUT: id på tjänsteraden vars arbetskostnad raden bär
+   * (tjänst 135). UI visar tjänsten med totalpriset (tjänsterad + arbetsrad),
+   * fakturan lägger raden direkt efter tjänsteraden. Null = vanlig rad.
+   */
+  labor_for_item_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -176,6 +182,10 @@ export interface AddCaseServiceInput {
   notes?: string
   /** Tjänsten ingår i kundens avtal (§ 4): pris 0, faktureras aldrig */
   covered_by_contract?: boolean
+  /** Arbetsrad för ROT/RUT: tjänsteraden vars arbetskostnad raden bär */
+  labor_for_item_id?: string | null
+  rot_rut_type?: RotRutType | null
+  fastighetsbeteckning?: string | null
 }
 
 /**

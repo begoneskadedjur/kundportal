@@ -447,7 +447,10 @@ export class CaseBillingService {
         status: 'pending',
         requires_approval: itemRequiresApproval(discountPercent),
         notes: input.notes || null,
-        covered_by_contract: input.covered_by_contract ?? false
+        covered_by_contract: input.covered_by_contract ?? false,
+        labor_for_item_id: input.labor_for_item_id ?? null,
+        rot_rut_type: input.rot_rut_type ?? null,
+        fastighetsbeteckning: input.fastighetsbeteckning ?? null,
       })
       .select()
       .single()

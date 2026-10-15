@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.60.0',
+    date: '2026-10-15',
+    title: 'Arbetskostnad för ROT och RUT',
+    items: [
+      { kind: 'nyhet', text: 'Privatärenden: skriv totalpriset inkl. moms på tjänsten och ange hur mycket som är arbete. Arbetet blir en egen rad och visas under tjänsten, med uträkning av avdraget och vad kunden betalar.' },
+      { kind: 'andring', text: 'Totalpriset ändras inte när arbetet delas upp. Uppdelningen kan ändras eller tas bort i efterhand.' },
+      { kind: 'andring', text: 'Fakturan kallar arbetsraden "Arbetskostnad" med tjänstens namn och skickar timmarna till Fortnox för Skatteverket.' },
+      { kind: 'buggfix', text: 'Fakturan stoppas om ärendet har både ROT och RUT eller avdrag på fel tjänst, och anpassat pris ger inte längre avdrag på hela beloppet.' },
+    ],
+  },
+  {
     version: '3.59.1',
     date: '2026-10-15',
     title: 'Dela upp för ROT/RUT',

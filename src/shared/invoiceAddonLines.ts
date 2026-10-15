@@ -172,12 +172,23 @@ export type FortnoxInvoiceRow =
       DiscountType?: 'PERCENT'
       HouseWork?: boolean
       HouseWorkType?: string
+      HouseWorkHoursToReport?: number
     }
 
 const houseWorkTypeFor = (rotRut: string | null | undefined) =>
   rotRut?.toUpperCase() === 'ROT' ? 'CONSTRUCTION'
   : rotRut?.toUpperCase() === 'RUT' ? 'CLEANING'
   : undefined
+
+/**
+ * Timmar att rapportera för ROT/RUT-raden. Fortnox kräver heltal: radens
+ * antal (arbetsraden, tjänst 135, antal = timmar) avrundat, minst 1.
+ */
+export function houseWorkHoursFor(quantity: number): number {
+  const q = Number(quantity)
+  if (!Number.isFinite(q) || q <= 0) return 1
+  return Math.max(1, Math.round(q))
+}
 
 /**
  * Fakturaraderna till Fortnox. Textrader (line_kind index_note, 0 kr) skickas
@@ -215,7 +226,11 @@ export function buildFortnoxInvoiceRows(
       VAT: item.vat_rate,
       ...(item.discount_percent > 0 ? { Discount: item.discount_percent, DiscountType: 'PERCENT' as const } : {}),
       ...(item.rot_rut_type && opts.fastighetsbeteckning
-        ? { HouseWork: true, HouseWorkType: houseWorkTypeFor(item.rot_rut_type) }
+        ? {
+            HouseWork: true,
+            HouseWorkType: houseWorkTypeFor(item.rot_rut_type),
+            HouseWorkHoursToReport: houseWorkHoursFor(Number(item.quantity)),
+          }
         : {}),
     })
     const period = addon ? addonPeriodText(addon.timeline) : null

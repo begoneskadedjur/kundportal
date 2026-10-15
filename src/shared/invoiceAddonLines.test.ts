@@ -5,6 +5,7 @@ import {
   addonLineName,
   addonPeriodText,
   buildFortnoxInvoiceRows,
+  houseWorkHoursFor,
   matchInvoiceAddonLines,
   type AddonCaseRow,
   type BillingItemLink,
@@ -130,7 +131,21 @@ describe('buildFortnoxInvoiceRows', () => {
     const rot: InvoiceItemLike[] = [
       { id: 'a', article_code: 'A', article_name: 'Arbete', quantity: 2, unit_price: 500, total_price: 1000, vat_rate: 25, discount_percent: 0, rot_rut_type: 'ROT' },
     ]
-    expect(buildFortnoxInvoiceRows(rot, { vatIncluded: false, fastighetsbeteckning: 'X 1:2' })[0]).toMatchObject({ HouseWork: true, HouseWorkType: 'CONSTRUCTION' })
+    expect(buildFortnoxInvoiceRows(rot, { vatIncluded: false, fastighetsbeteckning: 'X 1:2' })[0]).toMatchObject({ HouseWork: true, HouseWorkType: 'CONSTRUCTION', HouseWorkHoursToReport: 2 })
     expect(buildFortnoxInvoiceRows(rot, { vatIncluded: false })[0]).not.toHaveProperty('HouseWork')
+    expect(buildFortnoxInvoiceRows(rot, { vatIncluded: false })[0]).not.toHaveProperty('HouseWorkHoursToReport')
+  })
+
+  it('ROT/RUT-timmar rapporteras som heltal, minst 1', () => {
+    const rut: InvoiceItemLike[] = [
+      { id: 'a', article_code: '135', article_name: 'Arbetskostnad, Vägglusbekämpning', quantity: 1.5, unit_price: 1066.67, total_price: 1600, vat_rate: 25, discount_percent: 0, rot_rut_type: 'RUT' },
+      { id: 'b', article_code: '135', article_name: 'Arbetskostnad, Myrbekämpning', quantity: 0.4, unit_price: 1000, total_price: 400, vat_rate: 25, discount_percent: 0, rot_rut_type: 'RUT' },
+      { id: 'c', article_code: '135', article_name: 'Arbetskostnad, Getingbekämpning', quantity: 2.4, unit_price: 500, total_price: 1200, vat_rate: 25, discount_percent: 0, rot_rut_type: 'RUT' },
+    ]
+    const rows = buildFortnoxInvoiceRows(rut, { vatIncluded: true, fastighetsbeteckning: 'X 1:2' })
+    expect(rows.map((r) => ('HouseWorkHoursToReport' in r ? r.HouseWorkHoursToReport : null))).toEqual([2, 1, 2])
+    expect(rows[0]).toMatchObject({ HouseWorkType: 'CLEANING', DeliveredQuantity: 1.5 })
+    expect(houseWorkHoursFor(0)).toBe(1)
+    expect(houseWorkHoursFor(Number.NaN)).toBe(1)
   })
 })

@@ -42,6 +42,8 @@ export interface Service {
   used_for_addon_stations: boolean
   /** Bär årspriset för tilläggsstationer (per år, per månad = /12). Max EN tjänst. */
   used_for_addon_stations_annual?: boolean
+  /** Arbetstidstjänsten (tjänst 135): tilläggens arbetstid och ROT/RUT-arbetsrader. Max EN tjänst. */
+  used_for_addon_labour?: boolean
   created_at: string
   updated_at: string
 }

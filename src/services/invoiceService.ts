@@ -17,6 +17,107 @@ import { calculateInvoiceTotals, calculateDueDate, deriveInvoiceCaseType } from 
 import { CaseBillingService } from './caseBillingService'
 import { PaymentTermsService } from './paymentTermsService'
 
+// ─── ROT/RUT-arbetsrader ──────────────────────────────────────────────────
+// Privatärenden: arbetskostnaden för ROT/RUT ligger på en egen rad (tjänst
+// 135) som pekar på sin tjänsterad via labor_for_item_id. På fakturan heter
+// raden "Arbetskostnad, <tjänstens namn>" och ligger direkt efter tjänsten.
+
+type InvoiceSourceRow = {
+  id: string
+  item_type?: string | null
+  service_name?: string | null
+  article_name: string
+  rot_rut_type?: string | null
+  fastighetsbeteckning?: string | null
+  total_price: number
+  labor_for_item_id?: string | null
+  service?: { rot_eligible?: boolean | null; rut_eligible?: boolean | null } | null
+}
+
+/** Arbetsrader direkt efter sin tjänsterad. Övrig ordning orörd, inga rader tappas. */
+function orderLaborRowsAfterParent<T extends { id: string; labor_for_item_id?: string | null }>(items: T[]): T[] {
+  const ids = new Set(items.map(i => i.id))
+  const isChild = (i: T) => !!i.labor_for_item_id && i.labor_for_item_id !== i.id && ids.has(i.labor_for_item_id)
+  const children = new Map<string, T[]>()
+  for (const i of items) {
+    if (!isChild(i)) continue
+    const list = children.get(i.labor_for_item_id!) ?? []
+    list.push(i)
+    children.set(i.labor_for_item_id!, list)
+  }
+  const out: T[] = []
+  const placed = new Set<string>()
+  for (const i of items) {
+    if (isChild(i)) continue
+    out.push(i)
+    placed.add(i.id)
+    for (const c of children.get(i.id) ?? []) { out.push(c); placed.add(c.id) }
+  }
+  // Skydd: rader som inte placerats (t.ex. kedjor) läggs sist i ursprunglig ordning
+  for (const i of items) if (!placed.has(i.id)) out.push(i)
+  return out
+}
+
+/** Fakturaradens namn för en arbetsrad: "Arbetskostnad, Vägglusbekämpning". */
+function laborRowName(item: InvoiceSourceRow, all: InvoiceSourceRow[]): string | null {
+  if (!item.labor_for_item_id) return null
+  const parent = all.find(i => i.id === item.labor_for_item_id)
+  const parentName = parent ? (parent.service_name || parent.article_name) : null
+  return parentName ? `Arbetskostnad, ${parentName}` : 'Arbetskostnad'
+}
+
+/** Summa (exkl. moms) på raderna som bär ROT/RUT-avdrag. */
+function rotRutRowsTotal(items: InvoiceSourceRow[]): number {
+  return Math.round(items.filter(i => i.rot_rut_type).reduce((s, i) => s + Number(i.total_price || 0), 0) * 100) / 100
+}
+
+/**
+ * ROT/RUT-spärrar innan fakturan byggs (samma regler som offerten i
+ * EditCaseModal.handleCreateOffer). Kastar ett fel med begriplig text,
+ * anroparen visar det som toast ("Faktura: ...").
+ */
+function assertRotRutInvoiceable(items: InvoiceSourceRow[], customPrice: number | null): void {
+  // Fastighetsbeteckning krävs av Skatteverket, annars går avdraget inte att skicka till Fortnox
+  const missingFastighet = items
+    .filter(i => i.rot_rut_type && (!i.fastighetsbeteckning || String(i.fastighetsbeteckning).trim() === ''))
+    .map(i => i.service_name || i.article_name || 'Tjänst')
+  if (missingFastighet.length > 0) {
+    throw new Error(
+      `Fastighetsbeteckning saknas för ROT/RUT på: ${missingFastighet.join(', ')}. ` +
+      `Fyll i fastighetsbeteckning innan ärendet faktureras.`
+    )
+  }
+  const hasRot = items.some(i => i.rot_rut_type === 'ROT')
+  const hasRut = items.some(i => i.rot_rut_type === 'RUT')
+  if (hasRot && hasRut) {
+    throw new Error('Ärendet har både ROT och RUT. Dela upp i separata ärenden innan fakturan skapas.')
+  }
+  const misplaced = items.filter(i =>
+    (!i.item_type || i.item_type === 'service') &&
+    i.rot_rut_type &&
+    i.service &&
+    !i.service.rot_eligible &&
+    !i.service.rut_eligible
+  )
+  if (misplaced.length > 0) {
+    const names = misplaced.map(i => i.service_name || i.article_name).join(', ')
+    throw new Error(
+      `ROT/RUT ligger på "${names}" som inte är en arbetstidstjänst. ` +
+      `Använd "Dela upp för ROT/RUT" i Ekonomi-fliken så att avdraget beräknas på arbetskostnaden.`
+    )
+  }
+  if (customPrice) {
+    const laborTotal = rotRutRowsTotal(items)
+    if (customPrice + 0.005 < laborTotal) {
+      const kr = (n: number) => n.toLocaleString('sv-SE', { maximumFractionDigits: 2 })
+      throw new Error(
+        `Det anpassade priset (${kr(customPrice)} kr exkl. moms) är lägre än arbetskostnaden för ROT/RUT ` +
+        `(${kr(laborTotal)} kr exkl. moms). Höj det anpassade priset eller sänk arbetskostnaden.`
+      )
+    }
+  }
+}
+
 export class InvoiceService {
   /**
    * Generera nästa fakturanummer
@@ -98,26 +199,23 @@ export class InvoiceService {
     // Filtrera: fakturarader = item_type='service', eller alla om inga tjänsterader finns (bakåtkompatibilitet)
     // Rader som täcks av avtalet (§ 4, covered_by_contract) faktureras aldrig.
     const serviceItems = allBillingItems.filter(i => i.item_type === 'service' && !i.covered_by_contract)
-    const billingItems = serviceItems.length > 0 ? serviceItems : allBillingItems.filter(i => i.item_type === 'article' || !i.item_type)
+    // Arbetsrader för ROT/RUT läggs direkt efter sin tjänsterad (raderna skapas
+    // i den ordningen och fakturan läser dem i created_at-ordning)
+    const billingItems = orderLaborRowsAfterParent(
+      serviceItems.length > 0 ? serviceItems : allBillingItems.filter(i => i.item_type === 'article' || !i.item_type)
+    )
 
     if (billingItems.length === 0) {
       throw new Error('Inga fakturerbara tjänster på ärendet')
     }
 
-    // ROT/RUT kräver fastighetsbeteckning (Skatteverket). Blockera fakturering om någon
-    // ROT/RUT-rad saknar beteckning — annars skulle avdraget inte gå att skicka till Fortnox.
-    const missingFastighet = billingItems
-      .filter(i => i.rot_rut_type && (!i.fastighetsbeteckning || String(i.fastighetsbeteckning).trim() === ''))
-      .map(i => i.service_name || i.article_name || 'Tjänst')
-    if (missingFastighet.length > 0) {
-      throw new Error(
-        `Fastighetsbeteckning saknas för ROT/RUT på: ${missingFastighet.join(', ')}. ` +
-        `Fyll i fastighetsbeteckning innan ärendet faktureras.`
-      )
-    }
-
     // Kolla om anpassat pris finns
     const customPrice = await CaseBillingService.getCustomPrice(caseId, caseType)
+
+    // ROT/RUT-spärrar: fastighetsbeteckning, inte både ROT och RUT, avdrag bara
+    // på arbetstidstjänster, anpassat pris inte lägre än arbetskostnaden.
+    // Före alla skrivningar så att ingen halv faktura skapas.
+    assertRotRutInvoiceable(billingItems, customPrice)
 
     // Beräkna summor — anpassat pris eller standard
     let subtotal: number
@@ -199,23 +297,31 @@ export class InvoiceService {
     const invoiceItems: InvoiceItem[] = []
 
     if (customPrice) {
-      // Med anpassat pris: artikelrader som referens (pris 0) + en "Anpassat pris"-rad
+      // Med anpassat pris: artikelrader som referens (pris 0) + en "Anpassat pris"-rad.
+      // ROT/RUT (2026-10-15): avdraget får bara räknas på arbetskostnaden, inte på
+      // hela det anpassade beloppet. Rader som bär ROT/RUT (arbetsraderna, tjänst
+      // 135) behåller därför sina priser och sin avdragstyp. "Anpassat pris"-raden
+      // bär resten (anpassat pris - arbetsradernas summa) UTAN avdrag, så fakturans
+      // summa är fortfarande exakt det anpassade priset. Övriga rader nollas som förut.
+      // assertRotRutInvoiceable ovan har redan stoppat anpassat pris < arbetskostnad.
+      const laborTotal = rotRutRowsTotal(billingItems)
       for (const item of billingItems) {
+        const keepsPrice = !!item.rot_rut_type
         const { data: invoiceItem, error: itemError } = await supabase
           .from('invoice_items')
           .insert({
             invoice_id: invoice.id,
             case_billing_item_id: item.id,
             article_id: item.article_id,
-            article_code: item.article_code,
-            article_name: item.article_name,
+            article_code: keepsPrice ? (item.service_code || item.article_code) : item.article_code,
+            article_name: laborRowName(item, billingItems) ?? item.article_name,
             quantity: item.quantity,
-            unit_price: 0,
-            discount_percent: 0,
-            total_price: 0,
+            unit_price: keepsPrice ? item.unit_price : 0,
+            discount_percent: keepsPrice ? item.discount_percent : 0,
+            total_price: keepsPrice ? item.total_price : 0,
             vat_rate: item.vat_rate,
-            rot_rut_type: item.rot_rut_type || null,
-            fastighetsbeteckning: item.fastighetsbeteckning || null
+            rot_rut_type: keepsPrice ? item.rot_rut_type : null,
+            fastighetsbeteckning: keepsPrice ? (item.fastighetsbeteckning || null) : null
           })
           .select()
           .single()
@@ -224,7 +330,8 @@ export class InvoiceService {
         invoiceItems.push(invoiceItem)
       }
 
-      // Lägg till summeringsrad med det anpassade priset
+      // Lägg till summeringsrad med det anpassade priset (minus arbetsraderna)
+      const customRest = Math.round((customPrice - laborTotal) * 100) / 100
       const { data: customItem, error: customItemError } = await supabase
         .from('invoice_items')
         .insert({
@@ -234,12 +341,12 @@ export class InvoiceService {
           article_code: null,
           article_name: 'Anpassat pris',
           quantity: 1,
-          unit_price: customPrice,
+          unit_price: customRest,
           discount_percent: 0,
-          total_price: customPrice,
+          total_price: customRest,
           vat_rate: 25,
-          rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
-          fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null
+          rot_rut_type: null,
+          fastighetsbeteckning: null
         })
         .select()
         .single()
@@ -252,12 +359,12 @@ export class InvoiceService {
         // Välj rätt namn/kod beroende på om det är en tjänstrad eller artikelrad.
         // Tjänsterader får specifikation av mappade artiklar med kundpris
         // ("Myrbekämpning, 20 st Myrdosa à 18 kr"); artiklar utan kundpris nämns aldrig.
-        const displayName = item.item_type === 'service'
+        const displayName = laborRowName(item, billingItems) ?? (item.item_type === 'service'
           ? appendCustomerArticleSpec(
               item.service_name || item.article_name,
               buildCustomerArticleSpec(item.id, allBillingItems)
             )
-          : item.article_name
+          : item.article_name)
         const displayCode = item.item_type === 'service'
           ? (item.service_code || item.article_code)
           : item.article_code
@@ -801,8 +908,16 @@ export class InvoiceService {
       ? await CaseBillingService.getCustomPrice(invoice.case_id, priceCaseType)
       : null
     const invoiceCustomRow = invoice.items.find(i => i.case_billing_item_id === null && i.article_name === 'Anpassat pris')
+    // "Anpassat pris"-raden bär anpassat pris minus ROT/RUT-arbetsraderna (som
+    // behåller sina priser), övriga kopplade rader är 0. Summan av raderna ska
+    // därför vara det anpassade priset, både för gamla och nya fakturor.
+    const invoiceCustomTotal = invoiceCustomRow
+      ? Number(invoiceCustomRow.unit_price) + invoice.items
+          .filter(i => i.case_billing_item_id != null)
+          .reduce((s, i) => s + Number(i.total_price || 0), 0)
+      : null
     const customPriceChanged = customPrice
-      ? (!invoiceCustomRow || invoiceCustomRow.unit_price !== customPrice)
+      ? (invoiceCustomTotal == null || Math.abs(invoiceCustomTotal - customPrice) > 0.005)
       : (!!invoiceCustomRow)
 
     if (countMismatch) {
@@ -838,7 +953,8 @@ export class InvoiceService {
       .select('*, article:articles(*), service:services(*)')
       .in('id', linkedItemIds)
     if (billingFetchError) throw new Error(`Databasfel: ${billingFetchError.message}`)
-    const billingItems = billingItemsData || []
+    // Arbetsrader för ROT/RUT direkt efter sin tjänsterad
+    const billingItems = orderLaborRowsAfterParent(billingItemsData || [])
     if (billingItems.length === 0) throw new Error('Inga fakturerbara tjänster på ärendet')
 
     // Artiklar med kundpris på ärendet: ger specifikation på tjänsteraderna
@@ -863,6 +979,9 @@ export class InvoiceService {
       ? await CaseBillingService.getCustomPrice(invoice.case_id, priceCaseType)
       : null
 
+    // ROT/RUT-spärrar innan raderna raderas (samma som createInvoiceFromCase)
+    assertRotRutInvoiceable(billingItems, customPrice)
+
     // Radera befintliga invoice_items
     const { error: deleteError } = await supabase
       .from('invoice_items')
@@ -874,22 +993,26 @@ export class InvoiceService {
     const invoiceItems: InvoiceItem[] = []
 
     if (customPrice) {
+      // Samma fördelning som createInvoiceFromCase: ROT/RUT-raderna behåller pris
+      // och avdrag, "Anpassat pris" bär resten utan avdrag, övriga rader 0.
+      const laborTotal = rotRutRowsTotal(billingItems)
       for (const item of billingItems) {
+        const keepsPrice = !!item.rot_rut_type
         const { data: invoiceItem, error: itemError } = await supabase
           .from('invoice_items')
           .insert({
             invoice_id: invoiceId,
             case_billing_item_id: item.id,
             article_id: item.article_id,
-            article_code: item.article_code,
-            article_name: item.article_name,
+            article_code: keepsPrice ? (item.service_code || item.article_code) : item.article_code,
+            article_name: laborRowName(item, billingItems) ?? item.article_name,
             quantity: item.quantity,
-            unit_price: 0,
-            discount_percent: 0,
-            total_price: 0,
+            unit_price: keepsPrice ? item.unit_price : 0,
+            discount_percent: keepsPrice ? item.discount_percent : 0,
+            total_price: keepsPrice ? item.total_price : 0,
             vat_rate: item.vat_rate,
-            rot_rut_type: item.rot_rut_type || null,
-            fastighetsbeteckning: item.fastighetsbeteckning || null
+            rot_rut_type: keepsPrice ? item.rot_rut_type : null,
+            fastighetsbeteckning: keepsPrice ? (item.fastighetsbeteckning || null) : null
           })
           .select()
           .single()
@@ -897,6 +1020,7 @@ export class InvoiceService {
         invoiceItems.push(invoiceItem)
       }
 
+      const customRest = Math.round((customPrice - laborTotal) * 100) / 100
       const { data: customItem, error: customItemError } = await supabase
         .from('invoice_items')
         .insert({
@@ -906,12 +1030,12 @@ export class InvoiceService {
           article_code: null,
           article_name: 'Anpassat pris',
           quantity: 1,
-          unit_price: customPrice,
+          unit_price: customRest,
           discount_percent: 0,
-          total_price: customPrice,
+          total_price: customRest,
           vat_rate: 25,
-          rot_rut_type: billingItems.find(i => i.rot_rut_type)?.rot_rut_type || null,
-          fastighetsbeteckning: billingItems.find(i => i.fastighetsbeteckning)?.fastighetsbeteckning || null
+          rot_rut_type: null,
+          fastighetsbeteckning: null
         })
         .select()
         .single()
@@ -926,9 +1050,9 @@ export class InvoiceService {
             case_billing_item_id: item.id,
             article_id: item.article_id,
             article_code: item.article_code,
-            article_name: item.item_type === 'service'
+            article_name: laborRowName(item, billingItems) ?? (item.item_type === 'service'
               ? appendCustomerArticleSpec(item.service_name || item.article_name, buildCustomerArticleSpec(item.id, specArticles))
-              : item.article_name,
+              : item.article_name),
             quantity: item.quantity,
             unit_price: item.unit_price,
             discount_percent: item.discount_percent,
