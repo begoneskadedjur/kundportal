@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.56.1',
+    date: '2026-10-15',
+    title: 'Kundgrupp bara där den behövs',
+    items: [
+      { kind: 'buggfix', text: 'Nytt ärende för avtalskund frågar inte längre efter kundgrupp. Gruppen och kundnumret finns redan på kunden.' },
+    ],
+  },
+  {
     version: '3.56.0',
     date: '2026-10-14',
     title: 'Specialrapporter i ärendena',

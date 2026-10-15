@@ -2578,16 +2578,21 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               <Input label="Organisationsnummer" name="org_nr" value={formData.org_nr || ''} onChange={handleChange} />
                               <Input label="Beställare" name="bestallare" value={formData.bestallare || ''} onChange={handleChange} />
                             </div>
-                            <Select
-                              label="Kundgrupp *"
-                              value={(formData as any).customer_group_id || ''}
-                              onChange={(v) => setFormData(prev => ({ ...prev, customer_group_id: v || null } as any))}
-                              options={customerGroups
-                                .filter(g => !g.is_private_default)
-                                .map(g => ({ value: g.id, label: `${g.name} (${g.series_start}–${g.series_end})` }))}
-                              placeholder="Välj kundgrupp (Fortnox-nummerserie)"
-                              required
-                            />
+                            {/* Kundgruppen gäller bara engångsjobb företag. Avtalskunder har
+                                redan grupp och kundnummer på kundraden, och ärendet sparar
+                                inget val för dem. */}
+                            {caseType === 'business' && (
+                              <Select
+                                label="Kundgrupp"
+                                value={(formData as any).customer_group_id || ''}
+                                onChange={(v) => setFormData(prev => ({ ...prev, customer_group_id: v || null } as any))}
+                                options={customerGroups
+                                  .filter(g => !g.is_private_default)
+                                  .map(g => ({ value: g.id, label: `${g.name} (${g.series_start}–${g.series_end})` }))}
+                                placeholder="Välj kundgrupp (Fortnox-nummerserie)"
+                                required
+                              />
+                            )}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                               <Input label="Märkning faktura" name="markning_faktura" value={formData.markning_faktura || ''} onChange={handleChange} />
                               <Input type="email" label="E-post Faktura" name="e_post_faktura" value={formData.e_post_faktura || ''} onChange={handleChange} />
