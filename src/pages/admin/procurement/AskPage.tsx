@@ -6,11 +6,11 @@
 
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUp, MessageSquareText } from 'lucide-react'
+import { Icon } from '../../../components/icons/Icon'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import { EmptyState, LinkButton, Section, StatusDot } from '../../../components/admin/procurement/ui'
 import { fmtDate } from '../../../components/admin/procurement/uiFormat'
-import { procurementPath } from '../../../lib/procurementPortal'
+import { noticePath, procurementPath } from '../../../lib/procurementPortal'
 import {
   ProcurementAskService,
   type ProcurementAskHistoryItem,
@@ -40,7 +40,7 @@ const REF_GROUP_RE = /\[(U\d+(?:\s*,\s*U\d+)*)\]/g
 
 /** Länk för en källa: upphandlingen om den finns, annars köparen */
 function sourceHref(s: ProcurementAskSource): string | null {
-  if (s.noticeId) return procurementPath('/' + s.noticeId)
+  if (s.noticeId) return noticePath(s.noticeId)
   if (s.buyerId) return procurementPath('/kopare/' + s.buyerId)
   return null
 }
@@ -124,7 +124,7 @@ function SourceList({ sources }: { sources: ProcurementAskSource[] }) {
       <div className="text-[10px] uppercase tracking-[0.12em] text-slate-500 mb-1.5">Källor</div>
       <ol className="space-y-1">
         {sources.map((s, i) => {
-          const href = s.noticeId ? procurementPath('/' + s.noticeId) : null
+          const href = s.noticeId ? noticePath(s.noticeId) : null
           return (
             <li key={s.ref} className="flex items-baseline gap-2 text-[12px] tabular-nums min-w-0">
               <span className="w-4 shrink-0 text-right text-slate-500">{i + 1}</span>
@@ -220,7 +220,7 @@ export default function AskPage() {
         {turns.length === 0 ? (
           <div className="px-4 py-4">
             <EmptyState
-              icon={<MessageSquareText className="w-5 h-5" />}
+              icon={<Icon name="upphandling.fraga" className="w-5 h-5" />}
               title="Inga frågor ännu"
               hint="Börja med en egen fråga eller välj ett exempel nedan."
             />
@@ -293,7 +293,7 @@ export default function AskPage() {
             disabled={pending || !input.trim() || tooLong}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#20c58f] text-[#fff] text-xs font-medium hover:bg-[#1bb07f] disabled:opacity-40 transition-colors"
           >
-            <ArrowUp className="w-3.5 h-3.5" />
+            <Icon name="rapport.skicka" className="w-3.5 h-3.5" />
             Fråga
           </button>
         </div>

@@ -4,11 +4,15 @@
 // affären, utvärdering, vår kalkyl (och verkstaden), köparhistorik,
 // konkurrens, utfall och handlingar, hantering. En lång sida med
 // ankarnavigering överst, ingen flikrad. Öppnad upphandling markeras som läst.
+//
+// Sedan 3.63.0 är /upphandling/:id den kanoniska vägen och /upphandling/:id/:steg
+// (underlag, kalkyl, anbud, utfall, logg) rullar till stegets block. Stegen
+// som egna vyer kommer i planens etapp 5.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ArrowLeft } from 'lucide-react'
+import { Icon } from '../../../components/icons/Icon'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import {
   ProcurementService,
@@ -45,7 +49,7 @@ import OutcomeBlock from '../../../components/admin/procurement/detail/OutcomeBl
 import ManagementBlock from '../../../components/admin/procurement/detail/ManagementBlock'
 import BidCalculator from '../../../components/admin/procurement/BidCalculator'
 import BidWorkshop from '../../../components/admin/procurement/workshop/BidWorkshop'
-import { procurementPath } from '../../../lib/procurementPortal'
+import { isProcurementStandalone, procurementPath } from '../../../lib/procurementPortal'
 
 const NAV: Array<{ id: string; label: string }> = [
   { id: 'identitet', label: 'Identitet' },
@@ -61,6 +65,16 @@ const NAV: Array<{ id: string; label: string }> = [
   { id: 'hantering', label: 'Hantering' },
 ]
 
+/** Steg i adressen (planens avsnitt 3) till blocket på den långa sidan */
+const STEP_ANCHOR: Record<string, string> = {
+  oversikt: 'identitet',
+  underlag: 'kallor',
+  kalkyl: 'kalkyl',
+  anbud: 'verkstad',
+  utfall: 'utfall',
+  logg: 'tidslinje',
+}
+
 /** Hämtar och sätter en resurs; fel visas som toast men stoppar inte sidan */
 function quiet<T>(p: Promise<T>, set: (v: T) => void, what: string): Promise<void> {
   return p.then(set).catch((e) => {
@@ -70,7 +84,7 @@ function quiet<T>(p: Promise<T>, set: (v: T) => void, what: string): Promise<voi
 }
 
 export default function NoticeDetailPage() {
-  const { noticeId } = useParams<{ noticeId: string }>()
+  const { noticeId, steg } = useParams<{ noticeId: string; steg?: string }>()
   const [notice, setNotice] = useState<NoticeWithRelations | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -191,6 +205,14 @@ export default function NoticeDetailPage() {
     [notice, loadEvents]
   )
 
+  // Steg i adressen: rulla till blocket när sidan laddats
+  useEffect(() => {
+    const anchor = steg ? STEP_ANCHOR[steg] : null
+    if (loading || !notice || !anchor) return
+    const t = setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    return () => clearTimeout(t)
+  }, [loading, notice?.id, steg]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ---------------------------------------------------------------------------
 
   if (loading) {
@@ -204,7 +226,7 @@ export default function NoticeDetailPage() {
   if (!notice) {
     return (
       <div className="space-y-4">
-        <BackLink />
+        <BackLink status={null} />
         <EmptyState title={loadError ? 'Kunde inte hämta upphandlingen' : 'Upphandlingen finns inte'} hint={loadError ?? 'Den kan ha slagits ihop med en annan post eller tagits bort.'} />
       </div>
     )
@@ -215,7 +237,7 @@ export default function NoticeDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <BackLink />
+        <BackLink status={notice.our_status} />
         <h2 className="mt-3 text-base sm:text-lg font-semibold text-slate-100 leading-snug">{notice.title}</h2>
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-slate-500">
           <span>{notice.buyer?.name ?? notice.buyer_name ?? 'Okänd köpare'}</span>
@@ -230,7 +252,7 @@ export default function NoticeDetailPage() {
         </div>
       </div>
 
-      <nav className="sticky top-0 z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-slate-950/95 backdrop-blur border-b border-slate-800 flex gap-4 overflow-x-auto" aria-label="Block på sidan">
+      <nav className={`sticky ${isProcurementStandalone() ? 'top-14' : 'top-0'} z-10 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2 bg-slate-950/95 backdrop-blur border-b border-slate-800 flex gap-4 overflow-x-auto`} aria-label="Block på sidan">
         {NAV.map((n) => (
           <button
             key={n.id}
@@ -295,11 +317,13 @@ export default function NoticeDetailPage() {
   )
 }
 
-function BackLink() {
+/** Tillbaka till Annonser för nya träffar, annars till Anbud */
+function BackLink({ status }: { status: ProcurementNotice['our_status'] | null }) {
+  const toBids = status != null && status !== 'new'
   return (
-    <Link to={procurementPath('/bevakning')} className="inline-flex items-center gap-1.5 text-[12px] text-slate-400 hover:text-[#20c58f]">
-      <ArrowLeft className="w-3.5 h-3.5" />
-      Bevakning
+    <Link to={procurementPath(toBids ? '/anbud' : '/annonser')} className="inline-flex items-center gap-1.5 min-h-[44px] text-[12px] text-slate-400 hover:text-[#20c58f]">
+      <Icon name="rapport.tillbaka" className="w-3.5 h-3.5" />
+      {toBids ? 'Anbud' : 'Annonser'}
     </Link>
   )
 }

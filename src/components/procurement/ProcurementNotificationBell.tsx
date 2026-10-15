@@ -7,10 +7,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, CheckCheck } from 'lucide-react'
+import { Icon } from '../icons/Icon'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { procurementPath } from '../../lib/procurementPortal'
+import { noticePath, procurementPath } from '../../lib/procurementPortal'
 import { fmtDate } from '../admin/procurement/uiFormat'
 
 interface ProcurementNotification {
@@ -90,7 +90,7 @@ export function ProcurementNotificationBell() {
   const openItem = (n: ProcurementNotification) => {
     setOpen(false)
     if (!n.is_read) void markRead([n.id])
-    navigate(procurementPath(n.case_id ? `/${n.case_id}` : ''))
+    navigate(n.case_id ? noticePath(n.case_id) : procurementPath(''))
   }
 
   const markAll = async () => {
@@ -113,16 +113,13 @@ export function ProcurementNotificationBell() {
           setOpen((o) => !o)
           if (!open) void load()
         }}
-        className={`relative p-2 rounded-lg transition-colors ${open ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'}`}
+        className={`relative inline-flex items-center justify-center w-11 h-11 rounded-lg transition-colors ${open ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'}`}
         aria-label={`Notiser${unread > 0 ? ` (${unread} olästa)` : ''}`}
         title="Notiser"
       >
-        <Bell className="w-[18px] h-[18px]" />
-        {unread > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 bg-[#20c58f] text-[#fff] text-[10px] font-semibold rounded-full flex items-center justify-center tabular-nums">
-            {unread > 9 ? '9+' : unread}
-          </span>
-        )}
+        <Icon name="upphandling.notis" size={20} />
+        {/* Oläst: en liten punkt, aldrig en siffra i ett piller */}
+        {unread > 0 && <span className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-[#20c58f] ring-2 ring-slate-950" />}
       </button>
 
       {open && (
@@ -131,7 +128,7 @@ export function ProcurementNotificationBell() {
             <span className="text-[11px] uppercase tracking-[0.14em] text-slate-500">Notiser</span>
             {unread > 0 && (
               <button type="button" onClick={() => void markAll()} className="inline-flex items-center gap-1 text-[12px] text-slate-400 hover:text-[#20c58f]">
-                <CheckCheck className="w-3.5 h-3.5" />
+                <Icon name="allman.bock" className="w-3.5 h-3.5" />
                 Markera alla som lästa
               </button>
             )}

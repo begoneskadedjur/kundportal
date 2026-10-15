@@ -127,6 +127,11 @@ const ProcurementCompetitors = lazy(() => import('./pages/admin/procurement/Comp
 const ProcurementCompetitorProfile = lazy(() => import('./pages/admin/procurement/CompetitorProfilePage'));
 const ProcurementSettings = lazy(() => import('./pages/admin/procurement/SettingsPage'));
 const ProcurementAsk = lazy(() => import('./pages/admin/procurement/AskPage'));
+const ProcurementToday = lazy(() => import('./pages/admin/procurement/TodayPage'));
+const ProcurementForecast = lazy(() => import('./pages/admin/procurement/ForecastPage'));
+const ProcurementLessons = lazy(() => import('./pages/admin/procurement/LessonsPage'));
+const ProcurementAnswerLibrary = lazy(() => import('./pages/admin/procurement/AnswerLibraryPage'));
+import { LegacyNoticeRedirect as ProcurementLegacyNotice, WatchRedirect as ProcurementWatchRedirect } from './pages/procurement/legacyRoutes';
 import ProcurementApp from './pages/procurement/ProcurementApp';
 import { isProcurementStandalone } from './lib/procurementPortal';
 
@@ -229,17 +234,27 @@ function App() {
               <Route path="avslutade-arenden" element={<ProtectedRoute requiredRole="admin"><ClosedCasesFunnel /></ProtectedRoute>} />
               {/* Upphandlingar: inloggad (ProtectedRoute) plus åtkomstkontroll i ProcurementLayout (admin eller upphandlingsansvarig) */}
               <Route path="upphandlingar" element={<ProtectedRoute><ProcurementLayout /></ProtectedRoute>}>
-                <Route index element={<ProcurementMarket />} />
-                <Route path="bevakning" element={<ProcurementWatch />} />
+                {/* Samma ordning som upphandling.begone.se (3.63.0), procurementTabs.ts */}
+                <Route index element={<ProcurementToday />} />
                 <Route path="avtalsklocka" element={<ProcurementContractClock />} />
                 <Route path="signaler" element={<ProcurementSignals />} />
+                <Route path="prognos" element={<ProcurementForecast />} />
+                <Route path="annonser" element={<ProcurementWatch />} />
+                <Route path="bevakning" element={<ProcurementWatchRedirect />} />
+                <Route path="anbud" element={<ProcurementWatch key="anbud" mode="anbud" />} />
+                <Route path="anbud/lista" element={<ProcurementWatch key="anbud" mode="anbud" />} />
+                <Route path="anbud/bibliotek" element={<ProcurementAnswerLibrary />} />
+                <Route path="upphandling/:noticeId" element={<ProcurementNoticeDetail />} />
+                <Route path="upphandling/:noticeId/:steg" element={<ProcurementNoticeDetail />} />
+                <Route path="marknad" element={<ProcurementMarket />} />
+                <Route path="marknad/lardomar" element={<ProcurementLessons />} />
                 <Route path="kopare" element={<ProcurementBuyers />} />
                 <Route path="kopare/:buyerId" element={<ProcurementBuyerProfile />} />
                 <Route path="konkurrenter" element={<ProcurementCompetitors />} />
                 <Route path="konkurrenter/:supplierId" element={<ProcurementCompetitorProfile />} />
                 <Route path="fraga" element={<ProcurementAsk />} />
                 <Route path="installningar" element={<ProcurementSettings />} />
-                <Route path=":noticeId" element={<ProcurementNoticeDetail />} />
+                <Route path=":noticeId" element={<ProcurementLegacyNotice />} />
               </Route>
               <Route path="webhook-config" element={<ProtectedRoute requiredRole="admin"><WebhookConfig /></ProtectedRoute>} />
               <Route path="kundgrupper" element={<ProtectedRoute requiredRole="admin"><CustomerGroupsPage /></ProtectedRoute>} />

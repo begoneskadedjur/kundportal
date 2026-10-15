@@ -6,7 +6,7 @@
 
 import { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { ExternalLink } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import { ProcurementService, type NoticeWithRelations } from '../../../../services/procurementService'
 import {
   DOC_TYPE_LABEL,
@@ -156,7 +156,7 @@ export default function SubmissionCheck({ notice, requirements, documents, price
         Anbudet lämnas alltid på köparens plattform, aldrig från portalen.{' '}
         {notice.platform_url ? (
           <a href={notice.platform_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#20c58f] hover:underline">
-            Öppna köparens plattform <ExternalLink className="w-3 h-3" />
+            Öppna köparens plattform <Icon name="rapport.oppna" className="w-3 h-3" />
           </a>
         ) : (
           <span className="text-slate-600">Länk till plattformen saknas; se källposterna.</span>

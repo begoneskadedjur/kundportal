@@ -1,18 +1,19 @@
 // src/pages/admin/procurement/SignalsPage.tsx
 // Signaler (planens avsnitt 3 och 9.6): framförhållning ur upphandlingsplaner,
 // planerade poster i annonsdatabaserna, RFI, förhandsannonser och
-// avtalsklockan. Status går att ändra per signal. Under listan ligger
-// signalkällorna.
+// avtalsklockan. Status går att ändra per signal. Signalkällorna ligger
+// sedan 3.63.0 bara under Inställningar.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ExternalLink } from 'lucide-react'
+import { Icon } from '../../../components/icons/Icon'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import Select from '../../../components/ui/Select'
 import { ProcurementService } from '../../../services/procurementService'
 import {
   RELIABILITY_LABEL,
+  SIGNAL_STATUS_LABEL,
   SIGNAL_TYPE_LABEL,
   type ProcurementReliability,
   type ProcurementSignal,
@@ -20,17 +21,11 @@ import {
 } from '../../../types/procurement'
 import { EmptyState, Section, StatusDot } from '../../../components/admin/procurement/ui'
 import { fmtDate, fmtNum, tableCls, type Tone } from '../../../components/admin/procurement/uiFormat'
-import { SignalSourcesSection } from '../../../components/admin/procurement/settings/SignalSourcesSection'
-import { procurementPath } from '../../../lib/procurementPortal'
+import { noticePath, procurementPath } from '../../../lib/procurementPortal'
 
 type SignalStatus = ProcurementSignal['status']
 
-const STATUS_LABEL: Record<SignalStatus, string> = {
-  new: 'Ny',
-  watching: 'Bevakas',
-  converted: 'Blev upphandling',
-  dismissed: 'Avfärdad',
-}
+const STATUS_LABEL = SIGNAL_STATUS_LABEL
 
 const STATUS_OPTIONS = (Object.keys(STATUS_LABEL) as SignalStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s] }))
 
@@ -48,7 +43,7 @@ const SOURCE_LABEL: Record<string, string> = {
 type ListFilter = 'open' | 'all' | SignalStatus
 
 const LIST_OPTIONS: Array<{ value: ListFilter; label: string }> = [
-  { value: 'open', label: 'Nya och bevakade' },
+  { value: 'open', label: 'Nya och följda' },
   { value: 'all', label: 'Alla signaler' },
   ...STATUS_OPTIONS,
 ]
@@ -138,7 +133,7 @@ export default function SignalsPage() {
                         )}
                         <div className="text-[12px] text-slate-400 whitespace-pre-line line-clamp-3" title={s.text}>{s.text}</div>
                         {s.notice_id && (
-                          <Link to={procurementPath(`/${s.notice_id}`)} className="text-[11px] text-[#20c58f] hover:underline">Öppna upphandlingen</Link>
+                          <Link to={noticePath(s.notice_id)} className="text-[11px] text-[#20c58f] hover:underline">Öppna upphandlingen</Link>
                         )}
                         <div className="text-[10.5px] text-slate-600 mt-0.5">Upptäckt {fmtDate(s.created_at)}</div>
                       </div>
@@ -151,7 +146,7 @@ export default function SignalsPage() {
                       {s.url ? (
                         <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-[#20c58f]">
                           {SOURCE_LABEL[s.source] ?? s.source}
-                          <ExternalLink className="w-3 h-3" />
+                          <Icon name="rapport.oppna" className="w-3 h-3" />
                         </a>
                       ) : (
                         SOURCE_LABEL[s.source] ?? s.source
@@ -169,8 +164,6 @@ export default function SignalsPage() {
           </div>
         )}
       </Section>
-
-      <SignalSourcesSection />
     </div>
   )
 }

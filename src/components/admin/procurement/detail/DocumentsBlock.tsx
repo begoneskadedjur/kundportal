@@ -4,7 +4,7 @@
 
 import { useRef, useState } from 'react'
 import toast from 'react-hot-toast'
-import { ExternalLink, Upload } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import { ProcurementService, type NoticeWithRelations } from '../../../../services/procurementService'
 import { DOC_TYPE_LABEL, type ProcurementDocType, type ProcurementDocument } from '../../../../types/procurement'
 import { EmptyState, LinkButton, StatusDot } from '../ui'
@@ -141,7 +141,7 @@ export default function DocumentsBlock({ notice, documents, onDocumentsChanged }
                   <span className="text-[11px] text-slate-600 tabular-nums">hämtad {fmtDate(s.fetched_at)}</span>
                   {s.url && (
                     <a href={s.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[#20c58f] hover:underline">
-                      Öppna <ExternalLink className="w-3 h-3" />
+                      Öppna <Icon name="rapport.oppna" className="w-3 h-3" />
                     </a>
                   )}
                 </li>
@@ -150,7 +150,7 @@ export default function DocumentsBlock({ notice, documents, onDocumentsChanged }
                 <li className="flex items-baseline gap-x-3 text-[12.5px]">
                   <span className="text-slate-200 w-28 shrink-0">Köparens plattform</span>
                   <a href={notice.platform_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[#20c58f] hover:underline break-all">
-                    {notice.platform_url.replace(/^https?:\/\//, '').slice(0, 60)} <ExternalLink className="w-3 h-3 shrink-0" />
+                    {notice.platform_url.replace(/^https?:\/\//, '').slice(0, 60)} <Icon name="rapport.oppna" className="w-3 h-3 shrink-0" />
                   </a>
                 </li>
               )}
@@ -158,7 +158,7 @@ export default function DocumentsBlock({ notice, documents, onDocumentsChanged }
                 <li className="flex items-baseline gap-x-3 text-[12.5px]">
                   <span className="text-slate-200 w-28 shrink-0">Dokument</span>
                   <a href={notice.document_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[12px] text-[#20c58f] hover:underline break-all">
-                    {notice.document_url.replace(/^https?:\/\//, '').slice(0, 60)} <ExternalLink className="w-3 h-3 shrink-0" />
+                    {notice.document_url.replace(/^https?:\/\//, '').slice(0, 60)} <Icon name="rapport.oppna" className="w-3 h-3 shrink-0" />
                   </a>
                 </li>
               )}
@@ -195,7 +195,7 @@ export default function DocumentsBlock({ notice, documents, onDocumentsChanged }
                 dragOver ? 'border-[#20c58f] text-slate-200 bg-[#20c58f]/5' : 'border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300'
               }`}
             >
-              <Upload className="w-3.5 h-3.5" />
+              <Icon name="rapport.ladda-upp" className="w-3.5 h-3.5" />
               {uploading ? `Laddar upp ${uploading}` : 'Dra filer hit eller klicka för att välja (PDF, xlsx, docx, zip)'}
             </div>
             <input

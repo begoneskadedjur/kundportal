@@ -761,7 +761,7 @@ export async function getManagers(): Promise<Manager[]> {
 
 /**
  * Notis i notifications. case_type 'procurement': klick öppnar
- * {PROCUREMENT_PORTAL_URL}/{case_id} (adminportalen: /admin/upphandlingar/{case_id}), eller startsidan när case_id saknas.
+ * {PROCUREMENT_PORTAL_URL}/upphandling/{case_id} (adminportalen: /admin/upphandlingar/upphandling/{case_id}), eller startsidan när case_id saknas.
  */
 export async function insertNotifications(
   recipients: string[],
@@ -835,8 +835,13 @@ ${bodyHtml}
 </div></body></html>`
 }
 
+/**
+ * Länk till en upphandling i mejl. Sedan 3.63.0 den kanoniska vägen
+ * /upphandling/{id}; äldre mejl pekar på /{id}, som portalen fortsätter
+ * att ta emot för alltid.
+ */
 export function noticeLink(noticeId: string): string {
-  return `${PROCUREMENT_PORTAL_URL}/${noticeId}`
+  return `${PROCUREMENT_PORTAL_URL}/upphandling/${noticeId}`
 }
 
 /**

@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Plus } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import Modal from '../../../ui/Modal'
 import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
@@ -191,7 +191,7 @@ function RulePreview() {
   }
 
   const level = result ? ProcurementMatchService.level(result.score) : null
-  const countyOptions = [{ value: '', label: 'Inget län' }, ...COUNTY_OPTIONS.filter((o) => o.value !== 'begone' && o.value !== 'all')]
+  const countyOptions = [{ value: '', label: 'Inget län' }, ...COUNTY_OPTIONS.filter((o) => o.value.startsWith('SE'))]
 
   return (
     <div className="p-4 space-y-3 border-t border-slate-800">
@@ -279,7 +279,7 @@ export function WatchRulesSection() {
       hint={`Notis vid ${NOTIFY_SCORE} poäng, direktnotis vid 100. Ändringar gäller nya hämtningar; redan matchade upphandlingar behåller sin poäng.`}
       action={
         <LinkButton onClick={() => setEditing(toDraft())}>
-          <span className="inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" />Ny regel</span>
+          <span className="inline-flex items-center gap-1"><Icon name="allman.plus" className="w-3.5 h-3.5" />Ny regel</span>
         </LinkButton>
       }
     >

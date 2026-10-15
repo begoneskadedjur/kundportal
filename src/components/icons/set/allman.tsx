@@ -162,4 +162,13 @@ export const allmanIcons = {
   ),
   // Laddar: tre fjärdedels cirkel, snurras med animate-spin
   'allman.laddar': <path d="M20.5 12A8.5 8.5 0 1 1 12 3.5" />,
+  // Tema: halvmåne (ljust och mörkt läge), från upphandlingsskissen 2026-10-15
+  'allman.tema': <path d="M12 3.5a8.5 8.5 0 1 0 8.5 8.5A6.5 6.5 0 0 1 12 3.5z" />,
+  // Logga ut: dörrkarm med pil ut
+  'allman.logga-ut': (
+    <>
+      <path d="M13.5 4.5h-7A1.5 1.5 0 0 0 5 6v12a1.5 1.5 0 0 0 1.5 1.5h7" />
+      <path d="M10 12h10.5M17 8.5l3.5 3.5-3.5 3.5" />
+    </>
+  ),
 } satisfies Record<`allman.${string}`, ReactNode>

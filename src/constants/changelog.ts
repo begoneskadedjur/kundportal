@@ -45,6 +45,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.63.0',
+    date: '2026-10-15',
+    title: 'Ny ordning i upphandlingsportalen',
+    items: [
+      { kind: 'nyhet', text: 'Upphandlingsportalen öppnar på Idag: sista anbudsdag inom 14 dagar, nya annonser att ta upp eller avstå från, avtal som just gått in i bearbetningsfönstret, dina uppgifter och nya signaler.' },
+      { kind: 'andring', text: 'Menyn följer jobbet: Idag, Framförhållning (avtalsklocka, signaler, prognos), Annonser (tidigare Bevakning), Anbud (lista och anbudsbibliotek) och Marknad (översikt, köpare, konkurrenter, lärdomar, fråga datan). Inställningar och Mitt konto ligger i kontomenyn, och sök öppnas med Ctrl+K.' },
+      { kind: 'andring', text: 'Nya statusord: Bedöms ersätter Bevakas och Analyseras, Lämnat ersätter Anbud lämnat. I avtalsklockan heter Öppen nu Ej kontaktad och Planerad heter Möte bokat, och signaler som bevakas heter Följs.' },
+      { kind: 'andring', text: 'Marknad, avtalsklockan och köparlistan visar hela Sverige från början, och går att avgränsa till Norrland, Svealand, Götaland eller ett län.' },
+      { kind: 'buggfix', text: 'Sökning på BGU-nummer när man flyttar e-post till en upphandling hittade inga träffar.' },
+    ],
+  },
+  {
     version: '3.62.0',
     date: '2026-10-15',
     title: 'Fakturaplan inom bindningstiden',

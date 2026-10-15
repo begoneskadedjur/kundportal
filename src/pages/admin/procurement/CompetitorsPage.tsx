@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Search } from 'lucide-react'
+import { Icon } from '../../../components/icons/Icon'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import Select from '../../../components/ui/Select'
 import { ProcurementService, type AwardWithRelations, type BidderWithSupplier } from '../../../services/procurementService'
@@ -98,7 +98,7 @@ export default function CompetitorsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full sm:w-64">
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Icon name="allman.sok" className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}

@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ArrowLeft, ExternalLink, Link2, Search, X } from 'lucide-react'
+import { Icon } from '../../../components/icons/Icon'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -28,7 +28,7 @@ import { VALUE_KIND_LABEL, buildProcurements, median, type ProcurementGroup } fr
 import { HistoryEmpty, SupplierName } from '../../../components/admin/procurement/market/shared'
 import { countyLabel, criteriaLabel } from '../../../components/admin/procurement/market/format'
 import { countBy, sortKey, supplierSwitches } from '../../../components/admin/procurement/registry/registryStats'
-import { procurementPath } from '../../../lib/procurementPortal'
+import { noticePath, procurementPath } from '../../../lib/procurementPortal'
 
 type Customer = { id: string; company_name: string; organization_number: string | null }
 
@@ -93,7 +93,7 @@ function CustomerLink({ buyer, onChange }: { buyer: ProcurementBuyer; onChange: 
       {buyer.customer_id && !searching ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Link to={`/admin/befintliga-kunder/${buyer.customer_id}`} className="inline-flex items-center gap-1.5 text-sm text-slate-100 hover:text-[#20c58f]">
-            <Link2 className="w-3.5 h-3.5 text-[#20c58f]" />
+            <Icon name="rapport.lank" className="w-3.5 h-3.5 text-[#20c58f]" />
             {current?.company_name ?? 'Kopplad kund'}
             {current?.organization_number && <span className="text-[11px] text-slate-500">{formatOrgNumber(current.organization_number)}</span>}
           </Link>
@@ -111,7 +111,7 @@ function CustomerLink({ buyer, onChange }: { buyer: ProcurementBuyer; onChange: 
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <Icon name="allman.sok" className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 autoFocus
                 value={q}
@@ -121,7 +121,7 @@ function CustomerLink({ buyer, onChange }: { buyer: ProcurementBuyer; onChange: 
               />
             </div>
             <button type="button" onClick={() => { setSearching(false); setQ('') }} className="text-slate-500 hover:text-slate-200" aria-label="Avbryt">
-              <X className="w-4 h-4" />
+              <Icon name="allman.stang" className="w-4 h-4" />
             </button>
           </div>
           {results.length > 0 ? (
@@ -295,7 +295,7 @@ export default function BuyerProfilePage() {
     return (
       <div className="space-y-4">
         <Link to={procurementPath('/kopare')} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200">
-          <ArrowLeft className="w-3.5 h-3.5" /> Köpare
+          <Icon name="rapport.tillbaka" className="w-3.5 h-3.5" /> Köpare
         </Link>
         <EmptyState title="Köparen finns inte" hint="Den kan ha slagits ihop med en annan köpare vid importen." />
       </div>
@@ -306,7 +306,7 @@ export default function BuyerProfilePage() {
     <div className="space-y-8">
       <div>
         <Link to={procurementPath('/kopare')} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 mb-2">
-          <ArrowLeft className="w-3.5 h-3.5" /> Köpare
+          <Icon name="rapport.tillbaka" className="w-3.5 h-3.5" /> Köpare
         </Link>
         <h2 className="text-lg font-semibold text-slate-100">{buyer.name}</h2>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-slate-500 mt-0.5 tabular-nums">
@@ -315,7 +315,7 @@ export default function BuyerProfilePage() {
           <span>{buyer.county_name ?? countyLabel(buyer.county_code)}</span>
           {buyer.website && (
             <a href={buyer.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 hover:text-[#20c58f]">
-              Webbplats <ExternalLink className="w-3 h-3" />
+              Webbplats <Icon name="rapport.oppna" className="w-3 h-3" />
             </a>
           )}
         </div>
@@ -325,7 +325,7 @@ export default function BuyerProfilePage() {
       <PulseRow
         stats={[
           { label: 'Kända upphandlingar', value: fmtNum(groups.length), hint: groups.length ? `sedan ${groups[groups.length - 1].year ?? 'okänt år'}` : null },
-          { label: 'Median anbud', value: fmtNum(bidsMedian, 1), hint: bidsMedian != null && bidsMedian <= 2 ? 'duopol, ett tredje anbud har chans' : null, tone: bidsMedian != null && bidsMedian <= 2 ? 'good' : 'neutral' },
+          { label: 'Median anbud', value: fmtNum(bidsMedian, 1), hint: bidsMedian != null && bidsMedian <= 2 ? 'bara två anbudsgivare brukar svara, ett tredje anbud har chans' : null, tone: bidsMedian != null && bidsMedian <= 2 ? 'good' : 'neutral' },
           { label: 'Byter leverantör', value: switches.comparisons ? `${switches.switches} av ${switches.comparisons}` : '–', hint: 'byten mellan upphandlingar' },
           { label: 'Överprövade', value: appealKnown ? `${appealed} av ${appealKnown}` : '–', tone: appealed > 0 ? 'warn' : 'neutral' },
           { label: 'Nästa avtalsslut', value: fmtDate(nextEnd), hint: nextEnd ? current.find((g) => g.endDate === nextEnd)?.winners.map((w) => w.name).join(', ') : null },
@@ -395,7 +395,7 @@ export default function BuyerProfilePage() {
                             {g.isFramework != null ? (g.isFramework ? ' · ramavtal' : ' · kontrakt') : ''}
                             {g.wasAppealed ? ' · överprövad' : ''}
                           </div>
-                          {g.noticeId && <Link to={procurementPath(`/${g.noticeId}`)} className="text-[11px] text-[#20c58f] hover:underline">Öppna annonsen</Link>}
+                          {g.noticeId && <Link to={noticePath(g.noticeId)} className="text-[11px] text-[#20c58f] hover:underline">Öppna annonsen</Link>}
                         </div>
                       </td>
                       <td className={tableCls.td}>
@@ -472,7 +472,7 @@ export default function BuyerProfilePage() {
             {notices.map((n) => (
               <li key={n.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                 <div className="min-w-0">
-                  <Link to={procurementPath(`/${n.id}`)} className="text-[13px] text-slate-200 hover:text-[#20c58f] hover:underline">
+                  <Link to={noticePath(n.id)} className="text-[13px] text-slate-200 hover:text-[#20c58f] hover:underline">
                     {n.title}
                   </Link>
                   <div className="text-[11px] text-slate-500 tabular-nums">
@@ -507,7 +507,7 @@ export default function BuyerProfilePage() {
                     <td className={`${tableCls.td} whitespace-nowrap`}>{fmtDate(r.sent_at ?? r.created_at)}</td>
                     <td className={tableCls.td}>
                       {r.notice_id ? (
-                        <Link to={procurementPath(`/${r.notice_id}`)} className="hover:text-[#20c58f] hover:underline">{r.subject ?? 'Begäran'}</Link>
+                        <Link to={noticePath(r.notice_id)} className="hover:text-[#20c58f] hover:underline">{r.subject ?? 'Begäran'}</Link>
                       ) : (r.subject ?? 'Begäran')}
                     </td>
                     <td className={tableCls.td}>{r.recipient_email}</td>

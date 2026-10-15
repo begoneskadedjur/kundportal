@@ -489,12 +489,17 @@ export interface ProcurementUserSettings {
 // ---------------------------------------------------------------------------
 // Etiketter för UI
 
+// Statusspråk (docs/upphandlingsportal-ux-plan.md avsnitt 4): ett ord betyder
+// en sak i hela portalen. Det här är den enda källan för statusorden i
+// klienten och i api/. Databasvärdena är oförändrade; bara etiketterna är nya.
+// Bevakas och Analyseras heter båda Bedöms.
+
 export const OUR_STATUS_LABEL: Record<ProcurementOurStatus, string> = {
   new: 'Ny',
-  watching: 'Bevakas',
-  analyzing: 'Analyseras',
+  watching: 'Bedöms',
+  analyzing: 'Bedöms',
   bidding: 'Anbud pågår',
-  submitted: 'Anbud lämnat',
+  submitted: 'Lämnat',
   won: 'Vunnen',
   lost: 'Förlorad',
   declined: 'Avstår',
@@ -505,15 +510,80 @@ export const OUR_STATUS_LABEL: Record<ProcurementOurStatus, string> = {
 /** Tailwind-färg på statuspunkten (bg-klass) */
 export const OUR_STATUS_DOT: Record<ProcurementOurStatus, string> = {
   new: 'bg-sky-400',
-  watching: 'bg-slate-400',
+  watching: 'bg-amber-400',
   analyzing: 'bg-amber-400',
   bidding: 'bg-[#20c58f]',
-  submitted: 'bg-[#20c58f]',
+  submitted: 'bg-emerald-600',
   won: 'bg-emerald-400',
   lost: 'bg-red-400',
-  declined: 'bg-slate-600',
-  cancelled: 'bg-slate-600',
-  archived: 'bg-slate-700',
+  declined: 'bg-slate-500',
+  cancelled: 'bg-slate-500',
+  archived: 'bg-slate-600',
+}
+
+/**
+ * Statusar att välja bland, en per ord. Bedöms sparas som analyzing;
+ * gamla rader med watching visas som Bedöms och väljs som analyzing.
+ */
+export const OUR_STATUS_CHOICES: ProcurementOurStatus[] = ['new', 'analyzing', 'bidding', 'submitted', 'won', 'lost', 'declined', 'cancelled', 'archived']
+
+/** Värdet som en status visas som i väljare (watching blir analyzing) */
+export function ourStatusChoice(status: ProcurementOurStatus): ProcurementOurStatus {
+  return status === 'watching' ? 'analyzing' : status
+}
+
+/** Databasvärden bakom ett valt statusord (Bedöms är både watching och analyzing) */
+export function ourStatusValues(choice: ProcurementOurStatus): ProcurementOurStatus[] {
+  return choice === 'analyzing' || choice === 'watching' ? ['watching', 'analyzing'] : [choice]
+}
+
+/** Avtalsklockans status */
+export const AWARD_STATUS_LABEL: Record<ProcurementAwardStatus, string> = {
+  open: 'Ej kontaktad',
+  contacted: 'Kontaktad',
+  planned: 'Möte bokat',
+  done: 'Klar',
+  ignored: 'Ignorerad',
+}
+
+export const AWARD_STATUS_DOT: Record<ProcurementAwardStatus, string> = {
+  open: 'bg-sky-400',
+  contacted: 'bg-amber-400',
+  planned: 'bg-[#20c58f]',
+  done: 'bg-slate-500',
+  ignored: 'bg-slate-600',
+}
+
+/** Signalernas status */
+export const SIGNAL_STATUS_LABEL: Record<ProcurementSignal['status'], string> = {
+  new: 'Ny',
+  watching: 'Följs',
+  converted: 'Blev annons',
+  dismissed: 'Avfärdad',
+}
+
+export const SIGNAL_STATUS_DOT: Record<ProcurementSignal['status'], string> = {
+  new: 'bg-sky-400',
+  watching: 'bg-amber-400',
+  converted: 'bg-[#20c58f]',
+  dismissed: 'bg-slate-500',
+}
+
+/** Var ett avtal står mot bearbetningsfönstret (18 till 12 månader före slut) */
+export type ProcurementWindowState = 'before' | 'in' | 'late' | 'due'
+
+export const WINDOW_STATE_LABEL: Record<ProcurementWindowState, string> = {
+  before: 'Före fönstret',
+  in: 'I fönstret',
+  late: 'Sent',
+  due: 'Annons väntas nu',
+}
+
+export const WINDOW_STATE_DOT: Record<ProcurementWindowState, string> = {
+  before: 'bg-slate-500',
+  in: 'bg-[#20c58f]',
+  late: 'bg-amber-400',
+  due: 'bg-red-400',
 }
 
 export const NOTICE_KIND_LABEL: Record<ProcurementNoticeKind, string> = {

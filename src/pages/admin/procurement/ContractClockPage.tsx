@@ -60,7 +60,7 @@ export default function ContractClockPage() {
   const [awards, setAwards] = useState<AwardWithRelations[]>([])
   const [managers, setManagers] = useState<ProcurementManagerProfile[]>([])
   const [horizon, setHorizon] = useState<HorizonFilter>('18')
-  const [county, setCounty] = useState<CountyFilter>('begone')
+  const [county, setCounty] = useState<CountyFilter>('all')
   const [status, setStatus] = useState<StatusFilter>('active')
   const [excluded, setExcluded] = useState<Array<Pick<ProcurementAward, 'id' | 'title' | 'buyer_name' | 'source' | 'source_ref' | 'excluded_reason' | 'excluded_at'>>>([])
   const [showExcluded, setShowExcluded] = useState(false)

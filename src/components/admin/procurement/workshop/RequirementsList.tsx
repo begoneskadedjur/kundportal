@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Sparkles, Trash2 } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import { ProcurementService, type ProcurementManagerProfile } from '../../../../services/procurementService'
 import {
   REQUIREMENT_TYPE_LABEL,
@@ -94,7 +94,7 @@ export default function RequirementsList({ noticeId, requirements, documents, ma
 
       {hasAi && (
         <p className="flex items-center gap-1.5 text-[11.5px] text-amber-400/90 mb-2">
-          <Sparkles className="w-3.5 h-3.5 shrink-0" />
+          <Icon name="kalla.ai" className="w-3.5 h-3.5 shrink-0" />
           Rader märkta AI är utlästa ur underlaget. En människa ska granska hela listan mot underlaget innan anbudet lämnas.
         </p>
       )}
@@ -114,7 +114,7 @@ export default function RequirementsList({ noticeId, requirements, documents, ma
                   </div>
                   {r.source === 'ai' && <span className="mt-2 text-[10.5px] text-amber-400/80 shrink-0" title="Utläst av AI">AI</span>}
                   <button type="button" onClick={() => remove(r)} className="mt-1.5 p-1 text-slate-600 hover:text-red-400 shrink-0" aria-label="Ta bort krav">
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Icon name="allman.radera" className="w-3.5 h-3.5" />
                   </button>
                 </div>
                 <div className="mt-1.5 ml-5 grid grid-cols-2 sm:grid-cols-[110px_80px_80px_1fr_1.3fr] gap-2">

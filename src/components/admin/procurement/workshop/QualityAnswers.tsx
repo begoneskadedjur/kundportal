@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Sparkles } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import Modal from '../../../ui/Modal'
 import Select from '../../../ui/Select'
 import Button from '../../../ui/Button'
@@ -54,7 +54,7 @@ export default function QualityAnswers({ notice, requirements, onChanged }: Prop
         Kvalitetssvar, {withDraft} av {quality.length} med utkast
       </SubHeading>
       <p className="flex items-start gap-1.5 text-[11.5px] text-slate-500 mb-3">
-        <Sparkles className="w-3.5 h-3.5 shrink-0 mt-px text-amber-400/80" />
+        <Icon name="kalla.ai" className="w-3.5 h-3.5 shrink-0 mt-px text-amber-400/80" />
         Utkasten bygger bara på BeGones eget material och sparade svar i biblioteket. Luckor står som [KOMPLETTERA: ...] och fylls i av en människa innan svaret lämnas.
       </p>
 

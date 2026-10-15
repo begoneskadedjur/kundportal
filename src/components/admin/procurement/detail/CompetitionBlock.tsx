@@ -97,7 +97,7 @@ export default function CompetitionBlock({ notice, awards }: { notice: NoticeWit
       <div className="p-4 space-y-5">
         <p className="text-[12.5px] text-slate-300">
           {rows.length === 0
-            ? 'Inga kända konkurrenter hos köparen. Marknaden i stort är ett duopol med två anbud per upphandling; räkna med Anticimex och Nomor.'
+            ? 'Inga kända konkurrenter hos köparen. I marknaden i stort brukar bara två anbudsgivare svara; räkna med Anticimex och Nomor.'
             : `Köparen har i snitt fått ${avgBids != null ? avgBids.toFixed(1).replace('.', ',') : 'okänt antal'} anbud. Förväntade konkurrenter nedan, sorterade på hur ofta de deltagit.`}
         </p>
 

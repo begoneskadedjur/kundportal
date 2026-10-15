@@ -3,11 +3,15 @@
 // sista anbudsdag, förväntat antal anbud, kriterietyp, årsvärde, sannolikhet,
 // förväntat täckningsbidrag, status, ansvarig och källor. Olästa markeras.
 // Osorterad inkommande e-post visas överst när sådan finns.
+//
+// Sedan 3.63.0 visas sidan under Annonser (/annonser, tidigare /bevakning)
+// och, med mode 'anbud', som listan under Anbud (/anbud): bara upphandlingar
+// vi bedömer, räknar på eller lämnat, utan poänggräns och inkorg. Inkorgen
+// med Ta upp och Avstå och anbudstavlan kommer i etapp 4.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Search } from 'lucide-react'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import {
   ProcurementService,
@@ -18,7 +22,9 @@ import { refreshProcurementBadge } from '../../../hooks/useProcurementBadge'
 import {
   CRITERIA_TYPE_LABEL,
   OUR_STATUS_DOT,
+  OUR_STATUS_CHOICES,
   OUR_STATUS_LABEL,
+  ourStatusValues,
   type ProcurementInboundEmail,
   type ProcurementOurStatus,
 } from '../../../types/procurement'
@@ -28,13 +34,16 @@ import { daysUntil, fmtDate, fmtKrShort, fmtPct, fmtRelativeDays, tableCls } fro
 import { checkboxCls, inputCls, selectCls } from '../../../components/admin/procurement/detail/fields'
 import { errMsg, personName } from '../../../components/admin/procurement/detail/helpers'
 import UnsortedEmailSection from '../../../components/admin/procurement/watch/UnsortedEmailSection'
-import { procurementPath } from '../../../lib/procurementPortal'
+import { noticePath } from '../../../lib/procurementPortal'
+import { Icon } from '../../../components/icons/Icon'
 
 const ACTIVE_STATUSES: ProcurementOurStatus[] = ['new', 'watching', 'analyzing', 'bidding', 'submitted']
+/** Anbud: det vi bedömer, räknar på eller har lämnat */
+const WORK_STATUSES: ProcurementOurStatus[] = ['watching', 'analyzing', 'bidding', 'submitted']
 const DIRECT_SCORE = 100
 const NOTIFY_SCORE = 60
 
-type StatusFilter = 'active' | 'all' | ProcurementOurStatus
+type StatusFilter = 'active' | 'work' | 'all' | ProcurementOurStatus
 
 function deadlineTone(days: number | null): string {
   if (days == null) return 'text-slate-500'
@@ -81,7 +90,8 @@ function derived(n: NoticeWithRelations) {
   return { annual, annualComputed: n.annual_value == null && annual != null, prob, probComputed: n.win_probability == null }
 }
 
-export default function WatchPage() {
+export default function WatchPage({ mode = 'annonser' }: { mode?: 'annonser' | 'anbud' }) {
+  const bids = mode === 'anbud'
   const [notices, setNotices] = useState<NoticeWithRelations[]>([])
   const [seen, setSeen] = useState<Set<string>>(new Set())
   const [managers, setManagers] = useState<ProcurementManagerProfile[]>([])
@@ -89,9 +99,9 @@ export default function WatchPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [status, setStatus] = useState<StatusFilter>('active')
-  const [openOnly, setOpenOnly] = useState(true)
-  const [showBelow, setShowBelow] = useState(false)
+  const [status, setStatus] = useState<StatusFilter>(bids ? 'work' : 'active')
+  const [openOnly, setOpenOnly] = useState(!bids)
+  const [showBelow, setShowBelow] = useState(bids)
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
 
@@ -102,7 +112,7 @@ export default function WatchPage() {
 
   const load = useCallback(async () => {
     try {
-      const statuses = status === 'all' ? undefined : status === 'active' ? ACTIVE_STATUSES : [status]
+      const statuses = status === 'all' ? undefined : status === 'active' ? ACTIVE_STATUSES : status === 'work' ? WORK_STATUSES : ourStatusValues(status)
       const [list, seenIds] = await Promise.all([
         ProcurementService.listNotices({ minScore: showBelow ? undefined : NOTIFY_SCORE, statuses, openOnly, search }),
         ProcurementService.getSeenIds(),
@@ -120,13 +130,14 @@ export default function WatchPage() {
   }, [status, openOnly, showBelow, search])
 
   const loadEmails = useCallback(async () => {
+    if (bids) return
     try {
       setEmails(await ProcurementService.listInboundEmails('unsorted'))
     } catch {
       // Inkorgen är sekundär; tyst om tabellen saknar data eller rättighet
       setEmails([])
     }
-  }, [])
+  }, [bids])
 
   useEffect(() => {
     void load()
@@ -169,8 +180,9 @@ export default function WatchPage() {
 
   const statusOptions: Array<{ value: StatusFilter; label: string }> = [
     { value: 'active', label: 'Aktiva' },
+    { value: 'work', label: 'Bedöms, pågår och lämnat' },
     { value: 'all', label: 'Alla statusar' },
-    ...(Object.keys(OUR_STATUS_LABEL) as ProcurementOurStatus[]).map((s) => ({ value: s as StatusFilter, label: OUR_STATUS_LABEL[s] })),
+    ...OUR_STATUS_CHOICES.map((s) => ({ value: s as StatusFilter, label: OUR_STATUS_LABEL[s] })),
   ]
 
   if (loading) {
@@ -183,7 +195,7 @@ export default function WatchPage() {
 
   return (
     <div className="space-y-6">
-      <UnsortedEmailSection emails={emails} notices={notices} onChanged={() => void loadEmails()} />
+      {!bids && <UnsortedEmailSection emails={emails} notices={notices} onChanged={() => void loadEmails()} />}
 
       <PulseRow
         stats={[
@@ -197,7 +209,7 @@ export default function WatchPage() {
 
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
         <div className="relative flex-1">
-          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Icon name="allman.sok" className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             className={`${inputCls} pl-8`}
             placeholder="Sök titel, köpare eller beskrivning"
@@ -261,7 +273,7 @@ export default function WatchPage() {
                             {isUnread && <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" title="Oläst" />}
                             <div className="min-w-0">
                               <Link
-                                to={procurementPath(`/${n.id}`)}
+                                to={noticePath(n.id)}
                                 className={`block leading-snug hover:text-[#20c58f] ${isUnread ? 'font-semibold text-slate-100' : 'text-slate-200'}`}
                               >
                                 {n.title}
@@ -311,7 +323,7 @@ export default function WatchPage() {
                     <div className="flex items-start gap-1.5">
                       {isUnread && <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" />}
                       <div className="min-w-0 flex-1">
-                        <Link to={procurementPath(`/${n.id}`)} className={`block text-[13px] leading-snug ${isUnread ? 'font-semibold text-slate-100' : 'text-slate-200'}`}>
+                        <Link to={noticePath(n.id)} className={`block text-[13px] leading-snug ${isUnread ? 'font-semibold text-slate-100' : 'text-slate-200'}`}>
                           {n.title}
                         </Link>
                         <div className="text-[11px] text-slate-500 truncate">{n.buyer?.name ?? n.buyer_name ?? 'Okänd köpare'}</div>

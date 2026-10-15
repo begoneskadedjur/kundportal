@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ArrowLeft } from 'lucide-react'
+import { Icon } from '../../../components/icons/Icon'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import Button from '../../../components/ui/Button'
 import Input from '../../../components/ui/Input'
@@ -155,7 +155,7 @@ export default function CompetitorProfilePage() {
     return (
       <div className="space-y-4">
         <Link to={procurementPath('/konkurrenter')} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200">
-          <ArrowLeft className="w-3.5 h-3.5" /> Konkurrenter
+          <Icon name="rapport.tillbaka" className="w-3.5 h-3.5" /> Konkurrenter
         </Link>
         <EmptyState title="Leverantören finns inte" />
       </div>
@@ -168,7 +168,7 @@ export default function CompetitorProfilePage() {
     <div className="space-y-8">
       <div>
         <Link to={procurementPath('/konkurrenter')} className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 mb-2">
-          <ArrowLeft className="w-3.5 h-3.5" /> Konkurrenter
+          <Icon name="rapport.tillbaka" className="w-3.5 h-3.5" /> Konkurrenter
         </Link>
         <h2 className={`text-lg font-semibold ${supplier.is_begone ? 'text-[#20c58f]' : 'text-slate-100'}`}>{supplier.name}</h2>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-slate-500 mt-0.5 tabular-nums">

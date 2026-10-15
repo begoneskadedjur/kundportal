@@ -10,7 +10,7 @@ import { EmptyState, StatusDot } from '../ui'
 import { fmtDate, fmtKrShort, tableCls } from '../uiFormat'
 import { Block, SubHeading } from './fields'
 import { VALUE_KIND_LABEL, winnerKey, winnerName } from './helpers'
-import { procurementPath } from '../../../../lib/procurementPortal'
+import { noticePath, procurementPath } from '../../../../lib/procurementPortal'
 
 function switchConclusion(awards: AwardWithRelations[]): string {
   const seq = [...awards]
@@ -119,7 +119,7 @@ export default function BuyerHistoryBlock({ notice, awards, buyerNotices }: Prop
               {others.slice(0, 20).map((n) => (
                 <li key={n.id} className="py-1.5 flex flex-wrap items-baseline gap-x-3 text-[12.5px]">
                   <span className="text-[11px] text-slate-500 tabular-nums w-20 shrink-0">{fmtDate(n.published_at)}</span>
-                  <Link to={procurementPath(`/${n.id}`)} className="text-slate-200 hover:text-[#20c58f] flex-1 min-w-0">
+                  <Link to={noticePath(n.id)} className="text-slate-200 hover:text-[#20c58f] flex-1 min-w-0">
                     {n.title}
                   </Link>
                   <StatusDot dotClass={OUR_STATUS_DOT[n.our_status]}>{OUR_STATUS_LABEL[n.our_status]}</StatusDot>

@@ -6,7 +6,7 @@
 
 import { useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Mail } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import { ProcurementService, type NoticeWithRelations } from '../../../../services/procurementService'
 import type { ProcurementInboundEmail } from '../../../../types/procurement'
 import { Section, LinkButton } from '../ui'
@@ -63,7 +63,7 @@ function EmailRow({ email, notices, onChanged }: { email: ProcurementInboundEmai
   return (
     <li className="px-4 py-3">
       <div className="flex items-start gap-3">
-        <Mail className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+        <Icon name="kontakt.mejl" className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
             <span className="text-[13px] text-slate-200 truncate">{email.subject || '(inget ämne)'}</span>

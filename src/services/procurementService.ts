@@ -53,6 +53,27 @@ export interface ProcurementManagerProfile {
   display_name: string | null
 }
 
+/** Upphandlingen i korthet för uppgifterna på Idag */
+export type TaskNotice = Pick<ProcurementNotice, 'id' | 'title' | 'buyer_name' | 'bgu_number' | 'tender_deadline' | 'questions_deadline' | 'our_status' | 'owner_id'>
+
+export interface MyRequirementTask {
+  id: string
+  notice_id: string
+  text: string
+  req_type: ProcurementRequirement['req_type']
+  notice: TaskNotice
+}
+
+export interface MyQuestionTask {
+  id: string
+  notice_id: string
+  question: string
+  notice: TaskNotice
+}
+
+const TASK_NOTICE_FIELDS = 'id, title, buyer_name, bgu_number, tender_deadline, questions_deadline, our_status, owner_id'
+const TASK_STATUSES: ProcurementOurStatus[] = ['watching', 'analyzing', 'bidding']
+
 const NOTICE_SELECT =
   '*, buyer:procurement_buyers(id, name, org_number, county_name, customer_id, registrar_email, sector), sources:procurement_notice_sources(id, source, source_sub, source_id, url, fetched_at)'
 const AWARD_SELECT =
@@ -265,6 +286,22 @@ export class ProcurementService {
     const { data, error } = await supabase.from('procurement_suppliers').select('*').order('name').limit(5000)
     if (error) fail('Kunde inte hämta leverantörer', error)
     return rows<ProcurementSupplier>(data)
+  }
+
+  /** Söker leverantörer på namn eller orgnr, för söklådan (sammanslagna rader utelämnas) */
+  static async searchSuppliers(search: string, limit = 8): Promise<Array<Pick<ProcurementSupplier, 'id' | 'name' | 'org_number' | 'is_begone'>>> {
+    const s = search.trim().replace(/[%,()]/g, ' ')
+    if (!s) return []
+    const digits = s.replace(/\D/g, '')
+    const { data, error } = await supabase
+      .from('procurement_suppliers')
+      .select('id, name, org_number, is_begone')
+      .is('merged_into', null)
+      .or(`name.ilike.%${s}%${digits.length >= 4 ? `,org_number.ilike.%${digits}%` : ''}`)
+      .order('name')
+      .limit(limit)
+    if (error) fail('Kunde inte söka leverantörer', error)
+    return rows<Pick<ProcurementSupplier, 'id' | 'name' | 'org_number' | 'is_begone'>>(data)
   }
 
   static async getSupplier(id: string): Promise<ProcurementSupplier | null> {
@@ -586,7 +623,7 @@ export class ProcurementService {
   static async searchNoticesForMove(query: string, excludeId?: string): Promise<Array<Pick<ProcurementNotice, 'id' | 'bgu_number' | 'title' | 'buyer_name'>>> {
     const q = query.trim()
     if (!q) return []
-    const num = q.match(/^(?:bgu[-s]?)?(d+)$/i)
+    const num = q.match(/^(?:bgu[-\s]?)?(\d+)$/i)
     let req = supabase.from('procurement_notices').select('id, bgu_number, title, buyer_name')
     if (num) req = req.eq('bgu_number', Number(num[1]))
     else {
@@ -623,6 +660,35 @@ export class ProcurementService {
   static async deleteRequirement(id: string): Promise<void> {
     const { error } = await supabase.from('procurement_requirements').delete().eq('id', id)
     if (error) fail('Kunde inte ta bort kravet', error)
+  }
+
+  /**
+   * Mina uppgifter på Idag: kravrader och kvalitetssvar där jag är ansvarig och
+   * som inte är klara, i upphandlingar som fortfarande bedöms eller räknas på.
+   */
+  static async listMyOpenRequirements(userId: string): Promise<MyRequirementTask[]> {
+    const { data, error } = await supabase
+      .from('procurement_requirements')
+      .select(`id, notice_id, text, req_type, notice:procurement_notices!inner(${TASK_NOTICE_FIELDS})`)
+      .eq('owner_id', userId)
+      .eq('done', false)
+      .in('notice.our_status', TASK_STATUSES)
+      .limit(500)
+    if (error) fail('Kunde inte hämta dina kravrader', error)
+    return rows<MyRequirementTask>(data)
+  }
+
+  /** Frågor till köparen som inte skickats, i upphandlingar där jag är ansvarig */
+  static async listMyDraftQuestions(userId: string): Promise<MyQuestionTask[]> {
+    const { data, error } = await supabase
+      .from('procurement_questions')
+      .select(`id, notice_id, question, notice:procurement_notices!inner(${TASK_NOTICE_FIELDS})`)
+      .eq('status', 'draft')
+      .eq('notice.owner_id', userId)
+      .in('notice.our_status', TASK_STATUSES)
+      .limit(500)
+    if (error) fail('Kunde inte hämta dina frågor', error)
+    return rows<MyQuestionTask>(data)
   }
 
   static async listQuestions(noticeId: string): Promise<ProcurementQuestion[]> {

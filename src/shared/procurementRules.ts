@@ -184,6 +184,13 @@ export const SE_COUNTIES: Record<string, string> = {
 
 export const BEGONE_COUNTIES = ['SE110', 'SE121', 'SE122', 'SE123', 'SE312', 'SE313']
 
+/** Landsdelar för områdesvalet (Hela Sverige, landsdel eller län) */
+export const SE_REGIONS: Record<string, { label: string; counties: string[] }> = {
+  norrland: { label: 'Norrland', counties: ['SE313', 'SE321', 'SE322', 'SE331', 'SE332'] },
+  svealand: { label: 'Svealand', counties: ['SE110', 'SE121', 'SE122', 'SE124', 'SE125', 'SE311', 'SE312'] },
+  gotaland: { label: 'Götaland', counties: ['SE123', 'SE211', 'SE212', 'SE213', 'SE214', 'SE221', 'SE224', 'SE231', 'SE232'] },
+}
+
 /** Unika NUTS3-koder för Sverige ur en blandad lista (SE110, SWE, SE1 ...) */
 export function countiesFromNuts(codes: Array<string | null | undefined>): string[] {
   const out = new Set<string>()

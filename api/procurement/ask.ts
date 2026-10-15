@@ -30,6 +30,7 @@ import { db, requireProcurementAccess } from '../_lib/procurement'
 import { GoogleGenAI, ThinkingLevel } from '@google/genai'
 import { PROCUREMENT_AI_MODEL, parseJsonLoose } from '../_lib/procurementAi'
 import { BEGONE_COUNTIES, SE_COUNTIES, addMonthsIso, normalizeName, normalizeOrgNumber, swedishDate, todaySwedish } from '../../src/shared/procurementRules'
+import { OUR_STATUS_LABEL } from '../../src/types/procurement'
 
 export const config = { maxDuration: 60 }
 
@@ -229,10 +230,10 @@ const countyLabel = (code: string | null | undefined) => (code && SE_COUNTIES[co
 const VALUE_KIND_LABEL: Record<string, string> = { ceiling: 'ramtak', actual: 'verkligt värde', estimated: 'uppskattat', unknown: 'okänd art' }
 const CRITERIA_LABEL: Record<string, string> = { price: 'pris', quality: 'kvalitet', mixed: 'pris och kvalitet', cost: 'kostnad' }
 const OUTCOME_LABEL: Record<string, string> = { pending: 'inväntar besked', won: 'vunnet', lost: 'förlorat', cancelled: 'avbrutet', withdrawn: 'återkallat' }
-const STATUS_LABEL: Record<string, string> = {
-  new: 'ny', watching: 'bevakas', analyzing: 'analyseras', bidding: 'anbud pågår', submitted: 'anbud lämnat',
-  won: 'vunnen', lost: 'förlorad', declined: 'avstår', cancelled: 'avbruten', archived: 'arkiverad',
-}
+// Statusorden från den gemensamma källan (types/procurement.ts), med gemener i löptext
+const STATUS_LABEL: Record<string, string> = Object.fromEntries(
+  Object.entries(OUR_STATUS_LABEL).map(([k, v]) => [k, v.toLowerCase()])
+)
 const KIND_LABEL: Record<string, string> = { tender: 'annons', direct: 'direktupphandling', rfi: 'RFI', prior_information: 'förhandsannons', award: 'tilldelningsannons', modification: 'ändring', other: 'övrigt' }
 
 /** Tar bort tankstreck och sådant som kan bryta avgränsarna */

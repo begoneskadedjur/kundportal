@@ -1,12 +1,14 @@
 // src/pages/admin/procurement/SettingsPage.tsx
 // Inställningar (planens avsnitt 9.9): bevakningsregler med förhandsvisning,
 // signalkällor, källhälsa, dagligt sammandrag på eller av för mig och
-// upphandlingsansvariga med länk till Användarkonton (Personal).
+// upphandlingsansvariga med länk till Användarkonton (Personal). Nås från
+// kontomenyn sedan 3.63.0. Signalkällor och källhälsa finns bara här;
+// anbudsbiblioteket ligger under Anbud.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ExternalLink } from 'lucide-react'
+import { Icon } from '../../../components/icons/Icon'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import { ProcurementService, type ProcurementManagerProfile } from '../../../services/procurementService'
 import type { ProcurementSourceHealth } from '../../../types/procurement'
@@ -15,7 +17,6 @@ import { SourceHealthTable } from '../../../components/admin/procurement/market/
 import { WatchRulesSection } from '../../../components/admin/procurement/settings/WatchRulesSection'
 import { SignalSourcesSection } from '../../../components/admin/procurement/settings/SignalSourcesSection'
 import { MAIN_PORTAL_URL, isProcurementStandalone } from '../../../lib/procurementPortal'
-import AnswerLibrary from '../../../components/admin/procurement/workshop/AnswerLibrary'
 
 function DigestToggle() {
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -100,9 +101,6 @@ export default function SettingsPage() {
 
       <SignalSourcesSection />
 
-      {/* Anbudsbibliotek: sparade kvalitetssvar per kriterietyp (etapp 4) */}
-      <AnswerLibrary />
-
       <Section title="Källhälsa" hint="Varning när en källa varit tyst i över 24 timmar, notis till admin efter tre fel i rad.">
         {loading ? <div className="py-8 flex justify-center"><LoadingSpinner /></div> : <SourceHealthTable health={health} />}
       </Section>
@@ -113,11 +111,11 @@ export default function SettingsPage() {
         action={
           isProcurementStandalone() ? (
             <a href={`${MAIN_PORTAL_URL}/admin/anvandarkonton-personal`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-[#20c58f] hover:text-[#3ddba5]">
-              Användarkonton (Personal) <ExternalLink className="w-3 h-3" />
+              Användarkonton (Personal) <Icon name="rapport.oppna" className="w-3 h-3" />
             </a>
           ) : (
             <Link to="/admin/anvandarkonton-personal" className="inline-flex items-center gap-1 text-xs font-medium text-[#20c58f] hover:text-[#3ddba5]">
-              Användarkonton (Personal) <ExternalLink className="w-3 h-3" />
+              Användarkonton (Personal) <Icon name="rapport.oppna" className="w-3 h-3" />
             </Link>
           )
         }

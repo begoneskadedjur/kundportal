@@ -1,15 +1,18 @@
 // src/pages/admin/procurement/MarketPage.tsx
-// Marknad, upphandlingsportalens startsida (planens avsnitt 9.1): marknadens
-// storlek och trend, marknadsandel per leverantör och år, antal anbud,
-// pipeline per kvartal, utmanarläge, kvalitetsviktade köpare och källhälsa.
-// BeGones län är förvalt. Aggregaten räknas i market/marketStats.ts.
+// Marknad > Översikt (/marknad, planens avsnitt 9.1): marknadens storlek och
+// trend, marknadsandel per leverantör och år, antal anbud, utmanarläge och
+// kvalitetsviktade köpare. Hela Sverige är förvalt (beslut 2026-10-15).
+// Aggregaten räknas i market/marketStats.ts.
+//
+// Sedan 3.63.0 är Idag startsidan. Pipeline per kvartal ligger under
+// Framförhållning > Prognos, lärdomarna under Marknad > Lärdomar och
+// källhälsan under Inställningar (varningen om en tyst källa visas på Idag).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
-import { ProcurementService, type AwardWithRelations, type BidderWithSupplier, type NoticeWithRelations } from '../../../services/procurementService'
-import { NOTIFY_SCORE, todaySwedish } from '../../../shared/procurementRules'
-import type { ProcurementSourceHealth } from '../../../types/procurement'
+import { ProcurementService, type AwardWithRelations, type BidderWithSupplier } from '../../../services/procurementService'
+import { todaySwedish } from '../../../shared/procurementRules'
 import { PulseRow, Section } from '../../../components/admin/procurement/ui'
 import { fmtKrShort, fmtNum, fmtPct } from '../../../components/admin/procurement/uiFormat'
 import {
@@ -17,46 +20,36 @@ import {
   buildProcurements,
   challengerBuyers,
   indexBidders,
-  isInWindow,
   marketByYear,
   matchesCounty,
   overallBidsMedian,
-  pipelineByQuarter,
   qualityBuyers,
   shareTotals,
   sharesByYear,
   type CountyFilter,
 } from '../../../components/admin/procurement/market/marketStats'
-import { CountySelect, HistoryEmpty, SourceHealthTable, SourceHealthWarning } from '../../../components/admin/procurement/market/shared'
+import { CountySelect, HistoryEmpty } from '../../../components/admin/procurement/market/shared'
+import { areaLabel } from '../../../components/admin/procurement/market/format'
 import { MarketShareChart, MarketSizeCharts } from '../../../components/admin/procurement/market/MarketCharts'
-import { BidsTable, ChallengerTable, PipelineTable, QualityBuyersTable } from '../../../components/admin/procurement/market/MarketTables'
-import LessonsSection from '../../../components/admin/procurement/market/LessonsSection'
+import { BidsTable, ChallengerTable, QualityBuyersTable } from '../../../components/admin/procurement/market/MarketTables'
 
 export default function MarketPage() {
   const [loading, setLoading] = useState(true)
   const [awards, setAwards] = useState<AwardWithRelations[]>([])
   const [bidders, setBidders] = useState<BidderWithSupplier[]>([])
-  const [notices, setNotices] = useState<NoticeWithRelations[]>([])
-  const [health, setHealth] = useState<ProcurementSourceHealth[]>([])
-  const [county, setCounty] = useState<CountyFilter>('begone')
+  const [county, setCounty] = useState<CountyFilter>('all')
 
   const load = useCallback(async () => {
     setLoading(true)
     // Tilldelningar och anbudsgivare i ett RPC-anrop (procurement_market_dataset):
     // ingen klientberäkning över kapade svar, felträffar är redan bortfiltrerade
-    const [d, n, h] = await Promise.allSettled([
-      ProcurementService.listMarketDataset(),
-      ProcurementService.listNotices({ minScore: NOTIFY_SCORE, openOnly: true, limit: 1000 }),
-      ProcurementService.listSourceHealth(),
-    ])
-    if (d.status === 'fulfilled') {
-      setAwards(d.value.awards)
-      setBidders(d.value.bidders)
+    try {
+      const d = await ProcurementService.listMarketDataset()
+      setAwards(d.awards)
+      setBidders(d.bidders)
+    } catch {
+      toast.error('Marknadsdatan kunde inte hämtas')
     }
-    if (n.status === 'fulfilled') setNotices(n.value)
-    if (h.status === 'fulfilled') setHealth(h.value)
-    const failed = [d, n, h].filter((r) => r.status === 'rejected')
-    if (failed.length > 0) toast.error('Delar av marknadsdatan kunde inte hämtas')
     setLoading(false)
   }, [])
 
@@ -73,11 +66,6 @@ export default function MarketPage() {
   const shares = useMemo(() => sharesByYear(groups), [groups])
   const bids = useMemo(() => bidsByYear(groups), [groups])
   const bidsMedian = useMemo(() => overallBidsMedian(groups), [groups])
-  const noticesInCounty = useMemo(
-    () => notices.filter((n) => county === 'all' || (n.county_codes ?? []).some((c) => matchesCounty(c, county))),
-    [notices, county]
-  )
-  const pipeline = useMemo(() => pipelineByQuarter(noticesInCounty, groups, today, 8), [noticesInCounty, groups, today])
   const challengers = useMemo(() => challengerBuyers(groups, biddersByRef, today, 18), [groups, biddersByRef, today])
   const quality = useMemo(() => qualityBuyers(groups, today), [groups, today])
 
@@ -87,7 +75,6 @@ export default function MarketPage() {
   const firstYear = market[0]?.year ?? null
   const latestBids = bids.filter((b) => b.year <= currentYear).slice(-1)[0] ?? null
   const totals = shareTotals(shares)
-  const inWindow = groups.filter((g) => isInWindow(g, today) && g.status !== 'ignored' && g.status !== 'done').length
 
   if (loading) {
     return (
@@ -98,7 +85,7 @@ export default function MarketPage() {
   }
 
   const noHistory = awards.length === 0
-  const countyText = county === 'begone' ? 'BeGones län' : county === 'all' ? 'alla län' : 'valt län'
+  const countyText = areaLabel(county)
 
   return (
     <div className="space-y-8">
@@ -108,8 +95,6 @@ export default function MarketPage() {
         </p>
         <CountySelect value={county} onChange={setCounty} />
       </div>
-
-      <SourceHealthWarning health={health} />
 
       <PulseRow
         stats={[
@@ -134,12 +119,6 @@ export default function MarketPage() {
             hint: firstYear ? `av avtalat tak sedan ${firstYear}` : null,
             tone: totals.begone > 0 ? 'good' : 'neutral',
           },
-          {
-            label: 'I bearbetningsfönster',
-            value: fmtNum(inWindow),
-            hint: '12 till 18 månader före slut',
-            tone: inWindow > 0 ? 'warn' : 'neutral',
-          },
         ]}
       />
 
@@ -156,13 +135,6 @@ export default function MarketPage() {
       </Section>
 
       <Section
-        title="Pipeline per kvartal"
-        hint="Förväntat täckningsbidrag i bevakningen per kvartal för sista anbudsdag, och avtalsklockans avtal per kvartal för förväntad annons med årsvärde."
-      >
-        <PipelineTable rows={pipeline} />
-      </Section>
-
-      <Section
         title="Utmanarläge"
         hint="Köpare där bara Anticimex och Nomor/Rentokil lämnade anbud senast och avtalet löper ut inom 18 månader. Ett tredje anbud har ofta stor chans."
       >
@@ -171,13 +143,6 @@ export default function MarketPage() {
 
       <Section title="Kvalitetsviktade köpare" hint="Köpare som utvärderar på pris och kvalitet, där rapportering, egenkontroll och stationskartor väger.">
         {noHistory ? <HistoryEmpty /> : <QualityBuyersTable rows={quality} />}
-      </Section>
-
-      {/* Lärdomar vunnet mot förlorat (verktyg 12): våra egna anbud med utfall */}
-      <LessonsSection />
-
-      <Section title="Källhälsa" hint="Varning när en källa varit tyst i över 24 timmar. TED och Kommers bär bevakningen om Mercell faller bort.">
-        <SourceHealthTable health={health} />
       </Section>
     </div>
   )

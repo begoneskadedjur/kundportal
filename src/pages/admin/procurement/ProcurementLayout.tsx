@@ -1,8 +1,8 @@
 // src/pages/admin/procurement/ProcurementLayout.tsx
 // Ram för upphandlingsportalen under /admin/upphandlingar: åtkomstkontroll
 // (admin eller profiles.is_procurement_manager), rubrik och egen flikrad.
-// Flikarna följer planens avsnitt 9. Detaljsidan för en upphandling
-// (/admin/upphandlingar/:noticeId) visas utan aktiv flik.
+// Sedan 3.63.0 samma två nivåer som den fristående portalen: fem huvudposter
+// och undertabbar ur procurementTabs.ts (docs/upphandlingsportal-ux-plan.md).
 //
 // Sedan 2026-09-25 är upphandlingsportalen en fristående plattform på
 // upphandling.begone.se (src/pages/procurement/ProcurementApp.tsx). Den här
@@ -11,17 +11,16 @@
 // Plan: docs/upphandlingsportal-plan.md
 
 import { Suspense } from 'react'
-import { NavLink, Navigate, Outlet } from 'react-router-dom'
-import { ExternalLink, Gavel } from 'lucide-react'
+import { Navigate, Outlet } from 'react-router-dom'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
+import { Icon } from '../../../components/icons/Icon'
+import { ProcurementSearch } from '../../../components/procurement/ProcurementSearch'
 import { useProcurementAccess } from '../../../hooks/useProcurementAccess'
-import { useProcurementBadge } from '../../../hooks/useProcurementBadge'
-import { PROCUREMENT_PORTAL_URL, procurementPath } from '../../../lib/procurementPortal'
-import { PROCUREMENT_TABS } from '../../procurement/procurementTabs'
+import { PROCUREMENT_PORTAL_URL } from '../../../lib/procurementPortal'
+import { MainNav, SectionHeader } from '../../procurement/ProcurementNav'
 
 export default function ProcurementLayout() {
   const { allowed, loading } = useProcurementAccess()
-  const unread = useProcurementBadge()
 
   if (loading) {
     return (
@@ -34,44 +33,29 @@ export default function ProcurementLayout() {
 
   return (
     <div className="min-h-screen bg-slate-950">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-[1120px] mx-auto px-4 sm:px-6 py-8">
         <div className="flex items-center gap-2 mb-1">
-          <Gavel className="w-4 h-4 text-[#20c58f]" />
-          <h1 className="text-lg font-semibold text-slate-100">Upphandlingar</h1>
-          <a
-            href={PROCUREMENT_PORTAL_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="ml-auto inline-flex items-center gap-1 text-[12px] text-slate-400 hover:text-[#20c58f]"
-          >
-            Öppna Upphandlingsbevakning
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        </div>
-        <p className="text-xs text-slate-500 mb-5">
-          Offentliga upphandlingar inom skadedjursbekämpning: bevakning, marknad, avtalsklocka och anbudsarbete.
-        </p>
-
-        <nav className="flex gap-5 border-b border-slate-800 mb-6 overflow-x-auto" aria-label="Upphandlingar">
-          {PROCUREMENT_TABS.map((t) => (
-            <NavLink
-              key={t.sub}
-              to={procurementPath(t.sub)}
-              end={t.end}
-              className={({ isActive }) =>
-                `relative -mb-px pb-2.5 text-sm whitespace-nowrap transition-colors border-b-2 ${
-                  isActive ? 'border-[#20c58f] text-slate-100 font-medium' : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`
-              }
+          <Icon name="upphandling.anbud" size={16} className="text-[#20c58f]" />
+          <span className="text-lg font-semibold text-slate-100">Upphandlingar</span>
+          <div className="ml-auto flex items-center gap-1">
+            <ProcurementSearch />
+            <a
+              href={PROCUREMENT_PORTAL_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 min-h-[44px] text-[12px] text-slate-400 hover:text-[#20c58f]"
             >
-              {t.label}
-              {t.label === 'Bevakning' && unread > 0 && (
-                <span className="ml-1.5 text-[11px] tabular-nums text-amber-400">{unread}</span>
-              )}
-            </NavLink>
-          ))}
-        </nav>
+              Öppna Upphandlingsbevakning
+              <Icon name="rapport.oppna" className="w-3 h-3" />
+            </a>
+          </div>
+        </div>
 
+        <div className="border-b border-slate-800 mb-8 overflow-x-auto">
+          <MainNav />
+        </div>
+
+        <SectionHeader />
         <Suspense
           fallback={
             <div className="py-16 flex justify-center">

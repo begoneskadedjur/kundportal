@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ChevronDown, Search } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import Select from '../../../ui/Select'
 import Button from '../../../ui/Button'
 import {
@@ -19,7 +19,7 @@ import {
   type AnswerWithNotice,
   type CriterionType,
 } from '../../../../services/procurementAnswerService'
-import { procurementPath } from '../../../../lib/procurementPortal'
+import { noticePath } from '../../../../lib/procurementPortal'
 import { EmptyState, LinkButton } from '../ui'
 import { fmtDate, fmtNum } from '../uiFormat'
 import { Label, inputCls } from '../detail/fields'
@@ -191,7 +191,7 @@ export default function AnswerLibrary({ pickFor, onUsed, showHeading = !pickFor 
 
       <div className="flex flex-col sm:flex-row gap-2 mb-3">
         <div className="relative flex-1">
-          <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <Icon name="allman.sok" className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input className={`${inputCls} pl-8`} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Sök i rubrik, kriterium och svar" aria-label="Sök i biblioteket" />
         </div>
         <div className="sm:w-56">
@@ -230,7 +230,7 @@ export default function AnswerLibrary({ pickFor, onUsed, showHeading = !pickFor 
                 <li key={a.id} className="py-2.5">
                   <div className="flex items-start gap-2">
                     <button type="button" onClick={() => toggle(a.id)} className="mt-0.5 p-0.5 text-slate-600 hover:text-slate-300" aria-label={isOpen ? 'Fäll ihop' : 'Visa svaret'} aria-expanded={isOpen}>
-                      <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? '' : '-rotate-90'}`} />
+                      <Icon name="allman.chevron" className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
                     </button>
                     <div className="flex-1 min-w-0">
                       <button type="button" onClick={() => toggle(a.id)} className="text-left text-[12.5px] text-slate-100 hover:text-white">
@@ -243,7 +243,7 @@ export default function AnswerLibrary({ pickFor, onUsed, showHeading = !pickFor 
                         </span>
                         <span>Använt {fmtNum(a.use_count)} gånger{a.last_used_at ? `, senast ${fmtDate(a.last_used_at)}` : ''}</span>
                         {a.source_notice && (
-                          <Link to={procurementPath('/' + a.source_notice.id)} className="hover:text-slate-300 hover:underline truncate max-w-[280px]">
+                          <Link to={noticePath(a.source_notice.id)} className="hover:text-slate-300 hover:underline truncate max-w-[280px]">
                             BGU-{a.source_notice.bgu_number} {a.source_notice.title}
                           </Link>
                         )}

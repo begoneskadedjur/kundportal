@@ -1,21 +1,22 @@
 // src/pages/procurement/ProcurementShell.tsx
-// Skalet för den fristående upphandlingsportalen: topprad med logotyp,
-// flikrad, notisklocka (bara upphandlingsnotiser), temaväxlare, Mitt konto och
-// Logga ut. Ingen admin-sidomeny och inga andra portaldelar. Släpper bara in
-// profiler med admin eller is_procurement_manager; övriga får ett vänligt nej.
+// Skalet för den fristående upphandlingsportalen (docs/upphandlingsportal-ux-plan.md
+// avsnitt 2 och 5): topprad med logotyp, fem huvudposter som understrukna
+// tabbar, ikonknappar för sök, notiser (bara upphandlingsnotiser), tema och
+// konto. På mobil blir huvudposterna en fast bottenrad. Undertabbarna visas
+// under sidrubriken. Ingen admin-sidomeny och inga andra portaldelar. Släpper
+// bara in profiler med admin eller is_procurement_manager; övriga får ett vänligt nej.
 
 import { Suspense, useEffect } from 'react'
-import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
-import { LogOut, UserRound } from 'lucide-react'
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { hasProcurementAccess } from '../../hooks/useProcurementAccess'
-import { useProcurementBadge } from '../../hooks/useProcurementBadge'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
-import { ThemeToggle } from '../../components/shared/ThemeToggle'
+import { Icon } from '../../components/icons/Icon'
 import { ProcurementNotificationBell } from '../../components/procurement/ProcurementNotificationBell'
+import { ProcurementSearch } from '../../components/procurement/ProcurementSearch'
 import Button from '../../components/ui/Button'
 import { ProcurementBrand } from './ProcurementBrand'
-import { PROCUREMENT_TABS } from './procurementTabs'
+import { AccountMenu, BottomNav, MainNav, SectionHeader, ThemeButton } from './ProcurementNav'
 
 function NoAccess({ email, onSignOut }: { email: string | null; onSignOut: () => void }) {
   return (
@@ -31,7 +32,7 @@ function NoAccess({ email, onSignOut }: { email: string | null; onSignOut: () =>
           </p>
           <div className="mt-4">
             <Button variant="secondary" size="sm" onClick={onSignOut}>
-              <LogOut className="w-4 h-4 mr-1.5" />
+              <Icon name="allman.logga-ut" className="w-4 h-4 mr-1.5" />
               Logga ut
             </Button>
           </div>
@@ -43,7 +44,6 @@ function NoAccess({ email, onSignOut }: { email: string | null; onSignOut: () =>
 
 export default function ProcurementShell() {
   const { profile, user, loading, signOut } = useAuth()
-  const unread = useProcurementBadge()
   const location = useLocation()
 
   // Fristående skal: egen fliktitel, annars ärvs "BeGone Kundportal" från index.html
@@ -68,59 +68,24 @@ export default function ProcurementShell() {
   return (
     <div className="min-h-screen bg-slate-950">
       <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur border-b border-slate-800">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center gap-3 h-14">
-            <NavLink to="/" className="min-w-0" aria-label="Upphandlingsbevakning, startsidan">
+        <div className="max-w-[1120px] mx-auto px-4 sm:px-6">
+          <div className="flex items-center gap-4 h-14">
+            <Link to="/" className="min-w-0 lg:shrink-0" aria-label="Upphandlingsbevakning, Idag">
               <ProcurementBrand />
-            </NavLink>
-            <div className="ml-auto flex items-center gap-1">
+            </Link>
+            <MainNav className="hidden lg:flex ml-2 min-w-0" />
+            <div className="ml-auto flex items-center">
+              <ProcurementSearch />
               <ProcurementNotificationBell />
-              <ThemeToggle />
-              <NavLink
-                to="/mitt-konto"
-                className={({ isActive }) =>
-                  `hidden sm:inline-flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[13px] transition-colors ${isActive ? 'text-slate-100 bg-slate-800' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'}`
-                }
-                title="Mitt konto"
-              >
-                <UserRound className="w-4 h-4" />
-                <span className="max-w-[140px] truncate">{name}</span>
-              </NavLink>
-              <NavLink to="/mitt-konto" className="sm:hidden p-2 rounded-lg text-slate-400 hover:text-slate-100" aria-label="Mitt konto">
-                <UserRound className="w-[18px] h-[18px]" />
-              </NavLink>
-              <button
-                type="button"
-                onClick={() => void signOut()}
-                className="p-2 rounded-lg text-slate-400 hover:text-slate-100 hover:bg-slate-800/60 transition-colors"
-                aria-label="Logga ut"
-                title="Logga ut"
-              >
-                <LogOut className="w-[18px] h-[18px]" />
-              </button>
+              <ThemeButton />
+              <AccountMenu name={name} onSignOut={() => void signOut()} />
             </div>
           </div>
-          <nav className="flex gap-5 overflow-x-auto -mb-px" aria-label="Upphandlingsbevakning">
-            {PROCUREMENT_TABS.map((t) => (
-              <NavLink
-                key={t.sub}
-                to={t.sub || '/'}
-                end={t.end}
-                className={({ isActive }) =>
-                  `relative pb-2.5 pt-1 text-sm whitespace-nowrap transition-colors border-b-2 ${
-                    isActive ? 'border-[#20c58f] text-slate-100 font-medium' : 'border-transparent text-slate-400 hover:text-slate-200'
-                  }`
-                }
-              >
-                {t.label}
-                {t.label === 'Bevakning' && unread > 0 && <span className="ml-1.5 text-[11px] tabular-nums text-amber-400">{unread}</span>}
-              </NavLink>
-            ))}
-          </nav>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-[1120px] mx-auto px-4 sm:px-6 pt-8 pb-28 lg:pb-12">
+        <SectionHeader />
         <Suspense
           fallback={
             <div className="py-16 flex justify-center">
@@ -131,6 +96,8 @@ export default function ProcurementShell() {
           <Outlet />
         </Suspense>
       </main>
+
+      <BottomNav />
     </div>
   )
 }

@@ -67,7 +67,7 @@ export default function NotificationCenter({
 
       // Upphandlingsnotis: detaljsidan, eller portalens startsida utan id
       if (notification.case_type === 'procurement') {
-        window.location.href = procurementPortalUrl(notification.case_id ? `/${notification.case_id}` : '');
+        window.location.href = procurementPortalUrl(notification.case_id ? `/upphandling/${notification.case_id}` : '');
         return;
       }
 

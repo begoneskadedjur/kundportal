@@ -7,7 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { AlertTriangle } from 'lucide-react'
+import { Icon } from '../../icons/Icon'
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import Button from '../../ui/Button'
 import {
@@ -297,7 +297,7 @@ export default function BidCalculator({ notice, buyerAwards, bids, settings, onS
 
       {result.labourWarning && (
         <div className="flex items-center gap-2 text-[12px] text-amber-400">
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0" />
           {result.labourWarning}. Marginalen blir missvisande tills arbetstiden är rimlig.
         </div>
       )}

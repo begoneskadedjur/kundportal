@@ -5,7 +5,7 @@
 
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { AlertTriangle } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import Select from '../../../ui/Select'
 import { COUNTY_OPTIONS } from './format'
 import type { ProcurementSourceHealth } from '../../../../types/procurement'
@@ -109,9 +109,10 @@ export function SourceHealthWarning({ health }: { health: ProcurementSourceHealt
   if (silent.length === 0) return null
   return (
     <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[12.5px] text-amber-300">
-      <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+      <Icon name="rapport.avvikelse" className="w-4 h-4 mt-0.5 shrink-0" />
       <span>
-        {silent.map((h) => SOURCE_LABEL[h.source] ?? h.source).join(', ')} har varit tyst i över 24 timmar eller fått fel i rad. Kontrollera källhälsan nedan.
+        {silent.map((h) => SOURCE_LABEL[h.source] ?? h.source).join(', ')} har varit tyst i över 24 timmar eller fått fel i rad. Se källhälsan under{' '}
+        <Link to={procurementPath('/installningar')} className="underline underline-offset-2 hover:text-amber-200">Inställningar</Link>.
       </span>
     </div>
   )

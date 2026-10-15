@@ -4,11 +4,11 @@
 // förväntad annons, status och ansvarig.
 
 import { useState } from 'react'
-import { ExternalLink, Pencil } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { Icon } from '../../../icons/Icon'
 import Select from '../../../ui/Select'
-import { END_SOURCE_LABEL, FOLLOWUP_LABEL, type ProcurementAwardStatus } from '../../../../types/procurement'
-import { procurementPath } from '../../../../lib/procurementPortal'
+import { END_SOURCE_LABEL, FOLLOWUP_LABEL, WINDOW_STATE_DOT, WINDOW_STATE_LABEL, type ProcurementAwardStatus } from '../../../../types/procurement'
+import { noticePath } from '../../../../lib/procurementPortal'
 import type { ProcurementManagerProfile } from '../../../../services/procurementService'
 import { LinkButton, StatusDot } from '../ui'
 import { fmtDate, fmtKrShort, fmtRelativeDays, tableCls } from '../uiFormat'
@@ -21,7 +21,7 @@ import {
   annualValueOfGroup,
   expectedAnnouncementQuarter,
   followupOf,
-  isInWindow,
+  windowStateOf,
   type ProcurementGroup,
 } from '../market/marketStats'
 
@@ -48,7 +48,7 @@ function FollowupCell({ g, today }: { g: ProcurementGroup; today: string }) {
         <StatusDot tone="good">{FOLLOWUP_LABEL.new_notice}</StatusDot>
         <div className="text-[11px] text-slate-500 max-w-[220px] truncate" title={g.followupTitle ?? ''}>
           {g.followupNoticeId ? (
-            <Link to={procurementPath(`/${g.followupNoticeId}`)} className="text-[#20c58f] hover:underline">{g.followupTitle ?? 'Öppna annonsen'}</Link>
+            <Link to={noticePath(g.followupNoticeId)} className="text-[#20c58f] hover:underline">{g.followupTitle ?? 'Öppna annonsen'}</Link>
           ) : (
             g.followupTitle
           )}
@@ -56,7 +56,7 @@ function FollowupCell({ g, today }: { g: ProcurementGroup; today: string }) {
         </div>
         {g.followupUrl && (
           <a href={g.followupUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-[#20c58f]">
-            Källan <ExternalLink className="w-3 h-3" />
+            Källan <Icon name="rapport.oppna" className="w-3 h-3" />
           </a>
         )}
       </div>
@@ -73,7 +73,7 @@ function FollowupCell({ g, today }: { g: ProcurementGroup; today: string }) {
       </div>
     )
   }
-  if (status === 'passed_no_notice') return <div className="mt-1"><StatusDot tone="bad">{FOLLOWUP_LABEL.passed_no_notice}</StatusDot></div>
+  if (status === 'passed_no_notice') return <div className="mt-1"><StatusDot dotClass={WINDOW_STATE_DOT.due}>{WINDOW_STATE_LABEL.due}</StatusDot></div>
   return <div className="mt-1"><StatusDot tone="muted">{FOLLOWUP_LABEL.stale}</StatusDot></div>
 }
 
@@ -122,7 +122,7 @@ function EndDateCell({ g, onCorrectEnd }: { g: ProcurementGroup; onCorrectEnd: P
           title="Rätta slutdatum"
           aria-label="Rätta slutdatum"
         >
-          <Pencil className="w-3 h-3" />
+          <Icon name="allman.anteckning" className="w-3 h-3" />
         </button>
       </div>
       <div className="text-[11px] text-slate-500">{g.endDate ? fmtRelativeDays(g.endDate) : ''}</div>
@@ -163,9 +163,7 @@ export function ClockTable({ rows, today, managers, onStatus, onOwner, onCorrect
         <tbody>
           {rows.map((g) => {
             const followup = followupOf(g, today)
-            const settled = !!followup && followup !== 'passed_no_notice'
-            const inWindow = !settled && isInWindow(g, today)
-            const late = !settled && !!g.windowEnd && g.windowEnd < today && !!g.endDate && g.endDate >= today
+            const windowState = windowStateOf(g, today)
             const annual = annualValueOfGroup(g)
             return (
               <tr key={g.key} className={tableCls.tr}>
@@ -191,8 +189,7 @@ export function ClockTable({ rows, today, managers, onStatus, onOwner, onCorrect
                   {g.windowStart ? (
                     <>
                       <div>{fmtDate(g.windowStart)} till {fmtDate(g.windowEnd)}</div>
-                      {inWindow && <StatusDot tone="warn">I fönstret nu</StatusDot>}
-                      {late && <StatusDot tone="warn">Fönstret har passerat, avtalet löper</StatusDot>}
+                      {windowState && windowState !== 'due' && <StatusDot dotClass={WINDOW_STATE_DOT[windowState]}>{WINDOW_STATE_LABEL[windowState]}</StatusDot>}
                     </>
                   ) : '–'}
                   <FollowupCell g={g} today={today} />

@@ -5,7 +5,7 @@
 import toast from 'react-hot-toast'
 import Select from '../../../ui/Select'
 import type { NoticeWithRelations, ProcurementManagerProfile } from '../../../../services/procurementService'
-import { OUR_STATUS_DOT, OUR_STATUS_LABEL, type ProcurementOurStatus } from '../../../../types/procurement'
+import { OUR_STATUS_CHOICES, OUR_STATUS_DOT, OUR_STATUS_LABEL, ourStatusChoice, type ProcurementOurStatus } from '../../../../types/procurement'
 import { StatusDot } from '../ui'
 import { BlurText, Block, Label, type SaveNotice } from './fields'
 import { errMsg, personName } from './helpers'
@@ -42,11 +42,11 @@ export default function ManagementBlock({ notice, managers, onSave }: Props) {
           <div>
             <Select
               label="Status"
-              value={notice.our_status}
+              value={ourStatusChoice(notice.our_status)}
               onChange={(v) => {
-                if (v !== notice.our_status) void save({ our_status: v as ProcurementOurStatus }, `Status: ${OUR_STATUS_LABEL[v as ProcurementOurStatus]}`)
+                if (v !== ourStatusChoice(notice.our_status)) void save({ our_status: v as ProcurementOurStatus }, `Status: ${OUR_STATUS_LABEL[v as ProcurementOurStatus]}`)
               }}
-              options={(Object.keys(OUR_STATUS_LABEL) as ProcurementOurStatus[]).map((s) => ({ value: s, label: OUR_STATUS_LABEL[s] }))}
+              options={OUR_STATUS_CHOICES.map((s) => ({ value: s, label: OUR_STATUS_LABEL[s] }))}
             />
             <div className="mt-1.5">
               <StatusDot dotClass={OUR_STATUS_DOT[notice.our_status]}>{OUR_STATUS_LABEL[notice.our_status]}</StatusDot>

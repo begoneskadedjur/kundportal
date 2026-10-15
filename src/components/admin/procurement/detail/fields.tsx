@@ -4,7 +4,7 @@
 // hopfällbart block med ankare. Rena hjälpfunktioner ligger i helpers.tsx.
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import { numToInput, parseNum } from './helpers'
 import type { ProcurementService } from '../../../../services/procurementService'
 
@@ -195,7 +195,7 @@ export function Block({
     <section id={id} className="scroll-mt-24">
       <div className="flex items-end justify-between gap-3 mb-2">
         <button type="button" onClick={() => setOpen((o) => !o)} className="group flex items-center gap-1.5 min-w-0 text-left" aria-expanded={open}>
-          <ChevronDown className={`w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition-transform ${open ? '' : '-rotate-90'}`} />
+          <Icon name="allman.chevron" className={`w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`} />
           <h2 className="text-xs uppercase tracking-wide text-slate-500 group-hover:text-slate-300">
             {num && <span className="tabular-nums text-slate-600 mr-1.5">{num}</span>}
             {title}

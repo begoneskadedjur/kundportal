@@ -17,6 +17,7 @@ import {
   marketByYear,
   matchesCounty,
   matchesHorizon,
+  windowStateOf,
   median,
   nextQuarters,
   overallBidsMedian,
@@ -137,6 +138,23 @@ describe('hjälpare', () => {
     expect(matchesCounty(null, 'all')).toBe(true)
     expect(matchesCounty(null, 'begone')).toBe(false)
     expect(matchesCounty('SE224', 'SE224')).toBe(true)
+  })
+
+  it('landsdelar i områdesvalet', () => {
+    expect(matchesCounty('SE332', 'region:norrland')).toBe(true)
+    expect(matchesCounty('SE110', 'region:norrland')).toBe(false)
+    expect(matchesCounty('SE110', 'region:svealand')).toBe(true)
+    expect(matchesCounty('SE224', 'region:gotaland')).toBe(true)
+    expect(matchesCounty('SE224', 'region:okand')).toBe(false)
+  })
+
+  it('läget mot bearbetningsfönstret', () => {
+    const g = { windowStart: '2026-06-01', windowEnd: '2026-12-01', endDate: '2027-12-01', followupStatus: null }
+    expect(windowStateOf(g, '2026-05-01')).toBe('before')
+    expect(windowStateOf(g, '2026-10-15')).toBe('in')
+    expect(windowStateOf(g, '2027-03-01')).toBe('late')
+    expect(windowStateOf({ ...g, endDate: '2026-09-01' }, '2026-10-15')).toBe('due')
+    expect(windowStateOf({ ...g, followupStatus: 'new_notice' }, '2026-10-15')).toBeNull()
   })
 
   it('kommande kvartal', () => {

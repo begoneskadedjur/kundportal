@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Plus, X } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import type { NoticeWithRelations } from '../../../../services/procurementService'
 import { CRITERIA_TYPE_LABEL, type ProcurementCriteriaType } from '../../../../types/procurement'
 import Button from '../../../ui/Button'
@@ -109,7 +109,7 @@ export default function EvaluationBlock({ notice, onSave }: { notice: NoticeWith
                   </td>
                   <td className={tableCls.td}>
                     <button type="button" onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))} className="p-1 text-slate-500 hover:text-red-400" aria-label="Ta bort kriterium">
-                      <X className="w-3.5 h-3.5" />
+                      <Icon name="allman.stang" className="w-3.5 h-3.5" />
                     </button>
                   </td>
                 </tr>
@@ -122,7 +122,7 @@ export default function EvaluationBlock({ notice, onSave }: { notice: NoticeWith
           <div className="flex items-center gap-4">
             <LinkButton onClick={() => setRows((rs) => [...rs, { name: '', weight: null, type: 'quality' }])}>
               <span className="inline-flex items-center gap-1">
-                <Plus className="w-3 h-3" /> Lägg till kriterium
+                <Icon name="allman.plus" className="w-3 h-3" /> Lägg till kriterium
               </span>
             </LinkButton>
             {rows.length > 0 && (

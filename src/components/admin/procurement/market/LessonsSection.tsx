@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ProcurementAnswerService, LESSONS_MIN_OUTCOMES, type LessonGroup, type LessonsData } from '../../../../services/procurementAnswerService'
 import { CRITERIA_TYPE_LABEL } from '../../../../types/procurement'
-import { procurementPath } from '../../../../lib/procurementPortal'
+import { noticePath } from '../../../../lib/procurementPortal'
 import { EmptyState, PulseRow, Section, StatusDot } from '../ui'
 import { fmtDate, fmtKr, fmtNum, fmtPct, tableCls } from '../uiFormat'
 
@@ -144,7 +144,7 @@ export default function LessonsSection() {
             {rows.map((r) => (
               <tr key={r.bidId} className={tableCls.tr}>
                 <td className={`${tableCls.td} min-w-[220px]`}>
-                  <Link to={procurementPath('/' + r.noticeId)} className="text-slate-200 hover:text-[#20c58f] hover:underline">
+                  <Link to={noticePath(r.noticeId)} className="text-slate-200 hover:text-[#20c58f] hover:underline">
                     {r.title}
                   </Link>
                   <div className="text-[11px] text-slate-500">

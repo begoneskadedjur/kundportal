@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { AlertTriangle, ExternalLink, Plus } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import Modal from '../../../ui/Modal'
 import Button from '../../../ui/Button'
 import Input from '../../../ui/Input'
@@ -182,7 +182,7 @@ export function SignalSourcesSection({ title = 'Signalkällor' }: { title?: stri
       hint="Adresser till upphandlingsplaner. Hämtas dagligen 05:30; vid ändring plockar AI ut rader om skadedjur och sanering med kvartal."
       action={
         <LinkButton onClick={() => setEditing({ ...EMPTY })}>
-          <span className="inline-flex items-center gap-1"><Plus className="w-3.5 h-3.5" />Lägg till</span>
+          <span className="inline-flex items-center gap-1"><Icon name="allman.plus" className="w-3.5 h-3.5" />Lägg till</span>
         </LinkButton>
       }
     >
@@ -194,7 +194,7 @@ export function SignalSourcesSection({ title = 'Signalkällor' }: { title?: stri
         <>
           {unverified > 0 && (
             <div className="flex items-start gap-2 px-3 py-2.5 border-b border-slate-800 text-[12.5px] text-amber-300 bg-amber-500/5">
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <Icon name="rapport.avvikelse" className="w-4 h-4 mt-0.5 shrink-0" />
               <span>
                 {unverified} av {sources.length} källor är overifierade. De seedade adresserna är startsidor eller upphandlingssidor som hittades
                 2026-09-24 och har inte granskats för att innehålla en upphandlingsplan. Öppna varje adress, rätta den vid behov och markera som verifierad.
@@ -224,7 +224,7 @@ export function SignalSourcesSection({ title = 'Signalkällor' }: { title?: stri
                         <div className="text-slate-200">{s.name}</div>
                         <a href={s.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-[#20c58f] break-all">
                           {s.url.replace(/^https?:\/\//, '').slice(0, 60)}
-                          <ExternalLink className="w-3 h-3 shrink-0" />
+                          <Icon name="rapport.oppna" className="w-3 h-3 shrink-0" />
                         </a>
                         {s.notes && <div className="text-[11px] text-slate-500">{s.notes}</div>}
                       </div>

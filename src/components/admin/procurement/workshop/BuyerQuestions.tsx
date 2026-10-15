@@ -5,7 +5,7 @@
 
 import { useState } from 'react'
 import toast from 'react-hot-toast'
-import { Trash2 } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import { ProcurementService, type NoticeWithRelations } from '../../../../services/procurementService'
 import type { ProcurementQuestion } from '../../../../types/procurement'
 import { EmptyState, LinkButton } from '../ui'
@@ -117,7 +117,7 @@ export default function BuyerQuestions({ notice, questions, onChanged }: Props) 
                   </select>
                   <span className={`text-[10.5px] ${q.source === 'ai' ? 'text-amber-400/80' : 'text-slate-500'}`}>{q.source === 'ai' ? 'AI-förslag' : 'Egen'}</span>
                   <button type="button" onClick={() => remove(q)} className="p-1 text-slate-600 hover:text-red-400" aria-label="Ta bort fråga">
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Icon name="allman.radera" className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>

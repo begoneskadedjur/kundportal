@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Download, Trash2 } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import Button from '../../../ui/Button'
 import { ProcurementService, type NoticeWithRelations } from '../../../../services/procurementService'
 import { PriceListService } from '../../../../services/priceListService'
@@ -256,7 +256,7 @@ export default function PriceAppendix({ notice, lines, settings, currentBid, onC
                     <td className={`${tableCls.tdRight} ${toneTextClass(marginTone(pct, settings))}`}>{fmtMargin(pct)}</td>
                     <td className={tableCls.td}>
                       <button type="button" onClick={() => remove(l)} className="p-1 text-slate-600 hover:text-red-400" aria-label="Ta bort rad">
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Icon name="allman.radera" className="w-3.5 h-3.5" />
                       </button>
                     </td>
                   </tr>
@@ -293,7 +293,7 @@ export default function PriceAppendix({ notice, lines, settings, currentBid, onC
           )}
         </p>
         <Button size="sm" variant="outline" onClick={() => void exportXlsx()} loading={exporting} disabled={lines.length === 0}>
-          <Download className="w-3.5 h-3.5 mr-1.5" />
+          <Icon name="upphandling.excel" className="w-3.5 h-3.5 mr-1.5" />
           Exportera xlsx
         </Button>
       </div>

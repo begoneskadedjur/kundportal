@@ -75,13 +75,25 @@ export function procurementBase(): string {
 /**
  * Sökväg inne i upphandlingsportalen. procurementPath('/bevakning') blir
  * /bevakning i fristående läge och /admin/upphandlingar/bevakning i adminportalen.
- * procurementPath('') och procurementPath('/') ger startsidan (Marknad).
+ * procurementPath('') och procurementPath('/') ger startsidan (Idag).
  */
 export function procurementPath(sub = ''): string {
   const clean = !sub || sub === '/' ? '' : sub.startsWith('/') ? sub : `/${sub}`
   const base = procurementBase()
   if (!clean) return base || '/'
   return `${base}${clean}`
+}
+
+/** Ett uuid, så att /:noticeId aldrig tolkar ett nytt ord på roten som ett id */
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Kanonisk väg till en upphandling: /upphandling/:id (plus valfritt steg).
+ * Den gamla vägen /:id fungerar för alltid (mejl, notiser), men nya länkar
+ * byggs härifrån.
+ */
+export function noticePath(id: string, step?: string): string {
+  return procurementPath(`/upphandling/${id}${step ? `/${step}` : ''}`)
 }
 
 /** Fullständig adress i den fristående portalen, för länkar ut ur adminportalen */

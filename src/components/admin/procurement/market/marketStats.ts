@@ -26,9 +26,11 @@ import type {
   ProcurementNotice,
   ProcurementSourceHealth,
   ProcurementValueKind,
+  ProcurementWindowState,
 } from '../../../../types/procurement'
 import {
   BEGONE_COUNTIES,
+  SE_REGIONS,
   addMonthsIso,
   countyFromName,
   daysBetweenIso,
@@ -75,23 +77,9 @@ export function classifyOrg(org: string | null | undefined, isBegone = false): S
 }
 
 // ---------------------------------------------------------------------------
-// Avtalsklockans status
+// Avtalsklockans status: orden ligger i types/procurement.ts (en enda källa)
 
-export const AWARD_STATUS_LABEL: Record<ProcurementAwardStatus, string> = {
-  open: 'Öppen',
-  contacted: 'Kontaktad',
-  planned: 'Planerad',
-  done: 'Klar',
-  ignored: 'Ignorerad',
-}
-
-export const AWARD_STATUS_DOT: Record<ProcurementAwardStatus, string> = {
-  open: 'bg-sky-400',
-  contacted: 'bg-amber-400',
-  planned: 'bg-[#20c58f]',
-  done: 'bg-emerald-400',
-  ignored: 'bg-slate-600',
-}
+export { AWARD_STATUS_DOT, AWARD_STATUS_LABEL } from '../../../../types/procurement'
 
 export const VALUE_KIND_LABEL: Record<ProcurementValueKind, string> = {
   ceiling: 'ramtak',
@@ -481,12 +469,18 @@ export function buildProcurements(awards: AwardWithRelations[]): ProcurementGrou
 // Län
 
 /** 'begone' = BeGones län, 'all' = alla, annars en NUTS3-kod */
+/**
+ * Områdesval: hela Sverige (all, förvalt), landsdel (region:norrland,
+ * region:svealand, region:gotaland) eller ett län (SE110 ...). 'begone' finns
+ * kvar för äldre anrop men visas inte som val (beslut 2026-10-15).
+ */
 export type CountyFilter = 'begone' | 'all' | string
 
 export function matchesCounty(code: string | null | undefined, filter: CountyFilter): boolean {
   if (filter === 'all') return true
   if (!code) return false
   if (filter === 'begone') return BEGONE_COUNTIES.includes(code)
+  if (filter.startsWith('region:')) return (SE_REGIONS[filter.slice(7)]?.counties ?? []).includes(code)
   return code === filter
 }
 
@@ -627,6 +621,22 @@ export function annualValueOfGroup(g: ProcurementGroup): number | null {
 
 export function isInWindow(g: Pick<ProcurementGroup, 'windowStart' | 'windowEnd'>, today: string): boolean {
   return !!g.windowStart && !!g.windowEnd && g.windowStart <= today && today <= g.windowEnd
+}
+
+/**
+ * Avtalets läge mot bearbetningsfönstret: före fönstret, i fönstret, sent
+ * (fönstret har passerat, under 12 månader kvar) eller annons väntas nu (slut
+ * passerat utan ny annons). Null när köparen redan annonserat eller tilldelat
+ * på nytt, när avtalet är gammalt eller när slutdatum saknas.
+ */
+export function windowStateOf(g: Pick<ProcurementGroup, 'windowStart' | 'windowEnd' | 'endDate' | 'followupStatus'>, today: string): ProcurementWindowState | null {
+  const f = followupOf(g, today)
+  if (f === 'passed_no_notice') return 'due'
+  if (f) return null
+  if (!g.endDate || !g.windowStart || !g.windowEnd) return null
+  if (today < g.windowStart) return 'before'
+  if (today <= g.windowEnd) return 'in'
+  return 'late'
 }
 
 /**

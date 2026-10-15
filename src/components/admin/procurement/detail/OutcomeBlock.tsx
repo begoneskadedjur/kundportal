@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import { Check } from 'lucide-react'
+import { Icon } from '../../../icons/Icon'
 import Button from '../../../ui/Button'
 import {
   ProcurementService,
@@ -216,7 +216,7 @@ function BiddersSection({ noticeId, bidders, onChanged }: { noticeId: string; bi
                   <td className={tableCls.tdRight}>{fmtKr(b.price)}</td>
                   <td className={tableCls.tdRight}>{fmtNum(b.score, 2)}</td>
                   <td className={tableCls.tdRight}>{b.rank ?? '–'}</td>
-                  <td className={tableCls.td}>{b.is_winner ? <Check className="w-3.5 h-3.5 text-[#20c58f]" aria-label="Vann" /> : ''}</td>
+                  <td className={tableCls.td}>{b.is_winner ? <Icon name="allman.bock" className="w-3.5 h-3.5 text-[#20c58f]" aria-label="Vann" /> : ''}</td>
                   <td className={`${tableCls.td} text-slate-500`}>{BIDDER_SOURCE_LABEL[b.source] ?? b.source}</td>
                   <td className={`${tableCls.td} whitespace-nowrap`}>
                     {b.verified ? (

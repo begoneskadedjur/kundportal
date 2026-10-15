@@ -6,7 +6,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { Link, Navigate } from 'react-router-dom'
-import { Lock, Mail } from 'lucide-react'
+import { Icon } from '../../components/icons/Icon'
 import { useAuth } from '../../contexts/AuthContext'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import Button from '../../components/ui/Button'
@@ -54,7 +54,7 @@ export default function ProcurementLogin() {
             <div>
               <label htmlFor="proc-email" className="block text-[11px] uppercase tracking-[0.14em] text-slate-500 mb-1.5">E-postadress</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Icon name="kontakt.mejl" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   id="proc-email"
                   type="email"
@@ -71,7 +71,7 @@ export default function ProcurementLogin() {
             <div>
               <label htmlFor="proc-password" className="block text-[11px] uppercase tracking-[0.14em] text-slate-500 mb-1.5">Lösenord</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Icon name="allman.las" className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   id="proc-password"
                   type="password"
