@@ -12,11 +12,13 @@ import type {
   ProcurementBid,
   ProcurementBidder,
   ProcurementBuyer,
+  ProcurementContact,
   ProcurementDocType,
   ProcurementDocument,
   ProcurementDocumentRequest,
   ProcurementEvent,
   ProcurementInboundEmail,
+  ProcurementManualType,
   ProcurementNotice,
   ProcurementNoticeSource,
   ProcurementOurStatus,
@@ -242,6 +244,87 @@ export class ProcurementService {
       .from('procurement_user_settings')
       .upsert({ user_id: u.user.id, digest_enabled: enabled } as never, { onConflict: 'user_id' })
     if (error) fail('Kunde inte spara inställningen', error)
+  }
+
+  /** Notis när ett avtal går in i bearbetningsfönstret, på som standard */
+  static async getWindowNotifyEnabled(): Promise<boolean> {
+    const { data: u } = await supabase.auth.getUser()
+    if (!u.user) return true
+    const { data } = await supabase.from('procurement_user_settings').select('window_notify_enabled').eq('user_id', u.user.id).maybeSingle()
+    return (data as { window_notify_enabled?: boolean } | null)?.window_notify_enabled ?? true
+  }
+
+  static async setWindowNotifyEnabled(enabled: boolean): Promise<void> {
+    const { data: u } = await supabase.auth.getUser()
+    if (!u.user) throw new Error('Du är inte inloggad')
+    const { error } = await supabase
+      .from('procurement_user_settings')
+      .upsert({ user_id: u.user.id, window_notify_enabled: enabled } as never, { onConflict: 'user_id' })
+    if (error) fail('Kunde inte spara inställningen', error)
+  }
+
+  // -------------------------------------------------------------------------
+  // Kontaktpersoner hos köparen (procurement_contacts)
+
+  /** Kontakter för en köpare, eller alla (för avtalsklockan) */
+  static async listContacts(buyerId?: string): Promise<ProcurementContact[]> {
+    let q = supabase.from('procurement_contacts').select('*')
+    if (buyerId) q = q.eq('buyer_id', buyerId)
+    const { data, error } = await q.order('last_contacted_at', { ascending: false, nullsFirst: false }).order('last_seen_at', { ascending: false }).limit(5000)
+    if (error) fail('Kunde inte hämta kontaktpersoner', error)
+    return rows<ProcurementContact>(data)
+  }
+
+  static async saveContact(input: Partial<Pick<ProcurementContact, 'id' | 'name' | 'role' | 'email' | 'phone' | 'last_contacted_at' | 'notes'>> & { buyer_id: string }): Promise<ProcurementContact> {
+    const me = await currentUser()
+    const clean = {
+      buyer_id: input.buyer_id,
+      name: input.name?.trim() || null,
+      role: input.role?.trim() || null,
+      email: input.email?.trim().toLowerCase() || null,
+      phone: input.phone?.trim() || null,
+      last_contacted_at: input.last_contacted_at || null,
+      notes: input.notes?.trim() || null,
+    }
+    const q = input.id
+      ? supabase.from('procurement_contacts').update(clean as never).eq('id', input.id).select('*').single()
+      : supabase.from('procurement_contacts').insert({ ...clean, source: 'manual', created_by: me.id } as never).select('*').single()
+    const { data, error } = await q
+    if (error) fail('Kunde inte spara kontakten', error)
+    return data as unknown as ProcurementContact
+  }
+
+  static async deleteContact(id: string): Promise<void> {
+    const { error } = await supabase.from('procurement_contacts').delete().eq('id', id)
+    if (error) fail('Kunde inte ta bort kontakten', error)
+  }
+
+  // -------------------------------------------------------------------------
+  // Egna poster i Anbud: direktupphandling, avrop och offertförfrågan
+
+  /** Skapar en egen post via RPC:n procurement_create_manual_notice. Returnerar upphandlingens id. */
+  static async createManualNotice(input: {
+    type: ProcurementManualType
+    title: string
+    buyerId?: string | null
+    buyerName?: string | null
+    deadline?: string | null
+    value?: number | null
+    ownerId?: string | null
+    notes?: string | null
+  }): Promise<string> {
+    const { data, error } = await supabase.rpc('procurement_create_manual_notice' as never, {
+      p_type: input.type,
+      p_title: input.title,
+      p_buyer_id: input.buyerId ?? null,
+      p_buyer_name: input.buyerName ?? null,
+      p_deadline: input.deadline || null,
+      p_value: input.value ?? null,
+      p_owner_id: input.ownerId ?? null,
+      p_notes: input.notes ?? null,
+    } as never)
+    if (error) fail('Kunde inte skapa posten', error)
+    return String(data)
   }
 
   // -------------------------------------------------------------------------
@@ -591,9 +674,10 @@ export class ProcurementService {
       method: 'POST',
       body: JSON.stringify(input),
     })
-    const body = (await res.json().catch(() => ({}))) as { error?: string; subject?: string; body?: string; requestId?: string }
+    const body = (await res.json().catch(() => ({}))) as { error?: string; subject?: string; body?: string; text?: string; requestId?: string }
     if (!res.ok) throw new Error(body.error ?? `Begäran misslyckades (${res.status})`)
-    return body
+    // Förhandsvisningen svarar med text, inte body
+    return { ...body, body: body.body ?? body.text }
   }
 
   static async updateDocumentRequest(id: string, patch: Partial<Pick<ProcurementDocumentRequest, 'status' | 'notes' | 'received_at'>>): Promise<void> {

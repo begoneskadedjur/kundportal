@@ -247,6 +247,8 @@ function parseEforms(n) {
       contractStart: minDate(n['contract-duration-start-date-lot']),
       contractEnd: minDate(n['contract-duration-end-date-lot']),
       renewalMax: renewals.length ? Math.max(...renewals) : null,
+      renewalText: lang(n['renewal-description-lot'])[0] ?? null,
+      optionText: lang(n['option-description-lot'])[0] ?? null,
       durationMonths: eformsDurationMonths(n),
       durationText: lang(n['description-lot'])[0] ?? null,
       fallbackStart: pubDate,

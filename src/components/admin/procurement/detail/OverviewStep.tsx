@@ -13,6 +13,7 @@ import toast from 'react-hot-toast'
 import type { AwardWithRelations, NoticeWithRelations } from '../../../../services/procurementService'
 import { NOTICE_KIND_LABEL } from '../../../../types/procurement'
 import { SE_COUNTIES, annualValueOf, estimateWinProbability, swedishDate } from '../../../../shared/procurementRules'
+import { Icon } from '../../../icons/Icon'
 import { LinkButton } from '../ui'
 import { daysUntil, fmtDate, fmtKr, fmtKrShort, fmtNum, fmtPct, fmtRelativeDays } from '../uiFormat'
 import { BlurText, Block, inputCls, type SaveNotice } from './fields'
@@ -227,6 +228,21 @@ export default function OverviewStep({ notice, buyerAwards, noticeAwards, onSave
                 </Row>
                 <Row label="Avtalsslut">{fmtDate(buyer.end)}</Row>
                 <Row label="Senast">{buyer.latest[0]?.bids_received != null ? `${buyer.latest[0].bids_received} anbud` : '–'}</Row>
+                <Row label="Kontaktperson">
+                  {notice.contact_name || notice.contact_email ? (
+                    <span className="inline-flex flex-col">
+                      <span className="inline-flex items-center gap-1.5">
+                        <Icon name="upphandling.kontaktperson" size={16} className="text-slate-500" />
+                        {notice.contact_name ?? notice.contact_email}
+                      </span>
+                      {(notice.contact_phone || (notice.contact_name && notice.contact_email)) && (
+                        <span className="text-[12px] text-slate-400 break-all">{[notice.contact_phone, notice.contact_name ? notice.contact_email : null].filter(Boolean).join(' · ')}</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-slate-500">Ingen i annonsen, se köparprofilen</span>
+                  )}
+                </Row>
               </dl>
               <p className="mt-2 text-[12.5px] text-slate-400">{buyer.conclusion}</p>
               <Link to={procurementPath(`/kopare/${notice.buyer_id}`)} className="inline-flex items-center min-h-[44px] text-[13px] text-[#20c58f] hover:underline">

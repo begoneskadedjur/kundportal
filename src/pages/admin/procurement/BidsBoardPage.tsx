@@ -8,16 +8,22 @@
 //
 // På mobil blir kolumnerna undertabbar och en kolumn visas åt gången.
 // Kolumnernas statusar ligger i src/shared/procurementBoard.ts.
+//
+// Sedan 3.65.0: knappen Ny post skapar en direktupphandling, ett avrop från
+// ramavtal eller en offertförfrågan (NewPostDialog). Egna poster visar typen
+// med ikon överst på kortet.
 
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import { Icon } from '../../../components/icons/Icon'
 import { ProcurementService, type NoticeWithRelations, type ProcurementManagerProfile } from '../../../services/procurementService'
 import { addDaysIso, annualValueOf, swedishDate, todaySwedish } from '../../../shared/procurementRules'
 import { BOARD_COLUMNS, BOARD_MENU_STATUSES, BOARD_STATUSES, DECIDED_DAYS, columnOf, needsOutcomeChoice, statusForDrop, type BoardColumnKey } from '../../../shared/procurementBoard'
-import { OUR_STATUS_DOT, OUR_STATUS_LABEL, ourStatusChoice, type ProcurementOurStatus } from '../../../types/procurement'
+import { MANUAL_TYPE_ICON, MANUAL_TYPE_LABEL, OUR_STATUS_DOT, OUR_STATUS_LABEL, ourStatusChoice, type ProcurementManualType, type ProcurementOurStatus } from '../../../types/procurement'
+import NewPostDialog, { NewPostButton } from '../../../components/admin/procurement/NewPostDialog'
+import { useAuth } from '../../../contexts/AuthContext'
 import { IconButton, PrimaryButton, SecondaryButton } from '../../../components/admin/procurement/ui'
 import StatusMenu from '../../../components/admin/procurement/StatusMenu'
 import { daysUntil, fmtDate, fmtKrShort, fmtNum, fmtRelativeDays } from '../../../components/admin/procurement/uiFormat'
@@ -68,6 +74,9 @@ export default function BidsBoardPage() {
   const [outcomeFor, setOutcomeFor] = useState<NoticeWithRelations | null>(null)
   const [mobileCol, setMobileCol] = useState<BoardColumnKey>('pagar')
   const [exporting, setExporting] = useState(false)
+  const [newType, setNewType] = useState<ProcurementManualType | null>(null)
+  const navigate = useNavigate()
+  const { user } = useAuth()
 
   const load = useCallback(async () => {
     try {
@@ -156,6 +165,7 @@ export default function BidsBoardPage() {
         columns: [
           { header: 'Kolumn', width: 14 },
           { header: 'Status', width: 14 },
+          { header: 'Typ', width: 18 },
           { header: 'BGU', width: 10 },
           { header: 'Upphandling', width: 56 },
           { header: 'Köpare', width: 32 },
@@ -166,6 +176,7 @@ export default function BidsBoardPage() {
         rows: all.map(({ n, col }) => [
           col,
           OUR_STATUS_LABEL[n.our_status],
+          n.manual_type ? MANUAL_TYPE_LABEL[n.manual_type] : 'Annons',
           `BGU-${n.bgu_number}`,
           n.title,
           n.buyer?.name ?? n.buyer_name ?? '',
@@ -195,7 +206,10 @@ export default function BidsBoardPage() {
     <div>
       <div className="flex items-center justify-between gap-3 mb-3">
         <p className="text-[12.5px] text-slate-500">Dra kort mellan kolumnerna, eller byt status i kortets meny. Avgjort visar det senaste året.</p>
-        <IconButton icon={<Icon name="upphandling.excel" size={20} />} label="Exportera till Excel" onClick={() => void exportBoard()} disabled={exporting} />
+        <div className="flex items-center gap-1 shrink-0">
+          <IconButton icon={<Icon name="upphandling.excel" size={20} />} label="Exportera till Excel" onClick={() => void exportBoard()} disabled={exporting} />
+          <NewPostButton onPick={setNewType} />
+        </div>
       </div>
 
       {/* Mobil: en kolumn i taget */}
@@ -271,6 +285,12 @@ export default function BidsBoardPage() {
                       className={`rounded-lg border border-slate-800 bg-slate-950/60 hover:border-slate-700 px-3 py-2.5 transition-opacity ${dragId === n.id ? 'opacity-50' : ''} ${busy === n.id ? 'opacity-60' : ''} lg:cursor-grab`}
                     >
                       <Link to={noticePath(n.id)} className="block group" draggable={false}>
+                        {n.manual_type && (
+                          <div className="mb-1 inline-flex items-center gap-1.5 text-[11.5px] text-slate-400">
+                            <Icon name={MANUAL_TYPE_ICON[n.manual_type]} size={16} />
+                            {MANUAL_TYPE_LABEL[n.manual_type]}
+                          </div>
+                        )}
                         <div className="text-[13px] leading-snug font-medium text-slate-100 group-hover:text-[#20c58f]">{n.title}</div>
                         <div className="text-[12px] text-slate-500 mt-0.5 truncate">{n.buyer?.name ?? n.buyer_name ?? 'Okänd köpare'}</div>
                       </Link>
@@ -300,6 +320,19 @@ export default function BidsBoardPage() {
           </section>
         ))}
       </div>
+
+      {newType && (
+        <NewPostDialog
+          type={newType}
+          managers={managers}
+          defaultOwnerId={managers.some((m) => m.user_id === user?.id) ? user?.id ?? null : null}
+          onClose={() => setNewType(null)}
+          onCreated={(id) => {
+            setNewType(null)
+            navigate(noticePath(id))
+          }}
+        />
+      )}
 
       {outcomeFor && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="utfall-titel" onClick={() => setOutcomeFor(null)}>

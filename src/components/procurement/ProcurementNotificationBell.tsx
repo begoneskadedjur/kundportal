@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { Icon } from '../icons/Icon'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { noticePath, procurementPath } from '../../lib/procurementPortal'
+import { procurementNotificationSub, procurementPath } from '../../lib/procurementPortal'
 import { fmtDate } from '../admin/procurement/uiFormat'
 
 interface ProcurementNotification {
@@ -90,7 +90,7 @@ export function ProcurementNotificationBell() {
   const openItem = (n: ProcurementNotification) => {
     setOpen(false)
     if (!n.is_read) void markRead([n.id])
-    navigate(n.case_id ? noticePath(n.case_id) : procurementPath(''))
+    navigate(procurementPath(procurementNotificationSub(n)))
   }
 
   const markAll = async () => {

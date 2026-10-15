@@ -33,6 +33,7 @@ import {
   loadEnvFiles,
   parseArgs,
   parseDurationText,
+  parseRenewalOptions,
   politeFetch,
   tedDate,
   workWindow,
@@ -55,7 +56,8 @@ async function client() {
 async function selectAll(sb) {
   const cols =
     'id, award_key, source, source_ref, title, cpv_codes, raw, award_date, contract_signed_date, contract_start, contract_end, renewal_max, ' +
-    'calc_end_date, calc_end_source, start_basis_date, duration_months, calc_basis, excluded_reason, excluded_at, window_start, window_end'
+    'calc_end_date, calc_end_source, start_basis_date, duration_months, calc_basis, excluded_reason, excluded_at, window_start, window_end, ' +
+    'base_end_date, option_months, option_count, option_text, option_source'
   const out = []
   for (let from = 0; ; from += 1000) {
     const { data, error } = await sb.from('procurement_awards').select(cols).order('id').range(from, from + 999)
@@ -109,7 +111,10 @@ export function parseContractNotice(x) {
   if (/<NO_RENEWAL\/>/.test(x)) out.hasRenewal = false
   if (/<RENEWAL\/>/.test(x)) out.hasRenewal = true
   const renewalDescr = xmlText(x, 'RENEWAL_DESCR')
-  if (renewalDescr) out.renewalMonths = renewalMonthsFromText(renewalDescr)
+  if (renewalDescr) {
+    out.renewalMonths = renewalMonthsFromText(renewalDescr)
+    out.renewalText = renewalDescr
+  }
   out.description = xmlText(x, 'SHORT_DESCR')
   // R2.0.8: löptid i OBJECT_CONTRACT_INFORMATION
   if (!out.durationMonths) {
@@ -186,7 +191,7 @@ async function main() {
   }
 
   const updates = []
-  const stats = { excludedNew: 0, excludedCleared: 0, manualKept: 0, endChanged: 0, bySource: {} }
+  const stats = { excludedNew: 0, excludedCleared: 0, manualKept: 0, endChanged: 0, realOptions: 0, bySource: {} }
   const today = new Date().toISOString().slice(0, 10)
   for (const r of rows) {
     const raw = rawByRef.get(`${r.source}:${r.source_ref}`) ?? r.raw ?? {}
@@ -202,7 +207,17 @@ async function main() {
       durationFrom: null,
     }
     let durationText = null
+    // Riktiga förlängningsoptioner: TED eForms BT-58/BT-57/BT-54, äldre TED-XML RENEWAL_DESCR, annonstexten
+    let opts = null
+    let optionSource = null
     if (r.source === 'ted') {
+      const counts = arr(raw['renewal-maximum-lot']).map(Number).filter((x) => Number.isFinite(x))
+      opts = parseRenewalOptions({
+        count: r.renewal_max ?? (counts.length ? Math.max(...counts) : null),
+        renewalText: langFirst(raw['renewal-description-lot']),
+        optionText: langFirst(raw['option-description-lot']),
+      })
+      if (opts.known) optionSource = 'ted_eforms'
       input.durationMonths = eformsDuration(raw)
       if (input.durationMonths) input.durationFrom = 'ted'
       durationText = langFirst(raw['description-lot'])
@@ -221,6 +236,14 @@ async function main() {
           if (cn.hasRenewal === false) input.renewalMax = 0
           else if (cn.renewalMonths) input.renewalMax = cn.renewalMonths / 12
         }
+        if (cn.renewalText) {
+          opts = parseRenewalOptions({ count: null, renewalText: cn.renewalText })
+          if (!opts.known && cn.renewalMonths) opts = { ...opts, totalMonths: cn.renewalMonths, known: true, text: cn.renewalText.slice(0, 300) }
+          if (opts.known) optionSource = 'ted_xml'
+        } else if (cn.hasRenewal === false) {
+          opts = { count: 0, monthsEach: null, totalMonths: 0, maxEnd: null, text: 'Ingen förlängning (NO_RENEWAL)', known: true }
+          optionSource = 'ted_xml'
+        }
         durationText = cn.description
       }
     } else if (r.source === 'uhm') {
@@ -237,9 +260,20 @@ async function main() {
         input.durationMonths = parsed.months
         input.durationFrom = 'text'
         if (input.renewalMax == null && parsed.renewalMonths > 0) input.renewalMax = parsed.renewalMonths / 12
+        if (!opts?.known && parsed.renewalMonths > 0) {
+          opts = { count: null, monthsEach: null, totalMonths: parsed.renewalMonths, maxEnd: null, text: cleanText(durationText).slice(0, 300), known: true }
+          optionSource = 'text'
+        }
       }
     }
+    if (opts?.known) {
+      input.optionMonths = opts.totalMonths
+      input.optionsMaxEnd = opts.maxEnd
+      input.optionsText = opts.text
+      if (input.renewalMax == null && opts.count != null) input.renewalMax = opts.count
+    }
     const end = computeContractEnd(input)
+    if (opts?.known) stats.realOptions++
     const win = workWindow(end.date)
     const rel = awardRelevance(r.cpv_codes ?? [], r.title)
     const manual = !!r.excluded_at && (!r.excluded_reason || String(r.excluded_reason).startsWith('Manuellt'))
@@ -250,6 +284,11 @@ async function main() {
       start_basis_date: end.startBasis,
       duration_months: input.durationMonths,
       calc_basis: end.basis,
+      base_end_date: end.baseEnd ?? null,
+      option_months: end.optionMonths ?? null,
+      option_count: opts?.count ?? input.renewalMax ?? null,
+      option_text: opts?.known ? opts.text : null,
+      option_source: opts?.known ? optionSource : null,
       window_start: win.start,
       window_end: win.end,
     }
@@ -273,6 +312,7 @@ async function main() {
   for (const [k, v] of Object.entries(stats.bySource).sort()) console.log(`  ${k.padEnd(36)} ${String(v.rows).padStart(4)}  ${String(v.passed).padStart(4)}`)
   console.log(`\nNya felträffar: ${stats.excludedNew}, avflaggade: ${stats.excludedCleared}, manuella beslut behållna: ${stats.manualKept}`)
   console.log(`Ändrat slutdatum: ${stats.endChanged}, rader att uppdatera: ${updates.length}`)
+  console.log(`Rader med riktiga förlängningsoptioner ur annonsen: ${stats.realOptions}`)
   const excluded = updates.filter((u) => u.excluded)
   if (excluded.length) {
     console.log('\nFelträffar (titel, källa, orsak):')

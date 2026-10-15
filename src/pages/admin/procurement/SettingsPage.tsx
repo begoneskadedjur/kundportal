@@ -1,6 +1,7 @@
 // src/pages/admin/procurement/SettingsPage.tsx
 // Inställningar (planens avsnitt 9.9): bevakningsregler med förhandsvisning,
-// signalkällor, källhälsa, dagligt sammandrag på eller av för mig och
+// signalkällor, källhälsa, dagligt sammandrag och notisen om
+// bearbetningsfönstret på eller av för mig (sedan 3.65.0) och
 // upphandlingsansvariga med länk till Användarkonton (Personal). Nås från
 // kontomenyn sedan 3.63.0. Signalkällor och källhälsa finns bara här;
 // anbudsbiblioteket ligger under Anbud.
@@ -18,27 +19,37 @@ import { WatchRulesSection } from '../../../components/admin/procurement/setting
 import { SignalSourcesSection } from '../../../components/admin/procurement/settings/SignalSourcesSection'
 import { MAIN_PORTAL_URL, isProcurementStandalone } from '../../../lib/procurementPortal'
 
-function DigestToggle() {
+interface ToggleProps {
+  title: string
+  hint: string
+  read: () => Promise<boolean>
+  write: (on: boolean) => Promise<void>
+  onText: string
+  offText: string
+}
+
+/** Av och på per person (procurement_user_settings) */
+function SettingToggle({ title, hint, read, write, onText, offText }: ToggleProps) {
   const [enabled, setEnabled] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    ProcurementService.getDigestEnabled()
+    read()
       .then(setEnabled)
       .catch(() => {
         setEnabled(true)
-        toast.error('Kunde inte läsa inställningen för sammandraget')
+        toast.error('Kunde inte läsa inställningen')
       })
-  }, [])
+  }, [read])
 
   const toggle = async () => {
     if (enabled == null) return
     const next = !enabled
     setSaving(true)
     try {
-      await ProcurementService.setDigestEnabled(next)
+      await write(next)
       setEnabled(next)
-      toast.success(next ? 'Du får det dagliga sammandraget' : 'Sammandraget är avstängt för dig')
+      toast.success(next ? onText : offText)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Kunde inte spara inställningen')
     } finally {
@@ -49,10 +60,8 @@ function DigestToggle() {
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="min-w-0">
-        <div className="text-[13px] text-slate-200">Dagligt sammandrag via e-post</div>
-        <div className="text-[11.5px] text-slate-500">
-          Vardagar 07:45: nya träffar, deadlines inom sju dagar, avtal in i bearbetningsfönstret, nya signaler och handlingar att begära.
-        </div>
+        <div className="text-[13px] text-slate-200">{title}</div>
+        <div className="text-[11.5px] text-slate-500">{hint}</div>
       </div>
       {enabled == null ? (
         <LoadingSpinner />
@@ -61,7 +70,7 @@ function DigestToggle() {
           type="button"
           role="switch"
           aria-checked={enabled}
-          aria-label="Dagligt sammandrag"
+          aria-label={title}
           disabled={saving}
           onClick={() => void toggle()}
           className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${enabled ? 'bg-[#20c58f]' : 'bg-slate-700'}`}
@@ -72,6 +81,11 @@ function DigestToggle() {
     </div>
   )
 }
+
+const readDigest = () => ProcurementService.getDigestEnabled()
+const writeDigest = (on: boolean) => ProcurementService.setDigestEnabled(on)
+const readWindow = () => ProcurementService.getWindowNotifyEnabled()
+const writeWindow = (on: boolean) => ProcurementService.setWindowNotifyEnabled(on)
 
 export default function SettingsPage() {
   const [health, setHealth] = useState<ProcurementSourceHealth[]>([])
@@ -93,8 +107,25 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-8">
-      <Section title="Sammandrag för mig">
-        <DigestToggle />
+      <Section title="Sammandrag och notiser för mig">
+        <div className="divide-y divide-slate-800">
+          <SettingToggle
+            title="Dagligt sammandrag via e-post"
+            hint="Vardagar 07:45: nya träffar, deadlines inom sju dagar, avtal in i bearbetningsfönstret, nya signaler och handlingar att begära."
+            read={readDigest}
+            write={writeDigest}
+            onText="Du får det dagliga sammandraget"
+            offText="Sammandraget är avstängt för dig"
+          />
+          <SettingToggle
+            title="Notis när ett avtal går in i bearbetningsfönstret"
+            hint="En notis per avtal när det är 18 månader kvar till avtalsslut, med länk till köparen. Gäller även avsnittet i sammandraget."
+            read={readWindow}
+            write={writeWindow}
+            onText="Du får notisen om bearbetningsfönstret"
+            offText="Notisen om bearbetningsfönstret är avstängd för dig"
+          />
+        </div>
       </Section>
 
       <WatchRulesSection />

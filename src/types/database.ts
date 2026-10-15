@@ -555,6 +555,11 @@ export type Database = {
         Insert: Partial<P.ProcurementUserSettings>
         Update: Partial<P.ProcurementUserSettings>
       }
+      procurement_contacts: {
+        Row: P.ProcurementContact
+        Insert: Partial<P.ProcurementContact>
+        Update: Partial<P.ProcurementContact>
+      }
       // ✅ BILLING_AUDIT_LOG TABELL TILLAGD
       billing_audit_log: {
         Row: {

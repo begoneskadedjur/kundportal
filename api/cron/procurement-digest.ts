@@ -43,7 +43,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Måndag täcker helgen
     const lookbackDays = swedishWeekday() === 1 ? 3 : 1
     const sinceIso = new Date(Date.now() - lookbackDays * 86400000).toISOString()
-    const sinceDay = addDaysIso(today, -lookbackDays)
 
     try {
       const managers = (await getManagers()).filter((m) => m.digest_enabled)
@@ -55,7 +54,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const [{ data: fresh }, { data: deadlines }, { data: windowAwards }, { data: signals }, { data: recentAwards }, { data: requests }] = await Promise.all([
         sb.from('procurement_notices').select('id, title, buyer_name, match_score, tender_deadline, annual_value').gte('first_seen_at', sinceIso).gte('match_score', 60).order('match_score', { ascending: false }).limit(30),
         sb.from('procurement_notices').select('id, title, buyer_name, tender_deadline').in('our_status', ['new', 'watching', 'analyzing', 'bidding']).gte('match_score', 60).gte('tender_deadline', new Date().toISOString()).lte('tender_deadline', `${addDaysIso(today, 8)}T00:00:00Z`).order('tender_deadline').limit(30),
-        sb.from('procurement_awards').select('id, buyer_name, winner_name, calc_end_date, corrected_end_date, window_start, county_code').gt('window_start', sinceDay).lte('window_start', today).neq('status', 'ignored').limit(30),
+        // Avtal som gått in i bearbetningsfönstret: händelserna som procurement-deadlines skriver (en per avtal)
+        sb.from('procurement_events').select('id, award_id, metadata, created_at').eq('event_type', 'window_entered').gte('created_at', sinceIso).order('created_at').limit(30),
         sb.from('procurement_signals').select('id, buyer_name, text, expected_quarter, url').gte('created_at', sinceIso).eq('status', 'new').limit(30),
         sb.from('procurement_awards').select('id, notice_id, buyer_name, winner_name, award_date, county_code, title').gte('award_date', addDaysIso(today, -30)).in('county_code', BEGONE_COUNTIES).not('notice_id', 'is', null).limit(100),
         sb.from('procurement_document_requests').select('notice_id'),
@@ -69,6 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const sections: string[] = []
+      let windowSection: string | null = null
       if ((fresh ?? []).length > 0) {
         sections.push(
           heading(`Nya träffar (${fresh!.length})`) +
@@ -85,10 +86,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         )
       }
       if ((windowAwards ?? []).length > 0) {
-        sections.push(
+        windowSection =
           heading('Avtal som gått in i bearbetningsfönstret') +
-            list(windowAwards!.map((a) => `${escapeHtml(a.buyer_name ?? '')}: ${escapeHtml(a.winner_name ?? 'okänd leverantör')}, slut ${a.corrected_end_date ?? a.calc_end_date ?? 'okänt'}`))
-        )
+          list(
+            windowAwards!.map((ev) => {
+              const m = (ev.metadata ?? {}) as { buyer_id?: string | null; buyer_name?: string | null; winners?: string[]; end_date?: string | null }
+              const href = m.buyer_id ? `${PROCUREMENT_PORTAL_URL}/kopare/${m.buyer_id}` : `${PROCUREMENT_PORTAL_URL}/avtalsklocka`
+              return `<a href="${href}" style="color:#0f766e">${escapeHtml(m.buyer_name ?? 'Okänd köpare')}</a>: ${escapeHtml((m.winners ?? []).join(' och ') || 'okänd leverantör')}, slut ${m.end_date ?? 'okänt'}`
+            })
+          )
+        sections.push(windowSection)
       }
       if ((signals ?? []).length > 0) {
         sections.push(
@@ -108,15 +115,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return { status: 'success' as const, summary: { sent: 0, reason: 'inget nytt' } }
       }
 
-      const html = emailLayout(
-        `Upphandlingar ${today}`,
-        `${sections.join('')}<p style="font-size:12px;color:#64748b">Stäng av sammandraget under <a href="${PROCUREMENT_PORTAL_URL}/installningar" style="color:#0f766e">Upphandlingar, Inställningar</a>.</p>`
-      )
+      // Den som stängt av notisen om bearbetningsfönstret får inte heller den delen i sammandraget
+      const htmlFor = (withWindow: boolean) => {
+        const parts = withWindow || !windowSection ? sections : sections.filter((x) => x !== windowSection)
+        if (parts.length === 0) return null
+        return emailLayout(
+          `Upphandlingar ${today}`,
+          `${parts.join('')}<p style="font-size:12px;color:#64748b">Stäng av sammandraget under <a href="${PROCUREMENT_PORTAL_URL}/installningar" style="color:#0f766e">Upphandlingar, Inställningar</a>.</p>`
+        )
+      }
       let sent = 0
       const errors: string[] = []
       // Ett mejl per mottagare så att ingen ser de andras adresser
       for (const m of managers) {
         try {
+          const html = htmlFor(m.window_notify_enabled)
+          if (!html) continue
           await sendEmail({ to: [m.email], subject: `Upphandlingar ${today}: ${(fresh ?? []).length} nya träffar`, html })
           sent++
         } catch (err) {

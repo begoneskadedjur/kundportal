@@ -218,6 +218,14 @@ export interface ProcurementGroup {
   windowEnd: string | null
   /** Beräkningen av slutdatumet i klartext (procurement_awards.calc_basis) */
   calcBasis: string | null
+  /** Basavtalets slut utan förlängningsoptioner, för tidslinjen (null när slutet är rättat) */
+  baseEndDate: string | null
+  /** Förlängningsoptioner i månader som ingår i slutet (0 = inga, null = okänt) */
+  optionMonths: number | null
+  /** Optionstexten ur annonsen när optionerna är riktiga */
+  optionText: string | null
+  /** Sant när optionerna kommer ur annonsen och inte är antagna */
+  optionsKnown: boolean
   /** Ny annons, ny tilldelning eller slut passerat (procurement_refresh_award_followups) */
   followupStatus: ProcurementFollowupStatus | null
   followupNoticeId: string | null
@@ -313,6 +321,10 @@ export function groupAwards(awards: AwardWithRelations[]): ProcurementGroup[] {
         windowStart: null,
         windowEnd: null,
         calcBasis: null,
+        baseEndDate: null,
+        optionMonths: null,
+        optionText: null,
+        optionsKnown: false,
         followupStatus: null,
         followupNoticeId: null,
         followupUrl: null,
@@ -349,6 +361,10 @@ export function groupAwards(awards: AwardWithRelations[]): ProcurementGroup[] {
         g.calcEndDate = a.calc_end_date
         g.calcEndSource = a.calc_end_source
         g.calcBasis = a.calc_basis ?? null
+        g.baseEndDate = a.base_end_date ?? null
+        g.optionMonths = a.option_months ?? null
+        g.optionText = a.option_text ?? null
+        g.optionsKnown = !!a.option_source
       }
     }
     takeFollowup(g, a.followup_status ?? null, a.followup_notice_id ?? null, a.followup_url ?? null, a.followup_title ?? null, a.followup_date ?? null)
@@ -450,6 +466,10 @@ export function mergeCrossSource(groups: ProcurementGroup[]): ProcurementGroup[]
       match.calcEndDate = g.calcEndDate
       match.calcEndSource = g.calcEndSource
       match.calcBasis = g.calcBasis
+      match.baseEndDate = g.baseEndDate
+      match.optionMonths = g.optionMonths
+      match.optionText = g.optionText
+      match.optionsKnown = g.optionsKnown
     }
     takeFollowup(match, g.followupStatus, g.followupNoticeId, g.followupUrl, g.followupTitle, g.followupDate)
     if (match.status === 'open' && g.status !== 'open') match.status = g.status
@@ -750,6 +770,135 @@ export function pipelineByQuarter(
 }
 
 // ---------------------------------------------------------------------------
+// Prognos (Framförhållning > Prognos, sedan 3.65.0): en prognos i stället för två
+
+/** Slutdatum som bygger på antagande eller fritext räknas som osäkra i prognosen */
+export function isUncertainEnd(g: Pick<ProcurementGroup, 'endSource'>): boolean {
+  return g.endSource === 'assumption_2_2' || g.endSource === 'text_duration' || g.endSource == null
+}
+
+export interface QuarterForecast {
+  quarter: string
+  /** Avtalsklockans väntade annonser: antal och årsvärde, varav osäkert slutdatum */
+  clock: number
+  clockAnnual: number
+  clockUncertain: number
+  clockUncertainAnnual: number
+  /** Öppna anbud i bevakningen per kvartal för sista anbudsdag */
+  notices: number
+  noticeAnnual: number
+  contribution: number
+  /** Summa årsvärde, det stapeln visar */
+  total: number
+}
+
+/**
+ * Väntade annonser per kvartal: avtalsklockans avtal per kvartal för förväntad
+ * annons plus öppna anbud per kvartal för sista anbudsdag, i årsvärde.
+ * Räknereglerna är desamma som i pipelineByQuarter (samma urval av annonser
+ * och avtal), så att antalen inte ändras när de två prognoserna slås ihop.
+ * Osäkert slutdatum (antagandet två plus två år eller fritext) ritas ljusare.
+ */
+export function forecastByQuarter(
+  notices: Array<Pick<ProcurementNotice, 'tender_deadline' | 'expected_contribution' | 'our_status' | 'annual_value' | 'estimated_value' | 'duration_months'>>,
+  groups: ProcurementGroup[],
+  today: string,
+  count = 8
+): QuarterForecast[] {
+  const quarters = nextQuarters(today, count)
+  const rows = new Map<string, QuarterForecast>(
+    quarters.map((q) => [q, { quarter: q, clock: 0, clockAnnual: 0, clockUncertain: 0, clockUncertainAnnual: 0, notices: 0, noticeAnnual: 0, contribution: 0, total: 0 }])
+  )
+  for (const n of notices) {
+    if (CLOSED_NOTICE_STATUSES.has(n.our_status)) continue
+    const d = dateOnly(n.tender_deadline)
+    if (!d || d < today) continue
+    const row = rows.get(quarterOf(d) ?? '')
+    if (!row) continue
+    row.notices += 1
+    row.contribution += Number(n.expected_contribution ?? 0) || 0
+    const annual = n.annual_value ?? (n.estimated_value != null && n.duration_months ? (Number(n.estimated_value) / Number(n.duration_months)) * 12 : null)
+    row.noticeAnnual += Number(annual ?? 0) || 0
+  }
+  for (const g of groups) {
+    const f = followupOf(g, today)
+    if (g.status === 'ignored' || g.status === 'done' || f === 'new_notice' || f === 'new_award' || f === 'stale') continue
+    if (!g.endDate) continue
+    const row = rows.get(expectedAnnouncementQuarter(g, today) ?? '')
+    if (!row) continue
+    const annual = annualValueOfGroup(g) ?? 0
+    row.clock += 1
+    row.clockAnnual += annual
+    if (isUncertainEnd(g)) {
+      row.clockUncertain += 1
+      row.clockUncertainAnnual += annual
+    }
+  }
+  return quarters.map((q) => {
+    const r = rows.get(q)!
+    r.total = r.clockAnnual + r.noticeAnnual
+    return r
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Bara två anbudsgivare brukar svara (ersätter Utmanarläget sedan 3.65.0)
+
+/**
+ * Köpare där bara två anbudsgivare brukar svara: medianen av antalet anbud i
+ * köparens kända upphandlingar är högst två. Antalet tas ur kända
+ * anbudsgivare (procurement_bidders) när de finns, annars ur bids_received.
+ * Returnerar köparnycklarna (samma som buyerKeyOf).
+ */
+export function twoBidderBuyerKeys(
+  groups: ProcurementGroup[],
+  biddersByRef: ReturnType<typeof indexBidders>
+): Set<string> {
+  const counts = new Map<string, number[]>()
+  for (const g of groups) {
+    const bidders = g.refs.flatMap((r) => biddersByRef.get(r) ?? [])
+    const distinct = new Set(bidders.map((b) => normalizeOrgNumber(b.org_number ?? b.supplier?.org_number ?? null) ?? normalizeName(b.supplier?.name ?? b.name)))
+    const n = distinct.size > 0 ? Math.max(distinct.size, g.bidsReceived ?? 0) : g.bidsReceived
+    if (n == null || n <= 0) continue
+    const k = buyerKeyOf(g)
+    const list = counts.get(k) ?? []
+    list.push(n)
+    counts.set(k, list)
+  }
+  const out = new Set<string>()
+  for (const [k, list] of counts) {
+    const m = median(list)
+    if (m != null && m <= 2) out.add(k)
+  }
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// Avtalsklockans sortering
+
+export type ClockSort = 'window' | 'end' | 'value' | 'buyer' | 'county'
+
+export const CLOCK_SORT_LABEL: Record<ClockSort, string> = {
+  window: 'Fönstret öppnar först',
+  end: 'Avtalsslut först',
+  value: 'Störst årsvärde',
+  buyer: 'Köpare A-Ö',
+  county: 'Län',
+}
+
+export function sortClock(rows: ProcurementGroup[], sort: ClockSort, countyName: (code: string | null) => string): ProcurementGroup[] {
+  const byEnd = (a: ProcurementGroup, b: ProcurementGroup) => (a.endDate ?? '9999').localeCompare(b.endDate ?? '9999')
+  const byBuyer = (a: ProcurementGroup, b: ProcurementGroup) => String(a.buyerName ?? '').localeCompare(String(b.buyerName ?? ''), 'sv')
+  const list = [...rows]
+  if (sort === 'window') list.sort((a, b) => (a.windowStart ?? '9999').localeCompare(b.windowStart ?? '9999') || byEnd(a, b))
+  else if (sort === 'end') list.sort(byEnd)
+  else if (sort === 'value') list.sort((a, b) => (annualValueOfGroup(b) ?? -1) - (annualValueOfGroup(a) ?? -1) || byEnd(a, b))
+  else if (sort === 'buyer') list.sort((a, b) => byBuyer(a, b) || byEnd(a, b))
+  else list.sort((a, b) => countyName(a.countyCode).localeCompare(countyName(b.countyCode), 'sv') || byBuyer(a, b))
+  return list
+}
+
+// ---------------------------------------------------------------------------
 // Utmanarläge (verktyg 8)
 
 export interface ChallengerRow {
@@ -764,7 +913,7 @@ export interface ChallengerRow {
   endDate: string
 }
 
-function buyerKeyOf(g: ProcurementGroup): string {
+export function buyerKeyOf(g: ProcurementGroup): string {
   return g.buyerId ?? (g.buyerOrg ? `o:${g.buyerOrg}` : `n:${normalizeName(g.buyerName)}`)
 }
 

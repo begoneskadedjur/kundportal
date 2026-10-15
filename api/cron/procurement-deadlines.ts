@@ -10,6 +10,11 @@
 //      Överprövning måste göras innan avtal tecknas.
 //   3. Begäran om handlingar: påminnelse till köparen efter sju dagar utan
 //      svar, eskalering internt efter fjorton.
+//   4. Bearbetningsfönstret (sedan 3.65.0): en notis per avtal när det går in
+//      i fönstret 18 till 12 månader före slut, till alla upphandlingsansvariga
+//      som inte stängt av den (procurement_user_settings.window_notify_enabled).
+//      Avtalet märks med window_notified_at och en händelse window_entered som
+//      sammandraget läser. Notisen länkar till köparen (WINDOW_NOTIFICATION_PREFIX).
 //
 // Idempotent: varje påminnelse loggas som procurement_events med en nyckel
 // i metadata.reminder_key och skickas bara en gång.
@@ -20,6 +25,7 @@ import { withCronLog } from '../_lib/cronLogger'
 import {
   PROCUREMENT_FROM_EMAIL,
   db,
+  getManagers,
   emailLayout,
   escapeHtml,
   insertNotifications,
@@ -28,7 +34,16 @@ import {
   recordHealth,
   sendEmail,
 } from '../_lib/procurement'
-import { addDaysIso, daysBetweenIso, swedishDate, todaySwedish } from '../../src/shared/procurementRules'
+import {
+  WINDOW_NOTIFICATION_PREFIX,
+  addDaysIso,
+  addMonthsIso,
+  daysBetweenIso,
+  swedishDate,
+  todaySwedish,
+  windowEntriesToNotify,
+  type WindowAwardRow,
+} from '../../src/shared/procurementRules'
 
 export const config = { maxDuration: 120 }
 
@@ -78,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const result = await withCronLog('procurement-deadlines', async () => {
     const sb = db()
     const today = todaySwedish()
-    const counts = { deadlines: 0, questions: 0, standstill: 0, request_reminders: 0, escalations: 0 }
+    const counts = { deadlines: 0, questions: 0, standstill: 0, request_reminders: 0, escalations: 0, window_entries: 0, window_notifications: 0 }
     const errors: string[] = []
 
     try {
@@ -88,8 +103,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from('procurement_notices')
         .select('id, title, buyer_name, owner_id, tender_deadline, questions_deadline, our_status')
         .in('our_status', OPEN_STATUSES)
-        .gte('match_score', 60)
-        .or(`tender_deadline.lte.${horizon},questions_deadline.lte.${horizon}`)
+        // Träffar över tröskeln, och egna poster (direktupphandling, avrop, offertförfrågan) som saknar poäng
+        .or(
+          `and(match_score.gte.60,tender_deadline.lte.${horizon}),and(match_score.gte.60,questions_deadline.lte.${horizon}),` +
+            `and(manual_type.not.is.null,tender_deadline.lte.${horizon})`
+        )
       if (error) throw error
       for (const n of notices ?? []) {
         for (const [field, label, counter] of [
@@ -194,6 +212,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       }
 
+      // 4. Avtal som gått in i bearbetningsfönstret: en notis per avtal
+      try {
+        const r = await notifyWindowEntries(today)
+        counts.window_entries = r.entries
+        counts.window_notifications = r.notifications
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : String(err))
+      }
+
       await recordHealth('deadlines', true, { count: Object.values(counts).reduce((a, b) => a + b, 0) })
       return { status: errors.length > 0 ? ('partial' as const) : ('success' as const), summary: { today, ...counts, errors: errors.slice(0, 20) } }
     } catch (err) {
@@ -204,4 +231,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (result.status === 'failed') return res.status(500).json({ success: false, error: result.errorMessage })
   return res.status(200).json({ success: true, ...(result.summary as object) })
+}
+
+/**
+ * Notis när ett avtal går in i bearbetningsfönstret. Kandidaterna läses grovt
+ * (inte notifierade, inte felträffar, fönstret kan ha öppnat) och den rena
+ * regeln windowEntriesToNotify avgör. Avtalen märks även när ingen vill ha
+ * notisen, så att den aldrig kommer i efterhand.
+ */
+async function notifyWindowEntries(today: string): Promise<{ entries: number; notifications: number }> {
+  const sb = db()
+  const horizon = addMonthsIso(today, 18)
+  const { data, error } = await sb
+    .from('procurement_awards')
+    .select('id, source, source_ref, buyer_id, buyer_name, title, winner_name, calc_end_date, corrected_end_date, status, followup_status, excluded_reason, window_notified_at')
+    .is('excluded_reason', null)
+    .is('window_notified_at', null)
+    .or(`calc_end_date.lte.${horizon},corrected_end_date.lte.${horizon}`)
+    .limit(2000)
+  if (error) throw error
+  const rows = (data ?? []) as WindowAwardRow[]
+  // Hela gruppen behövs för engångsregeln: hämta syskonrader som redan är notifierade
+  const refs = [...new Set(rows.map((r) => r.source_ref).filter((x): x is string => !!x))]
+  let siblings: WindowAwardRow[] = []
+  if (refs.length > 0) {
+    const { data: sib } = await sb
+      .from('procurement_awards')
+      .select('id, source, source_ref, buyer_id, buyer_name, title, winner_name, calc_end_date, corrected_end_date, status, followup_status, excluded_reason, window_notified_at')
+      .in('source_ref', refs)
+      .not('window_notified_at', 'is', null)
+    siblings = (sib ?? []) as WindowAwardRow[]
+  }
+  const entries = windowEntriesToNotify([...rows, ...siblings], today)
+  if (entries.length === 0) return { entries: 0, notifications: 0 }
+
+  const recipients = (await getManagers()).filter((m) => m.window_notify_enabled).map((m) => m.user_id)
+  let notifications = 0
+  const now = new Date().toISOString()
+  for (const e of entries) {
+    const who = e.winners.length ? e.winners.join(' och ') : 'okänd leverantör'
+    const title = `${WINDOW_NOTIFICATION_PREFIX}: ${e.buyerName ?? 'okänd köpare'}`
+    const preview = `${e.title ?? 'Avtal'} med ${who} slutar ${e.endDate}. Bearbetningsfönstret är ${e.windowStart} till ${e.windowEnd}.`
+    notifications += await insertNotifications(recipients, e.buyerId, title, preview, e.buyerName ?? 'Avtalsklockan')
+    await sb.from('procurement_awards').update({ window_notified_at: now }).in('id', e.awardIds)
+    await sb.from('procurement_events').insert({
+      notice_id: null,
+      award_id: e.awardIds[0],
+      event_type: 'window_entered',
+      title,
+      detail: preview,
+      metadata: { award_ids: e.awardIds, buyer_id: e.buyerId, buyer_name: e.buyerName, end_date: e.endDate, window_start: e.windowStart, winners: e.winners },
+      actor_name: 'Avtalsklockan',
+    })
+  }
+  return { entries: entries.length, notifications }
 }

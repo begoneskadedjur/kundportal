@@ -357,6 +357,15 @@ export interface EndDateInput {
   durationMonths?: number | null
   /** Var avtalstiden kommer från: TED-fält/förfrågan ('ted') eller annonstexten ('text') */
   durationFrom?: 'ted' | 'text' | null
+  /**
+   * Riktiga förlängningsoptioner ur annonsen (parseRenewalOptions): total
+   * förlängning i månader. Går före antagandet ett år per förlängning.
+   */
+  optionMonths?: number | null
+  /** Sista möjliga avtalsslut med alla optioner, när annonsen anger ett datum */
+  optionsMaxEnd?: string | null
+  /** Optionstexten som beräkningen bygger på, för calc_basis */
+  optionsText?: string | null
 }
 
 export interface EndDateResult {
@@ -366,6 +375,138 @@ export interface EndDateResult {
   startBasis: string | null
   /** Beräkningen i klartext, visas i avtalsklockan */
   basis: string | null
+  /** Avtalsslut utan förlängningsoptioner (basavtalet), när det går att räkna */
+  baseEnd?: string | null
+  /** Förlängningsoptionerna i månader som lagts på basavtalet (0 = inga, null = okänt) */
+  optionMonths?: number | null
+}
+
+// ---------------------------------------------------------------------------
+// Förlängningsoptioner ur TED eForms
+//
+// Fälten i TED Search API v3 (verifierade mot API:et och procurement_awards.raw
+// 2026-10-16):
+//   renewal-maximum-lot      (BT-58)  högsta antal förlängningar, t.ex. "2"
+//   renewal-description-lot  (BT-57)  fritext, t.ex. "Förlängning är 12 månader",
+//                                     "24 months * 2", "max till 2030-03-27"
+//   option-description-lot   (BT-54)  optioner i övrigt, ibland förlängning
+// Äldre TED-XML har RENEWAL_DESCR (recompute-procurement-awards.mjs --fetch-cn).
+
+export interface RenewalOptions {
+  /** Antal förlängningar (BT-58 eller ur texten) */
+  count: number | null
+  /** Längd per förlängning i månader, när texten anger den */
+  monthsEach: number | null
+  /** Total förlängning i månader, när den går att räkna */
+  totalMonths: number | null
+  /** Sista möjliga slut när texten anger ett datum ("max till 2030-03-27") */
+  maxEnd: string | null
+  /** Texten som tolkades */
+  text: string | null
+  /** Sant när längden (eller slutdatumet) kommer ur annonsen och inte är antagen */
+  known: boolean
+}
+
+const OPT_NUM: Record<string, number> = { en: 1, ett: 1, one: 1, två: 2, two: 2, tre: 3, three: 3, fyra: 4, four: 4, fem: 5, five: 5, sex: 6, tolv: 12 }
+const OPT_N = '(\\d{1,3}|en|ett|one|två|two|tre|three|fyra|four|fem|five|sex|tolv)'
+const OPT_U = '(år|years?|månader|månad|mån|months?)'
+
+function optNum(w: string): number | null {
+  if (/^\d+$/.test(w)) return Number(w)
+  return OPT_NUM[w.toLowerCase()] ?? null
+}
+
+function optMonths(n: number, unit: string): number {
+  return /^(år|year)/i.test(unit) ? n * 12 : n
+}
+
+/**
+ * Förlängningsoptioner ur BT-58 (antal) och BT-57/BT-54 (text). Mönster:
+ *   "Förlängning är 12 månader", "Renewal length is 12 months"   -> 12 per förlängning
+ *   "24 months * 2", "2 x 12 månader", "två gånger ett år"         -> antal gånger längd
+ *   "1+1 år"                                                       -> summan, antal termer
+ *   "Förlängning kan ske i max 2 år", "upp till 24 månader"        -> total
+ *   "max till 2030-03-27", "längst till och med 2029-12-31"        -> sista möjliga slut
+ * BT-54 räknas bara när texten talar om förlängning. "N/A" och tomt ger inget.
+ */
+export function parseRenewalOptions(input: { count?: number | null; renewalText?: string | null; optionText?: string | null }): RenewalOptions {
+  const count0 = input.count != null && Number.isFinite(Number(input.count)) ? Math.max(0, Math.round(Number(input.count))) : null
+  const out: RenewalOptions = { count: count0, monthsEach: null, totalMonths: null, maxEnd: null, text: null, known: false }
+  const candidates = [input.renewalText, input.optionText]
+    .map((t) => cleanText(t))
+    .filter((t, i) => t && !/^(n\/?a|ej tillämpligt|saknas|-)\.?$/i.test(t) && (i === 0 || /förläng|extend|extension|renew|option att förlänga/i.test(t)))
+  for (const raw of candidates) {
+    const t = raw.toLowerCase().replace(/\(\d+\)/g, ' ').replace(/\s+/g, ' ')
+    let hit = false
+    const date = t.match(/(?:max(?:imalt)?|längst|senast|till och med|t\.o\.m\.?|until|up to|to)\s*(?:till\s*(?:och med\s*)?)?(\d{4}-\d{2}-\d{2})/)
+    if (date) {
+      out.maxEnd = date[1]
+      hit = true
+    }
+    const lenTimes = t.match(new RegExp(`${OPT_N}\\s*${OPT_U}\\s*(?:\\*|x|×|gånger|times)\\s*${OPT_N}\\b`))
+    const timesLen = t.match(new RegExp(`${OPT_N}\\s*(?:\\*|x|×|gånger|ggr|times)\\s*(?:om|med|á|à|a|of)?\\s*(?:högst\\s+)?${OPT_N}\\s*${OPT_U}`))
+    const plus = t.match(new RegExp(`\\b(\\d{1,2})\\s*\\+\\s*(\\d{1,2})(?:\\s*\\+\\s*(\\d{1,2}))?(?:\\s*\\+\\s*(\\d{1,2}))?\\s*${OPT_U}`))
+    const each = t.match(new RegExp(`(?:förlängning(?:en|sperioden?)?|renewal|extension|period)[^.\\d]{0,30}?(?:är|is|om|på|of|med|lenght is|length is|:)\\s*${OPT_N}\\s*${OPT_U}`))
+    const total = t.match(new RegExp(`(?:max(?:imalt)?|upp till|högst|totalt|sammanlagt|up to|maximum(?: of)?|ytterligare)\\s+(?:i\\s+)?${OPT_N}\\s*${OPT_U}`))
+    if (lenTimes) {
+      const len = optNum(lenTimes[1])
+      const n = optNum(lenTimes[3])
+      if (len != null && n != null && n > 0 && n <= 10) {
+        out.monthsEach = optMonths(len, lenTimes[2])
+        out.count = n
+        out.totalMonths = n * out.monthsEach
+        hit = true
+      }
+    } else if (timesLen) {
+      const n = optNum(timesLen[1])
+      const len = optNum(timesLen[2])
+      if (len != null && n != null && n > 0 && n <= 10) {
+        out.monthsEach = optMonths(len, timesLen[3])
+        out.count = n
+        out.totalMonths = n * out.monthsEach
+        hit = true
+      }
+    } else if (plus) {
+      // "1+1 år" i en förlängningstext: alla termer är förlängningar
+      const terms = [plus[1], plus[2], plus[3], plus[4]].filter(Boolean).map(Number)
+      out.count = terms.length
+      out.totalMonths = optMonths(terms.reduce((s, x) => s + x, 0), plus[5])
+      out.monthsEach = terms.every((x) => x === terms[0]) ? optMonths(terms[0], plus[5]) : null
+      hit = true
+    } else if (total) {
+      const n = optNum(total[1])
+      if (n != null && n > 0) {
+        out.totalMonths = optMonths(n, total[2])
+        if (out.count && out.totalMonths % out.count === 0) out.monthsEach = out.totalMonths / out.count
+        hit = true
+      }
+    } else if (each) {
+      const n = optNum(each[1])
+      if (n != null && n > 0) {
+        out.monthsEach = optMonths(n, each[2])
+        out.totalMonths = out.monthsEach * (out.count ?? 1)
+        if (out.count == null) out.count = 1
+        hit = true
+      }
+    }
+    if (hit) {
+      if (out.totalMonths != null && (out.totalMonths <= 0 || out.totalMonths > 120)) {
+        out.totalMonths = null
+        out.monthsEach = null
+      }
+      out.text = raw.slice(0, 300)
+      out.known = out.totalMonths != null || out.maxEnd != null
+      if (out.known) break
+    }
+  }
+  return out
+}
+
+function optionPhrase(months: number, opts: { count?: number | null; text?: string | null }): string {
+  const n = opts.count && opts.count > 0 && months % opts.count === 0 ? opts.count : null
+  const each = n ? months / n : null
+  const core = n && n > 1 && each ? `${n} förlängningar om ${each} månader` : `förlängning ${months} månader`
+  return `${core} enligt annonsen${opts.text ? ` ("${opts.text.slice(0, 80)}")` : ''}`
 }
 
 /**
@@ -399,11 +540,16 @@ function yearsText(months: number): string {
 
 /**
  * Beräknat avtalsslut, i ordningen:
- *   1. TED slutdatum plus förlängningar (ett år per förlängning)
+ *   1. TED slutdatum plus förlängningar
  *   2. Mercell contractExpiryDate
  *   3. Avtalsstart plus avtalstid (TED eller annonstexten) plus förlängningar
  *   4. Antagandet två plus två år från avtalsstarten (två år plus kända
- *      förlängningar när antalet är känt)
+ *      förlängningar när de är kända)
+ * Förlängningarna tas i ordningen: sista möjliga slut ur annonsen
+ * (optionsMaxEnd), riktiga optioner i månader ur annonsen (optionMonths,
+ * parseRenewalOptions), antalet förlängningar med ett år vardera
+ * (RENEWAL_YEARS_EACH), annars antagandets två förlängningsår.
+ * baseEnd är basavtalets slut utan optioner, för avtalsklockans tidslinje.
  * Avtalsstarten tas från avtalsstart, tecknat avtal, tilldelning plus en månad,
  * tilldelningsannonsen eller annonsen plus sex månader, aldrig rått från
  * tilldelningsdatumet.
@@ -412,46 +558,91 @@ export function computeContractEnd(input: EndDateInput): EndDateResult {
   const renewalsKnown = input.renewalMax != null && Number.isFinite(Number(input.renewalMax))
   const renewals = renewalsKnown ? Math.max(0, Number(input.renewalMax)) : 0
   const startInfo = startBasisOf(input)
+  const realMonths = input.optionMonths != null && Number.isFinite(Number(input.optionMonths)) && Number(input.optionMonths) >= 0 ? Math.round(Number(input.optionMonths)) : null
+  const maxEnd = tedDate(input.optionsMaxEnd)
+  const renewalWord = (n: number) => `${n} förlängning${n === 1 ? '' : 'ar'}`
+
+  /**
+   * Förlängningen på ett basavtalsslut, i ordningen: sista möjliga slut ur
+   * annonsen, riktiga optioner i månader ur annonsen, antalet förlängningar
+   * med antagandet ett år vardera. Null när inget är känt.
+   */
+  const extend = (base: string): { date: string; months: number; text: string } | null => {
+    if (maxEnd && maxEnd > base) {
+      const months = Math.max(0, Math.round(daysBetweenIso(base, maxEnd) / 30.4375))
+      return { date: maxEnd, months, text: `förlängning till ${maxEnd} enligt annonsen${input.optionsText ? ` ("${input.optionsText.slice(0, 80)}")` : ''}` }
+    }
+    if (realMonths != null && realMonths > 0) {
+      return { date: addMonthsIso(base, realMonths), months: realMonths, text: optionPhrase(realMonths, { count: renewalsKnown ? renewals : null, text: input.optionsText }) }
+    }
+    if (realMonths === 0) return { date: base, months: 0, text: 'inga förlängningar enligt annonsen' }
+    if (renewals > 0) {
+      const months = renewals * 12 * RENEWAL_YEARS_EACH
+      return { date: addMonthsIso(base, months), months, text: `${renewalWord(renewals)} (antaget ett år vardera)` }
+    }
+    return null
+  }
 
   const ted = tedDate(input.tedEnd)
   if (ted) {
-    if (renewals > 0) {
-      return {
-        date: addMonthsIso(ted, renewals * 12 * RENEWAL_YEARS_EACH),
-        source: 'ted_end_plus_renewals',
-        startBasis: startInfo.date,
-        basis: `TED slutdatum ${ted} plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}`,
-      }
+    const ext = extend(ted)
+    if (ext && ext.months > 0) {
+      return { date: ext.date, source: 'ted_end_plus_renewals', startBasis: startInfo.date, basis: `TED slutdatum ${ted} plus ${ext.text}`, baseEnd: ted, optionMonths: ext.months }
     }
-    return { date: ted, source: 'ted_end', startBasis: startInfo.date, basis: `TED slutdatum ${ted}` }
+    return { date: ted, source: 'ted_end', startBasis: startInfo.date, basis: `TED slutdatum ${ted}`, baseEnd: ted, optionMonths: renewalsKnown || realMonths != null ? 0 : null }
   }
   const mercell = input.mercellExpiry ? swedishDate(input.mercellExpiry) : null
-  if (mercell) return { date: mercell, source: 'mercell_expiry', startBasis: startInfo.date, basis: `Mercell avtalsslut ${mercell}` }
+  if (mercell) return { date: mercell, source: 'mercell_expiry', startBasis: startInfo.date, basis: `Mercell avtalsslut ${mercell}`, baseEnd: null, optionMonths: null }
 
-  if (!startInfo.date) return { date: null, source: null, startBasis: null, basis: null }
+  if (!startInfo.date) return { date: null, source: null, startBasis: null, basis: null, baseEnd: null, optionMonths: null }
 
   const duration = input.durationMonths != null && input.durationMonths > 0 ? Math.round(input.durationMonths) : null
   if (duration) {
-    const total = duration + renewals * 12 * RENEWAL_YEARS_EACH
+    const base = addMonthsIso(startInfo.date, duration)
+    const ext = extend(base)
     return {
-      date: addMonthsIso(startInfo.date, total),
+      date: ext?.date ?? base,
       source: input.durationFrom === 'text' ? 'text_duration' : 'contract_duration',
       startBasis: startInfo.date,
       basis:
         `Start ${startInfo.date} (${startInfo.label}) plus ${yearsText(duration)}` +
-        (renewals > 0 ? ` plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}` : '') +
+        (ext && ext.months > 0 ? ` plus ${ext.text}` : '') +
         (input.durationFrom === 'text' ? ', avtalstid ur annonstexten' : ''),
+      baseEnd: base,
+      optionMonths: ext ? ext.months : renewalsKnown ? 0 : null,
     }
   }
 
-  const renewalMonths = renewalsKnown ? renewals * 12 * RENEWAL_YEARS_EACH : 24
+  // Antagandet två plus två år: riktiga optioner eller känt antal ersätter de två förlängningsåren
+  const base = addMonthsIso(startInfo.date, 24)
+  const ext = extend(base)
+  if (ext) {
+    return {
+      date: ext.date,
+      source: 'assumption_2_2',
+      startBasis: startInfo.date,
+      basis: `Antagande: start ${startInfo.date} (${startInfo.label}) plus två år${ext.months > 0 ? ` plus ${ext.text}` : ', inga förlängningar'}`,
+      baseEnd: base,
+      optionMonths: ext.months,
+    }
+  }
+  if (renewalsKnown) {
+    return {
+      date: base,
+      source: 'assumption_2_2',
+      startBasis: startInfo.date,
+      basis: `Antagande: start ${startInfo.date} (${startInfo.label}) plus två år, inga förlängningar`,
+      baseEnd: base,
+      optionMonths: 0,
+    }
+  }
   return {
-    date: addMonthsIso(startInfo.date, 24 + renewalMonths),
+    date: addMonthsIso(startInfo.date, 48),
     source: 'assumption_2_2',
     startBasis: startInfo.date,
-    basis: `Antagande: start ${startInfo.date} (${startInfo.label}) plus två år${
-      renewalsKnown ? (renewals > 0 ? ` plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}` : ', inga förlängningar') : ' plus två förlängningsår'
-    }`,
+    basis: `Antagande: start ${startInfo.date} (${startInfo.label}) plus två år plus två förlängningsår`,
+    baseEnd: base,
+    optionMonths: null,
   }
 }
 
@@ -564,6 +755,124 @@ export function canonicalOrgNumber(raw: string | null | undefined): string | nul
 export function workWindow(endDate: string | null): { start: string | null; end: string | null } {
   if (!endDate) return { start: null, end: null }
   return { start: addMonthsIso(endDate, -18), end: addMonthsIso(endDate, -12) }
+}
+
+// ---------------------------------------------------------------------------
+// Notis när ett avtal går in i bearbetningsfönstret (api/cron/procurement-deadlines.ts)
+
+export interface WindowAwardRow {
+  id: string
+  source: string
+  source_ref: string | null
+  buyer_id: string | null
+  buyer_name: string | null
+  title: string | null
+  winner_name: string | null
+  calc_end_date: string | null
+  corrected_end_date: string | null
+  status: string | null
+  followup_status: string | null
+  excluded_reason?: string | null
+  window_notified_at: string | null
+}
+
+export interface WindowEntry {
+  key: string
+  awardIds: string[]
+  buyerId: string | null
+  buyerName: string | null
+  title: string | null
+  winners: string[]
+  endDate: string
+  windowStart: string
+  windowEnd: string
+}
+
+/**
+ * Avtal (en grupp per källa och upphandling) som är i bearbetningsfönstret i
+ * dag och ännu inte fått sin notis. En gång per avtal: har någon rad i gruppen
+ * window_notified_at satt räknas hela gruppen som notifierad. Felträffar,
+ * klara och ignorerade avtal och avtal där köparen redan annonserat eller
+ * tilldelat på nytt hoppas över. Samma köpare och slutdatum i flera källor
+ * (TED och UHM) ger en notis.
+ */
+export function windowEntriesToNotify(rows: WindowAwardRow[], today: string): WindowEntry[] {
+  const groups = new Map<string, WindowAwardRow[]>()
+  for (const r of rows) {
+    if (r.excluded_reason) continue
+    const k = `${r.source}:${r.source_ref ?? r.id}`
+    const list = groups.get(k) ?? []
+    list.push(r)
+    groups.set(k, list)
+  }
+  const out: WindowEntry[] = []
+  const seen = new Set<string>()
+  for (const [key, list] of groups) {
+    if (list.some((r) => r.window_notified_at)) continue
+    if (list.every((r) => r.status === 'done' || r.status === 'ignored')) continue
+    if (list.some((r) => r.followup_status === 'new_notice' || r.followup_status === 'new_award')) continue
+    const corrected = list.map((r) => r.corrected_end_date).filter((d): d is string => !!d).sort().pop() ?? null
+    const end = corrected ?? list.map((r) => r.calc_end_date).filter((d): d is string => !!d).sort().pop() ?? null
+    if (!end) continue
+    const w = workWindow(end)
+    if (!w.start || !w.end || today < w.start || today > w.end) continue
+    const first = list[0]
+    const dedup = `${first.buyer_id ?? normalizeName(first.buyer_name)}|${end}`
+    if (seen.has(dedup)) continue
+    seen.add(dedup)
+    out.push({
+      key,
+      awardIds: list.map((r) => r.id),
+      buyerId: first.buyer_id,
+      buyerName: first.buyer_name,
+      title: first.title,
+      winners: [...new Set(list.map((r) => r.winner_name).filter((n): n is string => !!n))],
+      endDate: end,
+      windowStart: w.start,
+      windowEnd: w.end,
+    })
+  }
+  return out.sort((a, b) => a.windowStart.localeCompare(b.windowStart))
+}
+
+/** Notisens rubrik börjar alltid så, så att klienten länkar till köparen i stället för en upphandling */
+export const WINDOW_NOTIFICATION_PREFIX = 'Bearbetningsfönstret öppnar'
+
+// ---------------------------------------------------------------------------
+// Kontaktperson hos köparen ur TED eForms
+//
+// Fält i TED Search API v3 (verifierade 2026-10-16 mot 11830-2025, 34449-2024,
+// 407043-2026): buyer-contact-point (BT-502, samma som
+// organisation-contact-point-buyer), buyer-email (BT-506), organisation-tel-buyer
+// (BT-503). Listorna följer köparna i ordning; första posten är huvudköparen.
+
+export const TED_CONTACT_FIELDS = ['buyer-contact-point', 'buyer-email', 'organisation-tel-buyer']
+
+export interface BuyerContact {
+  name: string | null
+  email: string | null
+  phone: string | null
+}
+
+function firstText(v: unknown): string | null {
+  const list = Array.isArray(v) ? v : v == null ? [] : [v]
+  const s = list.length ? cleanText(String(list[0])) : ''
+  return s || null
+}
+
+export function contactFromTed(n: Record<string, unknown>): BuyerContact | null {
+  const name = firstText(n['buyer-contact-point']) ?? firstText(n['organisation-contact-point-buyer'])
+  const emailRaw = firstText(n['buyer-email']) ?? firstText(n['organisation-email-buyer'])
+  const email = emailRaw && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw.toLowerCase() : null
+  const phone = firstText(n['organisation-tel-buyer'])
+  if (!name && !email) return null
+  return { name, email, phone }
+}
+
+/** Nyckel för en kontakt hos en köpare: e-post, annars namnet */
+export function contactKey(buyerId: string, c: Pick<BuyerContact, 'name' | 'email'>): string | null {
+  const who = c.email ? c.email.toLowerCase() : c.name ? normalizeName(c.name) : ''
+  return who ? `${buyerId}:${who}` : null
 }
 
 // ---------------------------------------------------------------------------

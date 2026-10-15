@@ -22,6 +22,8 @@ import {
   nextQuarters,
   overallBidsMedian,
   pipelineByQuarter,
+  forecastByQuarter,
+  twoBidderBuyerKeys,
   qualityBuyers,
   shareTotals,
   sharesByYear,
@@ -289,6 +291,35 @@ describe('avtalsklocka och pipeline', () => {
     expect(rows.map((r) => r.quarter)).toEqual(['2026-Q3', '2026-Q4', '2027-Q1', '2027-Q2'])
     expect(rows[1]).toMatchObject({ notices: 1, contribution: 100_000 })
     expect(rows[2]).toMatchObject({ clock: 1, clockAnnualValue: 1_000_000 })
+  })
+
+  it('en prognos: samma urval som pipelinen, osäkert slutdatum särredovisat', () => {
+    const groups = groupAwards([
+      award({ award_date: '2024-09-30', calc_end_date: '2028-09-30', calc_end_source: 'assumption_2_2', value: 4_000_000 }),
+      award({ award_date: '2024-09-30', calc_end_date: '2028-09-30', value: 4_000_000, status: 'ignored' }),
+    ])
+    const notices = [
+      { tender_deadline: '2026-11-15T12:00:00Z', expected_contribution: 100_000, our_status: 'bidding' as const, annual_value: 300_000, estimated_value: null, duration_months: null },
+      { tender_deadline: '2026-11-20T12:00:00Z', expected_contribution: 50_000, our_status: 'declined' as const, annual_value: 999, estimated_value: null, duration_months: null },
+    ]
+    const rows = forecastByQuarter(notices, groups, today, 4)
+    const old = pipelineByQuarter(notices, groups, today, 4)
+    rows.forEach((r, i) => {
+      expect(r.notices).toBe(old[i].notices)
+      expect(r.clock).toBe(old[i].clock)
+    })
+    expect(rows[1]).toMatchObject({ notices: 1, noticeAnnual: 300_000, total: 300_000 })
+    expect(rows[2]).toMatchObject({ clock: 1, clockAnnual: 1_000_000, clockUncertain: 1, total: 1_000_000 })
+  })
+
+  it('bara två anbudsgivare brukar svara: median av antalet anbud hos köparen', () => {
+    const groups = groupAwards([
+      award({ buyer_id: 'b1', bids_received: 2 }),
+      award({ buyer_id: 'b1', bids_received: 2 }),
+      award({ buyer_id: 'b2', bids_received: 4 }),
+    ])
+    const keys = twoBidderBuyerKeys(groups, indexBidders([]))
+    expect([...keys]).toEqual(['b1'])
   })
 })
 

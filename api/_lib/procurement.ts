@@ -21,13 +21,16 @@ import {
   canonicalOrgNumber,
   cleanText,
   computeContractEnd,
+  contactKey,
   parseDurationText,
+  parseRenewalOptions,
   estimateWinProbability,
   normalizeName,
   normalizeOrgNumber,
   normalizeTitle,
   scoreNotice,
   workWindow,
+  type BuyerContact,
 } from '../../src/shared/procurementRules'
 import type {
   ProcurementAwardSource,
@@ -316,6 +319,8 @@ export interface NoticeCandidate {
   sourceStatus?: string | null
   platformUrl?: string | null
   documentUrl?: string | null
+  /** Kontaktperson hos köparen ur annonsen (TED eForms BT-502, BT-506, BT-503) */
+  contact?: BuyerContact | null
 }
 
 export interface IngestResult {
@@ -408,6 +413,9 @@ export async function ingestNotice(c: NoticeCandidate): Promise<IngestResult> {
     fill('criteria_type', c.criteriaType)
     fill('platform_url', c.platformUrl)
     fill('document_url', c.documentUrl)
+    fill('contact_name', c.contact?.name ?? null)
+    fill('contact_email', c.contact?.email ?? null)
+    fill('contact_phone', c.contact?.phone ?? null)
     // CPV och län slås ihop: källorna kompletterar varandra
     const cpv = Array.from(new Set([...(cur.cpv_codes ?? []), ...c.cpv]))
     const counties = Array.from(new Set([...(cur.county_codes ?? []), ...c.countyCodes]))
@@ -465,6 +473,9 @@ export async function ingestNotice(c: NoticeCandidate): Promise<IngestResult> {
         our_status: c.sourceStatus === 'Cancelled' ? 'cancelled' : 'new',
         platform_url: c.platformUrl ?? null,
         document_url: c.documentUrl ?? null,
+        contact_name: c.contact?.name ?? null,
+        contact_email: c.contact?.email ?? null,
+        contact_phone: c.contact?.phone ?? null,
         match_score: m.score,
         match_reasons: m.reasons,
         expected_bids: prob.expectedBids,
@@ -503,7 +514,55 @@ export async function ingestNotice(c: NoticeCandidate): Promise<IngestResult> {
     { onConflict: 'source,source_id' }
   )
 
+  if (buyerId && c.contact) {
+    try {
+      await recordBuyerContact(buyerId, noticeId!, c.contact, c.source === 'mercell' ? 'mercell' : 'ted')
+    } catch (err) {
+      console.warn('[procurement] kontaktpersonen kunde inte sparas', err)
+    }
+  }
+
   return { noticeId: noticeId!, created, score, hard, title, buyerName }
+}
+
+/**
+ * Kontaktperson ur en annons till köparens kontaktlista (procurement_contacts).
+ * En rad per köpare och e-post (eller namn). Fyller tomma fält, rör aldrig
+ * manuellt ifyllda värden och lägger till upphandlingen i notice_ids.
+ */
+export async function recordBuyerContact(buyerId: string, noticeId: string | null, contact: BuyerContact, source: 'ted' | 'mercell'): Promise<void> {
+  const key = contactKey(buyerId, contact)
+  if (!key) return
+  const sb = db()
+  const { data: cur } = await sb.from('procurement_contacts').select('id, name, email, phone, notice_ids').eq('contact_key', key).maybeSingle()
+  const now = new Date().toISOString()
+  if (cur) {
+    const ids = new Set<string>((cur.notice_ids as string[] | null) ?? [])
+    if (noticeId) ids.add(noticeId)
+    await sb
+      .from('procurement_contacts')
+      .update({
+        name: cur.name ?? contact.name,
+        email: cur.email ?? contact.email,
+        phone: cur.phone ?? contact.phone,
+        notice_ids: [...ids],
+        last_seen_at: now,
+      })
+      .eq('id', cur.id)
+    return
+  }
+  await sb.from('procurement_contacts').insert({
+    buyer_id: buyerId,
+    contact_key: key,
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone,
+    role: 'Kontaktperson i annonsen',
+    source,
+    notice_ids: noticeId ? [noticeId] : [],
+    first_seen_at: now,
+    last_seen_at: now,
+  })
 }
 
 /** Genomsnittligt antal anbud hos köparen (alla källor), minus inget: det är ANDRA anbud om vi går in */
@@ -550,6 +609,10 @@ export interface AwardCandidate {
   durationMonths?: number | null
   /** Fritext där avtalstiden kan stå (TED description-lot, Mercell description) */
   durationText?: string | null
+  /** TED renewal-description-lot (BT-57): förlängningarnas längd i fritext */
+  renewalText?: string | null
+  /** TED option-description-lot (BT-54): optioner, ibland förlängning */
+  optionText?: string | null
   /** Publicering av upphandlingsannonsen, bas när inga avtalsdatum finns */
   tenderPublishedDate?: string | null
   wasAppealed?: boolean | null
@@ -565,9 +628,15 @@ export async function upsertAward(a: AwardCandidate): Promise<string> {
   const winnerKey = winnerOrg ?? normalizeName(a.winnerName) ?? 'okand'
   const award_key = `${a.source}:${a.sourceRef}:${winnerKey || 'okand'}`
   const textDuration = a.durationMonths ? null : parseDurationText(a.durationText)
+  // Riktiga förlängningsoptioner ur annonsen går före antagandet ett år per förlängning
+  const opts = parseRenewalOptions({ count: a.renewalMax ?? null, renewalText: a.renewalText ?? null, optionText: a.optionText ?? null })
+  const textOptions = !opts.known && textDuration && textDuration.renewalMonths > 0 ? textDuration.renewalMonths : null
   const end = computeContractEnd({
     tedEnd: a.contractEnd,
-    renewalMax: a.renewalMax ?? (textDuration && textDuration.renewalMonths > 0 ? textDuration.renewalMonths / 12 : null),
+    renewalMax: a.renewalMax ?? opts.count ?? (textDuration && textDuration.renewalMonths > 0 ? textDuration.renewalMonths / 12 : null),
+    optionMonths: opts.known ? opts.totalMonths : textOptions,
+    optionsMaxEnd: opts.maxEnd,
+    optionsText: opts.known ? opts.text : null,
     mercellExpiry: a.mercellExpiry,
     contractStart: a.contractStart,
     contractSignedDate: a.contractSignedDate,
@@ -618,6 +687,11 @@ export async function upsertAward(a: AwardCandidate): Promise<string> {
     start_basis_date: end.startBasis,
     duration_months: a.durationMonths ?? textDuration?.months ?? null,
     calc_basis: end.basis,
+    base_end_date: end.baseEnd ?? null,
+    option_months: end.optionMonths ?? null,
+    option_count: opts.count ?? a.renewalMax ?? null,
+    option_text: opts.known ? opts.text : null,
+    option_source: opts.known ? 'ted_eforms' : textOptions != null ? 'text' : null,
     window_start: win.start,
     window_end: win.end,
     was_appealed: a.wasAppealed ?? null,
@@ -742,6 +816,8 @@ export interface Manager {
   email: string
   display_name: string | null
   digest_enabled: boolean
+  /** Notis när ett avtal går in i bearbetningsfönstret */
+  window_notify_enabled: boolean
 }
 
 /** Alla aktiva upphandlingsansvariga med e-post och sammandragsval */
@@ -754,9 +830,16 @@ export async function getManagers(): Promise<Manager[]> {
     .eq('is_active', true)
   const users = (data ?? []).filter((p) => p.user_id && p.email)
   if (users.length === 0) return []
-  const { data: settings } = await sb.from('procurement_user_settings').select('user_id, digest_enabled').in('user_id', users.map((u) => u.user_id))
+  const { data: settings } = await sb.from('procurement_user_settings').select('user_id, digest_enabled, window_notify_enabled').in('user_id', users.map((u) => u.user_id))
   const off = new Set((settings ?? []).filter((s) => s.digest_enabled === false).map((s) => s.user_id))
-  return users.map((u) => ({ user_id: u.user_id, email: u.email, display_name: u.display_name, digest_enabled: !off.has(u.user_id) }))
+  const windowOff = new Set((settings ?? []).filter((s) => s.window_notify_enabled === false).map((s) => s.user_id))
+  return users.map((u) => ({
+    user_id: u.user_id,
+    email: u.email,
+    display_name: u.display_name,
+    digest_enabled: !off.has(u.user_id),
+    window_notify_enabled: !windowOff.has(u.user_id),
+  }))
 }
 
 /**
@@ -970,7 +1053,7 @@ export async function recipientsFor(ownerId: string | null): Promise<Manager[]> 
     const owner = managers.find((m) => m.user_id === ownerId)
     if (owner) return [owner]
     const { data } = await db().from('profiles').select('user_id, email, display_name').eq('user_id', ownerId).maybeSingle()
-    if (data?.email) return [{ user_id: data.user_id, email: data.email, display_name: data.display_name, digest_enabled: true }]
+    if (data?.email) return [{ user_id: data.user_id, email: data.email, display_name: data.display_name, digest_enabled: true, window_notify_enabled: true }]
   }
   return managers
 }

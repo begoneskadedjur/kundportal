@@ -14,6 +14,8 @@
 // reserv för utveckling. Alla länkar inne i sidorna byggs med procurementPath()
 // så att de fungerar i båda lägena.
 
+import { WINDOW_NOTIFICATION_PREFIX } from '../shared/procurementRules'
+
 const DEFAULT_HOST = 'upphandling.begone.se'
 const SESSION_KEY = 'begone_procurement_standalone'
 
@@ -100,4 +102,15 @@ export function noticePath(id: string, step?: string): string {
 export function procurementPortalUrl(sub = ''): string {
   const clean = !sub || sub === '/' ? '' : sub.startsWith('/') ? sub : `/${sub}`
   return `${PROCUREMENT_PORTAL_URL}${clean}`
+}
+
+/**
+ * Undersökväg för en notis med case_type 'procurement'. Notisen om
+ * bearbetningsfönstret (rubriken börjar med WINDOW_NOTIFICATION_PREFIX) bär
+ * köparens id och öppnar köparprofilen, eller avtalsklockan när köparen
+ * saknas. Övriga bär upphandlingens id.
+ */
+export function procurementNotificationSub(n: { case_id: string | null; title?: string | null }): string {
+  if ((n.title ?? '').startsWith(WINDOW_NOTIFICATION_PREFIX)) return n.case_id ? `/kopare/${n.case_id}` : '/avtalsklocka'
+  return n.case_id ? `/upphandling/${n.case_id}` : ''
 }

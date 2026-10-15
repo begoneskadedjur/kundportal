@@ -1,8 +1,9 @@
 // src/pages/admin/procurement/SignalsPage.tsx
 // Signaler (planens avsnitt 3 och 9.6): framförhållning ur upphandlingsplaner,
 // planerade poster i annonsdatabaserna, RFI, förhandsannonser och
-// avtalsklockan. Status går att ändra per signal. Signalkällorna ligger
-// sedan 3.63.0 bara under Inställningar.
+// avtalsklockan. Status ändras i en meny från statusens text (statusorden ur
+// types/procurement.ts), listan går att exportera till Excel. Signalkällorna
+// ligger sedan 3.63.0 bara under Inställningar.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -13,13 +14,16 @@ import Select from '../../../components/ui/Select'
 import { ProcurementService } from '../../../services/procurementService'
 import {
   RELIABILITY_LABEL,
+  SIGNAL_STATUS_DOT,
   SIGNAL_STATUS_LABEL,
   SIGNAL_TYPE_LABEL,
   type ProcurementReliability,
   type ProcurementSignal,
   type ProcurementSignalType,
 } from '../../../types/procurement'
-import { EmptyState, Section, StatusDot } from '../../../components/admin/procurement/ui'
+import { EmptyState, IconButton, Section, StatusDot } from '../../../components/admin/procurement/ui'
+import StatusMenu from '../../../components/admin/procurement/StatusMenu'
+import { exportXlsx } from '../../../components/admin/procurement/excelExport'
 import { fmtDate, fmtNum, tableCls, type Tone } from '../../../components/admin/procurement/uiFormat'
 import { noticePath, procurementPath } from '../../../lib/procurementPortal'
 
@@ -28,6 +32,7 @@ type SignalStatus = ProcurementSignal['status']
 const STATUS_LABEL = SIGNAL_STATUS_LABEL
 
 const STATUS_OPTIONS = (Object.keys(STATUS_LABEL) as SignalStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s] }))
+const STATUS_MENU = (Object.keys(STATUS_LABEL) as SignalStatus[]).map((s) => ({ value: s, label: STATUS_LABEL[s], dot: SIGNAL_STATUS_DOT[s] }))
 
 const RELIABILITY_TONE: Record<ProcurementReliability, Tone> = { high: 'good', medium: 'warn', low: 'muted' }
 
@@ -58,6 +63,7 @@ export default function SignalsPage() {
   const [signals, setSignals] = useState<ProcurementSignal[]>([])
   const [filter, setFilter] = useState<ListFilter>('open')
   const [type, setType] = useState<string>('all')
+  const [exporting, setExporting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -87,12 +93,58 @@ export default function SignalsPage() {
     }
   }
 
+  const exportSignals = async () => {
+    if (rows.length === 0) {
+      toast.error('Inga signaler i urvalet')
+      return
+    }
+    setExporting(true)
+    try {
+      await exportXlsx({
+        fileBase: 'Signaler',
+        sheetName: 'Signaler',
+        title: 'Signaler',
+        columns: [
+          { header: 'Typ', width: 20 },
+          { header: 'Köpare', width: 32 },
+          { header: 'Text', width: 70 },
+          { header: 'Väntas', width: 10 },
+          { header: 'Tillförlitlighet', width: 14 },
+          { header: 'Källa', width: 14 },
+          { header: 'Länk', width: 40 },
+          { header: 'Status', width: 12 },
+          { header: 'Upptäckt', width: 12 },
+        ],
+        rows: rows.map((s) => [
+          SIGNAL_TYPE_LABEL[s.signal_type] ?? s.signal_type,
+          s.buyer_name ?? '',
+          s.text,
+          s.expected_quarter?.replace('-', ' ') ?? '',
+          RELIABILITY_LABEL[s.reliability] ?? s.reliability,
+          SOURCE_LABEL[s.source] ?? s.source,
+          s.url ?? '',
+          STATUS_LABEL[s.status],
+          fmtDate(s.created_at),
+        ]),
+      })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Kunde inte skapa Excel-filen')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <div className="space-y-8">
       <Section
         title="Signaler"
         hint="Tidiga tecken på kommande upphandlingar i fallande tillförlitlighet: avtalsklockan, planerade poster, upphandlingsplaner och förhandsannonser."
-        action={<span className="text-xs text-slate-500 tabular-nums">{fmtNum(rows.length)} st</span>}
+        action={
+          <span className="inline-flex items-center gap-1">
+            <span className="text-xs text-slate-500 tabular-nums">{fmtNum(rows.length)} st</span>
+            <IconButton icon={<Icon name="upphandling.excel" size={20} />} label="Exportera till Excel" onClick={() => void exportSignals()} disabled={exporting} />
+          </span>
+        }
       >
         <div className="flex flex-wrap gap-3 px-3 py-3 border-b border-slate-800">
           <div className="w-52"><Select options={LIST_OPTIONS} value={filter} onChange={(v) => setFilter(v as ListFilter)} /></div>
@@ -153,9 +205,16 @@ export default function SignalsPage() {
                       )}
                     </td>
                     <td className={tableCls.td}>
-                      <div className="w-40">
-                        <Select options={STATUS_OPTIONS} value={s.status} onChange={(v) => void setStatus(s, v as SignalStatus)} />
-                      </div>
+                      <StatusMenu
+                        size="sm"
+                        value={s.status}
+                        label={STATUS_LABEL[s.status]}
+                        dot={SIGNAL_STATUS_DOT[s.status]}
+                        options={STATUS_MENU}
+                        onChange={(v) => void setStatus(s, v)}
+                        ariaLabel={`Byt status för signalen från ${s.buyer_name ?? 'okänd köpare'}`}
+                        align="right"
+                      />
                     </td>
                   </tr>
                 ))}

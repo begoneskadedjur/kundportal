@@ -143,6 +143,12 @@ export interface ProcurementNotice {
   requirements_summary: Record<string, unknown> | null
   notes: string | null
   dedup_key: string | null
+  /** Kontaktperson hos köparen ur annonsen (TED BT-502, BT-506, BT-503), sedan 3.65.0 */
+  contact_name?: string | null
+  contact_email?: string | null
+  contact_phone?: string | null
+  /** Egen post i Anbud (procurement_create_manual_notice), null för annonser ur källorna */
+  manual_type?: ProcurementManualType | null
   first_seen_at: string
   last_seen_at: string
   created_at: string
@@ -215,6 +221,17 @@ export interface ProcurementAward {
   followup_title?: string | null
   followup_date?: string | null
   followup_checked_at?: string | null
+  /** Basavtalets slut utan förlängningsoptioner (sedan 3.65.0) */
+  base_end_date?: string | null
+  /** Förlängningsoptioner i månader som ingår i calc_end_date (0 = inga, null = okänt) */
+  option_months?: number | null
+  option_count?: number | null
+  /** Optionstexten ur annonsen */
+  option_text?: string | null
+  /** Var optionerna kommer från när de är riktiga: ted_eforms, ted_xml, text, manual */
+  option_source?: 'ted_eforms' | 'ted_xml' | 'text' | 'manual' | null
+  /** Notisen om bearbetningsfönstret är skickad */
+  window_notified_at?: string | null
   created_at: string
   updated_at: string
 }
@@ -490,6 +507,44 @@ export interface ProcurementSourceHealth {
 export interface ProcurementUserSettings {
   user_id: string
   digest_enabled: boolean
+  /** Notis när ett avtal går in i bearbetningsfönstret (sedan 3.65.0) */
+  window_notify_enabled?: boolean
+  updated_at: string
+}
+
+/** Egen post i Anbud: direktupphandling, avrop från ramavtal, offertförfrågan */
+export type ProcurementManualType = 'direct' | 'call_off' | 'rfq'
+
+export const MANUAL_TYPE_LABEL: Record<ProcurementManualType, string> = {
+  direct: 'Direktupphandling',
+  call_off: 'Avrop från ramavtal',
+  rfq: 'Offertförfrågan',
+}
+
+/** Ikon ur set/upphandling.tsx per posttyp */
+export const MANUAL_TYPE_ICON: Record<ProcurementManualType, 'upphandling.direkt' | 'upphandling.avrop' | 'upphandling.offert'> = {
+  direct: 'upphandling.direkt',
+  call_off: 'upphandling.avrop',
+  rfq: 'upphandling.offert',
+}
+
+/** Kontaktperson hos en köpare (procurement_contacts), ur annonserna eller manuellt tillagd */
+export interface ProcurementContact {
+  id: string
+  buyer_id: string
+  contact_key: string | null
+  name: string | null
+  role: string | null
+  email: string | null
+  phone: string | null
+  last_contacted_at: string | null
+  source: 'ted' | 'mercell' | 'manual'
+  notice_ids: string[]
+  first_seen_at: string
+  last_seen_at: string
+  notes: string | null
+  created_by: string | null
+  created_at: string
   updated_at: string
 }
 

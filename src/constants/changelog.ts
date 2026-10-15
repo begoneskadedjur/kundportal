@@ -45,6 +45,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.65.0',
+    date: '2026-10-16',
+    title: 'Avtalsklocka med tidslinje, kontaktpersoner och egna poster',
+    items: [
+      { kind: 'nyhet', text: 'Avtalsklockan ritar varje avtal på en tidslinje med bearbetningsfönster, förlängningsoption och avtalsslut. Sök, sortera, välj område och filtrera på köpare där bara två anbudsgivare brukar svara. Status och ansvarig byts i en meny, felträffar ligger under Status och listan går att exportera till Excel.' },
+      { kind: 'andring', text: 'Förlängningsoptionerna läses nu ur annonsen (antal, längd eller sista möjliga slut) innan avtalsklockan antar ett år per förlängning. Hur slutdatumet räknats syns på raden.' },
+      { kind: 'nyhet', text: 'Köparprofilen har Kontaktpersoner: kontakten ur TED-annonserna kommer med automatiskt, och du kan lägga till egna med roll, telefon, e-post och senast kontakt. Kontaktpersonen syns också i avtalsklockan och i upphandlingens översikt.' },
+      { kind: 'nyhet', text: 'Ny post på Anbud: lägg upp en direktupphandling, ett avrop från ramavtal eller en offertförfrågan som inte kommer via någon annons. Den hamnar som Bedöms på tavlan.' },
+      { kind: 'nyhet', text: 'Notis när ett avtal går in i bearbetningsfönstret, en gång per avtal, med länk till köparen. Stängs av under Inställningar, Sammandrag och notiser.' },
+      { kind: 'andring', text: 'Prognos visar en enda prognos per kvartal: avtalsklockans väntade annonser plus öppna anbud, med ljusare stapel för osäkert slutdatum. Signaler går att exportera till Excel och status byts i en meny. I köparprofilen begärs handlingar per tidigare avtal.' },
+    ],
+  },
+  {
     version: '3.64.0',
     date: '2026-10-16',
     title: 'Annonser, anbudstavla och upphandlingen i steg',

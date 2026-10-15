@@ -37,8 +37,10 @@ import {
   type IngestResult,
 } from '../_lib/procurement'
 import {
+  TED_CONTACT_FIELDS,
   addDaysIso,
   cleanText,
+  contactFromTed,
   countiesFromNuts,
   normalizeName,
   normalizeTedNumber,
@@ -65,6 +67,9 @@ export const TED_FIELDS = [
   'received-submissions-type-val', 'received-submissions-type-code', 'tender-value-lowest', 'tender-value-highest', 'tender-value',
   'tender-rank', 'winner-decision-date', 'contract-conclusion-date', 'document-url-lot', 'result-value-lot',
   'framework-maximum-value-lot', 'links',
+  // Förlängningsoptioner (BT-57, BT-54) och kontaktperson hos köparen (BT-502, BT-506, BT-503), sedan 3.65.0
+  'renewal-description-lot', 'option-description-lot',
+  ...TED_CONTACT_FIELDS,
 ]
 
 type Multi = Record<string, string[] | string> | undefined
@@ -304,6 +309,7 @@ async function handleNotice(
     kind: kind === 'can' ? 'award' : (kind as ProcurementNoticeKind),
     platformUrl: first(n['document-url-lot']) ?? link,
     documentUrl: first(n['document-url-lot']),
+    contact: contactFromTed(n),
   })
   // Frågor senast: bara om fältet är tomt (användaren kan ha rättat)
   const answers = first(n['deadline-receipt-answers-date-lot'])
@@ -359,6 +365,8 @@ async function handleNotice(
       renewalMax,
       durationMonths: durationMonths(n),
       durationText: lang(n['description-lot'])[0] ?? null,
+      renewalText: lang(n['renewal-description-lot'])[0] ?? null,
+      optionText: lang(n['option-description-lot'])[0] ?? null,
       raw: i === 0 ? raw : null,
     })
     awardCount++

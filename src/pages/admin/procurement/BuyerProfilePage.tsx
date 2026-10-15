@@ -2,9 +2,11 @@
 // Köparprofil (verktyg 2): uppgifter och kundkoppling, förfaranden,
 // ramavtal eller kontrakt, kriterietyp, antal anbud, nuvarande och tidigare
 // leverantörer, byter de leverantör, överprövningar, uppskattat mot utfall,
-// upphandlingar i bevakningen och begärda handlingar.
+// upphandlingar i bevakningen och begärda handlingar. Sedan 3.65.0:
+// Kontaktpersoner (ur annonserna och manuellt tillagda) och Begär ut handlingar
+// per tidigare avtal med status när handlingarna mottagits.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { Icon } from '../../../components/icons/Icon'
@@ -19,10 +21,13 @@ import {
   OUR_STATUS_LABEL,
   REQUEST_STATUS_LABEL,
   type ProcurementBuyer,
+  type ProcurementContact,
   type ProcurementDocumentRequest,
   type ProcurementNotice,
 } from '../../../types/procurement'
-import { EmptyState, LinkButton, PulseRow, Section, StatusDot } from '../../../components/admin/procurement/ui'
+import { EmptyState, LinkButton, PulseRow, SecondaryButton, Section, StatusDot } from '../../../components/admin/procurement/ui'
+import BuyerContacts from '../../../components/admin/procurement/registry/BuyerContacts'
+import BuyerDocRequest, { RequestStatus } from '../../../components/admin/procurement/registry/BuyerDocRequest'
 import { fmtDate, fmtKrShort, fmtNum, fmtPct, tableCls } from '../../../components/admin/procurement/uiFormat'
 import { VALUE_KIND_LABEL, buildProcurements, median, type ProcurementGroup } from '../../../components/admin/procurement/market/marketStats'
 import { HistoryEmpty, SupplierName } from '../../../components/admin/procurement/market/shared'
@@ -213,18 +218,23 @@ export default function BuyerProfilePage() {
   const [bidders, setBidders] = useState<BidderWithSupplier[]>([])
   const [notices, setNotices] = useState<ProcurementNotice[]>([])
   const [requests, setRequests] = useState<ProcurementDocumentRequest[]>([])
+  const [contacts, setContacts] = useState<ProcurementContact[]>([])
+  const [addingContact, setAddingContact] = useState(false)
+  const [requestFor, setRequestFor] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!buyerId) return
     setLoading(true)
     try {
-      const [b, a, n, r] = await Promise.all([
+      const [b, a, n, r, c] = await Promise.all([
         ProcurementService.getBuyer(buyerId),
         ProcurementService.listAwards({ buyerId }),
         ProcurementService.listNoticesForBuyer(buyerId),
         ProcurementService.listDocumentRequests().catch(() => [] as ProcurementDocumentRequest[]),
+        ProcurementService.listContacts(buyerId).catch(() => [] as ProcurementContact[]),
       ])
       setBuyer(b)
+      setContacts(c)
       setAwards(a)
       setNotices(n)
       const noticeIds = new Set(n.map((x) => x.id))
@@ -258,6 +268,12 @@ export default function BuyerProfilePage() {
   }, [bidders])
 
   const switches = useMemo(() => supplierSwitches(groups), [groups])
+  const requestsFor = (g: ProcurementGroup) => requests.filter((r) => (r.award_id && g.awardIds.includes(r.award_id)) || (!!g.noticeId && r.notice_id === g.noticeId))
+  const reloadRequests = async () => {
+    const r = await ProcurementService.listDocumentRequests().catch(() => [] as ProcurementDocumentRequest[])
+    const noticeIds = new Set(notices.map((x) => x.id))
+    setRequests(r.filter((x) => x.buyer_id === buyerId || (x.notice_id && noticeIds.has(x.notice_id))))
+  }
   const bidsMedian = median(groups.map((g) => g.bidsReceived))
   const appealed = groups.filter((g) => g.wasAppealed).length
   const appealKnown = groups.filter((g) => g.wasAppealed != null).length
@@ -320,6 +336,12 @@ export default function BuyerProfilePage() {
           )}
         </div>
         {buyer.aliases.length > 0 && <div className="text-[11px] text-slate-600 mt-1">Även: {buyer.aliases.join(', ')}</div>}
+        <div className="mt-3">
+          <SecondaryButton onClick={() => setAddingContact(true)} disabled={addingContact}>
+            <Icon name="upphandling.kontaktperson" size={20} />
+            Lägg till kontakt
+          </SecondaryButton>
+        </div>
       </div>
 
       <PulseRow
@@ -333,9 +355,21 @@ export default function BuyerProfilePage() {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Section title="Uppgifter">
-          <DetailsForm key={buyer.id} buyer={buyer} onSave={saveBuyer} />
-        </Section>
+        <div className="space-y-6">
+          <Section title="Kontaktpersoner" hint="Kontaktpunkten i TED-annonserna sparas automatiskt. Kopiera telefon och e-post med ikonerna.">
+            <BuyerContacts
+              buyerId={buyer.id}
+              contacts={contacts}
+              registrarEmail={buyer.registrar_email}
+              onChange={setContacts}
+              adding={addingContact}
+              setAdding={setAddingContact}
+            />
+          </Section>
+          <Section title="Uppgifter">
+            <DetailsForm key={buyer.id} buyer={buyer} onSave={saveBuyer} />
+          </Section>
+        </div>
         <div className="space-y-6">
           <Section title="Kundkoppling" hint="Koppla köparen till kunden i portalen när de redan är kund hos oss.">
             <CustomerLink buyer={buyer} onChange={(id) => saveBuyer({ customer_id: id })} />
@@ -378,14 +412,17 @@ export default function BuyerProfilePage() {
                   <th className={tableCls.thRight}>Anbud</th>
                   <th className={tableCls.th}>Kriterier</th>
                   <th className={tableCls.th}>Avtalsslut</th>
+                  <th className={tableCls.th}>Handlingar</th>
                 </tr>
               </thead>
               <tbody>
                 {groups.map((g) => {
                   const losers = g.refs.flatMap((r) => biddersByRef.get(r) ?? []).filter((b) => !b.is_winner)
                   const running = !!g.endDate && g.endDate >= today
+                  const reqs = requestsFor(g)
                   return (
-                    <tr key={g.key} className={tableCls.tr}>
+                    <Fragment key={g.key}>
+                    <tr className={tableCls.tr}>
                       <td className={tableCls.td}>{g.year ?? '–'}</td>
                       <td className={tableCls.td}>
                         <div className="min-w-[180px] max-w-[260px]">
@@ -426,7 +463,35 @@ export default function BuyerProfilePage() {
                         <div className="text-[11px] text-slate-500">{g.endSource ? END_SOURCE_LABEL[g.endSource] : ''}</div>
                         {running && <StatusDot tone="good">Löper</StatusDot>}
                       </td>
+                      <td className={tableCls.td}>
+                        <div className="min-w-[120px]">
+                          <RequestStatus requests={reqs} />
+                          {g.noticeId ? (
+                            <LinkButton onClick={() => setRequestFor(requestFor === g.key ? null : g.key)}>{reqs.length ? 'Begär igen' : 'Begär ut handlingar'}</LinkButton>
+                          ) : (
+                            reqs.length === 0 && <span className="text-[11px] text-slate-600" title="Begäran kräver en annons i bevakningen (BGU-numret matchar svaret)">Ingen annons att koppla</span>
+                          )}
+                        </div>
+                      </td>
                     </tr>
+                    {requestFor === g.key && g.noticeId && (
+                      <tr className="border-b border-slate-800/70">
+                        <td colSpan={9} className="p-0">
+                          <BuyerDocRequest
+                            noticeId={g.noticeId}
+                            awardId={g.awardIds[0] ?? null}
+                            title={g.title}
+                            registrarEmail={buyer.registrar_email}
+                            onClose={() => setRequestFor(null)}
+                            onSent={() => {
+                              setRequestFor(null)
+                              void reloadRequests()
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   )
                 })}
               </tbody>

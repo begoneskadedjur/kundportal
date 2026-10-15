@@ -103,6 +103,13 @@ export function addMonthsIso(iso, months) {
   return `${target.getUTCFullYear()}-${String(target.getUTCMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
+/** Antal kalenderdagar från a till b (ÅÅÅÅ-MM-DD) */
+export function daysBetweenIso(a, b) {
+  const pa = a.split('-').map(Number)
+  const pb = b.split('-').map(Number)
+  return Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - Date.UTC(pa[0], pa[1] - 1, pa[2])) / 86400000)
+}
+
 /** TED skriver datum som 2026-09-09Z eller 2026-06-18+02:00. Plockar ut kalenderdatumet. */
 export function tedDate(raw) {
   if (!raw) return null
@@ -169,51 +176,177 @@ function yearsText(months) {
   return `${months} månader`
 }
 
+// Förlängningsoptioner ur TED eForms. Spegel av parseRenewalOptions i procurementRules.ts, håll i synk
+// (src/shared/procurementOptions.test.ts jämför båda).
+const OPT_NUM = { en: 1, ett: 1, one: 1, två: 2, two: 2, tre: 3, three: 3, fyra: 4, four: 4, fem: 5, five: 5, sex: 6, tolv: 12 }
+const OPT_N = '(\\d{1,3}|en|ett|one|två|two|tre|three|fyra|four|fem|five|sex|tolv)'
+const OPT_U = '(år|years?|månader|månad|mån|months?)'
+const optNum = (w) => (/^\d+$/.test(w) ? Number(w) : OPT_NUM[String(w).toLowerCase()] ?? null)
+const optMonths = (n, unit) => (/^(år|year)/i.test(unit) ? n * 12 : n)
+
+export function parseRenewalOptions(input) {
+  const count0 = input.count != null && Number.isFinite(Number(input.count)) ? Math.max(0, Math.round(Number(input.count))) : null
+  const out = { count: count0, monthsEach: null, totalMonths: null, maxEnd: null, text: null, known: false }
+  const candidates = [input.renewalText, input.optionText]
+    .map((t) => cleanText(t))
+    .filter((t, i) => t && !/^(n\/?a|ej tillämpligt|saknas|-)\.?$/i.test(t) && (i === 0 || /förläng|extend|extension|renew|option att förlänga/i.test(t)))
+  for (const raw of candidates) {
+    const t = raw.toLowerCase().replace(/\(\d+\)/g, ' ').replace(/\s+/g, ' ')
+    let hit = false
+    const date = t.match(/(?:max(?:imalt)?|längst|senast|till och med|t\.o\.m\.?|until|up to|to)\s*(?:till\s*(?:och med\s*)?)?(\d{4}-\d{2}-\d{2})/)
+    if (date) {
+      out.maxEnd = date[1]
+      hit = true
+    }
+    const lenTimes = t.match(new RegExp(`${OPT_N}\\s*${OPT_U}\\s*(?:\\*|x|×|gånger|times)\\s*${OPT_N}\\b`))
+    const timesLen = t.match(new RegExp(`${OPT_N}\\s*(?:\\*|x|×|gånger|ggr|times)\\s*(?:om|med|á|à|a|of)?\\s*(?:högst\\s+)?${OPT_N}\\s*${OPT_U}`))
+    const plus = t.match(new RegExp(`\\b(\\d{1,2})\\s*\\+\\s*(\\d{1,2})(?:\\s*\\+\\s*(\\d{1,2}))?(?:\\s*\\+\\s*(\\d{1,2}))?\\s*${OPT_U}`))
+    const each = t.match(new RegExp(`(?:förlängning(?:en|sperioden?)?|renewal|extension|period)[^.\\d]{0,30}?(?:är|is|om|på|of|med|lenght is|length is|:)\\s*${OPT_N}\\s*${OPT_U}`))
+    const total = t.match(new RegExp(`(?:max(?:imalt)?|upp till|högst|totalt|sammanlagt|up to|maximum(?: of)?|ytterligare)\\s+(?:i\\s+)?${OPT_N}\\s*${OPT_U}`))
+    if (lenTimes) {
+      const len = optNum(lenTimes[1])
+      const n = optNum(lenTimes[3])
+      if (len != null && n != null && n > 0 && n <= 10) {
+        out.monthsEach = optMonths(len, lenTimes[2])
+        out.count = n
+        out.totalMonths = n * out.monthsEach
+        hit = true
+      }
+    } else if (timesLen) {
+      const n = optNum(timesLen[1])
+      const len = optNum(timesLen[2])
+      if (len != null && n != null && n > 0 && n <= 10) {
+        out.monthsEach = optMonths(len, timesLen[3])
+        out.count = n
+        out.totalMonths = n * out.monthsEach
+        hit = true
+      }
+    } else if (plus) {
+      const terms = [plus[1], plus[2], plus[3], plus[4]].filter(Boolean).map(Number)
+      out.count = terms.length
+      out.totalMonths = optMonths(terms.reduce((s, x) => s + x, 0), plus[5])
+      out.monthsEach = terms.every((x) => x === terms[0]) ? optMonths(terms[0], plus[5]) : null
+      hit = true
+    } else if (total) {
+      const n = optNum(total[1])
+      if (n != null && n > 0) {
+        out.totalMonths = optMonths(n, total[2])
+        if (out.count && out.totalMonths % out.count === 0) out.monthsEach = out.totalMonths / out.count
+        hit = true
+      }
+    } else if (each) {
+      const n = optNum(each[1])
+      if (n != null && n > 0) {
+        out.monthsEach = optMonths(n, each[2])
+        out.totalMonths = out.monthsEach * (out.count ?? 1)
+        if (out.count == null) out.count = 1
+        hit = true
+      }
+    }
+    if (hit) {
+      if (out.totalMonths != null && (out.totalMonths <= 0 || out.totalMonths > 120)) {
+        out.totalMonths = null
+        out.monthsEach = null
+      }
+      out.text = raw.slice(0, 300)
+      out.known = out.totalMonths != null || out.maxEnd != null
+      if (out.known) break
+    }
+  }
+  return out
+}
+
+function optionPhrase(months, opts) {
+  const n = opts.count && opts.count > 0 && months % opts.count === 0 ? opts.count : null
+  const each = n ? months / n : null
+  const core = n && n > 1 && each ? `${n} förlängningar om ${each} månader` : `förlängning ${months} månader`
+  return `${core} enligt annonsen${opts.text ? ` ("${opts.text.slice(0, 80)}")` : ''}`
+}
+
 /** Beräknat avtalsslut. Spegel av computeContractEnd i procurementRules.ts, håll i synk. */
 export function computeContractEnd(input) {
   const renewalsKnown = input.renewalMax != null && Number.isFinite(Number(input.renewalMax))
   const renewals = renewalsKnown ? Math.max(0, Number(input.renewalMax)) : 0
   const startInfo = startBasisOf(input)
+  const realMonths = input.optionMonths != null && Number.isFinite(Number(input.optionMonths)) && Number(input.optionMonths) >= 0 ? Math.round(Number(input.optionMonths)) : null
+  const maxEnd = tedDate(input.optionsMaxEnd)
+  const renewalWord = (n) => `${n} förlängning${n === 1 ? '' : 'ar'}`
+
+  const extend = (base) => {
+    if (maxEnd && maxEnd > base) {
+      const months = Math.max(0, Math.round(daysBetweenIso(base, maxEnd) / 30.4375))
+      return { date: maxEnd, months, text: `förlängning till ${maxEnd} enligt annonsen${input.optionsText ? ` ("${input.optionsText.slice(0, 80)}")` : ''}` }
+    }
+    if (realMonths != null && realMonths > 0) {
+      return { date: addMonthsIso(base, realMonths), months: realMonths, text: optionPhrase(realMonths, { count: renewalsKnown ? renewals : null, text: input.optionsText }) }
+    }
+    if (realMonths === 0) return { date: base, months: 0, text: 'inga förlängningar enligt annonsen' }
+    if (renewals > 0) {
+      const months = renewals * 12 * RENEWAL_YEARS_EACH
+      return { date: addMonthsIso(base, months), months, text: `${renewalWord(renewals)} (antaget ett år vardera)` }
+    }
+    return null
+  }
 
   const ted = tedDate(input.tedEnd)
   if (ted) {
-    if (renewals > 0) {
-      return {
-        date: addMonthsIso(ted, renewals * 12 * RENEWAL_YEARS_EACH),
-        source: 'ted_end_plus_renewals',
-        startBasis: startInfo.date,
-        basis: `TED slutdatum ${ted} plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}`,
-      }
+    const ext = extend(ted)
+    if (ext && ext.months > 0) {
+      return { date: ext.date, source: 'ted_end_plus_renewals', startBasis: startInfo.date, basis: `TED slutdatum ${ted} plus ${ext.text}`, baseEnd: ted, optionMonths: ext.months }
     }
-    return { date: ted, source: 'ted_end', startBasis: startInfo.date, basis: `TED slutdatum ${ted}` }
+    return { date: ted, source: 'ted_end', startBasis: startInfo.date, basis: `TED slutdatum ${ted}`, baseEnd: ted, optionMonths: renewalsKnown || realMonths != null ? 0 : null }
   }
   const mercell = input.mercellExpiry ? swedishDate(input.mercellExpiry) : null
-  if (mercell) return { date: mercell, source: 'mercell_expiry', startBasis: startInfo.date, basis: `Mercell avtalsslut ${mercell}` }
+  if (mercell) return { date: mercell, source: 'mercell_expiry', startBasis: startInfo.date, basis: `Mercell avtalsslut ${mercell}`, baseEnd: null, optionMonths: null }
 
-  if (!startInfo.date) return { date: null, source: null, startBasis: null, basis: null }
+  if (!startInfo.date) return { date: null, source: null, startBasis: null, basis: null, baseEnd: null, optionMonths: null }
 
   const duration = input.durationMonths != null && input.durationMonths > 0 ? Math.round(input.durationMonths) : null
   if (duration) {
-    const total = duration + renewals * 12 * RENEWAL_YEARS_EACH
+    const base = addMonthsIso(startInfo.date, duration)
+    const ext = extend(base)
     return {
-      date: addMonthsIso(startInfo.date, total),
+      date: ext?.date ?? base,
       source: input.durationFrom === 'text' ? 'text_duration' : 'contract_duration',
       startBasis: startInfo.date,
       basis:
         `Start ${startInfo.date} (${startInfo.label}) plus ${yearsText(duration)}` +
-        (renewals > 0 ? ` plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}` : '') +
+        (ext && ext.months > 0 ? ` plus ${ext.text}` : '') +
         (input.durationFrom === 'text' ? ', avtalstid ur annonstexten' : ''),
+      baseEnd: base,
+      optionMonths: ext ? ext.months : renewalsKnown ? 0 : null,
     }
   }
 
-  const renewalMonths = renewalsKnown ? renewals * 12 * RENEWAL_YEARS_EACH : 24
+  const base = addMonthsIso(startInfo.date, 24)
+  const ext = extend(base)
+  if (ext) {
+    return {
+      date: ext.date,
+      source: 'assumption_2_2',
+      startBasis: startInfo.date,
+      basis: `Antagande: start ${startInfo.date} (${startInfo.label}) plus två år${ext.months > 0 ? ` plus ${ext.text}` : ', inga förlängningar'}`,
+      baseEnd: base,
+      optionMonths: ext.months,
+    }
+  }
+  if (renewalsKnown) {
+    return {
+      date: base,
+      source: 'assumption_2_2',
+      startBasis: startInfo.date,
+      basis: `Antagande: start ${startInfo.date} (${startInfo.label}) plus två år, inga förlängningar`,
+      baseEnd: base,
+      optionMonths: 0,
+    }
+  }
   return {
-    date: addMonthsIso(startInfo.date, 24 + renewalMonths),
+    date: addMonthsIso(startInfo.date, 48),
     source: 'assumption_2_2',
     startBasis: startInfo.date,
-    basis: `Antagande: start ${startInfo.date} (${startInfo.label}) plus två år${
-      renewalsKnown ? (renewals > 0 ? ` plus ${renewals} förlängning${renewals === 1 ? '' : 'ar'}` : ', inga förlängningar') : ' plus två förlängningsår'
-    }`,
+    basis: `Antagande: start ${startInfo.date} (${startInfo.label}) plus två år plus två förlängningsår`,
+    baseEnd: base,
+    optionMonths: null,
   }
 }
 
@@ -656,9 +789,14 @@ export function buildRows(records, buyers, suppliers, noticeIdByRef = new Map())
     // UHM: fallbackStart är upphandlingsannonsen (start sex månader senare).
     // TED: fallbackStart är tilldelningsannonsen (avtalet tecknat).
     const textDuration = f.durationMonths ? null : parseDurationText(f.durationText)
+    // Riktiga förlängningsoptioner ur annonsen (BT-58, BT-57, BT-54) före antagandet
+    const opts = parseRenewalOptions({ count: f.renewalMax ?? null, renewalText: f.renewalText ?? null, optionText: f.optionText ?? null })
     const end = computeContractEnd({
       tedEnd: f.contractEnd,
-      renewalMax: f.renewalMax ?? (textDuration && textDuration.renewalMonths > 0 ? textDuration.renewalMonths / 12 : null),
+      renewalMax: f.renewalMax ?? opts.count ?? (textDuration && textDuration.renewalMonths > 0 ? textDuration.renewalMonths / 12 : null),
+      optionMonths: opts.known ? opts.totalMonths : null,
+      optionsMaxEnd: opts.maxEnd,
+      optionsText: opts.text,
       contractStart: f.contractStart ?? null,
       contractSignedDate: f.contractSignedDate ?? null,
       awardDate: f.awardDate ?? null,
@@ -707,6 +845,11 @@ export function buildRows(records, buyers, suppliers, noticeIdByRef = new Map())
         start_basis_date: end.startBasis,
         duration_months: f.durationMonths ?? textDuration?.months ?? null,
         calc_basis: end.basis,
+        base_end_date: end.baseEnd ?? null,
+        option_months: end.optionMonths ?? null,
+        option_count: opts.count ?? f.renewalMax ?? null,
+        option_text: opts.text ?? null,
+        option_source: opts.known ? 'ted_eforms' : null,
         // Felträff flaggas, rådatan behålls (writeAll respekterar manuella beslut)
         excluded_reason: relevance.relevant ? null : relevance.reason,
         window_start: win.start,

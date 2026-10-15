@@ -1,7 +1,8 @@
 // src/pages/admin/procurement/MarketPage.tsx
 // Marknad > Översikt (/marknad, planens avsnitt 9.1): marknadens storlek och
-// trend, marknadsandel per leverantör och år, antal anbud, utmanarläge och
-// kvalitetsviktade köpare. Hela Sverige är förvalt (beslut 2026-10-15).
+// trend, marknadsandel per leverantör och år, antal anbud, köpare där bara två
+// anbudsgivare brukar svara (länk till avtalsklockans filter, ersätter
+// Utmanarläget sedan 3.65.0) och kvalitetsviktade köpare. Hela Sverige är förvalt (beslut 2026-10-15).
 // Aggregaten räknas i market/marketStats.ts.
 //
 // Sedan 3.63.0 är Idag startsidan. Pipeline per kvartal ligger under
@@ -9,16 +10,19 @@
 // källhälsan under Inställningar (varningen om en tyst källa visas på Idag).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
+import { Icon } from '../../../components/icons/Icon'
 import LoadingSpinner from '../../../components/shared/LoadingSpinner'
 import { ProcurementService, type AwardWithRelations, type BidderWithSupplier } from '../../../services/procurementService'
-import { todaySwedish } from '../../../shared/procurementRules'
+import { addMonthsIso, todaySwedish } from '../../../shared/procurementRules'
 import { PulseRow, Section } from '../../../components/admin/procurement/ui'
 import { fmtKrShort, fmtNum, fmtPct } from '../../../components/admin/procurement/uiFormat'
 import {
   bidsByYear,
   buildProcurements,
-  challengerBuyers,
+  buyerKeyOf,
+  followupOf,
   indexBidders,
   marketByYear,
   matchesCounty,
@@ -26,12 +30,14 @@ import {
   qualityBuyers,
   shareTotals,
   sharesByYear,
+  twoBidderBuyerKeys,
   type CountyFilter,
 } from '../../../components/admin/procurement/market/marketStats'
 import { CountySelect, HistoryEmpty } from '../../../components/admin/procurement/market/shared'
 import { areaLabel } from '../../../components/admin/procurement/market/format'
 import { MarketShareChart, MarketSizeCharts } from '../../../components/admin/procurement/market/MarketCharts'
-import { BidsTable, ChallengerTable, QualityBuyersTable } from '../../../components/admin/procurement/market/MarketTables'
+import { procurementPath } from '../../../lib/procurementPortal'
+import { BidsTable, QualityBuyersTable } from '../../../components/admin/procurement/market/MarketTables'
 
 export default function MarketPage() {
   const [loading, setLoading] = useState(true)
@@ -66,7 +72,12 @@ export default function MarketPage() {
   const shares = useMemo(() => sharesByYear(groups), [groups])
   const bids = useMemo(() => bidsByYear(groups), [groups])
   const bidsMedian = useMemo(() => overallBidsMedian(groups), [groups])
-  const challengers = useMemo(() => challengerBuyers(groups, biddersByRef, today, 18), [groups, biddersByRef, today])
+  // Avtal hos köpare där bara två anbudsgivare brukar svara och som slutar inom 18 månader
+  const twoBidderEnding = useMemo(() => {
+    const keys = twoBidderBuyerKeys(groups, biddersByRef)
+    const limit = addMonthsIso(today, 18)
+    return groups.filter((g) => keys.has(buyerKeyOf(g)) && !!g.endDate && g.endDate >= today && g.endDate <= limit && !followupOf(g, today))
+  }, [groups, biddersByRef, today])
   const quality = useMemo(() => qualityBuyers(groups, today), [groups, today])
 
   const currentYear = Number(today.slice(0, 4))
@@ -134,11 +145,21 @@ export default function MarketPage() {
         {noHistory ? <HistoryEmpty /> : <BidsTable rows={bids} overall={bidsMedian} />}
       </Section>
 
-      <Section
-        title="Utmanarläge"
-        hint="Köpare där bara Anticimex och Nomor/Rentokil lämnade anbud senast och avtalet löper ut inom 18 månader. Ett tredje anbud har ofta stor chans."
-      >
-        {noHistory ? <HistoryEmpty /> : <ChallengerTable rows={challengers} />}
+      <Section title="Två anbudsgivare, slut inom 18 mån" hint="Köpare där medianen av antalet anbud är högst två. Där har ett tredje anbud stor chans.">
+        {noHistory ? (
+          <HistoryEmpty />
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <div>
+              <div className="text-[22px] font-semibold tabular-nums text-slate-100 leading-none">{fmtNum(twoBidderEnding.length)}</div>
+              <div className="text-[12px] text-slate-500 mt-1">avtal i {countyText} hos köpare där bara två anbudsgivare brukar svara</div>
+            </div>
+            <Link to={`${procurementPath('/avtalsklocka')}?tva=1`} className="inline-flex items-center gap-1.5 min-h-[44px] text-[13px] text-[#20c58f] hover:underline">
+              <Icon name="upphandling.avtalsklocka" size={16} />
+              Visa i avtalsklockan
+            </Link>
+          </div>
+        )}
       </Section>
 
       <Section title="Kvalitetsviktade köpare" hint="Köpare som utvärderar på pris och kvalitet, där rapportering, egenkontroll och stationskartor väger.">
