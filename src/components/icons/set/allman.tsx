@@ -140,4 +140,26 @@ export const allmanIcons = {
       <circle fill="currentColor" stroke="none" cx="18" cy="12" r="1.4" />
     </>
   ),
+  // Stjärna: kundens Account Manager
+  'allman.stjarna': <path d="M12 3.8 14.23 9.23 20.08 9.67 15.61 13.47 17 19.18 12 16.1 7 19.18 8.39 13.47 3.92 9.67 9.77 9.23z" />,
+  'allman.minus': <path d="M5 12h14" />,
+  // Kalkyl: miniräknare
+  'allman.kalkyl': (
+    <>
+      <rect x="5.5" y="3" width="13" height="18" rx="2" />
+      <rect x="8" y="5.5" width="8" height="3.5" rx=".6" />
+      <path d="M15 14.5v4" />
+      <g fill="currentColor" stroke="none">
+        <circle cx="9" cy="12.5" r=".95" />
+        <circle cx="12" cy="12.5" r=".95" />
+        <circle cx="15" cy="12.5" r=".95" />
+        <circle cx="9" cy="15.5" r=".95" />
+        <circle cx="12" cy="15.5" r=".95" />
+        <circle cx="9" cy="18.5" r=".95" />
+        <circle cx="12" cy="18.5" r=".95" />
+      </g>
+    </>
+  ),
+  // Laddar: tre fjärdedels cirkel, snurras med animate-spin
+  'allman.laddar': <path d="M20.5 12A8.5 8.5 0 1 1 12 3.5" />,
 } satisfies Record<`allman.${string}`, ReactNode>

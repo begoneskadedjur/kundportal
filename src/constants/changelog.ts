@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.57.0',
+    date: '2026-10-15',
+    title: 'Egna ikoner i bokningen',
+    items: [
+      { kind: 'andring', text: 'Nytt ärende, bokningsförslagen och tjänstelistan använder portalens egna ikoner, med nya ritningar för bland annat team, restid, bokningsförslag och etablering.' },
+      { kind: 'buggfix', text: 'Utskick, restid och Lägg till i avtalet har fått ikoner som visar vad de gör.' },
+    ],
+  },
+  {
     version: '3.56.1',
     date: '2026-10-15',
     title: 'Kundgrupp bara där den behövs',

@@ -7,21 +7,7 @@
 //   Marginalindikator baserad på tjänstpris vs inköpskostnad
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import {
-  ShoppingCart,
-  Package,
-  Search,
-  Plus,
-  Minus,
-  Trash2,
-  ChevronDown,
-  ChevronRight,
-  Loader2,
-  AlertTriangle,
-  CheckCircle,
-  Calculator,
-  Repeat
-} from 'lucide-react'
+import { Icon } from '../icons/Icon'
 import toast from 'react-hot-toast'
 import { supabase } from '../../lib/supabase'
 import { CaseBillingService } from '../../services/caseBillingService'
@@ -1238,7 +1224,7 @@ export default function CaseServiceSelector({
   if (loading) {
     return (
       <div className={`flex items-center justify-center py-8 ${className}`}>
-        <Loader2 className="w-5 h-5 animate-spin text-[#20c58f]" />
+        <Icon name="allman.laddar" className="w-5 h-5 animate-spin text-[#20c58f]" />
         <span className="ml-2 text-sm text-slate-400">Laddar...</span>
       </div>
     )
@@ -1250,7 +1236,7 @@ export default function CaseServiceSelector({
       <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5">
-            <ShoppingCart className="w-4 h-4 text-[#20c58f]" />
+            <Icon name="sok.faktura" className="w-4 h-4 text-[#20c58f]" />
             <span className="text-sm font-semibold text-white">
               {isEstablishment && hasAddonLines ? 'Etableringen' : 'Tjänster & fakturarader'}
             </span>
@@ -1260,8 +1246,8 @@ export default function CaseServiceSelector({
             {marginPercent !== null && (
               <div className={`flex items-center gap-1 text-xs font-medium ${getMarginColor()}`}>
                 {marginOk
-                  ? <CheckCircle className="w-3.5 h-3.5" />
-                  : <AlertTriangle className="w-3.5 h-3.5" />}
+                  ? <Icon name="station.klar" className="w-3.5 h-3.5" />
+                  : <Icon name="rapport.avvikelse" className="w-3.5 h-3.5" />}
                 {marginPercent.toFixed(1)}% marginal
               </div>
             )}
@@ -1272,7 +1258,7 @@ export default function CaseServiceSelector({
                 onClick={() => setShowCalculatorPanel(true)}
                 className="flex items-center gap-1 px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white rounded-lg transition-colors"
               >
-                <Calculator className="w-3.5 h-3.5" />
+                <Icon name="allman.kalkyl" className="w-3.5 h-3.5" />
                 Prisguide
               </button>
             )}
@@ -1334,7 +1320,7 @@ export default function CaseServiceSelector({
                         className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium"
                         title="Fast pris från kundens prislista"
                       >
-                        <CheckCircle className="w-3 h-3" />
+                        <Icon name="station.klar" className="w-3 h-3" />
                         Fast pris
                       </span>
                     )}
@@ -1343,7 +1329,7 @@ export default function CaseServiceSelector({
                         className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium"
                         title="Priset härleds ur kundens avtalade artikelpriser (kundpris × antal) och kan inte ändras här"
                       >
-                        <CheckCircle className="w-3 h-3" />
+                        <Icon name="allman.las" className="w-3 h-3" />
                         Låst av avtal
                       </span>
                     )}
@@ -1352,7 +1338,7 @@ export default function CaseServiceSelector({
                         className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-[#20c58f]/20 text-[#20c58f] rounded text-[10px] font-medium"
                         title={coverage.contractLabel ? `Ingår i ${coverage.contractLabel}, faktureras inte` : "Ingår i avtalet, faktureras inte"}
                       >
-                        <CheckCircle className="w-3 h-3" />
+                        <Icon name="rapport.skyddat" className="w-3 h-3" />
                         Ingår i avtalet
                       </span>
                     )}
@@ -1367,7 +1353,7 @@ export default function CaseServiceSelector({
                           className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded text-[10px] font-medium hover:bg-emerald-500/30 transition-colors"
                           title="Raden är markerad som avtalstillägg - klicka för detaljer"
                         >
-                          <Repeat className="w-3 h-3" />
+                          <Icon name="bokning.avtalstillagg" className="w-3 h-3" />
                           Avtalstillägg +{Number(item.contract_addition_annual).toLocaleString('sv-SE')} kr/år
                         </button>
                       ) : !readOnly && !isEstablishment ? (
@@ -1377,7 +1363,7 @@ export default function CaseServiceSelector({
                           className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-700/60 text-slate-400 border border-slate-600 rounded text-[10px] font-medium hover:text-white hover:border-slate-500 transition-colors"
                           title="Lägg till som fast del av kundens avtal (höjer årspremien)"
                         >
-                          <Repeat className="w-3 h-3" />
+                          <Icon name="bokning.avtalstillagg" className="w-3 h-3" />
                           Lägg till i avtalet
                         </button>
                       ) : null
@@ -1389,11 +1375,11 @@ export default function CaseServiceSelector({
                     {!readOnly && (
                       <div className="flex items-center gap-1">
                         <button type="button" onClick={() => handleQuantityChange(item.id, -1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
-                          <Minus className="w-3 h-3" />
+                          <Icon name="allman.minus" className="w-3 h-3" />
                         </button>
                         <span className="text-sm text-white w-5 text-center">{item.quantity}</span>
                         <button type="button" onClick={() => handleQuantityChange(item.id, 1)} className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300">
-                          <Plus className="w-3 h-3" />
+                          <Icon name="allman.plus" className="w-3 h-3" />
                         </button>
                       </div>
                     )}
@@ -1433,7 +1419,7 @@ export default function CaseServiceSelector({
                     )}
                     {!readOnly && (
                       <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Icon name="allman.radera" className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
@@ -1443,7 +1429,7 @@ export default function CaseServiceSelector({
                     <div className="mt-2 p-2 bg-slate-800/30 border border-slate-700/50 rounded-md space-y-1.5">
                       {misplacedDeduction && (
                         <div className="flex items-start gap-1.5 text-xs text-amber-400">
-                          <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                          <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                           <span>
                             Avdraget ligger på en tjänst som inte är en arbetstidstjänst.
                             Ta bort det och använd "Dela upp för ROT/RUT" så att avdraget
@@ -1592,7 +1578,7 @@ export default function CaseServiceSelector({
                         onClick={() => openSplitForm(item)}
                         className="mt-2 flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#20c58f] transition-colors"
                       >
-                        <Calculator className="w-3.5 h-3.5" />
+                        <Icon name="allman.kalkyl" className="w-3.5 h-3.5" />
                         Dela upp för ROT/RUT
                       </button>
                     )
@@ -1618,7 +1604,7 @@ export default function CaseServiceSelector({
                         />
                         {isEmpty && !readOnly && (
                           <p className="flex items-center gap-1 text-[10px] text-amber-400 mt-0.5">
-                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            <Icon name="rapport.avvikelse" className="w-3 h-3 shrink-0" />
                             Motivering krävs innan ärendet kan avslutas
                           </p>
                         )}
@@ -1637,7 +1623,7 @@ export default function CaseServiceSelector({
             {showAddonPicker ? (
               <div className="space-y-2">
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <Icon name="allman.sok" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input
                     autoFocus
                     value={searchAddon}
@@ -1687,7 +1673,7 @@ export default function CaseServiceSelector({
                 onClick={() => setShowAddonPicker(true)}
                 className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-[#20c58f] transition-colors"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Icon name="allman.plus" className="w-3.5 h-3.5" />
                 Lägg till tilläggstjänst
               </button>
             )}
@@ -1704,7 +1690,7 @@ export default function CaseServiceSelector({
             <div className="border-t border-slate-700/50 mt-3 pt-2 space-y-1">
               {rotRut?.hasConflict && (
                 <div className="flex items-start gap-1.5 text-xs text-amber-400 mb-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                   <span>Ett ärende kan inte ha både ROT och RUT, dela upp detta i separata ärenden.</span>
                 </div>
               )}
@@ -1827,7 +1813,7 @@ export default function CaseServiceSelector({
           className="flex items-center justify-between w-full"
         >
           <div className="flex items-center gap-1.5">
-            <Package className="w-4 h-4 text-slate-400" />
+            <Icon name="bokning.artikel" className="w-4 h-4 text-slate-400" />
             <span className="text-sm font-semibold text-slate-300">
               {hasAddonLines && isEstablishment ? 'Etableringens interna kostnader' : 'Interna kostnader'}
             </span>
@@ -1842,8 +1828,8 @@ export default function CaseServiceSelector({
               <span className="text-xs text-slate-400">{formatPrice(purchaseCost)} ink.</span>
             )}
             {showArticleList
-              ? <ChevronDown className="w-4 h-4 text-slate-400" />
-              : <ChevronRight className="w-4 h-4 text-slate-400" />}
+              ? <Icon name="allman.chevron" className="w-4 h-4 text-slate-400 rotate-90" />
+              : <Icon name="allman.chevron" className="w-4 h-4 text-slate-400" />}
           </div>
         </button>
 
@@ -1934,7 +1920,7 @@ export default function CaseServiceSelector({
                             }}
                             className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
                           >
-                            <Minus className="w-3 h-3" />
+                            <Icon name="allman.minus" className="w-3 h-3" />
                           </button>
                           <input
                             type="number"
@@ -1967,7 +1953,7 @@ export default function CaseServiceSelector({
                             }}
                             className="w-6 h-6 flex items-center justify-center rounded bg-slate-700 hover:bg-slate-600 text-slate-300"
                           >
-                            <Plus className="w-3 h-3" />
+                            <Icon name="allman.plus" className="w-3 h-3" />
                           </button>
                         </div>
                       )}
@@ -1976,7 +1962,7 @@ export default function CaseServiceSelector({
                       </span>
                       {!readOnly && (
                         <button type="button" onClick={() => handleRemove(item.id)} className="text-slate-500 hover:text-red-400 transition-colors">
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Icon name="allman.radera" className="w-3.5 h-3.5" />
                         </button>
                       )}
                     </div>
@@ -2003,7 +1989,7 @@ export default function CaseServiceSelector({
             {!readOnly && (
               <div className="space-y-2">
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <Icon name="allman.sok" className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input
                     value={searchArticle}
                     onChange={e => setSearchArticle(e.target.value)}
@@ -2016,7 +2002,7 @@ export default function CaseServiceSelector({
                   {contractArticles.length > 0 && (
                     <div className="border-b border-slate-700/50 pb-2 mb-1">
                       <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-[#20c58f] uppercase tracking-wide">
-                        <Package className="w-3 h-3" />
+                        <Icon name="bokning.artikel" className="w-3 h-3" />
                         Kundens avtalsartiklar ({contractArticles.length})
                       </div>
                       <div className="space-y-0.5 ml-2">
@@ -2075,7 +2061,7 @@ export default function CaseServiceSelector({
                           onClick={() => toggleCategory(cat)}
                           className="flex items-center gap-1.5 w-full px-2 py-1 text-xs font-medium text-slate-400 hover:text-white"
                         >
-                          {expanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                          <Icon name="allman.chevron" className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`} />
                           {config?.label ?? cat} ({catArticles.length})
                         </button>
                         {expanded && (

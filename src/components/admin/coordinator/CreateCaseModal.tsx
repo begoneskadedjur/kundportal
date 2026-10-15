@@ -6,7 +6,7 @@ import { supabase, getAuthHeaders } from '../../../lib/supabase';
 import { apiFetch } from '../../../lib/api';
 import { PrivateCasesInsert, BusinessCasesInsert, Technician, BeGoneCaseRow } from '../../../types/database';
 import { Case } from '../../../types/cases';
-import { Building, User, Zap, MapPin, CheckCircle, ChevronLeft, ChevronDown, AlertCircle, FileText, Users, Home, Briefcase, Euro, FileCheck, Building2, Image as ImageIcon, CalendarSearch, ClipboardCheck, Search, Star, Plus, ShoppingCart, Map } from 'lucide-react';
+import { Icon } from '../../icons/Icon';
 import CaseServiceSelector from '../../shared/CaseServiceSelector';
 import ServiceArticleSelector from '../../shared/ServiceArticleSelector';
 import { CaseBillingService } from '../../../services/caseBillingService';
@@ -98,7 +98,7 @@ interface CreateCaseModalProps {
 function AddressInheritedHint() {
   return (
     <p className="mt-1 flex items-center gap-1.5 text-[11px] text-amber-400">
-      <AlertCircle className="w-3 h-3 shrink-0" />
+      <Icon name="rapport.avvikelse" className="w-3 h-3 shrink-0" />
       Hämtad från huvudkontoret, enheten saknar egen adress. Kontrollera innan du bokar.
     </p>
   );
@@ -1636,7 +1636,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   if (submitted) {
     return (
       <Modal isOpen={isOpen} onClose={() => {}} title="Klart!" size="md" preventClose={true}>
-        <div className="p-8 text-center"><CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" /></div>
+        <div className="p-8 text-center"><Icon name="station.klar" className="w-16 h-16 text-green-500 mx-auto mb-4" /></div>
       </Modal>
     );
   }
@@ -1645,7 +1645,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-3 px-4 py-2.5 border-t border-slate-700/50">
       <Button type="button" variant="secondary" onClick={onClose} disabled={loading} className="w-full sm:w-auto">Avbryt</Button>
       <Button type="submit" form="create-case-form" loading={loading} disabled={loading} className="w-full sm:w-auto">
-        <CheckCircle className="w-4 h-4 mr-1.5"/>
+        <Icon name="station.klar" className="w-4 h-4 mr-1.5" />
         {initialCaseData ? 'Boka In Ärende' : 'Skapa & Boka Ärende'}
       </Button>
     </div>
@@ -1684,21 +1684,21 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <div className="flex flex-col md:flex-row gap-3">
                   {allowedCaseTypes.includes('contract') && (
                     <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
-                      <FileCheck className="w-6 h-6 mx-auto mb-1.5 text-emerald-400" />
+                      <Icon name="bokning.extrabesok" className="w-6 h-6 mx-auto mb-1.5 text-emerald-400" />
                       <h3 className="text-sm font-semibold">Extrabesök Avtalskund</h3>
                       <p className="text-xs text-slate-400 mt-1">Enstaka tjänst utöver avtalet</p>
                     </button>
                   )}
                   {allowedCaseTypes.includes('inspection') && (
                     <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
-                      <ClipboardCheck className="w-6 h-6 mx-auto mb-1.5 text-cyan-400" />
+                      <Icon name="arende.station" className="w-6 h-6 mx-auto mb-1.5 text-cyan-400" />
                       <h3 className="text-sm font-semibold">Stationskontroll Avtalskund</h3>
                       <p className="text-xs text-slate-400 mt-1">Enstaka kontroll av stationerna</p>
                     </button>
                   )}
                   {allowedCaseTypes.includes('establishment') && (
                     <button type="button" onClick={() => selectCaseType('establishment')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-lime-500/30 cursor-pointer">
-                      <MapPin className="w-6 h-6 mx-auto mb-1.5 text-lime-400" />
+                      <Icon name="bokning.etablering" className="w-6 h-6 mx-auto mb-1.5 text-lime-400" />
                       <h3 className="text-sm font-semibold">Etablering Avtalskund</h3>
                       <p className="text-xs text-slate-400 mt-1">Utplacering av stationer</p>
                     </button>
@@ -1711,12 +1711,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 {/* Rad 1: Engångsärenden */}
                 <div className="flex flex-col md:flex-row gap-3">
                   <button type="button" onClick={() => selectCaseType('private')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
-                    <User className="w-6 h-6 mx-auto mb-1.5 text-blue-400" />
+                    <Icon name="arende.privat" className="w-6 h-6 mx-auto mb-1.5 text-blue-400" />
                     <h3 className="text-sm font-semibold">Engångsjobb Privatperson</h3>
                     <p className="text-xs text-slate-400 mt-1">Faktureras separat - ROT/RUT</p>
                   </button>
                   <button type="button" onClick={() => selectCaseType('business')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
-                    <Building className="w-6 h-6 mx-auto mb-1.5 text-green-400" />
+                    <Icon name="allman.foretag" className="w-6 h-6 mx-auto mb-1.5 text-green-400" />
                     <h3 className="text-sm font-semibold">Engångsjobb Företag</h3>
                     <p className="text-xs text-slate-400 mt-1">Faktureras separat</p>
                   </button>
@@ -1727,7 +1727,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   <p className="text-xs text-slate-500 mb-2 uppercase tracking-wider">Avtalskunder</p>
                   <div className="flex flex-col md:flex-row gap-3">
                     <button type="button" onClick={() => selectCaseType('contract')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
-                      <FileCheck className="w-6 h-6 mx-auto mb-1.5 text-emerald-400" />
+                      <Icon name="bokning.extrabesok" className="w-6 h-6 mx-auto mb-1.5 text-emerald-400" />
                       <h3 className="text-sm font-semibold">Extrabesök Avtalskund</h3>
                       <p className="text-xs text-slate-400 mt-1">Enstaka tjänst utöver avtalet - merförsäljning</p>
                       {contractCustomers.length > 0 && (
@@ -1735,7 +1735,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       )}
                     </button>
                     <button type="button" onClick={() => selectCaseType('inspection')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-cyan-500/30 cursor-pointer">
-                      <ClipboardCheck className="w-6 h-6 mx-auto mb-1.5 text-cyan-400" />
+                      <Icon name="arende.station" className="w-6 h-6 mx-auto mb-1.5 text-cyan-400" />
                       <h3 className="text-sm font-semibold">Stationskontroll Avtalskund</h3>
                       <p className="text-xs text-slate-400 mt-1">Enstaka kontroll - återkommande läggs i Rondering & Schema</p>
                       {contractCustomers.length > 0 && (
@@ -1743,7 +1743,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       )}
                     </button>
                     <button type="button" onClick={() => selectCaseType('establishment')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-lime-500/30 cursor-pointer">
-                      <MapPin className="w-6 h-6 mx-auto mb-1.5 text-lime-400" />
+                      <Icon name="bokning.etablering" className="w-6 h-6 mx-auto mb-1.5 text-lime-400" />
                       <h3 className="text-sm font-semibold">Etablering Avtalskund</h3>
                       <p className="text-xs text-slate-400 mt-1">Utplacering av stationer vid avtalsstart</p>
                       {contractCustomers.length > 0 && (
@@ -1751,12 +1751,12 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       )}
                     </button>
                     <button type="button" onClick={() => selectCaseType('rondering')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-sky-500/30 cursor-pointer">
-                      <Map className="w-6 h-6 mx-auto mb-1.5 text-sky-400" />
+                      <Icon name="arende.rondering" className="w-6 h-6 mx-auto mb-1.5 text-sky-400" />
                       <h3 className="text-sm font-semibold">Rondering Trafikkontoret</h3>
                       <p className="text-xs text-slate-400 mt-1">Egenkontrollprogram</p>
                     </button>
                     <button type="button" onClick={() => selectCaseType('egenkontroll')} className="flex-1 p-3 text-center rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border-2 border-emerald-500/30 cursor-pointer">
-                      <ClipboardCheck className="w-6 h-6 mx-auto mb-1.5 text-emerald-400" />
+                      <Icon name="rapport.bedomning" className="w-6 h-6 mx-auto mb-1.5 text-emerald-400" />
                       <h3 className="text-sm font-semibold">Egenkontroll</h3>
                       <p className="text-xs text-slate-400 mt-1">Stationsgranskning TK</p>
                     </button>
@@ -1767,9 +1767,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           {step === 'form' && (
             <form id="create-case-form" onSubmit={handleSubmit} className="space-y-3">
               {!initialCaseData && !initialCaseType && (
-                <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><ChevronLeft className="w-4 h-4" /> Byt kundtyp</Button>
+                <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><Icon name="rapport.tillbaka" className="w-4 h-4" /> Byt kundtyp</Button>
               )}
-              {error && (<div className="bg-red-500/20 border border-red-500/40 p-3 rounded-xl flex items-center gap-3"><AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" /><p className="text-sm text-red-400">{error}</p></div>)}
+              {error && (<div className="bg-red-500/20 border border-red-500/40 p-3 rounded-xl flex items-center gap-3"><Icon name="rapport.avvikelse" className="w-4 h-4 text-red-400 flex-shrink-0" /><p className="text-sm text-red-400">{error}</p></div>)}
               
               {/* Avtalskund-väljare (för contract, inspection, establishment, rondering) — sökbar dropdown */}
               {(caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering' || caseType === 'egenkontroll') && (
@@ -1796,14 +1796,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                           {caseType === 'inspection' ? 'Sök och välj kund med stationer...' : caseType === 'establishment' ? 'Sök och välj avtalskund...' : caseType === 'rondering' ? 'Sök och välj regionalkund...' : 'Sök och välj kund...'}
                         </span>
                       )}
-                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${customerDropdownOpen ? 'rotate-180' : ''}`} />
+                      <Icon name="allman.chevron" className={`w-4 h-4 text-slate-400 transition-transform flex-shrink-0 ${customerDropdownOpen ? '-rotate-90' : 'rotate-90'}`} />
                     </button>
 
                     {customerDropdownOpen && (
                       <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl overflow-hidden">
                         <div className="p-2 border-b border-slate-700">
                           <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                            <Icon name="allman.sok" className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                             <input
                               type="text"
                               value={customerSearchTerm}
@@ -1843,7 +1843,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                                   </div>
                                 </div>
                                 {selectedContractCustomer === customer.id && (
-                                  <CheckCircle className="w-4 h-4 text-[#20c58f] flex-shrink-0 ml-2" />
+                                  <Icon name="station.klar" className="w-4 h-4 text-[#20c58f] flex-shrink-0 ml-2" />
                                 )}
                               </button>
                             ))
@@ -1868,7 +1868,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     return (
                       <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-xl">
                         <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
-                          <Building2 className="w-4 h-4 text-purple-400" />
+                          <Icon name="sok.kund-foretag" className="w-4 h-4 text-purple-400" />
                           Välj anläggning/site *
                         </label>
                         <SiteSelector
@@ -1897,7 +1897,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     return (
                       <div className="p-3 bg-sky-500/10 border border-sky-500/30 rounded-xl">
                         <label className="block text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
-                          <Map className="w-4 h-4 text-sky-400" />
+                          <Icon name="rapport.karta" className="w-4 h-4 text-sky-400" />
                           Välj region *
                         </label>
                         <SiteSelector
@@ -1938,14 +1938,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     onClick={() => setOfferExpanded(v => !v)}
                     className="flex items-center gap-2 w-full text-left"
                   >
-                    <FileCheck className="w-4 h-4 text-[#20c58f]" />
+                    <Icon name="dok.offert" className="w-4 h-4 text-[#20c58f]" />
                     <span className="text-sm font-semibold text-white flex-1">Offertinnehåll</span>
                     {offerDetails.total_value && (
                       <span className="text-xs font-medium text-[#20c58f] mr-2">
                         {offerDetails.total_value.toLocaleString('sv-SE')} kr
                       </span>
                     )}
-                    <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${offerExpanded ? 'rotate-180' : ''}`} />
+                    <Icon name="allman.chevron" className={`w-4 h-4 text-slate-400 transition-transform ${offerExpanded ? '-rotate-90' : 'rotate-90'}`} />
                   </button>
                   {offerExpanded && (
                     <div className="mt-3 space-y-3">
@@ -1992,7 +1992,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   {/* Vänster kolumn: Intelligent bokning */}
                   <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
                     <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
-                      <Zap className="w-4 h-4 text-cyan-400"/>Intelligent Bokning
+                      <Icon name="allman.blixt" className="w-4 h-4 text-cyan-400" />Intelligent Bokning
                     </h3>
 
                     {/* Adress (hämtas från kund) */}
@@ -2007,7 +2007,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     {/* Account Manager-info */}
                     {accountManagerName && (
                       <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                        <Star size={12} className="text-amber-400 fill-amber-400" />
+                        <Icon name="allman.stjarna" className="w-3 h-3 text-amber-400" />
                         <span className="text-xs text-slate-400">Account Manager:</span>
                         <span className="text-xs text-amber-300 font-medium">{accountManagerName}</span>
                       </div>
@@ -2046,7 +2046,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     {/* Teknikerval för sökning */}
                     <div>
                       <h4 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
-                        <Users size={14} /> Sök bland valda tekniker
+                        <Icon name="bokning.team" className="w-3.5 h-3.5" /> Sök bland valda tekniker
                       </h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {technicians.map(tech => (
@@ -2060,7 +2060,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                             <span className="text-sm text-white truncate">{tech.name}</span>
                               {tech.id === accountManagerTechId && (
                                 <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-full shrink-0">
-                                  <Star size={10} className="fill-amber-400" />AM
+                                  <Icon name="allman.stjarna" className="w-2.5 h-2.5" />AM
                                 </span>
                               )}
                           </label>
@@ -2077,7 +2077,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       variant="primary"
                       disabled={!selectedContractCustomer}
                     >
-                      <Zap className="w-4 h-4 mr-1.5"/> Hitta bästa tid & tekniker
+                      <Icon name="allman.blixt" className="w-4 h-4 mr-1.5" /> Hitta bästa tid & tekniker
                     </Button>
 
                     {!selectedContractCustomer && (
@@ -2095,7 +2095,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     {suggestions.length > 0 && (
                       <div className="pt-4 border-t border-slate-700">
                         <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                          <CalendarSearch className="w-4 h-4 text-cyan-400" />
+                          <Icon name="bokning.forslag" className="w-4 h-4 text-cyan-400" />
                           Bokningsförslag ({suggestions.length} st)
                         </h4>
                         <div className="max-h-[40vh] overflow-y-auto pr-1 -mr-1">
@@ -2113,7 +2113,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   <div className="p-3 bg-cyan-500/5 border border-cyan-500/20 rounded-xl space-y-3">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
-                        <ClipboardCheck className="w-4 h-4 text-cyan-400" />
+                        <Icon name="arende.station" className="w-4 h-4 text-cyan-400" />
                       </div>
                       <div>
                         <h3 className="text-sm font-semibold text-white">Bokning & Detaljer</h3>
@@ -2136,7 +2136,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     {/* Kund & Kontakt */}
                     <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
-                        <User size={14}/> Kund & Kontakt
+                        <Icon name="rapport.person" className="w-3.5 h-3.5" /> Kund & Kontakt
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <Input
@@ -2207,7 +2207,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     {/* Bokning & Team */}
                     <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
-                        <Users size={14}/> Bokning & Team
+                        <Icon name="bokning.team" className="w-3.5 h-3.5" /> Bokning & Team
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
@@ -2284,11 +2284,11 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     {/* Ärendeinformation */}
                     <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
-                        <Briefcase size={14}/> Ärendeinformation
+                        <Icon name="arende.arende" className="w-3.5 h-3.5" /> Ärendeinformation
                       </h4>
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-1">
-                          <FileText size={12} className="inline mr-1" />
+                          <Icon name="allman.anteckning" className="w-3 h-3 inline mr-1" />
                           Anteckningar till tekniker (valfritt)
                         </label>
                         <textarea
@@ -2310,7 +2310,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         className="w-full flex items-center justify-between"
                       >
                         <h4 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                          <ShoppingCart size={14} /> Tjänster & fakturarader
+                          <Icon name="sok.faktura" className="w-3.5 h-3.5" /> Tjänster & fakturarader
                           <span className="text-xs font-normal text-slate-500">(valfritt)</span>
                           {draftBillingItems.length > 0 && (
                             <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#20c58f]/20 text-[#20c58f]">
@@ -2318,7 +2318,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                             </span>
                           )}
                         </h4>
-                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${showArticles ? 'rotate-180' : ''}`} />
+                        <Icon name="allman.chevron" size={16} className={`text-slate-400 transition-transform ${showArticles ? '-rotate-90' : 'rotate-90'}`} />
                       </button>
                       {showArticles && (
                         initialCaseData?.id
@@ -2340,7 +2340,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     {/* Utskick */}
                     <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
-                        <MapPin size={14}/> Utskick
+                        <Icon name="bokning.bekraftelse" className="w-3.5 h-3.5" /> Utskick
                       </h4>
                       <div>
                         <label className="block text-xs font-medium text-slate-400 mb-2">Skicka bokningsbekräftelse?</label>
@@ -2381,7 +2381,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               {caseType !== 'inspection' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3 flex flex-col">
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Zap className="w-4 h-4 text-blue-400"/>Intelligent Bokning</h3>
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Icon name="allman.blixt" className="w-4 h-4 text-blue-400" />Intelligent Bokning</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {caseType !== 'rondering' && caseType !== 'egenkontroll' && (
                       <div>
@@ -2397,7 +2397,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   {/* Account Manager-info */}
                   {accountManagerName && (
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                      <Star size={12} className="text-amber-400 fill-amber-400" />
+                      <Icon name="allman.stjarna" className="w-3 h-3 text-amber-400" />
                       <span className="text-xs text-slate-400">Account Manager:</span>
                       <span className="text-xs text-amber-300 font-medium">{accountManagerName}</span>
                     </div>
@@ -2445,7 +2445,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                     {/* Checkbox för att välja tekniker (endast för single booking) */}
                     {numberOfTechnicians === 1 && (
                       <div>
-                        <h4 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5"><Users size={14} /> Sök bland valda tekniker</h4>
+                        <h4 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5"><Icon name="bokning.team" className="w-3.5 h-3.5" /> Sök bland valda tekniker</h4>
                         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                           {technicians.map(tech => (
                             <label key={tech.id} className="flex items-center gap-2 p-2 rounded-md bg-slate-800 hover:bg-slate-700 cursor-pointer transition-colors">
@@ -2458,7 +2458,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               <span className="text-sm text-white truncate">{tech.name}</span>
                               {tech.id === accountManagerTechId && (
                                 <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-full shrink-0">
-                                  <Star size={10} className="fill-amber-400" />AM
+                                  <Icon name="allman.stjarna" className="w-2.5 h-2.5" />AM
                                 </span>
                               )}
                             </label>
@@ -2467,7 +2467,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       </div>
                     )}
 
-                    <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary"><Zap className="w-4 h-4 mr-1.5"/> Hitta bästa tid & tekniker</Button>
+                    <Button type="button" onClick={handleSuggestTime} loading={suggestionLoading} className="w-full" variant="primary"><Icon name="allman.blixt" className="w-4 h-4 mr-1.5" /> Hitta bästa tid & tekniker</Button>
                   </div>
 
                   {/* Resultat-sektion - under Intelligent Bokning i vänstra kolumnen */}
@@ -2481,7 +2481,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   {suggestions.length > 0 && (
                     <div className="pt-3 border-t border-slate-700">
                       <h4 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-                        <CalendarSearch className="w-4 h-4 text-purple-400" />
+                        <Icon name="bokning.forslag" className="w-4 h-4 text-purple-400" />
                         Bokningsförslag ({suggestions.length} st)
                       </h4>
                       <div className="max-h-[50vh] overflow-y-auto pr-1 -mr-1">
@@ -2498,7 +2498,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   {teamSuggestions.length > 0 && (
                     <div className="pt-4 border-t border-slate-700 space-y-3">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-2">
-                        <Users className="w-4 h-4 text-blue-400" />
+                        <Icon name="bokning.team" className="w-4 h-4 text-blue-400" />
                         Team-förslag ({numberOfTechnicians} tekniker)
                       </h4>
                       <div className="max-h-[50vh] overflow-y-auto space-y-3 pr-1 -mr-1">
@@ -2535,7 +2535,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 text-xs text-blue-400 mb-2">
-                                <Users className="w-3.5 h-3.5" />
+                                <Icon name="bokning.restid" className="w-3.5 h-3.5" />
                                 <span>Total: {totalTravel} min restid</span>
                               </div>
                               <div className="pt-2 border-t border-slate-600/50 space-y-1">
@@ -2561,9 +2561,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
                 {/* Höger kolumn: Bokning & Detaljer */}
                 <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
-                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><FileText className="w-4 h-4 text-green-400"/>Bokning & Detaljer</h3>
+                  <h3 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Icon name="allman.kalender" className="w-4 h-4 text-green-400" />Bokning & Detaljer</h3>
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
-                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><User size={14}/> Kund & Kontakt</h4>
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Icon name="rapport.person" className="w-3.5 h-3.5" /> Kund & Kontakt</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <Input label="Kontaktperson *" name="kontaktperson" value={formData.kontaktperson || ''} onChange={handleChange} required />
                           <Input label="Telefonnummer *" name="telefon_kontaktperson" value={formData.telefon_kontaktperson || ''} onChange={handleChange} required />
@@ -2614,7 +2614,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       )}
                   </div>
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
-                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Users size={14}/> Bokning & Team</h4>
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Icon name="bokning.team" className="w-3.5 h-3.5" /> Bokning & Team</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div><label className="block text-xs font-medium text-slate-400 mb-1">Starttid *</label><DatePicker selected={formData.start_date ? new Date(formData.start_date) : null} onChange={(date) => handleDateChange(date, 'start_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" timeCaption="Tid" timeInputLabel="Tid:" placeholderText="Välj starttid..." isClearable required className="w-full" /></div>
                           <div><label className="block text-xs font-medium text-slate-400 mb-1">Sluttid *</label><DatePicker selected={formData.due_date ? new Date(formData.due_date) : null} onChange={(date) => handleDateChange(date, 'due_date')} locale="sv" showTimeSelect timeFormat="HH:mm" timeIntervals={15} dateFormat="yyyy-MM-dd HH:mm" timeCaption="Tid" timeInputLabel="Tid:" placeholderText="Välj sluttid..." isClearable required className="w-full" /></div>
@@ -2643,7 +2643,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                                   {tech ? (
                                     <span className="text-xs font-bold text-[#20c58f]">{initials}</span>
                                   ) : (
-                                    <Plus className="w-3.5 h-3.5 text-slate-500" />
+                                    <Icon name="allman.plus" className="w-3.5 h-3.5 text-slate-500" />
                                   )}
                                 </div>
                                 <select
@@ -2665,7 +2665,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       </div>
                   </div>
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
-                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Briefcase size={14}/> Ärendeinformation</h4>
+                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Icon name="arende.arende" className="w-3.5 h-3.5" /> Ärendeinformation</h4>
                        <div><label className="block text-xs font-medium text-slate-400 mb-1">Beskrivning till tekniker</label><textarea name="description" value={formData.description || ''} onChange={handleChange} rows={Math.max(3, (formData.description || '').split('\n').length + 1)} className="w-full px-3 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm" placeholder="Kort om ärendet, portkod, etc."/></div>
                   </div>
                   {/* Tjänster & fakturarader (valfritt) */}
@@ -2676,7 +2676,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                         className="w-full flex items-center justify-between"
                       >
                         <h4 className="text-sm font-semibold text-white flex items-center gap-1.5">
-                          <ShoppingCart size={14} /> Tjänster & fakturarader
+                          <Icon name="sok.faktura" className="w-3.5 h-3.5" /> Tjänster & fakturarader
                           <span className="text-xs font-normal text-slate-500">(valfritt)</span>
                           {draftBillingItems.length > 0 && (
                             <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#20c58f]/20 text-[#20c58f]">
@@ -2684,7 +2684,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                             </span>
                           )}
                         </h4>
-                        <ChevronDown size={16} className={`text-slate-400 transition-transform ${showArticles ? 'rotate-180' : ''}`} />
+                        <Icon name="allman.chevron" size={16} className={`text-slate-400 transition-transform ${showArticles ? '-rotate-90' : 'rotate-90'}`} />
                       </button>
                       {showArticles && (
                         initialCaseData?.id
@@ -2703,7 +2703,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                       )}
                   </div>
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
-                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><MapPin size={14}/> Utskick</h4>
+                      <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2"><Icon name="bokning.bekraftelse" className="w-3.5 h-3.5" /> Utskick</h4>
                       <div>
                           <label className="block text-xs font-medium text-slate-400 mb-2">Skicka bokningsbekräftelse?</label>
                           <div className="flex gap-3">
@@ -2730,14 +2730,14 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                   {/* Bilder sektion */}
                   <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl space-y-3">
                       <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 mb-2">
-                        <ImageIcon size={14} className="text-cyan-400" /> Bilder (valfritt)
+                        <Icon name="rapport.bilder" className="w-3.5 h-3.5 text-cyan-400" /> Bilder (valfritt)
                       </h4>
 
                       {/* Visa befintliga bilder från kund */}
                       {existingImages.length > 0 && (
                         <div className="mb-2 p-3 bg-slate-800/30 rounded-xl border border-slate-700">
                           <div className="flex items-center gap-2 mb-2">
-                            <ImageIcon size={12} className="text-emerald-400" />
+                            <Icon name="rapport.bilder" className="w-3 h-3 text-emerald-400" />
                             <span className="text-xs text-emerald-400 font-medium">
                               {existingImages.length} bild{existingImages.length > 1 ? 'er' : ''} från kund
                             </span>

@@ -2,7 +2,7 @@
 // ⭐ VERSION 2.0 - Top Picks-sortering och strukturerad origin-data ⭐
 
 import React, { useState } from 'react';
-import { Clock, MapPin, Home, Star, TrendingUp, ChevronDown, ChevronUp, Route, User, CheckCircle2 } from 'lucide-react';
+import { Icon } from '../icons/Icon';
 
 // --- Typer ---
 export interface SingleSuggestion {
@@ -115,7 +115,7 @@ export default function BookingSuggestionCard({
       {/* Top Pick Badge */}
       {isTopPick && (
         <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-emerald-500 text-[#fff] text-xs font-bold rounded-full flex items-center gap-1 shadow-lg">
-          <Star className="w-3 h-3" />
+          <Icon name="allman.stjarna" className="w-3 h-3" />
           Bäst
         </div>
       )}
@@ -124,7 +124,7 @@ export default function BookingSuggestionCard({
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           {/* Vald-indikator */}
-          {isSelected && <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0" />}
+          {isSelected && <Icon name="station.klar" className="w-4 h-4 text-teal-400 shrink-0" />}
 
           {/* Rang-indikator */}
           {!isSelected && rank && rank <= 3 && (
@@ -141,11 +141,11 @@ export default function BookingSuggestionCard({
           {/* Tekniker-info */}
           <div className="min-w-0">
             <h4 className="font-semibold text-white text-sm truncate flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <Icon name="sok.tekniker" className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               {suggestion.technician_name}
               {isAccountManager && (
                 <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-full shrink-0">
-                  <Star size={10} className="fill-amber-400" />AM
+                  <Icon name="allman.stjarna" className="w-2.5 h-2.5" />AM
                 </span>
               )}
             </h4>
@@ -175,14 +175,14 @@ export default function BookingSuggestionCard({
       <div className="flex flex-wrap items-center gap-2 text-xs">
         {/* Restid till jobb */}
         <div className={`flex items-center gap-1 ${travelInfo.color}`}>
-          <Route className="w-3.5 h-3.5" />
+          <Icon name="bokning.restid" className="w-3.5 h-3.5" />
           <span className="font-medium">{suggestion.travel_time_minutes} min</span>
         </div>
 
         {/* Hemresa (om sent jobb) */}
         {homeInfo && (
           <div className={`flex items-center gap-1 ${homeInfo.color}`}>
-            <Home className="w-3.5 h-3.5" />
+            <Icon name="arende.privat" className="w-3.5 h-3.5" />
             <span className="font-medium">{suggestion.travel_time_home_minutes} min hem</span>
           </div>
         )}
@@ -190,7 +190,7 @@ export default function BookingSuggestionCard({
         {/* Första jobb badge */}
         {suggestion.is_first_job && (
           <div className="flex items-center gap-1 text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded">
-            <Home className="w-3 h-3" />
+            <Icon name="arende.privat" className="w-3 h-3" />
             <span className="font-medium">Hemstart</span>
           </div>
         )}
@@ -205,7 +205,7 @@ export default function BookingSuggestionCard({
         className="mt-2 pt-2 border-t border-slate-700/50 w-full flex items-center justify-between text-slate-500 hover:text-slate-300 transition-colors"
       >
         <span className="text-xs">{isExpanded ? 'Dölj' : 'Detaljer'}</span>
-        {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        <Icon name="allman.chevron" className={`w-3.5 h-3.5 transition-transform ${isExpanded ? '-rotate-90' : 'rotate-90'}`} />
       </button>
 
       {isExpanded && (
@@ -227,7 +227,7 @@ export default function BookingSuggestionCard({
               {/* Tidsspann - när föregående ärende slutar */}
               {suggestion.origin_end_time && (
                 <div className="flex items-center gap-1.5 text-slate-400">
-                  <Clock className="w-3.5 h-3.5" />
+                  <Icon name="allman.klocka" className="w-3.5 h-3.5" />
                   <span>
                     Slutar kl. {formatTime(suggestion.origin_end_time)}
                   </span>
@@ -237,7 +237,7 @@ export default function BookingSuggestionCard({
               {/* Adress */}
               {suggestion.origin_address && (
                 <div className="flex items-start gap-1.5 text-slate-400">
-                  <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <Icon name="rapport.adress" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                   <span className="break-words">
                     {suggestion.origin_address}
                   </span>
@@ -250,7 +250,7 @@ export default function BookingSuggestionCard({
           {suggestion.is_first_job && (
             <div className="p-2.5 rounded-md bg-purple-500/10 border border-purple-500/30 space-y-1">
               <p className="text-purple-300 font-medium flex items-center gap-1.5">
-                <Home className="w-3.5 h-3.5" />
+                <Icon name="arende.privat" className="w-3.5 h-3.5" />
                 Startar från hemadress
               </p>
               {suggestion.origin_address && (
@@ -263,7 +263,7 @@ export default function BookingSuggestionCard({
 
           {/* Effektivitetsbeskrivning */}
           <div className="flex items-center gap-1.5 p-2 rounded bg-slate-800/50">
-            <TrendingUp className={`w-3.5 h-3.5 ${efficiencyInfo.color}`} />
+            <Icon name="bokning.effektivitet" className={`w-3.5 h-3.5 ${efficiencyInfo.color}`} />
             <p className="text-slate-400">{efficiencyInfo.description}</p>
           </div>
         </div>
@@ -354,7 +354,7 @@ export function BookingSuggestionList({ suggestions, onSelect, accountManagerTec
       <div className="space-y-3">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <Star className="w-4 h-4 text-emerald-400" />
+            <Icon name="allman.stjarna" className="w-4 h-4 text-emerald-400" />
             <h4 className="text-sm font-semibold text-white">
               Rekommenderade tider
             </h4>

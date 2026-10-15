@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { OrganizationSite } from '../../types/multisite'
 import { getCustomerDisplayName } from '../../utils/multisiteHelpers'
-import { Building2, MapPin, Search } from 'lucide-react'
+import { Icon } from '../icons/Icon'
 import toast from 'react-hot-toast'
 
 interface SiteSelectorProps {
@@ -131,7 +131,7 @@ export default function SiteSelector({
     return (
       <div className={`w-full px-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-white ${className}`}>
         <div className="flex items-center gap-2">
-          <Building2 className="w-4 h-4 text-slate-400" />
+          <Icon name="sok.kund-foretag" className="w-4 h-4 text-slate-400" />
           <span>{sites[0].site_name}</span>
           {sites[0].site_code && (
             <span className="text-slate-500">({sites[0].site_code})</span>
@@ -156,7 +156,7 @@ export default function SiteSelector({
       >
         {selectedSite ? (
           <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-slate-400" />
+            <Icon name="sok.kund-foretag" className="w-4 h-4 text-slate-400" />
             <span>{selectedSite.site_name}</span>
             {selectedSite.site_code && (
               <span className="text-slate-500">({selectedSite.site_code})</span>
@@ -176,7 +176,7 @@ export default function SiteSelector({
           {sites.length > 5 && (
             <div className="p-2 border-b border-slate-700">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Icon name="allman.sok" className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   value={searchTerm}
@@ -210,7 +210,7 @@ export default function SiteSelector({
                       value === site.id ? 'bg-purple-500/20 text-purple-300' : 'text-white'
                     }`}
                   >
-                    <Building2 className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                    <Icon name="sok.kund-foretag" className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{site.site_name}</span>
@@ -225,7 +225,7 @@ export default function SiteSelector({
                       </div>
                       {site.address && (
                         <div className="flex items-center gap-1 mt-0.5">
-                          <MapPin className="w-3 h-3 text-slate-500" />
+                          <Icon name="rapport.adress" className="w-3 h-3 text-slate-500" />
                           <span className="text-xs text-slate-400">{site.address}</span>
                         </div>
                       )}
