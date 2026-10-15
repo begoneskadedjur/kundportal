@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.58.0',
+    date: '2026-10-15',
+    title: 'Automatisk prislista',
+    items: [
+      { kind: 'andring', text: 'Förvalslistan heter nu Automatisk prislista och innehåller hela den generella avropslistan: saneringar, hundsök, värmebehandling, tilläggsstationer, ljusfälla och timpris. Kunder utan egen prislista får alla priserna i § 2 på avtalskartan.' },
+      { kind: 'andring', text: 'Standard avropsavtal har fått tilläggsstation, ljusfälla och timpris. Artikellistan med interna kostnader heter Intern prislista.' },
+    ],
+  },
+  {
     version: '3.57.0',
     date: '2026-10-15',
     title: 'Egna ikoner i bokningen',

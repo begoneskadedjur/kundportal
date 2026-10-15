@@ -60,7 +60,7 @@ export const STEG: Steg[] = [
         <Punkter
           items={[
             <>Priset hämtas ur kundens prislista: tjänst <B>144 Tilläggsstation per år</B>, <B>79 Ljusfälla generell</B> för ljusfällor och <B>43</B> för per kontroll.</>,
-            <>Har kunden inget eget pris används listan <B>Standardtjänster</B>. Där kostar 144 och 79 i dag 3 600 kr per år. Tjänst 43 har inget standardpris, så per kontroll kräver att kunden har priset i sin egen lista.</>,
+            <>Har kunden inget eget pris används listan <B>Automatisk prislista</B>. Där kostar 144 och 79 i dag 3 600 kr per år. Tjänst 43 har inget standardpris, så per kontroll kräver att kunden har priset i sin egen lista.</>,
             'Per år och per månad går bara att välja när kunden har ett avtal.',
           ]}
         />

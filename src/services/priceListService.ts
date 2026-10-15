@@ -318,7 +318,7 @@ export class PriceListService {
       }
     }
 
-    // 2. Standardprislista
+    // 2. Automatiska prislistan (förvalslistan)
     const defaultList = await this.getDefaultPriceList()
     if (defaultList) {
       const { data: priceItem } = await supabase

@@ -84,7 +84,7 @@ export function PriceListsSettings() {
     setSettingDefaultId(id)
     try {
       await PriceListService.updatePriceList(id, { is_default: true })
-      toast.success('Standardprislista uppdaterad')
+      toast.success('Automatisk prislista uppdaterad')
       loadData()
     } catch (error) {
       console.error('Fel vid uppdatering:', error)

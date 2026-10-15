@@ -906,7 +906,7 @@ export default function ImportCustomerByPdfModal({
                     value={preview.price_list_id ?? ''}
                     onChange={v => setPreview(prev => prev ? { ...prev, price_list_id: v || null } : prev)}
                     options={[
-                      { value: '', label: 'Standardprislista (auto)' },
+                      { value: '', label: 'Automatisk prislista' },
                       ...priceLists.map(pl => ({ value: pl.id, label: pl.name })),
                     ]}
                   />

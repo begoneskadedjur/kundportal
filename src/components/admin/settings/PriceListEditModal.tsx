@@ -155,7 +155,7 @@ export function PriceListEditModal({
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="T.ex. Standardprislista 2025"
+              placeholder="T.ex. Avropsavtal 2026"
               className={`w-full px-4 py-2 bg-slate-900 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 ${
                 errors.name ? 'border-red-500 focus:ring-red-500' : 'border-slate-700 focus:ring-purple-500'
               }`}
@@ -217,12 +217,12 @@ export function PriceListEditModal({
               />
               <div className="flex items-center gap-2">
                 <Star className="w-4 h-4 text-purple-400" />
-                <span className="text-white">Standardprislista</span>
+                <span className="text-white">Automatisk prislista</span>
               </div>
             </label>
             {isDefault && (
               <p className="text-slate-500 text-xs ml-8">
-                Standardprislistan används för kunder utan specifik prislista.
+                Den automatiska prislistan gäller för kunder och avtal utan egen prislista.
               </p>
             )}
 
