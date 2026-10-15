@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.59.1',
+    date: '2026-10-15',
+    title: 'Dela upp för ROT/RUT',
+    items: [
+      { kind: 'buggfix', text: 'Dela upp för ROT/RUT säger direkt i formuläret varför uppdelningen inte går, till exempel när arbetet är större än radens pris.' },
+    ],
+  },
+  {
     version: '3.59.0',
     date: '2026-10-15',
     title: 'Fakturaplanen kollar Fortnox',

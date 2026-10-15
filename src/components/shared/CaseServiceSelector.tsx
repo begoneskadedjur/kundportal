@@ -170,6 +170,8 @@ export default function CaseServiceSelector({
   const [splitItemId, setSplitItemId] = useState<string | null>(null)
   const [splitAmount, setSplitAmount] = useState('')
   const [splitType, setSplitType] = useState<'ROT' | 'RUT' | null>(null)
+  // Felet visas i formuläret: en toast uppe till höger missas lätt
+  const [splitError, setSplitError] = useState<string | null>(null)
 
   // Inline price editing (service item id → input string)
   const [editingPrice, setEditingPrice] = useState<Record<string, string>>({})
@@ -812,6 +814,7 @@ export default function CaseServiceSelector({
       }
     }
     setSplitAmount(suggested)
+    setSplitError(null)
     // Förvälj avdragstyp bara när arbetstjänsten är berättigad för exakt en typ
     setSplitType(
       laborService?.rot_eligible && !laborService?.rut_eligible ? 'ROT'
@@ -825,23 +828,25 @@ export default function CaseServiceSelector({
     setSplitItemId(null)
     setSplitAmount('')
     setSplitType(null)
+    setSplitError(null)
   }
 
   const handleConfirmSplit = async (item: CaseBillingItemWithRelations) => {
     if (saving || !laborService) return
     const raw = parseFloat(splitAmount.replace(',', '.'))
     if (isNaN(raw) || raw <= 0) {
-      toast.error('Ange arbetskostnaden i kronor')
+      setSplitError('Ange arbetskostnaden i kronor.')
       return
     }
     if (!splitType) {
-      toast.error('Välj ROT eller RUT')
+      setSplitError('Välj ROT eller RUT.')
       return
     }
     // Privat: input är inkl. moms → räkna om till exkl. (lagringsformatet)
     const laborExkl = raw / priceMultiplier
     if (laborExkl > item.total_price + 0.01) {
-      toast.error('Arbetskostnaden kan inte överstiga radens pris')
+      const max = (item.total_price * priceMultiplier).toLocaleString('sv-SE', { maximumFractionDigits: 2 })
+      setSplitError(`Arbetskostnaden kan vara högst ${max} kr ${isPrivate ? 'inkl.' : 'exkl.'} moms, det vill säga radens pris. Ändra radens pris först om arbetet ska vara större.`)
       return
     }
 
@@ -1523,7 +1528,7 @@ export default function CaseServiceSelector({
                               inputMode="decimal"
                               autoFocus
                               value={splitAmount}
-                              onChange={e => setSplitAmount(e.target.value)}
+                              onChange={e => { setSplitAmount(e.target.value); setSplitError(null) }}
                               placeholder="Arbetskostnad"
                               className="w-28 px-2 py-0.5 text-sm text-right bg-slate-700 border border-slate-600 rounded text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#20c58f]"
                             />
@@ -1535,7 +1540,7 @@ export default function CaseServiceSelector({
                                 type="radio"
                                 name={`split-type-${item.id}`}
                                 checked={splitType === 'ROT'}
-                                onChange={() => setSplitType('ROT')}
+                                onChange={() => { setSplitType('ROT'); setSplitError(null) }}
                                 className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
                               />
                               <span className="text-xs text-slate-300">ROT ({getEffectiveRotPercent(laborService)}%)</span>
@@ -1547,7 +1552,7 @@ export default function CaseServiceSelector({
                                 type="radio"
                                 name={`split-type-${item.id}`}
                                 checked={splitType === 'RUT'}
-                                onChange={() => setSplitType('RUT')}
+                                onChange={() => { setSplitType('RUT'); setSplitError(null) }}
                                 className="w-3.5 h-3.5 text-[#20c58f] focus:ring-[#20c58f]"
                               />
                               <span className="text-xs text-slate-300">RUT ({getEffectiveRutPercent(laborService)}%)</span>
@@ -1571,6 +1576,12 @@ export default function CaseServiceSelector({
                             </button>
                           </div>
                         </div>
+                        {splitError && (
+                          <p role="alert" className="flex items-start gap-1.5 text-xs text-red-400">
+                            <Icon name="rapport.avvikelse" className="w-3.5 h-3.5 shrink-0 mt-px" />
+                            {splitError}
+                          </p>
+                        )}
                       </div>
                     ) : (
                       <button
