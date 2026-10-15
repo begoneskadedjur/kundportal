@@ -108,3 +108,8 @@ export const tableCls = {
 
 /** Diagramfärger: en färg per serie, brandgrönt först. Fungerar i ljust och mörkt läge. */
 export const SERIES_COLORS = ['#20c58f', '#38bdf8', '#f59e0b', '#a78bfa', '#f472b6', '#94a3b8']
+
+/** Textfärg ur en statuspunkts bg-klass: bg-amber-400 blir text-amber-400 */
+export function dotText(dot: string): string {
+  return dot.replace(/(^|\s)bg-/g, '$1text-')
+}

@@ -67,7 +67,7 @@ export const PROCUREMENT_SECTIONS: ProcurementSection[] = [
     icon: 'upphandling.annons',
     sub: '/annonser',
     prefixes: ['/annonser', '/bevakning'],
-    lead: 'Nya och öppna annonser som matchar bevakningen, och e-post som inte sorterats.',
+    lead: 'Nya upphandlingar som matchar bevakningen. Ta upp de som är värda att räkna på, avstå resten.',
     inNav: true,
   },
   {
@@ -77,9 +77,10 @@ export const PROCUREMENT_SECTIONS: ProcurementSection[] = [
     icon: 'upphandling.anbud',
     sub: '/anbud',
     prefixes: ['/anbud', '/upphandling'],
-    lead: 'Upphandlingar vi bedömer, räknar på eller har lämnat anbud i.',
+    lead: 'Allt vi räknar på eller har lämnat, från beslut till utfall.',
     tabs: [
-      { sub: '/anbud', label: 'Lista', end: true },
+      { sub: '/anbud', label: 'Tavla', end: true },
+      { sub: '/anbud/lista', label: 'Lista' },
       { sub: '/anbud/bibliotek', label: 'Anbudsbibliotek' },
     ],
     inNav: true,

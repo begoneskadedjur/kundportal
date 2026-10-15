@@ -1,5 +1,5 @@
 // src/components/admin/procurement/workshop/RequirementsList.tsx
-// Anbudsverkstad a) Kravlista: skallkrav, börkrav, bevis och kvalitetskriterier
+// Steget Underlag: kravlistan, den enda i portalen: skallkrav, börkrav, bevis och kvalitetskriterier
 // med sidhänvisning, ansvarig, klar och bilaga. AI skapar första versionen ur
 // underlaget; listan granskas alltid av en människa.
 
@@ -77,20 +77,29 @@ export default function RequirementsList({ noticeId, requirements, documents, ma
 
   return (
     <div>
-      <SubHeading
-        action={
-          <select className={`${selectCls} w-auto py-1`} value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Filtrera på typ">
-            <option value="all">Alla typer ({requirements.length})</option>
-            {TYPES.map((t) => (
-              <option key={t} value={t}>
-                {REQUIREMENT_TYPE_LABEL[t]} ({requirements.filter((r) => r.req_type === t).length})
-              </option>
-            ))}
-          </select>
-        }
-      >
+      <SubHeading>
         Kravlista, {doneCount} av {requirements.length} klara
       </SubHeading>
+      <nav className="flex gap-4 border-b border-slate-800 mb-3 overflow-x-auto" aria-label="Filtrera kravlistan">
+        {(['all', ...TYPES] as Array<'all' | ProcurementRequirementType>).map((t) => {
+          const count = t === 'all' ? requirements.length : requirements.filter((r) => r.req_type === t).length
+          const active = filter === t
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setFilter(t)}
+              aria-pressed={active}
+              className={`-mb-px inline-flex items-center gap-1.5 pb-2 pt-1 min-h-[40px] text-[13px] whitespace-nowrap border-b-2 transition-colors ${
+                active ? 'border-[#20c58f] text-slate-100 font-medium' : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {t === 'all' ? 'Alla' : REQUIREMENT_TYPE_LABEL[t]}
+              <span className="text-[11.5px] tabular-nums text-slate-500">{count}</span>
+            </button>
+          )
+        })}
+      </nav>
 
       {hasAi && (
         <p className="flex items-center gap-1.5 text-[11.5px] text-amber-400/90 mb-2">

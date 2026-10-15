@@ -54,6 +54,7 @@
     // avtalsslut, län) som delas mellan synk-cronen och klienten
     "src/types/procurement.ts",
     "src/shared/procurementRules.ts",
+    "src/shared/procurementAppendix.ts",
 
     // Stationsmarkörer (typens färg och ikon, tillägg, status) i kundrapporterna
     "src/shared/stationMarkers.ts",

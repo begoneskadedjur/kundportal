@@ -1,5 +1,5 @@
 // src/components/admin/procurement/detail/EvaluationBlock.tsx
-// Block 5: utvärdering. Kriterietyp och kriterier med vikter. TED:s vikter är
+// Steget Underlag: utvärdering. Kriterietyp och kriterier med vikter. TED:s vikter är
 // oanvändbara (planens avsnitt 2), så vikterna läses ur underlaget med AI
 // eller skrivs in här för hand.
 
@@ -57,12 +57,7 @@ export default function EvaluationBlock({ notice, onSave }: { notice: NoticeWith
   const update = (i: number, patch: Partial<Criterion>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)))
 
   return (
-    <Block
-      id="utvardering"
-      num="5"
-      title="Utvärdering"
-      hint="Vikterna i TED är oanvändbara. Vikter och prismodell läses ur förfrågningsunderlaget, av AI eller för hand."
-    >
+    <Block id="utvardering" icon="allman.statistik" title="Utvärdering" hint="Vikterna i TED är oanvändbara. Vikter och prismodell läses ur förfrågningsunderlaget, av AI eller för hand.">
       <div className="p-4 space-y-4">
         <div className="max-w-xs">
           <label className="block text-[11px] font-medium text-slate-500 mb-1">Kriterietyp</label>

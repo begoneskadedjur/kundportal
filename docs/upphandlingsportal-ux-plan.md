@@ -254,3 +254,8 @@ Skiss: https://claude.ai/artifact/2Zm6kPRqJqSMGBRFbgcef9 (version 3). Exempeldat
 4. **Prisbilagan i fyra steg.** (a) "Läs in köparens prisbilaga": AI läser köparens Excel/PDF-prisbilaga bland uppladdade dokument och skapar en rad per post (benämning, enhet, mängd), (b) "Föreslå priser": pris per rad ur BeGones prislistor eller kalkylen, kostnad och marginal per rad via marginEngine, (c) justera fritt, (d) export i köparens eget format (skriv priserna i deras fil när den finns, annars nuvarande xlsx). Dagens "Fyll från kalkylen" (en rad "Besök enligt avtalet") ersätts. Aldrig ordet "Fyll ur".
 5. **Begär ut handlingar** finns kvar: per tidigare avtal i köparprofilen och i steget Utfall.
 6. Leverantörskonton och kontakt med Antirio ingår INTE.
+
+## Byggstatus
+
+- 3.63.0 (2026-10-15): etapp 1 till 3.
+- 3.64.0 (2026-10-16): etapp 4 och 5 plus beslut 3 och 4. Annonser (AdsPage), anbudstavlan (BidsBoardPage, inbyggd drag and drop), detaljsidan i steg (detail/OverviewStep, detail/steps.ts), Hämta underlaget med släppyta för zip (src/shared/procurementPlatform.ts, procurementFiles.ts) och prisbilagan i fyra steg (api/procurement/read-price-appendix.ts, src/shared/procurementPricing.ts, procurementAppendix.ts, migration 20261016_prisbilaga_kopparens_fil.sql). Hämta underlaget bygger aldrig länkar ur Mercells sourceNoticeId: formaten gick inte att verifiera mot databasen, så utan document_url öppnas annonsen (Kommers egen sida, TED eller Mercell).

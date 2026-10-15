@@ -5,6 +5,7 @@
 import type { AwardWithRelations } from '../../../../services/procurementService'
 import type { ProcurementValueKind } from '../../../../types/procurement'
 import { normalizeName } from '../../../../shared/procurementRules'
+import { fmtDate } from '../uiFormat'
 import { useState } from 'react'
 import ConfirmModal from '../../../ui/ConfirmModal'
 
@@ -120,4 +121,32 @@ export function useConfirm() {
     />
   )
   return { confirm, node }
+}
+
+/** Slutsats om köparen brukar byta leverantör, ur köparens tilldelningar (Översikt) */
+export function switchConclusion(awards: AwardWithRelations[]): string {
+  const seq = [...awards]
+    .filter((a) => winnerKey(a) && a.award_date)
+    .sort((a, b) => (a.award_date ?? '').localeCompare(b.award_date ?? ''))
+  // Flera vinnare samma dag (delade kontrakt) räknas som en omgång
+  const rounds: AwardWithRelations[][] = []
+  for (const a of seq) {
+    const last = rounds[rounds.length - 1]
+    if (last && last[0].award_date === a.award_date) last.push(a)
+    else rounds.push([a])
+  }
+  if (rounds.length < 2) return rounds.length === 1 ? 'Bara en känd tilldelning. För lite historik för att säga om köparen byter leverantör.' : 'Ingen känd historik.'
+  let switches = 0
+  let lastSwitch: { from: string; to: string; date: string | null } | null = null
+  for (let i = 1; i < rounds.length; i++) {
+    const prev = new Set(rounds[i - 1].map((a) => winnerKey(a)))
+    const cur = rounds[i]
+    if (!cur.some((a) => prev.has(winnerKey(a)))) {
+      switches++
+      lastSwitch = { from: winnerName(rounds[i - 1][0]), to: winnerName(cur[0]), date: cur[0].award_date }
+    }
+  }
+  const n = rounds.length
+  if (switches === 0) return `Har behållit ${winnerName(rounds[n - 1][0])} i alla ${n} kända omgångar. Trogen köpare; ett utmanaranbud behöver ett tydligt skäl.`
+  return `Har bytt leverantör ${switches} av ${n - 1} gånger. Senast från ${lastSwitch?.from} till ${lastSwitch?.to} (${fmtDate(lastSwitch?.date ?? null)}).`
 }

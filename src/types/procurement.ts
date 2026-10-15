@@ -390,6 +390,13 @@ export interface ProcurementPriceLine {
   price_list_item_id: string | null
   sort_order: number
   notes: string | null
+  /** Köparens prisbilaga som raden lästes in ur (20261016_prisbilaga_kopparens_fil.sql) */
+  source_document_id?: string | null
+  /** Bladet i köparens xlsx */
+  source_sheet?: string | null
+  /** Cellen där vårt à-pris skrivs vid export, t.ex. E12 */
+  source_cell?: string | null
+  source_row?: number | null
   created_at: string
   updated_at: string
 }

@@ -45,6 +45,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.64.0',
+    date: '2026-10-16',
+    title: 'Annonser, anbudstavla och upphandlingen i steg',
+    items: [
+      { kind: 'nyhet', text: 'Annonser är en inkorg med Nya, Alla öppna, Under tröskeln och Osorterad e-post. Sök, välj område och sortering, ta upp eller avstå direkt i listan och exportera listan till Excel.' },
+      { kind: 'nyhet', text: 'Anbud öppnar på en tavla med Bedöms, Anbud pågår, Lämnat och Avgjort. Dra korten mellan kolumnerna på datorn eller byt status i kortets meny på mobilen. Listan finns kvar under Lista.' },
+      { kind: 'andring', text: 'En upphandling visas i fem steg: Översikt, Underlag, Kalkyl, Anbud och Utfall, plus Logg. Status och ansvarig byts i sidhuvudet, där också Avstå och Markera som lämnat finns.' },
+      { kind: 'nyhet', text: 'Hämta underlaget öppnar rätt sida hos e-Avrop, TendSign eller Kommers. Släpp sedan zip-filen på upphandlingen, så packas den upp och varje fil läses av AI.' },
+      { kind: 'nyhet', text: 'Prisbilagan i fyra steg: läs in köparens prisbilaga, föreslå priser ur prislistan och kalkylen med marginal per rad, justera och exportera med priserna inskrivna i köparens egen Excel-fil.' },
+    ],
+  },
+  {
     version: '3.63.0',
     date: '2026-10-15',
     title: 'Ny ordning i upphandlingsportalen',

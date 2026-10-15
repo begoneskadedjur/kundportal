@@ -25,6 +25,8 @@ const Today = lazy(() => import('../admin/procurement/TodayPage'))
 const Market = lazy(() => import('../admin/procurement/MarketPage'))
 const Lessons = lazy(() => import('../admin/procurement/LessonsPage'))
 const Watch = lazy(() => import('../admin/procurement/WatchPage'))
+const Ads = lazy(() => import('../admin/procurement/AdsPage'))
+const BidsBoard = lazy(() => import('../admin/procurement/BidsBoardPage'))
 const NoticeDetail = lazy(() => import('../admin/procurement/NoticeDetailPage'))
 const ContractClock = lazy(() => import('../admin/procurement/ContractClockPage'))
 const Signals = lazy(() => import('../admin/procurement/SignalsPage'))
@@ -53,11 +55,11 @@ export default function ProcurementApp() {
         <Route path="signaler" element={<Signals />} />
         <Route path="prognos" element={<Forecast />} />
         {/* Annonser (tidigare Bevakning) */}
-        <Route path="annonser" element={<Watch />} />
+        <Route path="annonser" element={<Ads />} />
         <Route path="bevakning" element={<WatchRedirect />} />
         {/* Anbud */}
-        <Route path="anbud" element={<Watch key="anbud" mode="anbud" />} />
-        <Route path="anbud/lista" element={<Watch key="anbud" mode="anbud" />} />
+        <Route path="anbud" element={<BidsBoard />} />
+        <Route path="anbud/lista" element={<Watch />} />
         <Route path="anbud/bibliotek" element={<AnswerLibraryPage />} />
         <Route path="upphandling/:noticeId" element={<NoticeDetail />} />
         <Route path="upphandling/:noticeId/:steg" element={<NoticeDetail />} />

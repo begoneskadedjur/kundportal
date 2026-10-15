@@ -118,6 +118,8 @@ import { AppLayout } from './components/shared/AppLayout';
 import ProcurementLayout from './pages/admin/procurement/ProcurementLayout';
 const ProcurementMarket = lazy(() => import('./pages/admin/procurement/MarketPage'));
 const ProcurementWatch = lazy(() => import('./pages/admin/procurement/WatchPage'));
+const ProcurementAds = lazy(() => import('./pages/admin/procurement/AdsPage'));
+const ProcurementBidsBoard = lazy(() => import('./pages/admin/procurement/BidsBoardPage'));
 const ProcurementNoticeDetail = lazy(() => import('./pages/admin/procurement/NoticeDetailPage'));
 const ProcurementContractClock = lazy(() => import('./pages/admin/procurement/ContractClockPage'));
 const ProcurementSignals = lazy(() => import('./pages/admin/procurement/SignalsPage'));
@@ -239,10 +241,10 @@ function App() {
                 <Route path="avtalsklocka" element={<ProcurementContractClock />} />
                 <Route path="signaler" element={<ProcurementSignals />} />
                 <Route path="prognos" element={<ProcurementForecast />} />
-                <Route path="annonser" element={<ProcurementWatch />} />
+                <Route path="annonser" element={<ProcurementAds />} />
                 <Route path="bevakning" element={<ProcurementWatchRedirect />} />
-                <Route path="anbud" element={<ProcurementWatch key="anbud" mode="anbud" />} />
-                <Route path="anbud/lista" element={<ProcurementWatch key="anbud" mode="anbud" />} />
+                <Route path="anbud" element={<ProcurementBidsBoard />} />
+                <Route path="anbud/lista" element={<ProcurementWatch />} />
                 <Route path="anbud/bibliotek" element={<ProcurementAnswerLibrary />} />
                 <Route path="upphandling/:noticeId" element={<ProcurementNoticeDetail />} />
                 <Route path="upphandling/:noticeId/:steg" element={<ProcurementNoticeDetail />} />

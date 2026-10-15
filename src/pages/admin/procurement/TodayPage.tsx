@@ -23,7 +23,6 @@ import {
   type NoticeWithRelations,
   type TaskNotice,
 } from '../../../services/procurementService'
-import { refreshProcurementBadge } from '../../../hooks/useProcurementBadge'
 import { DIRECT_NOTIFY_SCORE, NOTIFY_SCORE, addDaysIso, annualValueOf, swedishDate, todaySwedish } from '../../../shared/procurementRules'
 import {
   AWARD_STATUS_DOT,
@@ -42,6 +41,7 @@ import { buildProcurements, windowStateOf, type ProcurementGroup } from '../../.
 import { SourceHealthWarning } from '../../../components/admin/procurement/market/shared'
 import { errMsg } from '../../../components/admin/procurement/detail/helpers'
 import { noticePath, procurementPath } from '../../../lib/procurementPortal'
+import { DECLINE_TOAST, TAKE_TOAST, takeOrDecline } from '../../../components/admin/procurement/watch/sortNotice'
 
 const DEADLINE_DAYS = 14
 /** Avtal som gått in i fönstret de senaste så här många dagarna räknas som nya */
@@ -173,8 +173,8 @@ function buildTasks(reqs: MyRequirementTask[], questions: MyQuestionTask[], toda
         sub: `${who}, BGU-${e.notice.bgu_number}`,
         deadline,
         overdue: !!deadline && deadline < today,
-        step: 'anbud',
-        stepLabel: 'Anbud',
+        step: 'underlag',
+        stepLabel: 'Underlag',
         noticeId: id,
       })
     }
@@ -280,12 +280,10 @@ export default function TodayPage() {
   const sort = async (n: NoticeWithRelations, take: boolean) => {
     setBusy(n.id)
     try {
-      const patch = take ? { our_status: 'analyzing' as const, ...(n.owner_id || !user?.id ? {} : { owner_id: user.id }) } : { our_status: 'declined' as const }
-      await ProcurementService.updateNotice(n.id, patch, take ? 'Upptagen: Bedöms' : 'Avstår')
-      void ProcurementService.markSeen(n.id).then(() => refreshProcurementBadge()).catch(() => undefined)
+      const patch = await takeOrDecline(n, take, user?.id)
       setNotices((prev) => prev.map((x) => (x.id === n.id ? { ...x, ...patch } : x)))
       setSeen((prev) => new Set([...prev, n.id]))
-      toast.success(take ? 'Upptagen. Den ligger nu under Anbud som Bedöms.' : 'Avstår. Annonsen är flyttad ur listan.')
+      toast.success(take ? TAKE_TOAST : DECLINE_TOAST)
     } catch (e) {
       toast.error(errMsg(e, 'Kunde inte spara'))
     } finally {

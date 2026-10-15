@@ -4,7 +4,7 @@
 // hopfällbart block med ankare. Rena hjälpfunktioner ligger i helpers.tsx.
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { Icon } from '../../../icons/Icon'
+import { Icon, type IconName } from '../../../icons/Icon'
 import { numToInput, parseNum } from './helpers'
 import type { ProcurementService } from '../../../../services/procurementService'
 
@@ -170,42 +170,39 @@ export function SubHeading({ children, action }: { children: ReactNode; action?:
 }
 
 /**
- * Numrerat block på detaljsidan: rubrik som liten versal text, tunn ram,
- * ankare för navigeringen överst och hopfällbart.
+ * Avsnitt i detaljsidans steg (docs/upphandlingsportal-ux-plan.md avsnitt 3
+ * och 5): liten versal rubrik med ikon, luft mellan avsnitten och tunn ram
+ * bara runt innehåll med tabeller och fält (framed). Inget hopfällbart sedan
+ * 3.64.0; stegen håller sidan kort.
  */
 export function Block({
   id,
-  num,
+  icon,
   title,
   hint,
   action,
   children,
-  defaultOpen = true,
+  framed = true,
 }: {
-  id: string
-  num?: string
+  id?: string
+  icon?: IconName
   title: string
   hint?: ReactNode
   action?: ReactNode
   children: ReactNode
-  defaultOpen?: boolean
+  framed?: boolean
 }) {
-  const [open, setOpen] = useState(defaultOpen)
   return (
-    <section id={id} className="scroll-mt-24">
-      <div className="flex items-end justify-between gap-3 mb-2">
-        <button type="button" onClick={() => setOpen((o) => !o)} className="group flex items-center gap-1.5 min-w-0 text-left" aria-expanded={open}>
-          <Icon name="allman.chevron" className={`w-3.5 h-3.5 text-slate-600 group-hover:text-slate-400 transition-transform ${open ? 'rotate-90' : ''}`} />
-          <h2 className="text-xs uppercase tracking-wide text-slate-500 group-hover:text-slate-300">
-            {num && <span className="tabular-nums text-slate-600 mr-1.5">{num}</span>}
-            {title}
-          </h2>
-        </button>
-        {action && open && <div className="shrink-0">{action}</div>}
+    <section id={id} className="scroll-mt-24 min-w-0">
+      <div className="flex items-end justify-between gap-3 mb-2 min-h-[28px]">
+        <h2 className="inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.12em] text-slate-500">
+          {icon && <Icon name={icon} size={16} />}
+          {title}
+        </h2>
+        {action && <div className="shrink-0 flex items-center gap-1">{action}</div>}
       </div>
-      {hint && open && <p className="text-[11px] text-slate-600 -mt-1 mb-2 ml-5">{hint}</p>}
-      {open && <div className="rounded-xl border border-slate-800 bg-slate-900/40">{children}</div>}
+      {hint && <p className="text-[12px] text-slate-500 -mt-1 mb-2">{hint}</p>}
+      {framed ? <div className="rounded-[10px] border border-slate-800 bg-slate-900/40">{children}</div> : children}
     </section>
   )
 }
-

@@ -105,3 +105,58 @@ export function LinkButton({ onClick, children, disabled, tone = 'accent', type 
     </button>
   )
 }
+
+/** Ikonknapp 44 × 44 px med aria-label och title (verktyg: exportera, öppna original, avstå) */
+export function IconButton({ icon, label, onClick, href, disabled, tone = 'muted', className = '' }: {
+  icon: ReactNode
+  label: string
+  onClick?: () => void
+  href?: string
+  disabled?: boolean
+  tone?: 'muted' | 'danger'
+  className?: string
+}) {
+  const cls = `inline-flex items-center justify-center w-11 h-11 shrink-0 rounded-lg transition-colors disabled:opacity-40 ${
+    tone === 'danger' ? 'text-slate-500 hover:text-red-400 hover:bg-slate-800/60' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
+  } ${className}`
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" className={cls} aria-label={label} title={label}>
+        {icon}
+      </a>
+    )
+  }
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} className={cls} aria-label={label} title={label}>
+      {icon}
+    </button>
+  )
+}
+
+/** Primär handling: fylld brandgrön med vit text, ikon plus text */
+export function PrimaryButton({ children, onClick, disabled, className = '' }: { children: ReactNode; onClick?: () => void; disabled?: boolean; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center gap-2 h-10 min-h-[44px] sm:min-h-0 px-4 rounded-lg bg-[#20c58f] hover:bg-[#1bb07f] text-[#fff] text-[13.5px] font-medium disabled:opacity-50 transition-colors ${className}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** Sekundär handling: ram i linjefärg, ikon plus text */
+export function SecondaryButton({ children, onClick, disabled, className = '' }: { children: ReactNode; onClick?: () => void; disabled?: boolean; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center gap-2 h-10 min-h-[44px] sm:min-h-0 px-3.5 rounded-lg border border-slate-700 text-slate-200 text-[13.5px] hover:border-slate-500 hover:text-slate-100 disabled:opacity-50 transition-colors ${className}`}
+    >
+      {children}
+    </button>
+  )
+}

@@ -4,10 +4,9 @@
 // förväntat täckningsbidrag, status, ansvarig och källor. Olästa markeras.
 // Osorterad inkommande e-post visas överst när sådan finns.
 //
-// Sedan 3.63.0 visas sidan under Annonser (/annonser, tidigare /bevakning)
-// och, med mode 'anbud', som listan under Anbud (/anbud): bara upphandlingar
-// vi bedömer, räknar på eller lämnat, utan poänggräns och inkorg. Inkorgen
-// med Ta upp och Avstå och anbudstavlan kommer i etapp 4.
+// Sedan 3.64.0 är sidan bara listan under Anbud (/anbud/lista): upphandlingar
+// vi bedömer, räknar på eller lämnat, utan poänggräns, med Excel-export.
+// Inkorgen ligger i AdsPage (/annonser) och tavlan i BidsBoardPage (/anbud).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -25,15 +24,14 @@ import {
   OUR_STATUS_CHOICES,
   OUR_STATUS_LABEL,
   ourStatusValues,
-  type ProcurementInboundEmail,
   type ProcurementOurStatus,
 } from '../../../types/procurement'
 import { annualValueOf, estimateWinProbability } from '../../../shared/procurementRules'
-import { EmptyState, LinkButton, PulseRow, Section, StatusDot } from '../../../components/admin/procurement/ui'
+import { EmptyState, IconButton, LinkButton, Section, StatusDot } from '../../../components/admin/procurement/ui'
 import { daysUntil, fmtDate, fmtKrShort, fmtPct, fmtRelativeDays, tableCls } from '../../../components/admin/procurement/uiFormat'
 import { checkboxCls, inputCls, selectCls } from '../../../components/admin/procurement/detail/fields'
 import { errMsg, personName } from '../../../components/admin/procurement/detail/helpers'
-import UnsortedEmailSection from '../../../components/admin/procurement/watch/UnsortedEmailSection'
+import { exportXlsx } from '../../../components/admin/procurement/excelExport'
 import { noticePath } from '../../../lib/procurementPortal'
 import { Icon } from '../../../components/icons/Icon'
 
@@ -90,12 +88,12 @@ function derived(n: NoticeWithRelations) {
   return { annual, annualComputed: n.annual_value == null && annual != null, prob, probComputed: n.win_probability == null }
 }
 
-export default function WatchPage({ mode = 'annonser' }: { mode?: 'annonser' | 'anbud' }) {
-  const bids = mode === 'anbud'
+export default function WatchPage() {
+  const bids = true
   const [notices, setNotices] = useState<NoticeWithRelations[]>([])
   const [seen, setSeen] = useState<Set<string>>(new Set())
   const [managers, setManagers] = useState<ProcurementManagerProfile[]>([])
-  const [emails, setEmails] = useState<ProcurementInboundEmail[]>([])
+  const [exporting, setExporting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -129,42 +127,63 @@ export default function WatchPage({ mode = 'annonser' }: { mode?: 'annonser' | '
     }
   }, [status, openOnly, showBelow, search])
 
-  const loadEmails = useCallback(async () => {
-    if (bids) return
-    try {
-      setEmails(await ProcurementService.listInboundEmails('unsorted'))
-    } catch {
-      // Inkorgen är sekundär; tyst om tabellen saknar data eller rättighet
-      setEmails([])
-    }
-  }, [bids])
-
   useEffect(() => {
     void load()
   }, [load])
 
   useEffect(() => {
-    void loadEmails()
     ProcurementService.listManagers()
       .then(setManagers)
       .catch(() => setManagers([]))
-  }, [loadEmails])
+  }, [])
 
   const unread = useMemo(() => notices.filter((n) => !seen.has(n.id)), [notices, seen])
 
-  const stats = useMemo(() => {
-    const open = notices.filter((n) => {
-      const d = daysUntil(n.tender_deadline)
-      return d == null || d >= 0
-    })
-    const direct = open.filter((n) => n.match_score >= DIRECT_SCORE).length
-    const soon = open.filter((n) => {
-      const d = daysUntil(n.tender_deadline)
-      return d != null && d >= 0 && d <= 7
-    }).length
-    const tb = notices.reduce((s, n) => s + (Number(n.expected_contribution) || 0), 0)
-    return { open: open.length, direct, soon, tb }
-  }, [notices])
+  const exportList = async () => {
+    if (notices.length === 0) {
+      toast.error('Listan är tom')
+      return
+    }
+    setExporting(true)
+    try {
+      await exportXlsx({
+        fileBase: 'Anbudslista',
+        sheetName: 'Anbud',
+        title: 'Anbud, listan',
+        columns: [
+          { header: 'BGU', width: 10 },
+          { header: 'Upphandling', width: 56 },
+          { header: 'Köpare', width: 32 },
+          { header: 'Status', width: 14 },
+          { header: 'Ansvarig', width: 22 },
+          { header: 'Sista anbudsdag', width: 16 },
+          { header: 'Poäng', width: 8 },
+          { header: 'Årsvärde (kr)', width: 14, numFmt: '# ##0' },
+          { header: 'Sannolikhet', width: 12, numFmt: '0%' },
+          { header: 'Förväntat TB (kr)', width: 16, numFmt: '# ##0' },
+        ],
+        rows: notices.map((n) => {
+          const der = derived(n)
+          return [
+            `BGU-${n.bgu_number}`,
+            n.title,
+            n.buyer?.name ?? n.buyer_name ?? '',
+            OUR_STATUS_LABEL[n.our_status],
+            n.owner_id ? personName(managers, n.owner_id) : '',
+            n.tender_deadline ? fmtDate(n.tender_deadline) : '',
+            n.match_score,
+            der.annual,
+            der.prob,
+            n.expected_contribution,
+          ]
+        }),
+      })
+    } catch (e) {
+      toast.error(errMsg(e, 'Kunde inte skapa Excel-filen'))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const markAllRead = async () => {
     if (unread.length === 0) return
@@ -195,18 +214,6 @@ export default function WatchPage({ mode = 'annonser' }: { mode?: 'annonser' | '
 
   return (
     <div className="space-y-6">
-      {!bids && <UnsortedEmailSection emails={emails} notices={notices} onChanged={() => void loadEmails()} />}
-
-      <PulseRow
-        stats={[
-          { label: 'Öppna träffar', value: String(stats.open), hint: showBelow ? 'inklusive under tröskeln' : `poäng från ${NOTIFY_SCORE}` },
-          { label: 'Direktträffar', value: String(stats.direct), hint: `poäng från ${DIRECT_SCORE}`, tone: stats.direct > 0 ? 'good' : 'neutral' },
-          { label: 'Deadline inom 7 dagar', value: String(stats.soon), tone: stats.soon > 0 ? 'warn' : 'neutral' },
-          { label: 'Förväntat TB', value: fmtKrShort(stats.tb), hint: 'summa i listan' },
-          { label: 'Olästa', value: String(unread.length), tone: unread.length > 0 ? 'info' : 'muted' },
-        ]}
-      />
-
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
         <div className="relative flex-1">
           <Icon name="allman.sok" className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -231,6 +238,7 @@ export default function WatchPage({ mode = 'annonser' }: { mode?: 'annonser' | '
           <input type="checkbox" className={checkboxCls} checked={showBelow} onChange={(e) => setShowBelow(e.target.checked)} />
           Visa under tröskeln
         </label>
+        <IconButton icon={<Icon name="upphandling.excel" size={20} />} label="Exportera till Excel" onClick={() => void exportList()} disabled={exporting} />
       </div>
 
       <Section

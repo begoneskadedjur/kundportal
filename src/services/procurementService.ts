@@ -474,9 +474,11 @@ export class ProcurementService {
   /**
    * Laddar upp till den privata bucketen, skapar dokumentraden och startar
    * AI-extraktionen (api/procurement/extract-document). Extraktionen körs i
-   * bakgrunden; raden får ai_status done eller failed.
+   * bakgrunden; raden får ai_status done eller failed. Med extract 'await'
+   * väntar anropet på AI-läsningen (släppytan i steget Underlag läser fil för
+   * fil); ett fel i läsningen kastas då efter att filen sparats.
    */
-  static async uploadDocument(noticeId: string, file: File, docType: ProcurementDocType, extract = true): Promise<ProcurementDocument> {
+  static async uploadDocument(noticeId: string, file: File, docType: ProcurementDocType, extract: boolean | 'await' = true): Promise<ProcurementDocument> {
     const me = await currentUser()
     const safe = file.name.normalize('NFKD').replace(/[^\w.-]+/g, '_').slice(-120)
     const path = `${noticeId}/${Date.now()}_${safe}`
@@ -500,7 +502,8 @@ export class ProcurementService {
     if (error) fail('Kunde inte spara dokumentet', error)
     const doc = data as unknown as ProcurementDocument
     await this.addEvent(noticeId, 'document_uploaded', `Dokument uppladdat: ${file.name}`)
-    if (extract) void this.extractDocument(doc.id).catch(() => undefined)
+    if (extract === 'await') await this.extractDocument(doc.id)
+    else if (extract) void this.extractDocument(doc.id).catch(() => undefined)
     return doc
   }
 
@@ -513,6 +516,29 @@ export class ProcurementService {
       const body = await res.json().catch(() => ({}))
       throw new Error((body as { error?: string }).error ?? `Extraktionen misslyckades (${res.status})`)
     }
+  }
+
+  /**
+   * Läs in köparens prisbilaga (api/procurement/read-price-appendix). Finns
+   * rader ur samma dokument redan returneras conflict med antalet; anropa
+   * igen med replace för att ersätta dem.
+   */
+  static async readPriceAppendix(documentId: string, replace = false): Promise<{ rows: number; withCells: number; kind: 'xlsx' | 'pdf' } | { conflict: number }> {
+    const res = await apiFetch('/api/procurement/read-price-appendix', {
+      method: 'POST',
+      body: JSON.stringify({ documentId, replace }),
+    })
+    const body = (await res.json().catch(() => ({}))) as { error?: string; existing?: number; rows?: number; withCells?: number; kind?: 'xlsx' | 'pdf' }
+    if (res.status === 409) return { conflict: body.existing ?? 0 }
+    if (!res.ok) throw new Error(body.error ?? `Prisbilagan kunde inte läsas (${res.status})`)
+    return { rows: body.rows ?? 0, withCells: body.withCells ?? 0, kind: body.kind ?? 'xlsx' }
+  }
+
+  /** Filens innehåll ur lagringen, t.ex. köparens prisbilaga för exporten */
+  static async downloadDocument(path: string): Promise<Blob> {
+    const { data, error } = await supabase.storage.from(PROCUREMENT_BUCKET).download(path)
+    if (error || !data) fail('Kunde inte hämta filen', error)
+    return data
   }
 
   static async getDocumentUrl(path: string): Promise<string> {

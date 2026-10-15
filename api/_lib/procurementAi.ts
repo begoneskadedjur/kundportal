@@ -541,3 +541,55 @@ export async function extractSignals(
     })
     .slice(0, 30)
 }
+
+// ---------------------------------------------------------------------------
+// Köparens prisbilaga (beslut 4, steg a): en rad per post med benämning,
+// enhet och mängd. För kalkylblad också bladet och cellen där vårt pris ska
+// stå. Svaret tvättas i src/shared/procurementAppendix.ts cleanAppendixRows.
+
+const APPENDIX_SCHEMA = `{
+  "rows": [ { "label": string (postens benämning som i bilagan), "unit": string|null (st, besök, tim, objekt, m2 ...), "quantity": number|null (mängd eller årsvolym som köparen angett), "sheet": string|null (bladets namn, bara för kalkylblad), "row": number|null (radnumret R i kalkylbladet), "price_cell": string|null (cellen där anbudsgivaren skriver sitt à-pris, t.ex. "E12") } ]
+}`
+
+const APPENDIX_SYSTEM = `Du läser en prisbilaga eller ett anbudsformulär som en upphandlande myndighet vill att BeGone Skadedjur & Sanering AB fyller i med priser.
+Ta ut varje post som anbudsgivaren ska prissätta, i den ordning de står. Skriv benämningen som i bilagan, på svenska.
+- unit: enheten för priset (per besök, per timme, per objekt, styck). null om den saknas.
+- quantity: mängden eller den uppskattade volymen som köparen angett för posten. null om den saknas.
+- För kalkylblad: varje rad har formen "R12: A12=... | C12=... | E12=(tom)". Ange sheet (bladets namn efter "## Blad:"), row (radnumret) och price_cell: den cell på SAMMA rad där anbudsgivarens à-pris ska skrivas. Det är oftast en tom cell i en kolumn med rubrik som "Pris", "À-pris", "Pris per enhet" eller "Anbudspris". Välj aldrig en cell med text och aldrig en summakolumn (Summa, Totalt, Belopp) som räknas ut av en formel.
+- För PDF: sheet, row och price_cell är null.
+- Ta inte med rubrikrader, summarader, instruktioner eller rader som redan har ett pris ifyllt av köparen.
+Finns inga poster att prissätta: svara {"rows": []}.`
+
+/** Köparens prisbilaga till rader. Returnerar AI:ns råa svar; tvättas av anroparen. */
+export async function extractPriceAppendix(parts: AiPart[], opts: { abortSignal?: AbortSignal } = {}): Promise<unknown> {
+  return generateJson<unknown>({
+    system: APPENDIX_SYSTEM,
+    parts: [{ text: 'Ta ut posterna att prissätta ur prisbilagan nedan. Svara med JSON enligt schemat.' }, ...parts],
+    schemaHint: APPENDIX_SCHEMA,
+    maxOutputTokens: 16384,
+    abortSignal: opts.abortSignal,
+  })
+}
+
+/** Bladets celler som adress till visat värde (SheetJS), för rutnätstexten och kontrollen av priscellen */
+export function sheetCells(buffer: Buffer): Map<string, Map<string, string | number | boolean | null>> {
+  const wb = XLSX.read(buffer, { type: 'buffer', cellFormula: false })
+  const out = new Map<string, Map<string, string | number | boolean | null>>()
+  for (const name of wb.SheetNames.slice(0, 8)) {
+    const ws = wb.Sheets[name]
+    const cells = new Map<string, string | number | boolean | null>()
+    for (const key of Object.keys(ws)) {
+      if (key.startsWith('!')) continue
+      const c = ws[key] as { v?: unknown; w?: string; t?: string }
+      const v = c.t === 'n' ? (typeof c.v === 'number' ? c.v : null) : c.w ?? (c.v == null ? null : String(c.v))
+      cells.set(key, v as string | number | boolean | null)
+    }
+    out.set(name, cells)
+  }
+  return out
+}
+
+/** Gör en text-del med köparens kalkylblad som rutnät med celladresser */
+export function gridPart(fileName: string, gridText: string): AiPart {
+  return wrapText(fileName, 'kalkylblad med celladresser', gridText)
+}

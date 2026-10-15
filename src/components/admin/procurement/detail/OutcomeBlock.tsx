@@ -1,5 +1,5 @@
 // src/components/admin/procurement/detail/OutcomeBlock.tsx
-// Block 9: utfall och handlingar. Anbudsgivare på upphandlingen (importerade,
+// Steget Utfall: utfall och handlingar. Anbudsgivare på upphandlingen (importerade,
 // AI-utlästa ur handlingar eller manuella) med godkännande, begäran om
 // allmänna handlingar via e-post, inkommen e-post och vårt eget anbuds utfall.
 
@@ -17,15 +17,13 @@ import {
   DOCUMENT_REQUEST_TYPES,
   REQUEST_STATUS_LABEL,
   type ProcurementBid,
-  type ProcurementDocument,
   type ProcurementDocumentRequest,
   type ProcurementRequestStatus,
 } from '../../../../types/procurement'
 import { EmptyState, LinkButton, StatusDot } from '../ui'
 import { fmtDate, fmtKr, fmtNum, tableCls, type Tone } from '../uiFormat'
-import { BlurText, Block, Label, NumberField, SubHeading, checkboxCls, inputCls, selectCls } from './fields'
+import { BlurText, Block, KV, Label, NumberField, SubHeading, checkboxCls, inputCls, selectCls } from './fields'
 import { errMsg } from './helpers'
-import InboundEmailSection from './InboundEmailSection'
 
 const BIDDER_SOURCE_LABEL: Record<string, string> = {
   ted: 'TED',
@@ -59,24 +57,30 @@ interface Props {
   notice: NoticeWithRelations
   noticeAwards: AwardWithRelations[]
   bids: ProcurementBid[]
-  documents: ProcurementDocument[]
   onBidsChanged: () => void
   onEventsChanged: () => void
-  /** Hämtar om dokument och händelser, t.ex. efter att ett mejl flyttats */
-  onDocumentsChanged: () => void
+  /** Antalet kända anbudsgivare, för stegets statuspunkt */
+  onBiddersLoaded?: (count: number) => void
 }
 
-export default function OutcomeBlock({ notice, noticeAwards, bids, documents, onBidsChanged, onEventsChanged, onDocumentsChanged }: Props) {
+/**
+ * Steget Utfall: tilldelningen, anbudsgivare och priser, begär ut handlingar
+ * och vårt utfall med lärdom. Inkommen e-post ligger i Logg och lämnat pris i
+ * steget Anbud sedan 3.64.0.
+ */
+export default function OutcomeBlock({ notice, noticeAwards, bids, onBidsChanged, onEventsChanged, onBiddersLoaded }: Props) {
   const [bidders, setBidders] = useState<BidderWithSupplier[]>([])
   const [requests, setRequests] = useState<ProcurementDocumentRequest[]>([])
 
   const loadBidders = useCallback(async () => {
     try {
-      setBidders(await ProcurementService.listBidders({ noticeId: notice.id }))
+      const list = await ProcurementService.listBidders({ noticeId: notice.id })
+      setBidders(list)
+      onBiddersLoaded?.(list.length)
     } catch (e) {
       toast.error(errMsg(e, 'Kunde inte hämta anbudsgivare'))
     }
-  }, [notice.id])
+  }, [notice.id, onBiddersLoaded])
 
   const loadRequests = useCallback(async () => {
     try {
@@ -91,30 +95,54 @@ export default function OutcomeBlock({ notice, noticeAwards, bids, documents, on
     void loadRequests()
   }, [loadBidders, loadRequests])
 
+  const award = noticeAwards.find((a) => a.winner_name || a.supplier) ?? noticeAwards[0] ?? null
+  const decided = notice.our_status === 'won' || notice.our_status === 'lost' || !!award
+
   return (
-    <Block id="utfall" num="9" title="Utfall och handlingar">
-      <div className="p-4 space-y-6">
-        <BiddersSection noticeId={notice.id} bidders={bidders} onChanged={() => void loadBidders()} />
-        <RequestSection
-          notice={notice}
-          awardId={noticeAwards[0]?.id ?? null}
-          requests={requests}
-          onChanged={() => {
-            void loadRequests()
-            onEventsChanged()
-          }}
-        />
-        <InboundEmailSection
-          noticeId={notice.id}
-          documents={documents}
-          onMoved={() => {
-            void loadBidders()
-            onDocumentsChanged()
-          }}
-        />
-        <OwnOutcome bids={bids} onChanged={onBidsChanged} />
-      </div>
-    </Block>
+    <div className="space-y-8">
+      <Block icon="upphandling.utfall" title="Tilldelning" framed={false}>
+        {award ? (
+          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
+            <KV label="Vinnare">{award.supplier?.name ?? award.winner_name ?? 'Okänd'}</KV>
+            <KV label="Tilldelad">{fmtDate(award.award_date)}</KV>
+            <KV label="Värde">{fmtKr(award.value)}</KV>
+            <KV label="Anbud">{award.bids_received ?? '–'}</KV>
+          </dl>
+        ) : (
+          <div className="rounded-[10px] border border-slate-800 px-4 py-6 flex flex-col items-center text-center gap-2">
+            <Icon name="upphandling.utfall" size={32} className="text-slate-600" />
+            <p className="text-[13px] text-slate-300">{decided ? 'Tilldelningen är inte inläst ännu' : 'Utfallet kommer efter tilldelningen'}</p>
+            <p className="text-[12px] text-slate-500 max-w-md">
+              {notice.award_decision_at ? `Tilldelning väntas ${fmtDate(notice.award_decision_at)}. ` : ''}
+              Vinnare, anbudsgivare och priser visas här när beslutet kommit. Begär sedan ut handlingarna och skriv en lärdom.
+            </p>
+          </div>
+        )}
+      </Block>
+      <Block icon="upphandling.konkurrent" title={`Anbudsgivare (${bidders.length})`}>
+        <div className="p-4">
+          <BiddersSection noticeId={notice.id} bidders={bidders} onChanged={() => void loadBidders()} />
+        </div>
+      </Block>
+      <Block icon="kontakt.mejl" title="Begär ut handlingar">
+        <div className="p-4">
+          <RequestSection
+            notice={notice}
+            awardId={noticeAwards[0]?.id ?? null}
+            requests={requests}
+            onChanged={() => {
+              void loadRequests()
+              onEventsChanged()
+            }}
+          />
+        </div>
+      </Block>
+      <Block icon="allman.anteckning" title="Vårt utfall och lärdom">
+        <div className="p-4">
+          <OwnOutcome bids={bids} onChanged={onBidsChanged} />
+        </div>
+      </Block>
+    </div>
   )
 }
 
@@ -164,7 +192,7 @@ function BiddersSection({ noticeId, bidders, onChanged }: { noticeId: string; bi
   return (
     <div>
       <SubHeading action={<LinkButton onClick={() => setAdding((a) => !a)}>{adding ? 'Stäng' : 'Lägg till manuellt'}</LinkButton>}>
-        Anbudsgivare ({bidders.length})
+        Från TED, UHM, handlingar och manuellt
       </SubHeading>
 
       {adding && (
@@ -315,7 +343,6 @@ function RequestSection({
 
   return (
     <div>
-      <SubHeading>Begär ut handlingar</SubHeading>
       <div className="space-y-3">
         <div className="flex flex-wrap gap-x-4 gap-y-1.5">
           {DOCUMENT_REQUEST_TYPES.map((t) => (
@@ -430,38 +457,62 @@ function OwnOutcome({ bids, onChanged }: { bids: ProcurementBid[]; onChanged: ()
     }
   }
 
+  if (!current) return <p className="text-[12px] text-slate-500">Spara en kalkyl i steget Kalkyl så kan utfallet följas här.</p>
+
   return (
-    <div>
-      <SubHeading>Vårt anbud</SubHeading>
-      {!current ? (
-        <p className="text-[12px] text-slate-600">Spara en kalkyl i block 6 så kan utfallet följas här.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <Label>Utfall</Label>
-            <select
-              className={selectCls}
-              value={current.outcome}
-              onChange={(e) => void patch({ outcome: e.target.value as ProcurementBid['outcome'] }, 'Utfallet sparat')}
-              aria-label="Utfall"
-            >
-              {(Object.keys(OUTCOME_LABEL) as Array<ProcurementBid['outcome']>).map((o) => (
-                <option key={o} value={o}>{OUTCOME_LABEL[o]}</option>
-              ))}
-            </select>
-          </div>
-          <NumberField label="Lämnat pris per år" value={current.submitted_price} commitOnBlur onChange={(n) => void patch({ submitted_price: n })} suffix="kr" />
-          <div className="sm:col-span-3">
-            <Label>Lärdom</Label>
-            <BlurText
-              value={current.lesson}
-              multiline
-              onCommit={(v) => void patch({ lesson: v }, 'Lärdomen sparad')}
-              placeholder="Vad avgjorde? Prisavstånd till vinnaren, kvalitetspoäng, vad vi gör annorlunda nästa gång."
-            />
-          </div>
-        </div>
-      )}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div>
+        <Label>Utfall</Label>
+        <select
+          className={selectCls}
+          value={current.outcome}
+          onChange={(e) => void patch({ outcome: e.target.value as ProcurementBid['outcome'] }, 'Utfallet sparat')}
+          aria-label="Utfall"
+        >
+          {(Object.keys(OUTCOME_LABEL) as Array<ProcurementBid['outcome']>).map((o) => (
+            <option key={o} value={o}>{OUTCOME_LABEL[o]}</option>
+          ))}
+        </select>
+      </div>
+      <div className="sm:col-span-3">
+        <Label>Lärdom</Label>
+        <BlurText
+          value={current.lesson}
+          multiline
+          onCommit={(v) => void patch({ lesson: v }, 'Lärdomen sparad')}
+          placeholder="Vad avgjorde? Prisavstånd till vinnaren, kvalitetspoäng, vad vi gör annorlunda nästa gång."
+        />
+      </div>
     </div>
+  )
+}
+
+/** Steget Anbud: lämnat pris per år och när anbudet lämnades */
+export function OwnBidPrice({ bids, submittedAt, onChanged }: { bids: ProcurementBid[]; submittedAt: string | null; onChanged: () => void }) {
+  const current = bids.find((b) => b.is_current) ?? bids[0] ?? null
+  const save = async (n: number | null) => {
+    if (!current) return
+    try {
+      await ProcurementService.updateBid(current.id, { submitted_price: n })
+      toast.success('Lämnat pris sparat')
+      onChanged()
+    } catch (e) {
+      toast.error(errMsg(e, 'Kunde inte spara priset'))
+    }
+  }
+  return (
+    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 max-w-xl">
+      <div>
+        <dt className="text-[10px] uppercase tracking-[0.12em] text-slate-500 mb-1">Lämnat pris per år</dt>
+        <dd>
+          {current ? (
+            <NumberField value={current.submitted_price} commitOnBlur onChange={(n) => void save(n)} suffix="kr" ariaLabel="Lämnat pris per år" />
+          ) : (
+            <span className="text-[12.5px] text-slate-500">Spara en kalkyl i steget Kalkyl först</span>
+          )}
+        </dd>
+      </div>
+      <KV label="Lämnat datum">{submittedAt ? fmtDate(submittedAt) : 'Sätts när du markerar anbudet som lämnat'}</KV>
+    </dl>
   )
 }
