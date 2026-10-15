@@ -2059,8 +2059,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                             />
                             <span className="text-sm text-white truncate">{tech.name}</span>
                               {tech.id === accountManagerTechId && (
-                                <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-full shrink-0">
-                                  <Icon name="allman.stjarna" className="w-2.5 h-2.5" />AM
+                                <span className="flex items-center gap-0.5 text-[11px] font-semibold text-amber-400 shrink-0">
+                                  <Icon name="allman.stjarna" className="w-3 h-3" />AM
                                 </span>
                               )}
                           </label>
@@ -2457,8 +2457,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               />
                               <span className="text-sm text-white truncate">{tech.name}</span>
                               {tech.id === accountManagerTechId && (
-                                <span className="flex items-center gap-0.5 text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded-full shrink-0">
-                                  <Icon name="allman.stjarna" className="w-2.5 h-2.5" />AM
+                                <span className="flex items-center gap-0.5 text-[11px] font-semibold text-amber-400 shrink-0">
+                                  <Icon name="allman.stjarna" className="w-3 h-3" />AM
                                 </span>
                               )}
                             </label>
@@ -2511,28 +2511,36 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                               key={index}
                               className={`
                                 relative p-3 rounded-lg cursor-pointer transition-all duration-200
-                                ${isTopPick ? 'bg-emerald-500/10 border border-emerald-500/40' : 'bg-slate-700/50 border border-slate-600 hover:border-slate-500'}
+                                bg-slate-800/50 border ${isTopPick ? 'border-emerald-500/50' : 'border-slate-700 hover:border-slate-500'}
                                 hover:shadow-lg hover:shadow-slate-900/30
                               `}
                               onClick={() => applyTeamSuggestion(sugg)}
                             >
-                              {isTopPick && (
-                                <div className="absolute -top-2 -right-2 px-2 py-0.5 bg-emerald-500 text-[#fff] text-xs font-bold rounded-full shadow-lg">
-                                  Bäst
-                                </div>
-                              )}
-                              <div className="flex items-start justify-between gap-2 mb-2">
-                                <div>
-                                  <p className="text-lg font-bold text-white">
-                                    {formatTime(sugg.start_time)} – {formatTime(sugg.end_time)}
-                                  </p>
-                                  <p className="text-xs text-slate-400">
-                                    {new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
-                                  </p>
-                                </div>
-                                <div className={`px-2 py-1 rounded text-xs font-semibold ${scoreInfo.color} bg-slate-800`}>
+                              {/* Statusrad: rang eller Bäst val, betyg och antal tekniker, utan piller */}
+                              <div className="flex items-center gap-1.5 mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                                {isTopPick ? (
+                                  <span className="flex items-center gap-1 text-emerald-400">
+                                    <Icon name="allman.stjarna" className="w-3 h-3" />
+                                    Bäst val
+                                  </span>
+                                ) : (
+                                  <span>Förslag {index + 1}</span>
+                                )}
+                                <span className="text-slate-600">·</span>
+                                <span className={`flex items-center gap-1.5 ${scoreInfo.color}`}>
+                                  <span className="w-1.5 h-1.5 rounded-full bg-current" />
                                   {scoreInfo.label}
-                                </div>
+                                </span>
+                                <span className="text-slate-600">·</span>
+                                <span>{sugg.technicians.length} tekniker</span>
+                              </div>
+                              <div className="mb-2">
+                                <p className="text-lg font-bold text-white">
+                                  {formatTime(sugg.start_time)} – {formatTime(sugg.end_time)}
+                                </p>
+                                <p className="text-xs text-slate-400">
+                                  {new Date(sugg.start_time).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                                </p>
                               </div>
                               <div className="flex items-center gap-2 text-xs text-blue-400 mb-2">
                                 <Icon name="bokning.restid" className="w-3.5 h-3.5" />
@@ -2544,7 +2552,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                                     <span className="text-slate-300 flex items-center gap-1">
                                       {tech.name}
                                       {tech.id === accountManagerTechId && (
-                                        <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 px-1 py-0.5 rounded-full">AM</span>
+                                        <span className="flex items-center gap-0.5 text-[11px] font-semibold text-amber-400">
+                                          <Icon name="allman.stjarna" className="w-3 h-3" />AM
+                                        </span>
                                       )}
                                     </span>
                                     <span className="text-slate-500">{tech.travel_time_minutes} min</span>

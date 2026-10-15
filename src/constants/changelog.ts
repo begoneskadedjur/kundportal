@@ -51,6 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       { kind: 'andring', text: 'Nytt ärende, bokningsförslagen och tjänstelistan använder portalens egna ikoner, med nya ritningar för bland annat team, restid, bokningsförslag och etablering.' },
       { kind: 'buggfix', text: 'Utskick, restid och Lägg till i avtalet har fått ikoner som visar vad de gör.' },
+      { kind: 'andring', text: 'Bokningsförslagen visar rang, Bäst val och betyg på en lugn statusrad överst i kortet i stället för brickor.' },
     ],
   },
   {
