@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { BeGoneCaseRow, Technician, WorkSchedule, isScheduledCase, ALL_VALID_STATUSES } from '../../types/database'
+import { BeGoneCaseRow, Technician, WorkSchedule, isScheduledCase, ALL_VALID_STATUSES, isDocumentSignedAwaitingStatus } from '../../types/database'
 import { isTechWorkingAt, formatTime } from '../../components/coordinator/schedule/scheduleUtils'
 import { Case } from '../../types/cases'
 import { AnimatePresence } from 'framer-motion'
@@ -410,7 +410,7 @@ export default function CoordinatorSchedule() {
 
   const scheduledCases = useMemo(() => allCases.filter(isScheduledCase), [allCases])
   const actionableCases = useMemo(() =>
-    allCases.filter(c => c.status === 'Offert signerad - boka in' && c.oneflow_contract_id),
+    allCases.filter(c => isDocumentSignedAwaitingStatus(c.status) && c.oneflow_contract_id),
     [allCases]
   )
 

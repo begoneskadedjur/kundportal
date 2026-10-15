@@ -25,7 +25,9 @@ interface EventLogCardProps {
 }
 
 // Ikon och färg baserat på händelsetyp
-const getEventTypeInfo = (eventType: string) => {
+const getEventTypeInfo = (eventType: string, metadata?: Record<string, any>) => {
+  // Oneflow-händelserna heter offer_* för både offerter och avtal (document_type i metadata)
+  const isContract = metadata?.document_type === 'contract'
   switch (eventType) {
     case 'case_deleted':
       return {
@@ -60,28 +62,28 @@ const getEventTypeInfo = (eventType: string) => {
         icon: FileSignature,
         color: 'text-blue-400',
         bgColor: 'bg-blue-500/20',
-        label: 'Offert skickad'
+        label: isContract ? 'Avtal skickat' : 'Offert skickad'
       };
     case 'offer_signed':
       return {
         icon: CheckCircle,
         color: 'text-green-400',
         bgColor: 'bg-green-500/20',
-        label: 'Offert signerad'
+        label: isContract ? 'Avtal signerat' : 'Offert signerad'
       };
     case 'offer_declined':
       return {
         icon: XCircle,
         color: 'text-red-400',
         bgColor: 'bg-red-500/20',
-        label: 'Offert nekad'
+        label: isContract ? 'Avtal nekat' : 'Offert nekad'
       };
     case 'offer_expired':
       return {
         icon: Clock,
         color: 'text-amber-400',
         bgColor: 'bg-amber-500/20',
-        label: 'Offert förfallen'
+        label: isContract ? 'Avtal förfallet' : 'Offert förfallen'
       };
     case 'offer_deleted':
       return {
@@ -182,7 +184,7 @@ export default function EventLogCard({ maxEntries = 10, title = 'Händelselogg' 
         {entries.length > 0 && (
           <div className="space-y-2">
             {entries.map((entry) => {
-              const typeInfo = getEventTypeInfo(entry.event_type);
+              const typeInfo = getEventTypeInfo(entry.event_type, entry.metadata);
               const Icon = typeInfo.icon;
 
               return (

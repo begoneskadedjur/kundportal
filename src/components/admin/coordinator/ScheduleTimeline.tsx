@@ -70,8 +70,8 @@ const getStatusColor = (status: string, caseType?: string): { bg: string; text: 
     // Standard färgschema för ClickUp-ärenden
     if (ls.includes('avslutat')) return { bg: 'bg-green-600', text: 'text-[#fff]', border: 'border-green-700' };
     if (ls.startsWith('återbesök')) return { bg: 'bg-blue-600', text: 'text-[#fff]', border: 'border-blue-700' };
-    if (ls.includes('signerad')) return { bg: 'bg-[#20c58f]', text: 'text-[#fff]', border: 'border-emerald-600' };
-    if (ls.includes('offert')) return { bg: 'bg-orange-500', text: 'text-[#fff]', border: 'border-orange-600' };
+    if (ls.includes('signerad') || ls.startsWith('avtal signerat')) return { bg: 'bg-[#20c58f]', text: 'text-[#fff]', border: 'border-emerald-600' };
+    if (ls.includes('offert') || ls.startsWith('avtal s')) return { bg: 'bg-orange-500', text: 'text-[#fff]', border: 'border-orange-600' };
     if (ls.includes('bokad') || ls.includes('bokat')) return { bg: 'bg-yellow-500', text: 'text-black', border: 'border-yellow-600' };
     if (ls.includes('review')) return { bg: 'bg-purple-600', text: 'text-[#fff]', border: 'border-purple-700' };
     if (ls.includes('stängt')) return { bg: 'bg-red-600', text: 'text-[#fff]', border: 'border-red-700' };

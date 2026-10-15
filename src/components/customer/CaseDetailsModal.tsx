@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { apiFetch } from '../../lib/api'
+import { isDocumentStepStatus } from '../../shared/documentStatus'
 import {
   X,
   Calendar,
@@ -828,7 +829,7 @@ export default function CaseDetailsModal({
     if (status === 'Avslutat') return '#34d399'
     if (status === 'Borttaget') return '#94a3b8'
     if (status === 'Återbesök') return '#a78bfa'
-    if (status === 'Offert skickad' || status === 'Offert signerad - boka in') return '#fb923c'
+    if (isDocumentStepStatus(status)) return '#fb923c'
     if (status === 'Reklamation') return '#f87171'
     return '#94a3b8'
   }
@@ -838,6 +839,7 @@ export default function CaseDetailsModal({
       'open': 'Öppen', 'Öppen': 'Öppen', 'Bokad': 'Bokad',
       'Avslutat': 'Genomförd', 'Borttaget': 'Avbokat',
       'Offert skickad': 'Offert skickad', 'Offert signerad - boka in': 'Offert signerad',
+      'Avtal skickat': 'Avtal skickat', 'Avtal signerat - Etablera': 'Avtal signerat',
       'Bomkörning': 'Bomkörning', 'Ombokning': 'Ombokning', 'Reklamation': 'Reklamation',
       'Återbesök': 'Återbesök',
     }

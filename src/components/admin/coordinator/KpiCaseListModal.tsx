@@ -35,8 +35,8 @@ const getStatusColor = (status: string): string => {
   const ls = status?.toLowerCase() || '';
   if (ls.includes('avslutat')) return 'bg-green-500/20 text-green-400 border-green-500/40';
   if (ls.startsWith('återbesök')) return 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40';
-  if (ls.includes('bokad') || ls.includes('bokat') || ls.includes('signerad')) return 'bg-blue-500/20 text-blue-400 border-blue-500/40';
-  if (ls.includes('öppen') || ls.includes('offert')) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40';
+  if (ls.includes('bokad') || ls.includes('bokat') || ls.includes('signerad') || ls.startsWith('avtal signerat')) return 'bg-blue-500/20 text-blue-400 border-blue-500/40';
+  if (ls.includes('öppen') || ls.includes('offert') || ls.startsWith('avtal s')) return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/40';
   if (ls.includes('review')) return 'bg-purple-500/20 text-purple-400 border-purple-500/40';
   if (ls.includes('stängt')) return 'bg-slate-600/50 text-slate-400 border-slate-600/50';
   return 'bg-slate-500/20 text-slate-400 border-slate-500/40';

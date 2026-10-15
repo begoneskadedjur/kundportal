@@ -1581,8 +1581,8 @@ export default function EditContractCaseModal({
     const ls = (status || '').toLowerCase()
     if (ls.includes('avslutat')) return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
     if (ls.startsWith('återbesök')) return 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-    if (ls.includes('signerad')) return 'bg-[#20c58f]/20 text-[#20c58f] border-[#20c58f]/30'
-    if (ls.includes('offert')) return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+    if (ls.includes('signerad') || ls.startsWith('avtal signerat')) return 'bg-[#20c58f]/20 text-[#20c58f] border-[#20c58f]/30'
+    if (ls.includes('offert') || ls.startsWith('avtal s')) return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
     if (ls.includes('bokad')) return 'bg-amber-500/20 text-amber-300 border-amber-500/30'
     if (ls.includes('öppen')) return 'bg-sky-500/20 text-sky-300 border-sky-500/30'
     return 'bg-slate-500/20 text-slate-300 border-slate-600/50'
@@ -1633,7 +1633,7 @@ export default function EditContractCaseModal({
   // Samma statuslista (och ordning) som den gamla status-selecten erbjöd
   const statusOptions = (() => {
     const manual = ['Öppen', 'Bokad', 'Avslutat']
-    const auto = ['Återbesök', 'Offert skickad', 'Offert signerad - boka in']
+    const auto = ['Återbesök', 'Offert skickad', 'Offert signerad - boka in', 'Avtal skickat', 'Avtal signerat - Etablera']
     const list = [...manual]
     if (auto.includes(formData.status) && !list.includes(formData.status)) list.push(formData.status)
     return list

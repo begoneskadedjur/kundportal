@@ -6,6 +6,12 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatCurrency, formatDate } from '../../../utils/formatters'
 import { isCompletedStatus } from '../../../types/database'
+import {
+  isContractDocumentStatus,
+  isDocumentSentStatus,
+  isDocumentSignedAwaitingStatus,
+  isSignedContractStatus,
+} from '../../../shared/documentStatus'
 import type { TechnicianCase, WorkflowGroup, CaseSupplementaryData } from '../../../pages/technician/TechnicianCases'
 
 // ─── Helpers ────────────────────────────────────────────
@@ -78,16 +84,17 @@ function computeSmartHint(
   }
 
   // 4. Offer/contract flow
-  if (status.includes('offert skickad')) {
+  if (isDocumentSentStatus(c.status)) {
+    const word = isContractDocumentStatus(c.status) ? 'Avtal' : 'Offert'
     if (sup?.contract) {
-      if (sup.contract.status === 'declined') return { text: 'Kund avböjt — kontakta', severity: 'warning' }
-      if (sup.contract.status === 'overdue') return { text: 'Offert utgången — kontakta kund', severity: 'warning' }
-      if (sup.contract.status === 'signed') return { text: 'Offert signerad — uppdatera status', severity: 'warning' }
+      if (sup.contract.status === 'declined') return { text: 'Kund avböjt, kontakta', severity: 'warning' }
+      if (sup.contract.status === 'overdue') return { text: `${word} utgånget, kontakta kund`, severity: 'warning' }
+      if (isSignedContractStatus(sup.contract.status)) return { text: `${word} signerat, uppdatera status`, severity: 'warning' }
     }
     return { text: 'Väntar på kundsvar', severity: 'info' }
   }
-  if (status.includes('offert signerad')) {
-    return { text: 'Boka in utförande', severity: 'info' }
+  if (isDocumentSignedAwaitingStatus(c.status)) {
+    return { text: isContractDocumentStatus(c.status) ? 'Boka in etablering' : 'Boka in utförande', severity: 'info' }
   }
 
   // 5. Normal workflow
@@ -138,8 +145,8 @@ const getStatusColor = (status: string) => {
   const s = status?.toLowerCase() || ''
   if (s.includes('avslutat')) return 'bg-green-500/20 text-green-400'
   if (s.startsWith('återbesök')) return 'bg-cyan-500/20 text-cyan-400'
-  if (s.includes('bokad') || s.includes('bokat') || s.includes('offert signerad')) return 'bg-blue-500/20 text-blue-400'
-  if (s.includes('öppen') || s.includes('offert skickad')) return 'bg-yellow-500/20 text-yellow-400'
+  if (s.includes('bokad') || s.includes('bokat') || s.includes('offert signerad') || s.includes('avtal signerat')) return 'bg-blue-500/20 text-blue-400'
+  if (s.includes('öppen') || s.includes('offert skickad') || s.includes('avtal skickat')) return 'bg-yellow-500/20 text-yellow-400'
   if (s.includes('review')) return 'bg-purple-500/20 text-purple-400'
   if (s.includes('bomkörning') || s.includes('reklamation')) return 'bg-red-500/20 text-red-400'
   if (s.includes('ombokning')) return 'bg-orange-500/20 text-orange-400'

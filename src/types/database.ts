@@ -643,6 +643,11 @@ export type Database = {
           contact_address: string | null
           company_name: string | null
           organization_number: string | null
+          /**
+           * Org- eller personnumret wizarden skickade till Oneflow (create-contract).
+           * Skrivs aldrig av webhooken; jämförs mot kundens värde vid signering.
+           */
+          sent_organization_number?: string | null
 
           agreement_text: string | null
           total_value: number | null
@@ -1015,6 +1020,9 @@ export type ClickUpStatus =
   | 'Bokad'
   | 'Offert skickad'
   | 'Offert signerad - boka in'
+  // Avtal (sedan 2026-10-15): samma steg som offertens, se src/shared/documentStatus.ts
+  | 'Avtal skickat'
+  | 'Avtal signerat - Etablera'
   | 'Återbesök'
   | 'Avslutat'
   | 'Borttaget'
@@ -1038,6 +1046,9 @@ export const STATUS_ID_TO_NAME: { [key: string]: ClickUpStatus } = {
   'c127553498_f4QLnpo0': 'Ombokning',
   'c127553498_ozSZTPqg': 'Offert skickad',
   'c127553498_u6NXTUe8': 'Offert signerad - boka in',
+  // Portalens egna id:n (finns inte i ClickUp): avtal skickat och signerat
+  'c127553498_avtSkick': 'Avtal skickat',
+  'c127553498_avtSignE': 'Avtal signerat - Etablera',
   'c127553498_V0p3wG0L': 'Reklamation',
   'c127553498_PSuyPIHA': 'Borttaget',
   'c127553498_wQT5njhJ': 'Avslutat',
@@ -1052,6 +1063,8 @@ export const STATUS_NAME_TO_ID: { [key in ClickUpStatus]: string } = {
   'Ombokning': 'c127553498_f4QLnpo0',
   'Offert skickad': 'c127553498_ozSZTPqg',
   'Offert signerad - boka in': 'c127553498_u6NXTUe8',
+  'Avtal skickat': 'c127553498_avtSkick',
+  'Avtal signerat - Etablera': 'c127553498_avtSignE',
   'Reklamation': 'c127553498_V0p3wG0L',
   'Borttaget': 'c127553498_PSuyPIHA',
   'Avslutat': 'c127553498_wQT5njhJ',
@@ -1066,10 +1079,26 @@ export const STATUS_CONFIG: { [key in ClickUpStatus]: { id: string; color: strin
   'Ombokning': { id: 'c127553498_f4QLnpo0', color: '#5f55ee', type: 'custom', orderindex: 4 },
   'Offert skickad': { id: 'c127553498_ozSZTPqg', color: '#3db88b', type: 'custom', orderindex: 5 },
   'Offert signerad - boka in': { id: 'c127553498_u6NXTUe8', color: '#85e7a1', type: 'custom', orderindex: 6 },
+  // Samma steg som offertens (samma orderindex), egen färg så att avtal syns i listor
+  'Avtal skickat': { id: 'c127553498_avtSkick', color: '#2fa4b8', type: 'custom', orderindex: 5 },
+  'Avtal signerat - Etablera': { id: 'c127553498_avtSignE', color: '#7fd3e0', type: 'custom', orderindex: 6 },
   'Reklamation': { id: 'c127553498_V0p3wG0L', color: '#ee5e99', type: 'custom', orderindex: 7 },
   'Borttaget': { id: 'c127553498_PSuyPIHA', color: '#d33d44', type: 'done', orderindex: 8 },
   'Avslutat': { id: 'c127553498_wQT5njhJ', color: '#008844', type: 'closed', orderindex: 9 },
 }
+
+// Dokumentstegen (offert och avtal) jämförs alltid via hjälparna, aldrig mot
+// en enskild sträng: avtalets statusar är samma steg som offertens.
+export {
+  isDocumentSentStatus,
+  isDocumentSignedAwaitingStatus,
+  isDocumentStepStatus,
+  isContractDocumentStatus,
+  caseStatusForDocument,
+  DOCUMENT_SENT_STATUSES,
+  DOCUMENT_SIGNED_AWAITING_STATUSES,
+  DOCUMENT_STEP_STATUSES,
+} from '../shared/documentStatus'
 
 // 🔧 HJÄLPFUNKTIONER för status-hantering
 export const getStatusName = (statusId: string): ClickUpStatus => {
@@ -1105,6 +1134,10 @@ export const getCustomerStatusDisplay = (status: ClickUpStatus): string => {
       return 'Offert skickad'
     case 'Offert signerad - boka in':
       return 'Offert Signerad'
+    case 'Avtal skickat':
+      return 'Avtal skickat'
+    case 'Avtal signerat - Etablera':
+      return 'Avtal signerat'
     case 'Återbesök':
       return 'Pågående'
     case 'Borttaget':
@@ -1134,6 +1167,8 @@ export const ALL_VALID_STATUSES: ClickUpStatus[] = [
   'Bokad',
   'Offert skickad',
   'Offert signerad - boka in',
+  'Avtal skickat',
+  'Avtal signerat - Etablera',
   'Återbesök',
   'Avslutat',
   'Borttaget',

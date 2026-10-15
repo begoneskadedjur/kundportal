@@ -7,6 +7,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { Case, serviceTypeConfig } from '../../types/cases'
 import { STATUS_CONFIG, ClickUpStatus, getStatusColor } from '../../types/database'
+import { documentStepKey, isDocumentSentStatus, isDocumentSignedAwaitingStatus, sameDocumentStep } from '../../shared/documentStatus'
 import ServiceRequestStatus from './ServiceRequestStatus'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import CaseDetailsModal from './CaseDetailsModal'
@@ -78,7 +79,7 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
 
   const filteredCases = filter === 'all' 
     ? cases 
-    : cases.filter(c => c.status === filter)
+    : cases.filter(c => sameDocumentStep(c.status, filter))
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('sv-SE', {
@@ -101,7 +102,9 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
     }
     
     cases.forEach(c => {
-      counts[c.status] = (counts[c.status] || 0) + 1
+      // Avtalets statusar räknas i samma steg som offertens
+      const key = documentStepKey(c.status)
+      counts[key] = (counts[key] || 0) + 1
     })
     
     return counts
@@ -113,8 +116,8 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
     { value: 'all', label: 'Alla ärenden' },
     { value: 'Öppen', label: 'Väntar på svar' },
     { value: 'Bokad', label: 'Schemalagda' },
-    { value: 'Offert skickad', label: 'Offert skickad' },
-    { value: 'Offert signerad - boka in', label: 'Offert signerad' },
+    { value: 'Offert skickad', label: 'Offert eller avtal skickat' },
+    { value: 'Offert signerad - boka in', label: 'Offert eller avtal signerat' },
     { value: 'Återbesök', label: 'Pågående' },
     { value: 'Avslutat', label: 'Slutförda' },
     { value: 'Stängt - slasklogg', label: 'Stängda' }
@@ -243,8 +246,8 @@ const ServiceActivityTimeline: React.FC<ServiceActivityTimelineProps> = ({ custo
                     {/* Icon selection */}
                     {status === 'Öppen' && <Clock className="w-5 h-5 animate-pulse relative z-10" />}
                     {status === 'Bokad' && <Calendar className="w-5 h-5 relative z-10" />}
-                    {status === 'Offert skickad' && <FileText className="w-5 h-5 relative z-10" />}
-                    {status === 'Offert signerad - boka in' && <Star className="w-5 h-5 text-purple-400 relative z-10" />}
+                    {isDocumentSentStatus(status) && <FileText className="w-5 h-5 relative z-10" />}
+                    {isDocumentSignedAwaitingStatus(status) && <Star className="w-5 h-5 text-purple-400 relative z-10" />}
                     {status === 'Återbesök' && <Wrench className="w-5 h-5 text-blue-400 animate-pulse relative z-10" />}
                     {status === 'Avslutat' && <CheckCircle className="w-5 h-5 text-green-400 relative z-10" />}
                     {status === 'Stängt - slasklogg' && <XCircle className="w-5 h-5 text-red-400 relative z-10" />}

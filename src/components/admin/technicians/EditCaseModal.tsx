@@ -168,7 +168,7 @@ interface BackupData {
 }
 
 const MANUAL_STATUSES = ['Öppen', 'Bokad', 'Avslutat']
-const AUTO_STATUSES = ['Återbesök', 'Offert skickad', 'Offert signerad - boka in']
+const AUTO_STATUSES = ['Återbesök', 'Offert skickad', 'Offert signerad - boka in', 'Avtal skickat', 'Avtal signerat - Etablera']
 
 function buildStatusOptions(currentStatus: string) {
   const list = [...MANUAL_STATUSES]
@@ -183,8 +183,8 @@ const getStatusChipStyle = (status: string): string => {
   const ls = (status || '').toLowerCase()
   if (ls.includes('avslutat')) return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
   if (ls.startsWith('återbesök')) return 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-  if (ls.includes('signerad')) return 'bg-[#20c58f]/20 text-[#20c58f] border-[#20c58f]/30'
-  if (ls.includes('offert')) return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+  if (ls.includes('signerad') || ls.startsWith('avtal signerat')) return 'bg-[#20c58f]/20 text-[#20c58f] border-[#20c58f]/30'
+  if (ls.includes('offert') || ls.startsWith('avtal s')) return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
   if (ls.includes('bokad') || ls.includes('bokat')) return 'bg-amber-500/20 text-amber-300 border-amber-500/30'
   if (ls.includes('öppen')) return 'bg-sky-500/20 text-sky-300 border-sky-500/30'
   return 'bg-slate-500/15 text-slate-300 border-slate-600/50'
@@ -1251,6 +1251,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       // ═══════════════════════════════════════════════════════════════════════════
       let invoiceGenerated = false;
       let invoiceUpdated = false;
+      let invoiceSkippedZero = false;
       if (formData.status === 'Avslutat') {
         // Endast för private och business cases (inte contract)
         if (tableName === 'private_cases' || tableName === 'business_cases') {
@@ -1313,8 +1314,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 }
               }
 
-              // upsert: skapa ny eller ersätt oskickad
-              await InvoiceService.upsertInvoiceFromCase(
+              // upsert: skapa ny eller ersätt oskickad. null = underlaget är
+              // 0 kr och ingen faktura skapas (0 kr-regeln i invoiceService).
+              const upserted = await InvoiceService.upsertInvoiceFromCase(
                 currentCase.id,
                 billingCaseType,
                 {
@@ -1335,7 +1337,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   customer_id: caseCustomerId,
                 }
               );
-              if (wasAlreadyClosed) {
+              if (!upserted) {
+                invoiceSkippedZero = true;
+              } else if (wasAlreadyClosed) {
                 invoiceUpdated = true;
                 console.log('[EditCaseModal] Faktura uppdaterad för ärendet');
               } else {
@@ -1415,6 +1419,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         toast.success('Ärendet sparat — fakturan uppdaterad med nya siffror.');
       } else if (commissionUpdated) {
         toast.success('Ärendet sparat — provisionen uppdaterad med nya siffror.');
+      } else if (invoiceSkippedZero) {
+        toast.success('Ärendet sparat. Underlaget är 0 kr, ingen faktura skapas.');
       } else {
         toast.success('Ärendet har uppdaterats!');
       }

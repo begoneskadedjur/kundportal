@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
-import { BeGoneCaseRow, Technician, isScheduledCase } from '../../types/database';
+import { BeGoneCaseRow, Technician, isScheduledCase, isDocumentSignedAwaitingStatus } from '../../types/database';
 
 import ScheduleControlPanel from '../../components/admin/coordinator/ScheduleControlPanel';
 import ScheduleTimeline from '../../components/admin/coordinator/ScheduleTimeline';
@@ -23,7 +23,7 @@ export interface Absence {
   reason: string;
 }
 
-const ALL_STATUSES = ['Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
+const ALL_STATUSES = ['Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Avtal skickat', 'Avtal signerat - Etablera', 'Återbesök 1', 'Återbesök 2', 'Återbesök 3', 'Återbesök 4', 'Återbesök 5', 'Privatperson - review', 'Stängt - slasklogg', 'Avslutat'];
 const DEFAULT_ACTIVE_STATUSES = ALL_STATUSES.filter(status => !status.includes('Avslutat') && !status.includes('Stängt'));
 
 export default function CoordinatorSchedule() {
@@ -86,7 +86,7 @@ export default function CoordinatorSchedule() {
 
   // ✅ FÖRBÄTTRING: Denna panel visar nu endast ärenden som kräver en åtgärd.
   const actionableCases = useMemo(() => {
-    return allCases.filter(c => c.status === 'Offert signerad - boka in');
+    return allCases.filter(c => isDocumentSignedAwaitingStatus(c.status));
   }, [allCases]);
 
   const filteredScheduledCases = useMemo(() => {

@@ -279,7 +279,10 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
             caseData.customer_id,
             new Date()
           )
-          if (adhocResult.invoiceError) {
+          if (adhocResult.skippedZeroTotal) {
+            // 0 kr-regeln: ingen faktura, inget att logga som delfaktura
+            toast.success('Underlaget är 0 kr, ingen delfaktura skapad.')
+          } else if (adhocResult.invoiceError) {
             toast.error(`Raderna sparades men fakturan kunde inte skapas: ${adhocResult.invoiceError}. Kontakta admin.`, { duration: 10000 })
           } else {
             toast.success(`${pendingBillingItems.length} artikel(er) skickade till fakturering.`)
@@ -287,28 +290,30 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
 
           // Logga delfaktureringen så den syns i Ärendehistorik-panelen
           // (samma update_type som privat/företag använder i RevisitModal)
-          const authorName = (profile as { full_name?: string }).full_name || profile.display_name || 'Okänd'
-          const { error: logErr } = await supabase.from('case_updates_log').insert({
-            case_id: caseData.id,
-            case_table: 'cases',
-            case_type: 'contract',
-            update_type: 'partial_invoice_created',
-            updated_by: profile.id,
-            updated_by_id: profile.id,
-            updated_by_name: authorName,
-            user_role: 'koordinator',
-            user_name: authorName,
-            // field_changes är NOT NULL i case_updates_log
-            field_changes: {
-              partial_invoice: { old: null, new: `${pendingBillingItems.length} rader` },
-            },
-            previous_value: null,
-            new_value: JSON.stringify({
-              items: pendingBillingItems.length,
-              amount: pendingBillingItems.reduce((sum, i) => sum + Number(i.total_price), 0),
-            }),
-          })
-          if (logErr) console.error('[RevisitContractModal] Kunde inte logga delfakturering:', logErr)
+          if (!adhocResult.skippedZeroTotal) {
+            const authorName = (profile as { full_name?: string }).full_name || profile.display_name || 'Okänd'
+            const { error: logErr } = await supabase.from('case_updates_log').insert({
+              case_id: caseData.id,
+              case_table: 'cases',
+              case_type: 'contract',
+              update_type: 'partial_invoice_created',
+              updated_by: profile.id,
+              updated_by_id: profile.id,
+              updated_by_name: authorName,
+              user_role: 'koordinator',
+              user_name: authorName,
+              // field_changes är NOT NULL i case_updates_log
+              field_changes: {
+                partial_invoice: { old: null, new: `${pendingBillingItems.length} rader` },
+              },
+              previous_value: null,
+              new_value: JSON.stringify({
+                items: pendingBillingItems.length,
+                amount: pendingBillingItems.reduce((sum, i) => sum + Number(i.total_price), 0),
+              }),
+            })
+            if (logErr) console.error('[RevisitContractModal] Kunde inte logga delfakturering:', logErr)
+          }
         } catch (e: any) {
           console.error('[RevisitContractModal] Delfakturering misslyckades:', e)
           toast.error(`Delfakturering misslyckades: ${e.message}`)

@@ -42,6 +42,14 @@
     // Delade kundnummerregler för Fortnox-spegeln och allokeringen
     "src/shared/fortnoxCustomerNumbers.ts",
 
+    // Signeringsbehandlingen av avtal (api/_lib/contractSigning.ts): ärende-
+    // statusar, premie/org.nr-regler, fakturarader och andelar av premien
+    "src/shared/documentStatus.ts",
+    "src/shared/contractSigning.ts",
+    "src/shared/contractInvoiceRows.ts",
+    "src/shared/premiumShares.ts",
+    "src/shared/webLeadUppgifter.ts",
+
     // Upphandlingsportalen: radtyper och rena regler (matchning, dedup,
     // avtalsslut, län) som delas mellan synk-cronen och klienten
     "src/types/procurement.ts",

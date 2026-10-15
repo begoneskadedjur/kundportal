@@ -4,6 +4,13 @@ import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import fetch from 'node-fetch'
 import { refreshTemplates, isKnownTemplate, contractTypeOf, getKnownTemplateIds } from '../_lib/oneflowTemplates'
+import { processSignedContract } from '../_lib/contractSigning'
+import {
+  caseStatusForDocument,
+  documentEventText,
+  documentKindOf,
+  type DocumentKind,
+} from '../../src/shared/documentStatus'
 
 // Miljövariabler
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
@@ -694,741 +701,9 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
   }
 }
 
-// === HJÄLPFUNKTIONER FÖR CUSTOMER CREATION ===
-
-// Parsa kontraktslängd från text till månader
-const parseContractLength = (lengthText: string | null): number => {
-  if (!lengthText) return 12 // Default 1 år
-  
-  // Hantera enbart siffror (antar år om inget annat anges)
-  if (/^\d+$/.test(lengthText.trim())) {
-    const years = parseInt(lengthText.trim())
-    console.log(`📅 Parsade kontraktslängd: ${years} år → ${years * 12} månader`)
-    return years * 12
-  }
-  
-  // Hantera text med "år"
-  const yearMatch = lengthText.match(/(\d+)\s*år/i)
-  if (yearMatch) {
-    const years = parseInt(yearMatch[1])
-    console.log(`📅 Parsade kontraktslängd: ${years} år → ${years * 12} månader`)
-    return years * 12
-  }
-  
-  // Hantera text med "månad"
-  const monthMatch = lengthText.match(/(\d+)\s*månad/i)
-  if (monthMatch) {
-    const months = parseInt(monthMatch[1])
-    console.log(`📅 Parsade kontraktslängd: ${months} månader`)
-    return months
-  }
-  
-  console.log(`⚠️ Kunde inte parsa kontraktslängd '${lengthText}', använder default 12 månader`)
-  return 12 // Fallback
-}
-
-// Beräkna slutdatum för kontrakt
-const calculateEndDate = (startDate: string | null, lengthText: string | null): string | null => {
-  if (!startDate) return null
-  
-  const start = new Date(startDate)
-  const months = parseContractLength(lengthText)
-  start.setMonth(start.getMonth() + months)
-  return start.toISOString().split('T')[0]
-}
-
-// Beräkna finansiella värden
-const calculateFinancialValues = (oneflowTotalValue: number | null, lengthText: string | null) => {
-  if (!oneflowTotalValue) return { annual_value: null, monthly_value: null }
-  
-  // OneFlow skickar redan årsvärdet (inte totalt kontraktsvärde)
-  // Så vi behöver inte dividera med antal år
-  const annualValue = oneflowTotalValue
-  const monthlyValue = annualValue / 12
-  
-  console.log(`💰 Finansiella värden: Årsvärde=${annualValue}, Månadsvärde=${monthlyValue}`)
-  
-  return {
-    annual_value: annualValue,
-    monthly_value: monthlyValue
-  }
-}
-
-// Generera produktsammanfattning från OneFlow produkter (hanterar nested product_groups)
-const generateProductSummary = (productGroups: any[] | null): string | null => {
-  if (!productGroups || !Array.isArray(productGroups)) return null
-  
-  const summaries: string[] = []
-  
-  // Iterera genom alla product_groups
-  for (const group of productGroups) {
-    // Kontrollera om det är en product_group med products array
-    if (group.products && Array.isArray(group.products)) {
-      for (const product of group.products) {
-        const quantity = product.quantity?.amount || 1
-        const name = product.name || 'Okänd produkt'
-        summaries.push(`${quantity}st ${name}`)
-      }
-    } 
-    // Fallback om strukturen är annorlunda (direkt produkt)
-    else if (group.name) {
-      const quantity = group.quantity?.amount || 1
-      summaries.push(`${quantity}st ${group.name}`)
-    }
-  }
-  
-  return summaries.length > 0 ? summaries.join(', ') : null
-}
-
-// Extrahera service-detaljer från produkter
-const extractServiceDetails = (productGroups: any[] | null): string | null => {
-  if (!productGroups || !Array.isArray(productGroups)) return null
-  
-  const serviceDetails: string[] = []
-  
-  for (const group of productGroups) {
-    if (group.products && Array.isArray(group.products)) {
-      for (const product of group.products) {
-        if (product.description) {
-          serviceDetails.push(product.description)
-        }
-      }
-    }
-  }
-  
-  return serviceDetails.length > 0 ? serviceDetails.join('. ') : null
-}
-
-// Detektera service-frekvens från agreement_text och produkter
-const detectServiceFrequency = (agreementText: string | null, productGroups: any[] | null): string | null => {
-  const textToAnalyze = agreementText?.toLowerCase() || ''
-  
-  // Kontrollera vanliga frekvenser i texten
-  if (textToAnalyze.includes('månadsvis') || textToAnalyze.includes('månatlig') || 
-      textToAnalyze.includes('varje månad') || textToAnalyze.includes('per månad')) {
-    return 'monthly'
-  }
-  
-  if (textToAnalyze.includes('kvartalsvis') || textToAnalyze.includes('kvartal') || 
-      textToAnalyze.includes('var tredje månad')) {
-    return 'quarterly'
-  }
-  
-  if (textToAnalyze.includes('halvårsvis') || textToAnalyze.includes('halvår') || 
-      textToAnalyze.includes('var sjätte månad')) {
-    return 'biannual'
-  }
-  
-  if (textToAnalyze.includes('årsvis') || textToAnalyze.includes('årlig') || 
-      textToAnalyze.includes('en gång per år')) {
-    return 'annual'
-  }
-  
-  if (textToAnalyze.includes('veckovis') || textToAnalyze.includes('varje vecka')) {
-    return 'weekly'
-  }
-  
-  if (textToAnalyze.includes('varannan vecka')) {
-    return 'biweekly'
-  }
-  
-  if (textToAnalyze.includes('vid behov') || textToAnalyze.includes('efter behov')) {
-    return 'on_demand'
-  }
-  
-  // Om inget hittas, anta månadsvis som standard för skadedjursavtal
-  if (textToAnalyze.includes('regelbunden') || textToAnalyze.includes('kontinuerlig')) {
-    return 'monthly'
-  }
-  
-  return null
-}
-
-// Detektera företagstyp baserat på företagsnamn och produkter
-const detectBusinessType = (companyName: string | null, products: any[] | null): string | null => {
-  const companyNameLower = companyName?.toLowerCase() || ''
-  
-  // Detektera från företagsnamn
-  if (companyNameLower.includes('bostadsrättsförening') || companyNameLower.includes('hsb')) {
-    return 'housing_association'
-  }
-  if (companyNameLower.includes('restaurang') || companyNameLower.includes('kök')) {
-    return 'restaurant'
-  }
-  if (companyNameLower.includes('hotell') || companyNameLower.includes('logi')) {
-    return 'hotel'
-  }
-  if (companyNameLower.includes('skola') || companyNameLower.includes('förskola')) {
-    return 'education'
-  }
-  
-  // Detektera från produkter
-  if (products && Array.isArray(products)) {
-    const productNames = products.map(p => p.name?.toLowerCase() || '').join(' ')
-    
-    if (productNames.includes('restaurang') || productNames.includes('kök')) {
-      return 'restaurant'
-    }
-    if (productNames.includes('hotell') || productNames.includes('logi')) {
-      return 'hotel'
-    }
-  }
-  
-  return 'general'
-}
-
-// Mappa bransch från business_type
-const mapToIndustryCategory = (businessType: string | null): string | null => {
-  const mapping: { [key: string]: string } = {
-    'housing_association': 'residential',
-    'restaurant': 'commercial',
-    'hotel': 'commercial',
-    'education': 'public',
-    'general': 'commercial'
-  }
-  
-  return businessType ? mapping[businessType] || 'commercial' : null
-}
-
-// Beräkna kundstorlek baserat på kontraktsvärde
-const calculateCustomerSize = (totalValue: number | null): 'small' | 'medium' | 'large' | null => {
-  if (!totalValue) return null
-  
-  if (totalValue < 25000) return 'small'
-  if (totalValue < 100000) return 'medium'
-  return 'large'
-}
-
-// Kontrakttyp-mappning baserat på template ID
-const getContractTypeName = (templateId: string | null): string | null => {
-  const mapping: { [key: string]: string } = {
-    '8486368': 'Skadedjursavtal',
-    '8462854': 'Mekaniska fällor',
-    '9324573': 'Betesstationer',
-    '8465556': 'Betongstationer',
-    '8732196': 'Indikationsfällor'
-  }
-  
-  return templateId ? mapping[templateId] || 'Okänt avtal' : null
-}
-
-// === HUVUDFUNKTION FÖR CUSTOMER CREATION ===
-
-// Automatisk kundregistrering vid signerat avtal
-const createCustomerFromSignedContract = async (contractId: string): Promise<void> => {
-  try {
-    console.log('👤 Kontrollerar om kund ska skapas från signerat kontrakt:', contractId)
-
-    // Hämta kontraktet från vår databas
-    const { data: contract, error: contractError } = await supabase
-      .from('contracts')
-      .select('*')
-      .eq('oneflow_contract_id', contractId)
-      .single()
-
-    if (contractError || !contract) {
-      console.log('⚠️ Inget kontrakt hittades i vår databas för:', contractId)
-      return
-    }
-
-    // KRITISK KONTROLL: Endast signerade avtal blir kunder
-    if (contract.type !== 'contract' || contract.status !== 'signed') {
-      console.log('ℹ️ Hoppar över kundregistrering:', {
-        type: contract.type,
-        status: contract.status,
-        reason: 'Endast signerade avtal blir kunder'
-      })
-      return
-    }
-
-    // Kontrollera om kontrakt redan har en kund kopplad
-    if (contract.customer_id) {
-      console.log('ℹ️ Kontrakt har redan en kund kopplad:', contract.customer_id)
-      return
-    }
-
-    // Validera att vi har minimum required data
-    if (!contract.contact_email || !contract.company_name) {
-      console.log('⚠️ Otillräcklig information för att skapa kund:', {
-        hasEmail: !!contract.contact_email,
-        hasCompanyName: !!contract.company_name
-      })
-      return
-    }
-
-    // Kontrollera om kund redan finns (baserat på OneFlow contract ID eller org nummer)
-    let existingCustomerId = null
-    
-    // Kolla först efter oneflow_contract_id
-    const { data: existingByOneflow } = await supabase
-      .from('customers')
-      .select('id')
-      .eq('oneflow_contract_id', contractId)
-      .single()
-    
-    if (existingByOneflow) {
-      existingCustomerId = existingByOneflow.id
-      console.log('✅ Kund finns redan med OneFlow contract ID:', existingCustomerId)
-    }
-    
-    // Om inte hittat och vi har org nummer, kolla org nummer.
-    // Org.nr är inte unikt (multisite-enheter kan dela juridiskt bolag) —
-    // .single() felar tyst vid >1 träff. Välj deterministiskt: huvudkontor
-    // först, därefter äldsta raden.
-    if (!existingCustomerId && contract.organization_number) {
-      const { data: orgMatches } = await supabase
-        .from('customers')
-        .select('id, site_type')
-        .eq('organization_number', contract.organization_number)
-        .order('created_at', { ascending: true })
-        .limit(10)
-
-      const preferred = (orgMatches ?? []).find(c => c.site_type === 'huvudkontor') ?? orgMatches?.[0]
-      if (preferred) {
-        existingCustomerId = preferred.id
-        console.log('✅ Kund finns redan med org nummer:', existingCustomerId)
-      }
-    }
-
-    // Om inte hittat, kolla email (samma delade kontaktperson kan finnas på
-    // flera rader — ta äldsta i stället för att fela tyst vid >1 träff)
-    if (!existingCustomerId) {
-      const { data: existingByEmail } = await supabase
-        .from('customers')
-        .select('id')
-        .eq('contact_email', contract.contact_email)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle()
-
-      if (existingByEmail) {
-        existingCustomerId = existingByEmail.id
-        console.log('✅ Kund finns redan med email:', existingCustomerId)
-      }
-    }
-
-    if (existingCustomerId) {
-      // Länka kontraktet till befintlig kund
-      await supabase
-        .from('contracts')
-        .update({ customer_id: existingCustomerId })
-        .eq('id', contract.id)
-
-      console.log('✅ Kontrakt länkat till befintlig kund:', existingCustomerId)
-
-      // Tilldela kundnummer om kunden saknar ett och kontraktet har customer_group_id
-      if (contract.customer_group_id) {
-        try {
-          const { data: existingCust } = await supabase
-            .from('customers')
-            .select('customer_number')
-            .eq('id', existingCustomerId)
-            .single()
-
-          if (existingCust && !existingCust.customer_number) {
-            const { data: customerNumber, error: allocError } = await supabase
-              .rpc('allocate_customer_number', { p_group_id: contract.customer_group_id })
-
-            if (!allocError && customerNumber) {
-              await supabase
-                .from('customers')
-                .update({
-                  customer_group_id: contract.customer_group_id,
-                  customer_number: customerNumber
-                })
-                .eq('id', existingCustomerId)
-              console.log(`✅ Kundnummer ${customerNumber} tilldelat befintlig kund ${existingCustomerId}`)
-            }
-          }
-        } catch (numError) {
-          console.error('⚠️ Kunde inte tilldela kundnummer till befintlig kund:', numError)
-        }
-      }
-
-      return
-    }
-
-    // === SKAPA NY KUND MED KOMPLETT DATA ===
-    
-    console.log('📋 Skapar ny avtalskund från kontrakt:', {
-      oneflow_id: contractId,
-      company: contract.company_name,
-      template: contract.template_id,
-      value: contract.total_value
-    })
-
-    // Beräkna alla värden
-    // OBS: contract.total_value från OneFlow är årsvärdet, inte totalt kontraktsvärde
-    const annualValue = contract.total_value ? parseFloat(contract.total_value.toString()) : null
-    const monthlyValue = annualValue ? annualValue / 12 : null
-    const contractLengthMonths = parseContractLength(contract.contract_length)
-    const contractYears = contractLengthMonths / 12
-    // Semantik: <12 mån → totalvärde = årspremien (ingen halvering), ≥12 mån → annual × år
-    let totalContractValue: number | null = null
-    if (annualValue && annualValue > 0) {
-      if (contractLengthMonths && contractLengthMonths >= 12) {
-        totalContractValue = Math.round(annualValue * contractYears)
-      } else {
-        totalContractValue = Math.round(annualValue)
-      }
-    }
-    
-    console.log(`💰 Korrigerade finansiella beräkningar:`)
-    console.log(`  - Årsvärde från OneFlow: ${annualValue} kr`)
-    console.log(`  - Antal år: ${contractYears}`)
-    console.log(`  - Totalt kontraktsvärde: ${totalContractValue} kr (${annualValue} × ${contractYears})`)
-    console.log(`  - Månadsvärde: ${monthlyValue} kr`)
-    
-    const businessType = detectBusinessType(contract.company_name, contract.selected_products)
-    const productSummary = generateProductSummary(contract.selected_products)
-    const serviceDetails = extractServiceDetails(contract.selected_products)
-    const serviceFrequency = detectServiceFrequency(contract.agreement_text, contract.selected_products)
-    const contractEndDate = calculateEndDate(contract.start_date, contract.contract_length)
-    
-    const customerData = {
-      // Basic Customer Information
-      company_name: contract.company_name!,
-      organization_number: contract.organization_number,
-      contact_person: contract.contact_person,
-      contact_email: contract.contact_email!,
-      contact_phone: contract.contact_phone,
-      contact_address: contract.contact_address,
-      
-      // Billing Information - kopierat från contract
-      billing_email: contract.billing_email || contract.contact_email, // Fallback till contact_email om billing_email saknas
-      billing_address: contract.billing_address || contract.contact_address, // Fallback till contact_address
-      
-      // OneFlow Contract Linking
-      oneflow_contract_id: contractId,
-      created_from_contract_id: contract.id,
-      
-      // Contract Details
-      contract_template_id: contract.template_id,
-      contract_type: getContractTypeName(contract.template_id),
-      contract_status: 'signed' as const,
-      contract_length: contract.contract_length,
-      contract_start_date: contract.start_date,
-      contract_end_date: contractEndDate,
-      
-      // Financial Information
-      total_contract_value: totalContractValue,
-      annual_value: annualValue,
-      monthly_value: monthlyValue,
-      currency: 'SEK',
-      
-      // Agreement Content
-      agreement_text: contract.agreement_text,
-      products: contract.selected_products,
-      product_summary: productSummary,
-      service_details: serviceDetails,
-      
-      // Account Management
-      assigned_account_manager: contract.begone_employee_name,
-      account_manager_email: contract.begone_employee_email,
-      // Använd begone_employee som fallback för sales_person om created_by saknas
-      sales_person: contract.created_by_name || contract.begone_employee_name,
-      sales_person_email: contract.created_by_email || contract.begone_employee_email,
-      
-      // Business Intelligence
-      business_type: businessType,
-      industry_category: mapToIndustryCategory(businessType),
-      customer_size: calculateCustomerSize(totalContractValue),
-      service_frequency: serviceFrequency,
-      
-      // Prislista från wizard
-      price_list_id: contract.price_list_id || null,
-
-      // Metadata
-      source_type: 'oneflow' as const,
-      is_active: true
-    }
-
-    console.log('💾 Sparar ny kund med data:', {
-      company_name: customerData.company_name,
-      business_type: customerData.business_type,
-      total_value: customerData.total_contract_value,
-      annual_value: customerData.annual_value,
-      monthly_value: customerData.monthly_value,
-      contract_type: customerData.contract_type,
-      customer_size: customerData.customer_size
-    })
-
-    const { data: newCustomer, error: customerError } = await supabase
-      .from('customers')
-      .insert([customerData])
-      .select('id')
-      .single()
-
-    if (customerError) {
-      console.error('❌ Fel vid skapande av kund:', customerError)
-      throw customerError
-    }
-
-    // Länka kontraktet till den nya kunden
-    const { error: linkError } = await supabase
-      .from('contracts')
-      .update({ customer_id: newCustomer.id })
-      .eq('id', contract.id)
-
-    if (linkError) {
-      console.error('❌ Fel vid länkning av kontrakt till kund:', linkError)
-      throw linkError
-    }
-
-    console.log('✅ Ny avtalskund skapad och länkad:', {
-      customer_id: newCustomer.id,
-      contract_id: contract.id,
-      company: customerData.company_name,
-      value: customerData.total_contract_value
-    })
-
-    // Tilldela kundnummer från kundgrupp om det finns
-    if (contract.customer_group_id) {
-      try {
-        const { data: customerNumber, error: allocError } = await supabase
-          .rpc('allocate_customer_number', { p_group_id: contract.customer_group_id })
-
-        if (!allocError && customerNumber) {
-          await supabase
-            .from('customers')
-            .update({
-              customer_group_id: contract.customer_group_id,
-              customer_number: customerNumber
-            })
-            .eq('id', newCustomer.id)
-          console.log(`✅ Kundnummer ${customerNumber} tilldelat ny kund ${newCustomer.id}`)
-        } else if (allocError) {
-          console.error('⚠️ Kunde inte tilldela kundnummer:', allocError.message)
-        }
-      } catch (numError) {
-        console.error('⚠️ Fel vid kundnummerallokering:', numError)
-      }
-    }
-
-  } catch (error) {
-    console.error('💥 Fel vid kundregistrering för kontrakt', contractId, ':', error)
-    // Inte kritiskt - låt webhook fortsätta även om kundregistrering misslyckas
-  }
-}
-
-/**
- * Notis till faktureringsansvariga (profiles.can_approve_invoices) när ett
- * avtal signerats: kunden behöver ses över i avtalskartan (omfattning,
- * fakturering, schema). Säljaren är ofta en tekniker utan åtkomst till
- * Befintliga kunder, så notisen går till dem som faktiskt kan fylla i kartan.
- * Samma notiskedja som "Tillägg att besluta": case_type 'customer' med
- * kundens id, klick öppnar avtalskartan. Idempotent per avtal och mottagare.
- */
-const notifyInvoiceApproversOfSignedContract = async (contractId: string): Promise<void> => {
-  try {
-    const { data: contract } = await supabase
-      .from('contracts')
-      .select('id, type, status, customer_id, company_name, label, contract_type, annual_value, total_value, billing_frequency, contract_start_date, start_date')
-      .eq('oneflow_contract_id', contractId)
-      .maybeSingle()
-    if (!contract || contract.type !== 'contract' || contract.status !== 'signed') return
-    if (!contract.customer_id) {
-      console.log('ℹ️ Ingen kund kopplad till avtalet, ingen notis:', contractId)
-      return
-    }
-
-    // Notisen pekar på huvudkunden: avtalskartan ligger där även för enheter
-    const { data: cust } = await supabase
-      .from('customers')
-      .select('id, parent_customer_id, company_name')
-      .eq('id', contract.customer_id)
-      .maybeSingle()
-    const rootId = cust?.parent_customer_id ?? contract.customer_id
-    const companyName = cust?.company_name ?? contract.company_name ?? 'Ny avtalskund'
-
-    const { data: approvers } = await supabase
-      .from('profiles')
-      .select('user_id')
-      .eq('can_approve_invoices', true)
-      .eq('is_active', true)
-    const recipients = (approvers ?? []).map((p) => p.user_id as string).filter(Boolean)
-    if (recipients.length === 0) return
-
-    const annual = contract.annual_value ?? contract.total_value
-    const freqLabel: Record<string, string> = { annual: 'årsvis', semi_annual: 'halvårsvis', quarterly: 'kvartalsvis', monthly: 'månadsvis' }
-    const bits = [
-      contract.label ?? contract.contract_type ?? 'Avtal',
-      annual ? `${new Intl.NumberFormat('sv-SE').format(Math.round(Number(annual)))} kr per år` : null,
-      contract.billing_frequency ? freqLabel[contract.billing_frequency] ?? contract.billing_frequency : 'faktureringsintervall saknas',
-      contract.contract_start_date ?? contract.start_date ? `start ${contract.contract_start_date ?? contract.start_date}` : null,
-    ].filter(Boolean)
-    const title = `Nytt avtal signerat · ${companyName}`
-    const preview = `${bits.join(' · ')}. Kontrollera avtalskartan: omfattning, fakturering och schema.`
-
-    // En notis per mottagare och avtal: hoppa över dem som redan har en oläst
-    const { data: existing } = await supabase
-      .from('notifications')
-      .select('recipient_id')
-      .eq('case_type', 'customer')
-      .eq('case_id', rootId)
-      .eq('title', title)
-      .eq('is_read', false)
-    const already = new Set((existing ?? []).map((n) => n.recipient_id as string))
-
-    const rows = recipients
-      .filter((id) => !already.has(id))
-      .map((id) => ({
-        recipient_id: id,
-        case_id: rootId,
-        case_type: 'customer',
-        title,
-        preview,
-        case_title: companyName,
-        sender_id: id,
-        sender_name: 'Systemet',
-        is_read: false,
-      }))
-    if (rows.length === 0) return
-    const { error } = await supabase.from('notifications').insert(rows)
-    if (error) throw error
-    console.log(`🔔 Notis om signerat avtal till ${rows.length} faktureringsansvariga:`, companyName)
-  } catch (err) {
-    // Aldrig kritiskt: signeringen får inte fallera på en notis
-    console.error('⚠️ Kunde inte notifiera faktureringsansvariga:', err)
-  }
-}
-
-/**
- * Fyll avtalsfälten på contracts-raden vid signering.
- *
- * Oneflow-flödet skrev historiskt bara metadata (parter, mall, avtalstext,
- * total_value, start_date) till contracts och lade de faktiska avtalsvärdena
- * på KUNDRADEN. Följden blev att portalens avtalsvyer — Avtalskartan,
- * premietrappan, faktureringsunderlaget — stod tomma för signerade avtal, och
- * att någon fick fylla i dem för hand i faktureringsinställningarna efteråt.
- *
- * Här skrivs samma värden till avtalet direkt vid signering, så manuellt
- * skapade och signerade avtal ser likadana ut. Endast tomma fält fylls —
- * befintliga värden (t.ex. manuellt justerad premie) skrivs aldrig över.
- */
-async function completeContractFieldsOnSign(contractId: string): Promise<void> {
-  try {
-    // Explicit typ: den konkatenerade select-strängen bryter Supabase-klientens
-    // typinferens, så raden kommer tillbaka otypad.
-    type ContractRow = {
-      id: string
-      type: string | null
-      template_id: string | null
-      total_value: number | string | null
-      start_date: string | null
-      contract_length: string | null
-      annual_value: number | null
-      contract_start_date: string | null
-      contract_end_date: string | null
-      contract_type: string | null
-      label: string | null
-      total_contract_value: number | null
-    }
-
-    const { data, error } = await supabase
-      .from('contracts')
-      .select(
-        'id, type, status, template_id, total_value, start_date, contract_length, ' +
-          'annual_value, contract_start_date, contract_end_date, contract_type, label, ' +
-          'total_contract_value, contact_address'
-      )
-      .eq('oneflow_contract_id', contractId)
-      .single()
-
-    if (error || !data) return
-    const contract = data as unknown as ContractRow
-    if (contract.type !== 'contract') return // offerter har inga avtalsfält
-
-    const annualValue = contract.total_value ? parseFloat(contract.total_value.toString()) : null
-    const contractLengthMonths = parseContractLength(contract.contract_length)
-    const endDate = calculateEndDate(contract.start_date, contract.contract_length)
-
-    let totalContractValue: number | null = null
-    if (annualValue && annualValue > 0) {
-      totalContractValue =
-        contractLengthMonths && contractLengthMonths >= 12
-          ? Math.round(annualValue * (contractLengthMonths / 12))
-          : Math.round(annualValue)
-    }
-
-    // Avtalstypens namn. Sanningen är avtalets egen tjänsterad — den pekar på
-    // en tjänst i katalogen (services.is_contract_service) med rätt namn och id.
-    // Mallmappningen används bara som fallback; den har egna namnformer
-    // ("Mekaniska fällor") som inte matchar katalogen ("Avtal mekaniska fällor").
-    let typeName: string | null = null
-    const { data: contractServices } = await supabase
-      .from('case_billing_items')
-      .select('service_name, service_id, total_price, service:services!inner(is_contract_service)')
-      .eq('case_id', contract.id)
-      .eq('case_type', 'contract')
-      .eq('item_type', 'service')
-      .order('total_price', { ascending: false })
-
-    type ServiceRow = {
-      service_name: string | null
-      service: { is_contract_service: boolean } | { is_contract_service: boolean }[] | null
-    }
-    const rows = (contractServices ?? []) as unknown as ServiceRow[]
-    const isContractService = (r: ServiceRow) => {
-      const s = Array.isArray(r.service) ? r.service[0] : r.service
-      return !!s?.is_contract_service
-    }
-    // Avtalstjänsten först, annars den dyraste tjänsteraden
-    typeName = rows.find(isContractService)?.service_name ?? rows[0]?.service_name ?? null
-
-    if (!typeName) {
-      const fromTemplate = getContractTypeName(contract.template_id)
-      typeName = fromTemplate && fromTemplate !== 'Okänt avtal' ? fromTemplate : null
-    }
-    const hasTypeName = !!typeName
-
-    const updates: Record<string, unknown> = {}
-    if (contract.annual_value == null && annualValue) updates.annual_value = annualValue
-    if (contract.total_contract_value == null && totalContractValue) {
-      updates.total_contract_value = totalContractValue
-    }
-    if (!contract.contract_start_date && contract.start_date) {
-      updates.contract_start_date = contract.start_date
-    }
-    if (!contract.contract_end_date && endDate) updates.contract_end_date = endDate
-    // Signeringsdatum: nu är avtalet faktiskt signerat
-    updates.signed_at = new Date().toISOString().slice(0, 10)
-    if (!contract.contract_type && hasTypeName) updates.contract_type = typeName
-    if (!contract.label && hasTypeName) updates.label = typeName
-
-    if (Object.keys(updates).length > 0) {
-      const { error: updateError } = await supabase.from('contracts').update(updates).eq('id', contract.id)
-      if (updateError) {
-        console.error('⚠️ Kunde inte komplettera avtalsfält:', updateError.message)
-        return
-      }
-      console.log('✅ Avtalsfält kompletterade vid signering:', Object.keys(updates).join(', '))
-    }
-
-    // Premietrappans startpunkt — underlag för tidslinje och kommande höjningar
-    const startDate = contract.contract_start_date ?? contract.start_date
-    if (annualValue && annualValue > 0 && startDate) {
-      const { data: existing } = await supabase
-        .from('contract_premium_events')
-        .select('id')
-        .eq('contract_id', contract.id)
-        .limit(1)
-      if (!existing || existing.length === 0) {
-        await supabase.from('contract_premium_events').insert({
-          contract_id: contract.id,
-          effective_from: startDate,
-          annual_value: annualValue,
-          event_type: 'start',
-          source: 'oneflow',
-          note: 'Avtalet signerat via Oneflow',
-        })
-      }
-    }
-  } catch (err) {
-    // Aldrig kritiskt: signeringen får inte fallera på detta
-    console.error('⚠️ Fel vid komplettering av avtalsfält:', err)
-  }
-}
+// Kundskapande, avtalsfält, premie, avtalskarta, fakturaplan och notis vid
+// signerat AVTAL bor i api/_lib/contractSigning.ts (processSignedContract),
+// så att samma behandling kan köras om i efterhand (api/oneflow/reprocess-signed.ts).
 
 // Logga Oneflow-händelse som systemevent i ärendets kommunikationspanel
 const logOfferEventToCase = async (
@@ -1548,7 +823,7 @@ const logOfferEventToEventLog = async (
   try {
     const { data: contract } = await supabase
       .from('contracts')
-      .select('id, company_name, contact_person, begone_employee_name, begone_employee_email, source_id')
+      .select('id, type, company_name, contact_person, begone_employee_name, begone_employee_email, source_id')
       .eq('oneflow_contract_id', contractId)
       .single()
 
@@ -1574,6 +849,8 @@ const logOfferEventToEventLog = async (
       metadata: {
         ...metadata,
         oneflow_contract_id: contractId,
+        // Händelsetyperna heter offer_* för båda dokumentslagen; etiketten väljs på document_type
+        document_type: documentKindOf(contract.type),
         source_id: contract.source_id,
         technician_email: contract.begone_employee_email,
         technician_name: contract.begone_employee_name,
@@ -1651,6 +928,12 @@ const updateCaseStatusViaSourceId = async (
   } catch (error) {
     console.error('❌ Fel vid updateCaseStatusViaSourceId:', error)
   }
+}
+
+// Dokumentslaget (offert eller avtal) för ett Oneflow-dokument i vår databas
+const documentKindFor = async (contractId: string): Promise<DocumentKind> => {
+  const { data } = await supabase.from('contracts').select('type').eq('oneflow_contract_id', contractId).maybeSingle()
+  return documentKindOf(data?.type ?? null)
 }
 
 // Invalidera offer_statistics cache (tvingar nästa GET att hämta nytt)
@@ -1827,10 +1110,13 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
               .eq('oneflow_contract_id', contractId)
               .single()
 
+            // Avtal får egen status ("Avtal skickat"), offerter "Offert skickad"
+            const kind = documentKindOf(contractData.type)
+            const sentStatus = caseStatusForDocument(kind, 'sent')
             if (contractForLink?.source_id) {
               console.log(`🔗 Kopplar offert/kontrakt till ärende via source_id: ${contractForLink.source_id}`)
-              // Uppdatera status till "Offert skickad" på rätt tabell (cases/private_cases/business_cases)
-              await updateCaseStatusViaSourceId(contractId, 'Offert skickad', {
+              // Uppdatera status till "Offert skickad"/"Avtal skickat" på rätt tabell (cases/private_cases/business_cases)
+              await updateCaseStatusViaSourceId(contractId, sentStatus, {
                 oneflow_contract_id: contractId,
                 quote_status: contractData.type === 'offer' ? 'sent' : 'pending',
                 quote_sent_at: new Date().toISOString(),
@@ -1847,7 +1133,7 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
                 // Använd updateCaseStatusViaSourceId kan inte användas här (ingen contractId-koppling)
                 // Uppdatera alla tre tabeller manuellt
                 const fallbackUpdate = {
-                  status: 'Offert skickad',
+                  status: sentStatus,
                   oneflow_contract_id: contractId,
                   quote_status: contractData.type === 'offer' ? 'sent' : 'pending',
                   quote_sent_at: new Date().toISOString(),
@@ -1878,8 +1164,8 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
             // Logga systemevent till ärendets kommunikationspanel
             const recipientName = contractDetails.parties?.[1]?.participants?.[0]?.name
               || contractData.contact_person || contractData.company_name || 'mottagare'
-            await logOfferEventToCase(contractId, `📄 Offert skickad till ${recipientName}`)
-            await logOfferEventToEventLog(contractId, 'offer_sent', `Offert skickad till ${recipientName}`)
+            await logOfferEventToCase(contractId, `📄 ${documentEventText(kind, 'sent', recipientName)}`)
+            await logOfferEventToEventLog(contractId, 'offer_sent', documentEventText(kind, 'sent', recipientName))
           } else {
             console.log('⚠️ Kontraktdetaljer saknas för publish event')
           }
@@ -1922,23 +1208,38 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
             // Invalidera offer-statistik cache vid signering
             await invalidateOfferStatsCache()
 
-            // Fyll avtalsfälten (premie, datum, avtalstyp) på contracts-raden
-            // så signerade avtal blir kompletta som manuellt skapade. Måste
-            // köras FÖRE kundregistreringen, som läser contract_start_date.
-            await completeContractFieldsOnSign(contractId)
-
-            // Automatisk kundregistrering för signerade avtal
-            await createCustomerFromSignedContract(contractId)
-
-            // Faktureringsansvariga får veta att kunden behöver ses över i avtalskartan
-            await notifyInvoiceApproversOfSignedContract(contractId)
-
-            // Uppdatera ärendets huvudstatus till bokningsbar (för offerter).
-            // Spara även oneflow_contract_id direkt på ärendet (Fas 13b) så
-            // EditCaseModal/EditBusinessCaseModal kan visa "Visa offert"-knapp
-            // utan runtime-lookup.
-            if (contractData.type === 'offer') {
-              await updateCaseStatusViaSourceId(contractId, 'Offert signerad - boka in', {
+            const signedKind = documentKindOf(contractData.type)
+            if (signedKind === 'contract') {
+              // Signerat AVTAL: avtalsfält och premie, kund, avtalskarta,
+              // fakturaplan, källärendet och notis (api/_lib/contractSigning.ts).
+              // Status 'signed' OCH 'active' räknas: triggern
+              // contract_signed_becomes_active byter direkt till active när
+              // startdagen redan passerat. Aldrig kritiskt för webhooken.
+              try {
+                const counterParty = contractDetails.parties?.find(
+                  (p) => (p.type as string) !== 'owner' && !p.name?.toLowerCase().includes('begone')
+                )
+                const report = await processSignedContract(supabase, { oneflowContractId: contractId }, {
+                  oneflowPartyType: counterParty?.type ?? null,
+                })
+                console.log('✅ Signeringsbehandling klar:', {
+                  skipped: report.skipped ?? null,
+                  ourChain: report.ourChain,
+                  customerId: report.customerId,
+                  customerCreated: report.customerCreated,
+                  invoicesCreated: report.invoicesCreated,
+                  actions: report.actions.length,
+                  notes: report.notes.length,
+                })
+              } catch (signErr) {
+                console.error('💥 Fel i signeringsbehandlingen:', signErr instanceof Error ? signErr.message : signErr)
+              }
+            } else {
+              // Offert: ärendets huvudstatus blir bokningsbar. Spara även
+              // oneflow_contract_id direkt på ärendet (Fas 13b) så
+              // EditCaseModal/EditBusinessCaseModal kan visa "Visa offert"-knapp
+              // utan runtime-lookup.
+              await updateCaseStatusViaSourceId(contractId, caseStatusForDocument('offer', 'signed'), {
                 start_date: null,
                 due_date: null,
                 oneflow_contract_id: contractId,
@@ -1948,8 +1249,8 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
             // Logga systemevent till kommunikationspanelen
             const signerName = contractDetails.parties?.[1]?.participants?.find(p => p.signatory)?.name
               || contractData.contact_person || contractData.company_name || 'mottagare'
-            await logOfferEventToCase(contractId, `✅ Offert signerad av ${signerName}`)
-            await logOfferEventToEventLog(contractId, 'offer_signed', `Offert signerad av ${signerName}`)
+            await logOfferEventToCase(contractId, `✅ ${documentEventText(signedKind, 'signed', signerName)}`)
+            await logOfferEventToEventLog(contractId, 'offer_signed', documentEventText(signedKind, 'signed', signerName))
           }
           break
 
@@ -1976,8 +1277,11 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           await invalidateOfferStatsCache()
 
           // Logga systemevent
-          await logOfferEventToCase(contractId, '❌ Offert nekad av mottagaren')
-          await logOfferEventToEventLog(contractId, 'offer_declined', 'Offert nekad av mottagaren')
+          {
+            const kind = await documentKindFor(contractId)
+            await logOfferEventToCase(contractId, `❌ ${documentEventText(kind, 'declined')}`)
+            await logOfferEventToEventLog(contractId, 'offer_declined', documentEventText(kind, 'declined'))
+          }
           break
 
         case 'contract:lifecycle_state:start':
@@ -2046,8 +1350,11 @@ const processWebhookEvents = async (payload: OneflowWebhookPayload) => {
           await invalidateOfferStatsCache()
 
           // Logga systemevent
-          await logOfferEventToCase(contractId, '⏰ Offertens giltighetstid har gått ut')
-          await logOfferEventToEventLog(contractId, 'offer_expired', 'Offertens giltighetstid har gått ut')
+          {
+            const kind = await documentKindFor(contractId)
+            await logOfferEventToCase(contractId, `⏰ ${documentEventText(kind, 'expired')}`)
+            await logOfferEventToEventLog(contractId, 'offer_expired', documentEventText(kind, 'expired'))
+          }
           break
 
         case 'contract:signing_period_revive':

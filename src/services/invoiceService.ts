@@ -16,6 +16,7 @@ import type {
 import { calculateInvoiceTotals, calculateDueDate, deriveInvoiceCaseType } from '../types/invoice'
 import { CaseBillingService } from './caseBillingService'
 import { PaymentTermsService } from './paymentTermsService'
+import { selectInvoiceableCaseRows, caseInvoiceSubtotal, isZeroAmount } from '../shared/caseInvoiceRows'
 
 // ─── ROT/RUT-arbetsrader ──────────────────────────────────────────────────
 // Privatärenden: arbetskostnaden för ROT/RUT ligger på en egen rad (tjänst
@@ -191,19 +192,24 @@ export class InvoiceService {
       /** Portalens kundrad (customers.id). Sätts för engångsfakturor sedan 2026-09-03. */
       customer_id?: string | null
     },
-    invoiceType: string = 'case'
-  ): Promise<InvoiceWithItems> {
+    invoiceType: string = 'case',
+    options: {
+      /**
+       * Skapa fakturan även när underlaget är 0 kr. Bara när en befintlig
+       * oskickad faktura ersätts (upsertInvoiceFromCase): en faktura som blir
+       * 0 kr efter redigering ändras inte automatiskt bort.
+       */
+      allowZero?: boolean
+    } = {}
+  ): Promise<InvoiceWithItems | null> {
     // Hämta billing items för ärendet
     const allBillingItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
 
     // Filtrera: fakturarader = item_type='service', eller alla om inga tjänsterader finns (bakåtkompatibilitet)
     // Rader som täcks av avtalet (§ 4, covered_by_contract) faktureras aldrig.
-    const serviceItems = allBillingItems.filter(i => i.item_type === 'service' && !i.covered_by_contract)
     // Arbetsrader för ROT/RUT läggs direkt efter sin tjänsterad (raderna skapas
     // i den ordningen och fakturan läser dem i created_at-ordning)
-    const billingItems = orderLaborRowsAfterParent(
-      serviceItems.length > 0 ? serviceItems : allBillingItems.filter(i => i.item_type === 'article' || !i.item_type)
-    )
+    const billingItems = orderLaborRowsAfterParent(selectInvoiceableCaseRows(allBillingItems, 'case'))
 
     if (billingItems.length === 0) {
       throw new Error('Inga fakturerbara tjänster på ärendet')
@@ -211,6 +217,13 @@ export class InvoiceService {
 
     // Kolla om anpassat pris finns
     const customPrice = await CaseBillingService.getCustomPrice(caseId, caseType)
+
+    // 0 kr-regeln: summerar underlaget till 0 kr (t.ex. kostnadsfri inspektion
+    // eller 100 % rabatt) skapas ingen faktura och inget fakturanummer går åt.
+    // null = inget att fakturera; anroparen avgör hur raderna markeras.
+    if (!options.allowZero && isZeroAmount(caseInvoiceSubtotal(billingItems, customPrice))) {
+      return null
+    }
 
     // ROT/RUT-spärrar: fastighetsbeteckning, inte både ROT och RUT, avdrag bara
     // på arbetstidstjänster, anpassat pris inte lägre än arbetskostnaden.
@@ -396,6 +409,10 @@ export class InvoiceService {
     // Uppdatera billing items status
     await CaseBillingService.updateCaseItemsStatus(caseId, caseType, 'billed')
 
+    // Ärendet kan tidigare ha stängts på 0 kr (billing_status 'skip'). Nu finns
+    // en faktura, då ska ärendet åter räknas som fakturerat underlag.
+    await CaseBillingService.clearCaseBillingSkip(caseId, caseType)
+
     return {
       ...invoice,
       items: invoiceItems
@@ -412,6 +429,11 @@ export class InvoiceService {
    *   → kastar fel (kan inte skriva över en redan skickad faktura).
    *
    * Används när ett ärende redan är avslutat men sparas igen med ändrade priser.
+   *
+   * 0 kr-regeln: finns ingen faktura att ersätta och underlaget summerar till
+   * 0 kr skapas ingen faktura. Raderna markeras då som hanterade ('billed')
+   * och ärendet får billing_status 'skip' om det saknar levande fakturor.
+   * Returnerar null i det fallet.
    */
   static async upsertInvoiceFromCase(
     caseId: string,
@@ -426,7 +448,7 @@ export class InvoiceService {
       /** Portalens kundrad (customers.id). Sätts för engångsfakturor sedan 2026-09-03. */
       customer_id?: string | null
     }
-  ): Promise<InvoiceWithItems> {
+  ): Promise<InvoiceWithItems | null> {
     const { data: existing, error: fetchError } = await supabase
       .from('invoices')
       .select('id, status, fortnox_document_number')
@@ -447,6 +469,12 @@ export class InvoiceService {
         !existing.fortnox_document_number
 
       if (!canReplace) {
+        // Rader som lagts till efter att fakturan låsts men som summerar till
+        // 0 kr: inget att fakturera, ingen varning om låst faktura.
+        if (await this.pendingRowsSumToZero(caseId, caseType)) {
+          await CaseBillingService.markZeroAmountRowsHandled(caseId, caseType)
+          return null
+        }
         throw new Error(
           `Fakturan för ärendet är redan skickad/låst (status: ${existing.status}) och kan inte uppdateras. ` +
           `Makulera fakturan först om den ska göras om.`
@@ -473,7 +501,31 @@ export class InvoiceService {
     // att gissa — den som vill göra om delfakturan får makulera den först.
     await this.assertNoAlreadyInvoicedItems(caseId, caseType)
 
-    return this.createInvoiceFromCase(caseId, caseType, customerInfo)
+    // Ersätts en befintlig oskickad faktura byggs den om även om den blir 0 kr:
+    // en faktura som blir 0 kr efter redigering tas aldrig bort automatiskt.
+    // Finns ingen faktura gäller 0 kr-regeln: ingen faktura skapas.
+    const invoice = await this.createInvoiceFromCase(caseId, caseType, customerInfo, 'case', {
+      allowZero: !!existing,
+    })
+    if (!invoice) {
+      await CaseBillingService.markZeroAmountRowsHandled(caseId, caseType)
+    }
+    return invoice
+  }
+
+  /**
+   * Summerar ärendets ofakturerade rader (samma urval och anpassade pris som
+   * createInvoiceFromCase) till 0 kr? Inga ofakturerade fakturarader = false.
+   */
+  private static async pendingRowsSumToZero(
+    caseId: string,
+    caseType: 'private' | 'business'
+  ): Promise<boolean> {
+    const items = await CaseBillingService.getCaseBillingItems(caseId, caseType)
+    const rows = selectInvoiceableCaseRows(items, 'case')
+    if (rows.length === 0) return false
+    const customPrice = await CaseBillingService.getCustomPrice(caseId, caseType)
+    return isZeroAmount(caseInvoiceSubtotal(rows, customPrice))
   }
 
   /**

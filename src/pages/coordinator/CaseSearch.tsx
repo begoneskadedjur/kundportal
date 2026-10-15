@@ -72,7 +72,7 @@ const defaultFilters: FilterState = {
 };
 
 const statusOptions = [
-  'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in',
+  'Öppen', 'Bokad', 'Offert skickad', 'Offert signerad - boka in', 'Avtal skickat', 'Avtal signerat - Etablera',
   'Återbesök', 'Stängt - slasklogg', 'Avslutat'
 ];
 
@@ -107,7 +107,7 @@ const formatPrice = (price: number | null): string => {
 const getStatusColor = (status: string): string => {
   const completedStatuses = ['Avslutat', 'Stängt - slasklogg'];
   const inProgressStatuses = ['Bokad', 'Återbesök'];
-  const pendingStatuses = ['Öppen', 'Offert skickad', 'Offert signerad - boka in'];
+  const pendingStatuses = ['Öppen', 'Offert skickad', 'Offert signerad - boka in', 'Avtal skickat', 'Avtal signerat - Etablera'];
   
   if (completedStatuses.includes(status)) {
     return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';

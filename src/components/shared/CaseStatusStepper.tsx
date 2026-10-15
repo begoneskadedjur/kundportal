@@ -25,8 +25,8 @@ function getChipStyle(status: string): string {
   const ls = (status || '').toLowerCase()
   if (ls.includes('avslutat')) return 'bg-emerald-600/20 text-emerald-300 border-emerald-500/30'
   if (ls.startsWith('återbesök')) return 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-  if (ls.includes('signerad')) return 'bg-[#20c58f]/20 text-[#20c58f] border-[#20c58f]/30'
-  if (ls.includes('offert')) return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+  if (ls.includes('signerad') || ls.startsWith('avtal signerat')) return 'bg-[#20c58f]/20 text-[#20c58f] border-[#20c58f]/30'
+  if (ls.includes('offert') || ls.startsWith('avtal s')) return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
   if (ls.includes('bokad') || ls.includes('bokat')) return 'bg-amber-500/20 text-amber-300 border-amber-500/30'
   if (ls.includes('pågående')) return 'bg-purple-500/20 text-purple-300 border-purple-500/30'
   if (ls.includes('borttag') || ls.includes('stängt') || ls.includes('makuler')) return 'bg-red-500/20 text-red-300 border-red-500/30'

@@ -82,6 +82,7 @@ function loadColPrefs(): Set<ColKey> {
 const STATUS_ORDER: ClickUpStatus[] = [
   'Öppen', 'Bokad',
   'Offert skickad', 'Offert signerad - boka in',
+  'Avtal skickat', 'Avtal signerat - Etablera',
   'Återbesök', 'Ombokning', 'Bomkörning', 'Reklamation',
   'Avslutat', 'Borttaget',
 ]

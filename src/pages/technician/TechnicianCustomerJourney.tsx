@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { supabase } from '../../lib/supabase'
+import { isContractDocumentStatus, isDocumentStepStatus } from '../../shared/documentStatus'
 import { useAuth } from '../../contexts/AuthContext'
 import { formatCurrency } from '../../utils/formatters'
 import CustomerJourneyFunnel from '../../components/admin/sales/CustomerJourneyFunnel'
@@ -144,11 +145,12 @@ export default function TechnicianCustomerJourney() {
 
     const hasOffer = (c: JourneyCaseRow) => {
       const contract = contractMap.get(c.id)
-      return !!((contract && contract.type === 'offer') || c.status === 'Offert skickad' || c.status === 'Offert signerad - boka in')
+      return !!((contract && contract.type === 'offer') || (isDocumentStepStatus(c.status) && !isContractDocumentStatus(c.status)))
     }
     const hasContract = (c: JourneyCaseRow) => {
       const contract = contractMap.get(c.id)
-      return !!(contract && contract.type === 'contract')
+      // Avtalets ärendestatusar ("Avtal skickat", "Avtal signerat - Etablera") räknas även utan dokumentrad
+      return !!(contract && contract.type === 'contract') || isContractDocumentStatus(c.status)
     }
     const isCompleted = (c: JourneyCaseRow) => c.status === 'Avslutat'
     const isClosed = (c: JourneyCaseRow) => c.status === 'Stängt - slasklogg'
@@ -171,7 +173,7 @@ export default function TechnicianCustomerJourney() {
 
     const contractSigned = contractSent.filter(c => {
       const contract = contractMap.get(c.id)
-      return contract && (contract.status === 'signed' || contract.status === 'active')
+      return (contract && (contract.status === 'signed' || contract.status === 'active')) || c.status === 'Avtal signerat - Etablera'
     })
     const contractDeclined = contractSent.filter(c => {
       const contract = contractMap.get(c.id)

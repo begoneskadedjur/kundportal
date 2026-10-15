@@ -1,12 +1,13 @@
 // src/services/casePipelineService.ts — Service för koordinatorns offerthantering (Oneflow-baserad)
 import { supabase } from '../lib/supabase'
 import type { CoordinatorCaseAction, PipelineOfferRow, PipelineCaseRow, CoordinatorCaseStatus, ContactMethod } from '../types/casePipeline'
+import { normalizeSignedDocument, signedDocumentsOrFilter } from '../shared/documentStatus'
 
 const OFFER_COLUMNS = `
   id, oneflow_contract_id, type, status, company_name, contact_person,
   contact_email, contact_phone, contact_address, total_value,
   template_id, begone_employee_name, source_id, source_type, customer_id,
-  created_at, updated_at
+  created_at, updated_at, signed_at, created_by_email
 `
 
 export class CasePipelineService {
@@ -14,15 +15,17 @@ export class CasePipelineService {
 
   /** Hämta alla pipeline-dokument (Oneflow avtal + offerter) med coordinator actions */
   static async getPipelineOffers(): Promise<PipelineOfferRow[]> {
-    const { data: offers, error } = await supabase
+    const { data: rawOffers, error } = await supabase
       .from('contracts')
       .select(OFFER_COLUMNS)
       .is('legacy_archived_at', null)
-      .in('status', ['pending', 'signed', 'overdue', 'declined'])
+      // Signerade avtal kan stå som 'active' (triggern contract_signed_becomes_active)
+      .or(signedDocumentsOrFilter(['pending', 'signed', 'overdue', 'declined']))
       .order('created_at', { ascending: true })
 
     if (error) throw error
-    if (!offers || offers.length === 0) return []
+    if (!rawOffers || rawOffers.length === 0) return []
+    const offers = rawOffers.map(normalizeSignedDocument)
 
     // Hämta coordinator actions för alla offerter
     const offerIds = offers.map(o => o.id)

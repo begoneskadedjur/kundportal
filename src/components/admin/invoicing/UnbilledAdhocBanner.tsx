@@ -79,7 +79,9 @@ export default function UnbilledAdhocBanner() {
         })
       }
     }
-    setGroups([...byCase.values()].sort((a, b) => (a.invoiceDate ?? '').localeCompare(b.invoiceDate ?? '')))
+    // Grupper på 0 kr blir aldrig faktura (0 kr-regeln i generatorn) och ska
+    // inte larma som ofakturerad merförsäljning
+    setGroups([...byCase.values()].filter(g => Math.abs(g.total) >= 0.005).sort((a, b) => (a.invoiceDate ?? '').localeCompare(b.invoiceDate ?? '')))
   }, [])
 
   useEffect(() => { fetchOrphans() }, [fetchOrphans])

@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.61.0',
+    date: '2026-10-15',
+    title: 'Signerade avtal läggs upp av sig själva',
+    items: [
+      { kind: 'nyhet', text: 'När ett avtal från portalen signeras skapas kunden, avtalskartan och fakturaplanen automatiskt. Premiefakturan hamnar under Avtalskunder och faktureringsansvariga får en notis om vad som ska kontrolleras.' },
+      { kind: 'nyhet', text: 'Ärenden med avtal får egna statusar: "Avtal skickat" och "Avtal signerat - Etablera". Offerter behåller sina.' },
+      { kind: 'buggfix', text: 'Avtal som signerades på eller efter startdatum fick ingen kund och försvann ur Dokumentsignering. Nu syns de under Signerade och räknas i signeringsgraden.' },
+      { kind: 'andring', text: 'Ett ärende som stängs med 0 kr skapar ingen faktura. Avtalsraden på ett ärende faktureras aldrig som engångstjänst när avtalet signerats.' },
+    ],
+  },
+  {
     version: '3.60.0',
     date: '2026-10-15',
     title: 'Arbetskostnad för ROT och RUT',

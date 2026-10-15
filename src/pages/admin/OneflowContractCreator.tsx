@@ -100,6 +100,7 @@ interface WizardData {
   draftPriceMarkups: Record<string, number>
   prefillServices?: Array<{
     id: string
+    service_id?: string | null
     service_name: string | null
     service_code: string | null
     unit_price: number
@@ -1078,7 +1079,8 @@ export default function OneflowContractCreator() {
             ? wizardData.prefillServices.map(s => ({
                 draft_id: s.id,
                 item_type: 'service' as const,
-                service_id: null,
+                // Katalogtjänsten följer med: signeringen härleder avtalstypen (bärande § 4-rad) ur den
+                service_id: s.service_id ?? null,
                 service_code: s.service_code ?? null,
                 service_name: s.service_name ?? null,
                 article_id: null,

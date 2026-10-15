@@ -12,8 +12,10 @@ import type { WorkflowGroup } from '../../../pages/technician/TechnicianCases'
 const STATUS_TO_WORKFLOW: Record<string, WorkflowGroup> = {
   'Öppen': 'needs_booking',
   'Offert signerad - boka in': 'needs_booking',
+  'Avtal signerat - Etablera': 'needs_booking',
   'Bokad': 'booked',
   'Offert skickad': 'offer_sent',
+  'Avtal skickat': 'offer_sent',
   'Återbesök': 'revisit',
   'Bomkörning': 'needs_action',
   'Ombokning': 'needs_action',
@@ -25,7 +27,7 @@ const WORKFLOW_GROUPS: { key: WorkflowGroup; label: string; icon: React.ElementT
   { key: 'needs_action',  label: 'Kräver åtgärd',  icon: AlertTriangle, color: 'text-red-400',    bgClass: 'bg-red-500/20' },
   { key: 'needs_booking', label: 'Behöver bokas',   icon: CalendarPlus,  color: 'text-yellow-400', bgClass: 'bg-yellow-500/20' },
   { key: 'booked',        label: 'Inbokade',        icon: CalendarCheck, color: 'text-blue-400',   bgClass: 'bg-blue-500/20' },
-  { key: 'offer_sent',    label: 'Offert skickad',  icon: FileText,      color: 'text-amber-400',  bgClass: 'bg-amber-500/20' },
+  { key: 'offer_sent',    label: 'Offert eller avtal skickat',  icon: FileText,      color: 'text-amber-400',  bgClass: 'bg-amber-500/20' },
   { key: 'revisit',       label: 'Återbesök',       icon: RotateCcw,     color: 'text-cyan-400',   bgClass: 'bg-cyan-500/20' },
   { key: 'report',        label: 'Rapport',         icon: FileCheck,     color: 'text-purple-400', bgClass: 'bg-purple-500/20' },
 ]

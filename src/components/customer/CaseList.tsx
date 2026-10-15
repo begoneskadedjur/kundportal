@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { isDocumentStepStatus } from '../../shared/documentStatus'
 import { Calendar, Clock, AlertCircle, Eye, FileText, Flag, User, ClipboardCheck, ArrowUpDown } from 'lucide-react'
 import Card from '../ui/Card'
 import Button from '../ui/Button'
@@ -21,6 +22,8 @@ function getStatusLabel(status: string, revisitCount?: number): string {
     'Borttaget': 'Avbokat',
     'Offert skickad': 'Offert skickad',
     'Offert signerad - boka in': 'Offert signerad',
+    'Avtal skickat': 'Avtal skickat',
+    'Avtal signerat - Etablera': 'Avtal signerat',
     'Bomkörning': 'Bomkörning',
     'Ombokning': 'Ombokning',
     'Reklamation': 'Reklamation',
@@ -125,7 +128,7 @@ export default function CaseList() {
     if (status === 'Avslutat') return 'text-green-400 bg-green-400/20'
     if (status === 'Borttaget') return 'text-gray-400 bg-gray-400/20'
     if (status === 'Återbesök') return 'text-purple-400 bg-purple-400/20'
-    if (status === 'Offert skickad' || status === 'Offert signerad - boka in') return 'text-orange-400 bg-orange-400/20'
+    if (isDocumentStepStatus(status)) return 'text-orange-400 bg-orange-400/20'
     if (status === 'Reklamation') return 'text-red-400 bg-red-400/20'
     return 'text-slate-400 bg-slate-400/20'
   }

@@ -7,6 +7,7 @@ import {
 import LoadingSpinner from '../../components/shared/LoadingSpinner'
 import { supabase } from '../../lib/supabase'
 import { isCompletedStatus } from '../../types/database'
+import { isContractDocumentStatus, isDocumentStepStatus } from '../../shared/documentStatus'
 import { formatCurrency } from '../../utils/formatters'
 import { getAvailableTechnicians } from '../../services/commissionService'
 import type { TechnicianFilter } from '../../types/commission'
@@ -192,11 +193,12 @@ export default function CustomerJourney() {
     // Helpers
     const hasOffer = (c: JourneyCaseRow) => {
       const contract = contractMap.get(c.id)
-      return !!((contract && contract.type === 'offer') || c.status === 'Offert skickad' || c.status === 'Offert signerad - boka in')
+      return !!((contract && contract.type === 'offer') || (isDocumentStepStatus(c.status) && !isContractDocumentStatus(c.status)))
     }
     const hasContract = (c: JourneyCaseRow) => {
       const contract = contractMap.get(c.id)
-      return !!(contract && contract.type === 'contract')
+      // Avtalets ärendestatusar ("Avtal skickat", "Avtal signerat - Etablera") räknas även utan dokumentrad
+      return !!(contract && contract.type === 'contract') || isContractDocumentStatus(c.status)
     }
     const isCompleted = (c: JourneyCaseRow) => c.status === 'Avslutat'
     const isClosed = (c: JourneyCaseRow) => c.status === 'Stängt - slasklogg'
@@ -222,7 +224,7 @@ export default function CustomerJourney() {
     // Sub-branches within contract flow
     const contractSigned = contractSent.filter(c => {
       const contract = contractMap.get(c.id)
-      return contract && (contract.status === 'signed' || contract.status === 'active')
+      return (contract && (contract.status === 'signed' || contract.status === 'active')) || c.status === 'Avtal signerat - Etablera'
     })
     const contractDeclined = contractSent.filter(c => {
       const contract = contractMap.get(c.id)

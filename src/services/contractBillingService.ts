@@ -27,6 +27,7 @@ import {
   AdhocSalesMonth,
 } from '../types/contractBilling'
 import { CaseBillingService } from './caseBillingService'
+import { selectInvoiceableCaseRows, sumInvoiceableRows, isZeroAmount } from '../shared/caseInvoiceRows'
 import { CustomerContractArticleService } from './customerContractArticleService'
 import { resolveContractForCustomer } from './contractResolver'
 
@@ -370,7 +371,14 @@ export class ContractBillingService {
     caseId: string,
     customerId: string,
     completedAt: Date | string = new Date()
-  ): Promise<{ created: number; totalAmount: number; invoiceId: string | null; invoiceError?: string }> {
+  ): Promise<{
+    created: number
+    totalAmount: number
+    invoiceId: string | null
+    invoiceError?: string
+    /** Underlaget summerade till 0 kr: inga merförsäljningsrader och ingen faktura skapades */
+    skippedZeroTotal?: boolean
+  }> {
     // 1. Hämta case_billing_items för ärendet
     const allCaseBillingItems = await CaseBillingService.getCaseBillingItems(caseId, 'contract')
 
@@ -380,21 +388,27 @@ export class ContractBillingService {
 
     // Endast tjänsterader ska faktureras. Artiklar är interna kostnader (för
     // marginalkalkyl) och ligger kvar i case_billing_items — de ska ALDRIG bli
-    // fakturarader. Samma filtrering som privat/företag (invoiceService.createInvoiceFromCase).
+    // fakturarader. Samma filtrering som privat/företag (src/shared/caseInvoiceRows.ts).
     // Fallback: gamla ärenden utan tjänsterader faktureras på sina artikelrader (bakåtkompat).
     // Rader som täcks av avtalet (§ 4, covered_by_contract) faktureras aldrig som merförsäljning.
     // Tilläggsrader (pro rata per stationstyp, arbetstid) på 0 kr är underlag,
     // t.ex. teknikerns arbetstidsförslag utan ökning: de blir aldrig fakturarader.
-    const serviceItems = allCaseBillingItems.filter(i =>
-      i.item_type === 'service' && !i.covered_by_contract &&
-      !((i.is_addon_prorata_line || i.is_addon_labour_line) && !(Number(i.total_price) > 0))
-    )
-    const caseBillingItems = serviceItems.length > 0
-      ? serviceItems
-      : allCaseBillingItems.filter(i => i.item_type === 'article' || !i.item_type)
+    const caseBillingItems = selectInvoiceableCaseRows(allCaseBillingItems, 'contract_adhoc')
 
     if (caseBillingItems.length === 0) {
       return { created: 0, totalAmount: 0, invoiceId: null }
+    }
+
+    // 0 kr-regeln (Christian 2026-10-15): summerar underlaget till 0 kr, t.ex.
+    // ett kostnadsfritt återbesök eller 100 % rabatt, skapas varken
+    // merförsäljningsrader eller faktura. Ärenderaderna markeras som hanterade
+    // ('billed', som efter en vanlig överföring) och ärendet får billing_status
+    // 'skip'. Avtalstillägg appliceras ändå: de höjer årspremien och är inte
+    // en del av merförsäljningsfakturan.
+    if (isZeroAmount(sumInvoiceableRows(caseBillingItems))) {
+      await CaseBillingService.markZeroAmountRowsHandled(caseId, 'contract')
+      await this.applyContractAdditionsForCase(caseId, allCaseBillingItems)
+      return { created: 0, totalAmount: 0, invoiceId: null, skippedZeroTotal: true }
     }
 
     // 2. Normalisera completedAt till YYYY-MM-DD i svensk tid (inte UTC).
@@ -464,6 +478,8 @@ export class ContractBillingService {
 
     // 4. Markera case_billing_items som 'billed'
     await CaseBillingService.updateCaseItemsStatus(caseId, 'contract', 'billed')
+    // Stängdes ärendet tidigare på 0 kr ('skip') finns nu merförsäljning att fakturera
+    await CaseBillingService.clearCaseBillingSkip(caseId, 'contract')
 
     // 5. Generera adhoc-invoice enligt kundens grouping. Fel sväljs INTE:
     //    de returneras som invoiceError så anroparen kan varna användaren.
@@ -495,24 +511,33 @@ export class ContractBillingService {
       console.error('Kunde inte skapa adhoc-invoice:', err)
     }
 
-    // 6. Avtalstillägg: rader markerade som tillägg höjer kundens årspremie
-    //    (idempotent per rad via apply_contract_addition-RPC:n, toasts sköts
-    //    i ContractAdditionService så alla avslutsvägar får samma feedback)
-    const hasAdditions = allCaseBillingItems.some(i => i.contract_addition_annual != null)
-    if (hasAdditions) {
-      try {
-        const { ContractAdditionService } = await import('./contractAdditionService')
-        await ContractAdditionService.applyAdditionsForCase(caseId, null)
-      } catch (additionError) {
-        console.error('Avtalstillägg kunde inte appliceras:', additionError)
-      }
-    }
+    // 6. Avtalstillägg
+    await this.applyContractAdditionsForCase(caseId, allCaseBillingItems)
 
     return {
       created: caseBillingItems.length,
       totalAmount,
       invoiceId,
       invoiceError
+    }
+  }
+
+  /**
+   * Avtalstillägg: rader markerade som tillägg höjer kundens årspremie
+   * (idempotent per rad via apply_contract_addition-RPC:n, toasts sköts
+   * i ContractAdditionService så alla avslutsvägar får samma feedback).
+   */
+  private static async applyContractAdditionsForCase(
+    caseId: string,
+    items: Array<{ contract_addition_annual?: number | null }>
+  ): Promise<void> {
+    const hasAdditions = items.some(i => i.contract_addition_annual != null)
+    if (!hasAdditions) return
+    try {
+      const { ContractAdditionService } = await import('./contractAdditionService')
+      await ContractAdditionService.applyAdditionsForCase(caseId, null)
+    } catch (additionError) {
+      console.error('Avtalstillägg kunde inte appliceras:', additionError)
     }
   }
 

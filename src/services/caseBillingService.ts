@@ -32,6 +32,14 @@ import {
 } from '../types/caseBilling'
 import { PriceListService } from './priceListService'
 import { DEFAULT_ROT_PERCENT, DEFAULT_RUT_PERCENT } from '../utils/rotRutConstants'
+import { selectInvoiceableCaseRows, caseInvoiceSubtotal } from '../shared/caseInvoiceRows'
+
+/** Ärendetabellen per fakturatyp (billing_status ligger på ärendet). */
+const CASE_TABLE_BY_TYPE: Record<BillableCaseType, 'private_cases' | 'business_cases' | 'cases'> = {
+  private: 'private_cases',
+  business: 'business_cases',
+  contract: 'cases',
+}
 
 export class CaseBillingService {
   /**
@@ -938,15 +946,109 @@ export class CaseBillingService {
     caseId: string,
     caseType: BillableCaseType
   ): Promise<boolean> {
-    const customPrice = await this.getCustomPrice(caseId, caseType)
-    if (customPrice !== null) return customPrice > 0
-
+    // Samma urval och belopp som fakturan (src/shared/caseInvoiceRows.ts):
+    // radernas total_price efter rabatt, inte à-pris × antal. En rad med
+    // 100 % rabatt är 0 kr och ska varken ge kundnummer eller faktura.
     const items = await this.getCaseBillingItems(caseId, caseType)
-    const services = items.filter(i => i.item_type === 'service')
-    const rows = services.length > 0
-      ? services
-      : items.filter(i => i.item_type === 'article' || !i.item_type)
-    return rows.some(r => (r.unit_price ?? 0) * (r.quantity ?? 0) > 0)
+    const rows = selectInvoiceableCaseRows(items, caseType === 'contract' ? 'contract_adhoc' : 'case')
+    if (rows.length === 0) return false
+    const customPrice = await this.getCustomPrice(caseId, caseType)
+    return caseInvoiceSubtotal(rows, customPrice) > 0
+  }
+
+  /**
+   * 0 kr-regeln: ärendets ofakturerade rader summerar till 0 kr och ingen
+   * faktura skapas. Raderna markeras 'billed' (= hanterade av faktureringen,
+   * samma status som när en faktura skapas, även för artikelrader som aldrig
+   * blir fakturarader) så att de inte ligger kvar som ofakturerade i
+   * fakturakedjan eller i återbesökets delfakturalista.
+   *
+   * Kommer nya rader med belopp senare släpper releaseOrphanedBilledItems
+   * 'billed'-rader utan levande faktura tillbaka till 'pending' innan nästa
+   * faktura byggs (privat/företag), så 0 kr-raden följer då med som referens.
+   *
+   * Ärendet får billing_status 'skip' bara när det saknar levande fakturor
+   * (en betald delfaktura gör att ärendet fortfarande är fakturerat).
+   */
+  static async markZeroAmountRowsHandled(
+    caseId: string,
+    caseType: BillableCaseType
+  ): Promise<void> {
+    await this.updateCaseItemsStatusWhere(caseId, caseType, 'pending', 'billed')
+
+    try {
+      if (!(await this.caseHasLiveInvoice(caseId, caseType))) {
+        const { error } = await supabase
+          .from(CASE_TABLE_BY_TYPE[caseType])
+          .update({ billing_status: 'skip' })
+          .eq('id', caseId)
+        if (error) console.warn('[CaseBillingService] billing_status skip kunde inte sättas:', error.message)
+      }
+    } catch (err) {
+      // Statusfältet är informativt, raderna ovan är det som styr faktureringen
+      console.warn('[CaseBillingService] billing_status skip kunde inte sättas:', err)
+    }
+  }
+
+  /**
+   * Ärendet har fått en faktura (eller merförsäljningsrader) efter att tidigare
+   * ha stängts på 0 kr: billing_status 'skip' tillbaka till 'pending'. Rör bara
+   * 'skip', aldrig sent/paid. Fel loggas men stoppar aldrig faktureringen.
+   */
+  static async clearCaseBillingSkip(
+    caseId: string,
+    caseType: BillableCaseType
+  ): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from(CASE_TABLE_BY_TYPE[caseType])
+        .update({ billing_status: 'pending' })
+        .eq('id', caseId)
+        .eq('billing_status', 'skip')
+      if (error) console.warn('[CaseBillingService] billing_status kunde inte återställas:', error.message)
+    } catch (err) {
+      console.warn('[CaseBillingService] billing_status kunde inte återställas:', err)
+    }
+  }
+
+  /** Har ärendet någon faktura som inte är makulerad (inkl. merförsäljning via contract_billing_items)? */
+  private static async caseHasLiveInvoice(
+    caseId: string,
+    caseType: BillableCaseType
+  ): Promise<boolean> {
+    const { count, error } = await supabase
+      .from('invoices')
+      .select('id', { count: 'exact', head: true })
+      .eq('case_id', caseId)
+      .neq('status', 'cancelled')
+    if (error) throw new Error(`Databasfel: ${error.message}`)
+    if ((count ?? 0) > 0) return true
+    if (caseType !== 'contract') return false
+
+    // Månadsbatchade merförsäljningsfakturor saknar case_id: gå via raderna
+    const { count: cbiCount, error: cbiError } = await supabase
+      .from('contract_billing_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('case_id', caseId)
+      .eq('item_type', 'ad_hoc')
+      .neq('status', 'cancelled')
+    if (cbiError) throw new Error(`Databasfel: ${cbiError.message}`)
+    return (cbiCount ?? 0) > 0
+  }
+
+  private static async updateCaseItemsStatusWhere(
+    caseId: string,
+    caseType: BillableCaseType,
+    from: CaseBillingItemStatus,
+    to: CaseBillingItemStatus
+  ): Promise<void> {
+    const { error } = await supabase
+      .from('case_billing_items')
+      .update({ status: to, updated_at: new Date().toISOString() })
+      .eq('case_id', caseId)
+      .eq('case_type', caseType)
+      .eq('status', from)
+    if (error) throw new Error(`Databasfel: ${error.message}`)
   }
 
   /**

@@ -569,7 +569,10 @@ export default async function handler(
       contact_person: recipient.name || null,
       contact_email: recipient.email || null,
       price_list_id: priceListId || null,
-      customer_group_id: customerGroupId || null
+      customer_group_id: customerGroupId || null,
+      // Numret vi skickade: jämförs med kundens värde vid signering (kunden kan
+      // ändra fältet i Oneflow). Webhooken skriver aldrig kolumnen.
+      sent_organization_number: recipient.organization_number || contractData?.['org-nr'] || null,
     }
 
     // Portalens avtalsvillkor (uppsägningstid + faktureringsintervall).
@@ -643,7 +646,10 @@ export default async function handler(
     }
 
     // Persistera draftItems (tjänster + interna artiklar) till case_billing_items
-    // så att de kan visas i offertuppföljningen och andra vyer
+    // så att de kan visas i offertuppföljningen och andra vyer.
+    // Priserna är exkl. moms och samma som Oneflow-produkterna (wizarden bygger
+    // båda ur samma rader; privatpersoner ser priset × 1,25 i Oneflow). Vid
+    // signering rättas avtalets rader mot Oneflow-beloppet (api/_lib/contractSigning.ts).
     console.log(
       `[persist] draftItems i body: ${
         Array.isArray(draftItems) ? draftItems.length : 'saknas/ej array'

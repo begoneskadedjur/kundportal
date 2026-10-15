@@ -17,6 +17,8 @@ const STATUS_COLORS: Record<string, string> = {
   'Bokat': 'bg-blue-500/20 text-blue-400',
   'Offert skickad': 'bg-teal-500/20 text-teal-400',
   'Offert signerad - boka in': 'bg-green-500/20 text-green-400',
+  'Avtal skickat': 'bg-teal-500/20 text-teal-400',
+  'Avtal signerat - Etablera': 'bg-green-500/20 text-green-400',
   'Avslutat': 'bg-emerald-500/20 text-emerald-400',
   'Stängt - slasklogg': 'bg-red-500/20 text-red-400',
 }

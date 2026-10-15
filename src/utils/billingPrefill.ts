@@ -6,6 +6,8 @@ import type { SelectedArticleItem } from '../types/products'
 
 export interface PrefillService {
   id: string
+  /** Tjänsten i katalogen: följer med till avtalets rader så avtalstypen kan härledas */
+  service_id?: string | null
   service_name: string | null
   service_code: string | null
   unit_price: number
@@ -29,6 +31,7 @@ export function mapBillingItemsToPrefillServices(
     .filter(item => item.item_type === 'service')
     .map(item => ({
       id: item.id,
+      service_id: item.service_id ?? null,
       service_name: item.service_name,
       service_code: item.service_code,
       unit_price: item.unit_price,

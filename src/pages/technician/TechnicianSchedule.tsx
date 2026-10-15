@@ -113,8 +113,8 @@ const getStatusColor = (status: string, caseType?: string): { bg: string; text: 
   // Standard färgschema för ClickUp-ärenden
   if (ls.includes('avslutat')) return { bg: 'bg-green-900/50', text: 'text-green-300', border: 'border-green-700/50' };
   if (ls.startsWith('återbesök')) return { bg: 'bg-cyan-900/50', text: 'text-cyan-300', border: 'border-cyan-700/50' };
-  if (ls.includes('bokad') || ls.includes('bokat') || ls.includes('signerad')) return { bg: 'bg-blue-900/50', text: 'text-blue-300', border: 'border-blue-700/50' };
-  if (ls.includes('öppen') || ls.includes('offert')) return { bg: 'bg-yellow-900/50', text: 'text-yellow-300', border: 'border-yellow-700/50' };
+  if (ls.includes('bokad') || ls.includes('bokat') || ls.includes('signerad') || ls.startsWith('avtal signerat')) return { bg: 'bg-blue-900/50', text: 'text-blue-300', border: 'border-blue-700/50' };
+  if (ls.includes('öppen') || ls.includes('offert') || ls.startsWith('avtal s')) return { bg: 'bg-yellow-900/50', text: 'text-yellow-300', border: 'border-yellow-700/50' };
   if (ls.includes('review')) return { bg: 'bg-purple-900/50', text: 'text-purple-300', border: 'border-purple-700/50' };
   return { bg: 'bg-slate-800/50', text: 'text-slate-400', border: 'border-slate-700/50' };
 };

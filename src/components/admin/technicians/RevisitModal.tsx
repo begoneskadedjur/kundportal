@@ -279,7 +279,22 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
 
       // 2. Delfaktura om ikryssad
       let partialInvoiceNumber: string | null = null
+      let partialSkippedZero = false
+      let partialCheckFailed = false
       if (createPartialInvoice && caseData.case_type !== 'contract' && pendingBillingItems.length > 0) {
+        try {
+          // 0 kr-regeln: summerar de ofakturerade raderna till 0 kr blir det
+          // ingen delfaktura och ingen kundrad. Raderna ligger kvar ofakturerade
+          // och följer med slutfakturan (eller markeras hanterade vid avslut).
+          const hasAmount = await CaseBillingService.caseHasBillableAmount(caseData.id, billingCaseType)
+          if (!hasAmount) partialSkippedZero = true
+        } catch (checkError: unknown) {
+          console.error('[RevisitModal] Kunde inte kontrollera underlaget:', checkError)
+          toast.error(`Delfaktura: ${checkError instanceof Error ? checkError.message : String(checkError)}`)
+          partialCheckFailed = true
+        }
+      }
+      if (createPartialInvoice && !partialSkippedZero && !partialCheckFailed && caseData.case_type !== 'contract' && pendingBillingItems.length > 0) {
         try {
           const customerName = caseData.case_type === 'business'
             ? (caseData.company_name || caseData.kontaktperson || 'Okänd kund')
@@ -311,27 +326,32 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
             },
             'partial'
           )
-          partialInvoiceNumber = invoice.invoice_number
+          // null = 0 kr (spärren i InvoiceService), ingen delfaktura
+          if (!invoice) {
+            partialSkippedZero = true
+          } else {
+            partialInvoiceNumber = invoice.invoice_number
 
-          // Logga delfakturan
-          await supabase.from('case_updates_log').insert({
-            case_id: caseData.id,
-            case_table: tableName,
-            case_type: caseData.case_type,
-            update_type: 'partial_invoice_created',
-            updated_by: profile.id,
-            updated_by_id: profile.id,
-            updated_by_name: profile.full_name || profile.display_name || 'Okänd',
-            user_role: (profile as any).role || 'koordinator',
-            user_name: profile.full_name || profile.display_name || 'Okänd',
-            field_changes: { invoice_number: { old: null, new: invoice.invoice_number } },
-            previous_value: null,
-            new_value: JSON.stringify({
-              invoice_number: invoice.invoice_number,
-              amount: invoice.total_amount,
-              items: pendingBillingItems.map((i: any) => ({ name: i.service_name || i.article_name, amount: i.total_price }))
-            }),
-          })
+            // Logga delfakturan
+            await supabase.from('case_updates_log').insert({
+              case_id: caseData.id,
+              case_table: tableName,
+              case_type: caseData.case_type,
+              update_type: 'partial_invoice_created',
+              updated_by: profile.id,
+              updated_by_id: profile.id,
+              updated_by_name: profile.full_name || profile.display_name || 'Okänd',
+              user_role: (profile as any).role || 'koordinator',
+              user_name: profile.full_name || profile.display_name || 'Okänd',
+              field_changes: { invoice_number: { old: null, new: invoice.invoice_number } },
+              previous_value: null,
+              new_value: JSON.stringify({
+                invoice_number: invoice.invoice_number,
+                amount: invoice.total_amount,
+                items: pendingBillingItems.map((i: any) => ({ name: i.service_name || i.article_name, amount: i.total_price }))
+              }),
+            })
+          }
         } catch (invoiceError: any) {
           console.error('[RevisitModal] Delfaktura misslyckades:', invoiceError)
           toast.error(`Delfaktura: ${invoiceError.message}`)
@@ -364,6 +384,8 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
 
       if (partialInvoiceNumber) {
         toast.success(`Återbesök bokat och delfaktura ${partialInvoiceNumber} skapad!`)
+      } else if (partialSkippedZero) {
+        toast.success('Återbesök bokat. Underlaget är 0 kr, ingen delfaktura skapad.')
       } else {
         toast.success('Återbesök bokat!')
       }

@@ -56,8 +56,10 @@ const ServiceRequestStatus: React.FC<ServiceRequestStatusProps> = ({
       case 'Bokad':
         return <Calendar className={iconSizes[size]} />
       case 'Offert skickad':
+      case 'Avtal skickat':
         return <FileText className={iconSizes[size]} />
       case 'Offert signerad - boka in':
+      case 'Avtal signerat - Etablera':
         return <CheckCircle className={iconSizes[size]} />
       case 'Återbesök':
         return <Wrench className={`${iconSizes[size]} animate-spin-slow`} />

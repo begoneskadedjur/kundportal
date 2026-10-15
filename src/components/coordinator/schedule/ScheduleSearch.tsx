@@ -30,6 +30,8 @@ const STATUS_DOT: Record<string, string> = {
   'Bokad': 'bg-amber-500',
   'Offert skickad': 'bg-orange-500',
   'Offert signerad - boka in': 'bg-[#20c58f]',
+  'Avtal skickat': 'bg-orange-500',
+  'Avtal signerat - Etablera': 'bg-[#20c58f]',
   'Återbesök': 'bg-blue-500',
   'Borttaget': 'bg-red-500',
   'Avslutat': 'bg-emerald-600',

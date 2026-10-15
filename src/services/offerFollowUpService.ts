@@ -2,6 +2,7 @@
 import { supabase, getAuthHeaders } from '../lib/supabase'
 import type { CaseBillingItemWithRelations } from '../types/caseBilling'
 import type { CoordinatorCaseAction } from '../types/casePipeline'
+import { normalizeSignedDocument, signedDocumentsOrFilter } from '../shared/documentStatus'
 
 // === Prioritetskonstanter ===
 export const THRESHOLDS = {
@@ -219,6 +220,7 @@ export interface StatsContractRow {
   booked_case_id: string | null
   source_id: string | null
   source_type: string | null
+  signed_at?: string | null
 }
 
 export interface StatsAggregates {
@@ -236,7 +238,7 @@ const OFFER_COLUMNS = `
   begone_employee_email, created_at, updated_at, hidden_by, source_id, source_type,
   customer_id, status_updated_at, signing_deadline, customer_first_viewed_at,
   email_delivery_failed_at, quote_reference_number, template_id,
-  created_by_name, created_by_email, booked_case_id
+  created_by_name, created_by_email, booked_case_id, signed_at
 `
 
 const EMPTY_KPIS: FollowUpKPIs = {
@@ -258,8 +260,10 @@ export class OfferFollowUpService {
     let contractsQuery = supabase
       .from('contracts')
       .select(OFFER_COLUMNS)
-      // draft = utkast från avtalswizarden som sparats för att skickas senare
-      .in('status', ['draft', 'pending', 'overdue', 'signed', 'declined'])
+      // draft = utkast från avtalswizarden som sparats för att skickas senare.
+      // Signerade avtal kan stå som 'active' (triggern contract_signed_becomes_active
+      // byter direkt när startdagen passerat): de räknas som signerade.
+      .or(signedDocumentsOrFilter(['draft', 'pending', 'overdue', 'signed', 'declined']))
       .is('legacy_archived_at', null)
       .order('created_at', { ascending: true })
 
@@ -269,7 +273,9 @@ export class OfferFollowUpService {
       )
     }
 
-    const { data: allContracts, error: contractsError } = await contractsQuery
+    const { data: rawContracts, error: contractsError } = await contractsQuery
+    // Aktivt avtal med signeringsdatum = signerat (samma steg i kö, statistik och signeringsgrad)
+    const allContracts = rawContracts ? rawContracts.map(normalizeSignedDocument) : rawContracts
 
     if (contractsError) throw contractsError
     if (!allContracts || allContracts.length === 0) {
@@ -575,9 +581,10 @@ export class OfferFollowUpService {
         id, type, status, total_value, begone_employee_email, begone_employee_name,
         created_by_email, created_by_name, created_at, status_updated_at,
         organization_number, template_id, customer_first_viewed_at, booked_case_id,
-        source_id, source_type
+        source_id, source_type, signed_at
       `)
-      .in('status', ['pending', 'overdue', 'signed', 'declined'])
+      // Signerade avtal kan stå som 'active' (se getDashboardData)
+      .or(signedDocumentsOrFilter(['pending', 'overdue', 'signed', 'declined']))
       .is('legacy_archived_at', null)
       .not('created_by_email', 'is', null)
       .order('created_at', { ascending: true })
@@ -588,7 +595,7 @@ export class OfferFollowUpService {
     }
     const { data, error } = await query
     if (error) throw error
-    return (data || []) as StatsContractRow[]
+    return ((data || []) as StatsContractRow[]).map(normalizeSignedDocument)
   }
 
   /**

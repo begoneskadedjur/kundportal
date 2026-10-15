@@ -32,7 +32,7 @@ import { useOfferStats } from '../../hooks/useOfferStats'
 import { getExpiringContracts, type ExpiringContract } from '../../services/economicsService'
 
 // Types
-import { BeGoneCaseRow, Technician } from '../../types/database'
+import { BeGoneCaseRow, Technician, DOCUMENT_SIGNED_AWAITING_STATUSES, isDocumentSignedAwaitingStatus } from '../../types/database'
 
 // ============================================================
 // HELPERS
@@ -150,7 +150,7 @@ export default function CoordinatorDashboard() {
         const twoWeeksAgoStart = new Date(twoWeeksAgo.setHours(0, 0, 0, 0)).toISOString()
 
         const todayDateString = new Date().toISOString().split('T')[0]
-        const unplannedStatuses = ['Öppen', 'Offert signerad - boka in']
+        const unplannedStatuses = ['Öppen', ...DOCUMENT_SIGNED_AWAITING_STATUSES]
 
         const [
           unplannedPrivate,
@@ -246,7 +246,7 @@ export default function CoordinatorDashboard() {
   }, [])
 
   // --- Derived data ---
-  const casesToBookIn = allCases.filter(c => c.status === 'Offert signerad - boka in')
+  const casesToBookIn = allCases.filter(c => isDocumentSignedAwaitingStatus(c.status))
   const latestToBookIn = casesToBookIn.slice(0, 5)
 
   // Trend calculations (only from real data)
@@ -288,7 +288,7 @@ export default function CoordinatorDashboard() {
   }
 
   // --- KPI card click handlers (existing logic) ---
-  const getUnplannedCases = () => allCases.filter(c => ['Öppen', 'Offert signerad - boka in'].includes(c.status))
+  const getUnplannedCases = () => allCases.filter(c => c.status === 'Öppen' || isDocumentSignedAwaitingStatus(c.status))
 
   const getScheduledTodayCases = () => {
     const today = new Date()
