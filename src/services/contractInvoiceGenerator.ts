@@ -24,6 +24,8 @@ import { supabase } from '../lib/supabase'
 import { ImportedCustomerContractService } from './importedCustomerContractService'
 import { PaymentTermsService } from './paymentTermsService'
 import { InvoiceService } from './invoiceService'
+import { ContractInvoiceImportService } from './contractInvoiceImportService'
+import { ContractScopeService } from './contractScopeService'
 import { ContractService, isSyntheticContract } from './contractService'
 import { resolveOrganizationNumber } from '../utils/multisiteHelpers'
 import { resolvePremiumShares, allocateByShares } from '../shared/premiumShares'
@@ -114,6 +116,44 @@ export type BillingPlanAction =
    * september.
    */
   | 'later'
+  /**
+   * Fortnox-kontrollen (fortnoxPlanCheck.ts) hittade fakturan för en passerad
+   * period i Fortnox med samma belopp: utkastet görs om till F-{nr}.
+   */
+  | 'link-fortnox'
+  /** Som link-fortnox men beloppet är indexerat (0 till 8 % över planen): kopplas + indexsteg i trappan */
+  | 'link-fortnox-indexed'
+  /** Perioden har börjat, utkastet ligger kvar och fakturan finns inte i Fortnox: godkänn och skicka */
+  | 'overdue-send'
+
+/** En Fortnox-faktura som kan vara periodens faktura. */
+export interface FortnoxCandidate {
+  documentNumber: string
+  invoiceDate: string
+  dueDate: string | null
+  finalPayDate: string | null
+  /** Inkl. moms, ur fakturalistan */
+  total: number
+  /** Exkl. moms, uppskattad ur Total och planens momssats (listan saknar Net) */
+  net: number
+  balance: number
+  sent: boolean
+  booked: boolean
+  match: 'exact' | 'indexed'
+}
+
+/** Resultatet av Fortnox-kontrollen på en planpost. */
+export interface FortnoxCheckInfo {
+  /** match = en träff, choose = flera träffar (användaren väljer), missing = ingen träff */
+  status: 'match' | 'choose' | 'missing'
+  candidates: FortnoxCandidate[]
+  /** Valt Fortnox-nummer; null tills användaren valt vid flera träffar */
+  chosen: string | null
+  /** Åtgärden planen hade före kontrollen (återställs om användaren väljer bort alla) */
+  originalAction: BillingPlanAction
+  /** Beloppet träffarna jämfördes mot, exkl. moms */
+  baseSubtotal: number
+}
 
 export interface BillingPlanEntry {
   action: BillingPlanAction
@@ -139,6 +179,12 @@ export interface BillingPlanEntry {
   consolidated?: boolean
   /** Kundraden fakturan hör till: enhetens vid enhetsavtal, annars planens */
   customerId?: string
+  /** Befintliga fakturans Fortnox-nummer (null = aldrig skickad till Fortnox) */
+  existingFortnoxNumber?: string | null
+  /** Andra redigerbara utkast för samma period (dubbletter), utan Fortnox-nummer */
+  duplicateIds?: string[]
+  /** Fortnox-kontrollen för passerade perioder (sätts efter grundplanen) */
+  fortnox?: FortnoxCheckInfo
 }
 
 export interface BillingPlan {
@@ -161,6 +207,12 @@ export interface BillingPlan {
     uncovered: number
     /** Förlängningsperioder som väntar på sitt fakturadatum */
     later: number
+    /** Passerade perioder som finns i Fortnox och kopplas (link-fortnox + indexerade) */
+    linkFortnox: number
+    /** Passerade perioder med flera möjliga Fortnox-fakturor: användaren väljer */
+    fortnoxChoose: number
+    /** Passerade perioder som inte finns i Fortnox: godkänn och skicka */
+    overdueSend: number
   }
 }
 
@@ -172,6 +224,14 @@ export interface ApplyResult {
   skippedLocked: number
   /** Passerade perioder utan faktura som väntar på Fortnox-import */
   uncovered: number
+  /** Utkast/perioder som kopplats till sin Fortnox-faktura */
+  linkedIds?: string[]
+  /** Indexsteg som lagts i premietrappan vid indexerad koppling */
+  indexedSteps?: number
+  /** Kopplingar som väntar på att användaren väljer Fortnox-faktura, eller som hoppades över */
+  fortnoxSkipped?: number
+  /** Indexsteg som inte kunde läggas (kopplingen är ändå gjord) */
+  indexErrors?: string[]
 }
 
 /**
@@ -218,6 +278,7 @@ type ExistingInvoice = {
   invoice_type?: string | null
   contract_invoice_kind?: string | null
   invoice_items?: Array<{ article_name: string | null; line_kind?: string | null; contract_id?: string | null; total_price?: number | null }> | null
+  fortnox_document_number?: string | null
   has_generic_items?: boolean
   rowSignature?: string
 }
@@ -246,6 +307,9 @@ const EMPTY_SUMMARY = (): BillingPlan['summary'] => ({
   historical: 0,
   uncovered: 0,
   later: 0,
+  linkFortnox: 0,
+  fortnoxChoose: 0,
+  overdueSend: 0,
 })
 
 /**
@@ -257,8 +321,19 @@ export function computePlannedInvoicesPure(customer: CustomerForPlanning, paymen
   return computePlannedPeriods(customer, { paymentTermsDays })
 }
 
-function summarize(entries: BillingPlanEntry[]): BillingPlan['summary'] {
+export function summarize(entries: BillingPlanEntry[]): BillingPlan['summary'] {
   return entries.reduce((acc, e) => {
+    // Fortnox-kontrollen: kopplingar och perioder som saknas i Fortnox
+    if (e.action === 'link-fortnox' || e.action === 'link-fortnox-indexed') {
+      if (e.fortnox?.chosen) acc.linkFortnox += 1
+      else acc.fortnoxChoose += 1
+      return acc
+    }
+    if (e.action === 'overdue-send') {
+      acc.overdueSend += 1
+      return acc
+    }
+    if (e.fortnox?.status === 'missing') acc.overdueSend += 1
     if (e.action === 'create-historical' || e.action === 'backfill-historical-paid') acc.historical += 1
     else if (e.action === 'uncovered') acc.uncovered += 1
     else if (e.action === 'later') acc.later += 1
@@ -818,7 +893,7 @@ export class ContractInvoiceGenerator {
     let q = supabase
       .from('invoices')
       .select(
-        'id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, is_consolidated, contract_id, invoice_type, contract_invoice_kind, invoice_items(article_name, line_kind, contract_id, total_price)'
+        'id, invoice_number, status, billing_period_start, billing_period_end, total_amount, subtotal, is_historical, is_consolidated, contract_id, invoice_type, contract_invoice_kind, fortnox_document_number, invoice_items(article_name, line_kind, contract_id, total_price)'
       )
       .eq('customer_id', customerId)
       .in('invoice_type', ['contract', 'adhoc'])
@@ -1160,7 +1235,34 @@ export class ContractInvoiceGenerator {
     }
 
     entries.sort((a, b) => (a.planned?.periodStart ?? '').localeCompare(b.planned?.periodStart ?? ''))
-    return entries
+
+    // Fortnox-kontrollen behöver veta om fakturan gått till Fortnox, och
+    // vilka andra utkast som ligger på samma period (dubbletter, HSB Kullen
+    // 2026-10-15). Dubbletterna syns annars inte: kartan bär ett per månad.
+    const byId = new Map(contractInvoices.map((e) => [e.id, e]))
+    return entries.map((e) => {
+      if (!e.existingId) return e
+      const ex = byId.get(e.existingId)
+      if (!ex) return e
+      const key = ex.billing_period_start ? monthKey(ex.billing_period_start) : null
+      const duplicateIds = key
+        ? contractInvoices
+            .filter(
+              (o) =>
+                o.id !== ex.id &&
+                !!o.billing_period_start &&
+                monthKey(o.billing_period_start) === key &&
+                EDITABLE_STATUSES.has(o.status ?? 'draft') &&
+                !o.fortnox_document_number
+            )
+            .map((o) => o.id)
+        : []
+      return {
+        ...e,
+        existingFortnoxNumber: ex.fortnox_document_number ?? null,
+        ...(duplicateIds.length ? { duplicateIds } : {}),
+      }
+    })
   }
 
   /** Efterjustering vid radjämförelse (samlad faktura): 'keep' blir 'update' när radmängden ändrats. */
@@ -1204,6 +1306,25 @@ export class ContractInvoiceGenerator {
     for (const entry of entries) {
       const contractId = entry.consolidated ? null : (entry.contractId ?? plan.contractId)
       if (entry.action === 'keep' || entry.action === 'consolidated' || entry.action === 'later') continue
+      // Perioden har börjat och fakturan saknas i Fortnox: utkastet står kvar
+      // för godkännande, planen ändrar ingenting automatiskt.
+      if (entry.action === 'overdue-send') continue
+      if (entry.action === 'link-fortnox' || entry.action === 'link-fortnox-indexed') {
+        const chosen = entry.fortnox?.candidates.find((c) => c.documentNumber === entry.fortnox?.chosen)
+        if (!chosen || !entry.planned) {
+          result.fortnoxSkipped = (result.fortnoxSkipped ?? 0) + 1
+          continue
+        }
+        const linked = await this.linkFortnoxInvoice(plan, entry, chosen, contractId)
+        if (!linked) {
+          result.fortnoxSkipped = (result.fortnoxSkipped ?? 0) + 1
+          continue
+        }
+        result.linkedIds = [...(result.linkedIds ?? []), linked.invoiceId]
+        if (linked.indexed) result.indexedSteps = (result.indexedSteps ?? 0) + 1
+        if (linked.indexError) result.indexErrors = [...(result.indexErrors ?? []), linked.indexError]
+        continue
+      }
       if (entry.action === 'uncovered') {
         result.uncovered++
         continue
@@ -1708,6 +1829,97 @@ export class ContractInvoiceGenerator {
     if (itemErr) throw new Error(`Kunde inte skapa fakturarad: ${itemErr.message}`)
 
     return inv.id
+  }
+
+  /**
+   * Fortnox-kontrollens koppling: periodens utkast (eller den tomma perioden)
+   * görs om till Fortnox-fakturan F-{nr} via samma import som § 6 använder.
+   * Utkast som ändrats sedan planen räknades (skickats, fått Fortnox-nummer)
+   * rörs inte. Indexerad träff på ett årsavtal lägger ett indexsteg i trappan
+   * från periodstart, så att nästa års plan räknar på det nya beloppet.
+   */
+  private static async linkFortnoxInvoice(
+    plan: BillingPlan,
+    entry: BillingPlanEntry,
+    candidate: FortnoxCandidate,
+    contractId: string | null
+  ): Promise<{ invoiceId: string; indexed: boolean; indexError?: string } | null> {
+    if (!entry.planned) return null
+    let customerId = entry.consolidated ? plan.customerId : (entry.customerId ?? plan.customerId)
+    let periodStart = entry.planned.periodStart
+    let periodEnd = entry.planned.periodEnd
+    if (entry.existingId) {
+      const { data: row } = await supabase
+        .from('invoices')
+        .select('customer_id, status, fortnox_document_number, billing_period_start, billing_period_end')
+        .eq('id', entry.existingId)
+        .maybeSingle()
+      const r = row as { customer_id: string | null; status: string | null; fortnox_document_number: string | null; billing_period_start: string | null; billing_period_end: string | null } | null
+      if (!r || !EDITABLE_STATUSES.has(r.status ?? 'draft') || r.fortnox_document_number) return null
+      customerId = r.customer_id ?? customerId
+      periodStart = r.billing_period_start ?? periodStart
+      periodEnd = r.billing_period_end ?? periodEnd
+    }
+    const consolidated = !!entry.consolidated
+    const coveredContractIds = consolidated
+      ? [...new Set((entry.rows ?? []).map((r) => r.contract_id).filter((id): id is string => !!id))]
+      : undefined
+    const imported = await ContractInvoiceImportService.importForPeriod({
+      fortnoxNumber: candidate.documentNumber,
+      customerId,
+      contractId: consolidated ? null : contractId,
+      kind: entry.kind === 'equipment' ? 'equipment' : 'premium',
+      periodStart,
+      periodEnd,
+      coveredContractIds,
+      replaceInvoiceId: entry.existingId ?? null,
+      removeInvoiceIds: entry.duplicateIds,
+    })
+
+    let indexed = false
+    let indexError: string | undefined
+    if (entry.action === 'link-fortnox-indexed' && !consolidated && contractId && (entry.kind ?? 'premium') === 'premium') {
+      try {
+        indexed = await this.addIndexStepFromFortnox(contractId, entry.planned, imported.subtotal, candidate.documentNumber)
+      } catch (err) {
+        indexError = err instanceof Error ? err.message : 'Kunde inte lägga indexsteget'
+      }
+    }
+    return { invoiceId: imported.invoiceId, indexed, indexError }
+  }
+
+  /**
+   * Indexsteg ur en indexerad Fortnox-faktura. Bara årsavtal: en period är
+   * ett år, så fakturans belopp är årspremien. Delperiod (pro rata) eller
+   * utrustning på samma faktura skalas med samma faktor. Finns redan en
+   * indexering från periodstart görs ingenting.
+   */
+  private static async addIndexStepFromFortnox(
+    contractId: string,
+    planned: PlannedPeriod,
+    net: number,
+    fortnoxNumber: string
+  ): Promise<boolean> {
+    const { data: c } = await supabase.from('contracts').select('billing_frequency').eq('id', contractId).maybeSingle()
+    if ((c as { billing_frequency?: string | null } | null)?.billing_frequency !== 'annual') return false
+    const { data: same } = await supabase
+      .from('contract_premium_events')
+      .select('id')
+      .eq('contract_id', contractId)
+      .eq('effective_from', planned.periodStart)
+      .eq('event_type', 'indexation')
+      .limit(1)
+    if ((same ?? []).length > 0) return false
+    const plain = Math.abs(planned.subtotal - planned.annualInForce) < 1
+    const annual = plain || planned.subtotal <= 0 ? Math.round(net) : Math.round((planned.annualInForce * net) / planned.subtotal)
+    if (!(annual > 0)) return false
+    await ContractScopeService.addPremiumEvent(contractId, {
+      eventType: 'indexation',
+      effectiveFrom: planned.periodStart,
+      annualValue: annual,
+      note: `Indexerat belopp enligt Fortnox ${fortnoxNumber}`,
+    })
+    return true
   }
 
   /**

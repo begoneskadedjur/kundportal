@@ -90,6 +90,7 @@ import { useAddonPending } from '../../../../hooks/useAddonPending'
 import type { AddonBrick } from '../../../../types/addonStations'
 import BillingPlanPreviewModal from '../BillingPlanPreviewModal'
 import { ContractInvoiceGenerator, type BillingPlan, type BillingPlanEntry } from '../../../../services/contractInvoiceGenerator'
+import { checkPlanAgainstFortnox, hasFortnoxCheckCandidates, type FortnoxInvoiceCache } from '../../../../services/fortnoxPlanCheck'
 import type { CaseBillingItemWithRelations } from '../../../../types/caseBilling'
 import ContractCaseServiceSelector from '../ContractCaseServiceSelector'
 import Modal from '../../../ui/Modal'
@@ -1301,6 +1302,43 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     // billingPlansKey bumpas efter varje skrivning som påverkar fakturorna.
   }, [root.id, papers.length, contentReloadKey, billingPlansKey, contracts])
 
+  // Fortnox-kontrollen i bakgrunden, för § 6-varningen: ett utkast för en
+  // period som börjat och vars faktura redan finns i Fortnox är okopplat.
+  // Fakturalistan cachas tills nästa skrivning (billingPlansKey).
+  const fortnoxCheckCache = useRef<FortnoxInvoiceCache>(new Map())
+  useEffect(() => {
+    fortnoxCheckCache.current = new Map()
+  }, [billingPlansKey, root.id])
+  const [fortnoxUnlinked, setFortnoxUnlinked] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    let cancelled = false
+    const merged = billingPlans.length ? ContractInvoiceGenerator.mergePlans(root.id, billingPlans) : null
+    if (!merged || !hasFortnoxCheckCandidates(merged)) {
+      setFortnoxUnlinked(new Set())
+      return
+    }
+    checkPlanAgainstFortnox(merged, fortnoxCheckCache.current)
+      .then((r) => {
+        if (cancelled) return
+        const keys = new Set<string>()
+        for (const e of r.plan.entries) {
+          if (!e.planned || (e.action !== 'link-fortnox' && e.action !== 'link-fortnox-indexed')) continue
+          const ids = new Set<string>()
+          if (e.contractId) ids.add(e.contractId)
+          for (const row of e.rows ?? []) if (row.contract_id) ids.add(row.contract_id)
+          for (const id of ids) keys.add(`${id}|${e.kind ?? 'premium'}|${e.planned.periodStart}`)
+        }
+        setFortnoxUnlinked(keys)
+      })
+      .catch((err) => {
+        console.warn('Fortnox-kontrollen för avtalskartan misslyckades:', err)
+        if (!cancelled) setFortnoxUnlinked(new Set())
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [billingPlans, root.id])
+
   // § 5: aktiva stationer per kundrad, ur utplaceringarna (ute) och planritningarna (inne)
   const [stationsByCustomer, setStationsByCustomer] = useState<Map<string, { outdoor: number; indoor: number; addon: number }>>(new Map())
   /** Tilläggsstationer per år/månad utan beslutat läge, per enhet och stationstyp */
@@ -1572,12 +1610,15 @@ export default function ContractMapSection({ data, onChanged }: Props) {
           reason: e.reason,
           rows: e.rows?.map((r) => ({ name: r.article_name, quantity: r.quantity, unit_price: r.unit_price, total_price: r.total_price, contract_id: r.contract_id ?? null })),
         }
-        for (const id of ids) map.set(id, [...(map.get(id) ?? []), entry])
+        for (const id of ids) {
+          const unlinked = fortnoxUnlinked.has(`${id}|${entry.kind}|${entry.periodStart}`)
+          map.set(id, [...(map.get(id) ?? []), unlinked ? { ...entry, fortnoxUnlinked: true } : entry])
+        }
       }
     }
     for (const list of map.values()) list.sort((a, b) => a.periodStart.localeCompare(b.periodStart))
     return map
-  }, [billingPlans])
+  }, [billingPlans, fortnoxUnlinked])
 
   const planTotals = useMemo(() => {
     const merged = billingPlans.length ? ContractInvoiceGenerator.mergePlans(root.id, billingPlans) : null
@@ -1652,7 +1693,12 @@ export default function ContractMapSection({ data, onChanged }: Props) {
       setPlanPreview(merged)
       // Passerade perioder utan faktura håller modalen öppen: där finns
       // knappen för att registrera perioden som fakturerad utanför portalen.
-      if (merged.summary.create + merged.summary.update + merged.summary.delete + merged.summary.historical + merged.summary.uncovered === 0) {
+      // Utkast för perioder som börjat håller den också öppen: modalen
+      // kontrollerar dem mot Fortnox (kopplas eller ska skickas).
+      if (
+        merged.summary.create + merged.summary.update + merged.summary.delete + merged.summary.historical + merged.summary.uncovered === 0 &&
+        !hasFortnoxCheckCandidates(merged)
+      ) {
         setPlanPreviewOpen(false)
         setPlanPreview(null)
         toast.success(
@@ -1679,12 +1725,19 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     await openPlanPreview()
   }
 
-  const applyPlanPreview = async () => {
-    if (!planPreview) return
+  /** Planen kommer från modalen: efter Fortnox-kontrollen och användarens val */
+  const applyPlanPreview = async (checked: BillingPlan) => {
     setBusy(true)
     try {
-      const r = await ContractInvoiceGenerator.apply(planPreview)
-      toast.success(`Fakturor: ${r.createdIds.length} nya, ${r.updatedIds.length} uppdaterade, ${r.deletedIds.length} borttagna.`)
+      const r = await ContractInvoiceGenerator.apply(checked)
+      const linked = r.linkedIds?.length ?? 0
+      toast.success(
+        `Fakturor: ${r.createdIds.length} nya, ${r.updatedIds.length} uppdaterade, ${r.deletedIds.length} borttagna` +
+          (linked ? `, ${linked} kopplade till Fortnox${r.indexedSteps ? ` (${r.indexedSteps} indexsteg)` : ''}` : '') +
+          '.'
+      )
+      if (r.fortnoxSkipped) toast(`${r.fortnoxSkipped} Fortnox-koppling hoppades över (inget val, eller utkastet ändrat).`)
+      for (const msg of r.indexErrors ?? []) toast.error(`Indexsteget kunde inte läggas: ${msg}`)
       setPlanPreviewOpen(false)
       setPlanPreview(null)
       await onChanged()
@@ -2144,7 +2197,8 @@ export default function ContractMapSection({ data, onChanged }: Props) {
     isUnitContract: !isSingleSite && unitIds.has(c.customer_id ?? ''),
     followupUnits: followupFor(c).units,
     pendingBricks: bricksFor(c).length,
-    uncoveredPeriods: (planEntriesByContract.get(c.id) ?? []).filter((e) => e.action === 'uncovered').length,
+    uncoveredPeriods: (planEntriesByContract.get(c.id) ?? []).filter((e) => e.action === 'uncovered' || e.fortnoxUnlinked).length,
+    fortnoxUnlinkedPeriods: (planEntriesByContract.get(c.id) ?? []).filter((e) => e.fortnoxUnlinked).length,
     hasPlannedInvoice: hasPlannedInvoice(planEntriesByContract.get(c.id) ?? []),
     coveredUnits: coveredLocationsFor(c),
   })
@@ -3355,7 +3409,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
         isOpen={planPreviewOpen}
         plan={planPreview}
         loading={planLoading}
-        onConfirm={() => void applyPlanPreview()}
+        onConfirm={(checked) => void applyPlanPreview(checked)}
         onMarkOutside={markPeriodOutside}
         onCancel={() => {
           setPlanPreviewOpen(false)
@@ -4536,7 +4590,8 @@ function PaperContract({
     followupUnits: followup.units,
     breakdown: contentData.content.summary?.parts?.premium ?? contentData.content.summary?.breakdown ?? null,
     pendingBricks: (addonBricks ?? []).length,
-    uncoveredPeriods: (planEntries ?? []).filter((e) => e.action === 'uncovered').length,
+    uncoveredPeriods: (planEntries ?? []).filter((e) => e.action === 'uncovered' || e.fortnoxUnlinked).length,
+    fortnoxUnlinkedPeriods: (planEntries ?? []).filter((e) => e.fortnoxUnlinked).length,
     hasPlannedInvoice: hasPlannedInvoice(planEntries ?? []),
     coveredUnits: coveredLocations,
   })

@@ -111,6 +111,8 @@ export interface PremiumPlanEntry {
   existingStatus?: string | null
   consolidated?: boolean
   reason?: string
+  /** Perioden har börjat och fakturan finns i Fortnox, men utkastet är inte kopplat (Fortnox-kontrollen) */
+  fortnoxUnlinked?: boolean
   /** Fakturans rader som Fortnox får dem (förhandsvisning i panelen) */
   rows?: Array<{ name: string; quantity: number; unit_price: number; total_price: number; contract_id?: string | null }>
 }

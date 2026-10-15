@@ -68,8 +68,10 @@ export interface CompletenessInput {
   breakdown: MarginBreakdown | null
   /** Antal brickor med tilläggsstationer som väntar på beslut */
   pendingBricks: number
-  /** Passerade fakturaperioder utan faktura i portalen */
+  /** Passerade fakturaperioder utan faktura i portalen, plus perioder fakturerade i Fortnox men inte kopplade */
   uncoveredPeriods: number
+  /** Av uncoveredPeriods: utkast för en period som börjat där Fortnox-kontrollen hittat fakturan */
+  fortnoxUnlinkedPeriods?: number
   /** Nästa period finns som faktura (utkast eller skickad): fakturaplanen är gjord */
   hasPlannedInvoice: boolean
   /** Enheterna i omfattningen, för Er referens-koder */
@@ -95,8 +97,9 @@ export interface CompletenessResult {
 
 export function computeCompleteness(input: CompletenessInput): CompletenessResult {
   const { contract: c, scope, isAvrop, isUnitContract, followupUnits, breakdown, pendingBricks, uncoveredPeriods, hasPlannedInvoice, coveredUnits } = input
+  const fortnoxUnlinked = input.fortnoxUnlinkedPeriods ?? 0
   const annual = Number(c.annual_value ?? 0)
-  const start = c.contract_start_date ?? c.start_date ?? null
+  const start =c.contract_start_date ?? c.start_date ?? null
   const hasScope = !!c.covers_all_sites || isUnitContract || scope.length > 0
   const hasFollowup =
     isAvrop ||
@@ -131,7 +134,25 @@ export function computeCompleteness(input: CompletenessInput): CompletenessResul
     { key: 'pricelist', label: 'Prislista för avrop', ok: hasPriceList, vital: isAvrop, group: 'prislista', paragraph: '§ 2', hint: 'Utan prislista gäller kundens lista eller prisguiden för avrop.' },
     { key: 'labour', label: 'Arbetstid för marginal', ok: !breakdown?.labour_missing, vital: false, group: 'innehall', paragraph: '§ 4', hint: 'Utan årets arbetstid som intern kostnad säger marginalen ingenting. Minst en halvtimme per besök, normalt en timme.' },
     { key: 'bricks', label: pendingBricks === 1 ? 'En tilläggsstation väntar på beslut' : `${pendingBricks} tilläggsstationer väntar på beslut`, ok: pendingBricks === 0, vital: false, group: 'innehall', paragraph: '§ 5', hint: 'Bestäm om stationerna bakas in i premien eller faktureras som tillägg.' },
-    { key: 'uncovered', label: uncoveredPeriods === 1 ? 'En period saknar faktura' : `${uncoveredPeriods} perioder saknar faktura`, ok: uncoveredPeriods === 0, vital: false, group: 'fakturering', paragraph: '§ 6', hint: 'Koppla Fortnox-fakturan om perioden fakturerats utanför portalen.' },
+    {
+      key: 'uncovered',
+      label:
+        fortnoxUnlinked > 0 && fortnoxUnlinked === uncoveredPeriods
+          ? fortnoxUnlinked === 1
+            ? 'En period är fakturerad i Fortnox men inte kopplad'
+            : `${fortnoxUnlinked} perioder är fakturerade i Fortnox men inte kopplade`
+          : uncoveredPeriods === 1
+            ? 'En period saknar faktura'
+            : `${uncoveredPeriods} perioder saknar faktura`,
+      ok: uncoveredPeriods === 0,
+      vital: false,
+      group: 'fakturering',
+      paragraph: '§ 6',
+      hint:
+        fortnoxUnlinked > 0
+          ? 'Planera fakturor kopplar utkastet till fakturan som redan finns i Fortnox, så att ingen dubblett skickas.'
+          : 'Koppla Fortnox-fakturan om perioden fakturerats utanför portalen.',
+    },
     { key: 'refs', label: unitsWithoutCode === 1 ? 'Kod saknas på en enhet' : `Kod saknas på ${unitsWithoutCode} enheter`, ok: unitsWithoutCode === 0 || coveredUnits.length === 0, vital: false, group: 'referenser', paragraph: '§ 7', hint: 'Enhetens kod blir Er referens på fakturan. Saknas den anger beställaren kod på ärendet.' },
   ]
 

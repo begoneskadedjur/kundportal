@@ -85,6 +85,9 @@ export interface FortnoxInvoice {
   InvoiceDate: string
   Sent: boolean
   FinalPayDate: string | null
+  /** Finns i fakturalistan (InvoiceListItem) men inte alltid i äldre svar */
+  Booked?: boolean
+  Cancelled?: boolean
 }
 
 export interface FortnoxInvoiceRow {
@@ -165,10 +168,13 @@ export const FortnoxService = {
   },
 
   // Fakturor
-  async getInvoices(customerNumber?: string): Promise<FortnoxInvoice[]> {
-    const path = customerNumber
-      ? `invoices?customernumber=${customerNumber}`
-      : 'invoices'
+  async getInvoices(customerNumber?: string, opts?: { fromDate?: string; limit?: number }): Promise<FortnoxInvoice[]> {
+    const params = new URLSearchParams()
+    if (customerNumber) params.set('customernumber', customerNumber)
+    if (opts?.fromDate) params.set('fromdate', opts.fromDate)
+    if (opts?.limit) params.set('limit', String(opts.limit))
+    const qs = params.toString()
+    const path = qs ? `invoices?${qs}` : 'invoices'
     const data = await fortnoxRequest<{ Invoices: FortnoxInvoice[] }>(path)
     return data.Invoices ?? []
   },

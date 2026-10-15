@@ -4,12 +4,25 @@
 // Passerade perioder utan faktura ("saknar faktura") kan markeras som
 // fakturerade utanför portalen (systemet före Fortnox, manuell faktura)
 // direkt i listan, så att planen räknar dem som täckta.
+//
+// Fortnox-kontrollen (3.59.0): när grundplanen visas kontrolleras perioder
+// som redan börjat mot kundens fakturor i Fortnox (fortnoxPlanCheck.ts).
+// Utkast vars faktura redan finns i Fortnox kopplas i stället för att ligga
+// kvar som "Väntar"; flera träffar väljs här, aldrig automatiskt.
 
-import React, { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import LoadingSpinner from '../../shared/LoadingSpinner'
-import type { BillingPlan, BillingPlanAction, BillingPlanEntry } from '../../../services/contractInvoiceGenerator'
+import type { BillingPlan, BillingPlanAction, BillingPlanEntry, FortnoxCandidate } from '../../../services/contractInvoiceGenerator'
+import {
+  candidateStatusLabel,
+  checkPlanAgainstFortnox,
+  chooseFortnoxCandidate,
+  hasFortnoxCheckCandidates,
+  type FortnoxInvoiceCache,
+} from '../../../services/fortnoxPlanCheck'
 
 export interface MarkOutsideInput {
   amount: number
@@ -21,7 +34,8 @@ interface Props {
   isOpen: boolean
   plan: BillingPlan | null
   loading: boolean
-  onConfirm: () => void
+  /** Får planen efter Fortnox-kontrollen och användarens val: det är den som ska appliceras */
+  onConfirm: (plan: BillingPlan) => void
   onCancel: () => void
   /** Registrera en passerad period som fakturerad utanför portalen. Saknas den visas ingen knapp. */
   onMarkOutside?: (entry: BillingPlanEntry, input: MarkOutsideInput) => Promise<void>
@@ -60,10 +74,48 @@ const HIDDEN_ACTIONS = new Set<BillingPlanAction>([
   'backfill-historical-paid',
 ])
 
+const FORTNOX_ACTIONS = new Set<BillingPlanAction>(['link-fortnox', 'link-fortnox-indexed', 'overdue-send'])
+
+const formatKr = (n: number) => new Intl.NumberFormat('sv-SE').format(Math.round(n))
+
+/** Statuspunkt + platt text för Fortnox-kontrollens rader (inga piller) */
+function fortnoxRowText(entry: BillingPlanEntry): { dot: string; label: string; text: string } | null {
+  const f = entry.fortnox
+  if (!f) return null
+  const chosen = f.chosen ? f.candidates.find((c) => c.documentNumber === f.chosen) : undefined
+  if (chosen && chosen.match === 'indexed') {
+    return {
+      dot: 'bg-[#20c58f]',
+      label: 'Fortnox',
+      text: `Finns i Fortnox som ${chosen.documentNumber}, indexerad ${formatKr(f.baseSubtotal)} → ${formatKr(chosen.net)} kr`,
+    }
+  }
+  if (chosen) {
+    return { dot: 'bg-[#20c58f]', label: 'Fortnox', text: `Finns i Fortnox som ${chosen.documentNumber}, ${candidateStatusLabel(chosen)}` }
+  }
+  if (f.status === 'choose') {
+    return { dot: 'bg-amber-400', label: 'Välj faktura', text: `${f.candidates.length} fakturor i Fortnox kan vara periodens, välj vilken` }
+  }
+  return {
+    dot: 'bg-red-400',
+    label: 'Att skicka',
+    text:
+      entry.action === 'overdue-send'
+        ? 'Perioden har börjat och fakturan finns inte i Fortnox: godkänn och skicka'
+        : 'Saknas i Fortnox, att skicka',
+  }
+}
+
+function candidateLine(c: FortnoxCandidate): string {
+  return `${c.documentNumber} · ${c.invoiceDate} · ${formatKr(c.total)} kr inkl. moms · ${candidateStatusLabel(c)}${
+    c.match === 'indexed' ? ' · indexerat belopp' : ''
+  }`
+}
+
 const INPUT_CLASS =
   'bg-slate-800 border border-slate-600 rounded-lg px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent'
 
-export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfirm, onCancel, onMarkOutside }: Props) {
+export default function BillingPlanPreviewModal({ isOpen, plan: basePlan, loading, onConfirm, onCancel, onMarkOutside }: Props) {
   const [openIdx, setOpenIdx] = useState<number | null>(null)
   const [amount, setAmount] = useState('')
   const [invoicedAt, setInvoicedAt] = useState('')
@@ -71,17 +123,69 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Fortnox-kontrollen körs efter grundplanen och blockerar den inte.
+  // Fakturalistan cachas per kundnummer så länge modalen är öppen.
+  const [checkedPlan, setCheckedPlan] = useState<BillingPlan | null>(null)
+  const [fortnoxChecking, setFortnoxChecking] = useState(false)
+  const [fortnoxNotice, setFortnoxNotice] = useState<string | null>(null)
+  const fortnoxCache = useRef<FortnoxInvoiceCache>(new Map())
+
+  useEffect(() => {
+    if (!isOpen) {
+      fortnoxCache.current = new Map()
+      setCheckedPlan(null)
+      setFortnoxNotice(null)
+      setFortnoxChecking(false)
+      return
+    }
+    setCheckedPlan(basePlan)
+    setFortnoxNotice(null)
+    if (!basePlan || !hasFortnoxCheckCandidates(basePlan)) {
+      setFortnoxChecking(false)
+      return
+    }
+    let cancelled = false
+    setFortnoxChecking(true)
+    checkPlanAgainstFortnox(basePlan, fortnoxCache.current)
+      .then((r) => {
+        if (cancelled) return
+        setCheckedPlan(r.plan)
+        const notes: string[] = []
+        if (r.error) notes.push(r.error)
+        if (r.missingCustomerNumber > 0) notes.push('Kunden saknar Fortnox-kundnummer, kopplingar inte kontrollerade')
+        setFortnoxNotice(notes.length ? notes.join('. ') : null)
+      })
+      .catch((err) => {
+        console.warn('Fortnox-kontrollen misslyckades:', err)
+        if (!cancelled) setFortnoxNotice('Fortnox kunde inte nås, kopplingar inte kontrollerade')
+      })
+      .finally(() => {
+        if (!cancelled) setFortnoxChecking(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, basePlan])
+
   if (!isOpen) return null
 
+  const plan = checkedPlan ?? basePlan
+
   const hasVisibleChanges = plan
-    ? (plan.summary.create + plan.summary.update + plan.summary.delete) > 0
+    ? (plan.summary.create + plan.summary.update + plan.summary.delete + plan.summary.linkFortnox) > 0
     : false
   const hasHistorical = (plan?.summary.historical ?? 0) > 0
   const hasAnythingToApply = hasVisibleChanges || hasHistorical
 
-  const visibleEntries = (plan?.entries ?? []).filter(
-    e => !HIDDEN_ACTIONS.has(e.action) && e.action !== 'keep'
-  )
+  // Index i planen följer med: valet vid flera Fortnox-träffar pekar på posten
+  const visibleEntries = (plan?.entries ?? [])
+    .map((entry, planIdx) => ({ entry, planIdx }))
+    .filter(({ entry: e }) => !HIDDEN_ACTIONS.has(e.action) && e.action !== 'keep')
+
+  const choose = (planIdx: number, documentNumber: string | null) => {
+    if (!plan) return
+    setCheckedPlan(chooseFortnoxCandidate(plan, planIdx, documentNumber))
+  }
 
   const startMark = (i: number, entry: BillingPlanEntry) => {
     setOpenIdx(i)
@@ -135,6 +239,46 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
                 <span className="text-slate-500">{plan.summary.keep} oförändrade</span>
                 <span className="text-slate-500 ml-auto">belopp exkl. moms</span>
               </div>
+              {(plan.summary.linkFortnox + plan.summary.fortnoxChoose + plan.summary.overdueSend + plan.summary.uncovered) > 0 && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
+                  {plan.summary.linkFortnox > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#20c58f]" />
+                      {plan.summary.linkFortnox} kopplas till Fortnox
+                    </span>
+                  )}
+                  {plan.summary.fortnoxChoose > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      {plan.summary.fortnoxChoose} att välja
+                    </span>
+                  )}
+                  {plan.summary.overdueSend > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                      {plan.summary.overdueSend} saknas i Fortnox
+                    </span>
+                  )}
+                  {plan.summary.uncovered > 0 && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                      {plan.summary.uncovered} saknar faktura i portalen
+                    </span>
+                  )}
+                </div>
+              )}
+              {fortnoxChecking && (
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Kontrollerar passerade perioder mot Fortnox…
+                </div>
+              )}
+              {fortnoxNotice && !fortnoxChecking && (
+                <div className="flex items-center gap-1.5 text-xs text-amber-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  {fortnoxNotice}
+                </div>
+              )}
               {hasHistorical && (
                 <div className="text-xs text-slate-500">
                   {plan.summary.historical} historiska perioder registreras som betalda (visas ej i fakturering).
@@ -150,10 +294,87 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
               </div>
             ) : (
               <div className="max-h-96 overflow-y-auto space-y-1">
-                {visibleEntries.map((entry, i) => {
+                {visibleEntries.map(({ entry, planIdx }, i) => {
+                  const fx = fortnoxRowText(entry)
+                  // En period utan faktura som inte heller finns i Fortnox behåller
+                  // sin vanliga rad med "fakturerad utanför portalen".
+                  const plainUncovered =
+                    entry.action === 'uncovered' && entry.fortnox?.status === 'missing' && entry.fortnox.candidates.length === 0
+                  if (fx && !plainUncovered && (FORTNOX_ACTIONS.has(entry.action) || entry.fortnox)) {
+                    const f = entry.fortnox!
+                    const showChoices = f.candidates.length > 1 || (f.status === 'missing' && f.candidates.length > 0)
+                    return (
+                      <div key={i} className="bg-slate-800/20 border border-slate-700/50 rounded-lg text-xs">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2">
+                          <span className="flex items-center gap-1.5 w-28 shrink-0 text-slate-300">
+                            <span className={`w-1.5 h-1.5 rounded-full ${fx.dot}`} />
+                            {fx.label}
+                          </span>
+                          <span className="text-slate-200 w-24">{formatPeriod(entry.planned?.periodStart)}</span>
+                          <span className="text-slate-400 font-mono w-28" title="exkl. moms">
+                            {formatAmount(entry.existingSubtotal ?? entry.planned?.subtotal)}
+                          </span>
+                          <span className="text-slate-300 flex-1 min-w-[12rem]">{fx.text}</span>
+                          {f.status === 'match' && f.candidates.length === 1 && (
+                            <button
+                              type="button"
+                              onClick={() => choose(planIdx, null)}
+                              className="text-slate-400 underline decoration-dotted hover:text-slate-200 whitespace-nowrap"
+                            >
+                              koppla inte
+                            </button>
+                          )}
+                          {f.status === 'missing' && f.candidates.length === 1 && (
+                            <button
+                              type="button"
+                              onClick={() => choose(planIdx, f.candidates[0].documentNumber)}
+                              className="text-[#20c58f] underline decoration-dotted hover:brightness-110 whitespace-nowrap"
+                            >
+                              koppla {f.candidates[0].documentNumber} ändå
+                            </button>
+                          )}
+                        </div>
+                        {(entry.duplicateIds?.length ?? 0) > 0 && f.chosen && (
+                          <div className="px-3 pb-2 text-slate-500">
+                            {entry.duplicateIds!.length === 1
+                              ? 'Ett dubblettutkast för samma period tas bort.'
+                              : `${entry.duplicateIds!.length} dubblettutkast för samma period tas bort.`}
+                          </div>
+                        )}
+                        {showChoices && (
+                          <div className="px-3 pb-3 pt-2 border-t border-slate-700/50 space-y-1.5">
+                            <p className="text-slate-400">Vilken Fortnox-faktura är periodens? Ingen kopplas utan ditt val.</p>
+                            {f.candidates.map((c) => (
+                              <label key={c.documentNumber} className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name={`fortnox-${planIdx}`}
+                                  className="accent-[#20c58f]"
+                                  checked={f.chosen === c.documentNumber}
+                                  onChange={() => choose(planIdx, c.documentNumber)}
+                                />
+                                {candidateLine(c)}
+                              </label>
+                            ))}
+                            <label className="flex items-center gap-2 text-slate-400 cursor-pointer">
+                              <input
+                                type="radio"
+                                name={`fortnox-${planIdx}`}
+                                className="accent-[#20c58f]"
+                                checked={f.status === 'missing'}
+                                onChange={() => choose(planIdx, null)}
+                              />
+                              Ingen av dem
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
                   const meta = actionMeta[entry.action]
                   if (!meta) return null
                   const canMark = entry.action === 'uncovered' && !!onMarkOutside && !!entry.planned
+                  const missingInFortnox = entry.fortnox?.status === 'missing'
                   const isOpenRow = openIdx === i
                   return (
                     <div key={i} className="bg-slate-800/20 border border-slate-700/50 rounded-lg text-xs">
@@ -181,7 +402,9 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
                         {entry.reason && !canMark && <span className="text-slate-500 ml-auto">{entry.reason}</span>}
                         {canMark && (
                           <span className="ml-auto flex items-center gap-3">
-                            <span className="text-slate-500 hidden sm:inline">Importera från Fortnox i § 6, eller</span>
+                            <span className="text-slate-500 hidden sm:inline">
+                              {missingInFortnox ? 'Saknas i Fortnox, att skicka, eller' : 'Importera från Fortnox i § 6, eller'}
+                            </span>
                             <button
                               type="button"
                               onClick={() => (isOpenRow ? setOpenIdx(null) : startMark(i, entry))}
@@ -230,7 +453,7 @@ export default function BillingPlanPreviewModal({ isOpen, plan, loading, onConfi
 
       <div className="px-4 py-2.5 border-t border-slate-700/50 flex justify-end gap-2">
         <Button variant="secondary" onClick={onCancel}>Avbryt</Button>
-        <Button variant="primary" onClick={onConfirm} disabled={loading || !hasAnythingToApply}>
+        <Button variant="primary" onClick={() => plan && onConfirm(plan)} disabled={loading || !plan || !hasAnythingToApply}>
           Applicera plan
         </Button>
       </div>

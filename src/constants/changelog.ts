@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.59.0',
+    date: '2026-10-15',
+    title: 'Fakturaplanen kollar Fortnox',
+    items: [
+      { kind: 'nyhet', text: 'Planera fakturor kontrollerar perioder som redan har börjat mot kundens fakturor i Fortnox. Finns fakturan redan där kopplas utkastet till den i stället för att ligga kvar som Väntar, så att ingen dubblett skickas.' },
+      { kind: 'nyhet', text: 'Har Fortnox-fakturan ett indexerat belopp kopplas den ändå och årspremien får ett indexsteg från periodstart. Passar flera fakturor väljer du själv vilken som är periodens.' },
+      { kind: 'nyhet', text: 'Saknas fakturan i Fortnox fast perioden har börjat står det Saknas i Fortnox, att skicka. Avtalskartan varnar i § 6 när en period är fakturerad i Fortnox men inte kopplad.' },
+    ],
+  },
+  {
     version: '3.58.0',
     date: '2026-10-15',
     title: 'Automatisk prislista',

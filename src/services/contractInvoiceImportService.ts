@@ -28,7 +28,19 @@ export interface ImportContractInvoiceInput {
   periodEnd: string
   /** Avtal som fakturan täcker när den är samlad (för radkoppling och logg) */
   coveredContractIds?: string[]
+  /**
+   * Portalens utkast för perioden som fakturan ersätter (fakturaplanens
+   * Fortnox-kontroll). Utkastet görs om till F-{nr}; finns F-{nr} redan tas
+   * utkastet bort. Bara redigerbara utkast utan Fortnox-nummer rörs.
+   */
+  replaceInvoiceId?: string | null
+  /** Andra utkast för samma period (dubbletter) som tas bort, samma villkor */
+  removeInvoiceIds?: string[]
+  /** Hämtad faktura (sparar ett Fortnox-anrop när anroparen redan har den) */
+  detail?: FortnoxInvoiceDetail
 }
+
+const EDITABLE_DRAFT_STATUSES = new Set(['draft', 'pending_approval', 'ready'])
 
 export interface ImportContractInvoiceResult {
   invoiceId: string
@@ -63,7 +75,7 @@ export class ContractInvoiceImportService {
     }
 
     const invoiceNumber = `F-${nr}`
-    const detail = await FortnoxService.getInvoice(nr)
+    const detail = input.detail ?? (await FortnoxService.getInvoice(nr))
     if (detail.Cancelled) throw new Error(`Fortnox ${nr} är makulerad och kan inte täcka en period`)
 
     const subtotal = Math.round(num(detail.Net) * 100) / 100
@@ -123,11 +135,40 @@ export class ContractInvoiceImportService {
       created_at: detail.InvoiceDate ? `${detail.InvoiceDate}T12:00:00+02:00` : new Date().toISOString(),
     }
 
+    // Utkast som fakturan ersätter: bara redigerbara utan Fortnox-nummer.
+    // Ett skickat/bokfört/betalt utkast eller ett med Fortnox-nummer ägs av
+    // statussynken och rörs aldrig härifrån.
+    const draftIds = [input.replaceInvoiceId, ...(input.removeInvoiceIds ?? [])].filter((id): id is string => !!id)
+    const safeDrafts = new Set<string>()
+    if (draftIds.length > 0) {
+      const { data: drafts } = await supabase
+        .from('invoices')
+        .select('id, status, fortnox_document_number')
+        .in('id', draftIds)
+      for (const d of (drafts ?? []) as Array<{ id: string; status: string | null; fortnox_document_number: string | null }>) {
+        if (EDITABLE_DRAFT_STATUSES.has(d.status ?? 'draft') && !d.fortnox_document_number) safeDrafts.add(d.id)
+      }
+    }
+    const replaceId = input.replaceInvoiceId && safeDrafts.has(input.replaceInvoiceId) ? input.replaceInvoiceId : null
+    const removeDraft = async (id: string) => {
+      if (!safeDrafts.has(id)) return
+      await supabase.from('invoice_items').delete().eq('invoice_id', id)
+      const { error } = await supabase.from('invoices').delete().eq('id', id)
+      if (error) throw new Error(`Kunde inte ta bort utkastet: ${error.message}`)
+    }
+
     let invoiceId: string
     if (existing) {
       const { error } = await supabase.from('invoices').update(payload).eq('id', existing.id)
       if (error) throw new Error(`Kunde inte uppdatera ${invoiceNumber}: ${error.message}`)
       invoiceId = existing.id
+      await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
+      if (replaceId && replaceId !== existing.id) await removeDraft(replaceId)
+    } else if (replaceId) {
+      // Utkastet görs om till Fortnox-fakturan (samma rad, nytt nummer och belopp)
+      const { error } = await supabase.from('invoices').update(payload).eq('id', replaceId)
+      if (error) throw new Error(`Kunde inte göra om utkastet till ${invoiceNumber}: ${error.message}`)
+      invoiceId = replaceId
       await supabase.from('invoice_items').delete().eq('invoice_id', invoiceId)
     } else {
       const { data: inv, error } = await supabase.from('invoices').insert(payload).select('id').single()
@@ -154,6 +195,11 @@ export class ContractInvoiceImportService {
     if (rows.length > 0) {
       const { error: rErr } = await supabase.from('invoice_items').insert(rows)
       if (rErr) throw new Error(`Kunde inte spara fakturaraderna: ${rErr.message}`)
+    }
+
+    // Dubblettutkast för samma period tas bort när perioden är fakturerad
+    for (const id of input.removeInvoiceIds ?? []) {
+      if (id !== invoiceId) await removeDraft(id)
     }
 
     const logTargets = input.contractId ? [input.contractId] : (input.coveredContractIds ?? [])

@@ -17,6 +17,7 @@ import ContractCaseServiceSelector from './ContractCaseServiceSelector'
 import { type BillingFrequency, BILLING_FREQUENCY_CONFIG, type AdhocInvoiceGrouping } from '../../../types/contractBilling'
 import toast from 'react-hot-toast'
 import { ContractInvoiceGenerator, computePlannedInvoicesPure, type BillingPlan } from '../../../services/contractInvoiceGenerator'
+import { hasFortnoxCheckCandidates } from '../../../services/fortnoxPlanCheck'
 import { ContractService } from '../../../services/contractService'
 import { ContractScopeService } from '../../../services/contractScopeService'
 import { PaymentTermsService } from '../../../services/paymentTermsService'
@@ -585,7 +586,11 @@ export default function BillingSettingsModal({
       const plans = await ContractInvoiceGenerator.planCombinedForCustomer(planCustomerId)
       const newPlan = ContractInvoiceGenerator.mergePlans(planCustomerId, plans)
       setPlan(newPlan)
-      const hasChanges = (newPlan.summary.create + newPlan.summary.update + newPlan.summary.delete + newPlan.summary.historical) > 0
+      // Utkast för perioder som börjat håller förhandsvisningen öppen: den
+      // kontrollerar dem mot Fortnox (kopplas eller ska skickas).
+      const hasChanges =
+        (newPlan.summary.create + newPlan.summary.update + newPlan.summary.delete + newPlan.summary.historical) > 0 ||
+        hasFortnoxCheckCandidates(newPlan)
       if (!hasChanges) {
         setPlanOpen(false)
         setPlan(null)
@@ -607,12 +612,14 @@ export default function BillingSettingsModal({
     }
   }
 
-  const handleConfirmPlan = async () => {
-    if (!plan) return
+  // Planen kommer från förhandsvisningen: efter Fortnox-kontrollen och användarens val
+  const handleConfirmPlan = async (checked: BillingPlan) => {
     try {
-      const result = await ContractInvoiceGenerator.apply(plan)
+      const result = await ContractInvoiceGenerator.apply(checked)
+      const linked = result.linkedIds?.length ?? 0
       toast.success(
-        `Plan applicerad: ${result.createdIds.length} nya, ${result.updatedIds.length} uppdaterade, ${result.deletedIds.length} raderade, ${result.historicalIds.length} historiska`
+        `Plan applicerad: ${result.createdIds.length} nya, ${result.updatedIds.length} uppdaterade, ${result.deletedIds.length} raderade, ${result.historicalIds.length} historiska` +
+          (linked ? `, ${linked} kopplade till Fortnox` : '')
       )
       setPlanOpen(false)
       setPlan(null)
