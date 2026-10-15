@@ -102,17 +102,19 @@ const ACCENTS = ['#20c58f', '#38bdf8', '#f59e0b', '#a78bfa', '#f472b6', '#34d399
 
 const todayKey = () => new Date().toISOString().slice(0, 10)
 
-/** Fakturaplanen är gjord när nästa period redan finns som faktura (utkast eller skickad) */
+/**
+ * Fakturaplanen är gjord när nästa period redan finns som faktura (utkast
+ * eller skickad), eller när bindningstidens alla perioder har en faktura och
+ * det inte finns något kvar att skapa. Sista året i bindningstiden har ingen
+ * kommande period förrän cronen skapar förlängningen dagen efter sista
+ * uppsägningsdag; då ska avtalet inte se oplanerat ut.
+ */
 const hasPlannedInvoice = (entries: PremiumPlanEntry[]): boolean => {
   const today = todayKey()
-  return entries.some(
-    (e) =>
-      (!e.kind || e.kind === 'premium') &&
-      e.periodStart > today &&
-      // Utkast finns, eller nästa period är en förlängning som får sitt utkast
-      // automatiskt 40 dagar före start: inget att göra för hand.
-      ((!!e.existingStatus && e.action !== 'delete') || e.action === 'later')
-  )
+  const premium = entries.filter((e) => !e.kind || e.kind === 'premium')
+  const exists = (e: PremiumPlanEntry) => !!e.existingStatus && e.action !== 'delete'
+  if (premium.some((e) => e.periodStart > today && exists(e))) return true
+  return premium.some(exists) && !premium.some((e) => e.action === 'create')
 }
 
 // ---------------------------------------------------------------------------
@@ -2766,7 +2768,7 @@ export default function ContractMapSection({ data, onChanged }: Props) {
               {planTotals.done && !planLoading ? (
                 // Allt är planerat: säg det, och låt knappen bli en stillsam länk.
                 // Att planera om ändrar ingenting förrän avtalet ändras.
-                <span className="inline-flex items-center gap-2 text-[12px] whitespace-nowrap" title="Alla perioder fram till horisonten har en faktura som stämmer med avtalen. Planera om behövs bara om du ändrat något i avtalen.">
+                <span className="inline-flex items-center gap-2 text-[12px] whitespace-nowrap" title="Alla perioder i avtalens nuvarande bindningstid har en faktura som stämmer med avtalen. Förlängningen skapas automatiskt dagen efter sista uppsägningsdag. Planera om behövs bara om du ändrat något i avtalen.">
                   <span className="text-slate-200 font-semibold">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#20c58f] mr-1.5 align-middle" aria-hidden />
                     fakturorna är planerade

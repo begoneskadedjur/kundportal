@@ -32,6 +32,8 @@ export interface PlanningContract {
   billing_anchor_month: number | null
   billing_active: boolean | null
   notice_period_months: number | null
+  /** § 8 förlängningsläge: rolling (default), fixed eller option */
+  renewal_mode?: string | null
 }
 
 /** Ett steg i premietrappan: årsvärdet som gäller från och med datumet. */
@@ -96,10 +98,12 @@ export interface PlannedPeriod {
   sequenceNumber: number
   totalSequenceCount: number
   /**
-   * Perioden ligger efter avtalets eget slutdatum och finns bara för att
-   * avtalet rullar vidare. Utkast skapas först när fakturadatumet är inne.
+   * Förlängningsperiod: perioden hör till nästa bindningsperiod (eller, för
+   * ett avtal som löper tills vidare, har inte börjat än) och kom med i
+   * planen först när sista uppsägningsdag passerat. Cronen skapar sådana
+   * utkast direkt, utan att vänta på fakturadatumet.
    */
-  beyondContractEnd?: boolean
+  renewal?: boolean
 }
 
 export interface PlanOptions {
@@ -115,11 +119,19 @@ export interface PlanOptions {
   /** Idag (lokal ÅÅÅÅ-MM-DD), för tester */
   today?: string
   /**
-   * Horisont bortom avtalets slutdatum: rullande avtal fortsätter efter
-   * contract_end_date tills de sägs upp, så planeringen får en horisont
-   * (t.ex. 12 månader framåt) i stället för att stanna vid slutdatumet.
+   * Fri horisont bortom avtalets slutdatum (perioden får börja före
+   * horisonten utan att rymmas helt). Används bara av vyer som vill titta
+   * längre fram; fakturaplaneringen använder window: 'binding'.
    */
   horizonEnd?: string
+  /**
+   * binding = planera bara avtalets nuvarande bindningstid, plus nästa
+   * bindningsperiod när sista uppsägningsdag passerat utan uppsägning
+   * (bindingWindow). Samma regel för Planera fakturor, signeringen och
+   * cronen. Uppsagda avtal planeras som utan horisont (slutdatum och
+   * uppsägningens kapning). Går före horizonEnd.
+   */
+  window?: 'binding'
   /** Var § 5 per år-rader hamnar (default with_premium = på premiefakturan) */
   equipmentMode?: EquipmentInvoiceMode
 }
@@ -191,6 +203,122 @@ export function rollingEndDate(
     guard++
   }
   return toLocalIsoDate(d)
+}
+
+/** Uppsägningstid när avtalet saknar uppgift (samma antagande som computeTerminationCutoff). */
+export const DEFAULT_NOTICE_MONTHS = 2
+
+/** Lokal datumaritmetik i hela månader (JS-överslag som i övriga uppsägningsberäkningar). */
+export function addMonthsIso(iso: string, months: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return toLocalIsoDate(new Date(y, (m ?? 1) - 1 + months, d ?? 1))
+}
+
+export function addDaysIso(iso: string, days: number): string {
+  return toLocalIsoDate(addDays(parseLocalDate(iso), days))
+}
+
+/**
+ * Sista uppsägningsdag inför ett periodskifte: periodens slut minus
+ * uppsägningstiden. Den enda beräkningen av datumet: kundkortets bevakning
+ * (lastTerminationDay) och fakturaplaneringen använder båda den här.
+ */
+export function lastNoticeDay(periodEndIso: string, noticeMonths: number): string {
+  return addMonthsIso(periodEndIso, -noticeMonths)
+}
+
+/** Planeringsfönstret för ett avtal en viss dag. */
+export interface BindingWindow {
+  /** Slutet på nuvarande bindningstid (rullat fram år för år); null = tills vidare */
+  currentEnd: string | null
+  /** Sista uppsägningsdag inför currentEnd; null för tills vidare och option */
+  lastNoticeDay: string | null
+  /** Sista uppsägningsdag har passerat utan uppsägning: nästa bindningsperiod är säker */
+  renewalDue: boolean
+  /** Planeringens slut */
+  planEnd: string
+  /** Tills vidare: perioder som börjar före planEnd tas med */
+  openEnded: boolean
+}
+
+/**
+ * Vilka perioder får planeras i dag? Regeln (beslut 2026-10-15):
+ * - Avtal med slutdatum: perioderna i nuvarande bindningstid
+ *   (contract_start_date till slutdatumet, eller för ett rullande avtal som
+ *   redan förlängts, den löpande ettårsperioden). Nästa bindningsperiod
+ *   (ett år) kommer med först dagen efter sista uppsägningsdag.
+ * - Option: bara till slutdatumet. Förlängningen sker när optionen nyttjas
+ *   (slutdatumet flyttas), aldrig automatiskt.
+ * - Tills vidare (inget slutdatum): en period kommer med när en uppsägning
+ *   i dag inte längre hinner före periodstart, alltså perioder som börjar
+ *   före i dag plus uppsägningstiden.
+ * null = uppsagt avtal eller startdatum saknas: planeras som förut, utan
+ * horisont (slutdatum och uppsägningens kapning).
+ */
+export function bindingWindow(c: PlanningContract, todayIso: string = toLocalIsoDate(todayLocal())): BindingWindow | null {
+  if (c.terminated_at) return null
+  if (!c.contract_start_date) return null
+  const notice = c.notice_period_months ?? DEFAULT_NOTICE_MONTHS
+  if (!c.contract_end_date) {
+    return { currentEnd: null, lastNoticeDay: null, renewalDue: false, planEnd: addMonthsIso(todayIso, notice), openEnded: true }
+  }
+  if ((c.renewal_mode ?? 'rolling') === 'option') {
+    return { currentEnd: c.contract_end_date, lastNoticeDay: null, renewalDue: false, planEnd: c.contract_end_date, openEnded: false }
+  }
+  const currentEnd = rollingEndDate(c, todayIso) ?? c.contract_end_date
+  const deadline = lastNoticeDay(currentEnd, notice)
+  const renewalDue = todayIso > deadline
+  return {
+    currentEnd,
+    lastNoticeDay: deadline,
+    renewalDue,
+    planEnd: renewalDue ? addMonthsIso(currentEnd, 12) : currentEnd,
+    openEnded: false,
+  }
+}
+
+/**
+ * Nästa förlängning som ännu INTE är planerad: sista dag att säga upp den,
+ * dagen den planeras (dagen efter) och dess första period. null för uppsagda
+ * avtal, option och avtal utan perioder. Visas i kundkortet som "Därefter".
+ */
+export function nextRenewal(
+  c: PlanningContract,
+  opts: Omit<PlanOptions, 'window' | 'horizonEnd'> = {}
+): { noticeDeadline: string; planDate: string; period: PlannedPeriod } | null {
+  const todayIso = opts.today ?? toLocalIsoDate(todayLocal())
+  const w = bindingWindow(c, todayIso)
+  if (!w) return null
+  let deadline: string
+  if (w.openEnded) {
+    // Första perioden som inte ryms i dagens fönster
+    const later = computePlannedPeriods(c, { ...opts, horizonEnd: addMonthsIso(w.planEnd, 24) })
+    const next = later.find((p) => p.periodStart >= w.planEnd)
+    if (!next) return null
+    deadline = lastNoticeDay(next.periodStart, c.notice_period_months ?? DEFAULT_NOTICE_MONTHS)
+  } else {
+    if (!w.lastNoticeDay) return null
+    const end = w.renewalDue ? w.planEnd : w.currentEnd!
+    deadline = lastNoticeDay(end, c.notice_period_months ?? DEFAULT_NOTICE_MONTHS)
+  }
+  const planDate = addDaysIso(deadline, 1)
+  const periods = computePlannedPeriods(c, { ...opts, today: planDate, window: 'binding' }).filter((p) => p.renewal)
+  if (periods.length === 0) return null
+  return { noticeDeadline: deadline, planDate, period: periods[0] }
+}
+
+/**
+ * Cronens regel för när en planerad period blir utkast: en förlängning
+ * (säker sedan sista uppsägningsdag passerat) direkt, övriga perioder när
+ * fakturadatumet är inne. Fakturadatumet är aldrig före planeringsdagen.
+ */
+export function isDueForCreation(p: Pick<PlannedPeriod, 'renewal' | 'invoiceDate'>, todayIso: string): boolean {
+  return !!p.renewal || p.invoiceDate <= todayIso
+}
+
+/** Periodens mittpunkt ligger före datumet: perioden hör till största delen till tiden före. */
+function midpointBefore(periodStart: Date, periodEnd: Date, limit: Date): boolean {
+  return (periodStart.getTime() + periodEnd.getTime()) / 2 < limit.getTime()
 }
 
 export function periodDivisor(freq: string | null): number {
@@ -288,11 +416,18 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
   const freq = (contract.billing_frequency ?? null) as string | null
   const start = contract.contract_start_date ? parseLocalDate(contract.contract_start_date) : null
   const declaredEnd = contract.contract_end_date ? parseLocalDate(contract.contract_end_date) : null
-  const end = opts.horizonEnd
-    ? declaredEnd && declaredEnd > parseLocalDate(opts.horizonEnd)
-      ? declaredEnd
-      : parseLocalDate(opts.horizonEnd)
-    : declaredEnd
+  const todayIso = opts.today ?? toLocalIsoDate(todayLocal())
+  // Bindningsfönstret går före den fria horisonten. null (uppsagt avtal) =
+  // planera som utan horisont.
+  const win = opts.window === 'binding' ? bindingWindow(contract, todayIso) : null
+  const horizonIso = opts.window === 'binding' ? undefined : opts.horizonEnd
+  const end = win
+    ? parseLocalDate(win.planEnd)
+    : horizonIso
+      ? declaredEnd && declaredEnd > parseLocalDate(horizonIso)
+        ? declaredEnd
+        : parseLocalDate(horizonIso)
+      : declaredEnd
 
   if (!freq || freq === 'on_demand') return []
   if (!start || !end) return []
@@ -313,9 +448,28 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
 
   // Slutet är en rullande horisont (inte avtalets eget slutdatum eller en
   // uppsägning): då får perioden börja före horisonten utan att rymmas helt.
-  const endIsHorizon = !cutoff && !!opts.horizonEnd && (!declaredEnd || declaredEnd < effectiveEnd)
-  const intervals = iterPeriodsPure(start, effectiveEnd, freq, contract.billing_anchor_month, !endIsHorizon)
-  const today = opts.today ? parseLocalDate(opts.today) : todayLocal()
+  const endIsHorizon = !win && !cutoff && !!horizonIso && (!declaredEnd || declaredEnd < effectiveEnd)
+  let intervals: Array<{ periodStart: Date; periodEnd: Date }>
+  if (win) {
+    // Bindningstid: en period hör till den bindningsperiod där största delen
+    // av den ligger (mittpunkten). Perioderna är månadsankrade (1 okt) medan
+    // avtalet slutar t.ex. den 14:e: perioden 1 okt till 30 sep efter ett
+    // slutdatum 14 okt är nästa års, inte årets. Tills vidare: perioder som
+    // börjar före fönstrets slut.
+    const raw = iterPeriodsPure(start, effectiveEnd, freq, contract.billing_anchor_month, false)
+    intervals = win.openEnded ? raw : raw.filter((r) => midpointBefore(r.periodStart, r.periodEnd, effectiveEnd))
+  } else {
+    intervals = iterPeriodsPure(start, effectiveEnd, freq, contract.billing_anchor_month, !endIsHorizon)
+  }
+  const currentEndDate = win?.currentEnd ? parseLocalDate(win.currentEnd) : null
+  const isRenewal = (periodStart: Date, periodEnd: Date): boolean => {
+    if (win) {
+      if (win.openEnded) return toLocalIsoDate(periodStart) > todayIso
+      return win.renewalDue && !!currentEndDate && !midpointBefore(periodStart, periodEnd, currentEndDate)
+    }
+    return endIsHorizon && !!declaredEnd && periodStart >= declaredEnd
+  }
+  const today = parseLocalDate(todayIso)
   const startOfCurrentMonth = new Date(today.getFullYear(), today.getMonth(), 1)
   const paymentTermsDays = opts.paymentTermsDays ?? 30
   const leadDays = opts.leadDays ?? DEFAULT_INVOICE_LEAD_DAYS
@@ -358,7 +512,7 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
 
     return {
       kind: 'premium' as const,
-      beyondContractEnd: endIsHorizon && !!declaredEnd && periodStart >= declaredEnd,
+      renewal: isRenewal(periodStart, periodEnd),
       periodStart: periodStartIso,
       periodEnd: toLocalIsoDate(periodEnd),
       amount,
@@ -426,7 +580,15 @@ export function computePlannedMonthlyEquipmentPeriods(contract: PlanningContract
     const esMonth = new Date(es.getFullYear(), es.getMonth(), 1)
     if (esMonth > cur) cur = esMonth
   }
-  const horizon = opts.horizonEnd ? parseLocalDate(opts.horizonEnd) : new Date(today.getFullYear() + 1, today.getMonth(), 1)
+  // Bindningsfönstret som för premien; uppsagda avtal (inget fönster) som förut
+  const win = opts.window === 'binding' ? bindingWindow(contract, toLocalIsoDate(today)) : null
+  const horizon = win
+    ? parseLocalDate(win.planEnd)
+    : opts.horizonEnd && opts.window !== 'binding'
+      ? parseLocalDate(opts.horizonEnd)
+      : new Date(today.getFullYear() + 1, today.getMonth(), 1)
+  const todayIsoEq = toLocalIsoDate(today)
+  const currentEndDate = win?.currentEnd ? parseLocalDate(win.currentEnd) : null
   let end = horizon
   const cutoff = computeTerminationCutoff(contract)
   if (cutoff && cutoff < end) end = cutoff
@@ -437,6 +599,8 @@ export function computePlannedMonthlyEquipmentPeriods(contract: PlanningContract
   while (cur <= end) {
     const periodStartIso = toLocalIsoDate(cur)
     const periodEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0)
+    // Bindningstid: månaden hör dit största delen av den ligger, som premien
+    if (win && !win.openEnded && !midpointBefore(cur, periodEnd, end)) break
     const rows: PlannedEquipmentRow[] = monthly
       .filter((e) => !e.billing_start_date || e.billing_start_date <= periodStartIso)
       .map((e) => {
@@ -473,6 +637,13 @@ export function computePlannedMonthlyEquipmentPeriods(contract: PlanningContract
         isHistorical: false,
         sequenceNumber: idx,
         totalSequenceCount: 0,
+        // Tills vidare: månader som inte börjat; bindningstid: månader i nästa
+        // bindningsperiod (mittpunkten efter nuvarande slut)
+        renewal: win
+          ? win.openEnded
+            ? periodStartIso > todayIsoEq
+            : win.renewalDue && !!currentEndDate && !midpointBefore(cur, periodEnd, currentEndDate)
+          : false,
       })
     }
     cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1)
@@ -481,7 +652,11 @@ export function computePlannedMonthlyEquipmentPeriods(contract: PlanningContract
   return out
 }
 
-/** Horisont för rullande avtal: 12 månader framåt från idag. */
+/**
+ * 12 månader framåt från idag. Styr inte längre vad som planeras (det gör
+ * bindingWindow); cronen använder den bara för att gallra vilka avtal som
+ * kan ha en förlängning nära.
+ */
 export function rollingHorizonEnd(today: Date = todayLocal()): string {
   return toLocalIsoDate(new Date(today.getFullYear() + 1, today.getMonth(), today.getDate()))
 }

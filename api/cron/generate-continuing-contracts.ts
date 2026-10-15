@@ -1,7 +1,14 @@
 // api/cron/generate-continuing-contracts.ts
-// Säkerhetsnät för fortlöpande avtal: skapar nästa periods årspremiefaktura
-// när avtalets slutdatum passerat (eller närmar sig) utan uppsägning.
-// Körs 1:a varje månad 03:00 UTC via Vercel Cron.
+// Förlängningar av avtal: den ENDA som skapar nästa bindningsperiods fakturor.
+// Regeln (beslut 2026-10-15, contractPlanner.bindingWindow): Planera fakturor
+// och signeringen planerar bara nuvarande bindningstid. Dagen efter sista
+// uppsägningsdag (slutdatum minus uppsägningstid) utan uppsägning skapar
+// cronen hela nästa bindningsperiods fakturor direkt, med fakturadatum
+// periodstart minus ledtid men aldrig före idag. Saknade perioder inom
+// nuvarande bindningstid skapas som förut när fakturadatumet är inne.
+// Körs varje natt 03:00 UTC via Vercel Cron, så förlängningen hinner skapas
+// före fakturadatumet även vid kort uppsägningstid. Idempotent: bara perioder
+// som saknar faktura skapas.
 //
 // Avtalskartan som motor (fas 2): läser AVTALEN (contracts), inte kundraden.
 // Samma periodmatematik som webben (src/shared/contractPlanner.ts), samma
@@ -21,6 +28,7 @@ import {
   computePlannedMonthlyEquipmentPeriods,
   computePlannedPeriods,
   type EquipmentInvoiceMode,
+  isDueForCreation,
   parseLocalDate,
   periodDivisor,
   rollingHorizonEnd,
@@ -62,6 +70,7 @@ type CustomerRow = {
   billing_active: boolean | null
   notice_period_months: number | null
   contract_invoice_mode: string | null
+  renewal_mode?: string | null
 }
 
 type ContractRow = PlanningContract & {
@@ -426,9 +435,11 @@ async function insertInvoice(
   return true
 }
 
-/** Riktiga avtal på en kund: skapa saknade perioder inom horisonten. */
+/** Ska perioden skapas i dag? Se contractPlanner.isDueForCreation. */
+const dueToday = isDueForCreation
+
+/** Riktiga avtal på en kund: skapa saknade perioder i bindningsfönstret. */
 async function generateForCustomerContracts(customer: CustomerRow, contracts: ContractRow[], today: string): Promise<number> {
-  const horizonEnd = rollingHorizonEnd()
   const orgNr = await resolveOrgNr(customer)
   const covered = await loadCoveredPeriods(customer.id)
   const consolidatedMode = customer.contract_invoice_mode === 'consolidated' && contracts.length > 1
@@ -441,10 +452,10 @@ async function generateForCustomerContracts(customer: CustomerRow, contracts: Co
       steps: sources.steps,
       equipment: sources.equipment,
       leadDays: DEFAULT_INVOICE_LEAD_DAYS,
-      horizonEnd: contract.terminated_at ? undefined : horizonEnd,
+      // Nuvarande bindningstid, plus nästa när sista uppsägningsdag passerat
+      window: 'binding' as const,
       today,
     }
-    // Rullande avtal: planera bortom slutdatumet tills avtalet sägs upp
     const periods = computePlannedPeriods(contract, { ...planOpts, equipmentMode: sources.equipmentInvoiceMode })
       // Aldrig passerade perioder från cronen: de importeras från Fortnox
       .filter((p) => !p.isHistorical && !coveredByFortnox(p, covered.fortnoxRanges))
@@ -484,6 +495,7 @@ async function generateForCustomerContracts(customer: CustomerRow, contracts: Co
         for (const p of pl.periods) {
           const slot = byPeriod.get(p.periodStart) ?? { p: { ...p }, rows: [], labels: [] }
           slot.rows.push(...buildRows(pl.contract, pl.sources, p))
+          if (p.renewal) slot.p.renewal = true
           if (p.invoiceDate < slot.p.invoiceDate) slot.p.invoiceDate = p.invoiceDate
           if (p.dueDate < slot.p.dueDate) slot.p.dueDate = p.dueDate
           if (p.periodEnd > slot.p.periodEnd) slot.p.periodEnd = p.periodEnd
@@ -496,8 +508,8 @@ async function generateForCustomerContracts(customer: CustomerRow, contracts: Co
         if (covered.consolidated.has(key)) continue
         // Perioden redan fakturerad per avtal (t.ex. innan gemet slogs på): hoppa över
         if (group.some((pl) => covered.perContract.get(pl.contract.id)?.has(key))) continue
-        // Skapa bara när fakturadatumet är inne (ledtiden), annars nästa körning
-        if (slot.p.invoiceDate > today) continue
+        // Förlängning: direkt. Annars när fakturadatumet är inne (ledtiden).
+        if (!dueToday(slot.p, today)) continue
         const ok = await insertInvoice(customer, orgNr, slot.p, slot.rows, {
           contractId: null,
           consolidated: true,
@@ -527,7 +539,7 @@ async function createPerContract(
   for (const p of pl.periods) {
     const key = periodKey(p.kind, p.periodStart)
     if (own.has(key) || legacy.has(key)) continue
-    if (p.invoiceDate > today) continue
+    if (!dueToday(p, today)) continue
     const isEquipment = p.kind === 'equipment' || p.kind === 'equipment_monthly'
     const ok = await insertInvoice(customer, orgNr, p, buildRows(pl.contract, pl.sources, p), {
       contractId: pl.contract.id,
@@ -621,21 +633,28 @@ async function refreshEditableEquipmentInvoices(
   return updated
 }
 
-/** Kund utan avtalsrad: kundradens fält som förut, men aldrig passerade perioder. */
+/**
+ * Kund utan avtalsrad: kundradens fält, samma bindningsregel som avtalen,
+ * aldrig passerade perioder. Inom bindningstiden fylls bara kunder vars
+ * slutdatum passerat (som förut); förlängningen skapas för alla.
+ */
 async function generateForSynthCustomer(customer: CustomerRow, today: string): Promise<number> {
   const orgNr = await resolveOrgNr(customer)
   const covered = await loadCoveredPeriods(customer.id)
+  const rolled = !!customer.contract_end_date && customer.contract_end_date < today
   const periods = computePlannedPeriods(customer, {
-    horizonEnd: customer.terminated_at ? undefined : rollingHorizonEnd(),
+    window: 'binding',
     today,
-  }).filter((p) => !p.isHistorical && !coveredByFortnox(p, covered.fortnoxRanges))
+  }).filter((p) => !p.isHistorical && !coveredByFortnox(p, covered.fortnoxRanges) && (rolled || !!p.renewal))
   const existing = new Set<string>()
   for (const set of covered.perContract.values()) for (const k of set) existing.add(k)
   for (const k of covered.consolidated) existing.add(k)
 
   let created = 0
   for (const p of periods) {
-    if (existing.has(p.periodStart) || p.invoiceDate > today) continue
+    // Nyckeln är typ + månad (periodKey) som i loadCoveredPeriods; en
+    // jämförelse mot rå periodStart träffade aldrig.
+    if (existing.has(periodKey(p.kind, p.periodStart)) || !dueToday(p, today)) continue
     const ok = await insertInvoice(
       customer,
       orgNr,
@@ -672,16 +691,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const today = toLocalIsoDate(todayLocal())
     const horizon = rollingHorizonEnd()
 
-    // 1. Riktiga avtal som är levande, faktureras och vars slut ligger inom horisonten
+    // 1. Riktiga avtal som är levande och faktureras: slutdatum inom ett år
+    //    (förlängningen kan bli säker) eller inget slutdatum (tills vidare)
     const { data: contractRows, error: cErr } = await supabase
       .from('contracts')
       .select(
-        'id, customer_id, label, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, status, template_id, oneflow_contract_id, display_order'
+        'id, customer_id, label, contract_type, invoice_reference, diary_number, annual_value, contract_start_date, contract_end_date, terminated_at, effective_end_date, billing_frequency, billing_anchor_month, billing_active, notice_period_months, renewal_mode, status, template_id, oneflow_contract_id, display_order'
       )
       .in('status', LIVE_STATUSES)
       .eq('type', 'contract')
       .not('billing_frequency', 'is', null)
-      .lt('contract_end_date', horizon)
+      .or(`contract_end_date.is.null,contract_end_date.lt.${horizon}`)
     if (cErr) throw cErr
 
     const byCustomer = new Map<string, ContractRow[]>()
@@ -691,11 +711,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       byCustomer.set(c.customer_id, [...(byCustomer.get(c.customer_id) ?? []), c])
     }
 
-    // 2. Kunder utan avtalsrad (synth) med passerat slutdatum, som förut
+    // 2. Kunder utan avtalsrad (synth) med slutdatum inom ett år. Kunder utan
+    //    slutdatum och utan avtalsrad planeras inte här (som förut).
     const { data: synthCustomers, error: sErr } = await supabase
       .from('customers')
       .select('*')
-      .lt('contract_end_date', today)
+      .lt('contract_end_date', horizon)
       .is('terminated_at', null)
       .eq('billing_active', true)
     if (sErr) throw sErr

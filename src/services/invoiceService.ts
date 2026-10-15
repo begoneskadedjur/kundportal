@@ -205,23 +205,28 @@ export class InvoiceService {
     // Hämta billing items för ärendet
     const allBillingItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
 
-    // Filtrera: fakturarader = item_type='service', eller alla om inga tjänsterader finns (bakåtkompatibilitet)
-    // Rader som täcks av avtalet (§ 4, covered_by_contract) faktureras aldrig.
-    // Arbetsrader för ROT/RUT läggs direkt efter sin tjänsterad (raderna skapas
-    // i den ordningen och fakturan läser dem i created_at-ordning)
+    // Filtrera: fakturarader = tjänsterader (item_type='service'). Artikelrader
+    // är intern kostnad och blir aldrig fakturarader, inte heller när ärendet
+    // saknar tjänsterader. Rader som täcks av avtalet (§ 4, covered_by_contract)
+    // faktureras aldrig. Arbetsrader för ROT/RUT läggs direkt efter sin
+    // tjänsterad (raderna skapas i den ordningen och fakturan läser dem i
+    // created_at-ordning)
     const billingItems = orderLaborRowsAfterParent(selectInvoiceableCaseRows(allBillingItems, 'case'))
 
-    if (billingItems.length === 0) {
+    if (allBillingItems.length === 0) {
       throw new Error('Inga fakturerbara tjänster på ärendet')
     }
 
     // Kolla om anpassat pris finns
     const customPrice = await CaseBillingService.getCustomPrice(caseId, caseType)
 
-    // 0 kr-regeln: summerar underlaget till 0 kr (t.ex. kostnadsfri inspektion
-    // eller 100 % rabatt) skapas ingen faktura och inget fakturanummer går åt.
-    // null = inget att fakturera; anroparen avgör hur raderna markeras.
-    if (!options.allowZero && isZeroAmount(caseInvoiceSubtotal(billingItems, customPrice))) {
+    // 0 kr-regeln: summerar underlaget till 0 kr (t.ex. kostnadsfri inspektion,
+    // 100 % rabatt eller bara artikelrader utan tjänst) skapas ingen faktura och
+    // inget fakturanummer går åt. null = inget att fakturera; anroparen avgör
+    // hur raderna markeras. allowZero gäller bara när det finns tjänsterader att
+    // bygga fakturan av: en faktura utan rader skapas aldrig.
+    const subtotalBeforeVat = caseInvoiceSubtotal(billingItems, customPrice)
+    if (isZeroAmount(subtotalBeforeVat) && (!options.allowZero || billingItems.length === 0)) {
       return null
     }
 
@@ -367,7 +372,7 @@ export class InvoiceService {
       if (customItemError) throw new Error(`Databasfel: ${customItemError.message}`)
       invoiceItems.push(customItem)
     } else {
-      // Utan anpassat pris: standard — bara service-rader (eller artikel-rader för gamla ärenden)
+      // Utan anpassat pris: standard — bara tjänsterader, aldrig artikelrader (intern kostnad)
       for (const item of billingItems) {
         // Välj rätt namn/kod beroende på om det är en tjänstrad eller artikelrad.
         // Tjänsterader får specifikation av mappade artiklar med kundpris
@@ -515,15 +520,17 @@ export class InvoiceService {
 
   /**
    * Summerar ärendets ofakturerade rader (samma urval och anpassade pris som
-   * createInvoiceFromCase) till 0 kr? Inga ofakturerade fakturarader = false.
+   * createInvoiceFromCase) till 0 kr? Inga ofakturerade rader alls = false.
+   * Bara artikelrader (inga tjänsterader) och inget anpassat pris = true.
    */
   private static async pendingRowsSumToZero(
     caseId: string,
     caseType: 'private' | 'business'
   ): Promise<boolean> {
     const items = await CaseBillingService.getCaseBillingItems(caseId, caseType)
+    if (items.length === 0) return false
+    // Bara artikelrader (inga tjänsterader) = 0 kr-underlag, inte låst faktura
     const rows = selectInvoiceableCaseRows(items, 'case')
-    if (rows.length === 0) return false
     const customPrice = await CaseBillingService.getCustomPrice(caseId, caseType)
     return isZeroAmount(caseInvoiceSubtotal(rows, customPrice))
   }

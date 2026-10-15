@@ -183,11 +183,11 @@ export const STEG: Steg[] = [
   {
     title: 'Systemet planerar tilläggsfakturan',
     roles: ['systemet'],
-    when: 'Den 1:a varje månad',
+    when: 'Varje natt',
     body: (
       <>
         <p className="text-sm leading-relaxed text-slate-300">
-          Den 1:a varje månad planerar systemet avtalens fakturor tolv månader framåt. Först räknar det om tilläggen efter stationerna som står ute. Tilläggsfakturan dyker upp som en <B>egen planerad faktura bredvid årsfakturan</B>, för samma period.
+          Varje natt skapar systemet de avtalsfakturor som saknas: inom bindningstiden när fakturadatumet är inne, och nästa avtalsperiods fakturor dagen efter sista uppsägningsdag. Först räknar det om tilläggen efter stationerna som står ute. Tilläggsfakturan dyker upp som en <B>egen planerad faktura bredvid årsfakturan</B>, för samma period.
         </p>
         <Punkter
           items={[

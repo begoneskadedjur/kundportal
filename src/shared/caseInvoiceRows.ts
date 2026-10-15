@@ -26,23 +26,29 @@ export interface CaseInvoiceSourceRow {
  *   covered_by_contract) faktureras aldrig.
  * - Merförsäljning avtal: tilläggsrader (pro rata, arbetstid) på 0 kr är
  *   underlag, inte fakturarader.
- * - Finns inga sådana tjänsterader faktureras artikelraderna (gamla ärenden
- *   från före tjänsterna, bakåtkompatibilitet). Oförändrad semantik från
- *   de tidigare tre kopiorna av filtret.
+ * - Artikelrader blir ALDRIG fakturarader, i någon kontext. Deras pris är
+ *   intern kostnad (articles.default_price, unit_price = inköpspris). Även
+ *   artiklar med kundpris (customer_unit_price, avtalad prisbilaga) säljs via
+ *   tjänsteraden de är mappade mot (mapped_service_id): kundpriset låser
+ *   tjänstens pris och syns som specifikation på tjänstens fakturarad.
+ * - Finns inga fakturerbara tjänsterader är underlaget 0 kr (tom lista):
+ *   ingen faktura, raderna markeras hanterade enligt 0 kr-regeln. Ett
+ *   anpassat pris (caseInvoiceSubtotal) kan fortfarande ge belopp.
+ *
+ * Fram till 2026-10-15 föll urvalet tillbaka på artikelraderna när inga
+ * tjänsterader fanns, vilket fakturerade inköpspriser mot kund.
  */
 export function selectInvoiceableCaseRows<T extends CaseInvoiceSourceRow>(
   items: T[],
   context: CaseInvoiceContext
 ): T[] {
-  const serviceItems = items.filter(i =>
+  return items.filter(i =>
     i.item_type === 'service' &&
     !i.covered_by_contract &&
     !(context === 'contract_adhoc' &&
       (i.is_addon_prorata_line || i.is_addon_labour_line) &&
       !(Number(i.total_price) > 0))
   )
-  if (serviceItems.length > 0) return serviceItems
-  return items.filter(i => i.item_type === 'article' || !i.item_type)
 }
 
 /** Radernas summa exkl. moms, avrundad till ören. */

@@ -64,7 +64,7 @@ const actionMeta: Partial<Record<BillingPlanAction, { label: string; className: 
   // fakturerad utanför portalen med knappen på raden.
   uncovered: { label: 'SAKNAR FAKTURA', className: 'bg-amber-500/15 text-amber-300 border-amber-500/40' },
   consolidated: { label: 'SAMLINGSFAKTURA', className: 'bg-slate-700/40 text-slate-400 border-slate-600/40' },
-  // Förlängningsperiod efter slutdatumet: utkastet skapas automatiskt 40 dagar före periodstart
+  // Används inte längre: förlängningar planeras dagen efter sista uppsägningsdag och skapas direkt
   later: { label: 'SKAPAS SENARE', className: 'bg-slate-700/40 text-slate-400 border-slate-600/40' },
 }
 
@@ -284,6 +284,9 @@ export default function BillingPlanPreviewModal({ isOpen, plan: basePlan, loadin
                   {plan.summary.historical} historiska perioder registreras som betalda (visas ej i fakturering).
                 </div>
               )}
+              <div className="text-xs text-slate-500">
+                Planen gäller avtalets nuvarande bindningstid. Nästa avtalsperiod skapas automatiskt dagen efter sista uppsägningsdag, om avtalet inte sagts upp.
+              </div>
             </div>
 
             {visibleEntries.length === 0 ? (

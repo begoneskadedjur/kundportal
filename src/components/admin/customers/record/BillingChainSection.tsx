@@ -333,9 +333,9 @@ export default function BillingChainSection({ root, contracts, invoices, cases, 
                   <span className="text-xs truncate min-w-0 flex-1">
                     {contracts.length > 1 ? `${contractDisplayName(b.contract)} · ` : ''}
                     {formatDateSv(b.periodStart)} till {formatDateSv(b.periodEnd)}
-                    <span className="text-slate-600"> · skapas {formatDateSv(b.invoiceDate)}</span>
+                    <span className="text-slate-600"> · utkastet skapas {formatDateSv(b.planDate)}</span>
                     {b.noticeDeadline && (
-                      <span className="text-slate-600"> · om avtalet inte sägs upp senast {formatDateSv(b.noticeDeadline)}</span>
+                      <span className="text-slate-600"> om avtalet inte sägs upp senast {formatDateSv(b.noticeDeadline)}</span>
                     )}
                   </span>
                 </li>

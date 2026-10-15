@@ -388,24 +388,21 @@ export class ContractBillingService {
 
     // Endast tjänsterader ska faktureras. Artiklar är interna kostnader (för
     // marginalkalkyl) och ligger kvar i case_billing_items — de ska ALDRIG bli
-    // fakturarader. Samma filtrering som privat/företag (src/shared/caseInvoiceRows.ts).
-    // Fallback: gamla ärenden utan tjänsterader faktureras på sina artikelrader (bakåtkompat).
+    // fakturarader, inte heller när ärendet saknar tjänsterader. Samma
+    // filtrering som privat/företag (src/shared/caseInvoiceRows.ts).
     // Rader som täcks av avtalet (§ 4, covered_by_contract) faktureras aldrig som merförsäljning.
     // Tilläggsrader (pro rata per stationstyp, arbetstid) på 0 kr är underlag,
     // t.ex. teknikerns arbetstidsförslag utan ökning: de blir aldrig fakturarader.
     const caseBillingItems = selectInvoiceableCaseRows(allCaseBillingItems, 'contract_adhoc')
 
-    if (caseBillingItems.length === 0) {
-      return { created: 0, totalAmount: 0, invoiceId: null }
-    }
-
     // 0 kr-regeln (Christian 2026-10-15): summerar underlaget till 0 kr, t.ex.
-    // ett kostnadsfritt återbesök eller 100 % rabatt, skapas varken
-    // merförsäljningsrader eller faktura. Ärenderaderna markeras som hanterade
-    // ('billed', som efter en vanlig överföring) och ärendet får billing_status
-    // 'skip'. Avtalstillägg appliceras ändå: de höjer årspremien och är inte
-    // en del av merförsäljningsfakturan.
-    if (isZeroAmount(sumInvoiceableRows(caseBillingItems))) {
+    // ett kostnadsfritt återbesök, 100 % rabatt, bara rader som täcks av
+    // avtalet eller bara artikelrader, skapas varken merförsäljningsrader eller
+    // faktura. Ärenderaderna markeras som hanterade ('billed', som efter en
+    // vanlig överföring) och ärendet får billing_status 'skip'. Avtalstillägg
+    // appliceras ändå: de höjer årspremien och är inte en del av
+    // merförsäljningsfakturan.
+    if (caseBillingItems.length === 0 || isZeroAmount(sumInvoiceableRows(caseBillingItems))) {
       await CaseBillingService.markZeroAmountRowsHandled(caseId, 'contract')
       await this.applyContractAdditionsForCase(caseId, allCaseBillingItems)
       return { created: 0, totalAmount: 0, invoiceId: null, skippedZeroTotal: true }

@@ -16,9 +16,36 @@ describe('selectInvoiceableCaseRows', () => {
     expect(selectInvoiceableCaseRows(rows, 'case')).toEqual([service(500)])
   })
 
-  it('faller tillbaka på artikelrader för gamla ärenden utan tjänster', () => {
-    const rows = [article(120), { item_type: null, total_price: 80 }]
-    expect(selectInvoiceableCaseRows(rows, 'case')).toHaveLength(2)
+  it('artikelrader blir aldrig fakturarader, inte heller utan tjänsterader', () => {
+    const rows = [article(120), article(896)]
+    expect(selectInvoiceableCaseRows(rows, 'case')).toEqual([])
+    expect(selectInvoiceableCaseRows(rows, 'contract_adhoc')).toEqual([])
+  })
+
+  it('artiklar med kundpris säljs via tjänsteraden, aldrig som egen rad', () => {
+    const rows = [
+      { item_type: 'article', total_price: 300, customer_unit_price: 18, mapped_service_id: 's1' },
+    ]
+    expect(selectInvoiceableCaseRows(rows, 'case')).toEqual([])
+    expect(selectInvoiceableCaseRows(rows, 'contract_adhoc')).toEqual([])
+  })
+
+  it('rader utan item_type faktureras inte', () => {
+    expect(selectInvoiceableCaseRows([{ item_type: null, total_price: 80 }], 'case')).toEqual([])
+  })
+
+  it('merförsäljning: alla tjänster täcks av avtalet ger inga fakturarader, artiklarna tas inte i stället', () => {
+    const rows = [service(0, { covered_by_contract: true }), article(450)]
+    expect(selectInvoiceableCaseRows(rows, 'contract_adhoc')).toEqual([])
+  })
+
+  it('merförsäljning: bara tilläggsrader på 0 kr ger inga fakturarader, artiklarna tas inte i stället', () => {
+    const rows = [
+      service(0, { is_addon_prorata_line: true }),
+      service(0, { is_addon_labour_line: true }),
+      article(1200),
+    ]
+    expect(selectInvoiceableCaseRows(rows, 'contract_adhoc')).toEqual([])
   })
 
   it('utesluter rader som täcks av avtalet', () => {
@@ -38,6 +65,14 @@ describe('0 kr-regeln', () => {
   it('kostnadsfri inspektion summerar till 0 kr', () => {
     const rows = selectInvoiceableCaseRows([service(0), article(45)], 'case')
     expect(isZeroAmount(caseInvoiceSubtotal(rows, null))).toBe(true)
+  })
+
+  it('bara artikelrader är 0 kr-underlag (ingen faktura), anpassat pris ger ändå belopp', () => {
+    const rows = selectInvoiceableCaseRows([article(1016)], 'case')
+    expect(isZeroAmount(caseInvoiceSubtotal(rows, null))).toBe(true)
+    expect(caseInvoiceSubtotal(rows, 2000)).toBe(2000)
+    const adhoc = selectInvoiceableCaseRows([service(0, { covered_by_contract: true }), article(450)], 'contract_adhoc')
+    expect(isZeroAmount(sumInvoiceableRows(adhoc))).toBe(true)
   })
 
   it('100 % rabatt (total_price 0 trots à-pris) räknas som 0 kr', () => {

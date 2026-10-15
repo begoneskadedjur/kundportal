@@ -939,7 +939,7 @@ export class CaseBillingService {
    * belopp (t.ex. inspektion, reklamation, 0-kr-tjänst) ska inte konsumera kundnummer.
    *
    * Följer samma filtrering som invoiceService.createInvoiceFromCase:
-   * service-rader om de finns, annars artikel-rader (bakåtkompatibilitet).
+   * bara tjänsterader, artikelrader (intern kostnad) räknas aldrig.
    * Om kundspecifikt anpassat pris finns, returnera true om det är > 0.
    */
   static async caseHasBillableAmount(
@@ -949,9 +949,11 @@ export class CaseBillingService {
     // Samma urval och belopp som fakturan (src/shared/caseInvoiceRows.ts):
     // radernas total_price efter rabatt, inte à-pris × antal. En rad med
     // 100 % rabatt är 0 kr och ska varken ge kundnummer eller faktura.
+    // Ett ärende med bara artikelrader har inga fakturarader, men ett
+    // anpassat pris kan ändå ge en faktura (samma regel som fakturan).
     const items = await this.getCaseBillingItems(caseId, caseType)
+    if (items.length === 0) return false
     const rows = selectInvoiceableCaseRows(items, caseType === 'contract' ? 'contract_adhoc' : 'case')
-    if (rows.length === 0) return false
     const customPrice = await this.getCustomPrice(caseId, caseType)
     return caseInvoiceSubtotal(rows, customPrice) > 0
   }

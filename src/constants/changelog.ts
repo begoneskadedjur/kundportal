@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.62.0',
+    date: '2026-10-15',
+    title: 'Fakturaplan inom bindningstiden',
+    items: [
+      { kind: 'andring', text: 'Planera fakturor planerar bara avtalets nuvarande bindningstid. Nästa avtalsperiod skapas automatiskt dagen efter sista uppsägningsdag, om avtalet inte sagts upp.' },
+      { kind: 'andring', text: 'Förlängningen av avtal kontrolleras nu varje natt i stället för en gång i månaden.' },
+      { kind: 'buggfix', text: 'Förlängningen kunde skapa dubbla fakturautkast för kunder utan avtalsrad.' },
+      { kind: 'buggfix', text: 'Artiklar faktureras aldrig som egna rader med inköpspris. De ingår i tjänsten de hör till.' },
+    ],
+  },
+  {
     version: '3.61.0',
     date: '2026-10-15',
     title: 'Signerade avtal läggs upp av sig själva',

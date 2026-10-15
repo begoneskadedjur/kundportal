@@ -4,7 +4,7 @@
 // händer och en förenklad skärmbild. Fakta kontrollerade mot koden
 // 2026-09-30: addonStationBillingService, sync_addon_prorata_line,
 // AddonLabourStep, createAdHocItemsFromCase, AddonDropPrompt,
-// generate-continuing-contracts och contractPlanner.rollingHorizonEnd.
+// generate-continuing-contracts och contractPlanner.bindingWindow.
 
 import { RoleTag } from './tillaggShared'
 import { ROLE_CONFIG, type TillaggRole } from './tillaggRoles'

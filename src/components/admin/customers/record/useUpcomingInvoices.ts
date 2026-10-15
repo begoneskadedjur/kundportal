@@ -3,19 +3,13 @@
 // Kommande fakturor ur avtalskartans planerare, delade av Fakturering-fliken
 // (listan "Kommande fakturor") och Översiktens tidslinje. Två lager:
 //   upcoming  perioder som inte börjat, med eller utan utkast i databasen
-//   beyond    första perioden efter planerarens horisont per avtal, så att det
-//             syns att avtalet rullar vidare och när nästa faktura skapas
+//   beyond    första perioden i nästa förlängning per avtal (inte planerad än),
+//             med sista uppsägningsdag och dagen utkastet skapas
 // Samma periodmatematik som planeraren, aldrig egen räkning i vyerna.
 
 import { useEffect, useMemo, useState } from 'react'
 import { ContractInvoiceGenerator, type BillingPlanEntry } from '../../../../services/contractInvoiceGenerator'
-import {
-  computePlannedPeriods,
-  parseLocalDate,
-  toLocalIsoDate,
-  DEFAULT_INVOICE_LEAD_DAYS,
-  type PlanningContract,
-} from '../../../../shared/contractPlanner'
+import { nextRenewal, DEFAULT_INVOICE_LEAD_DAYS, type PlanningContract } from '../../../../shared/contractPlanner'
 import { contractDisplayName, formatDateSv, formatKr, formatMonthSv, type RecordContract } from '../../../../hooks/useCustomerRecord'
 import type { RecordTimelineEvent } from './ContractTimelineList'
 
@@ -25,7 +19,10 @@ export interface BeyondPeriod {
   periodEnd: string
   invoiceDate: string
   amount: number
+  /** Sista dag att säga upp för att slippa perioden */
   noticeDeadline: string | null
+  /** Dagen cronen skapar utkastet (dagen efter sista uppsägningsdag) */
+  planDate: string
 }
 
 export interface UpcomingInvoices {
@@ -73,35 +70,24 @@ export function useUpcomingInvoices(rootId: string, contracts: RecordContract[],
   }, [rootId, contracts.length, invoiceCount])
 
   const beyond = useMemo<BeyondPeriod[]>(() => {
-    const today = new Date().toISOString().slice(0, 10)
     const known = new Set((upcoming ?? []).map((e) => `${e.contractId ?? ''}|${e.planned!.periodStart}`))
-    const lastKnown = (upcoming ?? []).reduce((m, e) => (e.planned!.periodStart > m ? e.planned!.periodStart : m), today)
-    const d = new Date()
-    const horizon = toLocalIsoDate(new Date(d.getFullYear() + 2, d.getMonth(), d.getDate()))
     const out: BeyondPeriod[] = []
     for (const c of contracts) {
       const pc = c as unknown as PlanningContract
       if (pc.terminated_at || pc.billing_active === false) continue
-      const periods = computePlannedPeriods(pc, { horizonEnd: horizon, leadDays: DEFAULT_INVOICE_LEAD_DAYS })
-      const next = periods.find((p) => p.periodStart > lastKnown && !known.has(`${c.id}|${p.periodStart}`))
-      if (!next) continue
-      const notice = pc.notice_period_months
-      let noticeDeadline: string | null = null
-      if (notice && notice > 0) {
-        // Uppsägningen räknas från avtalets eget slutdatum (och dess årsdagar
-        // när avtalet rullar), inte från fakturaperiodens första dag. Perioderna
-        // är månadsankrade (1 nov), avtalet slutar t.ex. den 18:e.
-        let anchor: Date
-        if (pc.contract_end_date) {
-          anchor = parseLocalDate(pc.contract_end_date)
-          while (toLocalIsoDate(anchor) < next.periodStart) anchor = new Date(anchor.getFullYear() + 1, anchor.getMonth(), anchor.getDate())
-          noticeDeadline = toLocalIsoDate(new Date(anchor.getFullYear(), anchor.getMonth() - notice, anchor.getDate()))
-        } else {
-          const ps = parseLocalDate(next.periodStart)
-          noticeDeadline = toLocalIsoDate(new Date(ps.getFullYear(), ps.getMonth() - notice, ps.getDate() - 1))
-        }
-      }
-      out.push({ contract: c, periodStart: next.periodStart, periodEnd: next.periodEnd, invoiceDate: next.invoiceDate, amount: next.amount, noticeDeadline })
+      // Nästa förlängning som inte är planerad än: den planeras dagen efter
+      // sista uppsägningsdag (contractPlanner.nextRenewal, samma regel som cronen).
+      const next = nextRenewal(pc, { leadDays: DEFAULT_INVOICE_LEAD_DAYS })
+      if (!next || known.has(`${c.id}|${next.period.periodStart}`)) continue
+      out.push({
+        contract: c,
+        periodStart: next.period.periodStart,
+        periodEnd: next.period.periodEnd,
+        invoiceDate: next.period.invoiceDate,
+        amount: next.period.amount,
+        noticeDeadline: next.noticeDeadline,
+        planDate: next.planDate,
+      })
     }
     return out.sort((a, b) => a.periodStart.localeCompare(b.periodStart))
   }, [contracts, upcoming])
@@ -141,8 +127,8 @@ export function buildUpcomingInvoiceEvents(
       kind: 'invoice',
       title: `Faktura ${formatMonthSv(b.periodStart)}`,
       detail:
-        `${formatKr(b.amount)} · skapas ${formatDateSv(b.invoiceDate)} om avtalet rullar vidare` +
-        (b.noticeDeadline ? `, uppsägning senast ${formatDateSv(b.noticeDeadline)}` : ''),
+        `${formatKr(b.amount)} · utkastet skapas ${formatDateSv(b.planDate)} om avtalet inte sägs upp` +
+        (b.noticeDeadline ? ` senast ${formatDateSv(b.noticeDeadline)}` : ''),
       tag: contractDisplayName(b.contract),
     })
   }

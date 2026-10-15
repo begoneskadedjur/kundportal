@@ -43,7 +43,6 @@ import {
   computePlannedMonthlyEquipmentPeriods,
   computePlannedPeriods,
   computeTerminationCutoff,
-  rollingHorizonEnd,
   type ContractInvoiceKind,
   type EquipmentInvoiceMode,
   parseLocalDate,
@@ -80,10 +79,9 @@ export type BillingPlanAction =
   /** Perioden ligger på kundens samlingsfaktura (per-avtal-planen rör den inte) */
   | 'consolidated'
   /**
-   * Förlängningsperiod efter avtalets slutdatum vars fakturadatum inte är
-   * inne: visas som kommande men blir utkast först 40 dagar före periodstart
-   * (samma regel som cron). Ett ettårsavtal ska inte få nästa års utkast i
-   * september.
+   * Används inte längre (sedan 2026-10-15): förlängningsperioder kommer med i
+   * planen först när sista uppsägningsdag passerat och skapas då direkt
+   * (contractPlanner.bindingWindow). Kvar i typen för äldre vyer.
    */
   | 'later'
   /**
@@ -455,9 +453,9 @@ export class ContractInvoiceGenerator {
       equipment: sources.equipment,
       leadDays: DEFAULT_INVOICE_LEAD_DAYS,
       equipmentMode: sources.equipmentInvoiceMode,
-      // Rullande avtal fortsätter efter slutdatumet tills de sägs upp: samma
-      // horisont som cron, annars saknas nästa period när avtalsåret tar slut.
-      horizonEnd: contract.terminated_at ? undefined : rollingHorizonEnd(),
+      // Nuvarande bindningstid; nästa bindningsperiod först när sista
+      // uppsägningsdag passerat (samma regel som signeringen och cronen).
+      window: 'binding',
     })
     const existing = await this.loadExisting(customerId, contract.id, { kind: 'premium' })
     const consolidatedPeriods = await this.loadConsolidatedPeriodsForContract(customerId, contract.id)
@@ -521,6 +519,7 @@ export class ContractInvoiceGenerator {
         steps: sources.steps,
         equipment: sources.equipment,
         leadDays: DEFAULT_INVOICE_LEAD_DAYS,
+        window: 'binding',
       })
       const existing = await this.loadExisting(customerId, contract.id, { kind: 'equipment' })
       out.push(...this.buildDiff(planned, existing, { real: true }).map((e) => decorate(e, 'equipment')))
@@ -528,7 +527,7 @@ export class ContractInvoiceGenerator {
     const monthly = computePlannedMonthlyEquipmentPeriods(contract as PlanningContract, {
       paymentTermsDays,
       equipment: sources.equipment,
-      horizonEnd: contract.terminated_at ? undefined : rollingHorizonEnd(),
+      window: 'binding',
     })
     const existingMonthly = await this.loadExisting(customerId, contract.id, { kind: 'equipment_monthly' })
     if (monthly.length > 0 || existingMonthly.length > 0) {
@@ -610,7 +609,7 @@ export class ContractInvoiceGenerator {
           equipment: sources.equipment,
           leadDays: DEFAULT_INVOICE_LEAD_DAYS,
           equipmentMode: sources.equipmentInvoiceMode,
-          horizonEnd: contract.terminated_at ? undefined : rollingHorizonEnd(),
+          window: 'binding',
         })
         perContract.push({ contract, sources, periods })
         // Tillägg på egna fakturor samlas aldrig: de planeras per avtal
@@ -966,7 +965,6 @@ export class ContractInvoiceGenerator {
     )
 
     const entries: BillingPlanEntry[] = []
-    const todayIso = toLocalIsoDate(todayLocal())
 
     for (const p of filteredPlanned) {
       const consolidated = opts.consolidatedPeriods?.get(monthKey(p.periodStart))
@@ -983,10 +981,11 @@ export class ContractInvoiceGenerator {
       }
 
       const ex = existingByKey.get(monthKey(p.periodStart))
-      // Förlängningsperiod (efter avtalets slutdatum) vars fakturadatum inte
-      // är inne: utkastet skapas av cron 40 dagar före start, inte här.
-      const notDueYet = opts.real && !!p.beyondContractEnd && !p.isHistorical && p.invoiceDate > todayIso
 
+      // Planen innehåller bara nuvarande bindningstid, och nästa
+      // bindningsperiod först när sista uppsägningsdag passerat
+      // (contractPlanner.bindingWindow). En förlängningsperiod i planen är
+      // alltså säker och skapas direkt; den väntar inte på fakturadatumet.
       if (!ex) {
         if (p.isHistorical) {
           entries.push(
@@ -994,8 +993,6 @@ export class ContractInvoiceGenerator {
               ? { action: 'uncovered', planned: p, reason: 'Passerad period utan faktura i portalen. Importera från Fortnox.' }
               : { action: 'create-historical', planned: p }
           )
-        } else if (notDueYet) {
-          entries.push({ action: 'later', planned: p, reason: `Förlängning efter slutdatumet, utkastet skapas ${p.invoiceDate}` })
         } else {
           entries.push({ action: 'create', planned: p })
         }
@@ -1003,20 +1000,6 @@ export class ContractInvoiceGenerator {
       }
 
       const status = ex.status ?? 'draft'
-
-      // Ett utkast som skapats för tidigt för en förlängningsperiod tas bort;
-      // det kommer tillbaka när fakturadatumet är inne.
-      if (notDueYet && EDITABLE_STATUSES.has(status)) {
-        entries.push({
-          action: 'delete',
-          planned: p,
-          existingId: ex.id,
-          existingStatus: status,
-          existingAmount: ex.total_amount, existingSubtotal: ex.subtotal,
-          reason: `För tidigt skapad förlängningsperiod, utkastet skapas igen ${p.invoiceDate}`,
-        })
-        continue
-      }
 
       if (p.isHistorical) {
         if (!opts.real && (status !== 'paid' || !ex.is_historical)) {
@@ -1050,6 +1033,7 @@ export class ContractInvoiceGenerator {
     }
 
     // Befintliga utan motsvarande plan
+    const lastPlannedStart = filteredPlanned.reduce((m, p) => (p.periodStart > m ? p.periodStart : m), '')
     for (const ex of contractInvoices) {
       if (!ex.billing_period_start) continue
       if (plannedByKey.has(monthKey(ex.billing_period_start))) continue
@@ -1057,7 +1041,19 @@ export class ContractInvoiceGenerator {
       if (LOCKED_STATUSES.has(status)) {
         entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: 'Utanför nuvarande plan men redan bokförd/skickad/betald' })
       } else if (EDITABLE_STATUSES.has(status)) {
-        entries.push({ action: 'delete', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal })
+        // Ett utkast efter planens sista period är en förlängning som skapats
+        // för tidigt: den planeras igen dagen efter sista uppsägningsdag.
+        const afterPlan = !!lastPlannedStart && monthKey(ex.billing_period_start) > monthKey(lastPlannedStart)
+        entries.push({
+          action: 'delete',
+          existingId: ex.id,
+          existingStatus: status,
+          existingAmount: ex.total_amount,
+          existingSubtotal: ex.subtotal,
+          ...(afterPlan
+            ? { reason: 'Efter nuvarande bindningstid: planeras igen dagen efter sista uppsägningsdag om avtalet inte sägs upp' }
+            : {}),
+        })
       } else {
         entries.push({ action: 'locked', existingId: ex.id, existingStatus: status, existingAmount: ex.total_amount, existingSubtotal: ex.subtotal, reason: `Okänd status "${status}" - rör ej` })
       }

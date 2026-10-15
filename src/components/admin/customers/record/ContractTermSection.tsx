@@ -13,7 +13,7 @@ import { Loader2 } from 'lucide-react'
 import DateField from '../../../ui/DateField'
 import { formatDateSv, type RecordContract } from '../../../../hooks/useCustomerRecord'
 import { todayKey } from '../../../../utils/contractLifecycle'
-import { rollingEndDate } from '../../../../shared/contractPlanner'
+import { lastNoticeDay, rollingEndDate } from '../../../../shared/contractPlanner'
 import { PANEL_INPUT_CLASS, PAPER_GEAR_CLASS, PAPER_INPUT_CLASS, PAPER_LINK_CLASS, type PaperInk, type SectionMode } from './paperInk'
 
 type RenewalMode = 'rolling' | 'fixed' | 'option'
@@ -21,9 +21,8 @@ type RenewalMode = 'rolling' | 'fixed' | 'option'
 /** Sista dag att säga upp: slutdatum minus uppsägningstiden (i månader). */
 export function lastTerminationDay(endDate: string | null, noticeMonths: number | null): string | null {
   if (!endDate || !noticeMonths) return null
-  const [y, m, d] = endDate.split('-').map(Number)
-  const dt = new Date(Date.UTC(y, m - 1 - noticeMonths, d))
-  return dt.toISOString().slice(0, 10)
+  // Samma beräkning som fakturaplaneringen: förlängningen planeras dagen efter
+  return lastNoticeDay(endDate, noticeMonths)
 }
 
 function monthsBetween(start: string, end: string): number | null {

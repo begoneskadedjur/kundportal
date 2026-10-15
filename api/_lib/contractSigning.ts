@@ -52,7 +52,6 @@ import {
   computePlannedPeriods,
   DEFAULT_INVOICE_LEAD_DAYS,
   parseLocalDate,
-  rollingHorizonEnd,
   toLocalIsoDate,
   todayLocal,
   type EquipmentLine,
@@ -859,15 +858,18 @@ async function planInvoices(ctx: Ctx, contract: Row, customerId: string, contrac
     billing_anchor_month: num(contract.billing_anchor_month),
     billing_active: contract.billing_active === false ? false : null,
     notice_period_months: num(contract.notice_period_months),
+    renewal_mode: str(contract.renewal_mode),
   }
-  // Samma anrop som ContractInvoiceGenerator.planForContract
+  // Samma anrop som ContractInvoiceGenerator.planForContract: hela den
+  // nuvarande bindningstiden planeras direkt. Förlängningen efter
+  // slutdatumet skapas av cronen dagen efter sista uppsägningsdag.
   const periods = computePlannedPeriods(planning, {
     paymentTermsDays,
     steps,
     equipment,
     leadDays: DEFAULT_INVOICE_LEAD_DAYS,
     equipmentMode: 'separate',
-    horizonEnd: str(contract.terminated_at) ? undefined : rollingHorizonEnd(),
+    window: 'binding',
   })
   if (periods.length === 0) {
     report.notes.push('Fakturaplanen gav inga perioder (kontrollera startdatum, slutdatum och intervall).')
@@ -912,7 +914,6 @@ async function planInvoices(ctx: Ctx, contract: Row, customerId: string, contrac
     return (oe - os) / (pe - ps)
   }
 
-  const today = toLocalIsoDate(todayLocal())
   const sources = { premiumItems, equipment, additionNotes, label, diaryNumber: str(contract.diary_number) }
   const { data: customerRow } = isNewCustomer ? { data: null } : await db.from('customers').select('*').eq('id', customerId).maybeSingle()
   const cust = (customerRow ?? {
@@ -940,8 +941,6 @@ async function planInvoices(ctx: Ctx, contract: Row, customerId: string, contrac
       report.notes.push(`Perioden ${p.periodStart} t.o.m. ${p.periodEnd} har redan passerat utan faktura. Koppla Fortnox-fakturan eller planera den i kartan.`)
       continue
     }
-    // Förlängningsperiod vars fakturadatum inte är inne: skapas av cron senare
-    if (p.beyondContractEnd && p.invoiceDate > today) continue
 
     const rows = buildContractInvoiceRows(contractId, sources, p)
     if (rows.length === 0) continue
