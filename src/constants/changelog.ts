@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.66.1',
+    date: '2026-10-16',
+    title: 'Färre felträffar i upphandlingsbevakningen',
+    items: [
+      { kind: 'buggfix', text: 'Korta sökord som möss, mygg och duvor räknas inte längre mitt i andra ord. "Studentmössor" gav tidigare en träff på möss. Husmöss, myggor och myggbekämpning ger fortfarande träff.' },
+    ],
+  },
+  {
     version: '3.66.0',
     date: '2026-10-16',
     title: 'Bearbetningsfönstret räknas mot basavtalet',

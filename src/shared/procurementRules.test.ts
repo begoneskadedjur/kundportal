@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { awardRelevance, canonicalOrgNumber, computeContractEnd, parseDurationText } from './procurementRules'
+import { awardRelevance, canonicalOrgNumber, computeContractEnd, parseDurationText, scoreNotice } from './procurementRules'
 
 describe('computeContractEnd', () => {
   it('TED slutdatum plus förlängningar går först', () => {
@@ -67,5 +67,26 @@ describe('canonicalOrgNumber', () => {
   it('Nomors felskrivna orgnr slås ihop', () => {
     expect(canonicalOrgNumber('556529-3976')).toBe('5565263976')
     expect(canonicalOrgNumber('5560329285')).toBe('5560329285')
+  })
+})
+
+describe('korta nyckelord matchas inte mitt i andra ord', () => {
+  const score = (title: string, description = '') => scoreNotice({ title, description, cpv_codes: ['18400000'], county_codes: [] })
+  it('studentmössor ger ingen träff på möss', () => {
+    expect(score('Studentmössor Västerviks kommun').score).toBe(0)
+  })
+  it('möss, mössen och husmöss ger träff', () => {
+    expect(score('Bekämpning av möss').score).toBeGreaterThan(0)
+    expect(score('Sanering efter mössen i köket').score).toBeGreaterThan(0)
+    expect(score('Husmöss i förskolan').score).toBeGreaterThan(0)
+  })
+  it('mygg och myggor ger träff, byggnad gör det inte', () => {
+    expect(score('Myggbekämpning').score).toBeGreaterThan(0)
+    expect(score('Mössbekämpning i källare').score).toBeGreaterThan(0)
+    expect(score('Bekämpning av myggor').score).toBeGreaterThan(0)
+    expect(score('Byggnadsarbeten skola').score).toBe(0)
+  })
+  it('långa ord matchas fortfarande i sammansättningar', () => {
+    expect(score('Skadedjursavtal för kommunen').score).toBeGreaterThan(0)
   })
 })

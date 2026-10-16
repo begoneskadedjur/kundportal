@@ -252,9 +252,27 @@ function cpvHits(codes: string[], prefixes: string[]): string[] {
   return clean.filter((c) => prefixes.some((p) => p && c.startsWith(p)))
 }
 
+/** Ord kortare än så här matchas bara som eget ord eller sist i ett sammansatt ord */
+const SHORT_KEYWORD = 6
+/** Böjningsändelser som får följa ett kort nyckelord (möss → mössen, mygg → myggor) */
+const SHORT_SUFFIXES = ['', 'n', 'en', 'na', 's', 'ens', 'ar', 'arna', 'or', 'orna']
+/** Efterled som gör att ett kort nyckelord först i ett ord ändå gäller (myggbekämpning) */
+const PEST_HEADS = /^(bekämp|sanering|säkr|fäll|kontroll|problem|angrepp|förekomst)/
+/** Vanliga ord som innehåller ett kort nyckelord men betyder något annat */
+const FALSE_FRIENDS = /möss(a|an|or|orna)$/
+
+function keywordMatches(hay: string, keyword: string): boolean {
+  const k = keyword.toLowerCase()
+  if (k.length >= SHORT_KEYWORD || /\s/.test(k)) return hay.includes(k)
+  // Korta ord räknas bara som eget ord eller sista ledet i ett sammansatt ord
+  // (husmöss, myggen), aldrig mitt i ett annat ord som "studentmössor".
+  const words = hay.split(/[^a-zåäöéü]+/).filter(Boolean)
+  return words.some((w) => !FALSE_FRIENDS.test(w) && (SHORT_SUFFIXES.some((s) => w.endsWith(k + s)) || (w.startsWith(k) && PEST_HEADS.test(w.slice(k.length)))))
+}
+
 function keywordHits(text: string, keywords: string[]): string[] {
   const hay = ` ${decodeEntities(text).toLowerCase()} `
-  return keywords.filter((k) => k && hay.includes(k.toLowerCase()))
+  return keywords.filter((k) => k && keywordMatches(hay, k))
 }
 
 /**
