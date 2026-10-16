@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.67.0',
+    date: '2026-10-16',
+    title: 'Handboken: delfakturering och återbesök',
+    items: [
+      { kind: 'nyhet', text: 'Ny guide i handboken om delfakturering: fakturera det som är gjort när återbesöket bokas, samla en månads besök på en faktura och delfakturera merförsäljning hos avtalskunder. Med en övning där du provar själv.' },
+      { kind: 'nyhet', text: 'Ny guide om att boka återbesök, med en klickbar övning från fotspåren till bokat besök. Guiderna länkar till varandra, och båda faktureringsguiderna länkar till delfakturering.' },
+    ],
+  },
+  {
     version: '3.66.1',
     date: '2026-10-16',
     title: 'Färre felträffar i upphandlingsbevakningen',

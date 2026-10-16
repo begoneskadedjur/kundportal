@@ -46,6 +46,8 @@ import TipsbonusRaknare from './intranet/interactive/leads/TipsbonusRaknare'
 import LeadsRollKarta from './intranet/interactive/leads/LeadsRollKarta'
 import SpecialrapportDelarDemo from './intranet/interactive/specialrapporter/DelarDemo'
 import SnyggaTillOvning from './intranet/interactive/specialrapporter/SnyggaTillOvning'
+import DelfakturaManadOvning from './intranet/interactive/delfakturering/DelfakturaManadOvning'
+import AterbesokOvning from './intranet/interactive/delfakturering/AterbesokOvning'
 import AudienceModal from './intranet/AudienceModal'
 import { describeAudience } from '../../types/intranet'
 import { Eye } from 'lucide-react'
@@ -73,6 +75,8 @@ const INTERACTIVE_COMPONENTS: Record<string, ComponentType<{ variant?: string }>
   'leads-roller': LeadsRollKarta,
   'specialrapport-delar': SpecialrapportDelarDemo,
   'specialrapport-snygga-till': SnyggaTillOvning,
+  'delfaktura-manad': DelfakturaManadOvning,
+  'aterbesok-ovning': AterbesokOvning,
 }
 
 // ─── Blockrendering ────────────────────────────────

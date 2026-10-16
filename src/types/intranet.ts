@@ -6,7 +6,7 @@ import {
   BookOpen, ShieldCheck, HeartPulse, Leaf, FileText,
   MessageSquareText, ClipboardList, MapPin, AlertTriangle, Users,
   Calculator, Receipt, Wallet, CalendarPlus, CalendarDays, Repeat, PackagePlus, Search,
-  Lightbulb, Handshake, Target, FileStack,
+  Lightbulb, Handshake, Target, FileStack, Footprints, ReceiptText,
 } from 'lucide-react'
 
 // ─── Innehållsblock (jsonb i intranet_documents.content) ───
@@ -146,6 +146,8 @@ export const INTRANET_SLUG_ICONS: Record<string, LucideIcon> = {
   'guide-leads-saljare': Handshake,
   'guide-leads-kontor': Target,
   'guide-specialrapporter': FileStack,
+  'guide-aterbesok': Footprints,
+  'guide-delfakturering': ReceiptText,
 }
 
 // ─── Anslagstavla ───
