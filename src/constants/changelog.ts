@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.68.0',
+    date: '2026-10-16',
+    title: 'Ny handbok: en guide per uppgift och roll',
+    items: [
+      { kind: 'nyhet', text: 'Alla guider i handboken är omgjorda efter samma mall: kort svar överst, steg bredvid en skärm som ser ut som portalen, vad du gör om det krånglar, en övning där du provar själv och några frågor på slutet.' },
+      { kind: 'andring', text: 'Du ser bara guiderna för din roll. Tekniker får guider med telefonens skärm, kontoret med datorns. Samma ämne kan finnas i två versioner, en för varje.' },
+      { kind: 'andring', text: 'Knappen för återbesök i ärendet har fått en egen ikon med två fotspår, samma som i guiderna.' },
+    ],
+  },
+  {
     version: '3.67.0',
     date: '2026-10-16',
     title: 'Handboken: delfakturering och återbesök',

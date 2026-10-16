@@ -32,6 +32,8 @@ import { useRoleBasePath } from '../../../hooks/useRoleBasePath'
 import { IntranetService } from '../../../services/intranetService'
 import {
   ONBOARDING_SLUGS,
+  forRollerna,
+  profilRoller,
   type IntranetDocumentWithStatus,
   type IntranetPost,
   type IntranetResponsibility,
@@ -96,7 +98,7 @@ export default function IntranetStart() {
 
   useEffect(() => {
     if (user?.id) fetchAll(user.id)
-  }, [user?.id])
+  }, [user?.id, profile?.role, profile?.is_admin])
 
   const fetchAll = async (userId: string) => {
     setLoading(true)
@@ -106,7 +108,11 @@ export default function IntranetStart() {
       IntranetService.getKmaStats(),
       IntranetService.getResponsibilities(),
     ])
-    if (docsRes.status === 'fulfilled') setDocuments(docsRes.value)
+    // Guiderna för den egna rollen (admin ser alla i databasen men får sina här)
+    if (docsRes.status === 'fulfilled') {
+      const roller = profilRoller(profile)
+      setDocuments(docsRes.value.filter(d => d.section !== 'handbok' || forRollerna(d, roller)))
+    }
     if (postsRes.status === 'fulfilled') setPosts(postsRes.value)
     if (kmaRes.status === 'fulfilled') setKma(kmaRes.value)
     if (respRes.status === 'fulfilled') setResponsibilities(respRes.value)

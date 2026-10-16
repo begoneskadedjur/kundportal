@@ -3,7 +3,8 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { AlertCircle, CheckCircle, FileText, User, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Footprints, Receipt, Copy, History, Wrench, Wallet, Info } from 'lucide-react'
+import { AlertCircle, CheckCircle, FileText, User, Clock, Play, Pause, RotateCcw, Save, AlertTriangle, Calendar as CalendarIcon, BookOpen, MapPin, FileCheck, FileSignature, Image as ImageIcon, Plus, X, MessageSquare, Trash2, Pencil, Receipt, Copy, History, Wrench, Wallet, Info } from 'lucide-react'
+import { Icon as SvgIcon } from '../../icons/Icon'
 import Button from '../../ui/Button'
 import Input from '../../ui/Input'
 import Modal from '../../ui/Modal'
@@ -1713,7 +1714,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
               title="Boka återbesök eller skapa nytt ärende"
             >
-              <Footprints className="w-5 h-5" />
+              <SvgIcon name="arende.aterbesok" size={20} />
             </button>
           )}
           <button

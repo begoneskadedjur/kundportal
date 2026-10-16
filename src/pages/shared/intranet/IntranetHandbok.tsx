@@ -1,5 +1,8 @@
 // src/pages/shared/intranet/IntranetHandbok.tsx
-// Handbok: guider med sök och kategorifilter
+// Handbok: guider med sök och kategorifilter.
+// Varje roll ser bara sina egna guider (audience_roles). RLS sköter det för alla utom
+// admin, som ser allt i databasen; därför filtreras listan här också, och admin kan
+// välja Visa alla roller för att se och granska de andra rollernas guider.
 
 import { useEffect, useMemo, useState } from 'react'
 import { Search, BookOpen, AlertCircle, RefreshCw } from 'lucide-react'
@@ -8,19 +11,31 @@ import { useRoleBasePath } from '../../../hooks/useRoleBasePath'
 import { IntranetService } from '../../../services/intranetService'
 import {
   INTRANET_CATEGORY_CONFIG,
+  forRollerna,
+  profilRoller,
   type IntranetCategory,
   type IntranetDocumentWithStatus,
 } from '../../../types/intranet'
 import { GuideDocCard } from './intranetShared'
 
 export default function IntranetHandbok() {
-  const { user } = useAuth()
+  const { user, profile, isAdmin } = useAuth()
   const basePath = useRoleBasePath()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [guides, setGuides] = useState<IntranetDocumentWithStatus[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [category, setCategory] = useState<IntranetCategory | 'all'>('all')
+  const [allaRoller, setAllaRoller] = useState(false)
+
+  const minaRoller = useMemo(() => profilRoller(profile), [profile])
+
+  const synliga = useMemo(
+    () => (isAdmin && allaRoller)
+      ? guides
+      : guides.filter(g => forRollerna(g, minaRoller)),
+    [guides, isAdmin, allaRoller, minaRoller]
+  )
 
   useEffect(() => {
     if (user?.id) fetchGuides(user.id)
@@ -40,12 +55,12 @@ export default function IntranetHandbok() {
   }
 
   const categories = useMemo(() => {
-    const present = new Set(guides.map(g => g.category))
+    const present = new Set(synliga.map(g => g.category))
     return [...present]
-  }, [guides])
+  }, [synliga])
 
   const filtered = useMemo(() => {
-    let result = guides
+    let result = synliga
     if (category !== 'all') result = result.filter(g => g.category === category)
     const term = searchTerm.toLowerCase().trim()
     if (term) {
@@ -55,7 +70,7 @@ export default function IntranetHandbok() {
       )
     }
     return result
-  }, [guides, category, searchTerm])
+  }, [synliga, category, searchTerm])
 
   if (loading) {
     return (
@@ -86,8 +101,16 @@ export default function IntranetHandbok() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-slate-400 -mt-1">
-        Steg-för-steg-guider för hur du arbetar i systemet. Fler guider läggs till löpande.
+        Steg-för-steg-guider för hur du arbetar i systemet. Du ser guiderna för din roll.
       </p>
+
+      {isAdmin && (
+        <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none w-max">
+          <input type="checkbox" checked={allaRoller} onChange={e => setAllaRoller(e.target.checked)}
+            className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-[#20c58f] focus:ring-[#20c58f]" />
+          Visa alla rollers guider (bara admin)
+        </label>
+      )}
 
       {/* Sök + kategorifilter */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -126,7 +149,7 @@ export default function IntranetHandbok() {
 
       {(searchTerm || category !== 'all') && (
         <p className="text-sm text-slate-500">
-          Visar {filtered.length} av {guides.length} guider
+          Visar {filtered.length} av {synliga.length} guider
         </p>
       )}
 
@@ -140,7 +163,7 @@ export default function IntranetHandbok() {
         <div className="py-12 text-center bg-slate-800/30 border border-slate-700 rounded-xl">
           <BookOpen className="w-8 h-8 text-slate-500 mx-auto mb-2" />
           <p className="text-sm text-slate-400">
-            {guides.length === 0 ? 'Inga guider publicerade ännu.' : 'Inga guider matchar din sökning.'}
+            {synliga.length === 0 ? 'Inga guider för din roll ännu.' : 'Inga guider matchar din sökning.'}
           </p>
           {(searchTerm || category !== 'all') && (
             <button

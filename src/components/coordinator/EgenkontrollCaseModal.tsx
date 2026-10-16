@@ -9,9 +9,10 @@ import {
   X, Building, Calendar, Save, Check, MapPin,
   CheckSquare, Square, XSquare, MessageSquare, History,
   Trash2, Users, User, Phone, Mail, ChevronDown,
-  Footprints, Plus, Search, Image as ImageIcon, ClipboardCheck,
+  Plus, Search, Image as ImageIcon, ClipboardCheck,
   ChevronRight, AlertTriangle, Eye
 } from 'lucide-react'
+import { Icon as SvgIcon } from '../icons/Icon'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
 import Select from '../ui/Select'
@@ -522,7 +523,7 @@ export default function EgenkontrollCaseModal({
               className="p-2 text-slate-400 hover:text-teal-400 hover:bg-teal-500/20 rounded-lg transition-all"
               title="Boka återbesök"
             >
-              <Footprints className="w-5 h-5" />
+              <SvgIcon name="arende.aterbesok" size={20} />
             </button>
             <button
               type="button"

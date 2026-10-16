@@ -11,9 +11,10 @@ import {
   Clock, FileText, Users, Star, Play, Pause, RotateCcw,
   FileSignature, ChevronDown, Download, Send, ChevronRight, Receipt, Lightbulb,
   Building, Building2, Image as ImageIcon, Trash2, Plus, AlertTriangle, MessageSquare,
-  Footprints, Copy, History, Wrench, Wallet, ClipboardCheck, CheckCircle2,
+  Copy, History, Wrench, Wallet, ClipboardCheck, CheckCircle2,
   ClipboardList, Shield, Eye
 } from 'lucide-react'
+import { Icon as SvgIcon } from '../icons/Icon'
 import Button from '../ui/Button'
 import Modal from '../ui/Modal'
 import Select from '../ui/Select'
@@ -1862,7 +1863,7 @@ export default function EditContractCaseModal({
             className="p-2 text-slate-400 hover:text-teal-400 hover:bg-teal-500/20 rounded-lg transition-all duration-200"
             title="Boka återbesök eller kopiera ärende"
           >
-            <Footprints className="w-5 h-5" />
+            <SvgIcon name="arende.aterbesok" size={20} />
           </button>
           {/* Besökshistorik */}
           <button

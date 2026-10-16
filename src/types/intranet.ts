@@ -35,6 +35,43 @@ export type IntranetBlock =
   | { type: 'link'; slug: string; label: string; description?: string }
   /** Interaktiv demo - component slås upp i registret i dokumentläsaren */
   | { type: 'interactive'; component: string; variant?: string }
+  // ─── Guidemallen (2026-10-16): åtta delar i fast ordning, se GUIDE_DELAR ───
+  // I text i mallens block blir [[Knappnamn]] en knapp och [[Knappnamn|ikon.namn]]
+  // en knapp med portalens ikon.
+  /** 1. Huvud: för vem, var i portalen, hur lång tid, vad som måste vara klart */
+  | { type: 'intro'; roller: GuideRoll[]; var: string; tar: string; behover?: string; enhet: 'mobil' | 'dator' }
+  /** 2. Kort svar: en till tre meningar */
+  | { type: 'kortsvar'; text: string }
+  /** 3. Gör så här: steg bredvid skärmen. modul = guidemodulens namn (standard: dokumentets slug) */
+  | { type: 'visning'; steg: GuideSteg[]; modul?: string }
+  /** 4. Blev det inte som du tänkt? */
+  | { type: 'felsok'; items: { fraga: string; svar: string }[] }
+  /** 5. Bra att veta: högst fem punkter */
+  | { type: 'bra'; items: string[] }
+  /** 6. Prova själv: övningen i guidemodulen */
+  | { type: 'ovning'; uppdrag: string; modul?: string }
+  /** 7. Kolla att du kan: två eller tre frågor */
+  | { type: 'quiz'; fragor: GuideFraga[] }
+  /** 8. Läs också och fråga */
+  | { type: 'avslut'; lankar: { slug: string; label: string; description?: string }[]; fraga: string }
+
+/** Rollerna i guidemallen, samma värden som audience_roles */
+export type GuideRoll = 'technician' | 'koordinator' | 'admin' | 'säljare'
+
+export interface GuideSteg {
+  /** Vad man gör, en handling. [[Knapp]] blir en knapp. */
+  text: string
+  /** Vad man ser efteråt, så man vet att det gick rätt */
+  ser?: string
+}
+
+export interface GuideFraga {
+  fraga: string
+  alternativ: string[]
+  /** Index i alternativ för rätt svar */
+  ratt: number
+  forklaring: string
+}
 
 export type IntranetSection = 'obligatoriskt' | 'handbok'
 export type IntranetCategory =
@@ -194,6 +231,22 @@ export interface KmaStats {
   reported_this_year: number
 }
 
+// ─── Roller ───
+
+/** Rollerna en profil har: primärroll, extra roller och admin-flaggan */
+export function profilRoller(p: { role?: string | null; is_admin?: boolean | null; extra_roles?: string[] | null } | null | undefined): Set<string> {
+  const r = new Set<string>()
+  if (p?.role) r.add(p.role)
+  if (p?.is_admin) r.add('admin')
+  for (const x of p?.extra_roles || []) r.add(x)
+  return r
+}
+
+/** Är dokumentet till för någon av rollerna? Utan audience_roles gäller det alla. */
+export function forRollerna(doc: Pick<IntranetDocument, 'audience_roles'>, roller: Set<string>): boolean {
+  return !doc.audience_roles?.length || doc.audience_roles.some(r => roller.has(r))
+}
+
 // ─── Onboarding ───
 
 /** Kurerad läsordning för nyanställda (dokument- och guide-slugs i ordning) */
@@ -202,12 +255,17 @@ export const ONBOARDING_SLUGS: { slug: string; label: string }[] = [
   { slug: 'arbetsmiljopolicy', label: 'Arbetsmiljöpolicy' },
   { slug: 'kvalitetspolicy', label: 'Kvalitetspolicy' },
   { slug: 'miljopolicy', label: 'Miljöpolicy' },
+  // Grundguiderna finns i en tekniker- och en kontorsversion. Listan i
+  // IntranetStart filtreras på rollen, så var och en ser bara sin version.
+  { slug: 'guide-roller-och-vyer', label: 'Guide: Hitta rätt i portalen' },
+  { slug: 'guide-roller-och-vyer-kontor', label: 'Guide: Hitta rätt i portalen' },
   { slug: 'guide-ticket-systemet', label: 'Guide: Ticket-systemet' },
+  { slug: 'guide-ticket-systemet-kontor', label: 'Guide: Ticket-systemet' },
   { slug: 'guide-rapportera-tillbud', label: 'Guide: Rapportera tillbud' },
+  { slug: 'guide-rapportera-tillbud-kontor', label: 'Guide: Rapportera tillbud' },
   // Syns bara för tekniker (audience_roles), andra roller hoppar över steget
   { slug: 'guide-leads-tekniker', label: 'Guide: Tipsa om en lead' },
-  // Syns för tekniker, koordinator och admin, inte för säljare
-  { slug: 'guide-specialrapporter', label: 'Guide: Specialrapporter' },
+  { slug: 'guide-specialrapporter', label: 'Guide: Skriv en specialrapport' },
 ]
 
 /** Ungefärlig lästid i minuter utifrån innehållsblocken */
@@ -218,6 +276,10 @@ export function estimateReadingMinutes(content: IntranetBlock[]): number {
     if (block.type === 'list' || block.type === 'steps') words += block.items.join(' ').split(/\s+/).length
     if (block.type === 'chain') words += block.steps.length * 2
     if (block.type === 'jump') words += block.items.length * 4
+    if (block.type === 'visning') words += block.steg.map(s => `${s.text} ${s.ser ?? ''}`).join(' ').split(/\s+/).length
+    if (block.type === 'felsok') words += block.items.map(i => `${i.fraga} ${i.svar}`).join(' ').split(/\s+/).length
+    if (block.type === 'bra') words += block.items.join(' ').split(/\s+/).length
+    if (block.type === 'quiz') words += block.fragor.map(f => `${f.fraga} ${f.alternativ.join(' ')}`).join(' ').split(/\s+/).length
   }
   return Math.max(1, Math.round(words / 180))
 }

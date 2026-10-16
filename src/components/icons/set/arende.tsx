@@ -37,4 +37,13 @@ export const arendeIcons = {
       <circle cx="12" cy="13" r="2" />
     </>
   ),
+  // Återbesök: två fotspår (ersätter lucide Footprints i ärendemodalerna)
+  'arende.aterbesok': (
+    <>
+      <path d="M8 4.2c1.6 0 2.6 1.9 2.6 4.3 0 2.1-.9 3.6-2.5 3.6S5.5 10.6 5.5 8.5C5.5 6 6.4 4.2 8 4.2z" />
+      <path d="M6.3 14.6c0 1.6.8 2.6 1.9 2.6s1.8-1 1.7-2.5" />
+      <path d="M16 6.8c1.6 0 2.5 1.8 2.5 4.2 0 2.1-1 3.6-2.6 3.6s-2.5-1.5-2.5-3.6c0-2.4 1-4.2 2.6-4.2z" />
+      <path d="M14.1 17.2c0 1.6.7 2.6 1.8 2.6s1.9-1 1.9-2.6" />
+    </>
+  ),
 } satisfies Record<`arende.${string}`, ReactNode>

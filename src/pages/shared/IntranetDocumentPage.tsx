@@ -49,6 +49,7 @@ import SnyggaTillOvning from './intranet/interactive/specialrapporter/SnyggaTill
 import DelfakturaManadOvning from './intranet/interactive/delfakturering/DelfakturaManadOvning'
 import AterbesokOvning from './intranet/interactive/delfakturering/AterbesokOvning'
 import AudienceModal from './intranet/AudienceModal'
+import { MallBlock, arMallguide, kollaMall, mallToc } from './intranet/GuideMall'
 import { describeAudience } from '../../types/intranet'
 import { Eye } from 'lucide-react'
 
@@ -93,7 +94,10 @@ function hoppaTill(e: MouseEvent<HTMLAnchorElement>, id: string) {
   window.history.replaceState(window.history.state, '', ankarHref(id))
 }
 
-function BlockRenderer({ block, anchorId }: { block: IntranetBlock; anchorId?: string }) {
+const MALL_TYPER = new Set(['intro', 'kortsvar', 'visning', 'felsok', 'bra', 'ovning', 'quiz', 'avslut'])
+
+function BlockRenderer({ block, anchorId, slug }: { block: IntranetBlock; anchorId?: string; slug: string }) {
+  if (MALL_TYPER.has(block.type)) return <MallBlock block={block} slug={slug} />
   switch (block.type) {
     case 'h2':
       return <h2 id={anchorId} className="text-lg font-semibold text-white mt-8 mb-3 first:mt-0 scroll-mt-24">{block.text}</h2>
@@ -265,9 +269,9 @@ export default function IntranetDocumentPage() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [doc?.id])
 
-  // Innehållsförteckning från h2-block
+  // Innehållsförteckning: mallens delar, annars h2-blocken
   const toc = useMemo(
-    () =>
+    () => doc && arMallguide(doc.content) ? mallToc(doc.content) :
       (doc?.content || [])
         .map((block, i) => ({ block, i }))
         .filter(({ block }) => block.type === 'h2')
@@ -444,6 +448,20 @@ export default function IntranetDocumentPage() {
         </div>
       </header>
 
+      {/* Mallkoll (admin): guider byggda med guidemallen som bryter mot den */}
+      {isAdmin && isGuide && arMallguide(doc.content) && (() => {
+        const fel = kollaMall(doc.content, doc.slug)
+        return fel.length > 0 ? (
+          <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+            <p className="text-sm font-semibold text-white">Mallkoll: guiden följer inte guidemallen</p>
+            <ul className="mt-1 list-disc pl-5 text-sm text-slate-300">
+              {fel.map(f => <li key={f}>{f}</li>)}
+            </ul>
+            <p className="mt-1 text-xs text-slate-500">Syns bara för admin.</p>
+          </div>
+        ) : null
+      })()}
+
       {/* Innehållsförteckning (smal skärm), hopfälld */}
       {toc.length > 1 && (
         <details id="innehall" className="xl:hidden mb-6 bg-slate-800/30 border border-slate-700 rounded-xl scroll-mt-24 group">
@@ -470,7 +488,7 @@ export default function IntranetDocumentPage() {
       {/* Innehåll */}
       <article>
         {doc.content.map((block, i) => (
-          <BlockRenderer key={i} block={block} anchorId={anchorFor(block, i)} />
+          <BlockRenderer key={i} block={block} anchorId={anchorFor(block, i)} slug={doc.slug} />
         ))}
       </article>
 
