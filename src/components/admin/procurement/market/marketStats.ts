@@ -19,6 +19,7 @@
 
 import type { AwardWithRelations, BidderWithSupplier } from '../../../../services/procurementService'
 import type {
+  ProcurementAward,
   ProcurementAwardSource,
   ProcurementAwardStatus,
   ProcurementEndSource,
@@ -38,6 +39,7 @@ import {
   normalizeName,
   quarterOf,
   swedishDate,
+  windowReferenceEnd,
   workWindow,
 } from '../../../../shared/procurementRules'
 
@@ -214,6 +216,7 @@ export interface ProcurementGroup {
   /** Rättat slut om satt, annars beräknat */
   endDate: string | null
   endSource: ProcurementEndSource | null
+  /** Bearbetningsfönstret 18 till 12 månader före basavtalets slut (rättat slut om satt), sedan 3.66.0 */
   windowStart: string | null
   windowEnd: string | null
   /** Beräkningen av slutdatumet i klartext (procurement_awards.calc_basis) */
@@ -226,6 +229,10 @@ export interface ProcurementGroup {
   optionText: string | null
   /** Sant när optionerna kommer ur annonsen och inte är antagna */
   optionsKnown: boolean
+  /** Antal förlängningar (TED BT-58 eller ur texten) */
+  optionCount: number | null
+  /** Var de riktiga optionerna kommer från */
+  optionSource: ProcurementAward['option_source'] | null
   /** Ny annons, ny tilldelning eller slut passerat (procurement_refresh_award_followups) */
   followupStatus: ProcurementFollowupStatus | null
   followupNoticeId: string | null
@@ -274,7 +281,8 @@ function groupValue(winners: GroupWinner[]): { value: number | null; kind: Procu
 function applyEnd(g: ProcurementGroup) {
   g.endDate = g.correctedEndDate ?? g.calcEndDate
   g.endSource = g.correctedEndDate ? 'manual' : g.calcEndSource
-  const w = workWindow(g.endDate)
+  // Fönstret räknas mot basavtalets slut, inte sista möjliga slut med optioner (beslut 2026-10-16)
+  const w = workWindow(windowReferenceEnd({ correctedEnd: g.correctedEndDate, baseEnd: g.baseEndDate, calcEnd: g.calcEndDate }))
   g.windowStart = w.start
   g.windowEnd = w.end
 }
@@ -325,6 +333,8 @@ export function groupAwards(awards: AwardWithRelations[]): ProcurementGroup[] {
         optionMonths: null,
         optionText: null,
         optionsKnown: false,
+        optionCount: null,
+        optionSource: null,
         followupStatus: null,
         followupNoticeId: null,
         followupUrl: null,
@@ -365,6 +375,8 @@ export function groupAwards(awards: AwardWithRelations[]): ProcurementGroup[] {
         g.optionMonths = a.option_months ?? null
         g.optionText = a.option_text ?? null
         g.optionsKnown = !!a.option_source
+        g.optionCount = a.option_count ?? null
+        g.optionSource = a.option_source ?? null
       }
     }
     takeFollowup(g, a.followup_status ?? null, a.followup_notice_id ?? null, a.followup_url ?? null, a.followup_title ?? null, a.followup_date ?? null)
@@ -470,6 +482,8 @@ export function mergeCrossSource(groups: ProcurementGroup[]): ProcurementGroup[]
       match.optionMonths = g.optionMonths
       match.optionText = g.optionText
       match.optionsKnown = g.optionsKnown
+      match.optionCount = g.optionCount
+      match.optionSource = g.optionSource
     }
     takeFollowup(match, g.followupStatus, g.followupNoticeId, g.followupUrl, g.followupTitle, g.followupDate)
     if (match.status === 'open' && g.status !== 'open') match.status = g.status
@@ -639,14 +653,28 @@ export function annualValueOfGroup(g: ProcurementGroup): number | null {
   return g.value / contractYears(g)
 }
 
+/**
+ * Avtalet har förlängningsoptioner efter basavtalets slut (riktiga eller
+ * antagna). Rättat slut räknas som känt slut utan optioner.
+ */
+export function hasOptionPeriod(g: Pick<ProcurementGroup, 'baseEndDate' | 'endDate' | 'correctedEndDate'>): boolean {
+  return !g.correctedEndDate && !!g.baseEndDate && !!g.endDate && g.baseEndDate < g.endDate
+}
+
+/** Basavtalets slut (eller rättat slut) som fönstret räknas mot */
+export function windowEndOf(g: Pick<ProcurementGroup, 'endDate'> & Partial<Pick<ProcurementGroup, 'baseEndDate' | 'correctedEndDate'>>): string | null {
+  return g.correctedEndDate ? g.correctedEndDate : windowReferenceEnd({ baseEnd: g.baseEndDate, calcEnd: g.endDate })
+}
+
 export function isInWindow(g: Pick<ProcurementGroup, 'windowStart' | 'windowEnd'>, today: string): boolean {
   return !!g.windowStart && !!g.windowEnd && g.windowStart <= today && today <= g.windowEnd
 }
 
 /**
- * Avtalets läge mot bearbetningsfönstret: före fönstret, i fönstret, sent
- * (fönstret har passerat, under 12 månader kvar) eller annons väntas nu (slut
- * passerat utan ny annons). Null när köparen redan annonserat eller tilldelat
+ * Avtalets läge mot bearbetningsfönstret (räknat mot basavtalets slut sedan
+ * 3.66.0): före fönstret, i fönstret, sent (fönstret har passerat, under 12
+ * månader kvar av basavtalet eller optionstid) eller annons väntas nu (sista
+ * möjliga slut passerat utan ny annons). Null när köparen redan annonserat eller tilldelat
  * på nytt, när avtalet är gammalt eller när slutdatum saknas.
  */
 export function windowStateOf(g: Pick<ProcurementGroup, 'windowStart' | 'windowEnd' | 'endDate' | 'followupStatus'>, today: string): ProcurementWindowState | null {
@@ -660,18 +688,31 @@ export function windowStateOf(g: Pick<ProcurementGroup, 'windowStart' | 'windowE
 }
 
 /**
- * Förväntad annons: kvartalet då bearbetningsfönstret öppnar. Har fönstret
- * redan öppnat men avtalet inte löpt ut räknas innevarande kvartal.
+ * Förväntad annons: kvartalet då bearbetningsfönstret öppnar. Fönstret räknas
+ * mot basavtalets slut, som är det tidigaste köparen kan behöva annonsera
+ * (sedan 3.66.0). Har fönstret redan öppnat men basavtalet inte löpt ut räknas
+ * innevarande kvartal. Har basavtalet löpt ut men optionstid återstår har
+ * köparen troligen förlängt: då räknas fönstret mot sista möjliga slut.
+ * Avtal med optioner räknas som osäkra i prognosen (isUncertainForecast).
  */
-export function expectedAnnouncementQuarter(g: Pick<ProcurementGroup, 'windowStart' | 'endDate'> & Partial<Pick<ProcurementGroup, 'followupStatus'>>, today: string): string | null {
+export function expectedAnnouncementQuarter(
+  g: Pick<ProcurementGroup, 'windowStart' | 'endDate'> & Partial<Pick<ProcurementGroup, 'followupStatus' | 'baseEndDate' | 'correctedEndDate'>>,
+  today: string
+): string | null {
   // Ny annons eller ny tilldelning finns: inget förväntat. Slut passerat utan
   // ny annons: annonsen väntas nu, aldrig i en förfluten kvartalsruta.
   const f = followupOf({ followupStatus: g.followupStatus ?? null, endDate: g.endDate }, today)
   if (f === 'new_notice' || f === 'new_award' || f === 'stale') return null
   if (f === 'passed_no_notice') return quarterOf(today)
   if (!g.windowStart) return null
-  if (g.windowStart < today && g.endDate && g.endDate >= today) return quarterOf(today)
-  return quarterOf(g.windowStart)
+  if (g.windowStart >= today) return quarterOf(g.windowStart)
+  const base = windowEndOf(g)
+  if (base && base < today && g.endDate && g.endDate > base) {
+    // Basavtalet har löpt ut, optionstiden pågår: fönstret mot sista möjliga slut
+    const late = workWindow(g.endDate).start
+    return quarterOf(late && late > today ? late : today)
+  }
+  return quarterOf(today)
 }
 
 /** Kommande kvartal från och med innevarande: 2026-Q3, 2026-Q4 ... */
@@ -777,6 +818,14 @@ export function isUncertainEnd(g: Pick<ProcurementGroup, 'endSource'>): boolean 
   return g.endSource === 'assumption_2_2' || g.endSource === 'text_duration' || g.endSource == null
 }
 
+/**
+ * Osäker väntad annons i prognosen: osäkert slutdatum, eller förlängningsoptioner
+ * som kan skjuta annonsen från basavtalets fönster till ett senare (sedan 3.66.0).
+ */
+export function isUncertainForecast(g: Pick<ProcurementGroup, 'endSource' | 'baseEndDate' | 'endDate' | 'correctedEndDate'>): boolean {
+  return isUncertainEnd(g) || hasOptionPeriod(g)
+}
+
 export interface QuarterForecast {
   quarter: string
   /** Avtalsklockans väntade annonser: antal och årsvärde, varav osäkert slutdatum */
@@ -797,7 +846,9 @@ export interface QuarterForecast {
  * annons plus öppna anbud per kvartal för sista anbudsdag, i årsvärde.
  * Räknereglerna är desamma som i pipelineByQuarter (samma urval av annonser
  * och avtal), så att antalen inte ändras när de två prognoserna slås ihop.
- * Osäkert slutdatum (antagandet två plus två år eller fritext) ritas ljusare.
+ * Osäkert slutdatum (antagandet två plus två år eller fritext) och avtal med
+ * förlängningsoptioner (annonsen kan komma senare om köparen förlänger) ritas
+ * ljusare.
  */
 export function forecastByQuarter(
   notices: Array<Pick<ProcurementNotice, 'tender_deadline' | 'expected_contribution' | 'our_status' | 'annual_value' | 'estimated_value' | 'duration_months'>>,
@@ -829,7 +880,7 @@ export function forecastByQuarter(
     const annual = annualValueOfGroup(g) ?? 0
     row.clock += 1
     row.clockAnnual += annual
-    if (isUncertainEnd(g)) {
+    if (isUncertainForecast(g)) {
       row.clockUncertain += 1
       row.clockUncertainAnnual += annual
     }
@@ -887,7 +938,8 @@ export const CLOCK_SORT_LABEL: Record<ClockSort, string> = {
 }
 
 export function sortClock(rows: ProcurementGroup[], sort: ClockSort, countyName: (code: string | null) => string): ProcurementGroup[] {
-  const byEnd = (a: ProcurementGroup, b: ProcurementGroup) => (a.endDate ?? '9999').localeCompare(b.endDate ?? '9999')
+  // Samma slutdatum som raden visar: basavtalets slut (eller rättat slut)
+  const byEnd = (a: ProcurementGroup, b: ProcurementGroup) => (windowEndOf(a) ?? '9999').localeCompare(windowEndOf(b) ?? '9999')
   const byBuyer = (a: ProcurementGroup, b: ProcurementGroup) => String(a.buyerName ?? '').localeCompare(String(b.buyerName ?? ''), 'sv')
   const list = [...rows]
   if (sort === 'window') list.sort((a, b) => (a.windowStart ?? '9999').localeCompare(b.windowStart ?? '9999') || byEnd(a, b))

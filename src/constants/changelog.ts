@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.66.0',
+    date: '2026-10-16',
+    title: 'Bearbetningsfönstret räknas mot basavtalet',
+    items: [
+      { kind: 'andring', text: 'Bearbetningsfönstret (18 till 12 månader före slut) räknas nu mot basavtalets slut, inte mot sista möjliga slut med förlängningsoptioner. Köparen kan välja att inte förlänga, så vi börjar bearbeta i tid. Det gäller avtalsklockans lägen och sortering, Idag, notisen och sammandraget. I prognosen räknas annonsen tidigast inför basavtalets slut, och avtal med optioner visas som osäkra eftersom annonsen kan komma senare om köparen förlänger.' },
+      { kind: 'nyhet', text: 'Slutdatumet i avtalsklockan, köparprofilens avtal och upphandlingens översikt är basavtalets slut. Har avtalet förlängningsoptioner står en liten ikon efter datumet: håll muspekaren över eller tryck på den för att se optionerna, sista möjliga slut, varifrån uppgiften kommer och om en option troligen är avropad.' },
+    ],
+  },
+  {
     version: '3.65.0',
     date: '2026-10-16',
     title: 'Avtalsklocka med tidslinje, kontaktpersoner och egna poster',

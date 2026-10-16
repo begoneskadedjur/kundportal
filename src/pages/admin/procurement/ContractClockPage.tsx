@@ -1,7 +1,7 @@
 // src/pages/admin/procurement/ContractClockPage.tsx
 // Framförhållning > Avtalsklocka (docs/upphandlingsportal-ux-plan.md etapp 6
 // och 7): kända avtal med nuvarande leverantör, kontaktperson hos köparen,
-// tidslinje med bearbetningsfönster 18 till 12 månader före slut och
+// tidslinje med bearbetningsfönster 18 till 12 månader före basavtalets slut och
 // förlängningsoptioner, status och ansvarig i menyer. En rad per upphandling:
 // ramavtal med flera leverantörer grupperas på source_ref och samma
 // upphandling i TED och UHM slås ihop. Ändringar skrivs till alla ingående
@@ -241,13 +241,13 @@ export default function ContractClockPage() {
           { header: 'Län', width: 16 },
           { header: 'Upphandling', width: 48 },
           { header: 'Nuvarande leverantör', width: 30 },
-          { header: 'Avtalsslut', width: 12 },
+          { header: 'Sista möjliga slut', width: 12 },
           { header: 'Basavtal slut', width: 12 },
           { header: 'Optioner (mån)', width: 10 },
           { header: 'Optioner ur annonsen', width: 10 },
           { header: 'Slutdatumets källa', width: 28 },
           { header: 'Beräkning', width: 50 },
-          { header: 'Fönster från', width: 12 },
+          { header: 'Fönster från (mot basavtal)', width: 14 },
           { header: 'Fönster till', width: 12 },
           { header: 'Läge', width: 16 },
           { header: 'Annons väntas', width: 12 },
@@ -335,12 +335,12 @@ export default function ContractClockPage() {
 
       {!showingExcluded && (
         <div className="flex flex-wrap gap-x-5 gap-y-1 text-[11.5px] text-slate-500">
-          <span className="inline-flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm bg-[#20c58f]/15 border border-[#20c58f]" />Bearbetningsfönster 18 till 12 månader före slut</span>
+          <span className="inline-flex items-center gap-1.5"><span className="w-3 h-2.5 rounded-sm bg-[#20c58f]/15 border border-[#20c58f]" />Bearbetningsfönster 18 till 12 månader före basavtalets slut</span>
           <span className="inline-flex items-center gap-1.5">
             <span className="w-3 h-2.5 rounded-sm text-slate-500" style={{ backgroundImage: 'repeating-linear-gradient(135deg, transparent 0 2px, currentColor 2px 3px)' }} />
             Förlängningsoption
           </span>
-          <span className="inline-flex items-center gap-1.5"><span className="w-0.5 h-3 bg-slate-100" />Avtalsslut</span>
+          <span className="inline-flex items-center gap-1.5"><span className="w-0.5 h-3 bg-slate-100" />Avtalsslut, med optioner sista möjliga</span>
           <span className="inline-flex items-center gap-1.5"><span className="w-0.5 h-3 bg-amber-400" />Idag</span>
         </div>
       )}

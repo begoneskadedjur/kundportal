@@ -36,7 +36,7 @@ import {
   parseRenewalOptions,
   politeFetch,
   tedDate,
-  workWindow,
+  contractWorkWindow,
 } from './lib/procurementImportShared.mjs'
 
 const args = parseArgs()
@@ -274,7 +274,7 @@ async function main() {
     }
     const end = computeContractEnd(input)
     if (opts?.known) stats.realOptions++
-    const win = workWindow(end.date)
+    const win = contractWorkWindow(end)
     const rel = awardRelevance(r.cpv_codes ?? [], r.title)
     const manual = !!r.excluded_at && (!r.excluded_reason || String(r.excluded_reason).startsWith('Manuellt'))
 

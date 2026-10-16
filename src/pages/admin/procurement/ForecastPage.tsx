@@ -3,9 +3,10 @@
 // annonser per kvartal i årsvärde, där avtalsklockans avtal räknas på
 // kvartalet för förväntad annons och öppna anbud i bevakningen på kvartalet
 // för sista anbudsdag (forecastByQuarter i market/marketStats.ts, samma urval
-// som den tidigare pipelinen). Ljusare del av stapeln är avtal med osäkert
-// slutdatum (antagandet två plus två år eller fritext). Tabellen under visar
-// samma tal.
+// som den tidigare pipelinen). Fönstret räknas mot basavtalets slut (sedan
+// 3.66.0). Ljusare del av stapeln är avtal med osäkert slutdatum (antagandet
+// två plus två år eller fritext) eller med förlängningsoptioner, där annonsen
+// kan komma senare om köparen förlänger. Tabellen under visar samma tal.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -27,7 +28,7 @@ function quarterLabel(q: string): string {
 
 function barTitle(r: QuarterForecast): string {
   const parts = [`${quarterLabel(r.quarter)}: ${fmtKr(r.total)} per år`]
-  parts.push(`${r.clock} väntade annonser ur avtalsklockan, ${fmtKr(r.clockAnnual)}${r.clockUncertain ? `, varav ${r.clockUncertain} med osäkert slutdatum` : ''}`)
+  parts.push(`${r.clock} väntade annonser ur avtalsklockan, ${fmtKr(r.clockAnnual)}${r.clockUncertain ? `, varav ${r.clockUncertain} osäkra (slutdatum eller optioner)` : ''}`)
   parts.push(`${r.notices} öppna anbud, ${fmtKr(r.noticeAnnual)}`)
   return parts.join('\n')
 }
@@ -118,7 +119,7 @@ export default function ForecastPage() {
 
       <Section
         title="Väntade annonser per kvartal, årsvärde"
-        hint="En prognos i stället för två: avtalsklockans väntade annonser (kvartalet då bearbetningsfönstret öppnar) plus öppna anbud efter sista anbudsdag. Ljusare stapel betyder osäkert slutdatum."
+        hint="En prognos i stället för två: avtalsklockans väntade annonser (kvartalet då bearbetningsfönstret öppnar) plus öppna anbud efter sista anbudsdag. Fönstret räknas mot basavtalets slut. Ljusare stapel betyder osäkert slutdatum eller förlängningsoptioner som kan skjuta annonsen."
       >
         <ForecastBars rows={rows} />
       </Section>

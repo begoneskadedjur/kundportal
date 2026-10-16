@@ -5,7 +5,7 @@
 // VIKTIGT: avsnittet "Regler" nedan speglar src/shared/procurementRules.ts
 // (normalizeOrgNumber, cleanText, normalizeName, normalizeTitle,
 // normalizeTedNumber, tedDate, addMonthsIso, swedishDate, computeContractEnd,
-// workWindow, SE_COUNTIES, countiesFromNuts) och guessSector ur
+// workWindow, windowReferenceEnd, contractWorkWindow, SE_COUNTIES, countiesFromNuts) och guessSector ur
 // api/_lib/procurement.ts. Skripten är ren .mjs utan ts-loader och kan inte
 // importera .ts-filerna. Ändras originalen måste kopiorna här ändras på samma
 // sätt, annars får importen andra award_key/bidder_key än synken och raderna
@@ -413,10 +413,20 @@ export function canonicalOrgNumber(raw) {
   return o ? ORG_ALIASES[o] ?? o : null
 }
 
-/** Bearbetningsfönstret: 18 till 12 månader före slutdatum */
+/** Bearbetningsfönstret: 18 till 12 månader före det slutdatum som ges */
 export function workWindow(endDate) {
   if (!endDate) return { start: null, end: null }
   return { start: addMonthsIso(endDate, -18), end: addMonthsIso(endDate, -12) }
+}
+
+/** Spegel av windowReferenceEnd i procurementRules.ts: rättat slut, annars basavtalets slut, annars beräknat slut */
+export function windowReferenceEnd(input) {
+  return input.correctedEnd ?? input.baseEnd ?? input.calcEnd ?? null
+}
+
+/** Spegel av contractWorkWindow: bearbetningsfönstret mot basavtalets slut (beslut 2026-10-16) */
+export function contractWorkWindow(end) {
+  return workWindow(windowReferenceEnd({ baseEnd: end.baseEnd, calcEnd: end.date }))
 }
 
 /** Grov sektor ur orgnr (212 = kommun, 232 = region) och namn. Spegel av guessSector i api/_lib/procurement.ts */
@@ -805,7 +815,7 @@ export function buildRows(records, buyers, suppliers, noticeIdByRef = new Map())
       durationMonths: f.durationMonths ?? textDuration?.months ?? null,
       durationFrom: f.durationMonths ? 'ted' : textDuration ? 'text' : null,
     })
-    const win = workWindow(end.date)
+    const win = contractWorkWindow(end)
     const relevance = awardRelevance(rec.cpv ?? [], rec.title)
     const firstKeys = []
     for (const w of rec.winners) {

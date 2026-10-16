@@ -751,10 +751,26 @@ export function canonicalOrgNumber(raw: string | null | undefined): string | nul
   return o ? ORG_ALIASES[o] ?? o : null
 }
 
-/** Bearbetningsfönstret: 18 till 12 månader före slutdatum */
+/** Bearbetningsfönstret: 18 till 12 månader före det slutdatum som ges */
 export function workWindow(endDate: string | null): { start: string | null; end: string | null } {
   if (!endDate) return { start: null, end: null }
   return { start: addMonthsIso(endDate, -18), end: addMonthsIso(endDate, -12) }
+}
+
+/**
+ * Slutdatumet som bearbetningsfönstret räknas mot (beslut 2026-10-16):
+ * rättat slut när det finns, annars basavtalets slut utan
+ * förlängningsoptioner, annars beräknat slut. Köparen kan välja att inte
+ * förlänga, så fönstret ska öppna inför basavtalets slut och inte inför
+ * sista möjliga slut med alla optioner.
+ */
+export function windowReferenceEnd(input: { correctedEnd?: string | null; baseEnd?: string | null; calcEnd?: string | null }): string | null {
+  return input.correctedEnd ?? input.baseEnd ?? input.calcEnd ?? null
+}
+
+/** Bearbetningsfönstret för ett beräknat slut (computeContractEnd): mot basavtalets slut */
+export function contractWorkWindow(end: Pick<EndDateResult, 'date' | 'baseEnd'>): { start: string | null; end: string | null } {
+  return workWindow(windowReferenceEnd({ baseEnd: end.baseEnd, calcEnd: end.date }))
 }
 
 // ---------------------------------------------------------------------------
@@ -769,6 +785,8 @@ export interface WindowAwardRow {
   title: string | null
   winner_name: string | null
   calc_end_date: string | null
+  /** Basavtalets slut utan optioner: fönstret räknas mot det (sedan 3.66.0) */
+  base_end_date?: string | null
   corrected_end_date: string | null
   status: string | null
   followup_status: string | null
@@ -783,14 +801,18 @@ export interface WindowEntry {
   buyerName: string | null
   title: string | null
   winners: string[]
+  /** Slutet som fönstret räknas mot: rättat slut eller basavtalets slut */
   endDate: string
+  /** Sista möjliga slut med alla optioner, när det är senare än endDate */
+  maxEnd: string | null
   windowStart: string
   windowEnd: string
 }
 
 /**
  * Avtal (en grupp per källa och upphandling) som är i bearbetningsfönstret i
- * dag och ännu inte fått sin notis. En gång per avtal: har någon rad i gruppen
+ * dag och ännu inte fått sin notis. Fönstret räknas mot basavtalets slut
+ * (rättat slut när det finns), inte mot sista möjliga slut med optioner. En gång per avtal: har någon rad i gruppen
  * window_notified_at satt räknas hela gruppen som notifierad. Felträffar,
  * klara och ignorerade avtal och avtal där köparen redan annonserat eller
  * tilldelat på nytt hoppas över. Samma köpare och slutdatum i flera källor
@@ -812,7 +834,10 @@ export function windowEntriesToNotify(rows: WindowAwardRow[], today: string): Wi
     if (list.every((r) => r.status === 'done' || r.status === 'ignored')) continue
     if (list.some((r) => r.followup_status === 'new_notice' || r.followup_status === 'new_award')) continue
     const corrected = list.map((r) => r.corrected_end_date).filter((d): d is string => !!d).sort().pop() ?? null
-    const end = corrected ?? list.map((r) => r.calc_end_date).filter((d): d is string => !!d).sort().pop() ?? null
+    const calc = list.map((r) => r.calc_end_date).filter((d): d is string => !!d).sort().pop() ?? null
+    // Fönstret räknas mot basavtalets slut (windowReferenceEnd), inte sista möjliga slut med optioner
+    const base = list.map((r) => windowReferenceEnd({ baseEnd: r.base_end_date, calcEnd: r.calc_end_date })).filter((d): d is string => !!d).sort().pop() ?? null
+    const end = windowReferenceEnd({ correctedEnd: corrected, baseEnd: base, calcEnd: calc })
     if (!end) continue
     const w = workWindow(end)
     if (!w.start || !w.end || today < w.start || today > w.end) continue
@@ -828,6 +853,7 @@ export function windowEntriesToNotify(rows: WindowAwardRow[], today: string): Wi
       title: first.title,
       winners: [...new Set(list.map((r) => r.winner_name).filter((n): n is string => !!n))],
       endDate: end,
+      maxEnd: !corrected && calc && calc > end ? calc : null,
       windowStart: w.start,
       windowEnd: w.end,
     })

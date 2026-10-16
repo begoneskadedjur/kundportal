@@ -90,9 +90,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           heading('Avtal som gått in i bearbetningsfönstret') +
           list(
             windowAwards!.map((ev) => {
-              const m = (ev.metadata ?? {}) as { buyer_id?: string | null; buyer_name?: string | null; winners?: string[]; end_date?: string | null }
+              const m = (ev.metadata ?? {}) as { buyer_id?: string | null; buyer_name?: string | null; winners?: string[]; end_date?: string | null; max_end?: string | null }
               const href = m.buyer_id ? `${PROCUREMENT_PORTAL_URL}/kopare/${m.buyer_id}` : `${PROCUREMENT_PORTAL_URL}/avtalsklocka`
-              return `<a href="${href}" style="color:#0f766e">${escapeHtml(m.buyer_name ?? 'Okänd köpare')}</a>: ${escapeHtml((m.winners ?? []).join(' och ') || 'okänd leverantör')}, slut ${m.end_date ?? 'okänt'}`
+              return `<a href="${href}" style="color:#0f766e">${escapeHtml(m.buyer_name ?? 'Okänd köpare')}</a>: ${escapeHtml((m.winners ?? []).join(' och ') || 'okänd leverantör')}, basavtalet slutar ${m.end_date ?? 'okänt'}${m.max_end ? ` (optioner längst till ${m.max_end})` : ''}`
             })
           )
         sections.push(windowSection)

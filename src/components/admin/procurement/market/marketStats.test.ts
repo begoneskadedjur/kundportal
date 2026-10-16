@@ -24,6 +24,8 @@ import {
   pipelineByQuarter,
   forecastByQuarter,
   twoBidderBuyerKeys,
+  sortClock,
+  windowEndOf,
   qualityBuyers,
   shareTotals,
   sharesByYear,
@@ -310,6 +312,42 @@ describe('avtalsklocka och pipeline', () => {
     })
     expect(rows[1]).toMatchObject({ notices: 1, noticeAnnual: 300_000, total: 300_000 })
     expect(rows[2]).toMatchObject({ clock: 1, clockAnnual: 1_000_000, clockUncertain: 1, total: 1_000_000 })
+  })
+
+  it('fönstret räknas mot basavtalets slut och optionerna gör prognosen osäker (3.66.0)', () => {
+    // Basavtal 2027-12-31, optioner till 2029-12-31
+    const [g] = groupAwards([award({ base_end_date: '2027-12-31', calc_end_date: '2029-12-31', calc_end_source: 'ted_end_plus_renewals', option_months: 24, option_count: 2, option_source: 'ted_eforms' })])
+    expect(windowEndOf(g)).toBe('2027-12-31')
+    expect(g.windowStart).toBe('2026-06-30')
+    expect(g.windowEnd).toBe('2026-12-31')
+    expect(isInWindow(g, today)).toBe(true)
+    expect(windowStateOf(g, today)).toBe('in')
+    expect(expectedAnnouncementQuarter(g, today)).toBe('2026-Q3')
+    const rows = forecastByQuarter([], [g], today, 2)
+    expect(rows[0]).toMatchObject({ clock: 1, clockUncertain: 1 })
+    // Utan optioner och med säkert slut: inte osäker
+    const [plain] = groupAwards([award({ base_end_date: '2027-12-31', calc_end_date: '2027-12-31', calc_end_source: 'ted_end' })])
+    expect(forecastByQuarter([], [plain], today, 2)[0]).toMatchObject({ clock: 1, clockUncertain: 0 })
+    // Rättat slut styr fönstret
+    const [fixed] = groupAwards([award({ base_end_date: '2027-12-31', calc_end_date: '2029-12-31', corrected_end_date: '2029-06-30' })])
+    expect(fixed.windowStart).toBe('2027-12-30')
+  })
+
+  it('basavtalet har löpt ut men optionstid återstår: annonsen väntas inför sista slutet', () => {
+    const [g] = groupAwards([award({ base_end_date: '2026-03-31', calc_end_date: '2029-03-31', calc_end_source: 'ted_end_plus_renewals' })])
+    expect(windowStateOf(g, today)).toBe('late')
+    expect(expectedAnnouncementQuarter(g, today)).toBe('2027-Q3')
+    const [h] = groupAwards([award({ base_end_date: '2026-03-31', calc_end_date: '2027-12-31', calc_end_source: 'ted_end_plus_renewals' })])
+    expect(expectedAnnouncementQuarter(h, today)).toBe('2026-Q3')
+  })
+
+  it('sortering på fönster och slut följer basavtalet', () => {
+    const groups = groupAwards([
+      award({ source_ref: 'A', base_end_date: null, calc_end_date: '2028-06-30' }),
+      award({ source_ref: 'B', base_end_date: '2027-06-30', calc_end_date: '2029-06-30' }),
+    ])
+    expect(sortClock(groups, 'window', () => '').map((g) => g.key)).toEqual(['uhm:B', 'uhm:A'])
+    expect(sortClock(groups, 'end', () => '').map((g) => g.key)).toEqual(['uhm:B', 'uhm:A'])
   })
 
   it('bara två anbudsgivare brukar svara: median av antalet anbud hos köparen', () => {

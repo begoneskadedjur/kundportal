@@ -1,14 +1,16 @@
 // src/components/admin/procurement/clock/ClockTable.tsx
 // Avtalsklockans lista (docs/upphandlingsportal-ux-plan.md etapp 6 och 7): en
 // rad per upphandling med köpare, län, nuvarande leverantör och kontaktperson,
-// en tidslinje (bearbetningsfönster 18 till 12 månader före slut,
+// en tidslinje (bearbetningsfönster 18 till 12 månader före basavtalets slut,
 // förlängningsoption randig, avtalsslut och idag), slutdatum med källa och
 // rättning, årsvärde, samt status och ansvarig i menyer i stället för
 // rullistor. Felträff markeras med en ikonknapp.
 //
-// Tidslinjen: fönstret räknas mot sista möjliga slut med alla optioner (samma
-// slutdatum som avtalsklockan alltid använt). Den randiga ytan är
+// Tidslinjen: fönstret räknas mot basavtalets slut (beslut 2026-10-16, sedan
+// 3.66.0), inte mot sista möjliga slut med alla optioner. Den randiga ytan är
 // förlängningsoptionerna mellan basavtalets slut och det sista slutet.
+// Slutdatumet i raden är basavtalets slut; optionstiden syns bakom en liten
+// ikon (OptionPeriodHint).
 
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -20,8 +22,10 @@ import { noticePath } from '../../../../lib/procurementPortal'
 import type { ProcurementManagerProfile } from '../../../../services/procurementService'
 import StatusMenu from '../StatusMenu'
 import { IconButton, LinkButton, StatusDot } from '../ui'
-import { fmtDate, fmtKrShort, fmtNum, fmtRelativeDays } from '../uiFormat'
+import { fmtDate, fmtKrShort, fmtRelativeDays } from '../uiFormat'
 import { BuyerLink, SupplierName } from '../market/shared'
+import OptionPeriodHint from './OptionPeriodHint'
+import { optionPeriodOfGroup } from './optionPeriod'
 import { countyLabel } from '../market/format'
 import {
   AWARD_STATUS_DOT,
@@ -30,6 +34,7 @@ import {
   annualValueOfGroup,
   expectedAnnouncementQuarter,
   followupOf,
+  windowEndOf,
   windowStateOf,
   type ProcurementGroup,
 } from '../market/marketStats'
@@ -95,8 +100,7 @@ export function Timeline({ g, today }: { g: ProcurementGroup; today: string }) {
   const endOutside = g.endDate ? monthsFrom(from, g.endDate) > TIMELINE_MONTHS : false
   const label = [
     g.windowStart ? `Bearbetningsfönster ${g.windowStart} till ${g.windowEnd}` : null,
-    base != null ? `förlängningsoption från ${g.baseEndDate}` : null,
-    g.endDate ? `avtalsslut ${g.endDate}` : null,
+    base != null ? `basavtalet slutar ${g.baseEndDate}, förlängningsoption till ${g.endDate}` : g.endDate ? `avtalsslut ${g.endDate}` : null,
   ]
     .filter(Boolean)
     .join(', ')
@@ -145,9 +149,12 @@ function FollowupLine({ g, today }: { g: ProcurementGroup; today: string }) {
 
 function EndDateCell({ g, today, onCorrectEnd }: { g: ProcurementGroup; today: string; onCorrectEnd: Props['onCorrectEnd'] }) {
   const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(g.endDate ?? '')
+  // Basavtalets slut (eller rättat slut): fönstret räknas mot det
+  const shown = windowEndOf(g)
+  const [value, setValue] = useState(shown ?? '')
   const [saving, setSaving] = useState(false)
   const windowState = windowStateOf(g, today)
+  const period = optionPeriodOfGroup(g)
 
   const save = async (date: string | null) => {
     setSaving(true)
@@ -173,20 +180,20 @@ function EndDateCell({ g, today, onCorrectEnd }: { g: ProcurementGroup; today: s
         />
         <div className="flex gap-3">
           <LinkButton onClick={() => void save(value || null)} disabled={saving || !/^\d{4}-\d{2}-\d{2}$/.test(value)}>Spara</LinkButton>
-          <LinkButton tone="muted" onClick={() => { setEditing(false); setValue(g.endDate ?? '') }} disabled={saving}>Avbryt</LinkButton>
+          <LinkButton tone="muted" onClick={() => { setEditing(false); setValue(shown ?? '') }} disabled={saving}>Avbryt</LinkButton>
         </div>
       </div>
     )
   }
 
-  const optionYears = g.optionMonths && g.optionMonths > 0 ? g.optionMonths / 12 : null
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-1">
-        <span className="text-[13px] text-slate-100 tabular-nums">{fmtDate(g.endDate)}</span>
+        <span className="text-[13px] text-slate-100 tabular-nums">{fmtDate(shown)}</span>
+        <OptionPeriodHint period={period} today={today} />
         <button
           type="button"
-          onClick={() => { setValue(g.endDate ?? ''); setEditing(true) }}
+          onClick={() => { setValue(shown ?? ''); setEditing(true) }}
           className="inline-flex items-center justify-center w-11 h-11 -my-3 -mr-2 rounded-md text-slate-500 hover:text-[#20c58f]"
           title="Rätta avtalsslut"
           aria-label="Rätta avtalsslut"
@@ -194,13 +201,7 @@ function EndDateCell({ g, today, onCorrectEnd }: { g: ProcurementGroup; today: s
           <Icon name="allman.anteckning" size={16} />
         </button>
       </div>
-      <div className="text-[11px] text-slate-500">{g.endDate ? fmtRelativeDays(g.endDate) : ''}</div>
-      {optionYears != null && g.baseEndDate && !g.correctedEndDate && (
-        <div className="text-[11px] text-slate-400 inline-flex items-center gap-1" title={g.optionText ?? undefined}>
-          <Icon name="upphandling.forlangning" size={16} />
-          basavtal {g.baseEndDate}, option {fmtNum(optionYears, 1)} år{g.optionsKnown ? '' : ' (antagen)'}
-        </div>
-      )}
+      <div className="text-[11px] text-slate-500">{shown ? fmtRelativeDays(shown) : ''}</div>
       <div
         className={`text-[11px] ${g.correctedEndDate ? 'text-[#20c58f]' : g.endSource === 'assumption_2_2' ? 'text-amber-400' : 'text-slate-500'}`}
         title={g.correctedEndDate ? undefined : g.calcBasis ?? undefined}

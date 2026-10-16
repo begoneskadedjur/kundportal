@@ -12,13 +12,15 @@ import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import type { AwardWithRelations, NoticeWithRelations } from '../../../../services/procurementService'
 import { NOTICE_KIND_LABEL } from '../../../../types/procurement'
-import { SE_COUNTIES, annualValueOf, estimateWinProbability, swedishDate } from '../../../../shared/procurementRules'
+import { SE_COUNTIES, annualValueOf, estimateWinProbability, swedishDate, todaySwedish, windowReferenceEnd } from '../../../../shared/procurementRules'
 import { Icon } from '../../../icons/Icon'
 import { LinkButton } from '../ui'
 import { daysUntil, fmtDate, fmtKr, fmtKrShort, fmtNum, fmtPct, fmtRelativeDays } from '../uiFormat'
 import { BlurText, Block, inputCls, type SaveNotice } from './fields'
 import { errMsg, stockholmIso, switchConclusion, winnerKey, winnerName } from './helpers'
 import { procurementPath } from '../../../../lib/procurementPortal'
+import OptionPeriodHint from '../clock/OptionPeriodHint'
+import { optionPeriodOfAward } from '../clock/optionPeriod'
 
 const RULE_LABEL: Record<string, string> = {
   cpv_hard: 'CPV-träff',
@@ -75,8 +77,12 @@ export default function OverviewStep({ notice, buyerAwards, noticeAwards, onSave
     const dated = buyerAwards.filter((a) => a.award_date && a.notice_id !== notice.id).sort((a, b) => String(b.award_date).localeCompare(String(a.award_date)))
     const latestDate = dated[0]?.award_date ?? null
     const latest = dated.filter((a) => a.award_date === latestDate)
-    const end = latest.map((a) => a.corrected_end_date ?? a.calc_end_date).filter(Boolean).sort().pop() ?? null
-    return { latest, latestDate, end, conclusion: switchConclusion(buyerAwards) }
+    // Basavtalets slut (eller rättat slut) som slutdatum, optionstiden bakom ikonen (sedan 3.66.0)
+    const endOf = (a: AwardWithRelations) => windowReferenceEnd({ correctedEnd: a.corrected_end_date, baseEnd: a.base_end_date, calcEnd: a.calc_end_date })
+    const endAward = [...latest].filter((a) => endOf(a)).sort((a, b) => String(endOf(a)).localeCompare(String(endOf(b)))).pop() ?? null
+    const end = endAward ? endOf(endAward) : null
+    const period = endAward ? optionPeriodOfAward(endAward) : null
+    return { latest, latestDate, end, period, conclusion: switchConclusion(buyerAwards) }
   }, [buyerAwards, notice.id])
 
   // Konkurrensen i korthet: leverantörer som vunnit hos köparen, flest vinster först
@@ -226,7 +232,12 @@ export default function OverviewStep({ notice, buyerAwards, noticeAwards, onSave
                     ? `${buyer.latest.map((a) => winnerName(a)).join(' och ')}${buyer.latestDate ? ` sedan ${buyer.latestDate.slice(0, 4)}` : ''}`
                     : 'Ingen känd tilldelning'}
                 </Row>
-                <Row label="Avtalsslut">{fmtDate(buyer.end)}</Row>
+                <Row label="Avtalsslut">
+                  <span className="inline-flex items-center gap-1">
+                    {fmtDate(buyer.end)}
+                    <OptionPeriodHint period={buyer.period} today={todaySwedish()} />
+                  </span>
+                </Row>
                 <Row label="Senast">{buyer.latest[0]?.bids_received != null ? `${buyer.latest[0].bids_received} anbud` : '–'}</Row>
                 <Row label="Kontaktperson">
                   {notice.contact_name || notice.contact_email ? (

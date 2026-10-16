@@ -11,8 +11,9 @@
 //   3. Begäran om handlingar: påminnelse till köparen efter sju dagar utan
 //      svar, eskalering internt efter fjorton.
 //   4. Bearbetningsfönstret (sedan 3.65.0): en notis per avtal när det går in
-//      i fönstret 18 till 12 månader före slut, till alla upphandlingsansvariga
-//      som inte stängt av den (procurement_user_settings.window_notify_enabled).
+//      i fönstret 18 till 12 månader före basavtalets slut (sedan 3.66.0, inte sista
+//      möjliga slut med optioner), till alla upphandlingsansvariga som inte stängt
+//      av den (procurement_user_settings.window_notify_enabled).
 //      Avtalet märks med window_notified_at och en händelse window_entered som
 //      sammandraget läser. Notisen länkar till köparen (WINDOW_NOTIFICATION_PREFIX).
 //
@@ -244,10 +245,10 @@ async function notifyWindowEntries(today: string): Promise<{ entries: number; no
   const horizon = addMonthsIso(today, 18)
   const { data, error } = await sb
     .from('procurement_awards')
-    .select('id, source, source_ref, buyer_id, buyer_name, title, winner_name, calc_end_date, corrected_end_date, status, followup_status, excluded_reason, window_notified_at')
+    .select('id, source, source_ref, buyer_id, buyer_name, title, winner_name, calc_end_date, base_end_date, corrected_end_date, status, followup_status, excluded_reason, window_notified_at')
     .is('excluded_reason', null)
     .is('window_notified_at', null)
-    .or(`calc_end_date.lte.${horizon},corrected_end_date.lte.${horizon}`)
+    .or(`calc_end_date.lte.${horizon},base_end_date.lte.${horizon},corrected_end_date.lte.${horizon}`)
     .limit(2000)
   if (error) throw error
   const rows = (data ?? []) as WindowAwardRow[]
@@ -257,7 +258,7 @@ async function notifyWindowEntries(today: string): Promise<{ entries: number; no
   if (refs.length > 0) {
     const { data: sib } = await sb
       .from('procurement_awards')
-      .select('id, source, source_ref, buyer_id, buyer_name, title, winner_name, calc_end_date, corrected_end_date, status, followup_status, excluded_reason, window_notified_at')
+      .select('id, source, source_ref, buyer_id, buyer_name, title, winner_name, calc_end_date, base_end_date, corrected_end_date, status, followup_status, excluded_reason, window_notified_at')
       .in('source_ref', refs)
       .not('window_notified_at', 'is', null)
     siblings = (sib ?? []) as WindowAwardRow[]
@@ -271,7 +272,9 @@ async function notifyWindowEntries(today: string): Promise<{ entries: number; no
   for (const e of entries) {
     const who = e.winners.length ? e.winners.join(' och ') : 'okänd leverantör'
     const title = `${WINDOW_NOTIFICATION_PREFIX}: ${e.buyerName ?? 'okänd köpare'}`
-    const preview = `${e.title ?? 'Avtal'} med ${who} slutar ${e.endDate}. Bearbetningsfönstret är ${e.windowStart} till ${e.windowEnd}.`
+    // Fönstret räknas mot basavtalets slut; optionerna nämns när de kan förlänga avtalet
+    const options = e.maxEnd ? ` (med förlängningsoptioner längst till ${e.maxEnd})` : ''
+    const preview = `${e.title ?? 'Avtal'} med ${who} slutar ${e.endDate}${options}. Bearbetningsfönstret är ${e.windowStart} till ${e.windowEnd}.`
     notifications += await insertNotifications(recipients, e.buyerId, title, preview, e.buyerName ?? 'Avtalsklockan')
     await sb.from('procurement_awards').update({ window_notified_at: now }).in('id', e.awardIds)
     await sb.from('procurement_events').insert({
@@ -280,7 +283,7 @@ async function notifyWindowEntries(today: string): Promise<{ entries: number; no
       event_type: 'window_entered',
       title,
       detail: preview,
-      metadata: { award_ids: e.awardIds, buyer_id: e.buyerId, buyer_name: e.buyerName, end_date: e.endDate, window_start: e.windowStart, winners: e.winners },
+      metadata: { award_ids: e.awardIds, buyer_id: e.buyerId, buyer_name: e.buyerName, end_date: e.endDate, max_end: e.maxEnd, window_start: e.windowStart, winners: e.winners },
       actor_name: 'Avtalsklockan',
     })
   }

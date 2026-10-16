@@ -37,7 +37,7 @@ import {
 } from '../../../types/procurement'
 import { StatusDot } from '../../../components/admin/procurement/ui'
 import { daysUntil, fmtDate, fmtKrShort, fmtNum, fmtRelativeDays } from '../../../components/admin/procurement/uiFormat'
-import { buildProcurements, windowStateOf, type ProcurementGroup } from '../../../components/admin/procurement/market/marketStats'
+import { buildProcurements, windowEndOf, windowStateOf, type ProcurementGroup } from '../../../components/admin/procurement/market/marketStats'
 import { SourceHealthWarning } from '../../../components/admin/procurement/market/shared'
 import { errMsg } from '../../../components/admin/procurement/detail/helpers'
 import { noticePath, procurementPath } from '../../../lib/procurementPortal'
@@ -524,7 +524,7 @@ function WindowRow({ g }: { g: ProcurementGroup }) {
         </div>
         <div className="hidden md:block w-40 shrink-0 text-[12px] text-slate-300 truncate">{suppliers.length ? suppliers.join(', ') : '–'}</div>
         <div className="hidden sm:block w-32 shrink-0 text-right tabular-nums">
-          <div className="text-slate-300">Slut {fmtDate(g.endDate)}</div>
+          <div className="text-slate-300">Slut {fmtDate(windowEndOf(g))}</div>
           <div className="text-[12px] text-slate-500">fönster sedan {fmtDate(g.windowStart)}</div>
         </div>
         <span className="w-28 shrink-0 flex justify-end">

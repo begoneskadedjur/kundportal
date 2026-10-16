@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeContractEnd, contactFromTed, parseRenewalOptions, windowEntriesToNotify, workWindow, type WindowAwardRow } from './procurementRules'
+import { computeContractEnd, contactFromTed, contractWorkWindow, parseRenewalOptions, windowEntriesToNotify, windowReferenceEnd, workWindow, type WindowAwardRow } from './procurementRules'
 // @ts-expect-error ren .mjs utan typer: spegeln som importskripten använder
 import * as mirror from '../../scripts/lib/procurementImportShared.mjs'
 
@@ -52,11 +52,21 @@ describe('computeContractEnd med riktiga optioner', () => {
     expect(r.basis).toContain('antaget ett år vardera')
   })
 
-  it('bearbetningsfönstret flyttar med de riktiga optionerna', () => {
+  it('bearbetningsfönstret räknas mot basavtalets slut, inte mot optionerna (beslut 2026-10-16)', () => {
     const assumed = computeContractEnd({ tedEnd: '2027-01-31', renewalMax: 1 })
     const real = computeContractEnd({ tedEnd: '2027-01-31', renewalMax: 1, optionMonths: 24 })
-    expect(workWindow(assumed.date).start).toBe('2026-07-31')
-    expect(workWindow(real.date).start).toBe('2027-07-31')
+    expect(real.date).toBe('2029-01-31')
+    expect(contractWorkWindow(assumed)).toEqual({ start: '2025-07-31', end: '2026-01-31' })
+    expect(contractWorkWindow(real)).toEqual({ start: '2025-07-31', end: '2026-01-31' })
+    // Utan basavtal (Mercell) räknas fönstret mot slutet som förut
+    const mercell = computeContractEnd({ mercellExpiry: '2027-06-30' })
+    expect(contractWorkWindow(mercell)).toEqual(workWindow('2027-06-30'))
+  })
+
+  it('rättat slut går före basavtalet, basavtalet före beräknat slut', () => {
+    expect(windowReferenceEnd({ correctedEnd: '2028-01-01', baseEnd: '2027-01-31', calcEnd: '2029-01-31' })).toBe('2028-01-01')
+    expect(windowReferenceEnd({ baseEnd: '2027-01-31', calcEnd: '2029-01-31' })).toBe('2027-01-31')
+    expect(windowReferenceEnd({ baseEnd: null, calcEnd: '2029-01-31' })).toBe('2029-01-31')
   })
 
   it('spegeln i scripts/lib/procurementImportShared.mjs räknar likadant', () => {
@@ -68,7 +78,12 @@ describe('computeContractEnd med riktiga optioner', () => {
       { contractStart: '2024-01-01', renewalMax: 0 },
       { tedEnd: '2026-06-30Z', renewalMax: 2 },
     ]
-    for (const i of inputs) expect(mirror.computeContractEnd(i)).toEqual(computeContractEnd(i))
+    for (const i of inputs) {
+      expect(mirror.computeContractEnd(i)).toEqual(computeContractEnd(i))
+      expect(mirror.contractWorkWindow(mirror.computeContractEnd(i))).toEqual(contractWorkWindow(computeContractEnd(i)))
+    }
+    const refs = [{ correctedEnd: '2028-01-01', baseEnd: '2027-01-31', calcEnd: '2029-01-31' }, { baseEnd: '2027-01-31', calcEnd: '2029-01-31' }, { calcEnd: '2029-01-31' }, {}]
+    for (const r of refs) expect(mirror.windowReferenceEnd(r)).toEqual(windowReferenceEnd(r))
     const texts = ['Förlängning är 12 månader', '24 months * 2', 'Förlängningsoption av avtal max till 2030-03-27.', 'Förlängning kan ske i max 2 år', 'N/A']
     for (const t of texts) expect(mirror.parseRenewalOptions({ count: 2, renewalText: t })).toEqual(parseRenewalOptions({ count: 2, renewalText: t }))
   })
@@ -117,6 +132,17 @@ describe('windowEntriesToNotify', () => {
     expect(windowEntriesToNotify([row({ corrected_end_date: '2029-01-01' })], '2026-10-16')).toHaveLength(0)
     const two = windowEntriesToNotify([row({}), row({ id: 'u1', source: 'uhm', source_ref: 'x' })], '2026-10-16')
     expect(two).toHaveLength(1)
+  })
+
+  it('fönstret räknas mot basavtalets slut och sista möjliga slut följer med', () => {
+    // Basavtal 2028-04-15, optioner till 2030-04-15: fönstret öppnade 2026-10-15
+    const r = windowEntriesToNotify([row({ base_end_date: '2028-04-15', calc_end_date: '2030-04-15' })], '2026-10-16')
+    expect(r).toHaveLength(1)
+    expect(r[0]).toMatchObject({ endDate: '2028-04-15', maxEnd: '2030-04-15', windowStart: '2026-10-15', windowEnd: '2027-04-15' })
+    // Utan basavtal räknas fönstret mot sista slutet: inte i fönstret än
+    expect(windowEntriesToNotify([row({ calc_end_date: '2030-04-15' })], '2026-10-16')).toHaveLength(0)
+    // Rättat slut vinner över basavtalet
+    expect(windowEntriesToNotify([row({ base_end_date: '2028-04-15', calc_end_date: '2030-04-15', corrected_end_date: '2030-04-15' })], '2026-10-16')).toHaveLength(0)
   })
 })
 

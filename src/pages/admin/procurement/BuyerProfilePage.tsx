@@ -29,7 +29,9 @@ import { EmptyState, LinkButton, PulseRow, SecondaryButton, Section, StatusDot }
 import BuyerContacts from '../../../components/admin/procurement/registry/BuyerContacts'
 import BuyerDocRequest, { RequestStatus } from '../../../components/admin/procurement/registry/BuyerDocRequest'
 import { fmtDate, fmtKrShort, fmtNum, fmtPct, tableCls } from '../../../components/admin/procurement/uiFormat'
-import { VALUE_KIND_LABEL, buildProcurements, median, type ProcurementGroup } from '../../../components/admin/procurement/market/marketStats'
+import { VALUE_KIND_LABEL, buildProcurements, median, windowEndOf, type ProcurementGroup } from '../../../components/admin/procurement/market/marketStats'
+import OptionPeriodHint from '../../../components/admin/procurement/clock/OptionPeriodHint'
+import { optionPeriodOfGroup } from '../../../components/admin/procurement/clock/optionPeriod'
 import { HistoryEmpty, SupplierName } from '../../../components/admin/procurement/market/shared'
 import { countyLabel, criteriaLabel } from '../../../components/admin/procurement/market/format'
 import { countBy, sortKey, supplierSwitches } from '../../../components/admin/procurement/registry/registryStats'
@@ -459,7 +461,11 @@ export default function BuyerProfilePage() {
                       <td className={tableCls.tdRight}>{fmtNum(g.bidsReceived)}</td>
                       <td className={tableCls.td}>{criteriaLabel(g.criteriaType)}</td>
                       <td className={`${tableCls.td} whitespace-nowrap`}>
-                        <div className={running ? 'text-slate-100' : ''}>{fmtDate(g.endDate)}</div>
+                        {/* Basavtalets slut; optionstiden bakom ikonen (sedan 3.66.0) */}
+                        <div className={`inline-flex items-center gap-1 ${running ? 'text-slate-100' : ''}`}>
+                          {fmtDate(windowEndOf(g))}
+                          <OptionPeriodHint period={optionPeriodOfGroup(g)} today={today} />
+                        </div>
                         <div className="text-[11px] text-slate-500">{g.endSource ? END_SOURCE_LABEL[g.endSource] : ''}</div>
                         {running && <StatusDot tone="good">Löper</StatusDot>}
                       </td>

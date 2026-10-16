@@ -29,7 +29,7 @@ import {
   normalizeOrgNumber,
   normalizeTitle,
   scoreNotice,
-  workWindow,
+  contractWorkWindow,
   type BuyerContact,
 } from '../../src/shared/procurementRules'
 import type {
@@ -645,7 +645,7 @@ export async function upsertAward(a: AwardCandidate): Promise<string> {
     durationMonths: a.durationMonths ?? textDuration?.months ?? null,
     durationFrom: a.durationMonths ? 'ted' : textDuration ? 'text' : null,
   })
-  const win = workWindow(end.date)
+  const win = contractWorkWindow(end)
   const relevance = awardRelevance(a.cpv ?? [], a.title)
 
   // Felträffsflaggan sätts automatiskt, utom när en människa har tagit
