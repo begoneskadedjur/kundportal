@@ -56,7 +56,7 @@ function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
     <Dator adress="koordinator › schema">
       <SchemaHuvud datum="tisdag 20 oktober 2026" mk={mk} tryck={tryck} />
       <SchemaRutnat rader={RADER} besok={besok} mk={mk} tryck={tryck} />
-      {klar && l.djur && <Notis text={`Följeärende BE-0001235 skapat för ${l.djur}!`} />}
+      {klar && l.djur && <Notis text={`Följeärende skapat för ${l.djur}!`} />}
     </Dator>
   )
 }
@@ -132,7 +132,7 @@ function Ovning() {
           setSvar({
             typ: 'ok',
             titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-            text: `Getingärendet har fått eget ärendenummer, BE-0001235, och ligger hos Anna på samma tid som råttärendet. Vill du boka det en annan tid öppnar du det nya ärendet och ändrar tiden.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
+            text: `Getingärendet har samma ärendenummer som råttärendet, BE-0001234, och ligger hos Anna på samma tid som råttärendet. Vill du boka det en annan tid öppnar du det nya ärendet och ändrar tiden.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
           })
         }
       } else miss(TIPS[id] ?? 'Välj skadedjurstyp och skapa ärendet.')

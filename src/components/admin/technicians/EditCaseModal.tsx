@@ -86,7 +86,6 @@ import CommissionSection from '../../shared/CommissionSection'
 import type { CaseBillingSummary } from '../../../types/caseBilling'
 import { VisitService, type Visit, type VisitCaseType } from '../../../services/visitService'
 import { ProvisionService } from '../../../services/provisionService'
-import { CaseNumberService } from '../../../services/caseNumberService'
 import type { TechnicianShare } from '../../../types/provision'
 
 
@@ -809,14 +808,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       // Bestäm rätt tabell baserat på ärendetyp
       const tableName = currentCase.case_type === 'private' ? 'private_cases' : 'business_cases';
 
-      // Eget BE-nummer, samma väg som nya ärenden i CreateCaseModal
-      // (RPC generate_universal_case_number). Titeln är ärendenumret.
-      const caseNumber = await CaseNumberService.generateUniqueCaseNumber();
-
       // Skapa det nya följeärendet med ärvd information
       const newCaseData: any = {
-        case_number: caseNumber,
-        title: caseNumber,
+        // Följeärendet bär samma ärendenummer som ursprunget (beslut 2026-10-17).
+        // case_number är unikt per tabell, så numret ligger i titeln och
+        // case_number lämnas tomt; global_search läser numret ur titeln.
+        title: currentCase.title,
         // Ärvd kundinformation
         kontaktperson: currentCase.kontaktperson,
         telefon_kontaktperson: currentCase.telefon_kontaktperson,
@@ -873,7 +870,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       setShowFollowUpDialog(false);
       setFollowUpPestType('');
 
-      toast.success(`Följeärende ${caseNumber} skapat för ${followUpPestType}!`);
+      toast.success(`Följeärende skapat för ${followUpPestType}!`);
 
       // Öppna det nya ärendet genom att anropa onSuccess med det nya ärendet
       // Detta kommer att uppdatera parent-komponenten och öppna det nya ärendet

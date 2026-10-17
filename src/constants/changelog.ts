@@ -52,6 +52,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'buggfix', text: 'Har ett ärende ett anpassat pris för hela jobbet går det inte att delfakturera. Rutan är grå och priset faktureras en gång, när ärendet avslutas. Fasta priser från kundens prislista påverkas inte.' },
       { kind: 'buggfix', text: 'En offert som skapas från ett ärende får texten från ärendets tjänster i stället för avtalets standardtext. Står standardtexten kvar i en offert blir kontrollen gul: Kontrollera offertinnehållet.' },
       { kind: 'buggfix', text: 'Ärenden som tagits bort med papperskorgen i Mina ärenden syns inte längre i schemat.' },
+      { kind: 'andring', text: 'Ett följeärende har samma ärendenummer som det första ärendet, som det var tidigare.' },
     ],
   },
   {
