@@ -6,7 +6,7 @@
 import type { NavigateFunction } from 'react-router-dom'
 
 export type OneflowDocumentType = 'offer' | 'contract'
-export type OneflowRolePrefix = '/admin' | '/koordinator' | '/technician'
+export type OneflowRolePrefix = '/admin' | '/koordinator' | '/technician' | '/saljare'
 
 /** Minsta kunddata som behövs för förifyllning. Fälten följer customers-tabellen. */
 export interface PrefillCustomer {
@@ -26,6 +26,7 @@ const CREATOR_ROUTES: Record<OneflowRolePrefix, string> = {
   '/admin': '/admin/skapa-avtal',
   '/koordinator': '/koordinator/oneflow-contract-creator',
   '/technician': '/technician/oneflow',
+  '/saljare': '/saljare/oneflow-contract-creator',
 }
 
 export function oneflowCreatorRoute(rolePrefix: OneflowRolePrefix): string {

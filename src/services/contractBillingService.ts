@@ -362,6 +362,10 @@ export class ContractBillingService {
    * Kopierar alla case_billing_items till contract_billing_items som
    * item_type='ad_hoc' och markerar case_billing_items som 'billed'.
    *
+   * Idempotent: bara rader med status 'pending' tas med, och de flyttas till
+   * 'billed' innan merförsäljningsraderna skapas. En andra körning på samma
+   * rader (även samtidigt) hittar inget och returnerar created: 0.
+   *
    * invoice_date sätts från ärendets completedAt — det är detta datum
    * som styr vilken månadsbucket posten hamnar i på /admin/fakturering.
    * billing_period_start/end sätts till månaden runt completedAt för
@@ -422,10 +426,30 @@ export class ContractBillingService {
     const lastDayOfMonth = new Date(y, m + 1, 0).getDate()
     const periodEnd = `${y}-${fmt(m + 1)}-${fmt(lastDayOfMonth)}`
 
-    // 3. Skapa contract_billing_items - EN insert för alla rader (allt eller inget).
+    // 3a. Idempotens: lägg beslag på raderna INNAN något skapas. Bara rader som
+    //     fortfarande är 'pending' flyttas till 'billed', och bara de som den här
+    //     körningen själv flyttade tas med. Två körningar samtidigt (dubbeltryck,
+    //     två flikar) läste annars samma pending-rader och skapade två fakturor.
+    const { data: claimedRows, error: claimError } = await supabase
+      .from('case_billing_items')
+      .update({ status: 'billed', updated_at: new Date().toISOString() })
+      .in('id', caseBillingItems.map(i => i.id))
+      .eq('status', 'pending')
+      .select('id')
+    if (claimError) {
+      throw new Error(`Kunde inte reservera ärenderaderna för fakturering: ${claimError.message}`)
+    }
+    const claimedIds = new Set((claimedRows || []).map(r => r.id as string))
+    const toInvoice = caseBillingItems.filter(i => claimedIds.has(i.id))
+    if (toInvoice.length === 0) {
+      // En annan körning hann före: inget nytt att fakturera
+      return { created: 0, totalAmount: 0, invoiceId: null }
+    }
+
+    // 3b. Skapa contract_billing_items - EN insert för alla rader (allt eller inget).
     //    En loop med per-rad-insert lämnar halva radsatsen vid fel, och omkörning
     //    dubblar de redan skapade raderna.
-    const rows = caseBillingItems.map(item => {
+    const rows = toInvoice.map(item => {
       const requiresApproval = (item.discount_percent || 0) > 0
       return {
         customer_id: customerId,
@@ -468,13 +492,30 @@ export class ContractBillingService {
     const { error } = await supabase.from('contract_billing_items').insert(rows)
     if (error) {
       console.error('Kunde inte skapa ad-hoc items:', error)
+      // Släpp beslaget så raderna kan faktureras vid nästa försök
+      const { error: releaseError } = await supabase
+        .from('case_billing_items')
+        .update({ status: 'pending', updated_at: new Date().toISOString() })
+        .in('id', Array.from(claimedIds))
+        .eq('status', 'billed')
+      if (releaseError) console.error('Kunde inte återställa ärenderaderna till pending:', releaseError)
       throw new Error(`Kunde inte skapa ad-hoc faktureringsposter: ${error.message}`)
     }
 
-    const totalAmount = caseBillingItems.reduce((sum, item) => sum + item.total_price, 0)
+    const totalAmount = toInvoice.reduce((sum, item) => sum + item.total_price, 0)
 
-    // 4. Markera case_billing_items som 'billed'
-    await CaseBillingService.updateCaseItemsStatus(caseId, 'contract', 'billed')
+    // 4. Övriga lästa rader (artiklar, rader som täcks av avtalet, 0 kr-underlag)
+    //    markeras som hanterade. Bara de rader som lästes och fortfarande är
+    //    'pending': en rad som läggs till under tiden ska inte försvinna ofakturerad.
+    const otherIds = allCaseBillingItems.map(i => i.id).filter(id => !claimedIds.has(id))
+    if (otherIds.length > 0) {
+      const { error: markError } = await supabase
+        .from('case_billing_items')
+        .update({ status: 'billed', updated_at: new Date().toISOString() })
+        .in('id', otherIds)
+        .eq('status', 'pending')
+      if (markError) throw new Error(`Databasfel: ${markError.message}`)
+    }
     // Stängdes ärendet tidigare på 0 kr ('skip') finns nu merförsäljning att fakturera
     await CaseBillingService.clearCaseBillingSkip(caseId, 'contract')
 
@@ -512,7 +553,7 @@ export class ContractBillingService {
     await this.applyContractAdditionsForCase(caseId, allCaseBillingItems)
 
     return {
-      created: caseBillingItems.length,
+      created: toInvoice.length,
       totalAmount,
       invoiceId,
       invoiceError

@@ -2,6 +2,7 @@
 // Hook för att hantera tickets (kommentarer med @mentions)
 
 import { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import {
   getTickets,
@@ -179,7 +180,7 @@ export function useTickets(options: UseTicketsOptions = {}): UseTicketsReturn {
       return true;
     } catch (err) {
       console.error('Error updating ticket status:', err);
-      setError('Kunde inte uppdatera status');
+      toast.error(err instanceof Error ? err.message : 'Kunde inte uppdatera status');
       return false;
     }
   }, [profile, fetchStats, fetchTickets]);

@@ -713,6 +713,7 @@ export default function CasesPage() {
           isOpen={editCaseOpen}
           onClose={() => { setEditCaseOpen(false); setSelectedCase(null) }}
           onSuccess={() => { setEditCaseOpen(false); setSelectedCase(null); fetchData() }}
+          onDeleted={() => { setEditCaseOpen(false); setSelectedCase(null); fetchData() }}
           caseData={mapToTechnicianCase(selectedCase)}
         />
       )}

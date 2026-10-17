@@ -288,9 +288,9 @@ export default function TechnicianSchedule() {
     try { 
       // UPPDATERING: Hämtar även avtalsärenden från cases-tabellen
       const [privateResult, businessResult, contractResult] = await Promise.all([ 
-        supabase.from('private_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`).is('legacy_archived_at', null), 
-        supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`).is('legacy_archived_at', null),
-        supabase.from('cases').select('*, customer:customers(*)').or(`primary_technician_id.eq.${technicianId},secondary_technician_id.eq.${technicianId},tertiary_technician_id.eq.${technicianId}`).in('status', ALL_VALID_STATUSES)
+        supabase.from('private_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`).is('legacy_archived_at', null).is('deleted_at', null), 
+        supabase.from('business_cases').select('*').or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`).is('legacy_archived_at', null).is('deleted_at', null),
+        supabase.from('cases').select('*, customer:customers(*)').or(`primary_technician_id.eq.${technicianId},secondary_technician_id.eq.${technicianId},tertiary_technician_id.eq.${technicianId}`).is('deleted_at', null).in('status', ALL_VALID_STATUSES)
       ]); 
 
       if (privateResult.error) throw privateResult.error;
@@ -730,6 +730,7 @@ export default function TechnicianSchedule() {
           setOpenCommunicationOnLoad(false)
         }}
         onSuccess={handleUpdateSuccess}
+        onDeleted={() => handleUpdateSuccess()}
         caseData={selectedCase as any}
         openCommunicationOnLoad={openCommunicationOnLoad}
       />

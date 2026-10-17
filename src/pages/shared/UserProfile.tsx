@@ -131,6 +131,7 @@ export default function UserProfile({ embedded = false }: UserProfileProps) {
       'admin': 'Administratör',
       'koordinator': 'Koordinator',
       'technician': 'Tekniker',
+      'säljare': 'Säljare',
       'customer': 'Kund'
     }
     return roleNames[roleType] || roleType

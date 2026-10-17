@@ -1,7 +1,7 @@
 // src/components/coordinator/RevisitContractModal.tsx
 // Modal för att boka återbesök för kontraktsärenden (avtalskunder)
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   X,
   Calendar,
@@ -103,22 +103,43 @@ const formatAddress = (address: any): string => {
 // Hjälpfunktion för att konvertera till Date
 const toDate = (value: Date | string | null | undefined): Date | null => {
   if (!value) return null
-  if (value instanceof Date) return value
-  return new Date(value)
+  const d = value instanceof Date ? value : new Date(value)
+  return isNaN(d.getTime()) ? null : d
+}
+
+/** Samma minut räknas som samma tid (väljaren går i kvartssteg) */
+const sammaMinut = (a: Date, b: Date): boolean =>
+  Math.floor(a.getTime() / 60000) === Math.floor(b.getTime() / 60000)
+
+const EN_TIMME_MS = 60 * 60 * 1000
+const ETT_DYGN_MS = 24 * EN_TIMME_MS
+
+/**
+ * Längden på återbesöket när Slut lämnas tomt: samma längd som nuvarande
+ * besök om den är rimlig (över 0 och högst ett dygn), annars 1 timme.
+ */
+const standardLangdMs = (start: Date | null, end: Date | null): number => {
+  if (start && end) {
+    const langd = end.getTime() - start.getTime()
+    if (langd > 0 && langd <= ETT_DYGN_MS) return langd
+  }
+  return EN_TIMME_MS
 }
 
 export default function RevisitContractModal({ caseData, onSuccess, onClose }: RevisitContractModalProps) {
   const { profile } = useAuth()
   const [loading, setLoading] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(true)
+  // Spärr mot dubbeltryck: state hinner inte uppdateras mellan två snabba tryck
+  const bokarRef = useRef(false)
 
-  // Datum state
-  const [startDate, setStartDate] = useState<Date | null>(
-    toDate(caseData.scheduled_start) || new Date()
-  )
-  const [endDate, setEndDate] = useState<Date | null>(
-    toDate(caseData.scheduled_end)
-  )
+  // Nuvarande besök. Start och Slut börjar tomma: återbesöket ska alltid få en
+  // ny tid, inte ärva den nuvarande (då flyttades bara besöket till samma tid)
+  const nuvarandeStart = toDate(caseData.scheduled_start)
+  const nuvarandeSlut = toDate(caseData.scheduled_end)
+  const [startDate, setStartDate] = useState<Date | null>(null)
+  const [endDate, setEndDate] = useState<Date | null>(null)
+  const sammaSomNuvarande = !!(startDate && nuvarandeStart && sammaMinut(startDate, nuvarandeStart))
 
   // Anteckning
   const [revisitNote, setRevisitNote] = useState('')
@@ -133,9 +154,8 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
   const [revisitHistory, setRevisitHistory] = useState<RevisitHistoryEntry[]>([])
   const [showFullHistory, setShowFullHistory] = useState(false)
 
-  // Hämta pending billing items vid mount
-  useEffect(() => {
-    async function fetchPendingItems() {
+  // Hämta pending billing items vid mount (och efter en delfakturering)
+  const fetchPendingItems = useCallback(async () => {
       try {
         const { data, error } = await supabase
           .from('case_billing_items')
@@ -154,9 +174,11 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
       } catch (e) {
         console.error('[RevisitContractModal] Failed to fetch pending billing items:', e)
       }
-    }
-    fetchPendingItems()
   }, [caseData.id])
+
+  useEffect(() => {
+    fetchPendingItems()
+  }, [fetchPendingItems])
 
   // Funktion för att hämta återbesökshistorik
   const fetchHistory = async () => {
@@ -187,9 +209,30 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
   }, [caseData.id])
 
   // Boka återbesök
+  // Spärren sätts innan något annat körs, även kontrollerna som tar tid
   const handleScheduleRevisit = async () => {
+    if (bokarRef.current) return
+    bokarRef.current = true
+    setLoading(true)
+    try {
+      await bokaAterbesok()
+    } finally {
+      bokarRef.current = false
+      setLoading(false)
+    }
+  }
+
+  const bokaAterbesok = async () => {
     if (!startDate || !profile) {
       toast.error('Välj ett datum för återbesöket')
+      return
+    }
+    if (sammaSomNuvarande) {
+      toast.error('Välj en ny tid. Återbesöket kan inte börja samma tid som nuvarande besök.')
+      return
+    }
+    if (endDate && endDate.getTime() <= startDate.getTime()) {
+      toast.error('Slut måste vara efter Start.')
       return
     }
 
@@ -221,11 +264,14 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
       }
     }
 
-    setLoading(true)
-
     try {
       const newScheduledStart = toLocalISOStringWithOffset(startDate)
-      const newScheduledEnd = endDate ? toLocalISOStringWithOffset(endDate) : newScheduledStart
+      // Slut tomt: samma längd som nuvarande besök, annars 1 timme
+      const slut = endDate ?? new Date(startDate.getTime() + standardLangdMs(nuvarandeStart, nuvarandeSlut))
+      const newScheduledEnd = toLocalISOStringWithOffset(slut)
+      // Tidigare tider i svensk tid med offset (scheduled_start kan vara Date från formuläret)
+      const tidigareStart = nuvarandeStart ? toLocalISOStringWithOffset(nuvarandeStart) : null
+      const tidigareSlut = nuvarandeSlut ? toLocalISOStringWithOffset(nuvarandeSlut) : null
 
       // 0. Spara snapshot av nuvarande besök om det finns besöksdata,
       // ELLER om delfakturering körs — annars tappar historiken kopplingen
@@ -244,7 +290,7 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           source: 'revisit',
           isFinal: false,
           customerId: caseData.customer_id ?? null,
-          visitDate: (caseData.scheduled_start as string) ?? new Date().toISOString(),
+          visitDate: tidigareStart ?? toLocalISOStringWithOffset(new Date()),
           technicianId: caseData.primary_technician_id ?? null,
           technicianName: caseData.primary_technician_name ?? null,
           // Hela besökets bemanning, inte bara primärteknikern
@@ -282,6 +328,9 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           if (adhocResult.skippedZeroTotal) {
             // 0 kr-regeln: ingen faktura, inget att logga som delfaktura
             toast.success('Underlaget är 0 kr, ingen delfaktura skapad.')
+          } else if (adhocResult.created === 0) {
+            // Raderna var redan överförda (t.ex. från en annan flik): inget nytt att fakturera
+            toast('Artiklarna var redan skickade till fakturering.')
           } else if (adhocResult.invoiceError) {
             toast.error(`Raderna sparades men fakturan kunde inte skapas: ${adhocResult.invoiceError}. Kontakta admin.`, { duration: 10000 })
           } else {
@@ -290,7 +339,7 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
 
           // Logga delfaktureringen så den syns i Ärendehistorik-panelen
           // (samma update_type som privat/företag använder i RevisitModal)
-          if (!adhocResult.skippedZeroTotal) {
+          if (!adhocResult.skippedZeroTotal && adhocResult.created > 0) {
             const authorName = (profile as { full_name?: string }).full_name || profile.display_name || 'Okänd'
             const { error: logErr } = await supabase.from('case_updates_log').insert({
               case_id: caseData.id,
@@ -354,16 +403,16 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           case_table: 'cases',
           updated_by: profile.id,
           field_changes: {
-            scheduled_start: { old: caseData.scheduled_start, new: newScheduledStart },
-            scheduled_end: { old: caseData.scheduled_end, new: newScheduledEnd },
+            scheduled_start: { old: tidigareStart, new: newScheduledStart },
+            scheduled_end: { old: tidigareSlut, new: newScheduledEnd },
             status: { old: caseData.status, new: 'Återbesök' }
           },
           user_role: 'technician',
           case_type: 'contract',
           update_type: 'revisit_scheduled',
           previous_value: JSON.stringify({
-            scheduled_start: caseData.scheduled_start,
-            scheduled_end: caseData.scheduled_end
+            scheduled_start: tidigareStart,
+            scheduled_end: tidigareSlut
           }),
           new_value: JSON.stringify({
             scheduled_start: newScheduledStart,
@@ -375,36 +424,30 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
         })
       if (logError) console.error('[RevisitContractModal] Failed to log revisit:', logError)
 
-      toast.success('Återbesök bokat! Du kan boka fler återbesök.')
+      toast.success('Återbesök bokat.')
 
-      // Refresha historiken så den nya bokningen visas
-      await fetchHistory()
-
-      // Rensa anteckningsfältet för nästa bokning
+      // Nollställ rutan: ett nytt tryck får aldrig köra delfaktureringen igen.
+      // Listan läses om ifall rutan visas igen innan föräldern hunnit stänga.
+      setInvoiceNow(false)
       setRevisitNote('')
-
-      // Uppdatera startdatum till det nya bokade datumet
-      setStartDate(new Date(newScheduledStart))
+      setStartDate(null)
       setEndDate(null)
+      fetchPendingItems()
 
-      // Expandera historiken så användaren ser den nya bokningen
-      setShowFullHistory(true)
-
-      // Meddela parent-komponenten om uppdateringen
+      // Meddela parent-komponenten om uppdateringen och stäng rutan
       onSuccess({
         ...caseData,
         ...updatedCase
       })
+      onClose()
     } catch (error: any) {
       console.error('Error scheduling revisit:', error)
       toast.error(`Kunde inte boka återbesök: ${error.message}`)
-    } finally {
-      setLoading(false)
     }
   }
 
   const modalContent = (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10001] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[10001] flex items-center justify-center p-4" style={{ pointerEvents: 'auto' }}>
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl">
         {/* Header */}
         <div className="sticky top-0 z-10 bg-slate-900 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
@@ -419,6 +462,7 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           </div>
           <button
             onClick={onClose}
+            disabled={loading}
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
@@ -634,9 +678,12 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
                   dateFormat="d MMM yyyy HH:mm"
                   locale="sv"
                   minDate={new Date()}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
-                  placeholderText="Välj datum och tid"
+                  className={`w-full px-3 py-2 bg-slate-800 border rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 ${sammaSomNuvarande ? 'border-red-500' : 'border-slate-600'}`}
+                  placeholderText="Välj ny tid"
                 />
+                {sammaSomNuvarande && (
+                  <p className="text-xs text-red-400 mt-1">Samma tid som nuvarande besök. Välj en ny tid.</p>
+                )}
               </div>
 
               <div>
@@ -655,6 +702,7 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20"
                   placeholderText="Välj sluttid"
                 />
+                <p className="text-xs text-slate-500 mt-1">Tomt: samma längd som nuvarande besök, annars 1 timme.</p>
               </div>
             </div>
 
@@ -686,7 +734,7 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
             variant="primary"
             onClick={handleScheduleRevisit}
             loading={loading}
-            disabled={!startDate || loading}
+            disabled={!startDate || sammaSomNuvarande || loading}
             className="bg-teal-600 hover:bg-teal-500"
           >
             <Calendar className="w-4 h-4 mr-2" />

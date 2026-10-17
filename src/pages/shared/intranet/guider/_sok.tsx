@@ -1,5 +1,5 @@
 // src/pages/shared/intranet/guider/_sok.tsx
-// Delade delar för guiderna om sökrutan (guide-sokrutan-tekniker och guide-sokrutan-kontor).
+// Delade delar för guiderna om sökrutan (guide-sokrutan-tekniker, guide-sokrutan-kontor och guide-sokrutan-saljare).
 // Efterbildning av GlobalSearch.tsx: sökfältet med platshållaren "Sök ärende, kund, org.nr,
 // telefon eller sida", tolkningen "tolkas som …", grupperna ur GROUP_LABELS, raderna med
 // ikonplattan (SearchIconTile, samma som portalen), snabbvalen under den markerade raden och
@@ -37,7 +37,12 @@ export type Mk = (id: string) => MarkorProps | undefined
 /** Ett tryck i sökrutan: falt, stang, pil-ner, pil-upp, rad:<id>, val:<id>:<etikett>, guide */
 export type Tryck = (id: string) => void
 
-export const SCOPE_TEXT = { technician: 'Dina ärenden och ärenden du delar', koordinator: 'Alla ärenden', admin: 'Allt' } as const
+export const SCOPE_TEXT = {
+  technician: 'Dina ärenden och ärenden du delar',
+  koordinator: 'Alla ärenden',
+  admin: 'Allt',
+  säljare: 'Kunder, dokument och webbleads',
+} as const
 
 function Rad({ r, vald, tryck, mk, onHover, visaTyp }: { r: SokTraff; vald: boolean; tryck: Tryck; mk: Mk; onHover?: (id: string) => void; visaTyp: boolean }) {
   return (

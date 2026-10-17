@@ -222,25 +222,53 @@ export async function getCaseDeleteInfo(
 }
 
 /**
+ * Anledning när en tekniker tar bort ärendet via papperskorgen i Mina ärenden.
+ * Sparas i deleted_at/close_reason så att statistiken över stängda ärenden
+ * (ClosedCasesFunnel) fortsätter fungera.
+ */
+export interface CaseCloseReason {
+  reason: string;
+  notes: string | null;
+  technicianId: string | null;
+  technicianName: string | null;
+}
+
+/**
  * Soft-delete: sätter status = 'Borttaget' och döljer ärendet ur alla vyer.
  * Ärendet och all relaterad data behålls i databasen.
+ * Den enda vägen för att ta bort ärenden: Radera i ärendemodalen och
+ * teknikerns papperskorg (med closeReason) går båda hit.
  */
 export async function deleteCase(
   caseId: string,
   caseType: DeleteableCaseType,
   performedById: string,
-  performedByName: string
+  performedByName: string,
+  closeReason?: CaseCloseReason
 ): Promise<{ success: boolean; error?: string }> {
   const tableName = getTableName(caseType);
 
+  const update: Record<string, unknown> = { status: 'Borttaget' };
+  if (closeReason) {
+    update.deleted_at = new Date().toISOString();
+    update.deleted_by_technician_id = closeReason.technicianId || null;
+    update.deleted_by_technician_name = closeReason.technicianName || null;
+    update.close_reason = closeReason.reason;
+    update.close_reason_notes = closeReason.notes;
+  }
+
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from(tableName)
-      .update({ status: 'Borttaget' })
-      .eq('id', caseId);
+      .update(update)
+      .eq('id', caseId)
+      .select('id');
 
     if (error) {
       return { success: false, error: `Kunde inte markera ärendet som borttaget: ${error.message}` };
+    }
+    if (!data || data.length === 0) {
+      return { success: false, error: 'Kunde inte markera ärendet som borttaget: inga rader uppdaterades (behörighet kan saknas)' };
     }
 
     return { success: true };

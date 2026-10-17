@@ -19,10 +19,15 @@ import {
   navGroups as techGroups,
   breadcrumbMap as techCrumbs,
 } from '../../technician/layout/technicianNavConfig'
+import {
+  topLevelItems as saljTop,
+  navGroups as saljGroups,
+  breadcrumbMap as saljCrumbs,
+} from '../../saljare/layout/saljareNavConfig'
 import type { NavGroup, NavItem } from '../../admin/layout/adminNavConfig'
 import { isPrivateIdNumber, openOneflowCreator, type PrefillCustomer } from '../../../utils/oneflowPrefill'
 
-export type SearchPortal = 'admin' | 'koordinator' | 'technician'
+export type SearchPortal = 'admin' | 'koordinator' | 'technician' | 'säljare'
 export type QueryKind = 'case' | 'number' | 'orgnr' | 'phone' | 'email' | 'postal' | 'text'
 
 export type GroupKey =
@@ -93,10 +98,16 @@ export interface SearchGroup {
 // Portal och sökvägar
 // ---------------------------------------------------------------------------
 
-export const PORTAL_PREFIX: Record<SearchPortal, '/admin' | '/koordinator' | '/technician'> = {
+export const PORTAL_PREFIX: Record<SearchPortal, '/admin' | '/koordinator' | '/technician' | '/saljare'> = {
   admin: '/admin',
   koordinator: '/koordinator',
   technician: '/technician',
+  säljare: '/saljare',
+}
+
+/** Kontorsportaler med planering (schema, bokningsassistent, ärendelistan) */
+function canPlan(portal: SearchPortal): boolean {
+  return portal === 'admin' || portal === 'koordinator'
 }
 
 type CaseType = 'private' | 'business' | 'contract'
@@ -376,7 +387,7 @@ function caseItem(c: RpcCase, portal: SearchPortal): SearchItem {
   const open: SearchChoice = { label: 'Öppna', href: caseHref(portal, c.id, c.case_type) }
   const choices: SearchChoice[] = [open]
 
-  if (portal !== 'technician' && !c.archived) {
+  if (canPlan(portal) && !c.archived) {
     choices.push(
       c.scheduled
         ? { label: 'Flytta', href: `/koordinator/schema?openCase=${encodeURIComponent(c.id)}` }
@@ -581,6 +592,7 @@ const PAGES: Record<SearchPortal, PageEntry[]> = {
     { label: 'Schema & Planering', path: '/koordinator/schema', section: 'Planering' },
   ]),
   technician: pagesFrom(techTop, techGroups, techCrumbs),
+  säljare: pagesFrom(saljTop, saljGroups, saljCrumbs),
 }
 
 function matchesAll(haystack: string, tokens: string[]): boolean {
@@ -655,6 +667,27 @@ function baseActions(portal: SearchPortal): ActionDef[] {
     ]
   }
 
+  if (portal === 'säljare') {
+    return [
+      {
+        key: 'action:ny-lead', title: 'Ny lead', meta: 'Lägger upp en ny B2B-lead',
+        words: 'ny lead skapa leads', common: true,
+        choice: { label: 'Öppna', href: '/saljare/leads?ny=1' },
+      },
+      {
+        key: 'action:offert', title: 'Ny offert', meta: 'Öppnar offertguiden',
+        words: 'ny skapa offert', common: true,
+        choice: { label: 'Öppna', run: nav => openOneflowCreator(nav, prefix, 'offer') },
+      },
+      {
+        key: 'action:avtal', title: 'Nytt avtal', meta: 'Öppnar avtalsguiden',
+        words: 'nytt skapa avtal', common: true,
+        choice: { label: 'Öppna', run: nav => openOneflowCreator(nav, prefix, 'contract') },
+      },
+      incident,
+    ]
+  }
+
   return [
     {
       key: 'action:nytt-arende', title: 'Nytt ärende', meta: 'Privat, företag eller avtal',
@@ -705,7 +738,7 @@ function actionItems(
   const verb = parsed.verb ? normalize(parsed.verb) : ''
 
   // Kontextuella åtgärder från bästa träffen
-  if (topTechnician && portal !== 'technician' && (!verb || verb.startsWith('boka') || verb.startsWith('hitta'))) {
+  if (topTechnician && canPlan(portal) && (!verb || verb.startsWith('boka') || verb.startsWith('hitta'))) {
     const first = firstWord(topTechnician.title)
     out.push({
       key: `action:boka-hos:${topTechnician.id}`,
@@ -741,7 +774,7 @@ function actionItems(
         choices: [{ label: 'Öppna', run: nav => openOneflowCreator(nav, prefix, 'contract', topCustomer) }],
       })
     }
-    if (portal !== 'technician' && topCustomer.contract_type && (!verb || verb.includes('arende') || verb.startsWith('boka') || verb === 'nytt')) {
+    if (canPlan(portal) && topCustomer.contract_type && (!verb || verb.includes('arende') || verb.startsWith('boka') || verb === 'nytt')) {
       out.push({
         key: `action:arende-kund:${topCustomer.id}`,
         group: 'actions', icon: 'atgard', tone: 'atgard',
@@ -799,6 +832,8 @@ export function buildGroups(
     }
     if (portal !== 'technician') {
       for (const l of data.leads || []) buckets.leads.push(leadItem(l, portal))
+    }
+    if (canPlan(portal)) {
       for (const t of data.technicians || []) buckets.technicians.push(technicianItem(t, portal))
       for (const i of data.invoices || []) {
         const it = invoiceItem(i, portal)
@@ -812,7 +847,7 @@ export function buildGroups(
   }
 
   const topCustomer = data?.customers?.[0]
-  const topTechnician = portal !== 'technician' ? data?.technicians?.[0] : undefined
+  const topTechnician = canPlan(portal) ? data?.technicians?.[0] : undefined
   buckets.actions = actionItems(portal, parsed, topCustomer, topTechnician)
 
   let order = GROUP_ORDER

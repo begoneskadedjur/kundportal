@@ -1,7 +1,10 @@
 // src/components/saljare/layout/SäljareMobileNav.tsx
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Menu, X, LogOut } from 'lucide-react'
+import { Menu, X, LogOut, Search } from 'lucide-react'
+import { openGlobalSearch } from '../../shared/search/globalSearchEvents'
+import { ViewSwitcher } from '../../shared/ViewSwitcher'
+import { ReportIncidentButton } from '../../shared/ReportIncidentButton'
 import { topLevelItems, navGroups, mobileBottomItems } from './saljareNavConfig'
 import { MobileNavGroup } from '../../admin/layout/MobileNavGroup'
 import { IntranetLink } from '../../shared/IntranetLink'
@@ -27,6 +30,14 @@ export function SäljareMobileNav({ currentPath, onSignOut }: SäljareMobileNavP
           <p className="text-white font-semibold text-sm">BeGone</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openGlobalSearch}
+            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+            aria-label="Sök"
+          >
+            <Search className="w-5 h-5" />
+          </button>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
@@ -54,6 +65,7 @@ export function SäljareMobileNav({ currentPath, onSignOut }: SäljareMobileNavP
         `}
       >
         <nav className="p-3 space-y-1">
+          <ViewSwitcher currentView="säljare" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           {topLevelItems.map(item => {
             const Icon = item.icon
             const isActive = currentPath === item.path
@@ -77,6 +89,7 @@ export function SäljareMobileNav({ currentPath, onSignOut }: SäljareMobileNavP
             <MobileNavGroup key={group.label} group={group} currentPath={currentPath} onNavigate={() => setMobileMenuOpen(false)} />
           ))}
           <div className="h-px bg-slate-700/50 my-3" />
+          <ReportIncidentButton role="säljare" onNavigate={() => setMobileMenuOpen(false)} />
           <IntranetLink basePath="/saljare" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <ChangelogLink variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />
           <ProfileLink basePath="/saljare" variant="mobile" onNavigate={() => setMobileMenuOpen(false)} />

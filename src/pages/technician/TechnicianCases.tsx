@@ -178,9 +178,9 @@ export default function TechnicianCases() {
     try {
       // Fetch cases (with soft-delete filter)
       const [privateResult, businessResult, contractResult] = await Promise.allSettled([
-        supabase.from('private_cases').select('*').is('deleted_at', null).is('legacy_archived_at', null).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
-        supabase.from('business_cases').select('*').is('deleted_at', null).is('legacy_archived_at', null).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
-        supabase.from('cases').select('*').is('deleted_at', null).or(`primary_technician_id.eq.${technicianId},secondary_technician_id.eq.${technicianId},tertiary_technician_id.eq.${technicianId}`)
+        supabase.from('private_cases').select('*').is('deleted_at', null).neq('status', 'Borttaget').is('legacy_archived_at', null).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
+        supabase.from('business_cases').select('*').is('deleted_at', null).neq('status', 'Borttaget').is('legacy_archived_at', null).or(`primary_assignee_id.eq.${technicianId},secondary_assignee_id.eq.${technicianId},tertiary_assignee_id.eq.${technicianId}`),
+        supabase.from('cases').select('*').is('deleted_at', null).neq('status', 'Borttaget').or(`primary_technician_id.eq.${technicianId},secondary_technician_id.eq.${technicianId},tertiary_technician_id.eq.${technicianId}`)
       ])
 
       const allCases: TechnicianCase[] = [
@@ -384,6 +384,19 @@ export default function TechnicianCases() {
   }
 
   const handleUpdateSuccess = (updatedCase: Partial<TechnicianCase>) => {
+    // Nytt ärende (t.ex. följeärende): lägg till det i listan och behåll originalet
+    if (updatedCase?.id && selectedCase && updatedCase.id !== selectedCase.id) {
+      const newCase = {
+        ...updatedCase,
+        created_date: updatedCase.created_date
+          || (updatedCase as { start_date?: string }).start_date
+          || (updatedCase as { created_at?: string }).created_at
+          || new Date().toISOString(),
+      } as TechnicianCase
+      setCases(prev => prev.some(c => c.id === newCase.id) ? prev : [newCase, ...prev])
+      setSelectedCase(newCase)
+      return
+    }
     if (updatedCase && selectedCase) {
       setSelectedCase(prev => prev ? { ...prev, ...updatedCase } : prev)
     }
@@ -726,6 +739,7 @@ export default function TechnicianCases() {
         isOpen={isEditModalOpen}
         onClose={() => { setIsEditModalOpen(false); setSelectedCase(null); setOpenCommunicationOnLoad(false) }}
         onSuccess={handleUpdateSuccess}
+        onDeleted={(id) => handleDeleteSuccess([id])}
         caseData={selectedCase}
         openCommunicationOnLoad={openCommunicationOnLoad}
       />

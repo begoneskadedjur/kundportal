@@ -7,6 +7,7 @@ import LoadingSpinner from '../../shared/LoadingSpinner'
 import { SäljareSidebar } from './SäljareSidebar'
 import { SäljareTopHeader } from './SäljareTopHeader'
 import { SäljareMobileNav } from './SäljareMobileNav'
+import { GlobalSearch } from '../../shared/search/GlobalSearch'
 
 export default function SäljareLayout() {
   const { profile, signOut, loading } = useAuth()
@@ -54,6 +55,9 @@ export default function SäljareLayout() {
         sidebarCollapsed={sidebarCollapsed}
         userName={userName}
       />
+
+      {/* Global söklåda (Ctrl+K) */}
+      <GlobalSearch portal="säljare" />
 
       {/* Main content area */}
       <main

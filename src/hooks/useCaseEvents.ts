@@ -2,6 +2,7 @@
 // Hook för ärende-centrerad händelsevy med realtime-uppdateringar
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
@@ -144,7 +145,7 @@ export function useCaseEvents(options: UseCaseEventsOptions = {}): UseCaseEvents
       return true;
     } catch (err) {
       console.error('Error updating status:', err);
-      setError('Kunde inte uppdatera status');
+      toast.error(err instanceof Error ? err.message : 'Kunde inte uppdatera status');
       return false;
     }
   }, [profile, fetchStats]);

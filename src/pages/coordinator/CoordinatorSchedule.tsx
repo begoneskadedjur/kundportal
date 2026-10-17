@@ -212,7 +212,7 @@ export default function CoordinatorSchedule() {
           parent_case_id, created_by_technician_id, created_by_technician_name,
           service_id, service:services!service_id(name),
           oneflow_contract_id
-        `).is('legacy_archived_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
+        `).is('legacy_archived_at', null).is('deleted_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('business_cases').select(`
           id, title, status, priority, start_date, due_date, created_at, updated_at,
           adress, kontaktperson, skadedjur, annat_skadedjur, bestallare, company_name,
@@ -226,7 +226,7 @@ export default function CoordinatorSchedule() {
           parent_case_id, created_by_technician_id, created_by_technician_name,
           service_id, service:services!service_id(name),
           oneflow_contract_id
-        `).is('legacy_archived_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
+        `).is('legacy_archived_at', null).is('deleted_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('cases').select(`
           *, customer:customers(
             company_name, contact_address, contact_person, contact_phone,
@@ -236,7 +236,7 @@ export default function CoordinatorSchedule() {
           contract:contracts!cases_contract_id_fkey(
             id, address_label, contact_address, oneflow_contract_id
           )
-        `).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
+        `).is('deleted_at', null).in('status', ALL_VALID_STATUSES).order('created_at', { ascending: false }),
         supabase.from('technician_absences').select('*'),
       ])
 
@@ -510,6 +510,14 @@ export default function CoordinatorSchedule() {
     fetchData()
   }
 
+  // Radera i ärendemodalen: ta bort besöket ur schemat direkt
+  const handleCaseDeleted = (caseId: string) => {
+    setAllCases(prev => prev.filter(c => c.id !== caseId))
+    setContractCases(prev => prev.filter(c => c.id !== caseId))
+    setIsEditModalOpen(false)
+    setIsEditContractModalOpen(false)
+  }
+
   const handleCaseMoved = useCallback(async (
     caseId: string,
     newStart: Date,
@@ -717,6 +725,7 @@ export default function CoordinatorSchedule() {
         isOpen={isEditModalOpen}
         onClose={() => { setIsEditModalOpen(false); setOpenCommunicationOnLoad(false) }}
         onSuccess={handleUpdateSuccess}
+        onDeleted={handleCaseDeleted}
         caseData={selectedCase as any}
         technicians={technicians}
         openCommunicationOnLoad={openCommunicationOnLoad}
@@ -725,6 +734,7 @@ export default function CoordinatorSchedule() {
         isOpen={isEditContractModalOpen}
         onClose={() => { setIsEditContractModalOpen(false); setSelectedContractCase(null); setOpenCommunicationOnLoad(false) }}
         onSuccess={handleUpdateSuccess}
+        onDeleted={handleCaseDeleted}
         caseData={selectedContractCase}
       />
       <RonderingCaseModal

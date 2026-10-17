@@ -1,6 +1,7 @@
 // src/services/communicationService.ts
 // Service för kommunikationssystemet - kommentarer, mentions och notifikationer
 
+import toast from 'react-hot-toast';
 import { supabase } from '../lib/supabase';
 import {
   ROLE_MENTIONS,
@@ -57,13 +58,6 @@ export async function createComment(
   const mentionedRoles = comment.mentioned_roles || [];
   const mentionsAll = comment.mentions_all || false;
 
-  // AUTOMATISK ÅTERAKTIVERING (Ticket-nivå):
-  // Om detta är ett svar (parent_comment_id finns) på en resolved ticket,
-  // återaktivera ENDAST den specifika ticketen - andra tickets påverkas INTE.
-  if (comment.parent_comment_id) {
-    await reactivateTicketOnReply(comment.parent_comment_id);
-  }
-
   // Skapa kommentaren
   const { data, error } = await supabase
     .from('case_comments')
@@ -94,6 +88,23 @@ export async function createComment(
       comment.author_name,
       caseTitle
     );
+  }
+
+  // AUTOMATISK ÅTERAKTIVERING (Ticket-nivå):
+  // Ett svar i en löst ticket återöppnar ENDAST den ticketen, oavsett vem som svarar.
+  // Körs efter att svaret sparats eftersom RPC:n kräver att anroparen skrev svaret.
+  // Svaret är redan sparat, så ett fel här kastas inte (då skulle användaren skicka
+  // om svaret och skapa en dubblett). Felet visas i stället tydligt.
+  if (comment.parent_comment_id) {
+    try {
+      await reactivateTicketOnReply(data.id);
+    } catch (reopenError) {
+      toast.error(
+        reopenError instanceof Error
+          ? reopenError.message
+          : 'Svaret sparades men ticketen kunde inte återöppnas'
+      );
+    }
   }
 
   return data;
@@ -694,83 +705,62 @@ export async function getReadCount(commentId: string): Promise<number> {
 // === TICKET-STATUS ===
 
 /**
- * Återaktiverar EN specifik ticket (root-kommentar) när ett svar skapas på den.
- * ENDAST denna ticket påverkas - andra tickets i samma ärende förblir orörda.
+ * Återaktiverar ticketen (trådens rotkommentar) när ett svar har skapats i den.
+ * ENDAST denna ticket påverkas. Går via RPC:n reopen_ticket_on_reply (security definer),
+ * eftersom RLS bara låter författaren uppdatera sin egen kommentar. Den som skrev svaret
+ * återöppnar ticketen oavsett om hen skrev ticketen eller inte.
  *
- * @param parentCommentId - ID för root-kommentaren (ticketen) som svaret tillhör
+ * @param replyId - ID för det nyss skapade svaret
+ * @returns true om ticketen var löst och återöppnades
  */
-async function reactivateTicketOnReply(parentCommentId: string): Promise<void> {
-  if (!parentCommentId) {
-    return; // Inte ett svar, inget att återaktivera
+async function reactivateTicketOnReply(replyId: string): Promise<boolean> {
+  if (!replyId) return false;
+
+  const { data, error } = await supabase.rpc('reopen_ticket_on_reply', {
+    p_reply_id: replyId,
+  });
+
+  if (error) {
+    console.error('Fel vid återaktivering av ticket:', error);
+    throw new Error(
+      `Svaret sparades men ticketen kunde inte återöppnas: ${error.message}`
+    );
   }
 
-  // Kolla om parent-kommentaren (ticketen) är resolved
-  const { data: parentComment, error: fetchError } = await supabase
-    .from('case_comments')
-    .select('id, status, parent_comment_id')
-    .eq('id', parentCommentId)
-    .single();
-
-  if (fetchError || !parentComment) {
-    console.error('Fel vid hämtning av parent-kommentar:', fetchError);
-    return;
-  }
-
-  // Om parent själv har en parent, hitta root-ticketen
-  let rootId = parentCommentId;
-  if (parentComment.parent_comment_id) {
-    // Detta är ett svar på ett svar - hitta den riktiga root-ticketen
-    const { data: rootComment } = await supabase
-      .from('case_comments')
-      .select('id')
-      .eq('id', parentComment.parent_comment_id)
-      .single();
-
-    if (rootComment) {
-      rootId = rootComment.id;
-    }
-  }
-
-  // Återaktivera ENDAST denna root-ticket om den är resolved
-  const { error: updateError } = await supabase
-    .from('case_comments')
-    .update({
-      status: 'open',
-      resolved_at: null,
-      resolved_by: null
-    })
-    .eq('id', rootId)
-    .eq('status', 'resolved'); // Endast om den faktiskt är resolved
-
-  if (updateError) {
-    console.error('Fel vid återaktivering av ticket:', updateError);
-  }
+  return data === true;
 }
 
+/**
+ * Ändrar status på en kommentar/ticket via RPC:n set_case_comment_status.
+ * Behörigheten prövas i databasen: författaren, den som är nämnd i ticketen (personligen,
+ * via grupp eller @alla) samt admin och koordinator. resolved_at/resolved_by sätts av servern.
+ * Kastar fel om ändringen nekades eller ingen rad ändrades, så att UI:t inte visar
+ * en status som inte sparats.
+ *
+ * @param _resolvedBy - ignoreras, servern sätter resolved_by = inloggad användare
+ */
 export async function updateCommentStatus(
   commentId: string,
   status: 'open' | 'resolved',
-  resolvedBy?: string
-): Promise<void> {
-  const updateData: any = { status };
-
-  if (status === 'resolved' && resolvedBy) {
-    updateData.resolved_at = new Date().toISOString();
-    updateData.resolved_by = resolvedBy;
-  } else if (status !== 'resolved') {
-    updateData.resolved_at = null;
-    updateData.resolved_by = null;
-  }
-
-  const { error } = await supabase
-    .from('case_comments')
-    .update(updateData)
-    .eq('id', commentId);
+  _resolvedBy?: string
+): Promise<CaseComment> {
+  void _resolvedBy; // behålls för anroparnas signatur, servern bestämmer resolved_by
+  const { data, error } = await supabase.rpc('set_case_comment_status', {
+    p_comment_id: commentId,
+    p_status: status,
+  });
 
   if (error) {
     console.error('Fel vid uppdatering av kommentarsstatus:', error);
-    throw error;
+    throw new Error(error.message || 'Kunde inte ändra status');
   }
+
+  const row = data as CaseComment | null;
+  if (!row || row.id !== commentId || row.status !== status) {
+    throw new Error('Statusen sparades inte. Ladda om sidan och försök igen.');
+  }
+
+  return row;
 }
 
 // === LEGACY TICKETS (GAMMAL MODELL - BEHÅLLS FÖR BAKÅTKOMPATIBILITET) ===

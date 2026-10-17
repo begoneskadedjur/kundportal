@@ -3,6 +3,8 @@
 // Samma flöde som för teknikern i EditCaseModal, men ärendet öppnas från schemat
 // (CoordinatorSchedule). Efter Skapa nytt ärende stängs ärendet och schemat laddas om
 // (handleUpdateSuccess), så det nya ärendet ligger på samma tid och tekniker som det första.
+// Följeärendet får ett eget BE-nummer (CaseNumberService, samma väg som nya ärenden), och
+// toasten är "Följeärende <nummer> skapat för <skadedjur>!".
 // Påhittad kund, ingenting sparas.
 
 import { useState } from 'react'
@@ -54,7 +56,7 @@ function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
     <Dator adress="koordinator › schema">
       <SchemaHuvud datum="tisdag 20 oktober 2026" mk={mk} tryck={tryck} />
       <SchemaRutnat rader={RADER} besok={besok} mk={mk} tryck={tryck} />
-      {klar && l.djur && <Notis text={`Följeärende skapat för ${l.djur}!`} />}
+      {klar && l.djur && <Notis text={`Följeärende BE-0001235 skapat för ${l.djur}!`} />}
     </Dator>
   )
 }
@@ -130,7 +132,7 @@ function Ovning() {
           setSvar({
             typ: 'ok',
             titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-            text: `Getingärendet är skapat och ligger hos Anna på samma tid som råttärendet. Vill du boka det en annan tid öppnar du det nya ärendet och ändrar tiden.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
+            text: `Getingärendet har fått eget ärendenummer, BE-0001235, och ligger hos Anna på samma tid som råttärendet. Vill du boka det en annan tid öppnar du det nya ärendet och ändrar tiden.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
           })
         }
       } else miss(TIPS[id] ?? 'Välj skadedjurstyp och skapa ärendet.')

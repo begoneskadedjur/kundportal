@@ -2,7 +2,8 @@
 // Guidemodul: Skapa ett följeärende (tekniker, telefon).
 // EditCaseModal: fotspåren (Boka återbesök eller skapa nytt ärende) syns bara i privat- och
 // företagsärenden som inte själva är följeärenden (canCreateFollowUp). Vad vill du göra? ›
-// Skapa nytt ärende › Skadedjurstyp * › Skapa nytt ärende. Toasten är "Följeärende skapat för
+// Skapa nytt ärende › Skadedjurstyp * › Skapa nytt ärende. Följeärendet får ett eget BE-nummer
+// (CaseNumberService, samma väg som nya ärenden). Toasten är "Följeärende <nummer> skapat för
 // <skadedjur>!" och det nya ärendet visas med raden "Detta är ett följeärende".
 // Påhittad kund, ingenting sparas.
 
@@ -21,8 +22,10 @@ const URSPRUNG: ArendeData = {
   beskrivning: 'Råttor i källaren, spår vid tvättstugan.',
   tid: 'Tisdag 2026-10-20, 09:00 till 10:00',
 }
+const NYTT_NR = 'BE-0001235'
 const nyttArende = (djur: string): ArendeData => ({
   ...URSPRUNG,
+  nr: NYTT_NR,
   beskrivning: `Följeärende från ursprungsärende. Nytt skadedjursproblem: ${djur}`,
   foljearende: true,
 })
@@ -38,7 +41,7 @@ function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
       <TelefonFot mk={mk} tryck={tryck} />
       {l.vy === 'val' && <ValArk mk={mk} tryck={tryck} />}
       {l.vy === 'folje' && <FoljeArk valt={l.djur} listaOppen={l.lista} mk={mk} tryck={tryck} />}
-      {klar && l.djur && <Notis text={`Följeärende skapat för ${l.djur}!`} />}
+      {klar && l.djur && <Notis text={`Följeärende ${NYTT_NR} skapat för ${l.djur}!`} />}
     </Telefon>
   )
 }
@@ -107,7 +110,7 @@ function Ovning() {
           setSvar({
             typ: 'ok',
             titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-            text: `Ett nytt ärende för getingarna är skapat hos Familjen Exempel, med samma adress, tid och tekniker som råttärendet. Det har status Bokad, eget pris och egen arbetstid.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
+            text: `Ett nytt ärende för getingarna är skapat hos Familjen Exempel, med eget ärendenummer BE-0001235 och samma adress, tid och tekniker som råttärendet. Det har status Bokad, eget pris och egen arbetstid. I Mina ärenden ligger båda ärendena.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
           })
         }
       } else miss(TIPS[id] ?? 'Välj skadedjurstyp och skapa ärendet.')

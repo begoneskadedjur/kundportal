@@ -3,7 +3,9 @@
 // EditCaseModal: pratbubblan (Öppna kommunikation) öppnar CommunicationSlidePanel med
 // CommentInput (Skriv en kommentar... (använd @ för att nämna någon)). Radera längst ner till
 // vänster öppnar DeleteCaseConfirmDialog (Ta bort ärende, Ta bort). caseDeleteService.deleteCase
-// sätter status Borttaget, toasten är "Ärendet har tagits bort". Påhittad kund, ingenting sparas.
+// sätter status Borttaget, toasten är "Ärendet har tagits bort". Listan tar bort ärendet direkt
+// (onDeleted). Papperskorgen på kortet i Mina ärenden (CloseCaseModal) går samma väg via
+// deleteCase, med Anledning * sparad. Påhittad kund, ingenting sparas.
 
 import { useState } from 'react'
 import { ArendeHuvud, Notis, OvningRam, Rad, Kort, Status, Telefon, type OvningSvar } from '../skarmkit'

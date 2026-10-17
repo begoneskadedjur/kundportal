@@ -3,7 +3,7 @@ import { Trash2 } from 'lucide-react'
 import Modal from '../../ui/Modal'
 import Button from '../../ui/Button'
 import Select from '../../ui/Select'
-import { supabase } from '../../../lib/supabase'
+import { deleteCase, type DeleteableCaseType } from '../../../services/caseDeleteService'
 import toast from 'react-hot-toast'
 import type { TechnicianCase } from '../../../pages/technician/TechnicianCases'
 
@@ -26,12 +26,6 @@ interface CloseCaseModalProps {
   technicianName: string
 }
 
-function getTableName(caseType: string): string {
-  if (caseType === 'business') return 'business_cases'
-  if (caseType === 'contract') return 'cases'
-  return 'private_cases'
-}
-
 export default function CloseCaseModal({
   isOpen, onClose, cases, onSuccess, technicianId, technicianName,
 }: CloseCaseModalProps) {
@@ -48,23 +42,23 @@ export default function CloseCaseModal({
     setSaving(true)
 
     try {
-      const now = new Date().toISOString()
-      const updates = {
-        deleted_at: now,
-        deleted_by_technician_id: technicianId,
-        deleted_by_technician_name: technicianName,
-        close_reason: reason,
-        close_reason_notes: notes.trim() || null,
+      // Samma mjuka borttagning som Radera i ärendemodalen (status Borttaget),
+      // med anledningen sparad för statistiken över stängda ärenden.
+      const closeReason = {
+        reason,
+        notes: notes.trim() || null,
+        technicianId: technicianId || null,
+        technicianName: technicianName || null,
       }
 
       const results = await Promise.allSettled(
         cases.map(c =>
-          supabase.from(getTableName(c.case_type)).update(updates).eq('id', c.id)
+          deleteCase(c.id, c.case_type as DeleteableCaseType, technicianId, technicianName, closeReason)
         )
       )
 
       const succeeded = results
-        .map((r, i) => r.status === 'fulfilled' && !r.value.error ? cases[i].id : null)
+        .map((r, i) => r.status === 'fulfilled' && r.value.success ? cases[i].id : null)
         .filter(Boolean) as string[]
 
       const failed = cases.length - succeeded.length
@@ -129,7 +123,7 @@ export default function CloseCaseModal({
         )}
 
         <p className="text-xs text-slate-500">
-          Ärendet döljs från din vy men behålls i systemet. Admin kan se borttagna ärenden.
+          Ärendet markeras som borttaget och döljs från alla vyer. All data behålls.
         </p>
 
         <div>

@@ -156,6 +156,10 @@ export default function EgenkontrollCaseModal({
   const [showCommunicationPanel, setShowCommunicationPanel] = useState(false)
   const [showVisitHistoryPanel, setShowVisitHistoryPanel] = useState(false)
   const [showActionDialog, setShowActionDialog] = useState(false)
+  // Ärendet som det ser ut efter ett bokat återbesök. caseData-propen läses inte
+  // om av föräldern, så utan detta visar nästa återbesök gamla tider och gammal
+  // besöksdata (som redan sparats i besökshistoriken och nollställts).
+  const [efterAterbesok, setEfterAterbesok] = useState<object | null>(null)
   const [annotations, setAnnotations] = useState<RonderingAnnotation[]>([])
 
   // Nollställ alla overlay/dialog-states när modalen stängs. Modalen förblir
@@ -182,6 +186,7 @@ export default function EgenkontrollCaseModal({
   // Ladda data
   useEffect(() => {
     if (!isOpen || !caseData) return
+    setEfterAterbesok(null)
 
     const load = async () => {
       const init = {
@@ -1121,6 +1126,50 @@ export default function EgenkontrollCaseModal({
 
           </div>
         </div>
+
+        {/* Återbesök: MÅSTE renderas INUTI Modal (portal med max z-index), annars
+            hamnar rutan bakom egenkontrollen. Samma props som EditContractCaseModal. */}
+        {showActionDialog && caseData?.id && (
+          <RevisitContractModal
+            caseData={{
+              ...caseData,
+              ...(efterAterbesok ?? {}),
+              id: caseData.id,
+              case_number: formData.case_number,
+              title: formData.title || caseData.title || 'Egenkontroll',
+              description: formData.description,
+              status: formData.status,
+              contact_person: formData.contact_person,
+              contact_phone: formData.contact_phone,
+              contact_email: formData.contact_email,
+              scheduled_start: formData.scheduled_start,
+              scheduled_end: formData.scheduled_end,
+              work_report: formData.work_report || null,
+              primary_technician_id: formData.primary_technician_id || null,
+              primary_technician_name: formData.primary_technician_name || null,
+              secondary_technician_id: formData.secondary_technician_id || null,
+              secondary_technician_name: formData.secondary_technician_name || null,
+              customer_id: caseData.customer_id ?? null,
+            }}
+            onSuccess={(updatedCase) => {
+              setEfterAterbesok(updatedCase)
+              // Formuläret följer det nya besöket, annars skriver Spara tillbaka
+              // den gamla tiden, statusen och den redan arkiverade noteringen
+              // (bara de fält som återbesöket skrev, övriga osparade ändringar står kvar)
+              const uppdaterat = {
+                scheduled_start: fromDatabaseDate(updatedCase.scheduled_start as string | null) ?? formData.scheduled_start,
+                scheduled_end: fromDatabaseDate(updatedCase.scheduled_end as string | null) ?? formData.scheduled_end,
+                status: updatedCase.status || formData.status,
+                work_report: updatedCase.work_report ?? '',
+              }
+              setFormData(prev => ({ ...prev, ...uppdaterat }))
+              markeraSparat(uppdaterat)
+              setShowActionDialog(false)
+              onSuccess?.()
+            }}
+            onClose={() => setShowActionDialog(false)}
+          />
+        )}
       </Modal>
 
       {/* Avvikelse-lightbox */}
@@ -1172,19 +1221,6 @@ export default function EgenkontrollCaseModal({
           caseId={caseData.id}
           caseTitle={formData.case_number || caseData?.title || 'Egenkontroll'}
           onClose={() => setShowVisitHistoryPanel(false)}
-        />
-      )}
-
-      {/* Återbesök */}
-      {showActionDialog && caseData && (
-        <RevisitContractModal
-          isOpen={showActionDialog}
-          onClose={() => setShowActionDialog(false)}
-          originalCase={caseData}
-          onSuccess={() => {
-            setShowActionDialog(false)
-            onSuccess?.()
-          }}
         />
       )}
     </>

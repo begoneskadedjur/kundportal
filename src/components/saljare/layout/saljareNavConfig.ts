@@ -17,6 +17,7 @@ import {
   FilePen,
   FileSignature,
   Inbox,
+  AlertTriangle,
 } from 'lucide-react'
 import type { NavItem, NavGroup } from '../../admin/layout/adminNavConfig'
 
@@ -56,6 +57,7 @@ export const navGroups: NavGroup[] = [
     icon: Sparkles,
     items: [
       { label: 'AI Assistent', icon: Sparkles, path: '/saljare/ai-assistent' },
+      { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/saljare/tillbud-avvikelser', badgeKey: 'incidents' },
     ],
   },
 ]
@@ -90,6 +92,7 @@ export const breadcrumbMap: Record<string, string> = {
 
   // Verktyg
   '/saljare/ai-assistent': 'AI Assistent',
+  '/saljare/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/saljare/intranat': 'Intranät',
   '/saljare/larosate': 'Lärosäte',
   '/saljare/mitt-konto': 'Mitt konto',

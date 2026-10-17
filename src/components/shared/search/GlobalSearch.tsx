@@ -1,5 +1,5 @@
 // src/components/shared/search/GlobalSearch.tsx
-// Global söklåda (Ctrl+K / Cmd+K) för admin, koordinator och tekniker.
+// Global söklåda (Ctrl+K / Cmd+K) för admin, koordinator, tekniker och säljare.
 // Monteras en gång per portallayout. Sökningen går via RPC:n
 // public.global_search, som själv avgör vad rollen får se.
 
@@ -42,11 +42,14 @@ const SCOPE_TEXT: Record<SearchPortal, string> = {
   technician: 'Dina ärenden och ärenden du delar',
   koordinator: 'Alla ärenden',
   admin: 'Allt',
+  säljare: 'Kunder, dokument och webbleads',
 }
 
 /** Intranätguiden om sökrutan för portalen */
 function guideHref(portal: SearchPortal): string {
-  const slug = portal === 'technician' ? 'guide-sokrutan-tekniker' : 'guide-sokrutan-kontor'
+  const slug = portal === 'technician' ? 'guide-sokrutan-tekniker'
+    : portal === 'säljare' ? 'guide-sokrutan-saljare'
+    : 'guide-sokrutan-kontor'
   return `${PORTAL_PREFIX[portal]}/intranat/dokument/${slug}`
 }
 
@@ -391,7 +394,11 @@ export function GlobalSearch({ portal: requestedPortal }: GlobalSearchProps) {
                 <div className="px-3 py-6 text-sm text-slate-500">
                   <p>Inga träffar för "{parsed.term}".</p>
                   {!parsed.includeArchived && portal !== 'technician' && (
-                    <p className="mt-1 text-xs">Skriv ordet arkiv för att även söka i ClickUp-arkivet.</p>
+                    <p className="mt-1 text-xs">
+                      {portal === 'säljare'
+                        ? 'Skriv ordet arkiv för att även söka bland arkiverade dokument.'
+                        : 'Skriv ordet arkiv för att även söka i ClickUp-arkivet.'}
+                    </p>
                   )}
                 </div>
               )}

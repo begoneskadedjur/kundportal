@@ -416,6 +416,7 @@ function App() {
 
               {/* Verktyg */}
               <Route path="ai-assistent" element={<ProtectedRoute requiredRole="säljare"><TeamChat /></ProtectedRoute>} />
+              <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="säljare"><IncidentsPage /></ProtectedRoute>} />
 
               {/* Intranät + guider (Handbok) */}
               <Route path="intranat/*" element={<ProtectedRoute requiredRole="säljare"><IntranetPage /></ProtectedRoute>} />

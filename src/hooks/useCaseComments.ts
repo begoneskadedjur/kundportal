@@ -243,7 +243,7 @@ export function useCaseComments({
         await updateCommentStatus(commentId, status, user?.id);
       } catch (err) {
         console.error('Fel vid statusändring:', err);
-        toast.error('Kunde inte ändra status');
+        toast.error(err instanceof Error ? err.message : 'Kunde inte ändra status');
         // Återställ vid fel - hämta om kommentarer
         fetchComments();
       }

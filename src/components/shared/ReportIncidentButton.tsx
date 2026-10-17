@@ -6,14 +6,15 @@
 import { Link } from 'react-router-dom'
 import { AlertTriangle } from 'lucide-react'
 
-const INCIDENT_PATHS: Record<'admin' | 'koordinator' | 'technician', string> = {
+const INCIDENT_PATHS: Record<'admin' | 'koordinator' | 'technician' | 'säljare', string> = {
   admin: '/admin/tillbud-avvikelser',
   koordinator: '/koordinator/tillbud-avvikelser',
   technician: '/technician/tillbud-avvikelser',
+  säljare: '/saljare/tillbud-avvikelser',
 }
 
 interface ReportIncidentButtonProps {
-  role: 'admin' | 'koordinator' | 'technician'
+  role: 'admin' | 'koordinator' | 'technician' | 'säljare'
   /** Sidomeny i kollapsat läge (endast ikon) */
   collapsed?: boolean
   /** Anropas vid klick (t.ex. stäng mobilmeny) */

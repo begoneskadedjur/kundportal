@@ -80,6 +80,8 @@ interface EditContractCaseModalProps {
   caseData: any
   isCustomerView?: boolean
   openCommunicationOnLoad?: boolean // Öppna kommunikationspanelen direkt vid öppning
+  /** Anropas efter Radera så att listan/schemat kan ta bort ärendet direkt (annars onSuccess) */
+  onDeleted?: (caseId: string) => void
 }
 
 import { CaseNumberService } from '../../services/caseNumberService'
@@ -100,7 +102,8 @@ export default function EditContractCaseModal({
   onSuccess,
   caseData,
   isCustomerView = false,
-  openCommunicationOnLoad = false
+  openCommunicationOnLoad = false,
+  onDeleted
 }: EditContractCaseModalProps) {
   const navigate = useNavigate()
   const { profile, activeView } = useAuth()
@@ -2889,7 +2892,7 @@ export default function EditContractCaseModal({
             }))
             // Meddela parent att data uppdaterats
             if (onSuccess) onSuccess()
-            // Modalen förblir öppen - tekniker kan boka fler återbesök
+            // Återbesöksrutan stänger sig själv efter bokningen (onClose)
           }}
           onClose={() => setShowRevisitModal(false)}
         />
@@ -2947,9 +2950,11 @@ export default function EditContractCaseModal({
           isOpen={showDeleteDialog}
           onClose={() => setShowDeleteDialog(false)}
           onDeleted={() => {
-            // Stäng modalen efter radering
+            // Låt listan/schemat ta bort ärendet direkt, stäng sedan modalen
+            const deletedId = caseData?.id
             handleClose();
-            if (onSuccess) onSuccess();
+            if (onDeleted && deletedId) onDeleted(deletedId);
+            else if (onSuccess) onSuccess();
           }}
           caseId={caseData?.id || ''}
           caseType="contract"

@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.69.0',
+    date: '2026-10-17',
+    title: 'Rättningar i återbesök, tickets, säljarvyn och borttagna ärenden',
+    items: [
+      { kind: 'buggfix', text: 'Återbesök i avtalsärenden: rutan stängs när återbesöket är bokat, du måste välja en ny tid och samma merförsäljning kan inte delfaktureras två gånger. Återbesök från en egenkontroll fungerar igen.' },
+      { kind: 'buggfix', text: 'Markera löst och Återöppna på tickets fungerar för den som startade ticketen, den som är nämnd i den och för admin och koordinator. Går det inte står det varför. Svara syns alltid i telefonen.' },
+      { kind: 'nyhet', text: 'Säljare kan söka med Ctrl+K, byta vy och rapportera tillbud från säljarvyn.' },
+      { kind: 'buggfix', text: 'Följeärenden får ett eget ärendenummer. Ett borttaget ärende försvinner direkt ur schemat och listan, och papperskorgen i Mina ärenden tar bort på samma sätt som Radera.' },
+    ],
+  },
+  {
     version: '3.68.0',
     date: '2026-10-16',
     title: 'Ny handbok: en guide per uppgift och roll',

@@ -2,6 +2,8 @@
 import { useLocation } from 'react-router-dom'
 import { ChevronRight, Search, RefreshCw } from 'lucide-react'
 import { breadcrumbMap } from './saljareNavConfig'
+import { ViewSwitcher } from '../../shared/ViewSwitcher'
+import { openGlobalSearch } from '../../shared/search/globalSearchEvents'
 
 interface SäljareTopHeaderProps {
   sidebarCollapsed: boolean
@@ -29,6 +31,8 @@ export function SäljareTopHeader({ sidebarCollapsed, userName }: SäljareTopHea
 
       {/* Centered search */}
       <button
+        type="button"
+        onClick={openGlobalSearch}
         className="flex-1 max-w-md mx-auto flex items-center gap-2 px-4 py-2 rounded-full bg-slate-800/60 ring-1 ring-slate-700/50 hover:ring-slate-600 text-slate-400 transition-all duration-200"
         aria-label="Sök"
       >
@@ -42,6 +46,7 @@ export function SäljareTopHeader({ sidebarCollapsed, userName }: SäljareTopHea
         <button className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors" aria-label="Synka data" title="Synka data">
           <RefreshCw className="w-4 h-4" />
         </button>
+        <ViewSwitcher currentView="säljare" variant="header" />
         <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
           <span className="text-[#fff] text-xs font-bold">{userName.charAt(0).toUpperCase()}</span>
         </div>

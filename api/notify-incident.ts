@@ -22,6 +22,7 @@ const TYPE_LABELS: Record<string, { label: string; exclamation: string; color: s
 function incidentPathForRole(role: string | null): string {
   if (role === 'koordinator') return '/koordinator/tillbud-avvikelser'
   if (role === 'technician') return '/technician/tillbud-avvikelser'
+  if (role === 'säljare') return '/saljare/tillbud-avvikelser'
   return '/admin/tillbud-avvikelser'
 }
 

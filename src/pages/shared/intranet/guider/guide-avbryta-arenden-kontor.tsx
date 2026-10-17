@@ -1,9 +1,9 @@
 // src/pages/shared/intranet/guider/guide-avbryta-arenden-kontor.tsx
 // Guidemodul: Avbryt eller ta bort ett ärende (admin och koordinator, dator).
 // Samma flöde som teknikerns i EditCaseModal, men ärendet öppnas från schemat.
-// DeleteCaseConfirmDialog stänger bara ärendet (onDeleted → onClose) och schemat laddas
-// inte om, så besöket ligger kvar tills sidan laddas om. Borttaget är dolt i schemats
-// standardfilter (DEFAULT_ACTIVE_STATUSES). Påhittad kund, ingenting sparas.
+// Efter Ta bort tar schemat bort besöket direkt (onDeleted → handleCaseDeleted). Borttaget är
+// dolt i schemats standardfilter (DEFAULT_ACTIVE_STATUSES) och syns bara om man kryssar i
+// Borttaget under Filter. Påhittad kund, ingenting sparas.
 
 import { useState } from 'react'
 import { Dator, Notis, OvningRam, type OvningSvar } from '../skarmkit'
@@ -38,7 +38,7 @@ function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
     return (
       <Dator adress="koordinator › schema">
         <SchemaHuvud datum="tisdag 20 oktober 2026" mk={mk} tryck={tryck} />
-        <SchemaRutnat rader={RADER} besok={BESOK} mk={mk} tryck={tryck} />
+        <SchemaRutnat rader={RADER} besok={l.vy === 'klart' ? BESOK.filter(b => b.id !== 'fam') : BESOK} mk={mk} tryck={tryck} />
         {l.vy === 'klart' && <Notis text="Ärendet har tagits bort" />}
       </Dator>
     )
@@ -123,7 +123,7 @@ function Ovning() {
         setSvar({
           typ: 'ok',
           titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-          text: `Ärendet har status Borttaget. Besöket ligger kvar i schemat tills du laddar om sidan, sedan är det borta. Kommentaren och historiken finns kvar.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
+          text: `Ärendet har status Borttaget och besöket är borta ur schemat direkt. Kommentaren och historiken finns kvar.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
         })
       } else if (id === 'avbryt-tabort') { setL({ ...l, vy: 'arende' }); miss(TIPS[id]) }
       else miss('Tryck Ta bort i rutan.')

@@ -3,6 +3,7 @@
 // REDESIGN: Apple/Linear-inspirerad - kompakt, sofistikerad, hög polish
 
 import React, { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
 import {
   CaseComment,
   CommentAttachment,
@@ -127,6 +128,7 @@ export default function CommentItem({
         await updateCommentStatus(comment.id, newStatus, user?.id);
       } catch (err) {
         console.error('Fel vid statusändring:', err);
+        toast.error(err instanceof Error ? err.message : 'Kunde inte ändra status');
       }
     }
   };
@@ -455,9 +457,9 @@ export default function CommentItem({
             </div>
           )}
 
-          {/* Åtgärdsrad - REDESIGN: Mer diskret, visas vid hover */}
+          {/* Åtgärdsrad: visas vid hover, alltid synlig på pekskärm (pointer-coarse) */}
           {!isEditing && (
-            <div className="mt-1.5 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+            <div className="mt-1.5 flex items-center gap-3 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-opacity duration-150">
               {/* Svara-knapp */}
               {onReply && (
                 <button
@@ -534,7 +536,7 @@ export default function CommentItem({
             <div className="relative">
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="p-1 text-slate-600 hover:text-slate-400 hover:bg-slate-700/50 rounded opacity-0 group-hover:opacity-100 transition-all duration-150"
+                className="p-1 text-slate-600 hover:text-slate-400 hover:bg-slate-700/50 rounded opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 pointer-coarse:opacity-100 transition-all duration-150"
               >
                 <MoreHorizontal className="w-3.5 h-3.5" />
               </button>

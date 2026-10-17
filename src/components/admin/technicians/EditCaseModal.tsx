@@ -86,6 +86,7 @@ import CommissionSection from '../../shared/CommissionSection'
 import type { CaseBillingSummary } from '../../../types/caseBilling'
 import { VisitService, type Visit, type VisitCaseType } from '../../../services/visitService'
 import { ProvisionService } from '../../../services/provisionService'
+import { CaseNumberService } from '../../../services/caseNumberService'
 import type { TechnicianShare } from '../../../types/provision'
 
 
@@ -158,6 +159,8 @@ interface EditCaseModalProps {
   onSuccess: (updatedCase: TechnicianCase) => void
   caseData: TechnicianCase | null
   openCommunicationOnLoad?: boolean
+  /** Anropas efter Radera så att listan/schemat kan ta bort ärendet direkt */
+  onDeleted?: (caseId: string) => void
 }
 
 interface BackupData {
@@ -438,7 +441,7 @@ const BackupRestorePrompt: React.FC<{
   );
 };
 
-export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, openCommunicationOnLoad }: EditCaseModalProps) {
+export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, openCommunicationOnLoad, onDeleted }: EditCaseModalProps) {
   const navigate = useNavigate()
   const { profile, activeView } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -806,10 +809,15 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       // Bestäm rätt tabell baserat på ärendetyp
       const tableName = currentCase.case_type === 'private' ? 'private_cases' : 'business_cases';
 
+      // Eget BE-nummer, samma väg som nya ärenden i CreateCaseModal
+      // (RPC generate_universal_case_number). Titeln är ärendenumret.
+      const caseNumber = await CaseNumberService.generateUniqueCaseNumber();
+
       // Skapa det nya följeärendet med ärvd information
       const newCaseData: any = {
+        case_number: caseNumber,
+        title: caseNumber,
         // Ärvd kundinformation
-        title: currentCase.title, // Behåll samma titel (kundnamn/företagsnamn)
         kontaktperson: currentCase.kontaktperson,
         telefon_kontaktperson: currentCase.telefon_kontaktperson,
         e_post_kontaktperson: currentCase.e_post_kontaktperson,
@@ -865,7 +873,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       setShowFollowUpDialog(false);
       setFollowUpPestType('');
 
-      toast.success(`Följeärende skapat för ${followUpPestType}!`);
+      toast.success(`Följeärende ${caseNumber} skapat för ${followUpPestType}!`);
 
       // Öppna det nya ärendet genom att anropa onSuccess med det nya ärendet
       // Detta kommer att uppdatera parent-komponenten och öppna det nya ärendet
@@ -2384,7 +2392,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onDeleted={() => {
-          // Stäng modalen efter radering
+          // Låt listan/schemat ta bort ärendet direkt, stäng sedan modalen
+          onDeleted?.(currentCase.id);
           onClose();
         }}
         caseId={currentCase.id}

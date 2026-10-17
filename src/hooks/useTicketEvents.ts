@@ -3,6 +3,7 @@
 // En ticket = en root-kommentar (parent_comment_id IS NULL) med alla sina svar
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
@@ -144,7 +145,7 @@ export function useTicketEvents(options: UseTicketEventsOptions = {}): UseTicket
       return true;
     } catch (err) {
       console.error('Error resolving ticket:', err);
-      setError('Kunde inte markera ticket som löst');
+      toast.error(err instanceof Error ? err.message : 'Kunde inte markera ticket som löst');
       return false;
     }
   }, [profile, fetchStats]);
@@ -179,7 +180,7 @@ export function useTicketEvents(options: UseTicketEventsOptions = {}): UseTicket
       return true;
     } catch (err) {
       console.error('Error reopening ticket:', err);
-      setError('Kunde inte återöppna ticket');
+      toast.error(err instanceof Error ? err.message : 'Kunde inte återöppna ticket');
       return false;
     }
   }, [profile, fetchStats]);
