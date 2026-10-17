@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AVTALSOBJEKT_MAX_TECKEN, harStopp, kontrolleraAvtal, type AvtalsKontrollIndata } from './avtalsKontroll'
+import { AVTALETS_STANDARDTEXT, AVTALSOBJEKT_MAX_TECKEN, harStopp, kontrolleraAvtal, type AvtalsKontrollIndata } from './avtalsKontroll'
 
 const komplett: AvtalsKontrollIndata = {
   dokumentTyp: 'contract',
@@ -31,6 +31,14 @@ describe('kontrolleraAvtal', () => {
     const d = { ...komplett, avtalsobjekt: '   ' }
     expect(nivaFor(d, /Avtalsobjektet är tomt/)).toBe('rod')
     expect(harStopp(kontrolleraAvtal(d))).toBe(true)
+  })
+
+  it('offert med avtalets standardtext orörd blir gul, avtal med samma text grönt', () => {
+    const offert = { ...komplett, dokumentTyp: 'offer' as const, avtalsobjekt: AVTALETS_STANDARDTEXT }
+    expect(nivaFor(offert, /Kontrollera offertinnehållet/)).toBe('gul')
+    expect(harStopp(kontrolleraAvtal(offert))).toBe(false)
+    const avtal = { ...komplett, avtalsobjekt: AVTALETS_STANDARDTEXT }
+    expect(nivaFor(avtal, /Avtalsobjektet ifyllt/)).toBe('gron')
   })
 
   it('avtalsobjekt över 2 048 tecken stoppar', () => {

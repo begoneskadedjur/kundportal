@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.69.1',
+    date: '2026-10-17',
+    title: 'Delfaktura och anpassat pris, offerttext från ärendet',
+    items: [
+      { kind: 'buggfix', text: 'Har ett ärende ett anpassat pris för hela jobbet går det inte att delfakturera. Rutan är grå och priset faktureras en gång, när ärendet avslutas. Fasta priser från kundens prislista påverkas inte.' },
+      { kind: 'buggfix', text: 'En offert som skapas från ett ärende får texten från ärendets tjänster i stället för avtalets standardtext. Står standardtexten kvar i en offert blir kontrollen gul: Kontrollera offertinnehållet.' },
+      { kind: 'buggfix', text: 'Ärenden som tagits bort med papperskorgen i Mina ärenden syns inte längre i schemat.' },
+    ],
+  },
+  {
     version: '3.69.0',
     date: '2026-10-17',
     title: 'Rättningar i återbesök, tickets, säljarvyn och borttagna ärenden',

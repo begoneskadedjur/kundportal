@@ -220,6 +220,15 @@ export class InvoiceService {
     // Kolla om anpassat pris finns
     const customPrice = await CaseBillingService.getCustomPrice(caseId, caseType)
 
+    // Delfaktura spärras vid anpassat pris: det anpassade priset gäller hela
+    // ärendet (en rad per ärende i case_billing_overrides) och ersätter hela
+    // fakturans belopp. En delfaktura plus slutfakturan skulle ge kunden det
+    // anpassade priset två gånger. Fast pris per rad från prislistan är inte
+    // anpassat pris och spärrar inget.
+    if (invoiceType === 'partial' && customPrice != null && customPrice > 0) {
+      throw new Error('Ärendet har ett anpassat pris för hela jobbet. Det faktureras när ärendet avslutas, inte som delfaktura.')
+    }
+
     // 0 kr-regeln: summerar underlaget till 0 kr (t.ex. kostnadsfri inspektion,
     // 100 % rabatt eller bara artikelrader utan tjänst) skapas ingen faktura och
     // inget fakturanummer går åt. null = inget att fakturera; anroparen avgör

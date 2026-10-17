@@ -40,6 +40,12 @@ export interface AvtalsKontrollIndata {
   antalTjanster: number
 }
 
+/**
+ * Avtalets standardtext för avtalsobjektet. Används bara när man skapar ett
+ * avtal. Står den orörd i en offert blir kontrollpunkten gul.
+ */
+export const AVTALETS_STANDARDTEXT = 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.'
+
 /** Oneflows två stycken om 1 024 tecken var. Längre text kapas. */
 export const AVTALSOBJEKT_MAX_TECKEN = 2048
 
@@ -103,6 +109,9 @@ export function kontrolleraAvtal(d: AvtalsKontrollIndata): KontrollPunkt[] {
   if (!objekt) add('rod', 'avtalsobjekt', `${objektNamn} är tomt`)
   else if (d.avtalsobjekt.length > AVTALSOBJEKT_MAX_TECKEN) {
     add('rod', 'avtalsobjekt', `${objektNamn} är ${d.avtalsobjekt.length} tecken, max ${AVTALSOBJEKT_MAX_TECKEN.toLocaleString('sv-SE')}`)
+  } else if (!arAvtal && objekt === AVTALETS_STANDARDTEXT.trim()) {
+    // Offerten har avtalets standardtext om betesstationer orörd
+    add('gul', 'avtalsobjekt', 'Kontrollera offertinnehållet')
   } else {
     add('gron', 'avtalsobjekt', `${objektNamn} ifyllt, ${d.avtalsobjekt.length} tecken`)
   }

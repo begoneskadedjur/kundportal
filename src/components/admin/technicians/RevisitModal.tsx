@@ -134,6 +134,9 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
   const [createPartialInvoice, setCreatePartialInvoice] = useState(false)
   const [pendingBillingItems, setPendingBillingItems] = useState<any[]>([])
   const [loadingBillingItems, setLoadingBillingItems] = useState(false)
+  // Anpassat pris för hela ärendet (case_billing_overrides, exkl. moms). Finns
+  // ett sådant spärras delfakturan: priset faktureras när ärendet avslutas.
+  const [hasCaseCustomPrice, setHasCaseCustomPrice] = useState(false)
 
   // Historik
   const [revisitHistory, setRevisitHistory] = useState<RevisitHistoryEntry[]>([])
@@ -165,7 +168,13 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
       setLoadingBillingItems(true)
       try {
         const caseType = caseData.case_type === 'private' ? 'private' : 'business'
-        const items = await CaseBillingService.getCaseBillingItems(caseData.id, caseType)
+        const [items, customPrice] = await Promise.all([
+          CaseBillingService.getCaseBillingItems(caseData.id, caseType),
+          CaseBillingService.getCustomPrice(caseData.id, caseType)
+        ])
+        const hasCustom = customPrice != null && customPrice > 0
+        setHasCaseCustomPrice(hasCustom)
+        if (hasCustom) setCreatePartialInvoice(false)
         const serviceItems = items.filter((i: any) => i.item_type === 'service' && i.status === 'pending')
         setPendingBillingItems(serviceItems.length > 0 ? serviceItems : items.filter((i: any) => i.status === 'pending'))
       } catch (e) {
@@ -281,7 +290,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
       let partialInvoiceNumber: string | null = null
       let partialSkippedZero = false
       let partialCheckFailed = false
-      if (createPartialInvoice && caseData.case_type !== 'contract' && pendingBillingItems.length > 0) {
+      if (createPartialInvoice && !hasCaseCustomPrice && caseData.case_type !== 'contract' && pendingBillingItems.length > 0) {
         try {
           // 0 kr-regeln: summerar de ofakturerade raderna till 0 kr blir det
           // ingen delfaktura och ingen kundrad. Raderna ligger kvar ofakturerade
@@ -294,7 +303,7 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
           partialCheckFailed = true
         }
       }
-      if (createPartialInvoice && !partialSkippedZero && !partialCheckFailed && caseData.case_type !== 'contract' && pendingBillingItems.length > 0) {
+      if (createPartialInvoice && !hasCaseCustomPrice && !partialSkippedZero && !partialCheckFailed && caseData.case_type !== 'contract' && pendingBillingItems.length > 0) {
         try {
           const customerName = caseData.case_type === 'business'
             ? (caseData.company_name || caseData.kontaktperson || 'Okänd kund')
@@ -659,6 +668,25 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
                     <div className="flex items-center gap-2 text-sm text-slate-400">
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Hämtar tjänster...
+                    </div>
+                  ) : pendingBillingItems.length > 0 && hasCaseCustomPrice ? (
+                    <div className="space-y-1.5 opacity-60">
+                      <label className="flex items-center gap-2.5 cursor-not-allowed select-none">
+                        <input
+                          type="checkbox"
+                          checked={false}
+                          disabled
+                          aria-describedby="partial-invoice-blocked"
+                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 cursor-not-allowed"
+                        />
+                        <span className="text-sm font-medium text-slate-400 flex items-center gap-1.5">
+                          <Receipt className="w-4 h-4 text-slate-500" />
+                          Skapa delfaktura för nuvarande tjänster
+                        </span>
+                      </label>
+                      <p id="partial-invoice-blocked" className="ml-6 text-xs text-slate-400">
+                        Ärendet har ett anpassat pris för hela jobbet. Det faktureras när ärendet avslutas.
+                      </p>
                     </div>
                   ) : pendingBillingItems.length > 0 ? (
                     <div className="space-y-2">

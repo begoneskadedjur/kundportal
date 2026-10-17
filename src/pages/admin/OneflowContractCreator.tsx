@@ -7,7 +7,7 @@
 // Inget skickas till kunden förrän PDF:en är godkänd.
 
 import { formatPayback, marginTone, summarizeBillingLines, toneTextClass, type MarginLine } from '../../shared/marginEngine'
-import React, { useState, useCallback, useEffect, useMemo } from 'react'
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, ArrowRight, Building2, Check, Clock, ExternalLink, FileText, Info, Loader2, Lock,
@@ -44,7 +44,7 @@ import {
   formatAdress, formatEpost, formatForetagsnamn, formatIdNummer, formatPersonnamn, formatTelefon,
 } from '../../shared/kontaktFormat'
 import {
-  AVTALSOBJEKT_MAX_TECKEN, harStopp, kontrolleraAvtal, type KontrollAvsnitt, type KontrollNiva,
+  AVTALETS_STANDARDTEXT, AVTALSOBJEKT_MAX_TECKEN, harStopp, kontrolleraAvtal, type KontrollAvsnitt, type KontrollNiva,
 } from '../../shared/avtalsKontroll'
 
 interface WizardData {
@@ -136,7 +136,56 @@ interface WizardData {
   lead_id?: string
 }
 
-const DEFAULT_AGREEMENT_TEXT = 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.'
+// Avtalets standardtext gäller bara avtal. En offert får aldrig den som
+// utgångsläge: offerten från ett ärende fylls med texten från tjänsterna.
+const DEFAULT_AGREEMENT_TEXT = AVTALETS_STANDARDTEXT
+
+type ForslagsKalla = Pick<WizardData, 'case_id' | 'prefillServices' | 'selectedArticles' | 'draftItems' | 'draftPriceAssignments'>
+
+/**
+ * Samma text som knappen "Skriv förslag från tjänsterna" skriver.
+ * Ärendekopplat läge läser ärendets tjänster, manuellt läge utkastets.
+ * null = inga tjänster att skriva från.
+ */
+function skrivForslagFranTjanster(d: ForslagsKalla): string | null {
+  const hasPrefill = !!d.case_id && !!d.prefillServices && d.prefillServices.length > 0
+  const serviceDraftItems = d.draftItems.filter(i => i.item_type === 'service')
+  const articleDraftItems = d.draftItems.filter(i => i.item_type === 'article')
+  if (!hasPrefill && serviceDraftItems.length === 0) return null
+  const lines: string[] = []
+  if (hasPrefill) {
+    d.prefillServices!.forEach(s => {
+      const qty = s.quantity > 1 ? ` (${s.quantity} st)` : ''
+      lines.push(`- ${s.service_name ?? 'Tjänst'}${qty}`)
+      // Artiklar mappade mot denna tjänsterad
+      const mappedArticles = d.selectedArticles.filter(
+        a => a.mapped_service_id === s.id
+      )
+      mappedArticles.forEach(a => {
+        const aQty = a.quantity > 1 ? ` (${a.quantity} st)` : ''
+        const desc = a.article.description ? ` – ${a.article.description}` : ''
+        lines.push(`   • ${a.article.name}${aQty}${desc}`)
+      })
+    })
+  } else {
+    serviceDraftItems.forEach(svc => {
+      const qty = svc.quantity > 1 ? ` (${svc.quantity} st)` : ''
+      const extra = svc.notes ? ` - ${svc.notes}` : ''
+      lines.push(`- ${svc.service_name ?? 'Tjänst'}${qty}${extra}`)
+      // Artiklar mappade mot denna tjänst via priceAssignments eller mapped_service_id
+      const mapped = articleDraftItems.filter(a => {
+        const assigned = d.draftPriceAssignments[a.id] ?? a.mapped_service_id
+        return assigned === svc.id
+      })
+      mapped.forEach(a => {
+        const aQty = a.quantity > 1 ? ` (${a.quantity} st)` : ''
+        const desc = a.article?.description ? ` – ${a.article.description}` : ''
+        lines.push(`   • ${a.article_name}${aQty}${desc}`)
+      })
+    })
+  }
+  return `Tjänster som ingår:\n\n${lines.join('\n')}`
+}
 
 // Kontaktfälten snyggas till när de lämnas och igen innan avtalet skapas:
 // namn med stor bokstav, telefon som "070-123 45 67", adress som "Gata 1, 111 22 Ort".
@@ -454,6 +503,9 @@ export default function OneflowContractCreator() {
   const [wizardData, setWizardData] = useState<WizardData>(() =>
     createInitialWizardData(defaultAnstalld, user?.email || '')
   )
+  // Senaste offertinnehållet som skrevs automatiskt från ärendets tjänster.
+  // Ändras tjänsterna skrivs texten om, men bara så länge ingen har ändrat den.
+  const autoOffertTextRef = useRef<string | null>(null)
 
   // Dynamiska steg baserat på dokumenttyp
   const STEPS = wizardData.documentType === 'contract' ? CONTRACT_STEPS : OFFER_STEPS
@@ -500,7 +552,8 @@ export default function OneflowContractCreator() {
         try {
           const customerData = JSON.parse(savedData)
 
-          setWizardData(prev => ({
+          setWizardData(prev => {
+            const next: WizardData = {
             ...prev,
             documentType: customerData.documentType || prefillType,
             selectedTemplate: customerData.selectedTemplate || '',
@@ -554,7 +607,18 @@ export default function OneflowContractCreator() {
             // Leads: offert eller avtal från en lead; triggern på contracts flyttar leaden
             lead_id: customerData.leadId || undefined,
             returnPath: customerData.returnPath || undefined,
-          }))
+            }
+            // Offert: avtalets standardtext gäller bara avtal. Startar offerten
+            // från ett ärende skrivs offertinnehållet från ärendets tjänster
+            // (samma text som Skriv förslag från tjänsterna). Utan tjänster
+            // börjar offertinnehållet tomt.
+            if (next.documentType === 'offer' && !customerData.agreementText) {
+              const forslag = next.case_id ? skrivForslagFranTjanster(next) : null
+              next.agreementText = forslag ?? ''
+              autoOffertTextRef.current = forslag ?? ''
+            }
+            return next
+          })
 
           // Debug-logging för att spåra prefill-processen
           console.log('Prefill data received:', {
@@ -626,7 +690,11 @@ export default function OneflowContractCreator() {
         // Om ingen data finns men prefill är angett, sätt bara dokumenttyp
         setWizardData(prev => ({
           ...prev,
-          documentType: prefillType as 'contract' | 'offer'
+          documentType: prefillType as 'contract' | 'offer',
+          // Avtalets standardtext gäller bara avtal
+          agreementText: prefillType === 'offer' && prev.agreementText === DEFAULT_AGREEMENT_TEXT
+            ? ''
+            : prev.agreementText,
         }))
         toast.info(`Startar ${prefillType === 'contract' ? 'avtals' : 'offert'}-skapning`)
       }
@@ -673,6 +741,18 @@ export default function OneflowContractCreator() {
       // Om vi byter dokumenttyp
       if (field === 'documentType') {
         updated.selectedTemplate = ''
+
+        // Avtalets standardtext gäller bara avtal. Byter man till offert
+        // ersätts en orörd standardtext med förslaget från tjänsterna (eller
+        // tomt), och tillbaka till avtal får ett tomt fält standardtexten.
+        if (value === 'offer' && updated.agreementText === DEFAULT_AGREEMENT_TEXT) {
+          const forslag = skrivForslagFranTjanster(updated)
+          updated.agreementText = forslag ?? ''
+          autoOffertTextRef.current = forslag ?? ''
+        } else if (value === 'contract' && updated.agreementText.trim() === '') {
+          updated.agreementText = DEFAULT_AGREEMENT_TEXT
+          autoOffertTextRef.current = null
+        }
 
         // Sätt default-värden för offerter (används inte i offertmallar men krävs av API)
         if (value === 'offer') {
@@ -1356,50 +1436,15 @@ export default function OneflowContractCreator() {
   )
 
   const renderAgreementSuggestionButton = () => {
-    const hasPrefill = !!wizardData.case_id && !!wizardData.prefillServices && wizardData.prefillServices.length > 0
-    const serviceDraftItems = wizardData.draftItems.filter(i => i.item_type === 'service')
-    const articleDraftItems = wizardData.draftItems.filter(i => i.item_type === 'article')
-    const canGenerate = hasPrefill || serviceDraftItems.length > 0
-    if (!canGenerate) return null
+    const forslag = skrivForslagFranTjanster(wizardData)
+    if (forslag == null) return null
     return (
       <button
         type="button"
         className={SECONDARY_TONED_BUTTON}
         onClick={() => {
-          const lines: string[] = []
-          if (hasPrefill) {
-            wizardData.prefillServices!.forEach(s => {
-              const qty = s.quantity > 1 ? ` (${s.quantity} st)` : ''
-              lines.push(`- ${s.service_name ?? 'Tjänst'}${qty}`)
-              // Artiklar mappade mot denna tjänsterad
-              const mappedArticles = wizardData.selectedArticles.filter(
-                a => a.mapped_service_id === s.id
-              )
-              mappedArticles.forEach(a => {
-                const aQty = a.quantity > 1 ? ` (${a.quantity} st)` : ''
-                const desc = a.article.description ? ` – ${a.article.description}` : ''
-                lines.push(`   • ${a.article.name}${aQty}${desc}`)
-              })
-            })
-          } else {
-            serviceDraftItems.forEach(svc => {
-              const qty = svc.quantity > 1 ? ` (${svc.quantity} st)` : ''
-              const extra = svc.notes ? ` - ${svc.notes}` : ''
-              lines.push(`- ${svc.service_name ?? 'Tjänst'}${qty}${extra}`)
-              // Artiklar mappade mot denna tjänst via priceAssignments eller mapped_service_id
-              const mapped = articleDraftItems.filter(a => {
-                const assigned = wizardData.draftPriceAssignments[a.id] ?? a.mapped_service_id
-                return assigned === svc.id
-              })
-              mapped.forEach(a => {
-                const aQty = a.quantity > 1 ? ` (${a.quantity} st)` : ''
-                const desc = a.article?.description ? ` – ${a.article.description}` : ''
-                lines.push(`   • ${a.article_name}${aQty}${desc}`)
-              })
-            })
-          }
-          const generatedText = `Tjänster som ingår:\n\n${lines.join('\n')}`
-          updateWizardData('agreementText', generatedText)
+          updateWizardData('agreementText', forslag)
+          if (wizardData.documentType === 'offer') autoOffertTextRef.current = forslag
           toast.success('Förslaget är skrivet utifrån tjänsterna')
         }}
       >
@@ -1725,11 +1770,20 @@ export default function OneflowContractCreator() {
                 onChange={(items) => {
                   const services = mapBillingItemsToPrefillServices(items)
                   const articles = mapBillingItemsToSelectedArticles(items)
-                  setWizardData(prev => ({
-                    ...prev,
-                    prefillServices: services,
-                    selectedArticles: articles,
-                  }))
+                  setWizardData(prev => {
+                    const next = { ...prev, prefillServices: services, selectedArticles: articles }
+                    // Offertinnehållet följer tjänsterna så länge det är
+                    // den automatiska texten (eller tomt). Egen text rörs inte.
+                    if (
+                      next.documentType === 'offer' &&
+                      (prev.agreementText.trim() === '' || prev.agreementText === autoOffertTextRef.current)
+                    ) {
+                      const forslag = skrivForslagFranTjanster(next) ?? ''
+                      next.agreementText = forslag
+                      autoOffertTextRef.current = forslag
+                    }
+                    return next
+                  })
                 }}
               />
             ) : (

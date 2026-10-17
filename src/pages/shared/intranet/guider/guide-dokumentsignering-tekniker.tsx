@@ -2,8 +2,8 @@
 // Guidemodul: Skicka en offert från ärendet (tekniker, telefon).
 // Efterbildning av EditCaseModal (kvittot Offert uppe till höger, title "Skapa offertförslag
 // för denna kund", texten syns bara på större skärm) och OneflowContractCreator när den öppnas
-// från ärendet med prissatta tjänster: steget Offertinnehåll (Steg 6 av 7, Skriv förslag från
-// tjänsterna, Granska offerten), granskningen (Kontroll före utskick, Skapa och visa Oneflows PDF)
+// från ärendet med prissatta tjänster: steget Offertinnehåll (Steg 6 av 7, texten är redan
+// skriven från ärendets tjänster, samma som Skriv förslag från tjänsterna, Granska offerten), granskningen (Kontroll före utskick, Skapa och visa Oneflows PDF)
 // och utkastet (Så här ser kunden offerten, Ser allt rätt ut?, Skicka offerten, Ändra i wizarden,
 // Spara som utkast) samt bekräftelsen Offerten är skickad. Portalens tankstreck i "Offert, namn" skrivs här
 // med komma. Påhittad kund, ingenting skickas.
@@ -39,11 +39,10 @@ function SignaturIkon() {
 const EPOST = 'anna@exempel.se'
 const TJANST = 'Bekämpning av getingbo'
 const PRIS = '2 000 kr'
-const STANDARDTEXT = 'Regelbunden kontroll och bekämpning av skadedjur enligt överenskommet schema. Detta inkluderar inspektion av samtliga betesstationer, påfyllning av bete vid behov, samt dokumentation av aktivitet. Vid tecken på gnagaraktivitet vidtas omedelbara åtgärder med förstärkta insatser.'
 const FORSLAG = `Tjänster som ingår:\n\n- ${TJANST}`
 
 type Vy = 'arende' | 'innehall' | 'granska' | 'pdf' | 'klart'
-interface Lage { vy: Vy; forslag: boolean }
+interface Lage { vy: Vy }
 
 // ─── Delar ───
 
@@ -104,7 +103,8 @@ function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
   }
 
   if (l.vy === 'innehall') {
-    const text = l.forslag ? FORSLAG : STANDARDTEXT
+    // Offerten från ett ärende får texten från tjänsterna direkt
+    const text = FORSLAG
     return (
       <Telefon>
         <Band titel="Ny offert" procent={71} tryck={tryck}
@@ -154,7 +154,7 @@ function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
             <div className="flex justify-between text-[10px]"><span className="font-bold uppercase tracking-wide text-slate-400">Kund</span><button type="button" onClick={() => tryck('andra')} className="font-semibold text-emerald-400">Ändra</button></div>
             <Rad v="E-post" h={EPOST} />
             <p className="border-t border-slate-700 pt-1 text-[11px] font-bold text-white">Offertinnehåll</p>
-            <p className="whitespace-pre-line text-[10.5px] text-slate-300">{l.forslag ? FORSLAG : STANDARDTEXT.slice(0, 60) + '…'}</p>
+            <p className="whitespace-pre-line text-[10.5px] text-slate-300">{FORSLAG}</p>
             <div className="border-t border-slate-700 pt-1"><Rad v={TJANST} h={PRIS} /><Rad v="Totalt inkl. moms" h={PRIS} /></div>
           </div>
           <div className="grid gap-1.5 rounded-xl border border-slate-700 bg-slate-800/40 p-2.5">
@@ -163,6 +163,7 @@ function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
               <Punkt farg="bg-amber-400" text="E-post för faktura saknas, kunden fyller i vid signering" />
               <Punkt farg="bg-[#20c58f]" text={`Offerten skickas till ${EPOST}`} />
               <Punkt farg="bg-[#20c58f]" text="1 tjänst" />
+              <Punkt farg="bg-[#20c58f]" text={`Offertinnehållet ifyllt, ${FORSLAG.length} tecken`} />
             </ul>
           </div>
           <Markor markor={mk('skapa')} block>
@@ -222,11 +223,10 @@ function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
 // ─── Visning ───
 
 const VISNING: { lage: Lage; markera: string }[] = [
-  { lage: { vy: 'arende', forslag: false }, markera: 'offert' },
-  { lage: { vy: 'innehall', forslag: false }, markera: 'forslag' },
-  { lage: { vy: 'innehall', forslag: true }, markera: 'granska' },
-  { lage: { vy: 'granska', forslag: true }, markera: 'skapa' },
-  { lage: { vy: 'pdf', forslag: true }, markera: 'skicka' },
+  { lage: { vy: 'arende' }, markera: 'offert' },
+  { lage: { vy: 'innehall' }, markera: 'granska' },
+  { lage: { vy: 'granska' }, markera: 'skapa' },
+  { lage: { vy: 'pdf' }, markera: 'skicka' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
@@ -236,7 +236,7 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 
 // ─── Övning ───
 
-const START: Lage = { vy: 'arende', forslag: false }
+const START: Lage = { vy: 'arende' }
 const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du står i ärendet. Leta upp knappen som skapar en offert och tryck på den.' }
 
 const TIPS: Record<string, string> = {
@@ -246,7 +246,6 @@ const TIPS: Record<string, string> = {
   flik: 'Flikarna byter vy i ärendet. Offerten skapar du med kvittot uppe till höger.',
   avbryt: 'Avbryt lämnar guiden och du får börja om. Fortsätt i stället.',
   tillbaka: 'Tjänsten och priset är redan hämtade från ärendet. Fortsätt med texten.',
-  textruta: 'Du kan skriva själv, men knappen Skriv förslag från tjänsterna gör det åt dig.',
   'band-tillbaka': 'Avtal & Offerter tar dig till Dokumentsignering. Gör klart offerten först.',
   andra: 'Ändra tar dig till rätt steg. Här stämmer allt redan.',
   'pdf-yta': 'Det här är Oneflows PDF. Ser den rätt ut skickar du med knappen under.',
@@ -265,14 +264,13 @@ function Ovning() {
   const tryck = (id: string) => {
     if (l.vy === 'klart') return
     if (l.vy === 'arende') {
-      if (id === 'offert') { setL({ ...l, vy: 'innehall' }); tips('Offertguiden är öppen', 'Kund och tjänst är hämtade från ärendet. Läs texten i rutan. Stämmer den med jobbet?') }
+      if (id === 'offert') { setL({ ...l, vy: 'innehall' }); tips('Offertguiden är öppen', 'Kund och tjänst är hämtade från ärendet, och texten i rutan är skriven från tjänsterna. Läs igenom och tryck Granska offerten.') }
       else miss(TIPS[id] ?? 'Leta efter kvittot uppe till höger.')
     } else if (l.vy === 'innehall') {
-      if (id === 'forslag') { setL({ ...l, forslag: true }); tips('Bättre text', 'Nu står getingboet i offerten. Tryck Granska offerten.') }
-      else if (id === 'granska') {
-        if (!l.forslag) miss('Texten handlar om betesstationer och avtalskontroller, inte om getingboet. Tryck Skriv förslag från tjänsterna först.')
-        else { setL({ ...l, vy: 'granska' }); tips('Granska', 'Så här ser offerten ut för kunden. Gul punkt stoppar inte. Skapa PDF:en.') }
-      } else miss(TIPS[id] ?? 'Byt ut texten och gå vidare till granskningen.')
+      if (id === 'granska') { setL({ ...l, vy: 'granska' }); tips('Granska', 'Så här ser offerten ut för kunden. Gul punkt stoppar inte. Skapa PDF:en.') }
+      else if (id === 'forslag') tips('Texten är redan skriven', 'Skriv förslag från tjänsterna skriver samma text en gång till. Den behövs om du har ändrat tjänsterna. Tryck Granska offerten.')
+      else if (id === 'textruta') tips('Skriv gärna till', 'Du kan skriva till med egna ord, till exempel var boet sitter. Här räcker texten som den är. Tryck Granska offerten.')
+      else miss(TIPS[id] ?? 'Läs texten och gå vidare till granskningen.')
     } else if (l.vy === 'granska') {
       if (id === 'skapa') { setL({ ...l, vy: 'pdf' }); tips('Utkastet är skapat', 'Inget är skickat än. Titta på PDF:en och skicka.') }
       else miss(TIPS[id] ?? 'Tryck Skapa och visa Oneflows PDF.')
@@ -288,9 +286,9 @@ function Ovning() {
     }
   }
 
-  const framsteg = l.vy === 'arende' ? 0 : l.vy === 'innehall' ? (l.forslag ? 2 : 1) : l.vy === 'granska' ? 3 : l.vy === 'pdf' ? 4 : 5
+  const framsteg = l.vy === 'arende' ? 0 : l.vy === 'innehall' ? 1 : l.vy === 'granska' ? 2 : l.vy === 'pdf' ? 3 : 4
   return (
-    <OvningRam framsteg={framsteg} totalt={5} svar={svar} onBorjaOm={() => { setL(START); setSvar(BORJA); setFel(0) }}>
+    <OvningRam framsteg={framsteg} totalt={4} svar={svar} onBorjaOm={() => { setL(START); setSvar(BORJA); setFel(0) }}>
       <Skarm l={l} mk={() => undefined} tryck={tryck} />
     </OvningRam>
   )
