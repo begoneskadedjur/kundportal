@@ -33,7 +33,6 @@ import { IntranetService } from '../../../services/intranetService'
 import {
   ONBOARDING_SLUGS,
   forRollerna,
-  profilRoller,
   type IntranetDocumentWithStatus,
   type IntranetPost,
   type IntranetResponsibility,
@@ -85,7 +84,7 @@ function quickLinksFor(basePath: string) {
 }
 
 export default function IntranetStart() {
-  const { user, profile } = useAuth()
+  const { user, profile, activeView } = useAuth()
   const basePath = useRoleBasePath()
   const canPost = canPostAnnouncements(profile)
 
@@ -98,7 +97,7 @@ export default function IntranetStart() {
 
   useEffect(() => {
     if (user?.id) fetchAll(user.id)
-  }, [user?.id, profile?.role, profile?.is_admin])
+  }, [user?.id, activeView])
 
   const fetchAll = async (userId: string) => {
     setLoading(true)
@@ -108,9 +107,9 @@ export default function IntranetStart() {
       IntranetService.getKmaStats(),
       IntranetService.getResponsibilities(),
     ])
-    // Guiderna för den egna rollen (admin ser alla i databasen men får sina här)
+    // Guiderna för vyn man står i (admin ser alla i databasen men får vyns här)
     if (docsRes.status === 'fulfilled') {
-      const roller = profilRoller(profile)
+      const roller = new Set<string>([activeView])
       setDocuments(docsRes.value.filter(d => d.section !== 'handbok' || forRollerna(d, roller)))
     }
     if (postsRes.status === 'fulfilled') setPosts(postsRes.value)

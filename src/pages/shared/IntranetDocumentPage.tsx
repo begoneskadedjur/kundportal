@@ -49,7 +49,7 @@ import SnyggaTillOvning from './intranet/interactive/specialrapporter/SnyggaTill
 import DelfakturaManadOvning from './intranet/interactive/delfakturering/DelfakturaManadOvning'
 import AterbesokOvning from './intranet/interactive/delfakturering/AterbesokOvning'
 import AudienceModal from './intranet/AudienceModal'
-import { MallBlock, arMallguide, kollaMall, mallToc } from './intranet/GuideMall'
+import { MallBlock, arMallguide, kollaMall, mallEnhet, mallToc } from './intranet/GuideMall'
 import { describeAudience } from '../../types/intranet'
 import { Eye } from 'lucide-react'
 
@@ -96,8 +96,8 @@ function hoppaTill(e: MouseEvent<HTMLAnchorElement>, id: string) {
 
 const MALL_TYPER = new Set(['intro', 'kortsvar', 'visning', 'felsok', 'bra', 'ovning', 'quiz', 'avslut'])
 
-function BlockRenderer({ block, anchorId, slug }: { block: IntranetBlock; anchorId?: string; slug: string }) {
-  if (MALL_TYPER.has(block.type)) return <MallBlock block={block} slug={slug} />
+function BlockRenderer({ block, anchorId, slug, enhet }: { block: IntranetBlock; anchorId?: string; slug: string; enhet: 'mobil' | 'dator' }) {
+  if (MALL_TYPER.has(block.type)) return <MallBlock block={block} slug={slug} enhet={enhet} />
   switch (block.type) {
     case 'h2':
       return <h2 id={anchorId} className="text-lg font-semibold text-white mt-8 mb-3 first:mt-0 scroll-mt-24">{block.text}</h2>
@@ -488,7 +488,7 @@ export default function IntranetDocumentPage() {
       {/* Innehåll */}
       <article>
         {doc.content.map((block, i) => (
-          <BlockRenderer key={i} block={block} anchorId={anchorFor(block, i)} slug={doc.slug} />
+          <BlockRenderer key={i} block={block} anchorId={anchorFor(block, i)} slug={doc.slug} enhet={mallEnhet(doc.content)} />
         ))}
       </article>
 

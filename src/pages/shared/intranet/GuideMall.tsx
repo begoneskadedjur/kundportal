@@ -29,6 +29,12 @@ export const ROLL_TEXT: Record<GuideRoll, { text: string; ikon: IconName }> = {
   'säljare': { text: 'Säljare', ikon: 'roll.saljare' },
 }
 
+/** Guidens enhet enligt huvudet (intro), standard telefon */
+export function mallEnhet(content: IntranetBlock[]): 'mobil' | 'dator' {
+  const intro = content.find((b): b is Extract<IntranetBlock, { type: 'intro' }> => b.type === 'intro')
+  return intro?.enhet ?? 'mobil'
+}
+
 /** Är dokumentet byggt med guidemallen? */
 export function arMallguide(content: IntranetBlock[]): boolean {
   return content.some(b => b.type === 'intro')
@@ -108,50 +114,103 @@ function Kortsvar({ text }: { text: string }) {
 
 // ─── 3 Gör så här ──────────────────────────────────
 
-function Visning({ steg, modul }: { steg: GuideSteg[]; modul?: string }) {
+function Visning({ steg, modul, enhet }: { steg: GuideSteg[]; modul?: string; enhet: 'mobil' | 'dator' }) {
   const [aktiv, setAktiv] = useState(0)
   const Skarm = modul ? GUIDE_MODULER[modul]?.Visning : undefined
   const ga = (i: number) => setAktiv(Math.max(0, Math.min(steg.length - 1, i)))
   const sista = aktiv === steg.length - 1
-  return (
-    <>
-      <Rubrik del="visning" />
-      {Skarm && <p className="-mt-1 mb-3 text-sm text-slate-400">Tryck på ett steg så visar skärmen hur det ser ut. Den gröna markören visar var du trycker.</p>}
-      <div className={`grid items-start gap-5 ${Skarm ? 'lg:grid-cols-[minmax(0,1fr)_auto]' : ''}`}>
-        <div>
-          <ol className="grid gap-1.5">
-            {steg.map((s, i) => (
+
+  const knappar = (
+    <div className="flex gap-2">
+      <button type="button" onClick={() => ga(aktiv - 1)} disabled={aktiv === 0}
+        className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-40">
+        Föregående
+      </button>
+      <button type="button" onClick={() => (sista ? setAktiv(0) : ga(aktiv + 1))}
+        className="rounded-lg bg-[#20c58f] px-3 py-1.5 text-sm font-semibold text-[#fff] hover:bg-[#1ab37e]">
+        {sista ? 'Börja om' : 'Nästa steg'}
+      </button>
+    </div>
+  )
+
+  const stegLista = (
+    <ol className="grid gap-1.5">
+      {steg.map((s, i) => (
+        <li key={i}>
+          <button type="button" onClick={() => setAktiv(i)} aria-current={Skarm && i === aktiv ? 'step' : undefined}
+            className={`grid w-full grid-cols-[32px_1fr] gap-3 rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${Skarm && i === aktiv ? 'border-[#20c58f]/60 bg-slate-800/60' : 'border-transparent hover:bg-slate-800/40'}`}>
+            <span className={`flex h-7 w-7 items-center justify-center rounded-full border text-sm font-bold ${Skarm && i === aktiv ? 'border-[#20c58f] bg-[#20c58f] text-[#fff]' : 'border-[#20c58f]/50 text-[#20c58f]'}`}>{i + 1}</span>
+            <span className="grid min-w-0 gap-0.5">
+              <span className="text-[15px] leading-relaxed text-slate-200"><MallText text={s.text} /></span>
+              {s.ser && <span className="text-sm text-slate-400"><MallText text={s.ser} /></span>}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ol>
+  )
+
+  // Utan skärm: bara stegen
+  if (!Skarm) return <><Rubrik del="visning" />{stegLista}</>
+
+  // Dator: datorfönstret behöver hela bredden. Stegväljare överst, det aktiva
+  // steget i klartext och skärmen i full bredd under. (Två kolumner med en
+  // auto-kolumn lät datorfönstret växa in över stegen.)
+  if (enhet === 'dator') {
+    const s = steg[aktiv]
+    return (
+      <>
+        <Rubrik del="visning" />
+        <p className="-mt-1 mb-3 text-sm text-slate-400">Gå igenom stegen ett i taget. Skärmen visar hur det ser ut, och den gröna markören visar var du trycker.</p>
+        <div className="grid gap-3">
+          <ol className="flex flex-wrap gap-1.5" aria-label="Steg">
+            {steg.map((_, i) => (
               <li key={i}>
-                <button type="button" onClick={() => setAktiv(i)} aria-current={Skarm && i === aktiv ? 'step' : undefined}
-                  className={`grid w-full grid-cols-[32px_1fr] gap-3 rounded-xl border p-3 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${Skarm && i === aktiv ? 'border-[#20c58f]/60 bg-slate-800/60' : 'border-transparent hover:bg-slate-800/40'}`}>
-                  <span className={`flex h-7 w-7 items-center justify-center rounded-full border text-sm font-bold ${Skarm && i === aktiv ? 'border-[#20c58f] bg-[#20c58f] text-[#fff]' : 'border-[#20c58f]/50 text-[#20c58f]'}`}>{i + 1}</span>
-                  <span className="grid gap-0.5">
-                    <span className="text-[15px] leading-relaxed text-slate-200"><MallText text={s.text} /></span>
-                    {s.ser && <span className="text-sm text-slate-400"><MallText text={s.ser} /></span>}
-                  </span>
+                <button type="button" onClick={() => setAktiv(i)} aria-current={i === aktiv ? 'step' : undefined} aria-label={`Steg ${i + 1}`}
+                  className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${i === aktiv ? 'border-[#20c58f] bg-[#20c58f] text-[#fff]' : i < aktiv ? 'border-[#20c58f]/60 bg-[#20c58f]/15 text-[#20c58f]' : 'border-slate-600 text-slate-400 hover:border-[#20c58f]/60 hover:text-white'}`}>
+                  {i + 1}
                 </button>
               </li>
             ))}
           </ol>
-          {Skarm && (
-            <div className="mt-3 flex gap-2">
-              <button type="button" onClick={() => ga(aktiv - 1)} disabled={aktiv === 0}
-                className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-40">
-                Föregående
-              </button>
-              <button type="button" onClick={() => (sista ? setAktiv(0) : ga(aktiv + 1))}
-                className="rounded-lg bg-[#20c58f] px-3 py-1.5 text-sm font-semibold text-[#fff] hover:bg-[#1ab37e]">
-                {sista ? 'Börja om' : 'Nästa steg'}
-              </button>
+          <div className="grid gap-3 rounded-xl border border-[#20c58f]/40 bg-slate-800/50 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#20c58f]">Steg {aktiv + 1} av {steg.length}</p>
+              <p className="mt-1 text-[15px] leading-relaxed text-white"><MallText text={s.text} /></p>
+              {s.ser && <p className="mt-1 text-sm text-slate-400"><MallText text={s.ser} /></p>}
             </div>
-          )}
-        </div>
-        {Skarm && (
-          <div className="min-w-0 lg:sticky lg:top-24">
-            <Skarm steg={aktiv} onNasta={() => !sista && ga(aktiv + 1)} />
-            <p className="mt-2 text-center text-xs text-slate-500">Steg {aktiv + 1} av {steg.length}</p>
+            {knappar}
           </div>
-        )}
+          <div className="min-w-0">
+            <Skarm steg={aktiv} onNasta={() => !sista && ga(aktiv + 1)} />
+          </div>
+          <details className="group rounded-xl border border-slate-700 bg-slate-800/20">
+            <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-slate-300">
+              <Icon name="guide.steg" size={16} className="text-[#20c58f]" />
+              Alla steg i en lista
+              <Icon name="allman.chevron" size={16} className="ml-auto text-slate-500 transition-transform group-open:rotate-90" />
+            </summary>
+            <div className="px-2 pb-2">{stegLista}</div>
+          </details>
+        </div>
+      </>
+    )
+  }
+
+  // Telefon: stegen till vänster, telefonen (300 px) till höger
+  return (
+    <>
+      <Rubrik del="visning" />
+      <p className="-mt-1 mb-3 text-sm text-slate-400">Tryck på ett steg så visar skärmen hur det ser ut. Den gröna markören visar var du trycker.</p>
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0">
+          {stegLista}
+          <div className="mt-3">{knappar}</div>
+        </div>
+        <div className="min-w-0 lg:sticky lg:top-24">
+          <Skarm steg={aktiv} onNasta={() => !sista && ga(aktiv + 1)} />
+          <p className="mt-2 text-center text-xs text-slate-500">Steg {aktiv + 1} av {steg.length}</p>
+        </div>
       </div>
     </>
   )
@@ -290,11 +349,11 @@ function Avslut({ lankar, fraga }: { lankar: { slug: string; label: string; desc
 // ─── Inkoppling i dokumentläsaren ──────────────────
 
 /** Renderar ett av mallens block, annars null (då tar den vanliga renderaren över) */
-export function MallBlock({ block, slug }: { block: IntranetBlock; slug: string }) {
+export function MallBlock({ block, slug, enhet = 'mobil' }: { block: IntranetBlock; slug: string; enhet?: 'mobil' | 'dator' }) {
   switch (block.type) {
     case 'intro': return <Intro block={block} />
     case 'kortsvar': return <Kortsvar text={block.text} />
-    case 'visning': return <Visning steg={block.steg} modul={block.modul ?? slug} />
+    case 'visning': return <Visning steg={block.steg} modul={block.modul ?? slug} enhet={enhet} />
     case 'felsok': return <Felsok items={block.items} />
     case 'bra': return <Bra items={block.items} />
     case 'ovning': return <Ovning uppdrag={block.uppdrag} modul={block.modul ?? slug} />

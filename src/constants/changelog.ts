@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.70.0',
+    date: '2026-10-18',
+    title: 'Handboken i ordning',
+    items: [
+      { kind: 'nyhet', text: 'Handboken visar guiderna i fem ämnen i den ordning du bör läsa dem: Kom igång, Ärenden och besök, Stationer och kontroller, Pris och fakturering och Försäljning. Överst ser du hur många du har läst och vilken guide som är nästa.' },
+      { kind: 'andring', text: 'Du ser guiderna för vyn du står i. Har du flera roller byter du vy för att se de andra rollernas guider.' },
+      { kind: 'buggfix', text: 'I guiderna som visar datorns skärm lade sig skärmen över stegen. Nu står stegen överst och skärmen i full bredd under.' },
+    ],
+  },
+  {
     version: '3.69.1',
     date: '2026-10-17',
     title: 'Delfaktura och anpassat pris, offerttext från ärendet',
