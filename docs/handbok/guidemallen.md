@@ -57,6 +57,12 @@ export default { Visning, Ovning } satisfies GuideModul
 - Ikoner: `Icon` från `src/components/icons/Icon` med portalens namn (`arende.aterbesok`, `allman.kalender`, `sok.faktura` ...). Samma ikon som portalen visar på samma ställe.
 - Facit: `guider/guide-aterbesok.tsx` och `supabase/migrations/20261016_guidemallen_00_aterbesok.sql`.
 
+## Placering i handboken
+
+Handboken listar guiderna i ämnen och läsordning enligt `src/pages/shared/intranet/handbokSektioner.ts`. En ny guide måste läggas in där, i rätt ämne och på rätt plats i läsordningen (tekniker- och kontorsversionen bredvid varandra). Annars hamnar den under Fler guider längst ner.
+
+Handboken visar guiderna för vyn man står i (`activeView`). Guidens `audience_roles` avgör vilka vyer som ser den.
+
 ## När en funktion ändras
 
 Guiden ändras i samma leverans, precis som uppdateringsloggen.
