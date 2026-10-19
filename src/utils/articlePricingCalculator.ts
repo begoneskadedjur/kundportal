@@ -101,8 +101,9 @@ export function convertArticlesToOneflowProducts(
           basePrice: item.effectivePrice,
           vatRate: item.article.vat_rate / 100
         },
+        // Priset i Oneflow är alltid exkl. moms, även för privatpersoner (2026-10-19)
         individual: {
-          basePrice: item.effectivePrice * (1 + item.article.vat_rate / 100),
+          basePrice: item.effectivePrice,
           taxDeduction: item.article.rot_eligible ? 'rot' : item.article.rut_eligible ? 'rut' : undefined
         }
       },
@@ -153,8 +154,9 @@ export function convertServicesToOneflowProducts(
             basePrice: s.unit_price,
             vatRate
           },
+          // Priset i Oneflow är alltid exkl. moms, även för privatpersoner (2026-10-19)
           individual: {
-            basePrice: s.unit_price * (1 + vatRate),
+            basePrice: s.unit_price,
             taxDeduction
           }
         },
@@ -198,10 +200,9 @@ export function convertArticlesToOneflowProductsCustomPrice(
     hidePrice: true
   }))
 
-  // Extra rad med anpassat totalpris
-  const priceForParty = partyType === 'company'
-    ? customTotalPrice
-    : Math.round(customTotalPrice * 1.25)
+  // Extra rad med anpassat totalpris. Priset i Oneflow är alltid exkl. moms,
+  // även för privatpersoner (2026-10-19).
+  const priceForParty = customTotalPrice
 
   const totalProduct: SelectedProduct = {
     product: {

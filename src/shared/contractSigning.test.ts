@@ -20,16 +20,16 @@ describe('vår kedja', () => {
 })
 
 describe('premien ur Oneflow', () => {
-  it('privatperson: Oneflow visar inkl. moms, premien är exkl.', () => {
-    expect(premiumExclVatFromOneflow(7500, true)).toBe(6000)
-    expect(premiumExclVatFromOneflow('7500', true)).toBe(6000)
+  it('privatperson: beloppet är premien', () => {
+    expect(premiumExclVatFromOneflow(7500)).toBe(7500)
+    expect(premiumExclVatFromOneflow('7500')).toBe(7500)
   })
   it('företag: beloppet är premien', () => {
-    expect(premiumExclVatFromOneflow(37390, false)).toBe(37390)
+    expect(premiumExclVatFromOneflow(37390)).toBe(37390)
   })
   it('tomt eller noll ger null', () => {
-    expect(premiumExclVatFromOneflow(null, false)).toBeNull()
-    expect(premiumExclVatFromOneflow(0, true)).toBeNull()
+    expect(premiumExclVatFromOneflow(null)).toBeNull()
+    expect(premiumExclVatFromOneflow(0)).toBeNull()
   })
   it('parttyp: Oneflow vinner, sedan ärendetyp, sist numrets form', () => {
     expect(isIndividualParty({ oneflowPartyType: 'individual', sourceType: 'business_case' })).toBe(true)

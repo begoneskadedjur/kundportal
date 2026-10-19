@@ -957,8 +957,8 @@ export default function OneflowContractCreator() {
   }
 
   // --- Tjänster och pris: samma beräkning i granskningen och sidokortet ----
+  // Priset i Oneflow är alltid exkl. moms, även för privatpersoner (2026-10-19)
   const isPrivate = wizardData.partyType === 'individual'
-  const priceMultiplier = isPrivate ? 1.25 : 1
   const prisData = useMemo(() => {
     const hasPrefill = !!wizardData.prefillServices && wizardData.prefillServices.length > 0
     const draftServices = wizardData.draftItems.filter(i => i.item_type === 'service')
@@ -1905,8 +1905,8 @@ export default function OneflowContractCreator() {
     const isCompany = wizardData.partyType === 'company'
     const motpartNamn = (isCompany ? wizardData.foretag : '') || wizardData.Kontaktperson || 'kund'
     const totalLabel = isContract
-      ? `Årspremie ${isPrivate ? 'inkl.' : 'exkl.'} moms`
-      : `Totalt ${isPrivate ? 'inkl.' : 'exkl.'} moms`
+      ? 'Årspremie exkl. moms'
+      : 'Totalt exkl. moms'
     const { rows, serviceTotal, articleCost, mb } = prisData
     const marginColor = toneTextClass(marginTone(mb.headline_percent))
     const hasDurable = mb.cost_durable > 0
@@ -2000,12 +2000,12 @@ export default function OneflowContractCreator() {
                 <React.Fragment key={r.key}>
                   <span className="py-2.5 border-t border-slate-700/60 text-white">{r.name}</span>
                   <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">{r.quantity}</span>
-                  <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">{fmtSEK(r.total * priceMultiplier)}</span>
+                  <span className="py-2.5 border-t border-slate-700/60 text-right text-white tabular-nums">{fmtSEK(r.total)}</span>
                 </React.Fragment>
               ))}
               <span className="py-2.5 border-t border-slate-600 font-bold text-white">{totalLabel}</span>
               <span className="py-2.5 border-t border-slate-600" />
-              <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(serviceTotal * priceMultiplier)}</span>
+              <span className="py-2.5 border-t border-slate-600 text-right font-bold text-white tabular-nums">{fmtSEK(serviceTotal)}</span>
             </div>
           </section>
 
@@ -2286,7 +2286,7 @@ export default function OneflowContractCreator() {
     { namn: 'Motpart', text: motpartNamn, klar: !!motpartNamn.trim() },
     {
       namn: isContract ? 'Årspremie' : 'Pris',
-      text: `${fmtSEK(prisData.serviceTotal * priceMultiplier)} ${isPrivate ? 'inkl.' : 'exkl.'} moms`,
+      text: `${fmtSEK(prisData.serviceTotal)} exkl. moms`,
       klar: prisData.serviceTotal > 0,
     },
     {

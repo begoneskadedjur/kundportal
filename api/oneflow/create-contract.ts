@@ -648,7 +648,7 @@ export default async function handler(
     // Persistera draftItems (tjänster + interna artiklar) till case_billing_items
     // så att de kan visas i offertuppföljningen och andra vyer.
     // Priserna är exkl. moms och samma som Oneflow-produkterna (wizarden bygger
-    // båda ur samma rader; privatpersoner ser priset × 1,25 i Oneflow). Vid
+    // båda ur samma rader; priset i Oneflow är exkl. moms även för privatpersoner). Vid
     // signering rättas avtalets rader mot Oneflow-beloppet (api/_lib/contractSigning.ts).
     console.log(
       `[persist] draftItems i body: ${

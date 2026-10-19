@@ -6,10 +6,12 @@
 // Beslut 2026-10-15 (Christian, fallet Pär-Eric Nilsson, Oneflow 16463726):
 //   - Ärendet är bara utgångsläge, wizarden är sista ordet. Premien är det som
 //     står i Oneflow-avtalet.
-//   - Oneflow visar privatpersoner priser INKL. moms (articlePricingCalculator:
-//     individual.basePrice = pris × 1,25). Portalens premie (contracts.annual_value)
-//     är alltid EXKL. moms, fakturan lägger på momsen. 7 500 kr i Oneflow för en
-//     privatperson är alltså 6 000 kr i premie.
+//   - Beslut 2026-10-19 (Christian): priset i ett Oneflow-avtal är ALLTID exkl.
+//     moms, även när motparten är en privatperson. Oneflow-dokumentet är det
+//     bindande avtalet och mallen säger "Samtliga priser är angivna exklusive
+//     mervärdesskatt". Portalens premie (contracts.annual_value, alltid exkl.
+//     moms) är Oneflow-beloppet rakt av, fakturan lägger på momsen. Ersätter
+//     beslutet 2026-10-15 om att privatpersoner såg priset inkl. moms.
 //   - Org/personnummer: ändrar kunden numret i Oneflow till något som inte
 //     klarar kontrollsiffran behålls vårt.
 
@@ -55,14 +57,14 @@ export function isIndividualParty(input: {
 }
 
 /**
- * Årspremien exkl. moms ur Oneflow-avtalets belopp. Privatpersoner ser priset
- * inkl. moms i Oneflow (wizarden skickar pris × (1 + moms)).
+ * Årspremien exkl. moms ur Oneflow-avtalets belopp. Priset i Oneflow är alltid
+ * exkl. moms, för privatpersoner som för företag (beslut 2026-10-19), så
+ * beloppet är premien rakt av. Tomt eller noll ger null.
  */
-export function premiumExclVatFromOneflow(oneflowTotal: number | string | null | undefined, individual: boolean, vatRatePercent = 25): number | null {
+export function premiumExclVatFromOneflow(oneflowTotal: number | string | null | undefined): number | null {
   const total = Number(oneflowTotal ?? 0)
   if (!Number.isFinite(total) || total <= 0) return null
-  if (!individual) return round2(total)
-  return round2(total / (1 + vatRatePercent / 100))
+  return round2(total)
 }
 
 export interface PremiumRow {

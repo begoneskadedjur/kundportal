@@ -9,9 +9,9 @@
 // Steg (beslut från Christian 2026-10-15, fallet Pär-Eric Nilsson):
 //   F  Org/personnummer: kundens ändring i Oneflow som inte klarar
 //      kontrollsiffran ersätts med numret vi skickade.
-//   D  Avtalsfälten och premien: premien är Oneflow-avtalets belopp, exkl.
-//      moms (privatpersoner ser priset inkl. moms i Oneflow). Avtalets
-//      tjänsterader rättas så att summan stämmer.
+//   D  Avtalsfälten och premien: premien är Oneflow-avtalets belopp rakt av.
+//      Priset i Oneflow är alltid exkl. moms, även för privatpersoner (beslut
+//      2026-10-19). Avtalets tjänsterader rättas så att summan stämmer.
 //   G  Avtalstypen = avtalets tjänst i katalogen (bärande § 4-rad via triggern
 //      trg_contracts_ensure_carrier).
 //   A  Kunden skapas eller kopplas (signed OCH active är signerade: triggern
@@ -373,35 +373,16 @@ export async function processSignedContract(
   }
 
   // --- D: avtalsfälten och premien ---
-  const oneflowTotal = num(contract.total_value)
-  // Vår kedja vet att wizarden skickade privatpersonens pris inkl. moms. Avtal
-  // skapade direkt i Oneflow tas som de står, med en uppmaning att kontrollera.
-  const premium = premiumExclVatFromOneflow(oneflowTotal, ourChain && individual)
-  if (!ourChain && individual && premium) {
-    report.notes.push(`Motparten är en privatperson: kontrollera om premien ${kr(premium)} i Oneflow är angiven inkl. eller exkl. moms.`)
-  }
+  // Priset i Oneflow är alltid exkl. moms (beslut 2026-10-19): beloppet är premien
+  const premium = premiumExclVatFromOneflow(num(contract.total_value))
   const startDate = str(contract.contract_start_date) ?? str(contract.start_date)
   const lockedInvoices = await hasLockedInvoices(db, contractId)
   {
     const updates: Record<string, unknown> = {}
     const currentAnnual = num(contract.annual_value)
+    // Saknas premien sätts den till Oneflow-beloppet, annars lämnas den
     if (premium && currentAnnual == null) {
       updates.annual_value = premium
-    } else if (
-      premium &&
-      ourChain &&
-      currentAnnual != null &&
-      Math.abs(currentAnnual - premium) >= 0.5 &&
-      oneflowTotal != null &&
-      Math.abs(currentAnnual - oneflowTotal) < 0.5
-    ) {
-      // Premien fylldes tidigare med Oneflows belopp rakt av (inkl. moms för privatpersoner)
-      if (lockedInvoices) {
-        report.notes.push(`Premien står som ${kr(currentAnnual)} men Oneflow-avtalet motsvarar ${kr(premium)} exkl. moms. En faktura är redan skickad, premien är inte ändrad.`)
-      } else {
-        updates.annual_value = premium
-        report.notes.push(`Premien rättad från ${kr(currentAnnual)} till ${kr(premium)} exkl. moms (Oneflow visar ${kr(oneflowTotal)} inkl. moms).`)
-      }
     }
     const months = parseContractLength(str(contract.contract_length))
     const effectivePremium = (updates.annual_value as number | undefined) ?? currentAnnual ?? premium

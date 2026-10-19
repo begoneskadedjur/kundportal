@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.70.4',
+    date: '2026-10-19',
+    title: 'Avtalspriset är exkl. moms för alla',
+    items: [
+      { kind: 'buggfix', text: 'Avtalswizarden lade på moms på privatpersoners pris innan avtalet skickades till Oneflow, och signeringen drog sedan av momsen igen. Nu är priset i Oneflow-avtalet alltid exkl. moms, för privatpersoner som för företag, och premien i portalen är exakt avtalspriset. Momsen läggs på fakturan.' },
+    ],
+  },
+  {
     version: '3.70.3',
     date: '2026-10-19',
     title: 'Besök som försvann ur schemat',
