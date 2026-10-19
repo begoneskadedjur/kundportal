@@ -269,8 +269,8 @@ function App() {
               <Route path="tickets" element={<ProtectedRoute requiredRole="admin"><InternAdministration /></ProtectedRoute>} />
               <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="admin"><IncidentsPage /></ProtectedRoute>} />
               <Route path="bug-reports" element={<ProtectedRoute requiredRole="admin"><BugReportsPage /></ProtectedRoute>} />
-              <Route path="guides/case-deletion" element={<Navigate to="/admin/intranat/dokument/guide-avbryta-arenden" replace />} />
-              <Route path="guides/ticket-system" element={<Navigate to="/admin/intranat/dokument/guide-ticket-systemet" replace />} />
+              <Route path="guides/case-deletion" element={<Navigate to="/admin/intranat/dokument/guide-avbryta-arenden-kontor" replace />} />
+              <Route path="guides/ticket-system" element={<Navigate to="/admin/intranat/dokument/guide-ticket-systemet-kontor" replace />} />
               {/* Användarkonton (Kund) - konsoliderad portalhantering */}
               <Route path="anvandarkonton-kund" element={<AdminOrKoordinatorRoute><AdminOrganizationsPage /></AdminOrKoordinatorRoute>} />
               {/* Behåll gamla routes för bakåtkompatibilitet */}
@@ -287,10 +287,10 @@ function App() {
               {/* Lärosäte - Internt kunskapscenter för alla interna roller */}
               {/* Gamla Lärosätet ersatt av Intranätets handbok - behåll adresserna som redirects */}
               <Route path="larosate" element={<Navigate to="/admin/intranat/handbok" replace />} />
-              <Route path="larosate/guides/ticket-system" element={<Navigate to="/admin/intranat/dokument/guide-ticket-systemet" replace />} />
-              <Route path="larosate/guides/follow-up-case" element={<Navigate to="/admin/intranat/dokument/guide-foljearenden" replace />} />
-              <Route path="larosate/guides/case-deletion" element={<Navigate to="/admin/intranat/dokument/guide-avbryta-arenden" replace />} />
-              <Route path="larosate/guides/equipment-placement" element={<Navigate to="/admin/intranat/dokument/guide-placera-stationer" replace />} />
+              <Route path="larosate/guides/ticket-system" element={<Navigate to="/admin/intranat/dokument/guide-ticket-systemet-kontor" replace />} />
+              <Route path="larosate/guides/follow-up-case" element={<Navigate to="/admin/intranat/dokument/guide-foljearenden-kontor" replace />} />
+              <Route path="larosate/guides/case-deletion" element={<Navigate to="/admin/intranat/dokument/guide-avbryta-arenden-kontor" replace />} />
+              <Route path="larosate/guides/equipment-placement" element={<Navigate to="/admin/intranat/dokument/guide-tillaggsstationer-koordinator" replace />} />
 
               {/* Bakåtkompatibilitet: gamla URL:er redirectar till nya */}
               <Route path="customers" element={<Navigate to="/admin/befintliga-kunder" replace />} />
@@ -370,10 +370,10 @@ function App() {
               <Route path="analytics" element={<ProtectedRoute requiredRole="koordinator"><CoordinatorAnalytics /></ProtectedRoute>} />
 
               {/* Guides & Lärosäte */}
-              <Route path="guides/case-deletion" element={<Navigate to="/koordinator/intranat/dokument/guide-avbryta-arenden" replace />} />
-              <Route path="guides/ticket-system" element={<Navigate to="/koordinator/intranat/dokument/guide-ticket-systemet" replace />} />
-              <Route path="guides/follow-up-case" element={<Navigate to="/koordinator/intranat/dokument/guide-foljearenden" replace />} />
-              <Route path="guides/equipment-placement" element={<Navigate to="/koordinator/intranat/dokument/guide-placera-stationer" replace />} />
+              <Route path="guides/case-deletion" element={<Navigate to="/koordinator/intranat/dokument/guide-avbryta-arenden-kontor" replace />} />
+              <Route path="guides/ticket-system" element={<Navigate to="/koordinator/intranat/dokument/guide-ticket-systemet-kontor" replace />} />
+              <Route path="guides/follow-up-case" element={<Navigate to="/koordinator/intranat/dokument/guide-foljearenden-kontor" replace />} />
+              <Route path="guides/equipment-placement" element={<Navigate to="/koordinator/intranat/dokument/guide-tillaggsstationer-koordinator" replace />} />
               <Route path="larosate" element={<Navigate to="/koordinator/intranat/handbok" replace />} />
 
               {/* Bakåtkompatibilitet */}
@@ -422,10 +422,10 @@ function App() {
               <Route path="intranat/*" element={<ProtectedRoute requiredRole="säljare"><IntranetPage /></ProtectedRoute>} />
               <Route path="mitt-konto" element={<ProtectedRoute requiredRole="säljare"><UserProfile embedded /></ProtectedRoute>} />
               <Route path="larosate" element={<Navigate to="/saljare/intranat/handbok" replace />} />
-              <Route path="guides/ticket-system" element={<Navigate to="/saljare/intranat/dokument/guide-ticket-systemet" replace />} />
-              <Route path="guides/follow-up-case" element={<Navigate to="/saljare/intranat/dokument/guide-foljearenden" replace />} />
-              <Route path="guides/case-deletion" element={<Navigate to="/saljare/intranat/dokument/guide-avbryta-arenden" replace />} />
-              <Route path="guides/equipment-placement" element={<Navigate to="/saljare/intranat/dokument/guide-placera-stationer" replace />} />
+              <Route path="guides/ticket-system" element={<Navigate to="/saljare/intranat/handbok" replace />} />
+              <Route path="guides/follow-up-case" element={<Navigate to="/saljare/intranat/handbok" replace />} />
+              <Route path="guides/case-deletion" element={<Navigate to="/saljare/intranat/handbok" replace />} />
+              <Route path="guides/equipment-placement" element={<Navigate to="/saljare/intranat/handbok" replace />} />
             </Route>
 
             {/* --- TEKNIKER ROUTES — nested under TechnicianLayout med persistent sidebar --- */}
@@ -469,10 +469,10 @@ function App() {
 
             {/* Lärosäte redirects — bakåtkompatibilitet */}
             <Route path="/larosate" element={<Navigate to="/admin/intranat/handbok" replace />} />
-            <Route path="/larosate/guides/ticket-system" element={<Navigate to="/admin/intranat/dokument/guide-ticket-systemet" replace />} />
-            <Route path="/larosate/guides/follow-up-case" element={<Navigate to="/admin/intranat/dokument/guide-foljearenden" replace />} />
-            <Route path="/larosate/guides/case-deletion" element={<Navigate to="/admin/intranat/dokument/guide-avbryta-arenden" replace />} />
-            <Route path="/larosate/guides/equipment-placement" element={<Navigate to="/admin/intranat/dokument/guide-placera-stationer" replace />} />
+            <Route path="/larosate/guides/ticket-system" element={<Navigate to="/admin/intranat/dokument/guide-ticket-systemet-kontor" replace />} />
+            <Route path="/larosate/guides/follow-up-case" element={<Navigate to="/admin/intranat/dokument/guide-foljearenden-kontor" replace />} />
+            <Route path="/larosate/guides/case-deletion" element={<Navigate to="/admin/intranat/dokument/guide-avbryta-arenden-kontor" replace />} />
+            <Route path="/larosate/guides/equipment-placement" element={<Navigate to="/admin/intranat/dokument/guide-tillaggsstationer-koordinator" replace />} />
 
             {/* Customer routes */}
             <Route

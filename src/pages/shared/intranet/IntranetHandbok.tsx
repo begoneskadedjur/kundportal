@@ -43,6 +43,7 @@ function GuideRad({ g, nr, basePath, visaRoll }: { g: IntranetDocumentWithStatus
     <li>
       <Link
         to={`${basePath}/intranat/dokument/${g.slug}`}
+        state={visaRoll ? { allaRoller: true } : undefined}
         className="group flex items-start gap-3 px-4 py-3.5 transition-colors hover:bg-slate-800/50 focus:outline-none focus-visible:bg-slate-800/50"
       >
         <span

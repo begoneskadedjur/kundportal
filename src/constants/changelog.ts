@@ -52,6 +52,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'nyhet', text: 'Handboken visar guiderna i fem ämnen i den ordning du bör läsa dem: Kom igång, Ärenden och besök, Stationer och kontroller, Pris och fakturering och Försäljning. Överst ser du hur många du har läst och vilken guide som är nästa.' },
       { kind: 'andring', text: 'Du ser guiderna för vyn du står i. Har du flera roller byter du vy för att se de andra rollernas guider.' },
       { kind: 'buggfix', text: 'I guiderna som visar datorns skärm lade sig skärmen över stegen. Nu står stegen överst och skärmen i full bredd under.' },
+      { kind: 'buggfix', text: 'Gamla länkar och bokmärken till guider leder till din egen version av guiden. Öppnar du teknikerns version från kontorsvyn kommer du till kontorets.' },
     ],
   },
   {

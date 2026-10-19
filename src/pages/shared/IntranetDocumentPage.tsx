@@ -3,7 +3,7 @@
 // Innehållet renderas från strukturerade block (jsonb i databasen).
 
 import { useEffect, useMemo, useState, type ComponentType, type MouseEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import {
   ArrowLeft,
@@ -50,7 +50,7 @@ import DelfakturaManadOvning from './intranet/interactive/delfakturering/Delfakt
 import AterbesokOvning from './intranet/interactive/delfakturering/AterbesokOvning'
 import AudienceModal from './intranet/AudienceModal'
 import { MallBlock, arMallguide, kollaMall, mallEnhet, mallToc } from './intranet/GuideMall'
-import { describeAudience } from '../../types/intranet'
+import { describeAudience, forRollerna } from '../../types/intranet'
 import { Eye } from 'lucide-react'
 
 // Interaktiva demos - innehållsblock av typen interactive slår upp
@@ -247,7 +247,11 @@ function anchorFor(block: IntranetBlock, index: number): string | undefined {
 
 export default function IntranetDocumentPage() {
   const { slug } = useParams<{ slug: string }>()
-  const { user, profile, isAdmin } = useAuth()
+  const { user, profile, isAdmin, activeView } = useAuth()
+  const navigate = useNavigate()
+  // Admin som granskar alla rollers guider från handboken skickas inte vidare
+  const platsState = useLocation().state as { allaRoller?: boolean } | null
+  const granskar = isAdmin && !!platsState?.allaRoller
   const basePath = useRoleBasePath()
   const [showAudienceModal, setShowAudienceModal] = useState(false)
 
@@ -293,11 +297,33 @@ export default function IntranetDocumentPage() {
     requestAnimationFrame(() => document.getElementById(hash)?.scrollIntoView())
   }, [loadedDocId])
 
+  /** Samma guide i den version som vyn man står i ser, eller null */
+  const hittaRollversion = async (documentSlug: string, userId: string): Promise<string | null> => {
+    if (!documentSlug.startsWith('guide-')) return null
+    const stam = documentSlug.replace(/-(kontor|tekniker|saljare)$/, '')
+    const kandidater = [stam, `${stam}-kontor`, `${stam}-tekniker`, `${stam}-saljare`].filter(k => k !== documentSlug)
+    for (const k of kandidater) {
+      const d = await IntranetService.getDocumentBySlug(k, userId).catch(() => null)
+      if (d && d.section === 'handbok' && d.is_published && forRollerna(d, new Set([activeView]))) return k
+    }
+    return null
+  }
+
   const fetchDocument = async (documentSlug: string, userId: string) => {
     try {
       setLoading(true)
       setError(null)
       const result = await IntranetService.getDocumentBySlug(documentSlug, userId)
+      // Guiden finns i flera rollversioner (guide-x, guide-x-kontor, guide-x-tekniker,
+      // guide-x-saljare). Hör länken till en annan roll än vyn man står i, till exempel
+      // ett gammalt bokmärke, skickas man till sin egen version av samma guide.
+      if (!result || (!granskar && result.section === 'handbok' && !forRollerna(result, new Set([activeView])))) {
+        const egen = await hittaRollversion(documentSlug, userId)
+        if (egen) {
+          navigate(`${basePath}/intranat/dokument/${egen}${window.location.hash}`, { replace: true })
+          return
+        }
+      }
       if (!result) {
         setError('Dokumentet hittades inte')
       } else {
