@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.70.2',
+    date: '2026-10-19',
+    title: 'Besök som försvann ur schemat',
+    items: [
+      { kind: 'buggfix', text: 'Flyttar du ett besöks Från tid i ärendet följer Till tid med och besöket behåller sin längd. Förut stod sluttiden kvar på det gamla datumet och besöket syntes inte i schemat.' },
+      { kind: 'buggfix', text: 'Ett ärende går inte att spara med en sluttid före starttiden.' },
+    ],
+  },
+  {
     version: '3.70.0',
     date: '2026-10-18',
     title: 'Handboken i ordning',

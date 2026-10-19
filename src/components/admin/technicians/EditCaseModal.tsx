@@ -1061,6 +1061,12 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     const tableName = getTableName();
     if (!tableName || !currentCase) return;
 
+    if (formData.start_date && formData.due_date &&
+        new Date(formData.due_date).getTime() <= new Date(formData.start_date).getTime()) {
+      toast.error('Sluttiden måste vara efter starttiden.');
+      return;
+    }
+
     // ROT/RUT kräver fastighetsbeteckning (Skatteverket). Blockera spara om någon
     // ROT/RUT-tjänsterad saknar beteckning. Gäller bara privatärenden (ROT/RUT är
     // inte valbart för företag/avtal).
@@ -1535,7 +1541,21 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   // ✅ NY HANTERARE FÖR DEN ANPASSADE DATUMVÄLJAREN
   const handleDateChange = (date: Date | null, fieldName: 'start_date' | 'due_date') => {
     const isoString = date ? date.toISOString() : null;
-    setFormData(prev => ({ ...prev, [fieldName]: isoString }));
+    setFormData(prev => {
+      // Flyttas starten följer slutet med och behåller besökets längd,
+      // annars blir slutet kvar på det gamla datumet och besöket försvinner
+      // ur schemat (negativ längd)
+      if (fieldName === 'start_date' && date && prev.due_date) {
+        const gammalLangd = prev.start_date
+          ? new Date(prev.due_date).getTime() - new Date(prev.start_date).getTime()
+          : 0;
+        const langd = gammalLangd > 0 && gammalLangd <= 24 * 60 * 60 * 1000
+          ? gammalLangd
+          : 60 * 60 * 1000;
+        return { ...prev, start_date: isoString, due_date: new Date(date.getTime() + langd).toISOString() };
+      }
+      return { ...prev, [fieldName]: isoString };
+    });
   };
 
   const handleSuccessfulRestore = async () => {

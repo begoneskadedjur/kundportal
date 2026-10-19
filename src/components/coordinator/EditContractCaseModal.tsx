@@ -894,11 +894,22 @@ export default function EditContractCaseModal({
         }
       }
     }
-    
-    setFormData(prev => ({ 
-      ...prev, 
-      [fieldName]: date 
-    }))
+
+    setFormData(prev => {
+      // Flyttas Från tid följer Till tid med och behåller besökets längd,
+      // annars blir slutet kvar på det gamla datumet och besöket försvinner
+      // ur schemat (negativ längd, hänt på BE-0009027 och BE-0009178)
+      if (fieldName === 'scheduled_start' && date && prev.scheduled_end) {
+        const gammalLangd = prev.scheduled_start
+          ? prev.scheduled_end.getTime() - prev.scheduled_start.getTime()
+          : 0
+        const langd = gammalLangd > 0 && gammalLangd <= 24 * 60 * 60 * 1000
+          ? gammalLangd
+          : 60 * 60 * 1000
+        return { ...prev, scheduled_start: date, scheduled_end: new Date(date.getTime() + langd) }
+      }
+      return { ...prev, [fieldName]: date }
+    })
   }
 
   const handleTechnicianChange = (role: 'primary' | 'secondary' | 'tertiary', technicianId: string) => {
@@ -1186,6 +1197,12 @@ export default function EditContractCaseModal({
   const handleSubmit = async () => {
     sparatOkRef.current = false
     if (!localCaseData?.id) return
+
+    if (formData.scheduled_start && formData.scheduled_end &&
+        formData.scheduled_end.getTime() <= formData.scheduled_start.getTime()) {
+      toast.error('Till tid måste vara efter Från tid.')
+      return
+    }
 
     // SPÄRR: rabattrader utan motivering blockerar avslut. Körs FÖRE alla
     // skrivningar (statusändring, ad-hoc-fakturering, provision, avtalstillägg).
