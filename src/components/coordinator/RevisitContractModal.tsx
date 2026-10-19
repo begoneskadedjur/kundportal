@@ -26,6 +26,7 @@ import { ContractBillingService } from '../../services/contractBillingService'
 import { CaseBillingService } from '../../services/caseBillingService'
 import { VisitService } from '../../services/visitService'
 import toast from 'react-hot-toast'
+import { sluttidForeStart, SLUTTID_FORE_START_FEL } from '../../utils/besokstid'
 import "react-datepicker/dist/react-datepicker.css"
 
 registerLocale('sv', sv)
@@ -231,8 +232,8 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
       toast.error('Välj en ny tid. Återbesöket kan inte börja samma tid som nuvarande besök.')
       return
     }
-    if (endDate && endDate.getTime() <= startDate.getTime()) {
-      toast.error('Slut måste vara efter Start.')
+    if (sluttidForeStart(startDate, endDate)) {
+      toast.error(SLUTTID_FORE_START_FEL)
       return
     }
 

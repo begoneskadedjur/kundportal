@@ -45,12 +45,12 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: '3.70.2',
+    version: '3.70.3',
     date: '2026-10-19',
     title: 'Besök som försvann ur schemat',
     items: [
       { kind: 'buggfix', text: 'Flyttar du ett besöks Från tid i ärendet följer Till tid med och besöket behåller sin längd. Förut stod sluttiden kvar på det gamla datumet och besöket syntes inte i schemat.' },
-      { kind: 'buggfix', text: 'Ett ärende går inte att spara med en sluttid före starttiden.' },
+      { kind: 'andring', text: 'Ett besök går inte att spara med en sluttid före starttiden. Du får meddelandet "Sluttid kan inte vara tidigare än starttiden." Det gäller när du skapar ärenden, ändrar dem, bokar återbesök och flyttar besök i schemat.' },
     ],
   },
   {

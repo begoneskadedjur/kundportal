@@ -21,6 +21,7 @@ import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
+import { sluttidForeStart, SLUTTID_FORE_START_FEL } from '../../utils/besokstid'
 import { DROPDOWN_STATUSES } from '../../types/database'
 import { toSwedishISOString, fromDatabaseDate } from '../../utils/dateHelpers'
 import CommunicationSlidePanel from '../communication/CommunicationSlidePanel'
@@ -307,6 +308,10 @@ export default function EgenkontrollCaseModal({
 
   const handleSubmit = async () => {
     sparatOkRef.current = false
+    if (sluttidForeStart(formData.scheduled_start, formData.scheduled_end)) {
+      toast.error(SLUTTID_FORE_START_FEL)
+      return
+    }
     setLoading(true)
     try {
       const { data: updatedRows, error } = await supabase

@@ -14,6 +14,7 @@ import type { GeocodeResult } from '../../../services/geocoding'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../../contexts/AuthContext'
 import toast from 'react-hot-toast'
+import { sluttidForeStart, SLUTTID_FORE_START_FEL } from '../../../utils/besokstid'
 
 // ✅ NYA IMPORTER FÖR DATUMVÄLJAREN
 import DatePicker from 'react-datepicker'
@@ -1061,9 +1062,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     const tableName = getTableName();
     if (!tableName || !currentCase) return;
 
-    if (formData.start_date && formData.due_date &&
-        new Date(formData.due_date).getTime() <= new Date(formData.start_date).getTime()) {
-      toast.error('Sluttiden måste vara efter starttiden.');
+    if (sluttidForeStart(formData.start_date, formData.due_date)) {
+      toast.error(SLUTTID_FORE_START_FEL);
       return;
     }
 

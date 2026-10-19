@@ -20,6 +20,7 @@ import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
+import { sluttidForeStart, SLUTTID_FORE_START_FEL } from '../../utils/besokstid'
 import { DROPDOWN_STATUSES } from '../../types/database'
 import WorkReportDropdown from '../shared/WorkReportDropdown'
 import { useModernWorkReportGeneration } from '../../hooks/useModernWorkReportGeneration'
@@ -163,6 +164,10 @@ function AddSubVisitModal({ parentCase, technicians, onClose, onCreated }: AddSu
   const handleSave = async () => {
     if (!startDate) {
       toast.error('Välj ett startdatum')
+      return
+    }
+    if (sluttidForeStart(startDate, endDate)) {
+      toast.error(SLUTTID_FORE_START_FEL)
       return
     }
 
@@ -604,6 +609,10 @@ export default function RonderingCaseModal({
   // Spara ändringar
   const handleSubmit = async () => {
     sparatOkRef.current = false
+    if (sluttidForeStart(formData.scheduled_start, formData.scheduled_end)) {
+      toast.error(SLUTTID_FORE_START_FEL)
+      return
+    }
     // SPÄRR: rabattrader utan motivering blockerar avslut. Körs FÖRE alla
     // skrivningar (statusändring, ad-hoc-fakturering, provision).
     // Avtalstilläggsrader räknas inte som rabatt (exkluderas i servicen).

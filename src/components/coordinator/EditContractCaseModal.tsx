@@ -23,6 +23,7 @@ import { registerLocale } from 'react-datepicker'
 import sv from 'date-fns/locale/sv'
 import 'react-datepicker/dist/react-datepicker.css'
 import toast from 'react-hot-toast'
+import { sluttidForeStart, SLUTTID_FORE_START_FEL } from '../../utils/besokstid'
 import { DROPDOWN_STATUSES } from '../../types/database'
 import ServiceArticleSelector from '../shared/ServiceArticleSelector'
 import type { Service } from '../../types/services'
@@ -1198,9 +1199,8 @@ export default function EditContractCaseModal({
     sparatOkRef.current = false
     if (!localCaseData?.id) return
 
-    if (formData.scheduled_start && formData.scheduled_end &&
-        formData.scheduled_end.getTime() <= formData.scheduled_start.getTime()) {
-      toast.error('Till tid måste vara efter Från tid.')
+    if (sluttidForeStart(formData.scheduled_start, formData.scheduled_end)) {
+      toast.error(SLUTTID_FORE_START_FEL)
       return
     }
 

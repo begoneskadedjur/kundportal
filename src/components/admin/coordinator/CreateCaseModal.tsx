@@ -34,6 +34,7 @@ import AddressAutocomplete from '../../ui/AddressAutocomplete'
 import type { GeocodeResult } from '../../../services/geocoding';
 import { reverseGeocode } from '../../../services/geocoding';
 import toast from 'react-hot-toast';
+import { sluttidForeStart, SLUTTID_FORE_START_FEL } from '../../../utils/besokstid';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 import RoomNumberFields from '../../shared/RoomNumberFields';
 
@@ -1056,6 +1057,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     // För inspection-ärenden krävs inte title från användaren
     if (!caseType) {
       return toast.error("Du måste välja en ärendetyp.");
+    }
+    if (sluttidForeStart(formData.start_date, formData.due_date)) {
+      return toast.error(SLUTTID_FORE_START_FEL);
     }
 
     // Företagsnamn krävs för business-ärenden
