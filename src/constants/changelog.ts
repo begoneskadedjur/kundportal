@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.71.1',
+    date: '2026-10-20',
+    title: 'RFI-frågorna går att läsa in',
+    items: [
+      { kind: 'buggfix', text: 'Läs in frågorna i en RFI misslyckades med "null value" när formuläret hade både företagsuppgifter och fritextfrågor. Frågorna sparas nu.' },
+    ],
+  },
+  {
     version: '3.71.0',
     date: '2026-10-20',
     title: 'RFI-läge i upphandlingsportalen',

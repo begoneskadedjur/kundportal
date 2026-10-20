@@ -299,6 +299,14 @@ export async function readAndStoreRfi(doc: DocRow, userId: string, opts: { repla
       answer_meta: q.answer_meta,
       anchor: q.anchor,
       updated_by: userId,
+      // Alla rader måste ha samma fält: supabase-js sätter fält som saknas i någon
+      // rad till null i stället för kolumnens standardvärde, och dessa är not null.
+      answer: null as string | null,
+      answer_values: {} as Record<string, unknown>,
+      answer_status: 'utkast',
+      answer_source: null as string | null,
+      draft_sources: [] as unknown[],
+      library_answer_id: null as string | null,
     }
     if (prev) {
       carried++
