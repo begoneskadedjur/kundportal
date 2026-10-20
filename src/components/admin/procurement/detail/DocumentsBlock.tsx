@@ -17,7 +17,7 @@ import { DOC_TYPE_LABEL, type ProcurementDocType, type ProcurementDocument } fro
 import { documentLinkFor } from '../../../../shared/procurementPlatform'
 import { SKIP_REASON_LABEL, baseName, guessDocType, isZipName, mimeOf, sortFiles, type SkippedFile } from '../../../../shared/procurementFiles'
 import { EmptyState, IconButton, StatusDot } from '../ui'
-import { fmtDate, fmtDateTime, tableCls, type Tone } from '../uiFormat'
+import { fmtDate, fmtDateTime, type Tone } from '../uiFormat'
 import { Block, SubHeading, selectCls } from './fields'
 import { errMsg, useConfirm } from './helpers'
 
@@ -284,6 +284,19 @@ export default function DocumentsBlock({ notice, documents, onDocumentsChanged, 
 
       {(jobs.length > 0 || skipped.length > 0) && (
         <div className="mt-3 rounded-[10px] border border-slate-800 bg-slate-900/40 divide-y divide-slate-800">
+          {!running && (
+            <div className="flex items-center justify-between pl-3 text-[11.5px] text-slate-500">
+              <span>Senaste uppladdningen</span>
+              <IconButton
+                icon={<Icon name="allman.stang" size={20} />}
+                label="Stäng listan över senaste uppladdningen"
+                onClick={() => {
+                  setJobs([])
+                  setSkipped([])
+                }}
+              />
+            </div>
+          )}
           {jobs.map((j) => (
             <div key={j.key} className="flex items-center gap-3 px-3 py-2 text-[12.5px]">
               <div className="min-w-0 flex-1">
@@ -318,65 +331,55 @@ export default function DocumentsBlock({ notice, documents, onDocumentsChanged, 
             />
           </div>
         ) : (
-          <div className="rounded-[10px] border border-slate-800 bg-slate-900/40 overflow-x-auto">
-            <table className={tableCls.table}>
-              <thead className={tableCls.thead}>
-                <tr>
-                  <th className={tableCls.th}>Fil</th>
-                  <th className={tableCls.th}>Typ</th>
-                  <th className={tableCls.th}>AI</th>
-                  <th className={tableCls.thRight} />
-                </tr>
-              </thead>
-              <tbody>
-                {documents.map((d) => {
-                  const st = rerunning.has(d.id) ? AI_STATUS.running : AI_STATUS[d.ai_status]
-                  return (
-                    <tr key={d.id} id={`dok-${d.id}`} className={`${tableCls.tr} scroll-mt-24`}>
-                      <td className={`${tableCls.td} max-w-[280px]`}>
-                        <button type="button" onClick={() => void open(d)} className="text-left text-slate-200 hover:text-[#20c58f] break-words">
-                          {d.file_name}
-                        </button>
-                        <div className="text-[11px] text-slate-500">
-                          {[fmtSize(d.size_bytes), d.origin === 'email' ? 'via e-post' : null, fmtDateTime(d.created_at)].filter(Boolean).join(', ')}
-                        </div>
-                        {d.ai_summary && <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{d.ai_summary}</div>}
-                      </td>
-                      <td className={tableCls.td}>
-                        <select
-                          className={`${selectCls} min-w-[150px]`}
-                          value={d.doc_type}
-                          onChange={(e) => void changeType(d, e.target.value as ProcurementDocType)}
-                          aria-label={`Dokumenttyp för ${d.file_name}`}
-                        >
-                          {(Object.keys(DOC_TYPE_LABEL) as ProcurementDocType[]).map((t) => (
-                            <option key={t} value={t}>{DOC_TYPE_LABEL[t]}</option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className={`${tableCls.td} whitespace-nowrap`}>
-                        <span title={d.ai_error ?? undefined}>
-                          <StatusDot tone={st.tone}>{st.label}</StatusDot>
-                        </span>
-                        {d.ai_status === 'failed' && d.ai_error && <div className="text-[11px] text-red-400/80 max-w-[200px] truncate">{d.ai_error}</div>}
-                      </td>
-                      <td className={tableCls.tdRight}>
-                        <div className="flex justify-end">
-                          <IconButton
-                            icon={<Icon name="allman.aterstall" size={20} />}
-                            label={`Kör AI-läsningen igen för ${d.file_name}`}
-                            onClick={() => void rerun(d)}
-                            disabled={rerunning.has(d.id) || d.ai_status === 'running'}
-                          />
-                          <IconButton icon={<Icon name="allman.radera" size={20} />} label={`Ta bort ${d.file_name}`} onClick={() => remove(d)} tone="danger" />
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          // Lista i stället för tabell: kolumnen är smal på detaljsidan och knapparna
+          // hamnade utanför bild bakom en vågrät rullning.
+          <ul className="rounded-[10px] border border-slate-800 bg-slate-900/40 divide-y divide-slate-800">
+            {documents.map((d) => {
+              const st = rerunning.has(d.id) ? AI_STATUS.running : AI_STATUS[d.ai_status]
+              return (
+                <li key={d.id} id={`dok-${d.id}`} className="px-3 py-2.5 scroll-mt-24">
+                  <div className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <button type="button" onClick={() => void open(d)} className="text-left text-[13px] text-slate-200 hover:text-[#20c58f] break-words">
+                        {d.file_name}
+                      </button>
+                      <div className="text-[11px] text-slate-500">
+                        {[fmtSize(d.size_bytes), d.origin === 'email' ? 'via e-post' : null, fmtDateTime(d.created_at)].filter(Boolean).join(', ')}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0">
+                      <IconButton
+                        icon={<Icon name="allman.aterstall" size={20} />}
+                        label={rfi ? `Läs in frågorna igen ur ${d.file_name}` : `Kör AI-läsningen igen för ${d.file_name}`}
+                        onClick={() => void rerun(d)}
+                        disabled={rerunning.has(d.id) || d.ai_status === 'running'}
+                      />
+                      <IconButton icon={<Icon name="allman.radera" size={20} />} label={`Ta bort ${d.file_name}`} onClick={() => remove(d)} tone="danger" />
+                    </div>
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                    <select
+                      className={`${selectCls} w-auto min-w-[140px]`}
+                      value={d.doc_type}
+                      onChange={(e) => void changeType(d, e.target.value as ProcurementDocType)}
+                      aria-label={`Dokumenttyp för ${d.file_name}`}
+                    >
+                      {(Object.keys(DOC_TYPE_LABEL) as ProcurementDocType[]).map((t) => (
+                        <option key={t} value={t}>{DOC_TYPE_LABEL[t]}</option>
+                      ))}
+                    </select>
+                    <StatusDot tone={st.tone}>{st.label}</StatusDot>
+                  </div>
+                  {d.ai_status === 'failed' && d.ai_error && (
+                    <p className="mt-1 text-[11.5px] text-red-400/90 break-words">
+                      {d.ai_error}. Kör igen med pilen, eller ta bort filen.
+                    </p>
+                  )}
+                  {d.ai_summary && <p className="mt-1 text-[11px] text-slate-500 line-clamp-2">{d.ai_summary}</p>}
+                </li>
+              )
+            })}
+          </ul>
         )}
         <p className="text-[12px] text-slate-500 mt-2">
           {rfi

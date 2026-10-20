@@ -309,7 +309,7 @@ export async function readAndStoreRfi(doc: DocRow, userId: string, opts: { repla
       library_answer_id: null as string | null,
     }
     if (prev) {
-      carried++
+      if (String(prev.answer ?? "").trim() || Object.keys((prev.answer_values as Record<string, unknown> | null) ?? {}).length > 0) carried++
       return {
         ...base,
         answer: prev.answer ?? null,

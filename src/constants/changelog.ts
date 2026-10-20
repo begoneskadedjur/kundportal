@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.71.2',
+    date: '2026-10-20',
+    title: 'Dokumentlistan i upphandlingar',
+    items: [
+      { kind: 'andring', text: 'Dokumentlistan under Underlag är en lista i stället för en tabell, så att Ta bort och Kör igen alltid syns. Felmeddelandet visas i sin helhet.' },
+      { kind: 'andring', text: 'Listan över senaste uppladdningen går att stänga.' },
+      { kind: 'buggfix', text: 'Läs in frågorna i en RFI visar inte längre "svar följde med" när inga svar var ifyllda, och varnar bara för AI:n när inte alla frågor hittades.' },
+    ],
+  },
+  {
     version: '3.71.1',
     date: '2026-10-20',
     title: 'RFI-frågorna går att läsa in',

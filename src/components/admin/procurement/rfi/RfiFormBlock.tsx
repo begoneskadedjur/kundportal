@@ -47,7 +47,8 @@ export default function RfiFormBlock({ documents, questions, onChanged }: Props)
       toast.success(
         `${r.questions} frågor inlästa${r.kind === 'docx' ? `, ${r.anchored} med plats för svaret i dokumentet` : ''}${r.carried ? `. ${r.carried} svar följde med` : ''}.`
       )
-      if (r.aiError) toast(`AI:n svarade inte (${r.aiError.slice(0, 80)}). Frågorna lästes med den fasta tolkningen.`, { duration: 7000 })
+      // Bara när den fasta tolkningen inte räckte; annars är AI-felet ointressant för användaren
+      if (r.aiError && r.anchored < r.questions) toast(`AI:n kunde inte läsa formuläret, så frågorna lästes med den fasta tolkningen. Kontrollera att alla frågor kom med.`, { duration: 7000 })
     } catch (e) {
       toast.error(errMsg(e, 'Frågorna kunde inte läsas'))
     } finally {
