@@ -228,4 +228,38 @@ export const upphandlingIcons = {
       <path d="M12 3v2" />
     </>
   ),
+  // Blad med frågetecken: RFI, frågeformulär (sedan 3.71.0)
+  'upphandling.rfi': (
+    <>
+      <path d="M6 3.5h8.5L19 8v12.5H6z" />
+      <path d="M14.5 3.5V8H19" />
+      <path d="M10.2 11.2a2.3 2.3 0 1 1 3.3 2.1c-.8.4-1 .9-1 1.7" />
+      <path d="M12.5 18v.01" />
+    </>
+  ),
+  // Blad med penna: Svar
+  'upphandling.svar': (
+    <>
+      <path d="M13 20.5H5.5V3.5h9L18.5 7.5V10" />
+      <path d="M9 8.5h5M9 12h4" />
+      <path d="M19.5 12.5l2 2-6 6H13.5v-2z" />
+    </>
+  ),
+  // Blad med bock: Markera som besvarad
+  'upphandling.besvarad': (
+    <>
+      <path d="M6 3.5h8.5L19 8v12.5H6z" />
+      <path d="M14.5 3.5V8H19" />
+      <path d="M9 14l2.3 2.3L16 11.5" />
+    </>
+  ),
+  // Två pilar i en ring: Uppföljning
+  'upphandling.uppfoljning': (
+    <>
+      <path d="M19.5 9.5A8 8 0 0 0 5 7.5" />
+      <path d="M4.5 4v4h4" />
+      <path d="M4.5 14.5A8 8 0 0 0 19 16.5" />
+      <path d="M19.5 20v-4h-4" />
+    </>
+  ),
 } satisfies Record<`upphandling.${string}`, ReactNode>

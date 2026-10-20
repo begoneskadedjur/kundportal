@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.71.0',
+    date: '2026-10-20',
+    title: 'RFI-läge i upphandlingsportalen',
+    items: [
+      { kind: 'nyhet', text: 'En RFI har nu ett eget läge med fyra steg: Översikt, Underlag, Svar och Uppföljning. Kalkyl, krav och prisbilaga visas inte, och knappen heter Markera som besvarad. Läget kan bytas i sidhuvudet om annonstypen är fel.' },
+      { kind: 'nyhet', text: 'Köparens frågeformulär läses in fråga för fråga, ordagrant och i ordning, med var svaret ska stå. Under Svar fyller du i varje fråga, låter AI skriva utkast ur BeGones eget material och godkänner svaren ett i taget.' },
+      { kind: 'nyhet', text: 'Exportera ifyllt formulär skriver svaren i en kopia av köparens Word-fil på rätt ställen. Företagsuppgifter som omsättning och moderbolag sparas och fylls i automatiskt nästa gång.' },
+      { kind: 'nyhet', text: 'När RFI:n är besvarad följs köparen under Signaler, godkända svar kan sparas i anbudsbiblioteket och Uppföljning visar den riktiga annonsen när den dyker upp.' },
+    ],
+  },
+  {
     version: '3.70.4',
     date: '2026-10-19',
     title: 'Avtalspriset är exkl. moms för alla',

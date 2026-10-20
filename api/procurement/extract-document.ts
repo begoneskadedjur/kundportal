@@ -15,6 +15,9 @@
 //   4. Upphandlingen får ENDAST tomma fält ifyllda; manuella värden skrivs aldrig
 //      över. Kravlistan och frågorna skapas bara om det inte redan finns
 //      AI-rader, så en omkörning dubblerar inget.
+//   4b. RFI-läge (sedan 3.71.0): på en RFI läses Word och PDF som frågeformulär
+//      (api/_lib/procurementRfi.ts) i stället för krav-extraktionen. Inga
+//      krav, frågor till köparen eller fält på upphandlingen skapas då.
 //   5. Anbudsgivare ur handlingar sparas overifierade (verified false);
 //      ansvarig godkänner siffrorna i UI:t.
 //
@@ -22,8 +25,10 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { db, requireProcurementAccess, upsertBidder } from '../_lib/procurement'
-import { classifyInboundDocument, extractTenderDocument, fileToParts } from '../_lib/procurementAi'
-import type { ProcurementCriteriaType, ProcurementExtraction } from '../../src/types/procurement'
+import { classifyInboundDocument, extractTenderDocument, fileKind, fileToParts } from '../_lib/procurementAi'
+import { readAndStoreRfi } from '../_lib/procurementRfi'
+import { workModeOf } from '../../src/shared/procurementRfi'
+import type { ProcurementCriteriaType, ProcurementExtraction, ProcurementNoticeKind, ProcurementWorkMode } from '../../src/types/procurement'
 
 export const config = { maxDuration: 300 }
 
@@ -50,6 +55,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const actorName = (actor?.display_name as string | null) ?? auth.email ?? 'Okänd'
 
   await sb.from('procurement_documents').update({ ai_status: 'running', ai_error: null }).eq('id', documentId)
+
+  // RFI-läge: frågeformuläret läses som frågor, inte som förfrågningsunderlag
+  const classifyType = INBOUND_TYPES.includes(doc.doc_type) || (doc.origin === 'email' && ['unknown', 'other', 'rejection'].includes(doc.doc_type))
+  if (doc.notice_id && !classifyType) {
+    const { data: n } = await sb.from('procurement_notices').select('notice_kind, work_mode').eq('id', doc.notice_id).maybeSingle()
+    if (n && workModeOf(n as { notice_kind: ProcurementNoticeKind; work_mode: ProcurementWorkMode | null }) === 'rfi') {
+      const kind = fileKind(doc.mime_type, doc.file_name)
+      if (kind !== 'docx' && kind !== 'pdf') {
+        await sb.from('procurement_documents').update({ ai_status: 'skipped', ai_error: null }).eq('id', documentId)
+        return res.status(200).json({ ok: true, mode: 'rfi', skipped: true })
+      }
+      try {
+        const r = await readAndStoreRfi(doc, auth.userId, { replace: false })
+        await sb.from('procurement_events').insert({
+          notice_id: doc.notice_id,
+          event_type: 'rfi_read',
+          title: `RFI-formuläret inläst: ${doc.file_name}`,
+          detail: `${r.questions} frågor, ${r.anchored} med plats för svaret i dokumentet`,
+          metadata: { document_id: documentId, ...r },
+          actor_id: auth.userId,
+          actor_name: actorName,
+        })
+        return res.status(200).json({ ok: true, mode: 'rfi', ...r })
+      } catch (err) {
+        const e = err as Error & { code?: string }
+        if (e.code === 'exists') {
+          await sb.from('procurement_documents').update({ ai_status: 'done' }).eq('id', documentId)
+          return res.status(200).json({ ok: true, mode: 'rfi', alreadyRead: true })
+        }
+        console.error('[procurement/extract-document] rfi', documentId, e.message)
+        await sb.from('procurement_documents').update({ ai_status: 'failed', ai_error: e.message.slice(0, 1000) }).eq('id', documentId)
+        return res.status(502).json({ error: `Frågorna kunde inte läsas: ${e.message}` })
+      }
+    }
+  }
 
   try {
     const { data: blob, error: dlErr } = await sb.storage.from('procurement-documents').download(doc.storage_path)

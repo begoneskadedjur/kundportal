@@ -55,6 +55,9 @@
     "src/types/procurement.ts",
     "src/shared/procurementRules.ts",
     "src/shared/procurementAppendix.ts",
+    // RFI-läget: docx-utläsning med ankare och svarslogik (api/procurement/rfi)
+    "src/shared/procurementRfi.ts",
+    "src/shared/procurementRfiDocx.ts",
 
     // Stationsmarkörer (typens färg och ikon, tillägg, status) i kundrapporterna
     "src/shared/stationMarkers.ts",

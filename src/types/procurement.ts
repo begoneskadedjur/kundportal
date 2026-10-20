@@ -149,6 +149,8 @@ export interface ProcurementNotice {
   contact_phone?: string | null
   /** Egen post i Anbud (procurement_create_manual_notice), null för annonser ur källorna */
   manual_type?: ProcurementManualType | null
+  /** Manuellt arbetsläge (sedan 3.71.0): null följer notice_kind, rfi ger RFI-läge */
+  work_mode?: ProcurementWorkMode | null
   first_seen_at: string
   last_seen_at: string
   created_at: string
@@ -338,6 +340,14 @@ export interface ProcurementExtraction {
   summary?: string | null
   deciders?: string[]
   suggested_questions?: Array<{ question: string; reason: string | null }>
+  /** RFI-formulär (sedan 3.71.0): köparens bakgrundstext och utläsningens resultat */
+  rfi?: {
+    kind: 'docx' | 'pdf'
+    method: 'ai' | 'tolkning'
+    background: string | null
+    questions: number
+    anchored: number
+  }
   /** Klassning av inkomna handlingar */
   doc_type?: ProcurementDocType
   bidders?: Array<{ name: string; org_number: string | null; price: number | null; score: number | null; rank: number | null; is_winner: boolean | null }>
@@ -509,6 +519,50 @@ export interface ProcurementUserSettings {
   digest_enabled: boolean
   /** Notis när ett avtal går in i bearbetningsfönstret (sedan 3.65.0) */
   window_notify_enabled?: boolean
+  updated_at: string
+}
+
+/** Arbetsläge på detaljsidan: anbud i fem steg eller RFI i fyra (sedan 3.71.0) */
+export type ProcurementWorkMode = 'rfi' | 'tender'
+
+export type ProcurementRfiAnswerType = 'fritext' | 'ja_nej' | 'procent_per_ar' | 'foretagsuppgift'
+export type ProcurementRfiAnswerStatus = 'utkast' | 'godkand'
+export type ProcurementRfiAnswerSource = 'ai' | 'manuell' | 'foretagsuppgift' | 'bibliotek'
+
+/** En fråga i köparens RFI-formulär (procurement_rfi_questions, sedan 3.71.0) */
+export interface ProcurementRfiQuestion {
+  id: string
+  notice_id: string
+  document_id: string | null
+  sort_order: number
+  section: string | null
+  question: string
+  context: string | null
+  answer_type: ProcurementRfiAnswerType
+  /** years för procent per år, fields (key, label) för företagsuppgifter */
+  answer_meta: { years?: number[]; fields?: Array<{ key: string; label: string }> }
+  /** Var svaret skrivs i köparens docx; null för PDF och frågor utan verifierat ankare */
+  anchor: { kind: 'docx'; p?: number; cells?: Record<string, number>; before?: Record<string, string>; verified: boolean } | null
+  /** Fritext, eller kommentaren till ett ja/nej-svar */
+  answer: string | null
+  /** Ja/nej (choice), procent per år (år som nyckel) och företagsuppgifter (fältnyckel) */
+  answer_values: Record<string, string>
+  answer_status: ProcurementRfiAnswerStatus
+  answer_source: ProcurementRfiAnswerSource | null
+  draft_sources: Array<{ id: string; kind: 'material' | 'svar'; title: string; source: string | null }>
+  library_answer_id: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Återanvändbar företagsuppgift (procurement_company_facts) */
+export interface ProcurementCompanyFact {
+  key: string
+  label: string
+  value: string
+  updated_by: string | null
+  created_at: string
   updated_at: string
 }
 

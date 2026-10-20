@@ -6,6 +6,8 @@
 // till köparprofilen). Under dem tidslinjens datum på en rad, konkurrensen i
 // korthet och anteckningar. Ersätter blocken Identitet, Tidslinje (datumen),
 // Affären (sammanfattningen), Köparhistorik och Konkurrens sedan 3.64.0.
+// I RFI-läget (sedan 3.71.0) ersätts "Är den värd det" av en kort förklaring
+// av vad en RFI är och när svaret ska vara inne.
 
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
@@ -56,9 +58,11 @@ interface Props {
   buyerAwards: AwardWithRelations[]
   noticeAwards: AwardWithRelations[]
   onSave: SaveNotice
+  /** RFI-läget: förklaring och Svar senast i stället för affärens värde */
+  rfi?: { questions: number; approved: number } | null
 }
 
-export default function OverviewStep({ notice, buyerAwards, noticeAwards, onSave }: Props) {
+export default function OverviewStep({ notice, buyerAwards, noticeAwards, onSave, rfi = null }: Props) {
   const [showDesc, setShowDesc] = useState(false)
   const [showReasons, setShowReasons] = useState(false)
   const [editQ, setEditQ] = useState(false)
@@ -101,14 +105,19 @@ export default function OverviewStep({ notice, buyerAwards, noticeAwards, onSave
   }, [buyerAwards])
 
   const awardDate = dayOf(notice.award_decision_at) ?? dayOf(noticeAwards.find((a) => a.award_date)?.award_date ?? null)
-  const points: Array<{ key: string; label: string; date: string | null; edit?: boolean }> = [
-    { key: 'published', label: 'Publicerad', date: notice.published_at },
-    { key: 'questions', label: 'Frågor senast', date: notice.questions_deadline, edit: true },
-    { key: 'deadline', label: 'Sista anbudsdag', date: notice.tender_deadline },
-    { key: 'award', label: awardDate && daysUntil(awardDate)! < 0 ? 'Tilldelning' : 'Tilldelning väntas', date: awardDate },
-    { key: 'start', label: 'Avtalsstart', date: notice.contract_start },
-    { key: 'end', label: 'Avtalsslut', date: notice.contract_end },
-  ]
+  const points: Array<{ key: string; label: string; date: string | null; edit?: boolean }> = rfi
+    ? [
+        { key: 'published', label: 'Publicerad', date: notice.published_at },
+        { key: 'deadline', label: 'Svar senast', date: notice.tender_deadline },
+      ]
+    : [
+        { key: 'published', label: 'Publicerad', date: notice.published_at },
+        { key: 'questions', label: 'Frågor senast', date: notice.questions_deadline, edit: true },
+        { key: 'deadline', label: 'Sista anbudsdag', date: notice.tender_deadline },
+        { key: 'award', label: awardDate && daysUntil(awardDate)! < 0 ? 'Tilldelning' : 'Tilldelning väntas', date: awardDate },
+        { key: 'start', label: 'Avtalsstart', date: notice.contract_start },
+        { key: 'end', label: 'Avtalsslut', date: notice.contract_end },
+      ]
   const nextKey = points.find((p) => p.date && (daysUntil(p.date) ?? -1) >= 0)?.key
 
   const saveQuestions = async () => {
@@ -195,6 +204,25 @@ export default function OverviewStep({ notice, buyerAwards, noticeAwards, onSave
           )}
         </Block>
 
+        {rfi ? (
+          <Block icon="upphandling.rfi" title="Det här är en RFI" framed={false}>
+            <p className="text-[13.5px] leading-relaxed text-slate-300">
+              En RFI (förfrågan om information) är köparens sätt att lära sig marknaden innan upphandlingen skrivs. Den är inte bindande och har inget pris. BeGone svarar på köparens frågor, och svaren kan påverka vilka krav som ställs i den kommande upphandlingen.
+            </p>
+            <dl className="mt-4">
+              <Row label="Svar senast">
+                {notice.tender_deadline ? (
+                  <>
+                    {fmtDate(notice.tender_deadline)} <span className="text-slate-500">{fmtRelativeDays(notice.tender_deadline)}</span>
+                  </>
+                ) : (
+                  'Ej angivet'
+                )}
+              </Row>
+              <Row label="Frågor">{rfi.questions > 0 ? `${rfi.questions}, ${rfi.approved} godkända svar` : 'Inte inlästa, se Underlag'}</Row>
+            </dl>
+          </Block>
+        ) : (
         <Block title="Är den värd det" framed={false}>
           <dl>
             <Row label="Årsvärde">
@@ -220,6 +248,7 @@ export default function OverviewStep({ notice, buyerAwards, noticeAwards, onSave
             <Row label="Förväntat TB">{notice.expected_contribution != null ? `${fmtKr(notice.expected_contribution)}/år` : 'Räknas i steget Kalkyl'}</Row>
           </dl>
         </Block>
+        )}
 
         <Block title="Köparen i korthet" framed={false}>
           {!notice.buyer_id ? (

@@ -515,6 +515,16 @@ export type Database = {
         Insert: Partial<P.ProcurementQuestion>
         Update: Partial<P.ProcurementQuestion>
       }
+      procurement_rfi_questions: {
+        Row: P.ProcurementRfiQuestion
+        Insert: Partial<P.ProcurementRfiQuestion>
+        Update: Partial<P.ProcurementRfiQuestion>
+      }
+      procurement_company_facts: {
+        Row: P.ProcurementCompanyFact
+        Insert: Partial<P.ProcurementCompanyFact>
+        Update: Partial<P.ProcurementCompanyFact>
+      }
       procurement_price_lines: {
         Row: P.ProcurementPriceLine
         Insert: Partial<P.ProcurementPriceLine>

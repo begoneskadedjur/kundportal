@@ -14,6 +14,12 @@
 // att osparad text i kalkylen, kriterierna och kvalitetssvaren finns kvar när
 // man byter steg. På mobil ligger de primära knapparna i en fast rad längst
 // ned ovanför bottenmenyn. Öppnad upphandling markeras som läst.
+//
+// RFI-läge (sedan 3.71.0): när notice_kind är rfi, eller läget valts i
+// sidhuvudets lägesmeny, har sidan fyra steg: Översikt, Underlag (med
+// frågeformuläret), Svar och Uppföljning. Kalkyl, prisbilaga, kravlista,
+// kvalitetssvar, inlämningskontroll och frågor till köparen används inte.
+// Primärknappen heter Markera som besvarad.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -44,6 +50,9 @@ import {
   type ProcurementPriceLine,
   type ProcurementQuestion,
   type ProcurementRequirement,
+  type ProcurementRfiQuestion,
+  type ProcurementSignal,
+  type ProcurementWorkMode,
 } from '../../../types/procurement'
 import { originalNoticeUrl } from '../../../shared/procurementPlatform'
 import { EmptyState, IconButton, PrimaryButton, SecondaryButton } from '../../../components/admin/procurement/ui'
@@ -51,7 +60,12 @@ import StatusMenu from '../../../components/admin/procurement/StatusMenu'
 import { daysUntil, fmtDateTime, fmtRelativeDays } from '../../../components/admin/procurement/uiFormat'
 import { Block, type SaveNotice } from '../../../components/admin/procurement/detail/fields'
 import { errMsg, personName, useConfirm } from '../../../components/admin/procurement/detail/helpers'
-import { STEPS, STEP_DOT, STEP_STATE_LABEL, stepOf, stepStates, type StepKey } from '../../../components/admin/procurement/detail/steps'
+import { RFI_STEPS, STEPS, STEP_DOT, STEP_STATE_LABEL, rfiStepStates, stepOf, stepStates, type StepKey, type StepState } from '../../../components/admin/procurement/detail/steps'
+import { ProcurementRfiService } from '../../../services/procurementRfiService'
+import { isAnswered, workModeOf } from '../../../shared/procurementRfi'
+import RfiFormBlock from '../../../components/admin/procurement/rfi/RfiFormBlock'
+import RfiAnswers from '../../../components/admin/procurement/rfi/RfiAnswers'
+import RfiFollowUp from '../../../components/admin/procurement/rfi/RfiFollowUp'
 import OverviewStep from '../../../components/admin/procurement/detail/OverviewStep'
 import DocumentsBlock from '../../../components/admin/procurement/detail/DocumentsBlock'
 import DealBlock from '../../../components/admin/procurement/detail/DealBlock'
@@ -87,9 +101,11 @@ function daysTone(days: number | null): string {
 
 export default function NoticeDetailPage() {
   const { noticeId, steg } = useParams<{ noticeId: string; steg?: string }>()
-  const step = stepOf(steg)
   const { user } = useAuth()
   const [notice, setNotice] = useState<NoticeWithRelations | null>(null)
+  const mode: ProcurementWorkMode = notice ? workModeOf(notice) : 'tender'
+  const isRfi = mode === 'rfi'
+  const step = stepOf(steg, mode)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [acting, setActing] = useState(false)
@@ -106,6 +122,8 @@ export default function NoticeDetailPage() {
   const [questions, setQuestions] = useState<ProcurementQuestion[]>([])
   const [priceLines, setPriceLines] = useState<ProcurementPriceLine[]>([])
   const [bidderCount, setBidderCount] = useState(0)
+  const [rfiQuestions, setRfiQuestions] = useState<ProcurementRfiQuestion[]>([])
+  const [signal, setSignal] = useState<ProcurementSignal | null>(null)
 
   // ---------------------------------------------------------------------------
   // Laddning per resurs, så att ett steg kan hämta om bara sitt
@@ -125,6 +143,8 @@ export default function NoticeDetailPage() {
   const loadBids = useCallback(() => (noticeId ? quiet(ProcurementService.listBids(noticeId), setBids, 'kalkyler') : Promise.resolve()), [noticeId])
   const loadRequirements = useCallback(() => (noticeId ? quiet(ProcurementService.listRequirements(noticeId), setRequirements, 'kravlistan') : Promise.resolve()), [noticeId])
   const loadQuestions = useCallback(() => (noticeId ? quiet(ProcurementService.listQuestions(noticeId), setQuestions, 'frågorna') : Promise.resolve()), [noticeId])
+  const loadRfiQuestions = useCallback(() => (noticeId ? quiet(ProcurementRfiService.listQuestions(noticeId), setRfiQuestions, 'RFI-frågorna') : Promise.resolve()), [noticeId])
+  const loadSignal = useCallback(() => (noticeId ? quiet(ProcurementRfiService.getSignal(noticeId), setSignal, 'signalen') : Promise.resolve()), [noticeId])
   const loadPriceLines = useCallback(() => (noticeId ? quiet(ProcurementService.listPriceLines(noticeId), setPriceLines, 'prisbilagan') : Promise.resolve()), [noticeId])
 
   // Första laddningen
@@ -149,6 +169,8 @@ export default function NoticeDetailPage() {
           loadRequirements(),
           loadQuestions(),
           loadPriceLines(),
+          loadRfiQuestions(),
+          loadSignal(),
           quiet(ProcurementService.listManagers(), setManagers, 'upphandlingsansvariga'),
           PricingSettingsService.get()
             .then(setSettings)
@@ -188,9 +210,10 @@ export default function NoticeDetailPage() {
       void loadQuestions()
       void loadEvents()
       void loadPriceLines()
+      void loadRfiQuestions()
     }
     prevBusy.current = docsBusy
-  }, [docsBusy, reloadNotice, loadRequirements, loadQuestions, loadEvents, loadPriceLines])
+  }, [docsBusy, reloadNotice, loadRequirements, loadQuestions, loadEvents, loadPriceLines, loadRfiQuestions])
 
   const onDocumentsChanged = useCallback(() => {
     void loadDocuments()
@@ -198,7 +221,8 @@ export default function NoticeDetailPage() {
     void loadRequirements()
     void loadQuestions()
     void loadEvents()
-  }, [loadDocuments, reloadNotice, loadRequirements, loadQuestions, loadEvents])
+    void loadRfiQuestions()
+  }, [loadDocuments, reloadNotice, loadRequirements, loadQuestions, loadEvents, loadRfiQuestions])
 
   /** Sparar användarfält, uppdaterar sidan direkt och loggar händelsen. Kastar vid fel. */
   const saveNotice: SaveNotice = useCallback(
@@ -225,6 +249,19 @@ export default function NoticeDetailPage() {
     () => events.find((e) => (e.metadata as { our_status?: string } | null)?.our_status === 'submitted')?.created_at ?? null,
     [events]
   )
+
+  const rfiStates = useMemo(() => {
+    if (!notice) return null
+    return rfiStepStates({
+      status: notice.our_status,
+      documents: documents.length,
+      questions: rfiQuestions.length,
+      answered: rfiQuestions.filter(isAnswered).length,
+      approved: rfiQuestions.filter((q) => q.answer_status === 'godkand').length,
+      signalFollowed: !!signal && (signal.status === 'watching' || signal.status === 'converted'),
+      savedToLibrary: rfiQuestions.filter((q) => q.library_answer_id).length,
+    })
+  }, [notice, documents, rfiQuestions, signal])
 
   const states = useMemo(() => {
     if (!notice) return null
@@ -307,6 +344,45 @@ export default function NoticeDetailPage() {
     )
   }
 
+  const markAnswered = () => {
+    if (!notice) return
+    const open = rfiQuestions.filter((q) => q.answer_status !== 'godkand').length
+    confirm(
+      'Markera som besvarad',
+      `Har svaren skickats in till köparen?${open ? ` ${open} av ${rfiQuestions.length} svar är inte godkända.` : ''} Statusen blir Besvarad och köparen följs i Framförhållning tills upphandlingen annonseras.`,
+      async () => {
+        setActing(true)
+        try {
+          const r = await ProcurementRfiService.markAnswered(notice.id)
+          setNotice((prev) => (prev ? { ...prev, our_status: 'submitted' } : prev))
+          void loadEvents()
+          void loadSignal()
+          toast.success(r.created ? 'RFI:n är besvarad. En signal skapades i Framförhållning.' : 'RFI:n är besvarad. Signalen följs i Framförhållning.')
+        } catch (e) {
+          toast.error(errMsg(e, 'Kunde inte markera som besvarad'))
+        } finally {
+          setActing(false)
+        }
+      },
+      { confirmLabel: 'Markera som besvarad', variant: 'warning' }
+    )
+  }
+
+  const setMode = async (next: ProcurementWorkMode) => {
+    if (!notice || next === mode) return
+    const derived: ProcurementWorkMode = notice.notice_kind === 'rfi' ? 'rfi' : 'tender'
+    const value = next === derived ? null : next
+    const title = next === 'rfi' ? 'Läge: RFI' : 'Läge: anbud'
+    try {
+      await ProcurementRfiService.setWorkMode(notice.id, value, title)
+      setNotice((prev) => (prev ? { ...prev, work_mode: value } : prev))
+      void loadEvents()
+      toast.success(next === 'rfi' ? 'RFI-läge: svara på köparens frågor' : 'Anbudsläge: kalkyl, krav och anbud')
+    } catch (e) {
+      toast.error(errMsg(e, 'Kunde inte byta läge'))
+    }
+  }
+
   const markSubmitted = () => {
     if (!notice) return
     confirm(
@@ -329,7 +405,7 @@ export default function NoticeDetailPage() {
     )
   }
 
-  if (!notice || !states) {
+  if (!notice || !states || !rfiStates) {
     return (
       <div className="space-y-4">
         <BackLink status={null} />
@@ -343,7 +419,16 @@ export default function NoticeDetailPage() {
   const isNew = notice.our_status === 'new'
   const working = WORKING.includes(notice.our_status)
   const canDecline = isNew || working
-  const statusOptions = OUR_STATUS_CHOICES.map((s) => ({ value: s, label: OUR_STATUS_LABEL[s], dot: OUR_STATUS_DOT[s] }))
+  const statusLabel = (s: ProcurementOurStatus) => (isRfi && s === 'submitted' ? 'Besvarad' : OUR_STATUS_LABEL[s])
+  const statusOptions = OUR_STATUS_CHOICES.map((s) => ({ value: s, label: statusLabel(s), dot: OUR_STATUS_DOT[s] }))
+  const modeOptions: Array<{ value: ProcurementWorkMode; label: string; dot: string }> = [
+    { value: 'tender', label: 'Anbudsläge: kalkyl, krav och anbud', dot: 'bg-slate-400' },
+    { value: 'rfi', label: 'RFI-läge: svara på köparens frågor', dot: 'bg-sky-400' },
+  ]
+  const stepList: Array<{ key: StepKey; num: number; label: string; state: StepState }> = isRfi
+    ? RFI_STEPS.map((s) => ({ ...s, state: rfiStates[s.key] }))
+    : STEPS.map((s) => ({ ...s, state: states[s.key] }))
+  const rfiApproved = rfiQuestions.filter((q) => q.answer_status === 'godkand').length
   const ownerOptions = [
     { value: '', label: 'Ingen ansvarig', dot: 'bg-slate-600' },
     ...managers.map((m) => ({ value: m.user_id, label: m.display_name || m.email, dot: 'bg-slate-400' })),
@@ -355,6 +440,11 @@ export default function NoticeDetailPage() {
     <PrimaryButton onClick={() => void take()} disabled={acting}>
       <Icon name="upphandling.ta-upp" size={20} />
       Ta upp
+    </PrimaryButton>
+  ) : working && isRfi ? (
+    <PrimaryButton onClick={markAnswered} disabled={acting}>
+      <Icon name="upphandling.besvarad" size={20} />
+      Markera som besvarad
     </PrimaryButton>
   ) : working ? (
     <PrimaryButton onClick={markSubmitted} disabled={acting}>
@@ -395,7 +485,7 @@ export default function NoticeDetailPage() {
             <span className="tabular-nums">BGU-{notice.bgu_number}</span>
             <StatusMenu
               value={ourStatusChoice(notice.our_status)}
-              label={OUR_STATUS_LABEL[notice.our_status]}
+              label={statusLabel(notice.our_status)}
               dot={OUR_STATUS_DOT[notice.our_status]}
               options={statusOptions}
               onChange={(s) => void setStatus(s)}
@@ -410,9 +500,17 @@ export default function NoticeDetailPage() {
               onChange={(v) => void setOwner(v)}
               ariaLabel="Byt ansvarig"
             />
+            <StatusMenu
+              value={mode}
+              label={isRfi ? 'Läge: RFI' : 'Läge: anbud'}
+              dot={isRfi ? 'bg-sky-400' : 'bg-slate-400'}
+              options={modeOptions}
+              onChange={(v) => void setMode(v)}
+              ariaLabel="Byt läge mellan anbud och RFI"
+            />
             {notice.tender_deadline && (
               <span className="tabular-nums">
-                Sista anbudsdag {fmtDateTime(notice.tender_deadline)} <span className={daysTone(d)}>{fmtRelativeDays(notice.tender_deadline)}</span>
+                {isRfi ? 'Svar senast' : 'Sista anbudsdag'} {fmtDateTime(notice.tender_deadline)} <span className={daysTone(d)}>{fmtRelativeDays(notice.tender_deadline)}</span>
               </span>
             )}
           </div>
@@ -435,8 +533,8 @@ export default function NoticeDetailPage() {
       {/* Stegrad: skrollar i sin egen behållare på mobil */}
       <nav className="mt-4 mb-6 border-b border-slate-800 overflow-x-auto" aria-label="Steg">
         <div className="flex items-stretch gap-5 min-w-max">
-          {STEPS.map((s) => {
-            const st = states[s.key]
+          {stepList.map((s) => {
+            const st = s.state
             const active = step === s.key
             return (
               <Link
@@ -469,96 +567,138 @@ export default function NoticeDetailPage() {
 
       {/* Steg 1 Översikt */}
       <div className={panel('oversikt')}>
-        <OverviewStep notice={notice} buyerAwards={buyerAwards} noticeAwards={noticeAwards} onSave={saveNotice} />
-      </div>
-
-      {/* Steg 2 Underlag */}
-      <div className={`${panel('underlag')} space-y-8`}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <DocumentsBlock notice={notice} documents={documents} onDocumentsChanged={onDocumentsChanged} />
-          <div className="space-y-8 min-w-0">
-            <EvaluationBlock notice={notice} onSave={saveNotice} />
-            <DealBlock notice={notice} onSave={saveNotice} />
-          </div>
-        </div>
-        <Block icon="upphandling.krav" title="Kravlista">
-          <div className="p-4">
-            <RequirementsList noticeId={notice.id} requirements={requirements} documents={documents} managers={managers} onChanged={() => void loadRequirements()} />
-          </div>
-        </Block>
-        <Block icon="upphandling.fraga" title="Frågor till köparen">
-          <div className="p-4">
-            <BuyerQuestions notice={notice} questions={questions} onChanged={() => void loadQuestions()} />
-          </div>
-        </Block>
-      </div>
-
-      {/* Steg 3 Kalkyl */}
-      <div className={`${panel('kalkyl')} space-y-8`}>
-        <Block icon="allman.kalkyl" title="Vår kalkyl" hint="Årspris exkl. moms. Marginalen räknas med samma motor som avtalen, inklusive arbetstidsspärren." framed={false}>
-          <BidCalculator
-            notice={notice}
-            buyerAwards={buyerAwards}
-            bids={bids}
-            settings={settings}
-            onSaved={() => {
-              void loadBids()
-              void reloadNotice()
-              void loadEvents()
-            }}
-          />
-        </Block>
-        <Block icon="upphandling.prisbilaga" title="Prisbilaga" framed={false}>
-          <PriceAppendix notice={notice} lines={priceLines} documents={documents} settings={settings} currentBid={currentBid} onChanged={() => void loadPriceLines()} />
-        </Block>
-      </div>
-
-      {/* Steg 4 Anbud */}
-      <div className={`${panel('anbud')} space-y-8`}>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Block icon="upphandling.kvalitet" title="Kvalitetssvar">
-            <div className="p-4">
-              <QualityAnswers notice={notice} requirements={requirements} onChanged={() => void loadRequirements()} />
-            </div>
-          </Block>
-          <Block icon="upphandling.inlamning" title="Inlämningskontroll">
-            <div className="p-4">
-              <SubmissionCheck
-                notice={notice}
-                requirements={requirements}
-                documents={documents}
-                priceLines={priceLines}
-                currentBid={currentBid}
-                events={events}
-                onEventsChanged={() => void loadEvents()}
-              />
-            </div>
-          </Block>
-        </div>
-        <Block icon="upphandling.anbud" title="Vårt anbud" framed={false}>
-          <OwnBidPrice bids={bids} submittedAt={submittedAt} onChanged={() => void loadBids()} />
-          {working && (
-            <div className="mt-4 hidden lg:block">
-              <PrimaryButton onClick={markSubmitted} disabled={acting}>
-                <Icon name="upphandling.inlamning" size={20} />
-                Markera som lämnat
-              </PrimaryButton>
-            </div>
-          )}
-        </Block>
-      </div>
-
-      {/* Steg 5 Utfall */}
-      <div className={panel('utfall')}>
-        <OutcomeBlock
+        <OverviewStep
           notice={notice}
+          buyerAwards={buyerAwards}
           noticeAwards={noticeAwards}
-          bids={bids}
-          onBidsChanged={() => void loadBids()}
-          onEventsChanged={() => void loadEvents()}
-          onBiddersLoaded={setBidderCount}
+          onSave={saveNotice}
+          rfi={isRfi ? { questions: rfiQuestions.length, approved: rfiApproved } : null}
         />
       </div>
+
+      {isRfi && (
+        <>
+          {/* RFI steg 2 Underlag */}
+          <div className={`${panel('underlag')} space-y-8`}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <DocumentsBlock notice={notice} documents={documents} onDocumentsChanged={onDocumentsChanged} rfi />
+              <RfiFormBlock documents={documents} questions={rfiQuestions} onChanged={onDocumentsChanged} />
+            </div>
+          </div>
+
+          {/* RFI steg 3 Svar */}
+          <div className={panel('svar')}>
+            <RfiAnswers notice={notice} questions={rfiQuestions} documents={documents} managers={managers} onChanged={() => void loadRfiQuestions()} />
+          </div>
+
+          {/* RFI steg 4 Uppföljning */}
+          <div className={panel('uppfoljning')}>
+            <RfiFollowUp
+              notice={notice}
+              questions={rfiQuestions}
+              signal={signal}
+              onMarkAnswered={markAnswered}
+              onChanged={() => {
+                void loadRfiQuestions()
+                void loadSignal()
+              }}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Anbudsläget: steg 2 till 5. I RFI-läget används de inte och monteras inte. */}
+      {!isRfi && (
+        <>
+          {/* Steg 2 Underlag */}
+          <div className={`${panel('underlag')} space-y-8`}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <DocumentsBlock notice={notice} documents={documents} onDocumentsChanged={onDocumentsChanged} />
+              <div className="space-y-8 min-w-0">
+                <EvaluationBlock notice={notice} onSave={saveNotice} />
+                <DealBlock notice={notice} onSave={saveNotice} />
+              </div>
+            </div>
+            <Block icon="upphandling.krav" title="Kravlista">
+              <div className="p-4">
+                <RequirementsList noticeId={notice.id} requirements={requirements} documents={documents} managers={managers} onChanged={() => void loadRequirements()} />
+              </div>
+            </Block>
+            <Block icon="upphandling.fraga" title="Frågor till köparen">
+              <div className="p-4">
+                <BuyerQuestions notice={notice} questions={questions} onChanged={() => void loadQuestions()} />
+              </div>
+            </Block>
+          </div>
+
+          {/* Steg 3 Kalkyl */}
+          <div className={`${panel('kalkyl')} space-y-8`}>
+            <Block icon="allman.kalkyl" title="Vår kalkyl" hint="Årspris exkl. moms. Marginalen räknas med samma motor som avtalen, inklusive arbetstidsspärren." framed={false}>
+              <BidCalculator
+                notice={notice}
+                buyerAwards={buyerAwards}
+                bids={bids}
+                settings={settings}
+                onSaved={() => {
+                  void loadBids()
+                  void reloadNotice()
+                  void loadEvents()
+                }}
+              />
+            </Block>
+            <Block icon="upphandling.prisbilaga" title="Prisbilaga" framed={false}>
+              <PriceAppendix notice={notice} lines={priceLines} documents={documents} settings={settings} currentBid={currentBid} onChanged={() => void loadPriceLines()} />
+            </Block>
+          </div>
+
+          {/* Steg 4 Anbud */}
+          <div className={`${panel('anbud')} space-y-8`}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <Block icon="upphandling.kvalitet" title="Kvalitetssvar">
+                <div className="p-4">
+                  <QualityAnswers notice={notice} requirements={requirements} onChanged={() => void loadRequirements()} />
+                </div>
+              </Block>
+              <Block icon="upphandling.inlamning" title="Inlämningskontroll">
+                <div className="p-4">
+                  <SubmissionCheck
+                    notice={notice}
+                    requirements={requirements}
+                    documents={documents}
+                    priceLines={priceLines}
+                    currentBid={currentBid}
+                    events={events}
+                    onEventsChanged={() => void loadEvents()}
+                  />
+                </div>
+              </Block>
+            </div>
+            <Block icon="upphandling.anbud" title="Vårt anbud" framed={false}>
+              <OwnBidPrice bids={bids} submittedAt={submittedAt} onChanged={() => void loadBids()} />
+              {working && (
+                <div className="mt-4 hidden lg:block">
+                  <PrimaryButton onClick={markSubmitted} disabled={acting}>
+                    <Icon name="upphandling.inlamning" size={20} />
+                    Markera som lämnat
+                  </PrimaryButton>
+                </div>
+              )}
+            </Block>
+          </div>
+
+          {/* Steg 5 Utfall */}
+          <div className={panel('utfall')}>
+            <OutcomeBlock
+              notice={notice}
+              noticeAwards={noticeAwards}
+              bids={bids}
+              onBidsChanged={() => void loadBids()}
+              onEventsChanged={() => void loadEvents()}
+              onBiddersLoaded={setBidderCount}
+            />
+          </div>
+        </>
+      )}
 
       {/* Logg */}
       <div className={`${panel('logg')} space-y-8`}>

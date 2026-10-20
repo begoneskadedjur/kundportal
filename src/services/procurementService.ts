@@ -7,6 +7,7 @@
 
 import { supabase } from '../lib/supabase'
 import { apiFetch } from '../lib/api'
+import { workModeOf } from '../shared/procurementRfi'
 import type {
   ProcurementAward,
   ProcurementBid,
@@ -56,7 +57,11 @@ export interface ProcurementManagerProfile {
 }
 
 /** Upphandlingen i korthet för uppgifterna på Idag */
-export type TaskNotice = Pick<ProcurementNotice, 'id' | 'title' | 'buyer_name' | 'bgu_number' | 'tender_deadline' | 'questions_deadline' | 'our_status' | 'owner_id'>
+export type TaskNotice = Pick<ProcurementNotice, 'id' | 'title' | 'buyer_name' | 'bgu_number' | 'tender_deadline' | 'questions_deadline' | 'our_status' | 'owner_id'> &
+  Partial<Pick<ProcurementNotice, 'notice_kind' | 'work_mode'>>
+
+/** RFI:er har inga krav eller frågor till köparen; gamla rader ur krav-extraktionen döljs (3.71.0) */
+const notRfi = (t: { notice: TaskNotice }) => workModeOf({ notice_kind: t.notice.notice_kind ?? 'tender', work_mode: t.notice.work_mode ?? null }) !== 'rfi'
 
 export interface MyRequirementTask {
   id: string
@@ -73,7 +78,7 @@ export interface MyQuestionTask {
   notice: TaskNotice
 }
 
-const TASK_NOTICE_FIELDS = 'id, title, buyer_name, bgu_number, tender_deadline, questions_deadline, our_status, owner_id'
+const TASK_NOTICE_FIELDS = 'id, title, buyer_name, bgu_number, tender_deadline, questions_deadline, our_status, owner_id, notice_kind, work_mode'
 const TASK_STATUSES: ProcurementOurStatus[] = ['watching', 'analyzing', 'bidding']
 
 const NOTICE_SELECT =
@@ -148,7 +153,7 @@ export class ProcurementService {
     id: string,
     patch: Partial<Pick<ProcurementNotice,
       'our_status' | 'owner_id' | 'questions_deadline' | 'criteria_type' | 'criteria_weights' | 'price_model' | 'volumes' |
-      'expected_bids' | 'win_probability' | 'annual_value' | 'expected_contribution' | 'notes'>>,
+      'expected_bids' | 'win_probability' | 'annual_value' | 'expected_contribution' | 'notes' | 'work_mode'>>,
     eventTitle?: string
   ): Promise<void> {
     const { error } = await supabase.from('procurement_notices').update(patch as never).eq('id', id)
@@ -785,7 +790,7 @@ export class ProcurementService {
       .in('notice.our_status', TASK_STATUSES)
       .limit(500)
     if (error) fail('Kunde inte hämta dina kravrader', error)
-    return rows<MyRequirementTask>(data)
+    return rows<MyRequirementTask>(data).filter(notRfi)
   }
 
   /** Frågor till köparen som inte skickats, i upphandlingar där jag är ansvarig */
@@ -798,7 +803,7 @@ export class ProcurementService {
       .in('notice.our_status', TASK_STATUSES)
       .limit(500)
     if (error) fail('Kunde inte hämta dina frågor', error)
-    return rows<MyQuestionTask>(data)
+    return rows<MyQuestionTask>(data).filter(notRfi)
   }
 
   static async listQuestions(noticeId: string): Promise<ProcurementQuestion[]> {

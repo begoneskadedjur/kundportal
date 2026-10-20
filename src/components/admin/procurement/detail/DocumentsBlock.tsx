@@ -69,9 +69,11 @@ interface Props {
   notice: NoticeWithRelations
   documents: ProcurementDocument[]
   onDocumentsChanged: () => void
+  /** RFI-läget: Word och PDF läses som frågeformulär, inga krav eller fält fylls i */
+  rfi?: boolean
 }
 
-export default function DocumentsBlock({ notice, documents, onDocumentsChanged }: Props) {
+export default function DocumentsBlock({ notice, documents, onDocumentsChanged, rfi = false }: Props) {
   const [jobs, setJobs] = useState<Job[]>([])
   const [skipped, setSkipped] = useState<SkippedFile[]>([])
   const [running, setRunning] = useState(false)
@@ -310,7 +312,10 @@ export default function DocumentsBlock({ notice, documents, onDocumentsChanged }
       <div className="mt-3">
         {documents.length === 0 ? (
           <div className="rounded-[10px] border border-slate-800">
-            <EmptyState title="Inga dokument ännu" hint="Hämta underlaget och släpp filerna ovan, så skapar AI kravlista, volymer och frågor." />
+            <EmptyState
+              title="Inga dokument ännu"
+              hint={rfi ? 'Släpp köparens frågeformulär ovan, så läses frågorna in.' : 'Hämta underlaget och släpp filerna ovan, så skapar AI kravlista, volymer och frågor.'}
+            />
           </div>
         ) : (
           <div className="rounded-[10px] border border-slate-800 bg-slate-900/40 overflow-x-auto">
@@ -374,7 +379,9 @@ export default function DocumentsBlock({ notice, documents, onDocumentsChanged }
           </div>
         )}
         <p className="text-[12px] text-slate-500 mt-2">
-          AI fyller bara tomma fält: volymer, kriterier, prismodell, frågor senast, kravlista och förslag på frågor. Befintliga värden skrivs inte över.
+          {rfi
+            ? 'RFI-läge: Word och PDF läses som frågeformulär. Inga krav, volymer eller frågor till köparen skapas.'
+            : 'AI fyller bara tomma fält: volymer, kriterier, prismodell, frågor senast, kravlista och förslag på frågor. Befintliga värden skrivs inte över.'}
         </p>
       </div>
 
