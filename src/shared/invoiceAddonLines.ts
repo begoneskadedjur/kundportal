@@ -197,6 +197,25 @@ export function houseWorkHoursFor(quantity: number): number {
  * som timmar ("…, timmar"), och efter sista raden kommer förklaringen om
  * när tilläggen faktureras nästa gång.
  */
+/**
+ * Text som Fortnox tar emot. Fortnox avvisar hela fakturan med 2005016
+ * "Dokumenttext innehåller ogiltiga tecken" för t.ex. mittpunkt (INV-202610-0038,
+ * 2026-10-21). Kända typografiska tecken översätts, annat utanför bokstäver,
+ * siffror och vanlig skiljeteckenuppsättning tas bort.
+ */
+export function fortnoxText(text: string): string {
+  return text
+    .replace(/\s*[·•∙]\s*/g, ', ')
+    .replace(/[–—−]/g, '-')
+    .replace(/[‘’´`]/g, "'")
+    .replace(/[“”„]/g, '"')
+    .replace(/…/g, '...')
+    .replace(/[   \t]/g, ' ')
+    .replace(/[^\p{L}\p{N} \n\r.,:;!?()[\]\-+/\\&%'"#@*=_<>]/gu, '')
+    .replace(/ {2,}/g, ' ')
+    .trim()
+}
+
 export function buildFortnoxInvoiceRows(
   items: InvoiceItemLike[],
   opts: {
@@ -209,7 +228,7 @@ export function buildFortnoxInvoiceRows(
   const rows: FortnoxInvoiceRow[] = []
   for (const item of items) {
     if (item.line_kind === 'index_note') {
-      rows.push({ Description: item.article_name.slice(0, 200) })
+      rows.push({ Description: fortnoxText(item.article_name).slice(0, 200) })
       continue
     }
     const addon = addonByItem.get(item.id)
@@ -220,7 +239,7 @@ export function buildFortnoxInvoiceRows(
       : item.article_name
     rows.push({
       ArticleNumber: item.article_code || undefined,
-      Description: name.slice(0, 200),
+      Description: fortnoxText(name).slice(0, 200),
       DeliveredQuantity: Number(item.quantity),
       Price: opts.vatIncluded ? toVatInclusivePrice(Number(item.unit_price), item.vat_rate) : Number(item.unit_price),
       VAT: item.vat_rate,
@@ -234,11 +253,11 @@ export function buildFortnoxInvoiceRows(
         : {}),
     })
     const period = addon ? addonPeriodText(addon.timeline) : null
-    if (period) rows.push({ Description: `Period ${period}` })
+    if (period) rows.push({ Description: fortnoxText(`Period ${period}`) })
   }
   const period = addonInvoicePeriod(opts.addonLines ?? [])
   if (period && (opts.addonLines ?? []).some((l) => l.kind === 'station')) {
-    for (const line of addonCustomerNote(period.nextStart)) rows.push({ Description: line.slice(0, 200) })
+    for (const line of addonCustomerNote(period.nextStart)) rows.push({ Description: fortnoxText(line).slice(0, 200) })
   }
   return rows
 }

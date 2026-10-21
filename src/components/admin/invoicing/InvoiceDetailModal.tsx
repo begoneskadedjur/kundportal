@@ -72,7 +72,7 @@ import { useInvoiceCaseChain } from '../../../hooks/useInvoiceCaseChain'
 import { useInvoiceVisit, type VisitSnapshot } from '../../../hooks/useInvoiceVisit'
 import { useInvoiceAddons } from '../../../hooks/useInvoiceAddons'
 import { InvoiceAddonBlock, InvoiceAddonCosts, InvoiceAddonSideCard } from './InvoiceAddonSection'
-import { addonLineName, addonPeriodText, buildFortnoxInvoiceRows, type InvoiceItemLike } from '../../../shared/invoiceAddonLines'
+import { addonLineName, addonPeriodText, buildFortnoxInvoiceRows, fortnoxText, type InvoiceItemLike } from '../../../shared/invoiceAddonLines'
 import { splitCaseLines, formatHours } from '../../../shared/addonEconomics'
 import { formatVisitTechnicians } from '../../../services/visitService'
 import CommentSection from '../../communication/CommentSection'
@@ -1225,6 +1225,13 @@ export default function InvoiceDetailModal({
       // registreras via taxreductions-resursen efter att fakturan skapats.
       if (invoice.rot_rut_type && invoice.fastighetsbeteckning) {
         fortnoxPayload.TaxReductionType = invoice.rot_rut_type.toLowerCase()
+      }
+
+      // Fritexterna tvättas: ett enda tecken Fortnox inte godtar (t.ex. "·" i
+      // avtalsfakturans anteckning) stoppar hela fakturan med 2005016.
+      for (const key of ['Remarks', 'YourReference', 'OurReference', 'ExternalInvoiceReference1', 'ExternalInvoiceReference2']) {
+        const value = fortnoxPayload[key]
+        if (typeof value === 'string') fortnoxPayload[key] = fortnoxText(value)
       }
 
       const fortnoxInvoice = await FortnoxService.createInvoice(fortnoxPayload)

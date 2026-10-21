@@ -5,6 +5,7 @@ import {
   addonLineName,
   addonPeriodText,
   buildFortnoxInvoiceRows,
+  fortnoxText,
   houseWorkHoursFor,
   matchInvoiceAddonLines,
   type AddonCaseRow,
@@ -147,5 +148,17 @@ describe('buildFortnoxInvoiceRows', () => {
     expect(rows[0]).toMatchObject({ HouseWorkType: 'CLEANING', DeliveredQuantity: 1.5 })
     expect(houseWorkHoursFor(0)).toBe(1)
     expect(houseWorkHoursFor(Number.NaN)).toBe(1)
+  })
+})
+
+describe('fortnoxText', () => {
+  it('ersätter mittpunkt och typografiska tecken som Fortnox avvisar (2005016)', () => {
+    expect(fortnoxText('Årspremie Mekaniska fällor · Betalning 1/1 · Period 2026-10-01 t.o.m. 2027-09-30'))
+      .toBe('Årspremie Mekaniska fällor, Betalning 1/1, Period 2026-10-01 t.o.m. 2027-09-30')
+    expect(fortnoxText('Avtal – ”Ö-hus” … klart ✅')).toBe('Avtal - "Ö-hus" ... klart')
+  })
+
+  it('lämnar vanlig text orörd', () => {
+    expect(fortnoxText('Pär-Eric Nilsson, BE-0009084 (10 %)')).toBe('Pär-Eric Nilsson, BE-0009084 (10 %)')
   })
 })

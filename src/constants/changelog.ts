@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.73.1',
+    date: '2026-10-21',
+    title: 'Avtalsfakturor går att skicka till Fortnox',
+    items: [
+      { kind: 'buggfix', text: 'Avtalsfakturor stoppades av Fortnox med "Dokumenttext innehåller ogiltiga tecken". Fakturatexten innehöll mittpunkter (·) som Fortnox inte godtar. Text som skickas till Fortnox tvättas nu från sådana tecken, i portalen ser texten ut som förut.' },
+    ],
+  },
+  {
     version: '3.73.0',
     date: '2026-10-21',
     title: 'Avtalskunder får kundnummer från Fortnox',
