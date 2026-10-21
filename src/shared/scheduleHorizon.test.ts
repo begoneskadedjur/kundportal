@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { scheduleHorizon } from './scheduleHorizon'
+import { scheduleHorizon, contractLengthMonths } from './scheduleHorizon'
 import { generateInspectionDates } from '../utils/inspectionDateGenerator'
 import type { DateGenerationParams } from '../types/recurringSchedule'
 
@@ -33,10 +33,35 @@ describe('scheduleHorizon', () => {
     expect(h.planEnd).toBe('2026-12-01')
   })
 
-  it('tills vidare: uppsägningstiden framåt', () => {
-    const h = scheduleHorizon({ contract_start_date: '2025-03-01', contract_end_date: null, terminated_at: null, notice_period_months: 3 }, '2026-10-21')
-    expect(h.openEnded).toBe(true)
-    expect(h.planEnd).toBe('2027-01-21')
+  it('avtalsperiod som inte löpt ut: hela perioden, även flera år', () => {
+    const h = scheduleHorizon({ contract_start_date: '2026-02-02', contract_end_date: '2029-02-02', terminated_at: null, notice_period_months: 2 }, '2026-10-21')
+    expect(h.renewalDue).toBe(false)
+    expect(h.planEnd).toBe('2029-02-02')
+    expect(h.lastNoticeDay).toBe('2028-12-02')
+  })
+
+  it('inget slutdatum, inget om avtalstid: ett år från start, sedan ett år i taget', () => {
+    const fore = scheduleHorizon({ contract_start_date: '2025-03-01', contract_end_date: null, terminated_at: null, notice_period_months: 2 }, '2026-10-21')
+    expect(fore.openEnded).toBe(true)
+    expect(fore.currentEnd).toBe('2027-03-01')
+    expect(fore.planEnd).toBe('2027-03-01')
+    const efter = scheduleHorizon({ contract_start_date: '2025-03-01', contract_end_date: null, terminated_at: null, notice_period_months: 2 }, '2027-01-02')
+    expect(efter.renewalDue).toBe(true)
+    expect(efter.planEnd).toBe('2028-03-01')
+  })
+
+  it('inget slutdatum men avtalstid 3 år: hela avtalsperioden', () => {
+    const h = scheduleHorizon({ contract_start_date: '2026-06-01', contract_end_date: null, terminated_at: null, notice_period_months: null, contract_length: '3 år, därefter rullande' }, '2026-10-21')
+    expect(h.planEnd).toBe('2029-06-01')
+  })
+})
+
+describe('contractLengthMonths', () => {
+  it.each([
+    ['3 år', 36], ['1 år, därefter rullande', 12], ['36 månader', 36], ['6 månader', 6],
+    ['3 år och 8 månader', 44], ['2', 24], ['Tillsvidare', null], ['Rullande', null], [null, null],
+  ])('%s → %s', (text, months) => {
+    expect(contractLengthMonths(text)).toBe(months)
   })
 })
 

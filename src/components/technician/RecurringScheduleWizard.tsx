@@ -663,14 +663,11 @@ export function RecurringScheduleWizard({
     if (horizon.terminated) {
       return `Avtalet är uppsagt. Kontroller läggs ut till och med ${fmtDag(subDays(new Date(horizon.planEnd), 1).toISOString())}.`
     }
-    if (horizon.openEnded) {
-      return `Avtalet löper tills vidare. Kontroller läggs ut till ${fmtDag(horizon.planEnd)} (uppsägningstiden framåt) och fylls sedan på automatiskt.`
-    }
     if (horizon.renewalDue && horizon.lastNoticeDay) {
-      return `Avtalet förlängdes när sista uppsägningsdag ${fmtDag(horizon.lastNoticeDay)} passerade. Kontroller läggs ut till ${fmtDag(horizon.planEnd)}, därefter ett avtalsår i taget.`
+      return `Avtalet förlängdes ett år när sista uppsägningsdag ${fmtDag(horizon.lastNoticeDay)} passerade. Kontroller läggs ut till ${fmtDag(horizon.planEnd)}, därefter ett år i taget.`
     }
     if (horizon.currentEnd && horizon.lastNoticeDay) {
-      return `Kontroller läggs ut till periodskiftet ${fmtDag(horizon.currentEnd)}. Sägs avtalet inte upp senast ${fmtDag(horizon.lastNoticeDay)} läggs nästa avtalsår ut automatiskt dagen efter.`
+      return `Kontroller läggs ut för hela avtalsperioden, till ${fmtDag(horizon.currentEnd)}. Sägs avtalet inte upp senast ${fmtDag(horizon.lastNoticeDay)} läggs ett år till ut automatiskt dagen efter.`
     }
     return `Kontroller läggs ut till ${fmtDag(horizon.planEnd)}.`
   }

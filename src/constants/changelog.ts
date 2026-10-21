@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.72.1',
+    date: '2026-10-21',
+    title: 'Schemat för avtal utan slutdatum',
+    items: [
+      { kind: 'andring', text: 'Avtal utan slutdatum räknas som avtalsstarten plus avtalstiden, till exempel 3 år, eller ett år om avtalstid saknas. Hela den perioden läggs ut i schemat, sedan ett år i taget som faktureringen.' },
+    ],
+  },
+  {
     version: '3.72.0',
     date: '2026-10-21',
     title: 'Återkommande kontroller följer avtalsåret',

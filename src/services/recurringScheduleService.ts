@@ -72,7 +72,7 @@ export async function resolveContractEndDate(
 
 /** Fälten avtalsraden ger horisonten (contract_start_date, annars start_date). */
 const HORIZON_CONTRACT_COLUMNS =
-  'contract_start_date, start_date, contract_end_date, terminated_at, effective_end_date, notice_period_months, renewal_mode'
+  'contract_start_date, start_date, contract_end_date, terminated_at, effective_end_date, notice_period_months, renewal_mode, contract_length'
 
 /**
  * Avtalsfälten som styr ett schemas horisont. Avtalsraden är facit när den
@@ -103,6 +103,7 @@ export async function resolveHorizonContract(
           terminated_at: contract.terminated_at ?? null,
           effective_end_date: contract.effective_end_date ?? null,
           notice_period_months: contract.notice_period_months ?? null,
+          contract_length: contract.contract_length ?? null,
           renewal_mode: contract.renewal_mode ?? null,
         }
       }
@@ -115,7 +116,7 @@ export async function resolveHorizonContract(
   // 2. Fallback: kundradens datum med arv från huvudkontoret
   const { data: customer } = await supabase
     .from('customers')
-    .select('contract_end_date, contract_start_date, terminated_at, effective_end_date, notice_period_months, parent_customer_id')
+    .select('contract_end_date, contract_start_date, terminated_at, effective_end_date, notice_period_months, contract_length, parent_customer_id')
     .eq('id', customerId)
     .single()
   if (!customer) return null
@@ -126,11 +127,12 @@ export async function resolveHorizonContract(
     terminated_at: customer.terminated_at ?? null,
     effective_end_date: customer.effective_end_date ?? null,
     notice_period_months: customer.notice_period_months ?? null,
+    contract_length: customer.contract_length ?? null,
   }
   if (customer.parent_customer_id && (!own.contract_end_date || !own.contract_start_date)) {
     const { data: parent } = await supabase
       .from('customers')
-      .select('contract_end_date, contract_start_date, terminated_at, effective_end_date, notice_period_months')
+      .select('contract_end_date, contract_start_date, terminated_at, effective_end_date, notice_period_months, contract_length')
       .eq('id', customer.parent_customer_id)
       .single()
     if (parent) {
@@ -139,6 +141,7 @@ export async function resolveHorizonContract(
       own.terminated_at = own.terminated_at ?? parent.terminated_at ?? null
       own.effective_end_date = own.effective_end_date ?? parent.effective_end_date ?? null
       own.notice_period_months = own.notice_period_months ?? parent.notice_period_months ?? null
+      own.contract_length = own.contract_length ?? parent.contract_length ?? null
     }
   }
   return own

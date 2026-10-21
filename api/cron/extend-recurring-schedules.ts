@@ -66,8 +66,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select(`
         *,
         technician:technicians(id, name, work_schedule),
-        customer:customers(id, contract_status, effective_end_date, contact_person, contact_email, contact_phone, contact_address, contract_start_date, contract_end_date, terminated_at, notice_period_months, parent_customer_id),
-        contract:contracts(id, status, terminated_at, effective_end_date, contract_start_date, start_date, contract_end_date, notice_period_months, renewal_mode)
+        customer:customers(id, contract_status, effective_end_date, contact_person, contact_email, contact_phone, contact_address, contract_start_date, contract_end_date, terminated_at, notice_period_months, contract_length, parent_customer_id),
+        contract:contracts(id, status, terminated_at, effective_end_date, contract_start_date, start_date, contract_end_date, notice_period_months, renewal_mode, contract_length)
       `)
       .eq('status', 'active')
 
@@ -114,6 +114,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           start_date?: string | null
           contract_end_date?: string | null
           notice_period_months?: number | null
+          contract_length?: string | null
           renewal_mode?: string | null
         } | null
         if (contract?.status === 'ended') {
@@ -132,6 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           contract_end_date?: string | null
           terminated_at?: string | null
           notice_period_months?: number | null
+          contract_length?: string | null
           parent_customer_id?: string | null
         } | null
         if (customer?.contract_status === 'expired') {
@@ -277,6 +279,7 @@ async function horizonContractFor(
     terminated_at?: string | null
     effective_end_date?: string | null
     notice_period_months?: number | null
+    contract_length?: string | null
     renewal_mode?: string | null
   } | null,
   customer: {
@@ -285,6 +288,7 @@ async function horizonContractFor(
     terminated_at?: string | null
     effective_end_date?: string | null
     notice_period_months?: number | null
+    contract_length?: string | null
     parent_customer_id?: string | null
   } | null
 ): Promise<HorizonContract | null> {
@@ -296,6 +300,7 @@ async function horizonContractFor(
       terminated_at: contract.terminated_at ?? null,
       effective_end_date: contract.effective_end_date ?? null,
       notice_period_months: contract.notice_period_months ?? null,
+      contract_length: contract.contract_length ?? null,
       renewal_mode: contract.renewal_mode ?? null,
     }
   }
@@ -306,12 +311,13 @@ async function horizonContractFor(
     terminated_at: customer.terminated_at ?? null,
     effective_end_date: customer.effective_end_date ?? null,
     notice_period_months: customer.notice_period_months ?? null,
+    contract_length: customer.contract_length ?? null,
   }
   // Multisite-enheter saknar egna avtalsdatum och följer huvudkontoret
   if (customer.parent_customer_id && (!own.contract_end_date || !own.contract_start_date)) {
     const { data: parent } = await supabase
       .from('customers')
-      .select('contract_end_date, contract_start_date, terminated_at, effective_end_date, notice_period_months')
+      .select('contract_end_date, contract_start_date, terminated_at, effective_end_date, notice_period_months, contract_length')
       .eq('id', customer.parent_customer_id)
       .maybeSingle()
     if (parent) {
@@ -320,6 +326,7 @@ async function horizonContractFor(
       own.terminated_at = own.terminated_at ?? parent.terminated_at ?? null
       own.effective_end_date = own.effective_end_date ?? parent.effective_end_date ?? null
       own.notice_period_months = own.notice_period_months ?? parent.notice_period_months ?? null
+      own.contract_length = own.contract_length ?? parent.contract_length ?? null
     }
   }
   return own
