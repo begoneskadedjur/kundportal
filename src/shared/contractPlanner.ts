@@ -34,6 +34,11 @@ export interface PlanningContract {
   notice_period_months: number | null
   /** § 8 förlängningsläge: rolling (default), fixed eller option */
   renewal_mode?: string | null
+  /**
+   * Uppsägningens sista giltiga dag (satt vid uppsägning). Går före den
+   * beräknade kapningen: kunden betalar till och med detta datum.
+   */
+  effective_end_date?: string | null
 }
 
 /** Ett steg i premietrappan: årsvärdet som gäller från och med datumet. */
@@ -164,12 +169,15 @@ function addDays(d: Date, days: number): Date {
 
 /**
  * Kapningsdatum vid uppsägning:
- * - Inom bindningstid (terminated_at <= contract_end_date): avtalet löper till contract_end_date.
- * - Fortlöpande (terminated_at > contract_end_date): terminated_at + notice_period_months.
+ * - Satt slutdatum (effective_end_date, sista giltiga dag): det datumet.
+ *   Kunden betalar till och med slutdatumet (beslut Christian 2026-10-21).
+ * - Annars inom bindningstid (terminated_at <= contract_end_date): contract_end_date.
+ * - Annars fortlöpande: terminated_at + notice_period_months.
  * Null när avtalet inte är uppsagt.
  */
 export function computeTerminationCutoff(c: PlanningContract): Date | null {
   if (!c.terminated_at) return null
+  if (c.effective_end_date) return parseLocalDate(c.effective_end_date)
   const notice = c.notice_period_months ?? 2
   const termDate = new Date(c.terminated_at)
   const contractEnd = c.contract_end_date ? parseLocalDate(c.contract_end_date) : null
@@ -421,9 +429,15 @@ export function computePlannedPeriods(contract: PlanningContract, opts: PlanOpti
   // planera som utan horisont.
   const win = opts.window === 'binding' ? bindingWindow(contract, todayIso) : null
   const horizonIso = opts.window === 'binding' ? undefined : opts.horizonEnd
+  // Uppsagt avtal i bindningsläget: planera till uppsägningens slutdatum, inte
+  // till det ursprungliga slutdatumet (som för ett rullande avtal kan ha
+  // passerat för länge sedan). Kunden betalar till och med slutdatumet.
+  const terminationEnd = opts.window === 'binding' && !win ? computeTerminationCutoff(contract) : null
   const end = win
     ? parseLocalDate(win.planEnd)
-    : horizonIso
+    : terminationEnd
+      ? terminationEnd
+      : horizonIso
       ? declaredEnd && declaredEnd > parseLocalDate(horizonIso)
         ? declaredEnd
         : parseLocalDate(horizonIso)

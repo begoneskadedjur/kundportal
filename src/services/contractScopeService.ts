@@ -945,10 +945,10 @@ export class ContractScopeService {
         terminated_at: toLocalISOStringWithOffset(new Date()),
         effective_end_date: effectiveEndDate,
         termination_reason: reason ?? null,
-        billing_active: false,
-        // Passerat slutdatum → avtalet är slut nu. Annars behålls statusen så
-        // det syns som "uppsagt, löper till <datum>".
-        ...(alreadyPassed ? { status: 'ended' } : {}),
+        // Kunden betalar till och med slutdatumet: faktureringen stängs av
+        // först när avtalet tar slut (expire-contracts), och planeraren kapar
+        // vid effective_end_date. Passerat slutdatum → slut nu.
+        ...(alreadyPassed ? { status: 'ended', billing_active: false } : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', contractId)
@@ -1005,7 +1005,7 @@ export class ContractScopeService {
             terminated_at: toLocalISOStringWithOffset(new Date()),
             effective_end_date: effectiveEndDate,
             termination_reason: reason ?? null,
-            billing_active: false,
+            ...(alreadyPassed ? { billing_active: false } : {}),
             contract_status: 'terminated',
           })
           .eq('id', customerId)

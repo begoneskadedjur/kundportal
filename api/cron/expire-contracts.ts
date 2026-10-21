@@ -90,6 +90,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (updateErr) throw updateErr
 
+    // Uppsagda kunder: stäng kundradens fakturering när avtalet tagit slut.
+    // Uppsägningen låter den stå på till slutdatumet (kunden betalar till och
+    // med det), men utan levande avtal skulle annars buildSyntheticContract
+    // läsa kundraden och planera fakturor igen.
+    const customerIds = [...new Set(rows.map((r) => r.customer_id).filter((id): id is string => !!id))]
+    if (customerIds.length > 0) {
+      const { data: stillLive } = await supabase
+        .from('contracts')
+        .select('customer_id')
+        .in('customer_id', customerIds)
+        .in('status', ['signed', 'active'])
+        .is('terminated_at', null)
+      const keep = new Set((stillLive ?? []).map((c) => c.customer_id as string))
+      const close = customerIds.filter((id) => !keep.has(id))
+      if (close.length > 0) {
+        const { error: custErr } = await supabase
+          .from('customers')
+          .update({ billing_active: false })
+          .in('id', close)
+          .not('terminated_at', 'is', null)
+        if (custErr) console.error('[expire-contracts] Kunde inte stänga kundradens fakturering:', custErr.message)
+      }
+    }
+
     // Pausa scheman som fortfarande ligger aktiva på avtalet. ALDRIG
     // 'cancelled' — den vägen är irreversibel och sätter kopplade ärenden till
     // 'Borttaget'. 'paused' stoppar extend-recurring-schedules (som bara

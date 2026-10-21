@@ -7,6 +7,8 @@ import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 import { ContractInvoiceGenerator } from '../../../services/contractInvoiceGenerator'
 import { cancelVisitsAfterEnd } from '../../../services/terminationVisits'
+import { terminationLastDay } from '../../../shared/scheduleHorizon'
+import { toLocalIsoDate, todayLocal } from '../../../shared/contractPlanner'
 
 interface TerminateContractModalProps {
   organization: ConsolidatedCustomer | null
@@ -24,12 +26,6 @@ const formatCurrency = (amount: number): string => {
   }).format(amount)
 }
 
-function addMonths(date: Date, months: number): Date {
-  const result = new Date(date)
-  result.setMonth(result.getMonth() + months)
-  return result
-}
-
 export default function TerminateContractModal({ organization, isOpen, onClose, onTerminated }: TerminateContractModalProps) {
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
@@ -41,19 +37,31 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
 
   const isValidDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(new Date(s).getTime())
 
-  const resolvedEndDate: Date = useMemo(() => {
-    if (customEndDate && isValidDate(customEndDate)) return new Date(customEndDate)
-    if (!contractEnd) return addMonths(today, 2)
-    return today <= contractEnd ? contractEnd : addMonths(today, 2)
-  }, [customEndDate, contractEnd?.toISOString()])
+  // Förslag: sista giltiga dag enligt avtalet. Hinner uppsägningen före sista
+  // uppsägningsdag (2 mån före periodskiftet) gäller avtalet till
+  // periodskiftet, annars har det förlängts ett år. Kunden betalar till och
+  // med dagen.
+  const forslag = useMemo(
+    () => terminationLastDay({
+      contract_start_date: null,
+      contract_end_date: organization?.nextRenewalDate ?? null,
+      notice_period_months: null,
+    }),
+    [organization?.nextRenewalDate]
+  )
 
-  const isWithinContractPeriod = contractEnd ? resolvedEndDate <= contractEnd : false
+  const resolvedEndDate: Date = useMemo(() => {
+    if (customEndDate && isValidDate(customEndDate)) return new Date(customEndDate + 'T12:00:00')
+    return new Date(forslag.lastDay + 'T12:00:00')
+  }, [customEndDate, forslag.lastDay])
+
   const customDateValid = !customEndDate || isValidDate(customEndDate)
 
   if (!isOpen || !organization) return null
 
   const formatDate = (d: Date) => d.toLocaleDateString('sv-SE')
-  const effectiveDateStr = resolvedEndDate.toISOString().split('T')[0]
+  const effectiveDateStr = customEndDate && isValidDate(customEndDate) ? customEndDate : forslag.lastDay
+  const alreadyPassed = effectiveDateStr < toLocalIsoDate(todayLocal())
 
   const handleTerminate = async () => {
     if (!confirmed) return
@@ -78,7 +86,9 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
           termination_reason: reason || null,
           effective_end_date: effectiveDateStr,
           contract_status: 'terminated',
-          billing_active: false
+          // Kunden betalar till och med slutdatumet: faktureringen stängs av
+          // när avtalet tagit slut (expire-contracts), inte vid uppsägningen.
+          ...(alreadyPassed ? { billing_active: false } : {}),
         })
         .in('id', siteIds)
 
@@ -95,7 +105,7 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
           terminated_at: terminatedAtIso,
           termination_reason: reason || null,
           effective_end_date: effectiveDateStr,
-          billing_active: false,
+          ...(alreadyPassed ? { billing_active: false } : {}),
           updated_at: terminatedAtIso,
         })
         .in('customer_id', siteIds)
@@ -218,24 +228,27 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
               <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
                 <p className="text-sm text-slate-300 font-medium mb-1">Manuellt angivet slutdatum</p>
                 <p className="text-xs text-slate-400">
-                  Avtalet avslutas: <strong className="text-white tabular-nums">{formatDate(resolvedEndDate)}</strong>
+                  Sista giltiga dag: <strong className="text-white tabular-nums">{formatDate(resolvedEndDate)}</strong>
                 </p>
               </div>
-            ) : isWithinContractPeriod ? (
-              <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
-                <p className="text-sm text-slate-300 font-medium mb-1">Uppsägning inom avtalstiden</p>
+            ) : forslag.renewalDue ? (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                <p className="text-sm text-amber-300 font-medium mb-1">Avtalet har redan förlängts ett år</p>
                 <p className="text-xs text-slate-400">
-                  Avtalet avslutas vid nuvarande slutdatum: <strong className="text-white tabular-nums">{formatDate(resolvedEndDate)}</strong>
+                  Sista uppsägningsdag {forslag.lastNoticeDay} har passerat. Sista giltiga dag: <strong className="text-white tabular-nums">{formatDate(resolvedEndDate)}</strong>
                 </p>
               </div>
             ) : (
-              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-                <p className="text-sm text-amber-300 font-medium mb-1">Avtalet har löpt vidare efter avtalstiden</p>
+              <div className="p-3 bg-slate-800/20 border border-slate-700/50 rounded-xl">
+                <p className="text-sm text-slate-300 font-medium mb-1">Uppsägningen hinner före periodskiftet</p>
                 <p className="text-xs text-slate-400">
-                  Uppsägningstid 2 månader. Avtalet avslutas: <strong className="text-white tabular-nums">{formatDate(resolvedEndDate)}</strong>
+                  {forslag.lastNoticeDay ? `Sista uppsägningsdag är ${forslag.lastNoticeDay}. ` : ''}Sista giltiga dag: <strong className="text-white tabular-nums">{formatDate(resolvedEndDate)}</strong>
                 </p>
               </div>
             )}
+            <p className="text-xs text-slate-500">
+              Kunden faktureras till och med sista giltiga dag. Ärenden i schemat efter dagen tas bort.
+            </p>
 
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-1">

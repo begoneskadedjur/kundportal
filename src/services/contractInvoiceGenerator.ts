@@ -216,6 +216,8 @@ export interface CustomerForPlanning {
   billing_anchor_month: number | null
   billing_active: boolean | null
   notice_period_months: number | null
+  /** Uppsägningens sista giltiga dag: kunden betalar till och med den */
+  effective_end_date?: string | null
 }
 
 type CustomerRow = CustomerForPlanning & {
@@ -1218,13 +1220,18 @@ export class ContractInvoiceGenerator {
     const cutoff = computeTerminationCutoff(customer as CustomerRow)
     if (!cutoff) return 0
 
-    const { data: toDelete, error: fErr } = await supabase
+    // Satt slutdatum (effective_end_date) är sista giltiga dag och betalas:
+    // bara perioder som börjar EFTER det tas bort. Utan slutdatum är cutoff
+    // dagen då avtalet upphör, och en period som startar där tas bort.
+    const lastDayKnown = !!(customer as CustomerRow).effective_end_date
+    const base = supabase
       .from('invoices')
       .select('id, status, billing_period_start')
       .eq('customer_id', customerId)
       .eq('invoice_type', 'contract')
-      // gte: en period som STARTAR exakt på cutoff ligger efter avtalstiden
-      .gte('billing_period_start', toLocalIsoDate(cutoff))
+    const { data: toDelete, error: fErr } = lastDayKnown
+      ? await base.gt('billing_period_start', toLocalIsoDate(cutoff))
+      : await base.gte('billing_period_start', toLocalIsoDate(cutoff))
 
     if (fErr) throw new Error(fErr.message)
 
@@ -1243,8 +1250,8 @@ export class ContractInvoiceGenerator {
    * till just det avtalet, och avtalets rader på kundens samlingsfakturor.
    * Kundens andra avtal rörs aldrig. Rader utan contract_id lämnas orörda.
    *
-   * effectiveEndDate = sista giltiga dagen. En period som STARTAR exakt på
-   * slutdatumet ligger efter avtalstiden och tas därför bort (gte).
+   * effectiveEndDate = sista giltiga dagen, och kunden betalar till och med
+   * den. Bara perioder som STARTAR efter slutdatumet tas bort (gt).
    */
   static async cancelFutureForContract(contractId: string, effectiveEndDate: string): Promise<number> {
     if (!contractId || contractId.startsWith('synth-') || contractId.startsWith('kundrad-')) return 0
@@ -1254,7 +1261,7 @@ export class ContractInvoiceGenerator {
       .select('id, status, billing_period_start')
       .eq('contract_id', contractId)
       .eq('invoice_type', 'contract')
-      .gte('billing_period_start', effectiveEndDate)
+      .gt('billing_period_start', effectiveEndDate)
     if (error) throw new Error(`Kunde inte hämta framtida fakturor: ${error.message}`)
 
     let deleted = 0
@@ -1274,7 +1281,7 @@ export class ContractInvoiceGenerator {
     const touched = new Set<string>()
     for (const r of (consolidatedRows ?? []) as unknown as ConsRow[]) {
       const inv = r.invoice
-      if (!inv?.is_consolidated || !inv.billing_period_start || inv.billing_period_start < effectiveEndDate) continue
+      if (!inv?.is_consolidated || !inv.billing_period_start || inv.billing_period_start <= effectiveEndDate) continue
       if (LOCKED_STATUSES.has(inv.status ?? '')) continue
       await supabase.from('invoice_items').delete().eq('id', r.id)
       touched.add(inv.id)

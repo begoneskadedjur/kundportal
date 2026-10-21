@@ -48,6 +48,7 @@ import {
   type RecordInspectionSession,
 } from '../../../../hooks/useCustomerRecord'
 import { daysUntilEnd, isTerminatedButRunning } from '../../../../utils/contractLifecycle'
+import { terminationLastDay } from '../../../../shared/scheduleHorizon'
 import { buildRenewalPrefill } from '../../../../utils/contractRenewalPrefill'
 import { ContractScopeService, FrameworkAgreementService } from '../../../../services/contractScopeService'
 import { useFrameworkAgreements } from '../../../../hooks/useFrameworkAgreements'
@@ -3771,8 +3772,20 @@ function TerminateModal({
   onClose: () => void
   onConfirm: (endDate: string, reason: string | null) => void
 }) {
-  // Förval: avtalets slutdatum om det finns, annars idag
-  const [endDate, setEndDate] = useState(contract.contract_end_date ?? todayKey())
+  // Förval: sista giltiga dag enligt avtalet. Hinner uppsägningen före sista
+  // uppsägningsdag gäller avtalet till periodskiftet, annars ett år till.
+  // Kunden betalar till och med dagen.
+  const forslag = useMemo(() => {
+    const c = contract as RecordContract & { start_date?: string | null; contract_length?: string | null }
+    return terminationLastDay({
+      contract_start_date: c.contract_start_date ?? c.start_date ?? null,
+      contract_end_date: c.contract_end_date ?? null,
+      notice_period_months: c.notice_period_months ?? null,
+      renewal_mode: c.renewal_mode ?? null,
+      contract_length: c.contract_length ?? null,
+    }, todayKey())
+  }, [contract])
+  const [endDate, setEndDate] = useState(forslag.lastDay)
   const [reason, setReason] = useState('')
   const alreadyPassed = endDate < todayKey()
 
@@ -3799,8 +3812,15 @@ function TerminateModal({
         />
         <p className="text-[11px] text-slate-500 mt-1 mb-3">
           {alreadyPassed
-            ? 'Datumet har passerat — avtalet markeras som avslutat direkt.'
-            : 'Avtalet visas som uppsagt och löper till detta datum.'}
+            ? 'Datumet har passerat. Avtalet markeras som avslutat direkt.'
+            : 'Avtalet visas som uppsagt och löper till detta datum. Kunden faktureras till och med dagen, och schemat tas bort efter den.'}
+          {endDate === forslag.lastDay && forslag.lastNoticeDay && (
+            <span className="block mt-1">
+              {forslag.renewalDue
+                ? `Sista uppsägningsdag ${forslag.lastNoticeDay} har passerat, så avtalet har förlängts ett år.`
+                : `Uppsägningen hinner före sista uppsägningsdag ${forslag.lastNoticeDay}.`}
+            </span>
+          )}
         </p>
 
         <label className="block text-xs font-medium text-slate-400 mb-1">Anledning (valfritt)</label>

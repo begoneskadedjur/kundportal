@@ -86,6 +86,33 @@ describe('planeringen: bara nuvarande bindningstid', () => {
     expect(starts(c, '2027-09-01')).toEqual(['2026-10-01'])
   })
 
+  it('uppsagt månadsavtal faktureras till och med slutdatumet, inte längre', () => {
+    const c = base({
+      billing_frequency: 'monthly',
+      contract_start_date: '2024-11-01',
+      contract_end_date: '2025-11-01',
+      terminated_at: '2026-10-21T10:00:00+02:00',
+      effective_end_date: '2026-12-31',
+    })
+    const s = starts(c, '2026-10-21')
+    expect(s).toContain('2026-11-01')
+    expect(s).toContain('2026-12-01')
+    expect(s).not.toContain('2027-01-01')
+  })
+
+  it('uppsagt rullande årsavtal: året som redan förlängts faktureras', () => {
+    const c = base({
+      contract_start_date: '2024-11-04',
+      contract_end_date: '2025-11-04',
+      billing_anchor_month: 11,
+      terminated_at: '2026-10-21T10:00:00+02:00',
+      effective_end_date: '2027-11-03',
+    })
+    const s = starts(c, '2026-10-21')
+    expect(s).toContain('2026-11-01')
+    expect(s).not.toContain('2027-11-01')
+  })
+
   it('uppsagt avtal planeras som utan horisont (slutdatum och kapning)', () => {
     const c = base({ terminated_at: '2027-01-10' })
     expect(bindingWindow(c, '2027-07-15')).toBeNull()

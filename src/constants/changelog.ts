@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.72.3',
+    date: '2026-10-21',
+    title: 'Uppsagda avtal faktureras till slutdatumet',
+    items: [
+      { kind: 'buggfix', text: 'Ett uppsagt avtal faktureras till och med sista giltiga dag. Förut stängdes faktureringen av direkt vid uppsägningen, så ett månadsfakturerat avtal missade sina sista månader.' },
+      { kind: 'andring', text: 'Uppsägningsrutorna föreslår sista giltiga dag enligt avtalet. Hinner uppsägningen före sista uppsägningsdag gäller avtalet till periodskiftet, annars har det redan förlängts ett år. Datumet går att ändra.' },
+    ],
+  },
+  {
     version: '3.72.2',
     date: '2026-10-21',
     title: 'Uppsagda avtal försvinner ur schemat',

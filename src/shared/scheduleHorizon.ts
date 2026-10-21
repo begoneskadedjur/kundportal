@@ -55,6 +55,23 @@ export function contractLengthMonths(text: string | null | undefined): number | 
   return months > 0 ? months : null
 }
 
+/**
+ * Sista giltiga dag om avtalet sägs upp i dag (förslag i uppsägningsrutorna).
+ * Hinner uppsägningen före sista uppsägningsdag gäller avtalet till
+ * periodskiftet; annars har det redan förlängts och gäller ett år till.
+ * Kunden betalar till och med dagen. Saknas avtalsdatum: uppsägningstiden framåt.
+ */
+export function terminationLastDay(
+  c: Omit<HorizonContract, 'terminated_at' | 'effective_end_date'>,
+  todayIso: string = toLocalIsoDate(todayLocal())
+): { lastDay: string; lastNoticeDay: string | null; renewalDue: boolean } {
+  const h = scheduleHorizon({ ...c, terminated_at: null, effective_end_date: null }, todayIso)
+  if (!h.planEnd) {
+    return { lastDay: addDaysIso(addMonthsIso(todayIso, c.notice_period_months ?? 2), -1), lastNoticeDay: null, renewalDue: false }
+  }
+  return { lastDay: addDaysIso(h.planEnd, -1), lastNoticeDay: h.lastNoticeDay, renewalDue: h.renewalDue }
+}
+
 export interface ScheduleHorizon {
   /** Kontroller läggs ut till (exklusive) detta datum. null = horisont saknas */
   planEnd: string | null

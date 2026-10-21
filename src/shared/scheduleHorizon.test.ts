@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { scheduleHorizon, contractLengthMonths } from './scheduleHorizon'
+import { scheduleHorizon, contractLengthMonths, terminationLastDay } from './scheduleHorizon'
 import { generateInspectionDates } from '../utils/inspectionDateGenerator'
 import type { DateGenerationParams } from '../types/recurringSchedule'
 
@@ -54,6 +54,22 @@ describe('scheduleHorizon', () => {
   it('inget slutdatum men avtalstid 3 år: hela avtalsperioden', () => {
     const h = scheduleHorizon({ contract_start_date: '2026-06-01', contract_end_date: null, terminated_at: null, notice_period_months: null, contract_length: '3 år, därefter rullande' }, '2026-10-21')
     expect(h.planEnd).toBe('2029-06-01')
+  })
+})
+
+describe('terminationLastDay', () => {
+  const c = { contract_start_date: '2024-11-04', contract_end_date: '2025-11-04', notice_period_months: 2 }
+  it('före sista uppsägningsdag: dagen före periodskiftet', () => {
+    expect(terminationLastDay(c, '2026-08-01')).toEqual({ lastDay: '2026-11-03', lastNoticeDay: '2026-09-04', renewalDue: false })
+  })
+  it('efter sista uppsägningsdag: ett år till', () => {
+    expect(terminationLastDay(c, '2026-10-21')).toEqual({ lastDay: '2027-11-03', lastNoticeDay: '2026-09-04', renewalDue: true })
+  })
+  it('bindningstid kvar: till bindningstidens slut', () => {
+    expect(terminationLastDay({ contract_start_date: '2026-02-02', contract_end_date: '2029-02-02', notice_period_months: 2 }, '2026-10-21').lastDay).toBe('2029-02-01')
+  })
+  it('utan avtalsdatum: uppsägningstiden framåt', () => {
+    expect(terminationLastDay({ contract_start_date: null, contract_end_date: null, notice_period_months: null }, '2026-10-21').lastDay).toBe('2026-12-20')
   })
 })
 
