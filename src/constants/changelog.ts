@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.74.0',
+    date: '2026-10-21',
+    title: 'Statusknappen syns',
+    items: [
+      { kind: 'andring', text: 'Knappen för att byta status i ärendefönstren heter nu "Ändra status" och är grön med en egen ikon, så den är lätt att hitta. Önskemål från teknikerna.' },
+      { kind: 'andring', text: 'Mellanstatusar som Återbesök visas som text med en färgad punkt bredvid stegen.' },
+    ],
+  },
+  {
     version: '3.73.1',
     date: '2026-10-21',
     title: 'Avtalsfakturor går att skicka till Fortnox',

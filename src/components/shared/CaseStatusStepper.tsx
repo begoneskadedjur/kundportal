@@ -1,12 +1,13 @@
 // src/components/shared/CaseStatusStepper.tsx
 // Klickbar statusstepper för ärendemodalerna: Öppen ── Bokad ── Avslutat.
 // Statusar utanför huvudflödet (Återbesök, Offert skickad m.fl.) visas som
-// färgat chip vid det pausade steget, och hela statuslistan nås via en
+// platt text med statuspunkt till höger om stegen, och hela statuslistan nås via en
 // kompakt dropdown så att inga statusval försvinner jämfört med den gamla
 // <select>-ytan. Komponenten är ren UI - själva statuslogiken (fakturering,
 // provision osv. vid Avslutat) ligger kvar i modalernas submit-handlers.
 import React, { Fragment, useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown } from 'lucide-react'
+import { Icon } from '../icons/Icon'
 
 interface CaseStatusStepperProps {
   status: string
@@ -20,18 +21,18 @@ interface CaseStatusStepperProps {
   stepDates?: (string | null | undefined)[]
 }
 
-// Chipfärger i samma språk som schemats getStatusStyle
-function getChipStyle(status: string): string {
+// Textfärger i samma språk som schemats getStatusStyle
+function getStatusTextColor(status: string): string {
   const ls = (status || '').toLowerCase()
-  if (ls.includes('avslutat')) return 'bg-emerald-600/20 text-emerald-300 border-emerald-500/30'
-  if (ls.startsWith('återbesök')) return 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-  if (ls.includes('signerad') || ls.startsWith('avtal signerat')) return 'bg-[#20c58f]/20 text-[#20c58f] border-[#20c58f]/30'
-  if (ls.includes('offert') || ls.startsWith('avtal s')) return 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-  if (ls.includes('bokad') || ls.includes('bokat')) return 'bg-amber-500/20 text-amber-300 border-amber-500/30'
-  if (ls.includes('pågående')) return 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-  if (ls.includes('borttag') || ls.includes('stängt') || ls.includes('makuler')) return 'bg-red-500/20 text-red-300 border-red-500/30'
-  if (ls.includes('öppen')) return 'bg-sky-500/20 text-sky-300 border-sky-500/30'
-  return 'bg-slate-500/15 text-slate-300 border-slate-600/50'
+  if (ls.includes('avslutat')) return 'text-emerald-300'
+  if (ls.startsWith('återbesök')) return 'text-blue-300'
+  if (ls.includes('signerad') || ls.startsWith('avtal signerat')) return 'text-[#20c58f]'
+  if (ls.includes('offert') || ls.startsWith('avtal s')) return 'text-cyan-300'
+  if (ls.includes('bokad') || ls.includes('bokat')) return 'text-amber-300'
+  if (ls.includes('pågående')) return 'text-purple-300'
+  if (ls.includes('borttag') || ls.includes('stängt') || ls.includes('makuler')) return 'text-red-300'
+  if (ls.includes('öppen')) return 'text-sky-300'
+  return 'text-slate-300'
 }
 
 function formatStepDate(value: string | null | undefined): string | null {
@@ -122,27 +123,33 @@ export default function CaseStatusStepper({
         })}
       </div>
 
+      {/* Mellanstatus som platt text med statuspunkt (inga piller) */}
       {isIntermediate && (
-        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border flex-shrink-0 ${getChipStyle(status)}`}>
+        <span className={`inline-flex items-center gap-1.5 text-xs font-medium flex-shrink-0 ${getStatusTextColor(status)}`}>
           <span className="w-1.5 h-1.5 rounded-full bg-current" />
           {status}
         </span>
       )}
 
-      {/* Fullständig statuslista - inga statusval försvinner */}
+      {/* Fullständig statuslista - inga statusval försvinner. Grön kontur och
+          egen ikon så att teknikerna hittar den (önskemål 2026-10-21). */}
       <div className="relative flex-shrink-0" ref={menuRef}>
         <button
           type="button"
           onClick={() => !disabled && setMenuOpen(o => !o)}
           disabled={disabled}
-          className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs border transition-colors duration-200 ${
+          aria-expanded={menuOpen}
+          className={`flex items-center gap-1.5 pl-2 pr-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors duration-200 ${
             disabled
               ? 'text-slate-600 border-slate-800 cursor-default'
-              : 'text-slate-400 border-slate-700 hover:text-slate-200 hover:border-slate-500'
+              : menuOpen
+                ? 'text-[#20c58f] bg-[#20c58f]/20 border-[#20c58f]'
+                : 'text-[#20c58f] bg-[#20c58f]/10 border-[#20c58f]/55 hover:bg-[#20c58f]/20 hover:border-[#20c58f]'
           }`}
           title="Alla statusar"
         >
-          Status
+          <Icon name="arende.status" size={16} />
+          Ändra status
           <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${menuOpen ? 'rotate-180' : ''}`} />
         </button>
         {menuOpen && (

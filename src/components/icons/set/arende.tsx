@@ -28,6 +28,17 @@ export const arendeIcons = {
       <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
     </>
   ),
+  // Ändra status: två motriktade bågpilar runt en punkt (statusknappen i
+  // ärendemodalernas stepper, förslag A 2026-10-21)
+  'arende.status': (
+    <>
+      <path d="M19.5 9.5A8 8 0 0 0 5.2 7.6" />
+      <path d="M4.5 14.5a8 8 0 0 0 14.3 1.9" />
+      <path d="M5 3.5v4.2h4.2" />
+      <path d="M19 20.5v-4.2h-4.2" />
+      <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
+    </>
+  ),
   // Station: fällbox med ingångshål
   'arende.station': (
     <>
