@@ -1,6 +1,8 @@
 // api/cron/extend-recurring-schedules.ts
 // Daily cron job to extend recurring inspection schedules
-// Runs at 04:00 via Vercel Cron - generates new sessions for schedules approaching their generated_until date
+// Runs at 04:00 via Vercel Cron - lägger ut kontroller fram till schemats
+// horisont (periodskiftet, eller hela nästa avtalsår när sista
+// uppsägningsdag passerat)
 //
 // Sedan 2026-08-24 delar cronen klientens fullfjädrade datumgenerator
 // (src/utils/inspectionDateGenerator, med timeZone='Europe/Stockholm' eftersom
@@ -13,8 +15,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createClient } from '@supabase/supabase-js'
 import { requireCronSecret } from '../_lib/cronAuth'
-import { addMonths, format } from 'date-fns'
+import { format } from 'date-fns'
 import { generateInspectionDates } from '../../src/utils/inspectionDateGenerator'
+import { scheduleHorizon, type HorizonContract } from '../../src/shared/scheduleHorizon'
+import { toLocalIsoDate, todayLocal } from '../../src/shared/contractPlanner'
 import type {
   GeneratedInspectionDate,
   RecurringDayPattern,
@@ -29,9 +33,16 @@ const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-// Threshold: extend when generated_until is less than 60 days away
-const EXTENSION_THRESHOLD_DAYS = 60
-const EXTENSION_MONTHS = 2
+// Horisonten följer avtalet (scheduleHorizon, samma regel som fakturorna):
+// kontroller läggs ut till periodskiftet, och när sista uppsägningsdag passerat
+// utan uppsägning läggs hela nästa avtalsår ut på en gång. Förut förlängdes
+// alla scheman två månader i taget, och perioderna räknades om från varje
+// förlängning, så "6 per år" blev 6 per två månader.
+//
+// Tidsbudget: ett år per schema kan ge många ärenden första natten. Scheman
+// som inte hinns med tas nästa natt (generated_until flyttas bara när ett
+// schema är klart).
+const TIME_BUDGET_MS = 90_000
 
 // Klockslag i recurring_schedules.preferred_time är svensk väggtid
 const TIME_ZONE = 'Europe/Stockholm'
@@ -46,20 +57,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   console.log('[extend-schedules] Starting recurring schedule extension check...')
 
   try {
-    const thresholdDate = new Date()
-    thresholdDate.setDate(thresholdDate.getDate() + EXTENSION_THRESHOLD_DAYS)
+    const startedAt = Date.now()
+    const todayIso = toLocalIsoDate(todayLocal())
 
-    // Find all active schedules that need extension
+    // Alla aktiva scheman: horisonten avgör per schema om något ska läggas ut
     const { data: schedules, error: fetchError } = await supabase
       .from('recurring_schedules')
       .select(`
         *,
         technician:technicians(id, name, work_schedule),
-        customer:customers(id, contract_status, effective_end_date, contact_person, contact_email, contact_phone, contact_address),
-        contract:contracts(id, status, terminated_at, effective_end_date)
+        customer:customers(id, contract_status, effective_end_date, contact_person, contact_email, contact_phone, contact_address, contract_start_date, contract_end_date, terminated_at, notice_period_months, parent_customer_id),
+        contract:contracts(id, status, terminated_at, effective_end_date, contract_start_date, start_date, contract_end_date, notice_period_months, renewal_mode)
       `)
       .eq('status', 'active')
-      .lt('generated_until', format(thresholdDate, 'yyyy-MM-dd'))
 
     if (fetchError) {
       console.error('[extend-schedules] Error fetching schedules:', fetchError)
@@ -86,49 +96,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     let totalCreated = 0
     let totalErrors = 0
+    let deferred = 0
 
     for (const schedule of schedules) {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) {
+        deferred++
+        continue
+      }
       try {
-        const currentEnd = new Date(schedule.generated_until)
-        let newEnd = addMonths(currentEnd, EXTENSION_MONTHS)
+        const currentEnd = new Date(schedule.generated_until ?? schedule.schedule_start_date)
 
-        // Avtalet först: ett uppsagt avtal ska inte generera besök efter sin
-        // sista giltiga dag, även om KUNDEN fortfarande är aktiv (kunder med
-        // flera avtal behåller contract_status 'active' när ett sägs upp).
         const contract = schedule.contract as {
           status?: string | null
           terminated_at?: string | null
           effective_end_date?: string | null
+          contract_start_date?: string | null
+          start_date?: string | null
+          contract_end_date?: string | null
+          notice_period_months?: number | null
+          renewal_mode?: string | null
         } | null
         if (contract?.status === 'ended') {
           console.log(`[extend-schedules] Schedule ${schedule.id}: avtalet avslutat, hoppar över`)
           continue
         }
-        if (contract?.terminated_at) {
-          const contractEnd = contract.effective_end_date
-            ? new Date(contract.effective_end_date)
-            : null
-          if (!contractEnd || currentEnd >= contractEnd) {
-            console.log(`[extend-schedules] Schedule ${schedule.id}: avtalet uppsagt, hoppar över`)
-            continue
-          }
-          // Kapa förlängningen vid avtalets slutdatum
-          if (newEnd > contractEnd) newEnd = contractEnd
-        }
 
-        // is_auto_renewing=false betyder att schemat INTE ska rulla vidare
-        // förbi sitt eget avtalsslutdatum (alla scheman i produktion är true,
-        // men flaggan finns i modellen och ska respekteras).
-        if (schedule.is_auto_renewing === false && schedule.contract_end_date) {
-          const hardEnd = new Date(schedule.contract_end_date)
-          if (currentEnd >= hardEnd) {
-            console.log(`[extend-schedules] Schedule ${schedule.id}: is_auto_renewing=false och avtalstiden slut, hoppar över`)
-            continue
-          }
-          if (newEnd > hardEnd) newEnd = hardEnd
-        }
-
-        // Check if customer has been terminated — respect effective_end_date, not binding period
         const customer = schedule.customer as {
           contract_status?: string | null
           effective_end_date?: string | null
@@ -136,21 +128,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           contact_email?: string | null
           contact_phone?: string | null
           contact_address?: string | null
+          contract_start_date?: string | null
+          contract_end_date?: string | null
+          terminated_at?: string | null
+          notice_period_months?: number | null
+          parent_customer_id?: string | null
         } | null
-        if (customer?.contract_status === 'terminated') {
-          const effectiveEnd = customer.effective_end_date
-            ? new Date(customer.effective_end_date)
-            : null
-          if (!effectiveEnd || currentEnd >= effectiveEnd) {
-            console.log(`[extend-schedules] Schedule ${schedule.id} customer terminated, skipping`)
-            continue
-          }
-          if (newEnd > effectiveEnd) newEnd = effectiveEnd
-        }
         if (customer?.contract_status === 'expired') {
           console.log(`[extend-schedules] Schedule ${schedule.id} customer expired, skipping`)
           continue
         }
+
+        // Horisonten ur avtalet, annars kundraden (med arv från huvudkontoret)
+        const horizonContract = await horizonContractFor(contract, customer)
+        const horizon = horizonContract ? scheduleHorizon(horizonContract, todayIso) : null
+        if (!horizon?.planEnd) {
+          console.log(`[extend-schedules] Schedule ${schedule.id}: avtalsdatum saknas, ingen horisont`)
+          continue
+        }
+        let newEnd = new Date(horizon.planEnd)
+        // Kapat slut (uppsägning, is_auto_renewing=false): inget efter sista dagen
+        let hardEnd: Date | null = horizon.terminated ? newEnd : null
+
+        // is_auto_renewing=false betyder att schemat INTE ska rulla vidare
+        // förbi sitt eget avtalsslutdatum (alla scheman i produktion är true,
+        // men flaggan finns i modellen och ska respekteras).
+        if (schedule.is_auto_renewing === false && schedule.contract_end_date) {
+          const scheduleEnd = new Date(schedule.contract_end_date)
+          if (newEnd > scheduleEnd) { newEnd = scheduleEnd; hardEnd = scheduleEnd }
+        }
+
+        // Uppsagd kund: respektera effective_end_date, inte bindningstiden
+        if (customer?.contract_status === 'terminated' && customer.effective_end_date) {
+          const effectiveEnd = new Date(customer.effective_end_date)
+          if (newEnd > effectiveEnd) { newEnd = effectiveEnd; hardEnd = effectiveEnd }
+        }
+
+        if (newEnd <= currentEnd) continue
 
         const technicianId = schedule.technician_id
         const workSchedule = (schedule.technician as { work_schedule?: unknown } | null)?.work_schedule ?? null
@@ -170,6 +184,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           estimatedDurationMinutes: schedule.estimated_duration_minutes || 60,
           startDate: currentEnd,
           endDate: newEnd,
+          // Perioderna räknas från schemats start, inte från förlängningen
+          periodAnchor: new Date(schedule.schedule_start_date),
+          hardEndDate: hardEnd,
           technicianWorkSchedule: workSchedule as WorkSchedule | null,
           technicianAbsences: absences,
           existingBookings: bookings,
@@ -233,10 +250,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    console.log(`[extend-schedules] Done. Created: ${totalCreated}, Errors: ${totalErrors}`)
+    console.log(`[extend-schedules] Done. Created: ${totalCreated}, Errors: ${totalErrors}, Deferred: ${deferred}`)
     return res.status(200).json({
       message: 'Extension complete',
-      schedulesProcessed: schedules.length,
+      schedulesProcessed: schedules.length - deferred,
+      schedulesDeferred: deferred,
       sessionsCreated: totalCreated,
       errors: totalErrors
     })
@@ -245,6 +263,66 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[extend-schedules] Fatal error:', error)
     return res.status(500).json({ error: message })
   }
+}
+
+// ============================================
+// HORISONTENS AVTALSFÄLT (speglar resolveHorizonContract i recurringScheduleService)
+// ============================================
+
+async function horizonContractFor(
+  contract: {
+    contract_start_date?: string | null
+    start_date?: string | null
+    contract_end_date?: string | null
+    terminated_at?: string | null
+    effective_end_date?: string | null
+    notice_period_months?: number | null
+    renewal_mode?: string | null
+  } | null,
+  customer: {
+    contract_start_date?: string | null
+    contract_end_date?: string | null
+    terminated_at?: string | null
+    effective_end_date?: string | null
+    notice_period_months?: number | null
+    parent_customer_id?: string | null
+  } | null
+): Promise<HorizonContract | null> {
+  // Avtalsraden är facit när den har datum
+  if (contract && (contract.contract_start_date || contract.start_date || contract.contract_end_date)) {
+    return {
+      contract_start_date: contract.contract_start_date ?? contract.start_date ?? null,
+      contract_end_date: contract.contract_end_date ?? null,
+      terminated_at: contract.terminated_at ?? null,
+      effective_end_date: contract.effective_end_date ?? null,
+      notice_period_months: contract.notice_period_months ?? null,
+      renewal_mode: contract.renewal_mode ?? null,
+    }
+  }
+  if (!customer) return null
+  const own: HorizonContract = {
+    contract_start_date: customer.contract_start_date ?? null,
+    contract_end_date: customer.contract_end_date ?? null,
+    terminated_at: customer.terminated_at ?? null,
+    effective_end_date: customer.effective_end_date ?? null,
+    notice_period_months: customer.notice_period_months ?? null,
+  }
+  // Multisite-enheter saknar egna avtalsdatum och följer huvudkontoret
+  if (customer.parent_customer_id && (!own.contract_end_date || !own.contract_start_date)) {
+    const { data: parent } = await supabase
+      .from('customers')
+      .select('contract_end_date, contract_start_date, terminated_at, effective_end_date, notice_period_months')
+      .eq('id', customer.parent_customer_id)
+      .maybeSingle()
+    if (parent) {
+      own.contract_end_date = own.contract_end_date ?? parent.contract_end_date ?? null
+      own.contract_start_date = own.contract_start_date ?? parent.contract_start_date ?? null
+      own.terminated_at = own.terminated_at ?? parent.terminated_at ?? null
+      own.effective_end_date = own.effective_end_date ?? parent.effective_end_date ?? null
+      own.notice_period_months = own.notice_period_months ?? parent.notice_period_months ?? null
+    }
+  }
+  return own
 }
 
 // ============================================

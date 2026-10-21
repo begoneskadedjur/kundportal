@@ -39,6 +39,9 @@
     // Delad periodmatematik för årspremiefakturor (generate-continuing-contracts)
     "src/shared/contractPlanner.ts",
 
+    // Schemahorisonten (extend-recurring-schedules), samma regel som fakturorna
+    "src/shared/scheduleHorizon.ts",
+
     // Delade kundnummerregler för Fortnox-spegeln och allokeringen
     "src/shared/fortnoxCustomerNumbers.ts",
 

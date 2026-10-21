@@ -71,8 +71,14 @@ export function generateInspectionDates(params: DateGenerationParams): Generated
   const wallTime = makeWallTimeBuilder(timeZone)
   const results: GeneratedInspectionDate[] = []
 
-  // Calculate all period boundaries
-  const periods = calculatePeriods(frequency, startDate, endDate, customFrequencyConfig)
+  // Perioderna räknas alltid från schemats egen start (periodAnchor) och är
+  // alltid hela. Fönstret [startDate, endDate) väljer bara VILKA besök som
+  // läggs ut nu: ett besök hör till fönstret där dess del av perioden börjar.
+  // Förut räknades perioderna från fönstrets start och klipptes vid dess slut,
+  // så en förlängning på två månader fick hela årets kvot (6 per år blev 36).
+  const anchor = params.periodAnchor ?? startDate
+  const periods = calculatePeriods(frequency, anchor, endDate, customFrequencyConfig)
+  const hardEnd = params.hardEndDate ?? null
 
   // Determine how many visits per period
   const visitsPerPeriod = frequency === 'twice_monthly' ? 2
@@ -80,45 +86,43 @@ export function generateInspectionDates(params: DateGenerationParams): Generated
       ? customFrequencyConfig.visits_per_period
       : 1
 
-  for (const period of periods) {
-    // Season filter: skip periods outside active months (custom frequency only)
-    if (frequency === 'custom' && customFrequencyConfig?.active_months_start != null && customFrequencyConfig?.active_months_end != null) {
-      const periodMonth = period.start.getMonth() + 1 // 1-12
-      const mStart = customFrequencyConfig.active_months_start
-      const mEnd = customFrequencyConfig.active_months_end
-
-      let inSeason: boolean
-      if (mStart <= mEnd) {
-        // Normal range, e.g. mars(3)–november(11)
-        inSeason = periodMonth >= mStart && periodMonth <= mEnd
-      } else {
-        // Wrap-around range, e.g. november(11)–februari(2)
-        inSeason = periodMonth >= mStart || periodMonth <= mEnd
-      }
-      if (!inSeason) continue
+  const inSeason = (date: Date): boolean => {
+    if (frequency !== 'custom' || customFrequencyConfig?.active_months_start == null || customFrequencyConfig?.active_months_end == null) {
+      return true
     }
+    const month = date.getMonth() + 1 // 1-12
+    const mStart = customFrequencyConfig.active_months_start
+    const mEnd = customFrequencyConfig.active_months_end
+    // Normal range, e.g. mars(3)–november(11); wrap-around, e.g. november(11)–februari(2)
+    return mStart <= mEnd ? month >= mStart && month <= mEnd : month >= mStart || month <= mEnd
+  }
 
-    if (visitsPerPeriod > 1) {
-      // Multi-visit: split the period into equal segments
-      const totalDays = Math.max(1, Math.round(
-        (period.end.getTime() - period.start.getTime()) / 86400000
-      ))
-      const segmentDays = Math.floor(totalDays / visitsPerPeriod)
+  for (const period of periods) {
+    // Multi-visit: dela perioden i lika delar, en kontroll per del
+    const totalDays = Math.max(1, Math.round(
+      (period.end.getTime() - period.start.getTime()) / 86400000
+    ))
+    const segmentDays = visitsPerPeriod > 1 ? Math.floor(totalDays / visitsPerPeriod) : totalDays
 
-      for (let v = 0; v < visitsPerPeriod; v++) {
-        const segStart = addDays(period.start, v * segmentDays)
-        const segEnd = v < visitsPerPeriod - 1
-          ? subDays(addDays(period.start, (v + 1) * segmentDays), 1)
-          : period.end
+    for (let v = 0; v < visitsPerPeriod; v++) {
+      const segStart = addDays(period.start, v * segmentDays)
+      let segEnd = v < visitsPerPeriod - 1
+        ? subDays(addDays(period.start, (v + 1) * segmentDays), 1)
+        : period.end
 
-        const date = findBestDate(dayPattern, preferredDayOfMonth, preferredTime,
-          estimatedDurationMinutes, { start: segStart, end: segEnd }, period, technicianWorkSchedule,
-          technicianAbsences, [...existingBookings, ...results.map(r => ({ start: r.date, end: r.endDate }))], wallTime)
-        if (date) results.push(date)
+      // Delen hör till ett tidigare eller senare fönster
+      if (segStart < startDate || segStart >= endDate) continue
+      // Season filter (custom frequency only)
+      if (!inSeason(segStart)) continue
+      // Uppsagt avtal: inget efter sista giltiga dag
+      if (hardEnd) {
+        if (segStart >= hardEnd) continue
+        const lastDay = subDays(hardEnd, 1)
+        if (segEnd > lastDay) segEnd = lastDay
       }
-    } else {
+
       const date = findBestDate(dayPattern, preferredDayOfMonth, preferredTime,
-        estimatedDurationMinutes, period, period, technicianWorkSchedule,
+        estimatedDurationMinutes, { start: segStart, end: segEnd }, period, technicianWorkSchedule,
         technicianAbsences, [...existingBookings, ...results.map(r => ({ start: r.date, end: r.endDate }))], wallTime)
       if (date) results.push(date)
     }
@@ -183,12 +187,10 @@ function calculatePeriods(
         periodEnd = addMonths(current, 1)
     }
 
-    // Clamp to endDate
-    const clampedEnd = periodEnd > endDate ? endDate : periodEnd
-
+    // Perioden klipps aldrig vid fönstrets slut: kvoten gäller hela perioden
     periods.push({
       start: new Date(current),
-      end: subDays(clampedEnd, 1) // End of period is day before next period starts
+      end: subDays(periodEnd, 1) // End of period is day before next period starts
     })
 
     current = periodEnd

@@ -8,7 +8,7 @@ import {
   X, ChevronLeft, ChevronRight, Clock, Check,
   AlertTriangle, Loader2, CalendarDays, Repeat, Settings, MapPin, FileText
 } from 'lucide-react'
-import { format, addMonths, addMinutes, subDays } from 'date-fns'
+import { format, addMonths, addMinutes, subDays, subMonths, startOfDay } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import DatePicker from 'react-datepicker'
 import '../../styles/DatePickerDarkTheme.css'
@@ -21,8 +21,10 @@ import ContractCandidateSelector from '../shared/ContractCandidateSelector'
 import {
   previewScheduleDates,
   createScheduleWithSessions,
-  resolveScheduleHorizon
+  resolveScheduleHorizon,
+  findActiveScheduleForCustomer
 } from '../../services/recurringScheduleService'
+import type { ScheduleHorizon } from '../../shared/scheduleHorizon'
 import type {
   RecurringFrequency,
   RecurringDayPattern,
@@ -38,7 +40,8 @@ import {
   STANDARD_FREQUENCIES,
   SWEDISH_MONTH_NAMES,
   APPROX_VISITS_PER_YEAR,
-  frequencyFromVisitsPerYear
+  frequencyFromVisitsPerYear,
+  visitsPerYearFromSelection
 } from '../../types/recurringSchedule'
 import type { WorkSchedule } from '../../types/database'
 
@@ -127,13 +130,12 @@ export function RecurringScheduleWizard({
   const { profile } = useAuth()
   const [step, setStep] = useState<WizardStep>(1)
 
-  // Schemahorisont med arv från huvudkontoret OCH rullande periodskifte:
-  // ett passerat avtalsslutdatum rullas fram i hela år till nästa brytpunkt
-  // (avtal löper tills de sägs upp). horizonRolled = true betyder att datumet
-  // är en framrullad brytpunkt, inte ett faktiskt avtalsslut.
-  const [resolvedEndDate, setResolvedEndDate] = useState<string | null | undefined>(undefined)
+  // Schemahorisont (scheduleHorizon, samma regel som fakturorna): kontroller
+  // läggs ut till periodskiftet, och hela nästa avtalsår när sista
+  // uppsägningsdag passerat. Resten läggs ut automatiskt av cron-jobbet.
+  const [horizon, setHorizon] = useState<ScheduleHorizon | null>(null)
   const [resolvingEndDate, setResolvingEndDate] = useState(true)
-  const [horizonRolled, setHorizonRolled] = useState(false)
+  const resolvedEndDate = horizon?.planEnd ?? null
 
   // Täcks kunden av flera gällande avtal ska schemat inte tyst hamna på det
   // systemet råkar välja — besöken följs upp per avtal.
@@ -145,12 +147,7 @@ export function RecurringScheduleWizard({
     if (!isOpen || !customerId) return
     setResolvingEndDate(true)
     resolveScheduleHorizon(customerId, contractEndDate, selectedContractId)
-      .then(({ endDate, rolled }) => {
-        if (!cancelled) {
-          setResolvedEndDate(endDate)
-          setHorizonRolled(rolled)
-        }
-      })
+      .then((h) => { if (!cancelled) setHorizon(h) })
       .finally(() => { if (!cancelled) setResolvingEndDate(false) })
     return () => { cancelled = true }
   }, [customerId, contractEndDate, isOpen, selectedContractId])
@@ -192,10 +189,43 @@ export function RecurringScheduleWizard({
     return () => { cancelled = true }
   }, [isOpen, isBatch, batchUnits])
 
+  // Kunden har redan ett aktivt schema (på samma avtal): guiden låses. Ett
+  // andra schema dubblerar kontrollerna; nästa avtalsår läggs ut automatiskt.
+  type ActiveSchedule = Awaited<ReturnType<typeof findActiveScheduleForCustomer>>
+  const [existingSchedule, setExistingSchedule] = useState<ActiveSchedule>(null)
+  const [checkingExisting, setCheckingExisting] = useState(true)
+  // Kunder med flera avtal: vänta på avtalsvalet innan låset bedöms
+  const waitingForContractChoice = !isBatch && contractCandidates.length > 1 && !selectedContractId
+  useEffect(() => {
+    let cancelled = false
+    if (!isOpen || isBatch || waitingForContractChoice) {
+      setExistingSchedule(null)
+      setCheckingExisting(false)
+      return
+    }
+    setCheckingExisting(true)
+    findActiveScheduleForCustomer(customerId, selectedContractId)
+      .then(s => { if (!cancelled) setExistingSchedule(s) })
+      .catch(() => { if (!cancelled) setExistingSchedule(null) })
+      .finally(() => { if (!cancelled) setCheckingExisting(false) })
+    return () => { cancelled = true }
+  }, [isOpen, isBatch, customerId, selectedContractId, waitingForContractChoice])
+
+  // Batch: enheter som redan har ett schema hoppas över
+  const [scheduledUnitIds, setScheduledUnitIds] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    let cancelled = false
+    if (!isOpen || !isBatch || !batchUnits?.length) { setScheduledUnitIds(new Set()); return }
+    Promise.all(batchUnits.map(u => findActiveScheduleForCustomer(u.customerId).then(s => (s ? u.customerId : null))))
+      .then(ids => { if (!cancelled) setScheduledUnitIds(new Set(ids.filter((id): id is string => !!id))) })
+      .catch(() => { if (!cancelled) setScheduledUnitIds(new Set()) })
+    return () => { cancelled = true }
+  }, [isOpen, isBatch, batchUnits])
+
   // Step 1: Start date
-  // Starta aldrig i det förflutna: avtalsstart används bara om den ligger
-  // framåt i tiden (nytecknat avtal), annars idag — man lägger scheman i
-  // efterhand för löpande avtal och ska inte behöva bläddra fram flera år.
+  // Förval: avtalsstarten om den ligger framåt i tiden (nytecknat avtal),
+  // annars idag. Ett datum bakåt går att välja men sätter bara rytmen:
+  // kontroller läggs aldrig ut före idag.
   const initialStartDate = () => {
     const today = new Date()
     if (!contractStartDate) return today
@@ -204,13 +234,16 @@ export function RecurringScheduleWizard({
   }
   const [startDate, setStartDate] = useState<Date>(initialStartDate)
 
-  // Sista möjliga startdag: dagen före horisonten. Ett startdatum på eller
-  // efter horisonten ger inga perioder alls och därmed 0 kontrolltillfällen.
-  const lastStartDate = useMemo(
-    () => (resolvedEndDate ? subDays(new Date(resolvedEndDate), 1) : null),
-    [resolvedEndDate]
-  )
-  const startAfterHorizon = !!lastStartDate && startDate > lastStartDate
+  // Kontroller läggs ut från idag (eller ett senare startdatum) till
+  // horisonten. Startdatumet är periodernas ankare även när det ligger bakåt.
+  const today = startOfDay(new Date())
+  const windowStart = startDate > today ? startDate : today
+  // Startdatum på eller efter horisonten: inget läggs ut nu, de första
+  // kontrollerna läggs ut automatiskt när avtalsperioden är säker. Uppsagt
+  // avtal: då blir det aldrig några, så det spärras.
+  const startAfterHorizon = !!resolvedEndDate && windowStart >= new Date(resolvedEndDate)
+  const blockedByTermination = startAfterHorizon && !!horizon?.terminated
+  const fmtDag = (iso: string) => format(new Date(iso), 'd MMM yyyy', { locale: sv })
 
   // Step 2: Duration (single-unit mode)
   const [durationMinutes, setDurationMinutes] = useState(60)
@@ -282,13 +315,15 @@ export function RecurringScheduleWizard({
   // Batch: effective units with updated durations
   const effectiveUnits: BatchScheduleUnit[] = useMemo(() => {
     if (isBatch) {
-      return batchUnits.map(u => ({
-        ...u,
-        durationMinutes: unitDurations[u.customerId] ?? u.durationMinutes
-      }))
+      return batchUnits
+        .filter(u => !scheduledUnitIds.has(u.customerId))
+        .map(u => ({
+          ...u,
+          durationMinutes: unitDurations[u.customerId] ?? u.durationMinutes
+        }))
     }
     return [{ customerId, customerName, address: null, durationMinutes }]
-  }, [isBatch, batchUnits, unitDurations, customerId, customerName, durationMinutes])
+  }, [isBatch, batchUnits, scheduledUnitIds, unitDurations, customerId, customerName, durationMinutes])
 
   // Batch: group preview results by date for step 5 display
   const groupedDates: GroupedDateRow[] = useMemo(() => {
@@ -336,9 +371,11 @@ export function RecurringScheduleWizard({
       : null)
   const expectedForHorizon = useMemo(() => {
     if (!contractYearlyTarget || !resolvedEndDate) return null
-    const days = Math.round((new Date(resolvedEndDate).getTime() - startDate.getTime()) / 86400000)
+    const days = Math.round((new Date(resolvedEndDate).getTime() - windowStart.getTime()) / 86400000)
     if (days <= 0) return null
     return Math.max(1, Math.round((contractYearlyTarget * days) / 365))
+    // windowStart räknas om varje render; startDate styr det
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contractYearlyTarget, resolvedEndDate, startDate])
 
   // Initialize batch unit durations when opening
@@ -411,8 +448,10 @@ export function RecurringScheduleWizard({
         preferredDayOfMonth: dayPattern === 'specific_day' ? preferredDayOfMonth : undefined,
         preferredTime,
         estimatedDurationMinutes: durationMinutes,
-        startDate,
+        startDate: windowStart,
         endDate: previewEnd,
+        periodAnchor: startDate,
+        hardEndDate: horizon?.terminated && resolvedEndDate ? new Date(resolvedEndDate) : null,
         technicianWorkSchedule: workSchedule,
         customFrequencyConfig: resolvedCustomConfig
       })
@@ -442,8 +481,10 @@ export function RecurringScheduleWizard({
         preferredDayOfMonth: dayPattern === 'specific_day' ? preferredDayOfMonth : undefined,
         preferredTime,
         estimatedDurationMinutes: firstUnit.durationMinutes,
-        startDate,
+        startDate: windowStart,
         endDate: previewEnd,
+        periodAnchor: startDate,
+        hardEndDate: horizon?.terminated && resolvedEndDate ? new Date(resolvedEndDate) : null,
         technicianWorkSchedule: workSchedule,
         customFrequencyConfig: resolvedCustomConfig
       })
@@ -499,7 +540,9 @@ export function RecurringScheduleWizard({
             return !batchExcludedDates.has(dateKey)
           })
 
-          if (includedDates.length === 0) continue
+          // Startdatum efter horisonten: schemat skapas ändå, kontrollerna
+          // läggs ut automatiskt när avtalsperioden är säker
+          if (includedDates.length === 0 && !startAfterHorizon) continue
 
           const input: CreateRecurringScheduleInput = {
             customer_id: result.unit.customerId,
@@ -588,8 +631,10 @@ export function RecurringScheduleWizard({
     switch (step) {
       // Flera gällande avtal: ett måste väljas innan schemat kan byggas.
       case 1:
-        if (!isBatch && contractCandidates.length > 1 && !selectedContractId) return false
-        return !!startDate && !startAfterHorizon
+        if (waitingForContractChoice) return false
+        if (!isBatch && (checkingExisting || existingSchedule)) return false
+        if (isBatch && effectiveUnits.length === 0) return false
+        return !!startDate && !blockedByTermination
       case 2:
         if (isBatch) {
           return effectiveUnits.every(u => (unitDurations[u.customerId] ?? 0) > 0)
@@ -598,6 +643,7 @@ export function RecurringScheduleWizard({
       case 3: return !!frequency && !!dayPattern
       case 4: return !!preferredTime
       case 5:
+        if (startAfterHorizon) return true
         if (isBatch) return batchIncludedDays > 0
         return includedCount > 0
       default: return false
@@ -605,9 +651,29 @@ export function RecurringScheduleWizard({
   }
 
   // Submit button label
-  const submitLabel = isBatch
-    ? `Skapa ${batchTotalSessions} kontrolltillfällen (${effectiveUnits.length} enheter)`
-    : `Skapa ${includedCount} kontrolltillfällen`
+  const submitLabel = startAfterHorizon
+    ? 'Skapa schemat'
+    : isBatch
+      ? `Skapa ${batchTotalSessions} kontrolltillfällen (${effectiveUnits.length} enheter)`
+      : `Skapa ${includedCount} kontrolltillfällen`
+
+  // Vad som händer vid periodskiftet, i klartext
+  const horizonText = (): string | null => {
+    if (!horizon?.planEnd) return null
+    if (horizon.terminated) {
+      return `Avtalet är uppsagt. Kontroller läggs ut till och med ${fmtDag(subDays(new Date(horizon.planEnd), 1).toISOString())}.`
+    }
+    if (horizon.openEnded) {
+      return `Avtalet löper tills vidare. Kontroller läggs ut till ${fmtDag(horizon.planEnd)} (uppsägningstiden framåt) och fylls sedan på automatiskt.`
+    }
+    if (horizon.renewalDue && horizon.lastNoticeDay) {
+      return `Avtalet förlängdes när sista uppsägningsdag ${fmtDag(horizon.lastNoticeDay)} passerade. Kontroller läggs ut till ${fmtDag(horizon.planEnd)}, därefter ett avtalsår i taget.`
+    }
+    if (horizon.currentEnd && horizon.lastNoticeDay) {
+      return `Kontroller läggs ut till periodskiftet ${fmtDag(horizon.currentEnd)}. Sägs avtalet inte upp senast ${fmtDag(horizon.lastNoticeDay)} läggs nästa avtalsår ut automatiskt dagen efter.`
+    }
+    return `Kontroller läggs ut till ${fmtDag(horizon.planEnd)}.`
+  }
 
   const stepLabels = ['Startdatum', 'Tid per besök', 'Frekvens & dag', 'Klockslag', 'Förhandsvisning']
 
@@ -724,30 +790,71 @@ export function RecurringScheduleWizard({
                         hint={`Kunden har ${contractCandidates.length} gällande avtal. Välj vilket schemat hör till.`}
                       />
                     )}
-                    <div className="flex justify-center">
-                      <DatePicker
-                        selected={startDate}
-                        onChange={(date) => date && setStartDate(date)}
-                        locale={sv}
-                        inline
-                        minDate={new Date()}
-                        maxDate={lastStartDate ?? undefined}
-                      />
-                    </div>
-                    <p className="text-xs text-slate-500 text-center">
-                      Första kontroll: {format(startDate, 'EEEE d MMMM yyyy', { locale: sv })}
-                    </p>
-                    {startAfterHorizon && resolvedEndDate && (
-                      <p className="text-xs text-amber-400 text-center">
-                        Avtalsperioden slutar {format(new Date(resolvedEndDate), 'd MMM yyyy', { locale: sv })}. Välj ett startdatum före det.
+                    {!isBatch && existingSchedule ? (
+                      <div className="p-4 bg-slate-800/40 border border-slate-700 rounded-xl space-y-2">
+                        <div className="flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#20c58f] shrink-0 mt-1.5" />
+                          <p className="text-sm text-white font-medium">Kunden har redan ett återkommande schema</p>
+                        </div>
+                        <p className="text-sm text-slate-300">
+                          {(() => {
+                            const perYear = visitsPerYearFromSelection(existingSchedule.frequency, existingSchedule.custom_frequency_config)
+                            const takt = perYear ? `${perYear} kontroller per år` : FREQUENCY_CONFIG[existingSchedule.frequency]?.label ?? 'Återkommande'
+                            return `${takt}${existingSchedule.technician_name ? `, ${existingSchedule.technician_name}` : ''}.`
+                          })()}
+                          {existingSchedule.next_session && (
+                            <> Nästa kontroll {format(new Date(existingSchedule.next_session), 'd MMM yyyy', { locale: sv })}.</>
+                          )}
+                          {existingSchedule.generated_until && (
+                            <> Kontroller är utlagda till {fmtDag(existingSchedule.generated_until)}.</>
+                          )}
+                        </p>
+                        {horizonText() && <p className="text-sm text-slate-400">{horizonText()}</p>}
+                        <p className="text-xs text-slate-500">
+                          Ett nytt schema skulle dubblera kontrollerna. Behöver takten, tiden eller teknikern ändras gör du det i det befintliga schemat.
+                        </p>
+                      </div>
+                    ) : isBatch && effectiveUnits.length === 0 ? (
+                      <p className="text-sm text-slate-400">
+                        Alla enheter har redan ett återkommande schema. Nästa avtalsår läggs ut automatiskt.
                       </p>
-                    )}
-                    {horizonRolled && resolvedEndDate && (
-                      <p className="text-xs text-slate-500 text-center">
-                        Fortlöpande avtal — kontroller planeras till nästa periodskifte{' '}
-                        <span className="text-slate-300">{format(new Date(resolvedEndDate), 'd MMM yyyy', { locale: sv })}</span>,
-                        därefter förlängs schemat automatiskt.
-                      </p>
+                    ) : (
+                      <>
+                        {isBatch && scheduledUnitIds.size > 0 && (
+                          <div className="flex items-start gap-2 px-3 py-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0 mt-1.5" />
+                            <span className="text-xs text-amber-300">
+                              {scheduledUnitIds.size} av {batchUnits!.length} enheter har redan ett schema och hoppas över.
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex justify-center">
+                          <DatePicker
+                            selected={startDate}
+                            onChange={(date) => date && setStartDate(date)}
+                            locale={sv}
+                            inline
+                            minDate={subMonths(today, 12)}
+                            maxDate={addMonths(today, 24)}
+                          />
+                        </div>
+                        <p className="text-xs text-slate-500 text-center">
+                          {startDate < today
+                            ? `Rytmen räknas från ${format(startDate, 'd MMMM yyyy', { locale: sv })}. Kontroller läggs ut från i dag.`
+                            : `Första kontroll: ${format(startDate, 'EEEE d MMMM yyyy', { locale: sv })}`}
+                        </p>
+                        {blockedByTermination ? (
+                          <p className="text-xs text-amber-400 text-center">
+                            Avtalet är uppsagt och gäller inte efter {fmtDag(subDays(new Date(resolvedEndDate!), 1).toISOString())}. Välj ett tidigare startdatum.
+                          </p>
+                        ) : startAfterHorizon ? (
+                          <p className="text-xs text-slate-400 text-center">
+                            Startdatumet ligger efter {fmtDag(resolvedEndDate!)}. Inga kontroller läggs ut nu: de läggs ut automatiskt när avtalsperioden är säker.
+                          </p>
+                        ) : horizonText() && (
+                          <p className="text-xs text-slate-500 text-center">{horizonText()}</p>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -1267,7 +1374,9 @@ export function RecurringScheduleWizard({
 
                         {groupedDates.length === 0 && (
                           <div className="text-center py-6 text-slate-500 text-sm">
-                            Inga datum kunde genereras för vald period
+                            {startAfterHorizon && resolvedEndDate
+                              ? `Inga kontroller läggs ut nu. Startdatumet ligger efter ${fmtDag(resolvedEndDate)}, och kontrollerna läggs ut automatiskt när avtalsperioden är säker.`
+                              : 'Inga datum kunde genereras för vald period'}
                           </div>
                         )}
                       </>
@@ -1331,17 +1440,21 @@ export function RecurringScheduleWizard({
                           })}
                         </div>
 
-                        {previewDates.length === 0 && (
+                        {previewDates.length === 0 && (startAfterHorizon && resolvedEndDate ? (
+                          <div className="text-center py-6 text-slate-400 text-sm">
+                            Inga kontroller läggs ut nu. Startdatumet ligger efter {fmtDag(resolvedEndDate)}, och kontrollerna läggs ut automatiskt när avtalsperioden är säker.
+                          </div>
+                        ) : (
                           <div className="text-center py-6 text-slate-500 text-sm space-y-1">
                             <p>Inga datum kunde genereras för vald period</p>
                             {resolvedEndDate && (
                               <p className="text-xs">
-                                Perioden är {format(startDate, 'd MMM yyyy', { locale: sv })} till {format(new Date(resolvedEndDate), 'd MMM yyyy', { locale: sv })}.
+                                Perioden är {format(windowStart, 'd MMM yyyy', { locale: sv })} till {format(new Date(resolvedEndDate), 'd MMM yyyy', { locale: sv })}.
                                 Gå tillbaka och prova ett annat startdatum eller en annan dag i perioden.
                               </p>
                             )}
                           </div>
-                        )}
+                        ))}
                       </>
                     )}
                   </div>

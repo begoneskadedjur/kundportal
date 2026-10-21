@@ -19,6 +19,7 @@ import { generateInspectionDates } from '../utils/inspectionDateGenerator'
 import { CaseNumberService } from './caseNumberService'
 import { resolveContractForCustomer } from './contractResolver'
 import { ContractScopeService } from './contractScopeService'
+import { scheduleHorizon, type HorizonContract, type ScheduleHorizon } from '../shared/scheduleHorizon'
 
 // ============================================
 // HELPERS
@@ -69,89 +70,141 @@ export async function resolveContractEndDate(
   return parent.contract_end_date ?? null
 }
 
+/** Fälten avtalsraden ger horisonten (contract_start_date, annars start_date). */
+const HORIZON_CONTRACT_COLUMNS =
+  'contract_start_date, start_date, contract_end_date, terminated_at, effective_end_date, notice_period_months, renewal_mode'
+
 /**
- * Rullande schemahorisont. Avtal löper tills de sägs upp och förlängs
- * automatiskt vid periodskifte (generate-continuing-contracts-cronen) — ett
- * passerat contract_end_date betyder alltså inte att schemat ska ta slut,
- * utan att nästa brytpunkt ligger ett helt antal år framåt. Uppsagda avtal
- * rullas aldrig. Saknas slutdatum helt (tillsvidare) används avtalsstartens
- * nästa årsdag som brytpunkt.
+ * Avtalsfälten som styr ett schemas horisont. Avtalsraden är facit när den
+ * finns; annars kundraden med arv från huvudkontoret (PDF-avtal som inte
+ * materialiserats ännu). Delas av guiden; cron-jobbet läser samma fält.
  */
-export async function resolveScheduleHorizon(
+export async function resolveHorizonContract(
   customerId: string,
   ownEndDate?: string | null,
   /** Valt avtal när kunden täcks av flera — horisonten ska följa det avtalet. */
   preferredContractId?: string | null
-): Promise<{ endDate: string | null; rolled: boolean }> {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const roll = (iso: string) => {
-    const d = new Date(iso + 'T12:00:00')
-    let rolled = false
-    while (d <= today) {
-      d.setFullYear(d.getFullYear() + 1)
-      rolled = true
-    }
-    return { endDate: format(d, 'yyyy-MM-dd'), rolled }
-  }
-
-  // 1. AVTALET är facit när det finns: kundens gällande avtal löses med samma
-  //    prioritet som resten av systemet (contractResolver). Kundradens datum
-  //    kan tillhöra ett ANNAT avtal för kunder med flera avtal över tid.
+): Promise<HorizonContract | null> {
+  // 1. AVTALET: kundens gällande avtal löses med samma prioritet som resten av
+  //    systemet (contractResolver). Kundradens datum kan tillhöra ett ANNAT
+  //    avtal för kunder med flera avtal över tid.
   try {
     const contractId = preferredContractId ?? (await resolveContractForCustomer(customerId))
     if (contractId) {
       const { data: contract } = await supabase
         .from('contracts')
-        .select('start_date, contract_end_date, terminated_at, effective_end_date')
+        .select(HORIZON_CONTRACT_COLUMNS)
         .eq('id', contractId)
         .maybeSingle()
-      if (contract) {
-        if (contract.terminated_at) {
-          return {
-            endDate: contract.effective_end_date ?? contract.contract_end_date ?? null,
-            rolled: false,
-          }
+      if (contract && (contract.contract_start_date || contract.start_date || contract.contract_end_date)) {
+        return {
+          contract_start_date: contract.contract_start_date ?? contract.start_date ?? null,
+          contract_end_date: contract.contract_end_date ?? null,
+          terminated_at: contract.terminated_at ?? null,
+          effective_end_date: contract.effective_end_date ?? null,
+          notice_period_months: contract.notice_period_months ?? null,
+          renewal_mode: contract.renewal_mode ?? null,
         }
-        if (contract.contract_end_date) return roll(contract.contract_end_date)
-        if (contract.start_date) return { ...roll(contract.start_date), rolled: true }
-        // Avtal utan datum → fall igenom till kundraden nedan
       }
+      // Avtal utan datum → fall igenom till kundraden nedan
     }
   } catch (err) {
-    console.error('resolveScheduleHorizon: avtalsuppslag misslyckades, faller tillbaka på kundraden', err)
+    console.error('resolveHorizonContract: avtalsuppslag misslyckades, faller tillbaka på kundraden', err)
   }
 
-  // 2. Fallback: kundradens datum (med arv från huvudkontoret) — för kunder
-  //    utan riktig avtalsrad (PDF-avtal som inte materialiserats ännu).
+  // 2. Fallback: kundradens datum med arv från huvudkontoret
   const { data: customer } = await supabase
     .from('customers')
-    .select('contract_end_date, contract_start_date, terminated_at, parent_customer_id')
+    .select('contract_end_date, contract_start_date, terminated_at, effective_end_date, notice_period_months, parent_customer_id')
     .eq('id', customerId)
     .single()
+  if (!customer) return null
 
-  let endDate = ownEndDate ?? customer?.contract_end_date ?? null
-  let startDate = customer?.contract_start_date ?? null
-  let terminated = !!customer?.terminated_at
-
-  if (customer?.parent_customer_id) {
+  const own: HorizonContract = {
+    contract_start_date: customer.contract_start_date ?? null,
+    contract_end_date: ownEndDate ?? customer.contract_end_date ?? null,
+    terminated_at: customer.terminated_at ?? null,
+    effective_end_date: customer.effective_end_date ?? null,
+    notice_period_months: customer.notice_period_months ?? null,
+  }
+  if (customer.parent_customer_id && (!own.contract_end_date || !own.contract_start_date)) {
     const { data: parent } = await supabase
       .from('customers')
-      .select('contract_end_date, contract_start_date, terminated_at')
+      .select('contract_end_date, contract_start_date, terminated_at, effective_end_date, notice_period_months')
       .eq('id', customer.parent_customer_id)
       .single()
     if (parent) {
-      endDate = endDate ?? parent.contract_end_date ?? null
-      startDate = startDate ?? parent.contract_start_date ?? null
-      terminated = terminated || !!parent.terminated_at
+      own.contract_end_date = own.contract_end_date ?? parent.contract_end_date ?? null
+      own.contract_start_date = own.contract_start_date ?? parent.contract_start_date ?? null
+      own.terminated_at = own.terminated_at ?? parent.terminated_at ?? null
+      own.effective_end_date = own.effective_end_date ?? parent.effective_end_date ?? null
+      own.notice_period_months = own.notice_period_months ?? parent.notice_period_months ?? null
     }
   }
+  return own
+}
 
-  if (terminated) return { endDate, rolled: false }
+/**
+ * Schemahorisonten för en kund: hur långt fram kontroller får läggas ut i dag
+ * (scheduleHorizon, samma regel som fakturorna). Periodskiftet, sista
+ * uppsägningsdag och om nästa avtalsår redan är säkert följer med, så guiden
+ * kan förklara när nästa år läggs ut.
+ */
+export async function resolveScheduleHorizon(
+  customerId: string,
+  ownEndDate?: string | null,
+  preferredContractId?: string | null
+): Promise<ScheduleHorizon> {
+  const contract = await resolveHorizonContract(customerId, ownEndDate, preferredContractId)
+  return contract
+    ? scheduleHorizon(contract)
+    : { planEnd: null, currentEnd: null, lastNoticeDay: null, renewalDue: false, openEnded: false, terminated: false }
+}
 
-  if (endDate) return roll(endDate)
-  if (startDate) return { ...roll(startDate), rolled: true }
-  return { endDate: null, rolled: false }
+/** Kundens aktiva återkommande schema (för låset i guiden). */
+export async function findActiveScheduleForCustomer(
+  customerId: string,
+  contractId?: string | null
+): Promise<{
+  id: string
+  frequency: RecurringFrequency
+  custom_frequency_config: CustomFrequencyConfig | null
+  generated_until: string | null
+  contract_id: string | null
+  technician_name: string | null
+  next_session: string | null
+} | null> {
+  const { data, error } = await supabase
+    .from('recurring_schedules')
+    .select('id, frequency, custom_frequency_config, generated_until, contract_id, technician:technicians(name)')
+    .eq('customer_id', customerId)
+    .eq('status', 'active')
+  if (error || !data || data.length === 0) return null
+  // Kunder med flera avtal får ett schema per avtal: ett schema på ett annat
+  // avtal låser inte. Schema utan avtalskoppling låser alltid.
+  const match = data.find(s => !contractId || !s.contract_id || s.contract_id === contractId)
+  if (!match) return null
+
+  const { data: next } = await supabase
+    .from('station_inspection_sessions')
+    .select('scheduled_at')
+    .eq('recurring_schedule_id', match.id)
+    .eq('status', 'scheduled')
+    .gte('scheduled_at', new Date().toISOString())
+    .order('scheduled_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  const tech = match.technician as { name?: string } | { name?: string }[] | null
+  return {
+    id: match.id,
+    frequency: match.frequency as RecurringFrequency,
+    custom_frequency_config: (match.custom_frequency_config ?? null) as CustomFrequencyConfig | null,
+    generated_until: match.generated_until ?? null,
+    contract_id: match.contract_id ?? null,
+    technician_name: (Array.isArray(tech) ? tech[0]?.name : tech?.name) ?? null,
+    next_session: next?.scheduled_at ?? null,
+  }
 }
 
 // ============================================

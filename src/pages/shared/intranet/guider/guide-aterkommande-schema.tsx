@@ -111,6 +111,7 @@ function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void
                       ))}
                     </div>
                     <p className="text-center text-[11px] text-slate-500">Första kontroll: {l.datum ? 'måndag 2 november 2026' : 'fredag 16 oktober 2026'}</p>
+                    <p className="text-center text-[11px] text-slate-500">Kontroller läggs ut till periodskiftet 1 sep 2027. Sägs avtalet inte upp senast 1 jul 2027 läggs nästa avtalsår ut automatiskt dagen efter.</p>
                   </>
                 )}
                 {steg === 2 && (
@@ -269,7 +270,7 @@ function Ovning() {
             setSvar({
               typ: 'ok',
               titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-              text: `Fyra stationskontroller är bokade på Anna Exempel fram till avtalets slut. De syns i schemat som vanliga ärenden och kan flyttas en och en.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
+              text: `Fyra stationskontroller är bokade på Anna Exempel fram till periodskiftet, och nästa avtalsår läggs ut automatiskt. De syns i schemat som vanliga ärenden och kan flyttas en och en.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
             })
           }
         } else if (id === 'tillbaka') setL({ ...l, vy: 'w4' })

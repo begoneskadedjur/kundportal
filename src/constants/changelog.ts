@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.72.0',
+    date: '2026-10-21',
+    title: 'Återkommande kontroller följer avtalsåret',
+    items: [
+      { kind: 'buggfix', text: 'Ett schema med till exempel 6 kontroller per år fick 6 kontroller varannan månad när det förlängdes. Nu får det 6 per år, jämnt fördelade.' },
+      { kind: 'andring', text: 'Kontrollerna läggs ut till avtalets periodskifte. Dagen efter sista uppsägningsdag läggs hela nästa avtalsår ut automatiskt, om avtalet inte är uppsagt. Förut förlängdes schemat två månader i taget.' },
+      { kind: 'andring', text: 'Har kunden redan ett återkommande schema går det inte att lägga ett till. Rutan visar det befintliga schemat och när nästa avtalsår läggs ut.' },
+      { kind: 'nyhet', text: 'Startdatumet för ett schema kan väljas fritt, även efter periodskiftet. Ett datum bakåt sätter bara rytmen, kontroller läggs aldrig ut före i dag.' },
+    ],
+  },
+  {
     version: '3.71.2',
     date: '2026-10-20',
     title: 'Dokumentlistan i upphandlingar',

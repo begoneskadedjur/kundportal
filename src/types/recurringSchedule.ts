@@ -291,8 +291,18 @@ export interface DateGenerationParams {
   preferredDayOfMonth?: number
   preferredTime: string              // "HH:MM"
   estimatedDurationMinutes: number
+  /** Fönstrets start: kontroller vars del av perioden börjar här eller senare läggs ut */
   startDate: Date
+  /** Fönstrets slut (exklusivt) */
   endDate: Date
+  /**
+   * Schemats egen start, som perioderna räknas från. Utelämnad = startDate.
+   * Förlängningar MÅSTE skicka schemats schedule_start_date, annars börjar
+   * en ny period vid varje förlängning.
+   */
+  periodAnchor?: Date
+  /** Uppsagt avtal: sista giltiga dag är dagen före. Inget läggs ut därefter. */
+  hardEndDate?: Date | null
   technicianWorkSchedule?: WorkSchedule | null
   technicianAbsences?: { start_date: string; end_date: string }[]
   existingBookings?: { start: Date; end: Date; title?: string }[]
