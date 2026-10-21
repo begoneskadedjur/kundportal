@@ -11,7 +11,7 @@ set
   source_updated_at = now(),
   content = $json$[
     {"type":"intro","roller":["admin","koordinator"],"var":"Schemat › [[Nytt ärende]] uppe till höger","tar":"5 min","behover":"Kundens adress och kontaktuppgifter, och om kunden har avtal med oss","enhet":"dator"},
-    {"type":"kortsvar","text":"Tryck [[Nytt ärende]] i schemat och välj typ. Har kunden avtal med oss väljer du en avtalstyp, oftast Extrabesök Avtalskund, även när jobbet inte ingår i avtalet. Bara kunder utan avtal blir Engångsjobb Privatperson eller Engångsjobb Företag."},
+    {"type":"kortsvar","text":"Tryck [[Nytt ärende]] i schemat och välj typ. Ska arbete utföras hos en avtalskund men ingår inte i kundens avtal väljer du Extrabesök Avtalskund. Kunder utan avtal blir Engångsjobb Privatperson eller Engångsjobb Företag."},
     {"type":"callout","variant":"warning","title":"Det vanligaste misstaget","text":"En avtalskund ringer om något som inte ingår i avtalet, till exempel getingar hos en kund som har avtal om råttor. Det är ett Extrabesök Avtalskund, inte ett engångsjobb. Som engångsjobb hamnar ärendet utanför avtalet: kunden ser det inte i sin kundportal, och det faktureras som ett eget engångsjobb i stället för som merförsäljning på avtalet."},
     {"type":"p","text":"Så väljer du ärendetyp. Engångsärenden står överst i listan och Avtalskunder under."},
     {"type":"list","items":[
@@ -24,7 +24,7 @@ set
     ]},
     {"type":"visning","steg":[
       {"text":"Öppna schemat och tryck [[Nytt ärende]] uppe till höger.","ser":"En lista öppnas med Engångsärenden överst och Avtalskunder under."},
-      {"text":"Välj ärendetyp. Har kunden avtal väljer du Extrabesök Avtalskund. Har kunden inget avtal väljer du Engångsjobb Privatperson eller Engångsjobb Företag.","ser":"Formuläret öppnas, till exempel Nytt ärende: Engångsjobb Privatperson."},
+      {"text":"Välj ärendetyp. Gäller det arbete hos en avtalskund som inte ingår i avtalet väljer du Extrabesök Avtalskund. Har kunden inget avtal väljer du Engångsjobb Privatperson eller Engångsjobb Företag.","ser":"Formuläret öppnas, till exempel Nytt ärende: Engångsjobb Privatperson."},
       {"text":"Fyll i Adress och välj Tjänst under Intelligent Bokning. Tryck [[Hitta bästa tid & tekniker]].","ser":"Bokningsförslagen visas under knappen, med tid, tekniker och restid."},
       {"text":"Tryck på det förslag som passar.","ser":"Starttid, Sluttid och ansvarig tekniker fylls i under Bokning & Detaljer."},
       {"text":"Fyll i kunden under Kund & Kontakt: Kontaktperson, Telefonnummer och Personnummer. För ett företag fyller du i Företagsnamn och väljer Kundgrupp i stället för personnummer.","ser":"Fält med * måste vara ifyllda."},
@@ -38,7 +38,7 @@ set
       {"fraga":"Jag valde fel ärendetyp, till exempel ett engångsjobb åt en avtalskund","svar":"Har du inte skapat ärendet än: tryck [[Avbryt]] och välj [[Nytt ärende]] igen. Är ärendet redan skapat går typen inte att byta. Skriv varför i kommunikationen, ta bort ärendet med [[Radera|allman.radera]] och skapa det igen med rätt typ. Är ärendet avslutat eller fakturerat frågar du admin först."}
     ]},
     {"type":"bra","items":[
-      "En avtalskund som vill ha något utöver avtalet är alltid Extrabesök Avtalskund, även när skadedjuret inte står i avtalet. Ärendet behåller kopplingen till avtalet och kunden ser det i sin kundportal.",
+      "Arbete hos en avtalskund som inte ingår i avtalet är alltid Extrabesök Avtalskund. Ärendet kopplas till kunden och kunden ser det i sin kundportal.",
       "Osäker på om kunden har avtal? Sök fram kunden under Kunder & Avtal › Befintliga kunder innan du väljer typ.",
       "Ett engångsjobb ska aldrig vara en etablering. Etablering Avtalskund är bara utplacering av stationer hos en avtalskund.",
       "Skicka bokningsbekräftelse? står på Nej. Väljer du ett av Ja-valen får kunden ett sms när du skapar ärendet."
