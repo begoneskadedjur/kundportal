@@ -61,6 +61,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     body: req.method !== 'GET' && req.method !== 'HEAD' ? JSON.stringify(req.body) : undefined,
   })
 
-  const data = await fortnoxRes.json()
+  const data = await fortnoxRes.json().catch(() => ({ error: fortnoxRes.statusText }))
+  // Felsvar loggas så att Vercel-loggen visar Fortnox egen förklaring.
+  // 404 på GET är normalt (findOrCreate letar efter kund/artikel) och loggas inte.
+  if (!fortnoxRes.ok && !(fortnoxRes.status === 404 && req.method === 'GET')) {
+    console.error('[fortnox-proxy]', JSON.stringify({
+      method: req.method,
+      path: fortnoxPath,
+      status: fortnoxRes.status,
+      user: auth.email ?? null,
+      error: data,
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+    }).slice(0, 8000))
+  }
   return res.status(fortnoxRes.status).json(data)
 }

@@ -1094,8 +1094,6 @@ export default function InvoiceDetailModal({
         terms_of_payment: isPrivatePerson ? '10' : null,
         show_price_vat_included: isPrivatePerson ? true : undefined,
         our_reference: technicianName,
-        // Engångskunder: numret får aldrig peka på en annan kund i Fortnox
-        verify_organization_number: isOneOffInvoice,
       })
 
       // 2a2. Debiteringstillfället är sändningen: en avtalsfaktura planeras om

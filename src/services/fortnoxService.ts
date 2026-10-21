@@ -217,9 +217,6 @@ export const FortnoxService = {
     show_price_vat_included?: boolean
     // Vår referens — teknikerns namn
     our_reference?: string | null
-    // Opt-in: kräv att befintlig Fortnox-kund på numret har SAMMA org-/personnummer.
-    // Utan flaggan används numret så fort det finns (avtalsflödet, oförändrat).
-    verify_organization_number?: boolean
   }): Promise<string> {
     const customerNumberStr = String(customer.customer_number)
 
@@ -233,15 +230,16 @@ export const FortnoxService = {
     }
 
     if (existing?.CustomerNumber) {
-      if (customer.verify_organization_number) {
-        const ours = orgDigits(customer.organization_number)
-        const theirs = orgDigits(existing.OrganisationNumber)
-        if (ours && theirs && ours !== theirs) {
-          throw new Error(
-            `Kundnummer ${customerNumberStr} tillhör "${existing.Name}" (${existing.OrganisationNumber}) i Fortnox, ` +
-            `inte ${customer.company_name}. Rätta kundnumret på kundkortet innan fakturan skickas.`
-          )
-        }
+      // Numret måste tillhöra samma org-/personnummer i Fortnox. Portalen
+      // reserverar nummer som Fortnox inte känner till, och Fortnox kan ge
+      // samma nummer till en kund som läggs upp direkt där (10524, 2026-10-19).
+      const ours = orgDigits(customer.organization_number)
+      const theirs = orgDigits(existing.OrganisationNumber)
+      if (ours && theirs && ours !== theirs) {
+        throw new Error(
+          `Kundnummer ${customerNumberStr} tillhör "${existing.Name}" (${existing.OrganisationNumber}) i Fortnox, ` +
+          `inte ${customer.company_name}. Rätta kundnumret på kundkortet innan fakturan skickas.`
+        )
       }
       return existing.CustomerNumber
     }

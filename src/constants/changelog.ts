@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.72.4',
+    date: '2026-10-21',
+    title: 'Fakturor hamnar aldrig på fel Fortnox-kund',
+    items: [
+      { kind: 'buggfix', text: 'Innan en faktura skickas till Fortnox kontrolleras att kundnumret där har samma person- eller organisationsnummer som kunden. Gäller nu även avtalsfakturor, inte bara engångskunder. Stämmer det inte stoppas sändningen med ett meddelande om vem numret tillhör.' },
+    ],
+  },
+  {
     version: '3.72.3',
     date: '2026-10-21',
     title: 'Uppsagda avtal faktureras till slutdatumet',
