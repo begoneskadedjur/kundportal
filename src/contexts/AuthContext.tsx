@@ -252,6 +252,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const availableViews = computeAvailableViews(profile);
   const hasDualRole = availableViews.length > 1;
 
+  // Vyn som gäller: portalen i adressen om profilen har den, annars sparad
+  // vy om den är tillåten, annars profilens första. Den sparade vyn rättas
+  // annars bara vid inloggningssidan, så den som öppnar en direktlänk eller
+  // appen från hemskärmen fick standardvärdet 'admin' (Kim, handboken visade
+  // adminguiderna 2026-10-21, och teknikerlogik i ärendemodalerna slogs av).
+  const pathView = (Object.keys(VIEW_PATHS) as ActiveView[]).find(v =>
+    location.pathname.startsWith(VIEW_PATHS[v].replace(/\/dashboard$/, '') + '/') ||
+    location.pathname === VIEW_PATHS[v].replace(/\/dashboard$/, '')
+  );
+  const effectiveView: ActiveView = availableViews.length === 0
+    ? activeView
+    : pathView && availableViews.includes(pathView)
+      ? pathView
+      : availableViews.includes(activeView) ? activeView : availableViews[0];
+
   const setActiveView = (view: ActiveView) => {
     setActiveViewState(view);
     localStorage.setItem('begone_active_view', view);
@@ -270,7 +285,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isSäljare,
     hasDualRole,
     availableViews,
-    activeView,
+    activeView: effectiveView,
     setActiveView,
   };
 
