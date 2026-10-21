@@ -210,7 +210,7 @@ export function fortnoxText(text: string): string {
     .replace(/[‘’´`]/g, "'")
     .replace(/[“”„]/g, '"')
     .replace(/…/g, '...')
-    .replace(/[   \t]/g, ' ')
+    .replace(/[^\S\n\r ]/g, ' ')
     .replace(/[^\p{L}\p{N} \n\r.,:;!?()[\]\-+/\\&%'"#@*=_<>]/gu, '')
     .replace(/ {2,}/g, ' ')
     .trim()
