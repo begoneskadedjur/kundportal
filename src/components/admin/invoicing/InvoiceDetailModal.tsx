@@ -935,7 +935,11 @@ export default function InvoiceDetailModal({
       }
 
       const isOneOffInvoice = invoice.case_type === 'private' || invoice.case_type === 'business'
-      if (!customerNumber && !isOneOffInvoice) {
+      // Engångs- och avtalskunder får sitt nummer från Fortnox första gången
+      // ett utkast skickas (steg 1c). Portalen reserverar aldrig nummer i
+      // förväg: Fortnox kan då ge samma nummer till någon annan (10524, 2026-10-19).
+      const allocatesAtSend = isOneOffInvoice || (invoice.invoice_type === 'contract' && !!customerRowId)
+      if (!customerNumber && !allocatesAtSend) {
         toast.error('Kunden saknar kundnummer — lägg till det på kundkortet innan du skickar till Fortnox')
         return
       }
@@ -1012,13 +1016,15 @@ export default function InvoiceDetailModal({
         }
       }
 
-      // 1c. Engångskund utan Fortnox-nummer: se till att kundraden finns och
-      // låt servern hitta/adoptera/skapa Fortnox-kunden med nästa lediga
-      // nummer i kundgruppens intervall (api/fortnox/allocate-customer).
+      // 1c. Kund utan Fortnox-nummer (engångs- eller avtalskund): se till att
+      // kundraden finns och låt servern hitta/adoptera/skapa Fortnox-kunden
+      // med nästa lediga nummer i kundgruppens intervall
+      // (api/fortnox/allocate-customer). Avtalskundens grupp valdes i
+      // avtalswizarden och sattes på kunden vid signeringen.
       // Flera Fortnox-träffar på samma org.nr → koordinatorn väljer i modalen.
-      if (!customerNumber && isOneOffInvoice) {
+      if (!customerNumber && allocatesAtSend) {
         const oneOffType = invoice.case_type as 'private' | 'business'
-        if (!customerRowId) {
+        if (!customerRowId && isOneOffInvoice) {
           const created = await CaseCustomerService.getOrCreateCaseCustomer({
             caseType: oneOffType,
             name: invoice.customer_name,

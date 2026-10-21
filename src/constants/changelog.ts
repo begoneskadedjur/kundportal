@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.73.0',
+    date: '2026-10-21',
+    title: 'Avtalskunder får kundnummer från Fortnox',
+    items: [
+      { kind: 'andring', text: 'En ny avtalskund får sitt kundnummer första gången ett utkast skickas till Fortnox, på samma sätt som engångskunder. Numret tas ur kundgruppen som valdes i avtalsguiden. Finns personen eller bolaget redan i Fortnox används det kortet.' },
+      { kind: 'buggfix', text: 'Förut fick avtalskunden ett nummer redan vid signeringen, men bara i portalen. Fortnox kunde då ge samma nummer till en annan kund innan första fakturan skickades.' },
+    ],
+  },
+  {
     version: '3.72.4',
     date: '2026-10-21',
     title: 'Fakturor hamnar aldrig på fel Fortnox-kund',

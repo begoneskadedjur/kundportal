@@ -1,5 +1,5 @@
 // api/fortnox/allocate-customer.ts
-// Ger en portalkund (engångskund) sitt Fortnox-kundnummer vid "Till Fortnox"
+// Ger en portalkund (engångs- eller avtalskund) sitt Fortnox-kundnummer vid "Till Fortnox"
 // (docs/kundnummer-fortnox-plan.md, fas 4).
 //
 // Ordning:

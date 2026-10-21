@@ -6,7 +6,8 @@
 // här: engångskunder får sitt nummer från Fortnox när fakturan skickas
 // ("Till Fortnox" → api/fortnox/allocate-customer). Raden skapas utan nummer så
 // att tekniker kan avsluta ärenden utan Fortnox-åtkomst. Portalens räknare
-// (allocate_customer_number) används bara av Oneflow-webhooken för avtalskunder.
+// (allocate_customer_number) används inte längre av något flöde: även
+// avtalskunder får sitt nummer från Fortnox vid första utkastet (2026-10-21).
 
 import { supabase } from '../lib/supabase'
 

@@ -566,17 +566,16 @@ async function createOrLinkCustomer(
   }
 
   const groupId = str(contract.customer_group_id)
-  const allocateNumber = async (customerId: string) => {
+  // Kundgruppen från avtalswizarden sätts på kunden, men inget nummer: det
+  // ges av Fortnox första gången ett utkast skickas (allocate-customer).
+  // Ett nummer som bara reserveras i portalen kan Fortnox ge till någon
+  // annan (10524, 2026-10-19).
+  const assignGroup = async (customerId: string) => {
     if (!groupId) return
-    const { data: cust } = await db.from('customers').select('customer_number').eq('id', customerId).maybeSingle()
-    if (cust && (cust as Row).customer_number) return
-    await write(ctx, 'Kundnummer tilldelas ur kundgruppen (allocate_customer_number)', async () => {
-      const { data: customerNumber, error } = await db.rpc('allocate_customer_number', { p_group_id: groupId })
-      if (error || !customerNumber) {
-        console.error('⚠️ Kunde inte tilldela kundnummer:', error?.message)
-        return
-      }
-      await db.from('customers').update({ customer_group_id: groupId, customer_number: customerNumber }).eq('id', customerId)
+    const { data: cust } = await db.from('customers').select('customer_group_id').eq('id', customerId).maybeSingle()
+    if (cust && (cust as Row).customer_group_id) return
+    await write(ctx, 'Kundgruppen från avtalet sätts på kunden', async () => {
+      must(await db.from('customers').update({ customer_group_id: groupId }).eq('id', customerId), 'Kundgrupp')
     })
   }
 
@@ -586,7 +585,7 @@ async function createOrLinkCustomer(
       must(await db.from('contracts').update({ customer_id: id }).eq('id', contractId), 'Kundkoppling')
     })
     contract.customer_id = id
-    await allocateNumber(id)
+    await assignGroup(id)
     return { customerId: id, created: false }
   }
 
@@ -642,7 +641,7 @@ async function createOrLinkCustomer(
   })
   if (!newId) return { customerId: ctx.dryRun ? '(ny kund)' : null, created: ctx.dryRun }
   contract.customer_id = newId
-  await allocateNumber(newId)
+  await assignGroup(newId)
   return { customerId: newId, created: true }
 }
 
