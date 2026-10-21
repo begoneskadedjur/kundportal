@@ -6,6 +6,7 @@ import { ConsolidatedCustomer } from '../../../hooks/useConsolidatedCustomers'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 import { ContractInvoiceGenerator } from '../../../services/contractInvoiceGenerator'
+import { cancelVisitsAfterEnd } from '../../../services/terminationVisits'
 
 interface TerminateContractModalProps {
   organization: ConsolidatedCustomer | null
@@ -105,19 +106,14 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
         // Avbryt inte — customers-uppdateringen lyckades; logga och fortsätt.
       }
 
-      // Avboka inbokade besök EFTER sista giltiga dagen.
-      // TIDSZONSFÄLLA: scheduled_at är timestamptz. Utan T23:59:59 jämförs
-      // datumsträngen mot midnatt, och besök PÅ sista giltiga dagen avbokas
-      // felaktigt — de ska genomföras.
-      const { error: sessionsError } = await supabase
-        .from('station_inspection_sessions')
-        .update({ status: 'cancelled' })
-        .in('customer_id', siteIds)
-        .eq('status', 'scheduled')
-        .gt('scheduled_at', `${effectiveDateStr}T23:59:59`)
-
-      if (sessionsError) {
-        console.error('Error cancelling future inspection sessions:', sessionsError)
+      // Avboka inbokade besök EFTER sista giltiga dagen och ta bort deras
+      // ärenden ur schemat. Besök PÅ sista dagen genomförs.
+      let removedVisits = 0
+      try {
+        removedVisits = (await cancelVisitsAfterEnd({ customerIds: siteIds }, effectiveDateStr)).cases
+      } catch (err) {
+        console.error('Error cancelling future inspection sessions:', err)
+        toast.error('Besöken efter slutdatumet kunde inte tas bort. Kontrollera schemat.')
       }
 
       // Pausa löpande scheman. ALDRIG 'cancelled': den vägen är irreversibel
@@ -146,6 +142,9 @@ export default function TerminateContractModal({ organization, isOpen, onClose, 
       }
       if (totalFutureDeleted > 0) {
         toast.success(`${totalFutureDeleted} framtida avtalsfakturor raderade`)
+      }
+      if (removedVisits > 0) {
+        toast.success(`${removedVisits} besök efter slutdatumet borttagna ur schemat`)
       }
 
       toast.success(`Avtal uppsagt for ${organization.company_name} — slutdatum: ${formatDate(resolvedEndDate)}`)

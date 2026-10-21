@@ -27,10 +27,11 @@ describe('scheduleHorizon', () => {
     expect(h.planEnd).toBe('2026-11-04')
   })
 
-  it('uppsagt avtal: till sista giltiga dag', () => {
+  it('uppsagt avtal: till och med sista giltiga dag', () => {
     const h = scheduleHorizon({ ...ulriksdal, terminated_at: '2026-10-01T10:00:00Z', effective_end_date: '2026-12-01' }, '2026-10-21')
     expect(h.terminated).toBe(true)
-    expect(h.planEnd).toBe('2026-12-01')
+    // planEnd är exklusivt: dagen efter sista giltiga dag
+    expect(h.planEnd).toBe('2026-12-02')
   })
 
   it('avtalsperiod som inte löpt ut: hela perioden, även flera år', () => {

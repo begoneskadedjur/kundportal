@@ -18,6 +18,7 @@ import {
   bindingWindow,
   computeTerminationCutoff,
   addMonthsIso,
+  addDaysIso,
   toLocalIsoDate,
   todayLocal,
   type PlanningContract,
@@ -97,10 +98,14 @@ export function scheduleHorizon(
   todayIso: string = toLocalIsoDate(todayLocal())
 ): ScheduleHorizon {
   if (c.terminated_at) {
-    const cutoff = c.effective_end_date ?? (() => {
-      const d = computeTerminationCutoff(asPlanning(c, c.contract_start_date))
-      return d ? toLocalIsoDate(d) : null
-    })()
+    // effective_end_date är sista giltiga dag och planEnd är exklusivt, så
+    // dagen efter: ett besök PÅ sista dagen ska genomföras.
+    const cutoff = c.effective_end_date
+      ? addDaysIso(c.effective_end_date, 1)
+      : (() => {
+          const d = computeTerminationCutoff(asPlanning(c, c.contract_start_date))
+          return d ? toLocalIsoDate(d) : null
+        })()
     return { ...EMPTY, planEnd: cutoff, currentEnd: cutoff, terminated: true }
   }
 

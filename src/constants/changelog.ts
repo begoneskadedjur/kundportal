@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.72.2',
+    date: '2026-10-21',
+    title: 'Uppsagda avtal försvinner ur schemat',
+    items: [
+      { kind: 'buggfix', text: 'När ett avtal sägs upp tas ärendena efter slutdatumet bort ur schemat. Förut avbokades bara kontrollerna, och ärendena låg kvar som Bokad. Besök på sista giltiga dagen ligger kvar.' },
+      { kind: 'andring', text: 'Ångras uppsägningen kommer både kontrollerna och ärendena tillbaka i schemat.' },
+    ],
+  },
+  {
     version: '3.72.1',
     date: '2026-10-21',
     title: 'Schemat för avtal utan slutdatum',

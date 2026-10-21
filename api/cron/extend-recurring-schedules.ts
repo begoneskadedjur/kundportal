@@ -18,7 +18,7 @@ import { requireCronSecret } from '../_lib/cronAuth'
 import { format } from 'date-fns'
 import { generateInspectionDates } from '../../src/utils/inspectionDateGenerator'
 import { scheduleHorizon, type HorizonContract } from '../../src/shared/scheduleHorizon'
-import { toLocalIsoDate, todayLocal } from '../../src/shared/contractPlanner'
+import { toLocalIsoDate, todayLocal, addDaysIso } from '../../src/shared/contractPlanner'
 import type {
   GeneratedInspectionDate,
   RecurringDayPattern,
@@ -162,7 +162,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // Uppsagd kund: respektera effective_end_date, inte bindningstiden
         if (customer?.contract_status === 'terminated' && customer.effective_end_date) {
-          const effectiveEnd = new Date(customer.effective_end_date)
+          // Sista giltiga dag ingår: gränsen är dagen efter
+          const effectiveEnd = new Date(addDaysIso(customer.effective_end_date, 1))
           if (newEnd > effectiveEnd) { newEnd = effectiveEnd; hardEnd = effectiveEnd }
         }
 

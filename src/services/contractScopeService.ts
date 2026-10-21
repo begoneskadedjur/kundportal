@@ -8,6 +8,7 @@ import { toLocalISOStringWithOffset } from '../utils/dateHelpers'
 import { isLiveContract, isImportedContractRow, type ContractLifecycleFields } from '../utils/contractLifecycle'
 import { customersCoveredByContract, resolveContractCandidates } from './contractResolver'
 import { ContractInvoiceGenerator } from './contractInvoiceGenerator'
+import { cancelVisitsAfterEnd, restoreVisitsAfterEnd } from './terminationVisits'
 
 export interface ScopeRow {
   id: string
@@ -970,17 +971,14 @@ export class ContractScopeService {
     // 3. Pausa löpande scheman (tvåstegsregeln ovan)
     const pausedSchedules = await this.pauseSchedulesForContract(contractId, customerId)
 
-    // 4. Avboka inbokade besök EFTER sista giltiga dagen.
-    //    TIDSZONSFÄLLA: scheduled_at är timestamptz. Utan T23:59:59 jämförs
-    //    datumsträngen mot midnatt, och besök PÅ sista giltiga dagen avbokas
-    //    felaktigt — de ska ju genomföras.
-    const { error: sessErr } = await supabase
-      .from('station_inspection_sessions')
-      .update({ status: 'cancelled' })
-      .eq('contract_id', contractId)
-      .eq('status', 'scheduled')
-      .gt('scheduled_at', `${effectiveEndDate}T23:59:59`)
-    if (sessErr) console.error('Kunde inte avboka framtida kontrollbesök:', sessErr.message)
+    // 4. Avboka inbokade besök EFTER sista giltiga dagen och ta bort deras
+    //    ärenden ur schemat. Besök PÅ sista dagen genomförs.
+    let removedVisits = 0
+    try {
+      removedVisits = (await cancelVisitsAfterEnd({ contractId }, effectiveEndDate)).cases
+    } catch (err) {
+      console.error('Kunde inte avboka framtida kontrollbesök:', err)
+    }
 
     // 5. Ta bort framtida icke-låsta avtalsfakturor för DETTA avtal
     let deletedInvoices = 0
@@ -1022,6 +1020,7 @@ export class ContractScopeService {
         reason,
         `Gäller t.o.m. ${effectiveEndDate}`,
         pausedSchedules > 0 ? `${pausedSchedules} schema pausade` : null,
+        removedVisits > 0 ? `${removedVisits} besök efter slutdatumet borttagna` : null,
         deletedInvoices > 0 ? `${deletedInvoices} planerade fakturor borttagna` : null,
       ]
         .filter(Boolean)
@@ -1086,14 +1085,13 @@ export class ContractScopeService {
 
     // Boka om besök som avbokades efter det gamla slutdatumet. Samma
     // T23:59:59-gräns som vid uppsägningen, annars träffas fel rader.
+    // Ärendena läggs tillbaka i schemat.
     if (prevEnd) {
-      const { error: sessErr } = await supabase
-        .from('station_inspection_sessions')
-        .update({ status: 'scheduled' })
-        .eq('contract_id', contractId)
-        .eq('status', 'cancelled')
-        .gt('scheduled_at', `${prevEnd}T23:59:59`)
-      if (sessErr) console.error('Kunde inte återställa avbokade besök:', sessErr.message)
+      try {
+        await restoreVisitsAfterEnd({ contractId }, prevEnd)
+      } catch (err) {
+        console.error('Kunde inte återställa avbokade besök:', err)
+      }
     }
 
     // Kundfälten återställs bara om uppsägningen faktiskt nollade dem
