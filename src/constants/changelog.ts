@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.75.0',
+    date: '2026-10-21',
+    title: 'Webbförfrågningar visar om de kom via en film',
+    items: [
+      { kind: 'nyhet', text: 'En förfrågan från begone.se som skickas efter knappen under en film får raden "Kom till formuläret via: Knappen under filmen". Då ser vi om filmerna på råttsidan och mussidan ger förfrågningar.' },
+    ],
+  },
+  {
     version: '3.74.0',
     date: '2026-10-21',
     title: 'Statusknappen syns',

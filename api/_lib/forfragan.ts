@@ -22,6 +22,8 @@ export const TILLATNA_MIME: Record<string, string> = {
 const DETALJ_NYCKLAR = new Set([
   'fraga', 'svar', 'foljfraga', 'folj', 'akut', 'nar_ringa', 'antal_bilder',
   'kalla', 'fran', 'kundgrupp', 'art', 'sakerhet', 'utfall', 'vag',
+  // Var på sidan besökaren gick vidare till formuläret, t.ex. 'film' (knappen under en film på begone.se).
+  'via',
   // Om besökaren samtyckt till marknadsföringscookies (Google Ads) när förfrågan skickades. Styr om
   // klick-id:n får användas för att stämma av konverteringar i Ads.
   'samtycke_marknadsforing',

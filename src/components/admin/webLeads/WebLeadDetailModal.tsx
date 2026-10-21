@@ -63,6 +63,12 @@ const DETALJ_ETIKETT: Record<string, string> = {
   art: 'Art enligt artanalysen',
   sakerhet: 'Säkerhet',
   utfall: 'Analysens utfall',
+  via: 'Kom till formuläret via',
+}
+
+/** Läsbara värden för detaljfält som sajten skickar som koder. */
+const DETALJ_VARDE: Record<string, Record<string, string>> = {
+  via: { film: 'Knappen under filmen' },
 }
 
 type Svar = { etikett: string; varde: string }
@@ -75,7 +81,7 @@ function formularSvar(inquiry: WebInquiry): Svar[] {
   else if (d.svar != null && d.svar !== '') svar.push({ etikett: 'Svar', varde: String(d.svar) })
   if (typeof d.foljfraga === 'string' && d.folj != null) svar.push({ etikett: d.foljfraga, varde: String(d.folj) })
   for (const [k, etikett] of Object.entries(DETALJ_ETIKETT)) {
-    if (d[k] != null && d[k] !== '') svar.push({ etikett, varde: String(d[k]) })
+    if (d[k] != null && d[k] !== '') svar.push({ etikett, varde: DETALJ_VARDE[k]?.[String(d[k])] ?? String(d[k]) })
   }
   return svar
 }
