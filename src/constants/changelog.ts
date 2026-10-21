@@ -51,6 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       { kind: 'andring', text: 'Knappen för att byta status i ärendefönstren heter nu "Ändra status" och är grön med en egen ikon, så den är lätt att hitta. Önskemål från teknikerna.' },
       { kind: 'andring', text: 'Mellanstatusar som Återbesök visas som text med en färgad punkt bredvid stegen.' },
+      { kind: 'andring', text: 'Handbokens guide Skapa ett ärende och välj rätt ärendetyp förklarar nu alla ärendetyper, och när en avtalskund ska ha Extrabesök Avtalskund i stället för ett engångsjobb.' },
       { kind: 'buggfix', text: 'Tekniker som öppnade portalen från hemskärmen eller en länk kunde få handboken för admin, med texten "Inga guider för din roll ännu". Nu följer handboken och ärendefönstren alltid portalen man står i.' },
     ],
   },
