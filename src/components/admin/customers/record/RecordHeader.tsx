@@ -43,8 +43,10 @@ function FortnoxStatus({ customer, root }: { customer: RecordCustomer; root: Rec
     )
   }
 
+  // Normalläge för nya kunder: numret ges av Fortnox när första fakturan
+  // skickas som utkast (allocate-customer), inte i förväg
   if (customer.customer_number == null) {
-    return <span className="text-red-400">Kundnummer saknas</span>
+    return <span className="text-slate-400">Kundnummer ges vid första Fortnox-utkastet</span>
   }
 
   return (

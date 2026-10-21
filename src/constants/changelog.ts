@@ -51,6 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       { kind: 'andring', text: 'En ny avtalskund får sitt kundnummer första gången ett utkast skickas till Fortnox, på samma sätt som engångskunder. Numret tas ur kundgruppen som valdes i avtalsguiden. Finns personen eller bolaget redan i Fortnox används det kortet.' },
       { kind: 'buggfix', text: 'Förut fick avtalskunden ett nummer redan vid signeringen, men bara i portalen. Fortnox kunde då ge samma nummer till en annan kund innan första fakturan skickades.' },
+      { kind: 'andring', text: 'En kund utan kundnummer visas inte längre som ett fel. Kundkortet säger "Kundnummer ges vid första Fortnox-utkastet" och punkten i kundlistan är grå.' },
     ],
   },
   {

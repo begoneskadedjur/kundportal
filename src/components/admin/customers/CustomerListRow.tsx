@@ -109,7 +109,7 @@ export function portalStatusInfo(org: ConsolidatedCustomer): { label: string; do
 
 function FortnoxDot({ number, verified }: { number: number | null; verified: boolean }) {
   if (number == null) {
-    return <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" title="Fortnox-kundnummer saknas" aria-hidden />
+    return <span className="w-1.5 h-1.5 rounded-full bg-slate-500 shrink-0" title="Kundnummer ges vid första Fortnox-utkastet" aria-hidden />
   }
   if (verified) {
     return <span className="w-1.5 h-1.5 rounded-full bg-[#20c58f] shrink-0" title="Verifierad mot Fortnox" aria-hidden />
