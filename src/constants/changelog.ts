@@ -49,6 +49,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: '2026-10-21',
     title: 'Avtalsfakturor går att skicka till Fortnox',
     items: [
+      { kind: 'buggfix', text: 'Avtalsfakturor får Vår referens i Fortnox: kundansvarig, annars säljaren som skickade avtalet. Förut kom referensen bara med om avtalet hade en kundansvarig, vilket nästan inga avtal har.' },
       { kind: 'buggfix', text: 'Avtalsfakturor stoppades av Fortnox med "Dokumenttext innehåller ogiltiga tecken". Fakturatexten innehöll mittpunkter (·) som Fortnox inte godtar. Text som skickas till Fortnox tvättas nu från sådana tecken, i portalen ser texten ut som förut.' },
     ],
   },

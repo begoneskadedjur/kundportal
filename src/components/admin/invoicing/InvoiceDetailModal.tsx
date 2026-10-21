@@ -1046,7 +1046,7 @@ export default function InvoiceDetailModal({
             chosenCustomerNumber: opts.chosenCustomerNumber,
             reactivate: opts.reactivate,
             forceNew: opts.forceNew,
-            ourReference: technicianName,
+            ourReference: technicianName ?? contractCustomer?.assigned_account_manager ?? null,
           })
           if (result.status === 'candidates') {
             setFortnoxCandidates({ kind: result.kind, candidates: result.candidates })
@@ -1210,13 +1210,22 @@ export default function InvoiceDetailModal({
         if (contractIds.size > 0) {
           const { data: contractRows } = await supabase
             .from('contracts')
-            .select('id, diary_number, account_manager_name')
+            .select('id, diary_number, account_manager_name, begone_employee_name')
             .in('id', [...contractIds])
-          const rows = (contractRows ?? []) as Array<{ diary_number: string | null; account_manager_name: string | null }>
+          const rows = (contractRows ?? []) as Array<{ diary_number: string | null; account_manager_name: string | null; begone_employee_name: string | null }>
           const diaries = [...new Set(rows.map((r) => r.diary_number?.trim()).filter((d): d is string => !!d))]
           if (diaries.length > 0) fortnoxPayload.ExternalInvoiceReference1 = diaries.join(' / ').slice(0, 80)
-          const managers = [...new Set(rows.map((r) => r.account_manager_name?.trim()).filter((m): m is string => !!m))]
+          // Kundansvarig, annars avtalets säljare (wizardens "BeGone-ansvarig").
+          // account_manager_name är tomt på nästan alla avtal, så utan
+          // reservvägen kom ingen Vår referens med (Pär-Eric, faktura 1055).
+          const managers = [...new Set(rows
+            .map((r) => (r.account_manager_name || r.begone_employee_name)?.trim())
+            .filter((m): m is string => !!m))]
           if (managers.length === 1 && !fortnoxPayload.OurReference) fortnoxPayload.OurReference = managers[0]
+        }
+        // Sista reserv: kundkortets kundansvarige, samma namn som modalen visar under Säljare
+        if (!fortnoxPayload.OurReference && contractCustomer?.assigned_account_manager?.trim()) {
+          fortnoxPayload.OurReference = contractCustomer.assigned_account_manager.trim()
         }
       }
 
