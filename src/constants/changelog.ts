@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.80.3',
+    date: '2026-10-22',
+    title: 'Förfallna fakturor visar rätt steg',
+    items: [
+      { kind: 'buggfix', text: 'En förfallen faktura visade alla steg som grå, som om den aldrig skickats. Nu är stegen till och med Skickad klara och Betald är nästa steg, med Förfallen bredvid.' },
+      { kind: 'andring', text: 'Rutan Kunden i fakturan heter nu Kundens övriga fakturor. Den räknar inte fakturan du har öppen, och därför kunde det stå 0 kr förfallet på en förfallen faktura.' },
+    ],
+  },
+  {
     version: '3.80.2',
     date: '2026-10-22',
     title: 'Arbetsorder och objekt kommer med på fakturan',

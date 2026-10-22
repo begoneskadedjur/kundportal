@@ -248,8 +248,8 @@ export default function InvoicePulseRow({ invoice, pulse, caseBillingItems, case
         </PulseCell>
       )}
 
-      {/* d) Kunden */}
-      <PulseCell label="Kunden">
+      {/* d) Kundens övriga fakturor (den öppna fakturan räknas inte) */}
+      <PulseCell label="Kundens övriga fakturor">
         {pulse.loading || !hasCustomerData ? (
           <div className="text-sm font-bold text-slate-100 tabular-nums">–</div>
         ) : (

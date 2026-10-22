@@ -39,7 +39,10 @@ export default function InvoiceStatusStepper({
   nextStepText
 }: InvoiceStatusStepperProps) {
   const isCancelled = status === 'cancelled'
-  const currentIdx = isCancelled ? -1 : STEPS.findIndex(s => s.key === status)
+  // Förfallen = skickad men obetald: allt till och med Skickad är klart och
+  // Betald är nästa steg. Utan detta blev alla steg grå (status saknas i STEPS).
+  const stepKey = status === 'overdue' ? 'paid' : status
+  const currentIdx = isCancelled ? -1 : STEPS.findIndex(s => s.key === stepKey)
 
   return (
     <div className="px-4 py-2.5 border-b border-slate-700/50">
