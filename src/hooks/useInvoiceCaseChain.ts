@@ -14,6 +14,8 @@ export interface ChainInvoice {
   invoice_type: string
   status: InvoiceStatus
   total_amount: number
+  /** Exkl. moms, visas vid hover */
+  subtotal: number | null
   created_at: string
   /** null = månadsbatchad samlingsfaktura utan direkt ärendekoppling */
   case_id: string | null
@@ -26,6 +28,8 @@ export interface CaseChainData {
   pendingCount: number
   /** Summa inkl. moms, som fakturornas belopp i kedjan */
   pendingAmount: number
+  /** Samma summa exkl. moms, visas vid hover */
+  pendingAmountExVat: number
   /** Tjänstenamn på de väntande raderna — för kedjans väntar-rad när raderna är tomma */
   pendingNames: string[]
   /** Ärendet är avslutat — ingen slutfaktura-rad ska utlovas */
@@ -39,6 +43,7 @@ const EMPTY_CHAIN: CaseChainData = {
   invoices: [],
   pendingCount: 0,
   pendingAmount: 0,
+  pendingAmountExVat: 0,
   pendingNames: [],
   caseClosed: false,
   show: false,
@@ -72,7 +77,7 @@ export function useInvoiceCaseChain(
         const [invoicesRes, pendingRes, caseRes] = await Promise.all([
           supabase
             .from('invoices')
-            .select('id, invoice_number, invoice_type, status, total_amount, created_at, case_id')
+            .select('id, invoice_number, invoice_type, status, total_amount, subtotal, created_at, case_id')
             .eq('case_id', caseId)
             .order('created_at', { ascending: true }),
           // Contract-fakturor (årspremie) har ingen radkoppling till ärendet — hoppa över
@@ -113,7 +118,7 @@ export function useInvoiceCaseChain(
             if (extraIds.length > 0) {
               const { data: extra } = await supabase
                 .from('invoices')
-                .select('id, invoice_number, invoice_type, status, total_amount, created_at, case_id')
+                .select('id, invoice_number, invoice_type, status, total_amount, subtotal, created_at, case_id')
                 .in('id', extraIds)
               invoices = [...invoices, ...((extra as ChainInvoice[] | null) || [])].sort((a, b) =>
                 a.created_at.localeCompare(b.created_at)
@@ -141,6 +146,7 @@ export function useInvoiceCaseChain(
         const pendingAmount = Math.round(pendingRows.reduce(
           (s, r) => s + Number(r.total_price || 0) * (1 + Number(r.vat_rate ?? 25) / 100), 0
         ) * 100) / 100
+        const pendingAmountExVat = Math.round(pendingRows.reduce((s, r) => s + Number(r.total_price || 0), 0) * 100) / 100
         const pendingNames = Array.from(
           new Set(pendingRows.map(r => r.service_name || r.article_name).filter(Boolean) as string[])
         )
@@ -156,6 +162,7 @@ export function useInvoiceCaseChain(
           invoices,
           pendingCount: pendingRows.length,
           pendingAmount,
+          pendingAmountExVat,
           pendingNames,
           caseClosed,
           show,

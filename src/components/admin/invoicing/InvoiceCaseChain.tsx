@@ -21,7 +21,7 @@ export function UnbilledRowsNotice({ chain }: { chain: CaseChainData }) {
       <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
       <span>
         {chain.pendingCount} ofakturerad{plural ? 'e' : ''} tjänsterad{plural ? 'er' : ''} (
-        {formatInvoiceAmount(chain.pendingAmount)}) på ärendet ingår inte i denna faktura
+        {formatInvoiceAmount(chain.pendingAmount)} inkl. moms) på ärendet ingår inte i denna faktura
       </span>
     </div>
   )
@@ -91,7 +91,10 @@ export default function InvoiceCaseChainSection({
               {isPartial && <span className="text-teal-400 font-medium">delfaktura</span>}
             </div>
           </div>
-          <span className="text-xs font-semibold text-white tabular-nums whitespace-nowrap">
+          <span
+            className="text-xs font-semibold text-white tabular-nums whitespace-nowrap"
+            title={inv.subtotal != null ? `${formatInvoiceAmount(Number(inv.subtotal))} exkl. moms` : undefined}
+          >
             {formatInvoiceAmount(Number(inv.total_amount || 0))}
           </span>
         </div>
@@ -123,7 +126,10 @@ export default function InvoiceCaseChainSection({
             {chain.pendingCount} ofakturerad{plural ? 'e' : ''} tjänsterad{plural ? 'er' : ''} på ärendet
             <span className="text-slate-500"> · kvar att fakturera</span>
           </span>
-          <span className="font-semibold text-slate-300 tabular-nums whitespace-nowrap">
+          <span
+            className="font-semibold text-slate-300 tabular-nums whitespace-nowrap"
+            title={`${formatInvoiceAmount(chain.pendingAmountExVat)} exkl. moms`}
+          >
             {formatInvoiceAmount(chain.pendingAmount)}
           </span>
         </div>
@@ -149,6 +155,7 @@ export default function InvoiceCaseChainSection({
       <h3 className="flex items-center gap-1.5 text-sm font-semibold text-white mb-2">
         <Link2 className="w-4 h-4 text-teal-400" />
         Ärendets fakturakedja
+        <span className="ml-auto text-[11px] font-normal text-slate-500">belopp inkl. moms</span>
       </h3>
       <div>
         {rows.map((r, i) => (

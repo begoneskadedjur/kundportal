@@ -259,7 +259,7 @@ export default function ServiceCostBreakdown({
         <h3 className="text-xs font-medium text-slate-400">
           Kostnadsuppdelning per tjänst
           <span className="ml-2 text-slate-500 font-normal">
-            — så här kalkylerade teknikern priset
+            — så här kalkylerade teknikern priset · exkl. moms
           </span>
         </h3>
         <div className="flex items-center gap-3 text-xs">

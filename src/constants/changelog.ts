@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.80.6',
+    date: '2026-10-22',
+    title: 'Tydligt med eller utan moms i fakturan',
+    items: [
+      { kind: 'andring', text: 'Ärendets fakturakedja säger att beloppen är inklusive moms, och beloppet exklusive moms syns när du håller muspekaren över det. Rutan för ofakturerade rader säger inkl. moms och kostnadsuppdelningen exkl. moms, så att det aldrig behöver gissas.' },
+    ],
+  },
+  {
     version: '3.80.5',
     date: '2026-10-22',
     title: 'Ofakturerat belopp visas inklusive moms',
