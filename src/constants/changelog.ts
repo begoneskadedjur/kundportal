@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.80.7',
+    date: '2026-10-22',
+    title: 'Alla ärenden får avslutsdatum',
+    items: [
+      { kind: 'buggfix', text: 'Privat- och företagsärenden fick inget avslutsdatum sedan slutet av augusti, och ronderingar och egenkontroller fick det aldrig från sina rutor. Nu sätts datumet när ärendet får status Avslutat, oavsett var det avslutas. Avslutas ärendet igen efter ett återbesök gäller det nya datumet.' },
+    ],
+  },
+  {
     version: '3.80.6',
     date: '2026-10-22',
     title: 'Tydligt med eller utan moms i fakturan',
