@@ -67,7 +67,7 @@ import {
   toInvoiceItemRows,
   type ContractServiceItem,
 } from '../../src/shared/contractInvoiceRows'
-import { classifyOneflowBillingField } from '../../src/shared/invoiceDelivery'
+import { deriveDeliveryFromContract, type DerivedDelivery } from '../../src/shared/invoiceDelivery'
 
 export interface SigningOptions {
   /** Inga skrivningar: rapporten beskriver vad som skulle göras */
@@ -522,16 +522,18 @@ async function createOrLinkCustomer(
   const contractId = String(contract.id)
   const oneflowId = str(contract.oneflow_contract_id)
 
-  // Fakturafältet i Oneflow: kundens eget svar. Giltig e-post = fakturavägen
-  // e-post; annan text = fakturaadress som ekonomi bekräftar vid första fakturan
-  // (src/shared/invoiceDelivery.ts). Kontaktens e-post används aldrig som
-  // fakturamejl: kunden har inte sagt att fakturan ska dit.
-  const billing = classifyOneflowBillingField(str(contract.billing_email) ?? null)
-  const billingText = billing.billingText ?? str(contract.billing_address)
+  // Fakturavägen sätts automatiskt ur avtalets fakturafält (beslut 2026-10-22):
+  // e-post i fältet → e-post, adress → brev, inget → kontaktpersonens e-post
+  // (src/shared/invoiceDelivery.ts). Ändras vid behov på kundsidan.
+  const delivery = deriveDeliveryFromContract({
+    billingText: str(contract.billing_email) ?? str(contract.billing_address),
+    contactEmail: str(contract.contact_email),
+    companyName: str(contract.company_name),
+  })
 
   if (str(contract.customer_id)) {
-    // Kopplad redan (wizarden valde kunden): kundens svar fyller det som saknas
-    await applyBillingFieldToExisting(ctx, String(contract.customer_id), billing)
+    // Kopplad redan (wizarden valde kunden): avtalet sätter vägen om den saknas
+    await applyDeliveryToExisting(ctx, String(contract.customer_id), delivery)
     return { customerId: str(contract.customer_id), created: false }
   }
   const companyName = str(contract.company_name)
@@ -596,7 +598,7 @@ async function createOrLinkCustomer(
     })
     contract.customer_id = id
     await assignGroup(id)
-    await applyBillingFieldToExisting(ctx, id, billing)
+    await applyDeliveryToExisting(ctx, id, delivery)
     return { customerId: id, created: false }
   }
 
@@ -612,12 +614,12 @@ async function createOrLinkCustomer(
     contact_email: email,
     contact_phone: str(contract.contact_phone),
     contact_address: str(contract.contact_address),
-    billing_email: billing.billingEmail,
-    billing_address: billingText ?? str(contract.contact_address),
-    invoice_delivery_method: billing.billingEmail ? ('email' as const) : null,
-    invoice_delivery_source: billing.billingEmail ? ('kund' as const) : null,
-    invoice_delivery_confirmed_at: billing.billingEmail ? new Date().toISOString() : null,
-    invoice_delivery_confirmed_by_name: billing.billingEmail ? 'Kunden i Oneflow-avtalet' : null,
+    billing_email: delivery?.billingEmail ?? null,
+    billing_address: delivery?.billingAddress ?? str(contract.contact_address),
+    invoice_delivery_method: delivery?.method ?? null,
+    invoice_delivery_source: delivery ? ('kund' as const) : null,
+    invoice_delivery_confirmed_at: delivery ? new Date().toISOString() : null,
+    invoice_delivery_confirmed_by_name: delivery?.reason ?? null,
     oneflow_contract_id: oneflowId,
     created_from_contract_id: contractId,
     contract_template_id: str(contract.template_id),
@@ -654,12 +656,8 @@ async function createOrLinkCustomer(
     newId = String((data as Row).id)
     must(await db.from('contracts').update({ customer_id: newId }).eq('id', contractId), 'Kundkoppling')
   })
-  if (!billing.billingEmail) {
-    report.notes.push(
-      billing.billingText
-        ? `Kunden skrev "${billing.billingText}" som fakturaadress i avtalet. Fakturavägen bekräftas vid första fakturan.`
-        : 'Kunden angav ingen fakturaadress i avtalet. Fakturavägen bekräftas vid första fakturan.'
-    )
+  if (!delivery) {
+    report.notes.push('Avtalet saknar fakturauppgift och kontaktpersonen saknar e-post. Ange fakturavägen på kundsidan under fliken Fakturering.')
   }
   if (!newId) return { customerId: ctx.dryRun ? '(ny kund)' : null, created: ctx.dryRun }
   contract.customer_id = newId
@@ -668,39 +666,32 @@ async function createOrLinkCustomer(
 }
 
 /**
- * Befintlig kund utan bekräftad fakturaväg: kundens svar i Oneflow fyller i
- * det som saknas. En väg som redan är bekräftad (av ekonomi, Fortnox-kortet
- * eller tidigare) och uppgifter som redan finns skrivs aldrig över.
+ * Befintlig kund utan fakturaväg: avtalet sätter den. En väg som redan finns
+ * (ändrad för hand, från Fortnox-kortet eller tidigare) skrivs aldrig över.
  */
-async function applyBillingFieldToExisting(
-  ctx: Ctx,
-  customerId: string,
-  billing: { billingEmail: string | null; billingText: string | null }
-): Promise<void> {
+async function applyDeliveryToExisting(ctx: Ctx, customerId: string, delivery: DerivedDelivery | null): Promise<void> {
   const { db, report } = ctx
-  if (!billing.billingEmail && !billing.billingText) return
   const { data } = await db
     .from('customers')
-    .select('invoice_delivery_method, billing_email, billing_address')
+    .select('invoice_delivery_method')
     .eq('id', customerId)
     .maybeSingle()
   const cust = data as Row | null
   if (!cust || str(cust.invoice_delivery_method)) return
-
-  const update: Record<string, unknown> = {}
-  if (billing.billingEmail) {
-    update.invoice_delivery_method = 'email'
-    update.invoice_delivery_source = 'kund'
-    update.invoice_delivery_confirmed_at = new Date().toISOString()
-    update.invoice_delivery_confirmed_by_name = 'Kunden i Oneflow-avtalet'
-    if (!str(cust.billing_email)) update.billing_email = billing.billingEmail
-  } else if (billing.billingText) {
-    if (!str(cust.billing_address)) update.billing_address = billing.billingText
-    report.notes.push(`Kunden skrev "${billing.billingText}" som fakturaadress i avtalet. Fakturavägen bekräftas vid första fakturan.`)
+  if (!delivery) {
+    report.notes.push('Avtalet saknar fakturauppgift och kontaktpersonen saknar e-post. Ange fakturavägen på kundsidan under fliken Fakturering.')
+    return
   }
-  if (Object.keys(update).length === 0) return
-  await write(ctx, `Kundens fakturauppgifter ur avtalet: ${Object.entries(update).filter(([k]) => !k.startsWith('invoice_delivery_confirmed')).map(([k, v]) => `${k} = ${v}`).join(', ')}`, async () => {
-    must(await db.from('customers').update(update).eq('id', customerId), 'Fakturauppgifter')
+  const update: Record<string, unknown> = {
+    invoice_delivery_method: delivery.method,
+    invoice_delivery_source: 'kund',
+    invoice_delivery_confirmed_at: new Date().toISOString(),
+    invoice_delivery_confirmed_by_name: delivery.reason,
+  }
+  if (delivery.billingEmail) update.billing_email = delivery.billingEmail
+  if (delivery.billingAddress) update.billing_address = delivery.billingAddress
+  await write(ctx, `Fakturaväg ur avtalet: ${delivery.method === 'print' ? `brev till ${delivery.billingAddress}` : `e-post till ${delivery.billingEmail}`} (${delivery.reason})`, async () => {
+    must(await db.from('customers').update(update).eq('id', customerId), 'Fakturaväg')
   })
 }
 

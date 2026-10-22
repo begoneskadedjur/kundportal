@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildFortnoxDeliveryUpdate,
+  deriveDeliveryFromContract,
+  normalizeBillingAddress,
   classifyOneflowBillingField,
   evaluateInvoiceDelivery,
   fromFortnoxDeliveryType,
@@ -151,5 +153,39 @@ describe('Fortnox-kortet', () => {
     const { card } = buildFortnoxCustomerCard({ name: 'X AB' })
     expect(card.DefaultDeliveryTypes).toBeUndefined()
     expect(card.YourReference).toBeUndefined()
+  })
+})
+
+describe('deriveDeliveryFromContract (avtalet styr, inget manuellt steg)', () => {
+  it('e-post i fältet blir e-post', () => {
+    expect(deriveDeliveryFromContract({ billingText: 'tapeten@centsoft.se', contactEmail: 'x@y.se' })).toMatchObject({ method: 'email', billingEmail: 'tapeten@centsoft.se' })
+  })
+  it('e-post inbäddad i text vinner (PDF-fakturans adress)', () => {
+    const r = deriveDeliveryFromContract({
+      billingText: 'BRF Slottsterrassen i Värmdö, Fack 55881536, R855, 106 37 Stockholm.  epost för pdf-faktura:  fastum.se.mailinvoice@postnordscanning.com',
+      contactEmail: 'x@y.se',
+    })
+    expect(r).toMatchObject({ method: 'email', billingEmail: 'fastum.se.mailinvoice@postnordscanning.com' })
+  })
+  it('skanningsadress blir brev, bolagsnamnet tas bort och referensen står kvar', () => {
+    const r = deriveDeliveryFromContract({
+      billingText: 'Nacka vatten och avfall AB Ansvar 28310 INX 9099-002 831 90 Östersund',
+      contactEmail: 'maria.campbell@nvoa.se',
+      companyName: 'Nacka vatten och avfall AB',
+    })
+    expect(r).toMatchObject({ method: 'print', billingAddress: 'Ansvar 28310 INX 9099-002, 831 90 Östersund' })
+  })
+  it('vanliga adresser blir brev', () => {
+    expect(normalizeBillingAddress('Brf Havet Fack 5589 3101 R 855 106 37 Stockholm', 'BRF Havet')).toBe('Fack 5589 3101 R 855, 106 37 Stockholm')
+    expect(normalizeBillingAddress('C/O Farang Tulegatan 11 11353 Stockholm')).toBe('C/O Farang Tulegatan 11, 113 53 Stockholm')
+    expect(normalizeBillingAddress('Frihamnsgatan 26, 115 56 Stockholm')).toBe('Frihamnsgatan 26, 115 56 Stockholm')
+    expect(normalizeBillingAddress('Box 1, 123 45 Upplands Väsby, Sverige')).toBe('Box 1, 123 45 Upplands Väsby')
+  })
+  it('saknas fältet går fakturan till kontaktpersonen', () => {
+    expect(deriveDeliveryFromContract({ billingText: null, contactEmail: 'anna@exempel.se' })).toMatchObject({ method: 'email', billingEmail: 'anna@exempel.se' })
+    expect(deriveDeliveryFromContract({ billingText: 'Ansvar 28310', contactEmail: 'anna@exempel.se' })).toMatchObject({ method: 'email', billingEmail: 'anna@exempel.se' })
+  })
+  it('ingenting att skicka till ger null', () => {
+    expect(deriveDeliveryFromContract({ billingText: '', contactEmail: null })).toBeNull()
   })
 })

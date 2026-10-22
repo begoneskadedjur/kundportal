@@ -1541,16 +1541,15 @@ export default function InvoiceDetailModal({
           />
         )}
 
-        {/* Fakturavägen: e-post, e-faktura eller brev. Saknas den väljer
-            faktureringsansvarig här innan fakturan kan godkännas eller skickas. */}
+        {/* Fakturavägen: sätts automatiskt ur avtalet och ändras på kundsidan.
+            Här visas den bara, så att man ser vart fakturan går. */}
         {invoice && invoice.status !== 'cancelled' && deliveryCustomerId && (
           <InvoiceDeliveryPanel
             className="mx-4 mt-3"
             customerId={deliveryCustomerId}
-            canEdit={!!profile?.can_approve_invoices && !invoice.fortnox_document_number}
+            canEdit={false}
             actorName={profile?.display_name || profile?.email || 'Okänd'}
             onEvaluation={setDeliveryEval}
-            onSaved={() => { loadInvoice() }}
             reloadKey={deliveryReloadKey}
           />
         )}

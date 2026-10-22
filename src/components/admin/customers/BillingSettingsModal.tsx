@@ -22,8 +22,6 @@ import { ContractService } from '../../../services/contractService'
 import { ContractScopeService } from '../../../services/contractScopeService'
 import { PaymentTermsService } from '../../../services/paymentTermsService'
 import BillingPlanPreviewModal from './BillingPlanPreviewModal'
-import InvoiceDeliveryPanel from '../invoicing/InvoiceDeliveryPanel'
-import { useAuth } from '../../../contexts/AuthContext'
 
 interface SiteBillingData {
   id: string
@@ -103,7 +101,6 @@ export default function BillingSettingsModal({
   onClose,
   onSave,
 }: BillingSettingsModalProps) {
-  const { profile } = useAuth()
   const uid = useId()
   const [saving, setSaving] = useState(false)
   const [plan, setPlan] = useState<BillingPlan | null>(null)
@@ -896,18 +893,6 @@ export default function BillingSettingsModal({
                 Styr hur avslutade avtalsärenden faktureras utanför årspremien (fliken "Merförsäljning Avtal").
               </p>
             </div>
-            {/* Fakturavägen sparas direkt (och på Fortnox-kortet), inte med Spara nedan */}
-            <InvoiceDeliveryPanel
-              customerId={headquarterCustomerId ?? customerId}
-              canEdit={!!profile?.can_approve_invoices}
-              actorName={profile?.display_name || profile?.email || 'Okänd'}
-              onSaved={(owner) => {
-                if (owner.id !== (headquarterCustomerId ?? customerId)) return
-                setBillingEmail(owner.billing_email ?? '')
-                setBillingAddress(owner.billing_address ?? '')
-                setBillingReference(owner.billing_reference ?? '')
-              }}
-            />
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Input label="Faktura-email" type="email" value={billingEmail} onChange={e => setBillingEmail(e.target.value)} placeholder="faktura@example.com" />

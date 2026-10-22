@@ -29,6 +29,8 @@ import {
 import { buildUpcomingInvoiceEvents, useUpcomingInvoices } from './useUpcomingInvoices'
 import ContractTimeline from './ContractTimeline'
 import BillingChainSection from './BillingChainSection'
+import InvoiceDeliveryPanel from '../../invoicing/InvoiceDeliveryPanel'
+import { useAuth } from '../../../../contexts/AuthContext'
 import UnitsSection from './UnitsSection'
 import AccessAccountsSection, { countAccessPersons } from './AccessAccountsSection'
 import ContractMapSection from './ContractMapSection'
@@ -186,6 +188,7 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
   }, [data])
 
   const { customer, root, units, billingItems, caseCounts, access } = data
+  const { profile } = useAuth()
   const {
     customerById,
     additionsByCustomer,
@@ -421,6 +424,17 @@ export default function CustomerRecordContent({ data, basePath, density, onDataC
       )}
 
       <div hidden={activeTab !== 'fakturering'} className="pt-6">
+        {/* Fakturavägen: sätts automatiskt ur avtalet, ändras här vid behov
+            (sparas på kunden och Fortnox-kortet) */}
+        {density === 'full' && (
+          <InvoiceDeliveryPanel
+            className="mb-4"
+            customerId={customer.id}
+            canEdit={profile?.role === 'admin' || profile?.role === 'koordinator' || !!profile?.is_admin}
+            actorName={profile?.display_name || profile?.email || 'Okänd'}
+            onSaved={() => onDataChanged?.()}
+          />
+        )}
         <BillingChainSection root={root} units={units} contracts={realContracts} invoices={data.invoices} cases={data.cases} billingItems={data.billingItems} />
       </div>
 

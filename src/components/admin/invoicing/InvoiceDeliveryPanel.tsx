@@ -1,9 +1,9 @@
 // src/components/admin/invoicing/InvoiceDeliveryPanel.tsx
-// Fakturavägen: hur kunden får sina fakturor. Visar vägen som en rad när den
-// är bekräftad och ett val (e-post, e-faktura, brev) när den saknas. Ekonomi
-// väljer här vid första fakturan; valet sparas på kunden och Fortnox-kortet
-// (InvoiceDeliveryService.saveChoice). Används i fakturamodalen och i
-// kundens faktureringsinställningar.
+// Fakturavägen: hur kunden får sina fakturor och vart. Vägen sätts automatiskt
+// ur avtalet (src/shared/invoiceDelivery.ts). Rutan visar vägen, mottagaren,
+// varför och vad som stod i avtalet. På kundsidan (fliken Fakturering) kan den
+// ändras; ändringen sparas på kunden och Fortnox-kortet
+// (InvoiceDeliveryService.saveChoice). I fakturan visas den bara.
 import { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, Check, Mail, Pencil, RefreshCw } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -24,7 +24,7 @@ import {
 
 interface InvoiceDeliveryPanelProps {
   customerId: string | null
-  /** Får välja och ändra väg (faktureringsansvarig eller admin) */
+  /** Får ändra vägen (kundsidan). I fakturan visas den bara. */
   canEdit: boolean
   /** Namnet som sparas som den som bekräftade */
   actorName: string
@@ -104,11 +104,24 @@ export default function InvoiceDeliveryPanel({
   }
   if (!delivery) return null
 
-  const { evaluation, owner, inheritedFromParent } = delivery
+  const { evaluation, owner, inheritedFromParent, contractBillingText } = delivery
   const showForm = canEdit && (editing || !evaluation.ok)
   const ownerMethod = isInvoiceDeliveryMethod(owner.invoice_delivery_method) ? owner.invoice_delivery_method : null
   const source = owner.invoice_delivery_source as InvoiceDeliverySource | null
   const contactEmail = isValidEmail(owner.contact_email) ? owner.contact_email!.trim() : null
+  // Vart fakturan går och varför: sammanhanget för den som läser eller ändrar
+  const destination = ownerMethod === 'email'
+    ? owner.billing_email?.trim() || null
+    : ownerMethod === 'print'
+      ? owner.billing_address?.trim() || owner.contact_address?.trim() || null
+      : ownerMethod === 'einvoice'
+        ? `e-faktura på org.nr ${owner.organization_number ?? 'saknas'}`
+        : null
+  const why = source === 'ekonomi'
+    ? `Ändrad för hand${owner.invoice_delivery_confirmed_by_name ? ` av ${owner.invoice_delivery_confirmed_by_name}` : ''}`
+    : owner.invoice_delivery_confirmed_by_name
+      ? `Satt automatiskt: ${owner.invoice_delivery_confirmed_by_name}`
+      : source ? `Satt från ${INVOICE_DELIVERY_SOURCE_LABEL[source] ?? source}` : 'Satt automatiskt'
   const formError = method
     ? validateDeliveryChoice(
         { method, billingEmail: email, billingAddress: address, billingReference: reference },
@@ -173,19 +186,26 @@ export default function InvoiceDeliveryPanel({
       </div>
 
       {evaluation.ok && !editing && (
-        <p className="text-[11px] text-slate-500 mt-1">
-          {source ? `Satt av ${INVOICE_DELIVERY_SOURCE_LABEL[source] ?? source}` : 'Bekräftad'}
-          {owner.invoice_delivery_confirmed_by_name && source === 'ekonomi' ? ` (${owner.invoice_delivery_confirmed_by_name})` : ''}
-          {owner.invoice_delivery_confirmed_at ? ` · ${owner.invoice_delivery_confirmed_at.slice(0, 10)}` : ''}
-          {inheritedFromParent && owner.company_name ? ` · gäller via ${owner.company_name}` : ''}
-        </p>
+        <div className="mt-1.5 space-y-0.5">
+          {destination && (
+            <p className="text-xs text-slate-300 break-words">Till: {destination}</p>
+          )}
+          <p className="text-[11px] text-slate-500">
+            {why}
+            {owner.invoice_delivery_confirmed_at ? ` · ${owner.invoice_delivery_confirmed_at.slice(0, 10)}` : ''}
+            {inheritedFromParent && owner.company_name ? ` · gäller via ${owner.company_name}` : ''}
+          </p>
+          {contractBillingText && contractBillingText !== destination && (
+            <p className="text-[11px] text-slate-500 break-words">I avtalet stod: {contractBillingText}</p>
+          )}
+        </div>
       )}
 
       {!evaluation.ok && (
         <p className="text-xs text-amber-300 mt-1">{evaluation.message}</p>
       )}
-      {!evaluation.ok && !canEdit && (
-        <p className="text-[11px] text-slate-500 mt-1">Faktureringsansvarig väljer fakturavägen.</p>
+      {editing && contractBillingText && (
+        <p className="text-[11px] text-slate-400 mt-1 break-words">I avtalet stod: {contractBillingText}</p>
       )}
 
       {showForm && (

@@ -28,6 +28,8 @@ export interface CustomerDelivery {
   owner: DeliveryCustomer
   /** Fakturan gäller en enhet men vägen styrs av huvudkontoret */
   inheritedFromParent: boolean
+  /** Det som stod i senaste avtalets fakturafält, för sammanhang */
+  contractBillingText: string | null
 }
 
 /** Fel när en faktura stoppas av fakturavägen. Meddelandet visas för användaren. */
@@ -51,7 +53,21 @@ export class InvoiceDeliveryService {
     if (!own) return null
     const parent = own.parent_customer_id ? await loadRow(own.parent_customer_id) : null
     const owner = resolveDeliveryOwner(own, parent)
-    return { evaluation: evaluateInvoiceDelivery(owner), owner, inheritedFromParent: owner.id !== own.id }
+    const { data: contract } = await supabase
+      .from('contracts')
+      .select('billing_email, billing_address')
+      .eq('customer_id', owner.id)
+      .eq('type', 'contract')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    const c = contract as { billing_email: string | null; billing_address: string | null } | null
+    return {
+      evaluation: evaluateInvoiceDelivery(owner),
+      owner,
+      inheritedFromParent: owner.id !== own.id,
+      contractBillingText: c?.billing_email?.trim() || c?.billing_address?.trim() || null,
+    }
   }
 
   /**

@@ -4,10 +4,11 @@
 // Fortnox-allokering.
 //
 // Beslut 2026-10-22 (Christian, fallet Nacka vatten och avfall): den som gör
-// avtalet kan inte veta hur kunden vill betala. Kunden skriver det själv i
-// Oneflow-fältet "Faktura adress (PDF)". Är det en e-postadress är vägen e-post.
-// Annars sparas texten som fakturaadress och ekonomi väljer vägen vid första
-// fakturan. Ingen faktura godkänns eller skickas till Fortnox utan bekräftad väg.
+// avtalet kan inte veta hur kunden vill betala, och ingen ska behöva välja.
+// Vägen sätts automatiskt ur avtalets fakturafält (deriveDeliveryFromContract):
+// e-post i fältet → e-post, adress → brev, inget → kontaktpersonens e-post.
+// Den är en inställning på kundsidan (fliken Fakturering) som kan ändras.
+// Saknas vägen helt (ingen kontaktperson heller) stoppas fakturan som skydd.
 //
 // Fortnox-fakta (kontrollerat 2026-10-22 mot alla 958 aktiva kundkort):
 // DefaultDeliveryTypes.Invoice är EMAIL, ELECTRONICINVOICE eller PRINT, och
@@ -30,10 +31,10 @@ export const INVOICE_DELIVERY_LABEL: Record<InvoiceDeliveryMethod, string> = {
 }
 
 export const INVOICE_DELIVERY_SOURCE_LABEL: Record<InvoiceDeliverySource, string> = {
-  kund: 'kunden i avtalet',
-  ekonomi: 'ekonomi',
+  kund: 'avtalet',
+  ekonomi: 'ändrad för hand',
   fortnox: 'Fortnox-kortet',
-  upplaggning: 'fakturamejlet vid uppläggning',
+  upplaggning: 'kunduppgifterna',
 }
 
 const TO_FORTNOX: Record<InvoiceDeliveryMethod, FortnoxInvoiceDeliveryType> = {
@@ -95,6 +96,72 @@ export function classifyOneflowBillingField(raw: string | null | undefined): One
   if (!value) return { billingEmail: null, billingText: null }
   if (isValidEmail(value)) return { billingEmail: value, billingText: null }
   return { billingEmail: null, billingText: value }
+}
+
+// --- Automatisk väg ur avtalet (beslut 2026-10-22, Christian) -------------------
+//
+// Ingen ska behöva välja. Vägen sätts ur det kunden skrev i avtalets fakturafält:
+//   1. Fältet innehåller en e-postadress → e-post till den.
+//   2. Fältet innehåller en adress med postnummer och ort → brev dit.
+//   3. Fältet saknas eller går inte att använda → e-post till kontaktpersonen.
+// Vägen kan ändras på kundsidan (fliken Fakturering) när det behövs.
+
+const EMAIL_IN_TEXT = /[^\s@,;:<>()"']+@[^\s@,;:<>()"']+\.[^\s@,;:<>()"'.]+/
+
+/**
+ * Gör kundens fritext till en brevadress "Adressrad, 123 45 Ort". Sista
+ * postnumret följt av en ort räknas, så att referenser och boxnummer före det
+ * stannar i adressraden. Bolagsnamnet först i texten tas bort: Fortnox skriver
+ * namnet ovanför adressen. Ger null när texten inte har postnummer och ort.
+ */
+export function normalizeBillingAddress(text: string | null | undefined, companyName?: string | null): string | null {
+  if (!text) return null
+  const cleaned = text.replace(/\s+/g, ' ').replace(/,?\s*Sverige\s*\.?$/i, '').trim()
+  const m = cleaned.match(/^(.*?)[,.]?\s*(\d{3})\s?(\d{2})\s+(\p{L}[\p{L} '-]{1,39}?)\s*\.?$/u)
+  if (!m) return null
+  let line = m[1].replace(/[,.\s]+$/, '').trim()
+  const name = companyName?.replace(/\s+/g, ' ').trim()
+  if (name && line.toLowerCase().startsWith(name.toLowerCase())) {
+    line = line.slice(name.length).replace(/^[,.\s]+/, '').trim()
+  }
+  if (!line) return null
+  return `${line}, ${m[2]} ${m[3]} ${m[4].trim()}`
+}
+
+export interface DerivedDelivery {
+  method: InvoiceDeliveryMethod
+  billingEmail: string | null
+  billingAddress: string | null
+  /** Sparas som invoice_delivery_confirmed_by_name och visas på kundsidan */
+  reason: string
+}
+
+/**
+ * Fakturavägen ur avtalets fakturafält. Null bara när varken fältet eller
+ * kontaktpersonen ger något att skicka till.
+ */
+export function deriveDeliveryFromContract(params: {
+  billingText: string | null | undefined
+  contactEmail: string | null | undefined
+  companyName?: string | null
+}): DerivedDelivery | null {
+  const text = (params.billingText ?? '').replace(/\s+/g, ' ').trim()
+  const found = text.match(EMAIL_IN_TEXT)?.[0] ?? null
+  if (found && isValidEmail(found)) {
+    return { method: 'email', billingEmail: found, billingAddress: null, reason: 'Fakturamejl i avtalet' }
+  }
+  const address = normalizeBillingAddress(text, params.companyName)
+  if (address) {
+    return { method: 'print', billingEmail: null, billingAddress: address, reason: 'Fakturaadress i avtalet' }
+  }
+  const contact = params.contactEmail?.trim() ?? ''
+  if (isValidEmail(contact)) {
+    return {
+      method: 'email', billingEmail: contact, billingAddress: null,
+      reason: text ? 'Kontaktpersonens e-post (avtalets fakturauppgift gick inte att använda)' : 'Kontaktpersonens e-post (avtalet saknade fakturauppgift)',
+    }
+  }
+  return null
 }
 
 // --- Vilken kundrad äger fakturavägen ------------------------------------------
@@ -164,7 +231,7 @@ export function evaluateInvoiceDelivery(owner: DeliveryCustomer): DeliveryEvalua
   if (!method) {
     return {
       ...base, ok: false, issue: 'unconfirmed',
-      message: `Fakturavägen för ${who} är inte bekräftad. Välj e-post, e-faktura eller brev innan fakturan godkänns.`,
+      message: `Fakturavägen för ${who} saknas. Ange den på kundsidan under fliken Fakturering.`,
     }
   }
   if (!hasFortnoxCard) {

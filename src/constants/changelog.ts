@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.79.0',
+    date: '2026-10-22',
+    title: 'Fakturavägen sätts automatiskt',
+    items: [
+      { kind: 'andring', text: 'Ingen behöver välja fakturaväg. Den sätts ur avtalet: står det en e-postadress i fakturafältet går fakturan dit, står det en adress går den som brev, och står det inget går den till kontaktpersonens e-post.' },
+      { kind: 'nyhet', text: 'Fakturavägen är en inställning på kundsidan under fliken Fakturering. Där står vart fakturan går, varför, och vad som stod i avtalet. Pennan ändrar vägen, och Fortnox-kortet uppdateras direkt.' },
+      { kind: 'andring', text: 'I fakturan visas fakturavägen bara, så att du ser vart fakturan går innan du godkänner. Den kan inte ändras där.' },
+    ],
+  },
+  {
     version: '3.78.0',
     date: '2026-10-22',
     title: 'Varning när ett engångsjobb gäller en avtalskund',
