@@ -20,6 +20,7 @@ import { RestidRad } from '../../../components/technician/ny/RestidRad'
 import { useBesok } from '../../../hooks/useTeknikerBesok'
 import { useMapsKlar, useMinPosition, useRestid } from '../../../hooks/useRestid'
 import type { MinPosition } from '../../../services/restidService'
+import { geoCache, geokoda, type LatLng } from '../../../services/geokodService'
 import {
   svenskDag, laggTillDagar, klockslag, besokBeskrivning, nastaBesok, tidTill, type DagBesok,
 } from '../../../services/teknikerDagService'
@@ -30,29 +31,6 @@ const GENOMGANG: GenomgangSteg[] = [
   { rubrik: 'Navigera, Ring och Öppna', text: 'Knapparna gäller stoppet som är valt. Tryck på ett annat stopp i listan för att byta.', mal: 'karta-knappar' },
   { rubrik: 'Min position', text: 'Visar var du är just nu. Har bilen Abax används bilens position, annars telefonens. Telefonen frågar om lov första gången.', mal: 'karta-position' },
 ]
-
-type LatLng = { lat: number; lng: number }
-
-// Geokodade adresser under sessionen. null = går inte att hitta, försök inte igen.
-const geoCache = new Map<string, LatLng | null>()
-
-function geokoda(geocoder: google.maps.Geocoder, adress: string): Promise<LatLng | null> {
-  if (geoCache.has(adress)) return Promise.resolve(geoCache.get(adress) ?? null)
-  return new Promise(resolve => {
-    geocoder.geocode({ address: adress, region: 'se' }, (res, status) => {
-      if (status === 'OK' && res && res[0]) {
-        const l = res[0].geometry.location
-        const p = { lat: l.lat(), lng: l.lng() }
-        geoCache.set(adress, p)
-        resolve(p)
-      } else {
-        // OVER_QUERY_LIMIT sparas inte, så det går att försöka igen senare
-        if (status !== 'OVER_QUERY_LIMIT') geoCache.set(adress, null)
-        resolve(null)
-      }
-    })
-  })
-}
 
 // Bilen som rund markör med bilikonen (samma ritning som falt.bil, 24/1,6)
 const BIL_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">'

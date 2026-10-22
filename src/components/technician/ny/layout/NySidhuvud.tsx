@@ -11,6 +11,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 
 export interface SidhuvudInfo {
   underrubrik?: string
+  /** Gör rubrik och underrubrik till en länk, till exempel datumet på Idag till Schema */
+  underrubrikLank?: string
   onVisaMig?: () => void
 }
 
@@ -33,10 +35,10 @@ export function useSidhuvudInfo(): SidhuvudInfo {
 export function useNySidhuvud(info: SidhuvudInfo): void {
   const ctx = useContext(SidhuvudContext)
   const setInfo = ctx?.setInfo
-  const { underrubrik, onVisaMig } = info
+  const { underrubrik, underrubrikLank, onVisaMig } = info
   useEffect(() => {
     if (!setInfo) return
-    setInfo({ underrubrik, onVisaMig })
+    setInfo({ underrubrik, underrubrikLank, onVisaMig })
     return () => setInfo({})
-  }, [setInfo, underrubrik, onVisaMig])
+  }, [setInfo, underrubrik, underrubrikLank, onVisaMig])
 }

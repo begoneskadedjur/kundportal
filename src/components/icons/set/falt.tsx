@@ -57,6 +57,27 @@ export const faltIcons = {
       <circle cx="12" cy="15.2" r="1.8" fill="currentColor" stroke="none" />
     </>
   ),
+  // Vecka: kalenderblad med en veckorad markerad (schemat)
+  'falt.vecka': (
+    <>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+      <rect x="6.5" y="13" width="11" height="3" rx=".6" />
+    </>
+  ),
+  // Månad: kalenderblad med dagarna som punkter (schemat)
+  'falt.manad': (
+    <>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+      <circle cx="8" cy="13.5" r=".9" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="13.5" r=".9" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="13.5" r=".9" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="17" r=".9" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="17" r=".9" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="17" r=".9" fill="currentColor" stroke="none" />
+    </>
+  ),
   // Imorgon: kalenderblad med pil framåt
   'falt.imorgon': (
     <>

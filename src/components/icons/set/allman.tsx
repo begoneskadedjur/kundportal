@@ -86,6 +86,8 @@ export const allmanIcons = {
   'allman.bock': <path d="M5 12.5l4.5 4.5L19 7.5" />,
   'allman.stang': <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />,
   'allman.chevron': <path d="M9.5 6l6 6-6 6" />,
+  // Föregående: chevron åt vänster (schemat i nya arbetsvyn)
+  'allman.chevron-vanster': <path d="M14.5 6l-6 6 6 6" />,
   // Automatiskt: blixt
   'allman.blixt': <path d="M13 3 5.5 13.5H11L10 21l7.5-10.5H12L13 3z" />,
   // För hand

@@ -52,6 +52,12 @@ export interface DagBesok {
   skadedjur: string | null
   arendenummer: string | null
   avslutsdatum: Date | null
+  /** Tekniker 1 till 3 på ärendet, i ordning. Används för att visa kollegor. */
+  tekniker: { id: string; namn: string | null }[]
+  /** Pågående arbetstid startades (null = ingen timer igång) */
+  arbeteStartat: Date | null
+  /** Sparad arbetstid i minuter, utan pågående pass */
+  arbetadeMinuter: number
 }
 
 // ─── Svensk tid ───
@@ -138,6 +144,15 @@ export function arAvtalsbesok(b: DagBesok): boolean {
   return b.kalla === 'cases'
 }
 
+/** Orten ur en adress: "Storgatan 12, 171 45 Solna, Sverige" blir "Solna". Tomt om det inte går. */
+export function ortUrAdress(adress: string): string {
+  const delar = adress.split(',').map(d => d.trim()).filter(Boolean)
+    .filter(d => !/^(sverige|sweden)$/i.test(d))
+  if (delar.length < 2) return ''
+  const sista = delar[delar.length - 1].replace(/^(SE-?)?\d{3}\s?\d{2}\s*/i, '').trim()
+  return /\d/.test(sista) ? '' : sista
+}
+
 // ─── Länkar ───
 
 export function navigeraUrl(adress: string): string {
@@ -179,6 +194,14 @@ function tid(v: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d
 }
 
+function teknikerLista(par: [unknown, unknown][]): { id: string; namn: string | null }[] {
+  const ut: { id: string; namn: string | null }[] = []
+  for (const [id, namn] of par) {
+    if (typeof id === 'string' && id) ut.push({ id, namn: typeof namn === 'string' && namn ? namn : null })
+  }
+  return ut
+}
+
 function typForServiceType(st: string | null | undefined): BesokTyp {
   switch (st) {
     case 'inspection': return 'inspection'
@@ -215,6 +238,13 @@ function franCases(c: any): DagBesok {
     skadedjur: c.pest_type ?? null,
     arendenummer: c.case_number ?? null,
     avslutsdatum: tid(c.completed_date),
+    tekniker: teknikerLista([
+      [c.primary_technician_id, c.primary_technician_name],
+      [c.secondary_technician_id, c.secondary_technician_name],
+      [c.tertiary_technician_id, c.tertiary_technician_name],
+    ]),
+    arbeteStartat: tid(c.work_started_at),
+    arbetadeMinuter: Number(c.time_spent_minutes) || 0,
   }
 }
 
@@ -241,11 +271,18 @@ function franClickUp(c: any, kalla: 'private' | 'business'): DagBesok {
     skadedjur: c.skadedjur || c.annat_skadedjur || null,
     arendenummer: c.case_number ?? null,
     avslutsdatum: tid(c.completed_date),
+    tekniker: teknikerLista([
+      [c.primary_assignee_id, c.primary_assignee_name],
+      [c.secondary_assignee_id, c.secondary_assignee_name],
+      [c.tertiary_assignee_id, c.tertiary_assignee_name],
+    ]),
+    arbeteStartat: tid(c.work_started_at),
+    arbetadeMinuter: Number(c.time_spent_minutes) || 0,
   }
 }
 
-const CASES_FALT = 'id, title, status, service_type, scheduled_start, scheduled_end, completed_date, address, contact_person, contact_phone, customer_id, case_number, pest_type, customer:customers(company_name, contact_address, contact_person, contact_phone)'
-const CLICKUP_FALT_PRIVAT = 'id, title, status, start_date, due_date, completed_date, adress, kontaktperson, telefon_kontaktperson, skadedjur, annat_skadedjur, case_number'
+const CASES_FALT = 'id, title, status, service_type, scheduled_start, scheduled_end, completed_date, address, contact_person, contact_phone, customer_id, case_number, pest_type, work_started_at, time_spent_minutes, primary_technician_id, primary_technician_name, secondary_technician_id, secondary_technician_name, tertiary_technician_id, tertiary_technician_name, customer:customers(company_name, contact_address, contact_person, contact_phone)'
+const CLICKUP_FALT_PRIVAT = 'id, title, status, start_date, due_date, completed_date, adress, kontaktperson, telefon_kontaktperson, skadedjur, annat_skadedjur, case_number, work_started_at, time_spent_minutes, primary_assignee_id, primary_assignee_name, secondary_assignee_id, secondary_assignee_name, tertiary_assignee_id, tertiary_assignee_name'
 const CLICKUP_FALT_FORETAG = `${CLICKUP_FALT_PRIVAT}, company_name, bestallare`
 
 function sortera(lista: DagBesok[]): DagBesok[] {

@@ -223,7 +223,7 @@ function Bottenmeny({ current, onSkapa }: { current: string; onSkapa: () => void
 // ─── Sidhuvud ───
 
 function Sidhuvud({ current, ticketAntal, onSkapa }: { current: string; ticketAntal: number; onSkapa: () => void }) {
-  const { underrubrik, onVisaMig } = useSidhuvudInfo()
+  const { underrubrik, underrubrikLank, onVisaMig } = useSidhuvudInfo()
   const rubrik = rubrikFor(current)
 
   const visaMigKnapp = onVisaMig && (
@@ -238,7 +238,12 @@ function Sidhuvud({ current, ticketAntal, onSkapa }: { current: string; ticketAn
       <header className="lg:hidden fixed top-0 inset-x-0 z-40 h-16 pt-[env(safe-area-inset-top)] box-content bg-slate-900 border-b border-slate-700/60 flex items-center justify-between pl-4 pr-1">
         <div className="min-w-0">
           <h1 className="text-xl font-bold text-white leading-tight truncate">{rubrik}</h1>
-          {underrubrik && <p className="text-[13px] text-slate-400 truncate">{underrubrik}</p>}
+          {underrubrik && (underrubrikLank ? (
+            <Link to={underrubrikLank} className="flex items-center gap-1 min-h-[24px] text-[13px] text-slate-400 hover:text-white truncate focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded">
+              <span className="truncate underline decoration-slate-600 underline-offset-2">{underrubrik}</span>
+              <Icon name="allman.chevron" size={16} className="flex-shrink-0 text-slate-500" />
+            </Link>
+          ) : <p className="text-[13px] text-slate-400 truncate">{underrubrik}</p>)}
         </div>
         <div className="flex items-center">
           <button type="button" onClick={openGlobalSearch} className={IKONKNAPP} aria-label="Sök kund, adress eller ärende">
@@ -254,7 +259,9 @@ function Sidhuvud({ current, ticketAntal, onSkapa }: { current: string; ticketAn
       <header className="hidden lg:flex fixed top-0 right-0 left-64 z-30 h-14 bg-slate-900/90 backdrop-blur-sm border-b border-slate-700/60 items-center gap-4 px-6">
         <div className="min-w-0 w-56">
           <h1 className="text-base font-semibold text-white truncate">{rubrik}</h1>
-          {underrubrik && <p className="text-xs text-slate-400 truncate">{underrubrik}</p>}
+          {underrubrik && (underrubrikLank ? (
+            <Link to={underrubrikLank} className="block text-xs text-slate-400 hover:text-white truncate underline decoration-slate-600 underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded">{underrubrik}</Link>
+          ) : <p className="text-xs text-slate-400 truncate">{underrubrik}</p>)}
         </div>
         <button
           type="button"

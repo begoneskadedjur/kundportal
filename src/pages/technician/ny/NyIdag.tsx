@@ -179,7 +179,7 @@ export default function NyIdag() {
 
   const oppnaVisaMig = useCallback(() => setVisaMig(true), [])
   const underrubrik = laddar ? langtDatum(idag) : `${langtDatum(idag)}, ${dagens.length} besök`
-  useNySidhuvud({ underrubrik, onVisaMig: oppnaVisaMig })
+  useNySidhuvud({ underrubrik, underrubrikLank: '/technician/schedule', onVisaMig: oppnaVisaMig })
 
   const oppna = (b: DagBesok) => setOppet({ kalla: b.kalla, id: b.id })
   const offertAntal = (offerter?.forfallna ?? 0) + (offerter?.attFolja ?? 0)

@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.83.0',
+    date: '2026-10-23',
+    title: 'Nytt schema i nya arbetsvyn',
+    items: [
+      { kind: 'nyhet', text: 'Schemat i nya arbetsvyn visar dagen som en tidslinje med körtid mellan besöken och lediga luckor, veckan som rutnät på datorn och månaden som kalender. Varje dag säger i klartext hur mycket som är bokat, till exempel 5 av 8 timmar. Sök, filter och statistik finns kvar. Vyn är fortfarande bara påslagen för de som har Ny arbetsvy.' },
+    ],
+  },
+  {
     version: '3.82.4',
     date: '2026-10-23',
     title: 'Nya arbetsvyn: etablering ingår i avtalet',

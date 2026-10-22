@@ -105,6 +105,7 @@ import NyIdag from './pages/technician/ny/NyIdag';
 import NyKarta from './pages/technician/ny/NyKarta';
 import NyMinaArenden from './pages/technician/ny/NyMinaArenden';
 import NyMer from './pages/technician/ny/NyMer';
+import NySchema from './pages/technician/ny/NySchema';
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal';
@@ -444,7 +445,7 @@ function App() {
               {/* Bara nya arbetsvyn. Alla andra skickas till översikten som förut. */}
               <Route path="karta" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyKarta />} gammal={<Navigate to="/technician/dashboard" replace />} /></ProtectedRoute>} />
               <Route path="mer" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyMer />} gammal={<Navigate to="/technician/dashboard" replace />} /></ProtectedRoute>} />
-              <Route path="schedule" element={<ProtectedRoute requiredRole="technician"><TechnicianSchedule /></ProtectedRoute>} />
+              <Route path="schedule" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NySchema />} gammal={<TechnicianSchedule />} /></ProtectedRoute>} />
               <Route path="inspection/:caseId" element={<ProtectedRoute requiredRole="technician"><StationInspectionModule /></ProtectedRoute>} />
               <Route path="specialrapporter" element={<ProtectedRoute requiredRole="technician"><SpecialReportsPage /></ProtectedRoute>} />
               <Route path="specialrapporter/:id" element={<ProtectedRoute requiredRole="technician"><SpecialReportEditorPage /></ProtectedRoute>} />

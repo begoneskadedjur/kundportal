@@ -33,6 +33,8 @@ interface Props {
   onClose: () => void
   /** Anropas när modalen stängs (och när ärendet raderats), så listan kan läsas om */
   onSaved?: () => void
+  /** Öppna kommunikationsfliken direkt (djuplänkar från notiser, bara privat- och företagsärenden) */
+  oppnaKommunikation?: boolean
 }
 
 type Modal = 'contract' | 'rondering' | 'egenkontroll' | 'clickup'
@@ -76,7 +78,7 @@ function mappaAvtalsarende(c: Rad, technicianId: string | null | undefined): Rad
   }
 }
 
-export default function OppnaArende({ arende, onClose, onSaved }: Props) {
+export default function OppnaArende({ arende, onClose, onSaved, oppnaKommunikation = false }: Props) {
   const { profile } = useAuth()
   const technicianId = profile?.technician_id
   const [rad, setRad] = useState<Rad | null>(null)
@@ -182,6 +184,7 @@ export default function OppnaArende({ arende, onClose, onSaved }: Props) {
         onSuccess={sparatClickUp}
         onDeleted={raderat}
         caseData={rad}
+        openCommunicationOnLoad={oppnaKommunikation}
       />
     )
   }
