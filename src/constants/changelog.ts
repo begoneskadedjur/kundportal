@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.82.2',
+    date: '2026-10-22',
+    title: 'Specialrapporter: tekniker ser sina egna',
+    items: [
+      { kind: 'buggfix', text: 'I teknikervyn visar Specialrapporter nu bara rapporter du själv har skapat och rapporter på ärenden där du är tekniker, även på ett av ärendets besök. Förut kunde den som också hade adminbehörighet se alla rapporter även i teknikervyn.' },
+    ],
+  },
+  {
     version: '3.82.1',
     date: '2026-10-22',
     title: 'Kartan i nya arbetsvyn visar dagväljaren',

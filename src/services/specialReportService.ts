@@ -259,13 +259,25 @@ export class SpecialReportService {
   // Lista och sök
   // ==========================================================================
 
-  /** Alla rapporter användaren når (RLS), senast ändrad först */
-  static async list(): Promise<SpecialReportListItem[]> {
-    const { data: reports, error } = await db
+  /**
+   * Rapporterna användaren når (RLS), senast ändrad först. Med
+   * endastMina (teknikervyn) bara de man skapat eller är delaktig i via
+   * ärendet (tekniker 1-3 eller besök), även för profiler med adminflagga.
+   */
+  static async list(opts: { endastMina?: boolean } = {}): Promise<SpecialReportListItem[]> {
+    let query = db
       .from('special_reports')
       .select(LIST_COLUMNS)
       .order('updated_at', { ascending: false })
       .limit(1000)
+    if (opts.endastMina) {
+      const { data: ids, error: idsError } = await db.rpc('mina_specialrapport_ids')
+      if (idsError) fel(idsError, 'Rapporterna kunde inte hämtas')
+      const mina = ((ids ?? []) as unknown[]).map(v => String(v))
+      if (mina.length === 0) return []
+      query = query.in('id', mina)
+    }
+    const { data: reports, error } = await query
     if (error) fel(error, 'Rapporterna kunde inte hämtas')
     return SpecialReportService.berika((reports ?? []) as ListRow[])
   }

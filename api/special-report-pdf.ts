@@ -16,7 +16,8 @@
 //    och svarar { version }
 //
 // Åtkomst: samma regel som RLS-funktionen can_access_special_report (admin,
-// koordinator, tekniker på ärendet eller skaparen). Data läses med service role.
+// koordinator, tekniker 1-3 på ärendet, tekniker på ärendets besök eller
+// skaparen). Data läses med service role.
 // Kartorna är satellitskärmdumpar via Maps JS i Puppeteer (Static Maps blockerar
 // satellit i EU/EEA), alla i samma browser-session som PDF:en.
 
@@ -215,9 +216,21 @@ async function canAccessReport(userId: string, report: SpecialReport): Promise<b
     .select(columns.join(', '))
     .eq('id', report.case_id)
     .maybeSingle()
-  if (!caseRow) return false
-  const row = caseRow as unknown as Record<string, string | null>
-  return columns.some(c => row[c] === profile.technician_id)
+  const row = (caseRow ?? {}) as unknown as Record<string, string | null>
+  if (columns.some(c => row[c] === profile.technician_id)) return true
+
+  // Tekniker på något av ärendets besök (som tekniker_delaktig_i_arende)
+  const visits = () => supabase
+    .from('visits')
+    .select('id')
+    .eq('case_id', report.case_id)
+    .eq('case_type', report.case_type)
+    .limit(1)
+  const [byColumn, byList] = await Promise.all([
+    visits().eq('technician_id', profile.technician_id),
+    visits().contains('technicians', [{ id: profile.technician_id }]),
+  ])
+  return (byColumn.data ?? []).length > 0 || (byList.data ?? []).length > 0
 }
 
 // ----------------------------------------------------------------------------

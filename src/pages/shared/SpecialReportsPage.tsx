@@ -54,13 +54,14 @@ export default function SpecialReportsPage() {
 
   useEffect(() => {
     document.title = 'Specialrapporter - BeGone'
-    SpecialReportService.list()
+    // Teknikervyn visar bara egna och delaktiga rapporter, även för admin
+    SpecialReportService.list({ endastMina: base.startsWith('/technician') })
       .then(setRapporter)
       .catch(e => {
         toast.error(e instanceof Error ? e.message : 'Kunde inte hämta rapporterna')
         setRapporter([])
       })
-  }, [])
+  }, [base])
 
   const synliga = useMemo(() => {
     const q = sok.trim().toLowerCase()
