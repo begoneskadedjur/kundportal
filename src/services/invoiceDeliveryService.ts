@@ -20,7 +20,7 @@ import {
 const COLUMNS =
   'id, company_name, customer_number, organization_number, parent_customer_id, ' +
   'invoice_delivery_method, invoice_delivery_source, invoice_delivery_confirmed_at, invoice_delivery_confirmed_by_name, ' +
-  'billing_email, billing_address, contact_address, billing_reference'
+  'billing_email, billing_address, contact_address, contact_email, billing_reference'
 
 export interface CustomerDelivery {
   evaluation: DeliveryEvaluation

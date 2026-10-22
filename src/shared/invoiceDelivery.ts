@@ -112,6 +112,7 @@ export interface DeliveryCustomer {
   billing_email: string | null
   billing_address: string | null
   contact_address?: string | null
+  contact_email?: string | null
   billing_reference?: string | null
 }
 

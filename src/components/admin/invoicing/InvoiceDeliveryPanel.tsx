@@ -14,6 +14,7 @@ import {
   INVOICE_DELIVERY_METHODS,
   INVOICE_DELIVERY_SOURCE_LABEL,
   isInvoiceDeliveryMethod,
+  isValidEmail,
   validateDeliveryChoice,
   type DeliveryCustomer,
   type DeliveryEvaluation,
@@ -107,6 +108,7 @@ export default function InvoiceDeliveryPanel({
   const showForm = canEdit && (editing || !evaluation.ok)
   const ownerMethod = isInvoiceDeliveryMethod(owner.invoice_delivery_method) ? owner.invoice_delivery_method : null
   const source = owner.invoice_delivery_source as InvoiceDeliverySource | null
+  const contactEmail = isValidEmail(owner.contact_email) ? owner.contact_email!.trim() : null
   const formError = method
     ? validateDeliveryChoice(
         { method, billingEmail: email, billingAddress: address, billingReference: reference },
@@ -220,6 +222,17 @@ export default function InvoiceDeliveryPanel({
             placeholder="faktura@kund.se"
             required={method === 'email'}
           />
+          {/* Genväg: kontaktpersonens e-post fylls bara i fältet, aldrig sparad
+              av sig själv. Visas när den finns och inte redan står där. */}
+          {contactEmail && contactEmail.toLowerCase() !== email.trim().toLowerCase() && (
+            <button
+              type="button"
+              onClick={() => { setEmail(contactEmail); if (!method) setMethod('email') }}
+              className="-mt-1.5 text-xs text-[#20c58f] hover:underline text-left break-all"
+            >
+              Använd kontaktpersonens e-post ({contactEmail})
+            </button>
+          )}
           <Input
             label={method === 'print' ? 'Fakturaadress' : 'Fakturaadress (valfritt)'}
             value={address}
