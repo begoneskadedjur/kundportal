@@ -44,6 +44,8 @@
 
     // Delade kundnummerregler för Fortnox-spegeln och allokeringen
     "src/shared/fortnoxCustomerNumbers.ts",
+    // Fakturavägen (signeringen, Oneflow-webhooken, allocate-customer)
+    "src/shared/invoiceDelivery.ts",
 
     // Signeringsbehandlingen av avtal (api/_lib/contractSigning.ts): ärende-
     // statusar, premie/org.nr-regler, fakturarader och andelar av premien

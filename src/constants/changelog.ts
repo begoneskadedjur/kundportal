@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.77.0',
+    date: '2026-10-22',
+    title: 'Fakturavägen bekräftas vid första fakturan',
+    items: [
+      { kind: 'nyhet', text: 'Varje kund har en fakturaväg: e-post, e-faktura eller brev. Den syns överst i fakturan och under Faktureringsinställningar på kunden. Faktureringsansvarig kan ändra den där, och Fortnox-kortet uppdateras direkt.' },
+      { kind: 'andring', text: 'En faktura kan inte godkännas eller skickas till Fortnox förrän kundens fakturaväg är bekräftad. Saknas den väljer faktureringsansvarig vägen i fakturan. Säljaren behöver inte veta hur kunden vill betala.' },
+      { kind: 'andring', text: 'Det kunden skriver om fakturan i Oneflow-avtalet tas om hand. En e-postadress blir fakturavägen e-post. En postadress eller skanningsadress hamnar som fakturaadress, och ekonomi bekräftar vägen vid första fakturan. Förut kunde en adress hamna i fältet för fakturamejl.' },
+      { kind: 'buggfix', text: 'En ändring i ett Oneflow-avtal kunde koppla loss avtalet från kunden som valts i avtalswizarden. Nu ligger kopplingen kvar.' },
+    ],
+  },
+  {
     version: '3.76.0',
     date: '2026-10-22',
     title: 'Admin ser vem som läst guiderna',

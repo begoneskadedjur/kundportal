@@ -73,6 +73,8 @@ export interface FortnoxCustomer {
   CreditLimit: number
   InvoiceDiscount: number
   GLN: string
+  /** Kortets leveranssätt: EMAIL | PRINT | ELECTRONICINVOICE */
+  DefaultDeliveryTypes?: { Invoice?: string; Order?: string; Offer?: string }
 }
 
 export interface FortnoxInvoice {
@@ -217,7 +219,13 @@ export const FortnoxService = {
     show_price_vat_included?: boolean
     // Vår referens — teknikerns namn
     our_reference?: string | null
-  }): Promise<string> {
+    // Fakturavägen (DefaultDeliveryTypes.Invoice) och Er referens på nya kort
+    invoice_delivery_type?: 'EMAIL' | 'PRINT' | 'ELECTRONICINVOICE' | null
+    your_reference?: string | null
+  }, opts: {
+    // Anropas med det befintliga kortet, t.ex. för att läsa dess leveranssätt
+    onExisting?: (existing: FortnoxCustomer) => void | Promise<void>
+  } = {}): Promise<string> {
     const customerNumberStr = String(customer.customer_number)
 
     // Försök hämta befintlig kund
@@ -241,6 +249,7 @@ export const FortnoxService = {
           `inte ${customer.company_name}. Rätta kundnumret på kundkortet innan fakturan skickas.`
         )
       }
+      if (opts.onExisting) await opts.onExisting(existing)
       return existing.CustomerNumber
     }
 
@@ -257,6 +266,8 @@ export const FortnoxService = {
       terms_of_payment: customer.terms_of_payment,
       show_price_vat_included: customer.show_price_vat_included,
       our_reference: customer.our_reference,
+      invoice_delivery_type: customer.invoice_delivery_type,
+      your_reference: customer.your_reference,
     })
     const newCustomer = await fortnoxRequest<{ Customer: FortnoxCustomer }>('customers', 'POST', {
       Customer: { CustomerNumber: customerNumberStr, ...card },

@@ -32,6 +32,7 @@ import {
   type PremiumApprovalItem,
 } from '../../services/discountApprovalService'
 import { InvoiceService } from '../../services/invoiceService'
+import { InvoiceDeliveryError } from '../../services/invoiceDeliveryService'
 import { formatInvoiceAmount, type InvoiceType } from '../../types/invoice'
 
 const TYPE_BADGE: Record<InvoiceType, { label: string; className: string }> = {
@@ -148,7 +149,7 @@ export default function DiscountApprovals() {
       )
     } catch (error) {
       console.error('Error approving invoice:', error)
-      toast.error('Kunde inte godkänna fakturan')
+      toast.error(error instanceof InvoiceDeliveryError ? error.message : 'Kunde inte godkänna fakturan', { duration: 8000 })
     } finally {
       setApprovingId(null)
     }
@@ -182,7 +183,7 @@ export default function DiscountApprovals() {
       toast.success('Premiefaktura godkänd')
     } catch (error) {
       console.error('Error approving contract invoice:', error)
-      toast.error('Kunde inte godkänna fakturan')
+      toast.error(error instanceof InvoiceDeliveryError ? error.message : 'Kunde inte godkänna fakturan', { duration: 8000 })
     } finally {
       setApprovingPremiumId(null)
     }

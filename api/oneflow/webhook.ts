@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import fetch from 'node-fetch'
 import { refreshTemplates, isKnownTemplate, contractTypeOf, getKnownTemplateIds } from '../_lib/oneflowTemplates'
 import { processSignedContract } from '../_lib/contractSigning'
+import { classifyOneflowBillingField } from '../../src/shared/invoiceDelivery'
 import {
   caseStatusForDocument,
   documentEventText,
@@ -449,6 +450,14 @@ const parseContractDetailsToInsertData = (details: OneflowContractDetails): Cont
     billingAddress = dataFields['faktura-adress'] || dataFields['billing-address']
     console.log(`✅ Hittade faktura-adress: ${billingAddress}`)
   }
+
+  // Kunden kan skriva vad som helst i fakturafältet (Nacka vatten och avfall
+  // skrev sin skanningsadress). Bara en giltig e-postadress blir fakturamejl;
+  // annan text sparas som fakturaadress för ekonomi att bekräfta
+  // (src/shared/invoiceDelivery.ts).
+  const billingField = classifyOneflowBillingField(billingEmail)
+  billingEmail = billingField.billingEmail
+  if (billingField.billingText && !billingAddress) billingAddress = billingField.billingText
   
   console.log('📋 Parties från OneFlow:')
   details.parties?.forEach((party, index) => {
@@ -660,6 +669,10 @@ const saveOrUpdateContract = async (contractData: ContractInsertData, options?: 
         billing_frequency,
         ...webhookData
       } = contractData as any
+
+      // Kundkopplingen sätts av signeringen och wizarden, aldrig av Oneflow:
+      // parsningen ger alltid null och får inte koppla loss avtalet från kunden
+      if (webhookData.customer_id == null) delete webhookData.customer_id
 
       // Skydda livscykel-status från att nedgraderas av content-events
       const LIFECYCLE_STATUSES = ['overdue', 'signed', 'declined', 'ended', 'active', 'trashed']

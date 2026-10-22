@@ -83,6 +83,10 @@ export interface FortnoxCustomerCardInput {
   terms_of_payment?: string | null
   show_price_vat_included?: boolean
   our_reference?: string | null
+  /** Fakturavägen, Fortnox-kortets DefaultDeliveryTypes.Invoice. Utelämnad = Fortnox standard. */
+  invoice_delivery_type?: 'EMAIL' | 'PRINT' | 'ELECTRONICINVOICE' | null
+  /** Er referens på kortet, t.ex. kundens ansvarskod */
+  your_reference?: string | null
 }
 
 /**
@@ -113,6 +117,8 @@ export function buildFortnoxCustomerCard(input: FortnoxCustomerCardInput): {
     ...(input.terms_of_payment ? { TermsOfPayment: input.terms_of_payment } : {}),
     ...(input.show_price_vat_included != null ? { ShowPriceVATIncluded: input.show_price_vat_included } : {}),
     ...(input.our_reference ? { OurReference: input.our_reference } : {}),
+    ...(input.your_reference?.trim() ? { YourReference: input.your_reference.trim() } : {}),
+    ...(input.invoice_delivery_type ? { DefaultDeliveryTypes: { Invoice: input.invoice_delivery_type } } : {}),
   }
   return { card, type, orgNrSkipped: !!input.organization_number && !orgOk }
 }

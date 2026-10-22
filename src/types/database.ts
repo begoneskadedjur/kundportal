@@ -122,6 +122,14 @@ export type Database = {
           work_order_number_enabled: boolean
           work_object_enabled: boolean
           room_number_enabled: boolean
+
+          // 📮 Fakturavägen (src/shared/invoiceDelivery.ts). Valfria i typen så
+          // att befintliga inserts inte behöver ange dem; triggern sätter e-post
+          // när kunden skapas med giltigt fakturamejl.
+          invoice_delivery_method?: 'email' | 'print' | 'einvoice' | null
+          invoice_delivery_source?: 'kund' | 'ekonomi' | 'fortnox' | 'upplaggning' | null
+          invoice_delivery_confirmed_at?: string | null
+          invoice_delivery_confirmed_by_name?: string | null
         }
         Insert: Omit<Database['public']['Tables']['customers']['Row'], 'id' | 'created_at' | 'updated_at'> & {
           contract_status?: 'signed' | 'active' | 'terminated' | 'expired'

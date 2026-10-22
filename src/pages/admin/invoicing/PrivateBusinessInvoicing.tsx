@@ -18,6 +18,7 @@ import toast from 'react-hot-toast'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
 import { InvoiceService } from '../../../services/invoiceService'
+import { InvoiceDeliveryError } from '../../../services/invoiceDeliveryService'
 import type { Invoice, InvoiceStatus, InvoiceFilters } from '../../../types/invoice'
 import { INVOICE_STATUS_CONFIG, formatInvoiceAmount, formatInvoiceDate, isInvoiceOverdue } from '../../../types/invoice'
 import InvoiceDetailModal from '../../../components/admin/invoicing/InvoiceDetailModal'
@@ -258,7 +259,7 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
       loadData()
     } catch (error) {
       console.error('Fel vid godkännande:', error)
-      toast.error('Kunde inte godkänna fakturan')
+      toast.error(error instanceof InvoiceDeliveryError ? error.message : 'Kunde inte godkänna fakturan', { duration: 8000 })
     }
   }
 
@@ -272,14 +273,29 @@ export default function PrivateBusinessInvoicing({ invoiceType = 'private-busine
       toast.error('Inga markerade fakturor väntar på godkännande')
       return
     }
-    try {
-      await Promise.all(toApprove.map(i => InvoiceService.approveInvoice(i.id, user.id, approverName)))
-      toast.success(`${toApprove.length} ${toApprove.length === 1 ? 'faktura godkänd' : 'fakturor godkända'}`)
-      loadData()
-    } catch (error) {
-      console.error('Fel vid godkännande:', error)
-      toast.error('Kunde inte godkänna fakturor')
+    // Varje faktura för sig: en kund utan bekräftad fakturaväg stoppar bara
+    // sina egna fakturor, resten godkänns
+    const results = await Promise.allSettled(
+      toApprove.map(i => InvoiceService.approveInvoice(i.id, user.id, approverName))
+    )
+    const approved = results.filter(r => r.status === 'fulfilled').length
+    const blocked = toApprove.filter((_, idx) => {
+      const r = results[idx]
+      return r.status === 'rejected' && r.reason instanceof InvoiceDeliveryError
+    })
+    const failed = results.length - approved - blocked.length
+    if (approved > 0) toast.success(`${approved} ${approved === 1 ? 'faktura godkänd' : 'fakturor godkända'}`)
+    if (blocked.length > 0) {
+      toast.error(
+        `${blocked.length} ${blocked.length === 1 ? 'faktura' : 'fakturor'} väntar på fakturaväg: ${[...new Set(blocked.map(i => i.customer_name))].join(', ')}. Öppna fakturan och välj väg.`,
+        { duration: 10000 }
+      )
     }
+    if (failed > 0) {
+      console.error('Fel vid godkännande:', results.filter(r => r.status === 'rejected'))
+      toast.error(`${failed} ${failed === 1 ? 'faktura' : 'fakturor'} kunde inte godkännas`)
+    }
+    loadData()
   }
 
   // Exportera till Fortnox (CSV) – endast status 'ready' exporteras,

@@ -3,6 +3,7 @@
 
 import { buildCustomerArticleSpec, appendCustomerArticleSpec } from '../types/caseBilling'
 import { supabase } from '../lib/supabase'
+import { InvoiceDeliveryService } from './invoiceDeliveryService'
 import type {
   Invoice,
   InvoiceWithItems,
@@ -738,6 +739,9 @@ export class InvoiceService {
     approverId: string,
     approverName: string
   ): Promise<Invoice> {
+    // Ingen faktura godkänns utan bekräftad fakturaväg (src/shared/invoiceDelivery.ts).
+    // Kastar InvoiceDeliveryError med text till användaren.
+    await InvoiceDeliveryService.assertInvoiceDeliverable(id)
     return this.updateInvoiceStatus(id, 'ready', {
       approved_by: approverId,
       approved_by_name: approverName

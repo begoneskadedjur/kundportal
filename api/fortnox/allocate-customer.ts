@@ -45,6 +45,7 @@ import {
   parseFortnoxCustomerNumber,
   type FortnoxMirrorHit,
 } from '../../src/shared/fortnoxCustomerNumbers'
+import { isInvoiceDeliveryMethod, toFortnoxDeliveryType } from '../../src/shared/invoiceDelivery'
 
 const FORTNOX_API = 'https://api.fortnox.se/3'
 const MIRROR_MAX_AGE_MS = 10 * 60 * 1000
@@ -68,6 +69,9 @@ interface CustomerRow {
   customer_group_id: string | null
   parent_customer_id: string | null
   site_name: string | null
+  invoice_delivery_method: string | null
+  invoice_delivery_source: string | null
+  billing_reference: string | null
 }
 
 /**
@@ -202,7 +206,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data: customerData, error: customerError } = await supabase
     .from('customers')
-    .select('id, customer_number, company_name, organization_number, billing_email, contact_email, billing_address, contact_address, contact_phone, customer_group_id, parent_customer_id, site_name')
+    .select('id, customer_number, company_name, organization_number, billing_email, contact_email, billing_address, contact_address, contact_phone, customer_group_id, parent_customer_id, site_name, invoice_delivery_method, invoice_delivery_source, billing_reference')
     .eq('id', customerId)
     .maybeSingle()
   if (customerError || !customerData) {
@@ -242,6 +246,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const range = group ? { start: group.series_start, end: group.series_end } : null
+
+  // Fakturavägen (src/shared/invoiceDelivery.ts): nya kort får den, och ett
+  // befintligt kort som adopteras får den när kunden eller ekonomi valt den.
+  const deliveryType = isInvoiceDeliveryMethod(customer.invoice_delivery_method)
+    ? toFortnoxDeliveryType(customer.invoice_delivery_method)
+    : null
 
   // 3. Identitet: finns kunden redan i Fortnox?
   const digits = orgDigits(customer.organization_number)
@@ -298,6 +308,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const wb = await writeBack({ customer, group, invoiceId, customerNumber: numeric })
       await bumpGroupCounter(group, numeric)
+      // Ett val från kunden (Oneflow) eller ekonomi gäller före kortets gamla
+      // leveranssätt. Bara DefaultDeliveryTypes.Invoice skrivs: kontrollerat
+      // 2026-10-22 att Fortnox då lämnar alla andra fält orörda.
+      if (deliveryType && !wb.conflict && (customer.invoice_delivery_source === 'ekonomi' || customer.invoice_delivery_source === 'kund')) {
+        const put = await fortnoxCall<{ Customer: FortnoxCustomerLike }>(token, 'PUT', `customers/${encodeURIComponent(adopt.customer_number)}`, {
+          Customer: { DefaultDeliveryTypes: { Invoice: deliveryType } },
+        })
+        if (!put.ok) {
+          warnings.push(`Fakturavägen kunde inte sättas på Fortnox-kort ${adopt.customer_number}: ${fortnoxErrorMessage(put.data)}. Kortets leveranssätt gäller.`)
+        }
+      }
       return res.status(200).json({
         status: wb.conflict ? 'conflict-adopted' : 'reused',
         customerNumber: adopt.customer_number,
@@ -340,6 +361,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     terms_of_payment: isPrivate ? '10' : null,
     show_price_vat_included: isPrivate ? true : undefined,
     our_reference: ourReference || null,
+    invoice_delivery_type: deliveryType,
+    your_reference: customer.billing_reference,
   })
   if (orgNrSkipped) warnings.push('Org-/personnumret validerar inte (Luhn) och utelämnades på Fortnox-kortet. Komplettera i Fortnox.')
 

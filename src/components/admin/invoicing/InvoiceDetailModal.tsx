@@ -63,6 +63,9 @@ import ServiceCostBreakdown from '../../shared/ServiceCostBreakdown'
 import CaseModalSection from '../../shared/CaseModalSection'
 import InvoiceStatusStepper from '../../shared/InvoiceStatusStepper'
 import InvoicePulseRow from './InvoicePulseRow'
+import InvoiceDeliveryPanel from './InvoiceDeliveryPanel'
+import { InvoiceDeliveryError, InvoiceDeliveryService } from '../../../services/invoiceDeliveryService'
+import { toFortnoxDeliveryType, isInvoiceDeliveryMethod, type DeliveryEvaluation } from '../../../shared/invoiceDelivery'
 import InvoiceMarkingSection from './InvoiceMarkingSection'
 import InvoiceCaseChainSection, { UnbilledRowsNotice } from './InvoiceCaseChain'
 import InvoiceVisitTimeline from './InvoiceVisitTimeline'
@@ -392,6 +395,11 @@ export default function InvoiceDetailModal({
   const [updating, setUpdating] = useState(false)
   const [approving, setApproving] = useState(false)
   const [sendingToFortnox, setSendingToFortnox] = useState(false)
+  // Fakturavägen (InvoiceDeliveryPanel): kundraden kan saknas för engångskunder
+  // tills sändningen skapar den, därför egen state + omladdningsnyckel
+  const [deliveryEval, setDeliveryEval] = useState<DeliveryEvaluation | null>(null)
+  const [deliveryCustomerId, setDeliveryCustomerId] = useState<string | null>(null)
+  const [deliveryReloadKey, setDeliveryReloadKey] = useState(0)
   // Flera Fortnox-kunder på samma org.nr (eller bara inaktiva): koordinatorn
   // väljer i modalen innan utkastet skapas (docs/kundnummer-fortnox-plan.md)
   const [fortnoxCandidates, setFortnoxCandidates] = useState<{
@@ -690,6 +698,9 @@ export default function InvoiceDetailModal({
     try {
       const data = await InvoiceService.getInvoice(invoiceId)
       setInvoice(data)
+      if ((data?.customer_id ?? null) !== deliveryCustomerId) setDeliveryEval(null)
+      setDeliveryCustomerId(data?.customer_id ?? null)
+      setDeliveryReloadKey(k => k + 1)
 
       // Kolla om fakturan är inaktuell
       if (data && !['sent', 'paid', 'cancelled'].includes(data.status)) {
@@ -799,6 +810,10 @@ export default function InvoiceDetailModal({
   // Godkännande (faktureringsansvarig) — kvittering som låser upp Fortnox-knappen
   const handleApprove = async () => {
     if (!invoice || !user || !profile?.can_approve_invoices) return
+    if (deliveryEval && !deliveryEval.ok) {
+      toast.error(deliveryEval.message ?? 'Fakturavägen är inte bekräftad')
+      return
+    }
 
     setApproving(true)
     const approverName = profile?.display_name || profile?.technicians?.name || profile?.email || 'Okänd'
@@ -834,7 +849,12 @@ export default function InvoiceDetailModal({
       onStatusChange?.()
     } catch (error) {
       console.error('Kunde inte godkänna fakturan:', error)
-      toast.error('Kunde inte godkänna fakturan')
+      if (error instanceof InvoiceDeliveryError) {
+        toast.error(error.message)
+        setDeliveryReloadKey(k => k + 1)
+      } else {
+        toast.error('Kunde inte godkänna fakturan')
+      }
     } finally {
       setApproving(false)
     }
@@ -1022,22 +1042,37 @@ export default function InvoiceDetailModal({
       // (api/fortnox/allocate-customer). Avtalskundens grupp valdes i
       // avtalswizarden och sattes på kunden vid signeringen.
       // Flera Fortnox-träffar på samma org.nr → koordinatorn väljer i modalen.
-      if (!customerNumber && allocatesAtSend) {
+      if (!customerNumber && allocatesAtSend && !customerRowId && isOneOffInvoice) {
         const oneOffType = invoice.case_type as 'private' | 'business'
-        if (!customerRowId && isOneOffInvoice) {
-          const created = await CaseCustomerService.getOrCreateCaseCustomer({
-            caseType: oneOffType,
-            name: invoice.customer_name,
-            personnummer: oneOffType === 'private' ? invoice.organization_number : null,
-            organization_number: oneOffType === 'business' ? invoice.organization_number : null,
-            email: invoice.customer_email,
-            phone: invoice.customer_phone,
-            address: invoice.customer_address,
-            customerGroupId: caseMetaEarly?.customer_group_id ?? undefined,
-          })
-          customerRowId = created.customerId
-          customerNumber = created.customerNumber
+        const created = await CaseCustomerService.getOrCreateCaseCustomer({
+          caseType: oneOffType,
+          name: invoice.customer_name,
+          personnummer: oneOffType === 'private' ? invoice.organization_number : null,
+          organization_number: oneOffType === 'business' ? invoice.organization_number : null,
+          email: invoice.customer_email,
+          phone: invoice.customer_phone,
+          address: invoice.customer_address,
+          customerGroupId: caseMetaEarly?.customer_group_id ?? undefined,
+        })
+        customerRowId = created.customerId
+        customerNumber = created.customerNumber
+      }
+
+      // 1c-väg. Fakturavägen måste vara bekräftad innan Fortnox-kortet skapas
+      // eller fakturan skickas (src/shared/invoiceDelivery.ts). Engångskundens
+      // rad finns först nu, så panelen pekas om dit för att ekonomi ska kunna välja.
+      let delivery: Awaited<ReturnType<typeof InvoiceDeliveryService.getForCustomer>> = null
+      if (customerRowId) {
+        delivery = await InvoiceDeliveryService.getForCustomer(customerRowId)
+        if (delivery && !delivery.evaluation.ok) {
+          setDeliveryCustomerId(customerRowId)
+          setDeliveryReloadKey(k => k + 1)
+          toast.error(delivery.evaluation.message ?? 'Fakturavägen är inte bekräftad', { duration: 8000 })
+          return
         }
+      }
+
+      if (!customerNumber && allocatesAtSend) {
         if (!customerNumber && customerRowId) {
           const result = await FortnoxMirrorService.allocateCustomer({
             customerId: customerRowId,
@@ -1100,6 +1135,21 @@ export default function InvoiceDetailModal({
         terms_of_payment: isPrivatePerson ? '10' : null,
         show_price_vat_included: isPrivatePerson ? true : undefined,
         our_reference: technicianName,
+        invoice_delivery_type: isInvoiceDeliveryMethod(delivery?.owner.invoice_delivery_method)
+          ? toFortnoxDeliveryType(delivery.owner.invoice_delivery_method)
+          : null,
+        your_reference: delivery?.owner.billing_reference ?? null,
+      }, {
+        // Kortet finns redan: Fortnox-kortets leveranssätt gäller för fakturan.
+        // Har någon ändrat det direkt i Fortnox tar portalen över det.
+        onExisting: async (card) => {
+          if (!delivery) return
+          const adopted = await InvoiceDeliveryService.adoptFromFortnoxCard(delivery.owner.id, card.DefaultDeliveryTypes?.Invoice)
+          if (adopted) {
+            toast(`Fortnox-kortet säger ${adopted === 'email' ? 'e-post' : adopted === 'print' ? 'brev' : 'e-faktura'}. Portalen har uppdaterats.`, { icon: 'ℹ️', duration: 6000 })
+            setDeliveryReloadKey(k => k + 1)
+          }
+        },
       })
 
       // 2a2. Debiteringstillfället är sändningen: en avtalsfaktura planeras om
@@ -1377,6 +1427,9 @@ export default function InvoiceDetailModal({
   const showBlockers = !!invoice && ['pending_approval', 'ready'].includes(invoice.status)
   const blockers: { label: string; severe?: boolean }[] = []
   if (showBlockers && invoice) {
+    if (deliveryEval && !deliveryEval.ok) {
+      blockers.push({ label: 'fakturavägen är inte bekräftad', severe: true })
+    }
     if (marking && marking.missing.length > 0) {
       blockers.push({ label: `${marking.missing[0]} saknas på ärendet` })
     }
@@ -1485,6 +1538,20 @@ export default function InvoiceDetailModal({
             caseContext={caseContext}
             priceCheck={priceCheck}
             hasAddonLines={hasAddonLines}
+          />
+        )}
+
+        {/* Fakturavägen: e-post, e-faktura eller brev. Saknas den väljer
+            faktureringsansvarig här innan fakturan kan godkännas eller skickas. */}
+        {invoice && invoice.status !== 'cancelled' && deliveryCustomerId && (
+          <InvoiceDeliveryPanel
+            className="mx-4 mt-3"
+            customerId={deliveryCustomerId}
+            canEdit={!!profile?.can_approve_invoices && !invoice.fortnox_document_number}
+            actorName={profile?.display_name || profile?.email || 'Okänd'}
+            onEvaluation={setDeliveryEval}
+            onSaved={() => { loadInvoice() }}
+            reloadKey={deliveryReloadKey}
           />
         )}
 
@@ -2370,10 +2437,12 @@ export default function InvoiceDetailModal({
               {invoice.status === 'pending_approval' && (
                 <button
                   onClick={handleApprove}
-                  disabled={approving || !profile?.can_approve_invoices}
+                  disabled={approving || !profile?.can_approve_invoices || (!!deliveryEval && !deliveryEval.ok)}
                   title={!profile?.can_approve_invoices
                     ? 'Endast faktureringsansvarig kan godkänna'
-                    : undefined}
+                    : deliveryEval && !deliveryEval.ok
+                      ? deliveryEval.message ?? 'Fakturavägen är inte bekräftad'
+                      : undefined}
                   className="flex items-center gap-2 px-3 py-1.5 bg-transparent border border-[#20c58f] text-[#20c58f] hover:bg-[#20c58f]/10 text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {approving
@@ -2385,10 +2454,12 @@ export default function InvoiceDetailModal({
               {(invoice.status === 'pending_approval' || invoice.status === 'ready') && (
                 <button
                   onClick={() => handleSendToFortnox()}
-                  disabled={sendingToFortnox || invoice.status === 'pending_approval'}
+                  disabled={sendingToFortnox || invoice.status === 'pending_approval' || (!!deliveryEval && !deliveryEval.ok)}
                   title={invoice.status === 'pending_approval'
                     ? 'Låst tills fakturan godkänts av faktureringsansvarig'
-                    : undefined}
+                    : deliveryEval && !deliveryEval.ok
+                      ? deliveryEval.message ?? 'Fakturavägen är inte bekräftad'
+                      : undefined}
                   className={`flex items-center gap-2 px-3 py-1.5 bg-[#20c58f] hover:bg-[#1bb07e] text-sm text-[#fff] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                     blockers.length > 0
                       ? severeBlocker

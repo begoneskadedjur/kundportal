@@ -11,6 +11,8 @@ import {
 import toast from 'react-hot-toast'
 import { ContractBillingService } from '../../../services/contractBillingService'
 import { FortnoxService, isPersonnummer } from '../../../services/fortnoxService'
+import { InvoiceDeliveryService } from '../../../services/invoiceDeliveryService'
+import { isInvoiceDeliveryMethod, toFortnoxDeliveryType } from '../../../shared/invoiceDelivery'
 import { resolveFortnoxCustomerNumber } from '../../../utils/fortnoxCustomerResolver'
 import { supabase } from '../../../lib/supabase'
 import type { ContractInvoice, BillingFrequency } from '../../../types/contractBilling'
@@ -315,6 +317,14 @@ export function ContractInvoiceModal({
         return
       }
 
+      // Fakturavägen måste vara bekräftad (src/shared/invoiceDelivery.ts).
+      // Väljs i fakturamodalen eller kundens faktureringsinställningar.
+      const delivery = await InvoiceDeliveryService.getForCustomer(customerId)
+      if (delivery && !delivery.evaluation.ok) {
+        toast.error(`${delivery.evaluation.message} Välj den under Faktureringsinställningar på kunden.`, { duration: 10000 })
+        return
+      }
+
       // 1. Hämta eller skapa kund i Fortnox. Privatpersoner med avtal får
       // Type=PRIVATE, 10 dagars villkor och priser inkl. moms på kundkortet.
       const isPrivatePerson = isPersonnummer(invoice.customer.organization_number)
@@ -327,6 +337,14 @@ export function ContractInvoiceModal({
         customer_type: isPrivatePerson ? 'PRIVATE' : 'COMPANY',
         terms_of_payment: isPrivatePerson ? '10' : null,
         show_price_vat_included: isPrivatePerson ? true : undefined,
+        invoice_delivery_type: isInvoiceDeliveryMethod(delivery?.owner.invoice_delivery_method)
+          ? toFortnoxDeliveryType(delivery.owner.invoice_delivery_method)
+          : null,
+        your_reference: delivery?.owner.billing_reference ?? null,
+      }, {
+        onExisting: async (card) => {
+          if (delivery) await InvoiceDeliveryService.adoptFromFortnoxCard(delivery.owner.id, card.DefaultDeliveryTypes?.Invoice)
+        },
       })
 
       // 2. Säkerställ att artiklar finns i Fortnox, bygg sedan fakturarader
