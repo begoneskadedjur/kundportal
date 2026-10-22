@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.76.0',
+    date: '2026-10-22',
+    title: 'Admin ser vem som läst guiderna',
+    items: [
+      { kind: 'nyhet', text: 'Läskvittenser har en ny flik, Guider. Där ser admin för varje medarbetare vilka guider för den egna rollen som är öppnade och genomgångna, när, hur länge, hur långt man kom i stegen, om övningen gjordes och hur det gick på frågorna. Det går också att se per guide vilka som inte har läst den.' },
+      { kind: 'andring', text: 'Handboken säger nu att portalen sparar vilka guider man har öppnat och hur det gick. Bara admin ser det.' },
+    ],
+  },
+  {
     version: '3.75.0',
     date: '2026-10-21',
     title: 'Webbförfrågningar visar om de kom via en film',

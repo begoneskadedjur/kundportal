@@ -129,6 +129,44 @@ export interface IntranetAcknowledgement {
   acknowledged_at: string
 }
 
+/** En öppning av en guide i läsloggen (intranet_guide_views) */
+export interface IntranetGuideView {
+  id: string
+  document_id: string
+  user_id: string
+  user_name: string | null
+  version: number
+  active_view: string | null
+  opened_at: string
+  last_seen_at: string
+  active_seconds: number
+  scroll_pct: number
+  steps_total: number | null
+  max_step: number
+  exercise_started_at: string | null
+  quiz_total: number | null
+  quiz_answered: number
+  quiz_correct: number
+  quiz_first_correct: number
+}
+
+/** Läsloggen sammanställd per person och guide (RPC intranet_guide_stats) */
+export interface IntranetGuideStat {
+  user_id: string
+  document_id: string
+  opens: number
+  first_opened_at: string
+  last_opened_at: string
+  active_seconds: number
+  steps_total: number | null
+  max_step: number
+  exercise_started: boolean
+  quiz_total: number | null
+  quiz_best_correct: number
+  quiz_best_first_correct: number
+  max_scroll_pct: number
+}
+
 /** Dokument berikat med den inloggades kvittensstatus */
 export interface IntranetDocumentWithStatus extends IntranetDocument {
   /** Kvittens för aktuell version (null = ej kvitterad) */

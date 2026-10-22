@@ -10,6 +10,7 @@ import { Icon, type IconName } from '../../../components/icons/Icon'
 import { useRoleBasePath } from '../../../hooks/useRoleBasePath'
 import type { GuideFraga, GuideRoll, GuideSteg, IntranetBlock } from '../../../types/intranet'
 import { GUIDE_MODULER } from './guider/registry'
+import { useGuideSporningen } from './guideSporning'
 
 export const GUIDE_DELAR = {
   visning: { id: 'gor-sa-har', titel: 'Gör så här', ikon: 'guide.steg' },
@@ -115,7 +116,13 @@ function Kortsvar({ text }: { text: string }) {
 // ─── 3 Gör så här ──────────────────────────────────
 
 function Visning({ steg, modul, enhet }: { steg: GuideSteg[]; modul?: string; enhet: 'mobil' | 'dator' }) {
-  const [aktiv, setAktiv] = useState(0)
+  const [aktiv, setAktivState] = useState(0)
+  const sporning = useGuideSporningen()
+  // Läsloggen: steget räknas när man själv väljer det, inte första steget som visas från start
+  const setAktiv = (i: number) => {
+    setAktivState(i)
+    sporning.steg(i + 1)
+  }
   const Skarm = modul ? GUIDE_MODULER[modul]?.Visning : undefined
   const ga = (i: number) => setAktiv(Math.max(0, Math.min(steg.length - 1, i)))
   const sista = aktiv === steg.length - 1
@@ -258,6 +265,7 @@ function Bra({ items }: { items: string[] }) {
 
 function Ovning({ uppdrag, modul }: { uppdrag: string; modul?: string }) {
   const Komponent = modul ? GUIDE_MODULER[modul]?.Ovning : undefined
+  const sporning = useGuideSporningen()
   return (
     <>
       <Rubrik del="ovning" />
@@ -265,7 +273,9 @@ function Ovning({ uppdrag, modul }: { uppdrag: string; modul?: string }) {
         <Icon name="guide.prova" size={20} className="mt-0.5 flex-none text-[#20c58f]" />
         <p className="text-[15px] leading-relaxed text-slate-200"><span className="font-semibold text-white">Uppdrag: </span><MallText text={uppdrag} /></p>
       </div>
-      {Komponent ? <Komponent /> : <p className="text-sm text-slate-500">Övningen laddas inte. Kontakta admin.</p>}
+      {Komponent
+        ? <div onPointerDownCapture={sporning.ovning} onKeyDownCapture={sporning.ovning}><Komponent /></div>
+        : <p className="text-sm text-slate-500">Övningen laddas inte. Kontakta admin.</p>}
       <p className="mt-2 text-xs text-slate-500">Övning med påhittade kunder. Ingenting sparas.</p>
     </>
   )
@@ -275,8 +285,22 @@ function Ovning({ uppdrag, modul }: { uppdrag: string; modul?: string }) {
 
 function Quiz({ fragor }: { fragor: GuideFraga[] }) {
   const [svar, setSvar] = useState<Record<number, number>>({})
+  // Första valet per fråga, för läsloggens rätt på första försöket
+  const [forsta, setForsta] = useState<Record<number, number>>({})
+  const sporning = useGuideSporningen()
   const antalRatt = fragor.filter((f, i) => svar[i] === f.ratt).length
   const allaSvarade = Object.keys(svar).length === fragor.length
+  const svara = (i: number, j: number) => {
+    const nyaSvar = { ...svar, [i]: j }
+    const nyaForsta = i in forsta ? forsta : { ...forsta, [i]: j }
+    setSvar(nyaSvar)
+    setForsta(nyaForsta)
+    sporning.quiz(
+      Object.keys(nyaSvar).length,
+      fragor.filter((f, k) => nyaSvar[k] === f.ratt).length,
+      fragor.filter((f, k) => nyaForsta[k] === f.ratt).length
+    )
+  }
   return (
     <>
       <Rubrik del="quiz" />
@@ -293,7 +317,7 @@ function Quiz({ fragor }: { fragor: GuideFraga[] }) {
                     : j === f.ratt && valt === j ? 'border-[#20c58f] bg-[#20c58f]/10'
                     : j === valt ? 'border-red-500/60 bg-red-500/10' : 'border-slate-700 opacity-70'
                   return (
-                    <button key={j} type="button" onClick={() => setSvar(s => ({ ...s, [i]: j }))}
+                    <button key={j} type="button" onClick={() => svara(i, j)}
                       className={`rounded-lg border px-3 py-2 text-left text-[15px] text-slate-200 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${stil}`}>
                       <MallText text={a} />
                     </button>

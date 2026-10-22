@@ -194,6 +194,7 @@ export default function IntranetHandbok() {
           <div className="h-full rounded-full bg-[#20c58f] transition-[width]" style={{ width: `${procent}%` }} />
         </div>
         <p className="mt-2 text-xs text-slate-500">Varje guide visar skärmen som du ser den, steg för steg, och slutar med en övning. Tryck Markera som läst längst ner när du är klar.</p>
+        <p className="mt-1 text-xs text-slate-500">Portalen sparar vilka guider du har öppnat, hur länge, hur långt du kom och hur det gick på frågorna, så att vi ser vilka guider som behöver bli bättre. Bara admin ser det.</p>
         {isAdmin && (
           <label className="mt-3 flex w-max cursor-pointer select-none items-center gap-2 text-sm text-slate-300">
             <input type="checkbox" checked={allaRoller} onChange={e => setAllaRoller(e.target.checked)}

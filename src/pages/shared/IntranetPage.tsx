@@ -7,10 +7,10 @@
 // Policys      - obligatoriska dokument grupperade per kategori
 // Handbok      - guider med sök och kategorifilter
 // Kontakter    - personkort + ansvarsroller
-// Kvittenser   - adminens läsmatris
+// Kvittenser   - adminens läsmatris (policys) och läsloggen för guiderna
 // :slug        - dokument-/guideläsare
 
-import { Routes, Route, NavLink, Navigate } from 'react-router-dom'
+import { Routes, Route, NavLink, Navigate, useSearchParams } from 'react-router-dom'
 import {
   Home,
   ShieldCheck,
@@ -26,6 +26,7 @@ import IntranetHandbok from './intranet/IntranetHandbok'
 import IntranetKontakter from './intranet/IntranetKontakter'
 import IntranetDocumentPage from './IntranetDocumentPage'
 import IntranetAckMatrix from '../../components/admin/intranet/IntranetAckMatrix'
+import IntranetGuideStats from '../../components/admin/intranet/IntranetGuideStats'
 
 function Subnav({ basePath, isAdmin }: { basePath: string; isAdmin: boolean }) {
   const tabs = [
@@ -109,7 +110,7 @@ export default function IntranetPage() {
           element={
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
               <Subnav basePath={basePath} isAdmin={isAdmin} />
-              <IntranetAckMatrix />
+              <Kvittenser />
             </div>
           }
         />
@@ -127,4 +128,21 @@ export default function IntranetPage() {
 function LegacySlugRedirect({ basePath }: { basePath: string }) {
   const slug = window.location.pathname.split('/').pop() || ''
   return <Navigate to={`${basePath}/intranat/dokument/${slug}`} replace />
+}
+
+/** Läskvittenser: policyernas kvittenser eller läsloggen för guiderna (?vy=guider) */
+function Kvittenser() {
+  const [params, setParams] = useSearchParams()
+  const guider = params.get('vy') === 'guider'
+  const flik = (aktiv: boolean) =>
+    `px-3 py-1.5 text-sm font-medium border-b-2 transition-colors ${aktiv ? 'border-[#20c58f] text-white' : 'border-transparent text-slate-400 hover:text-white'}`
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2 border-b border-slate-700">
+        <button className={flik(!guider)} onClick={() => setParams({}, { replace: true })}>Policys</button>
+        <button className={flik(guider)} onClick={() => setParams({ vy: 'guider' }, { replace: true })}>Guider</button>
+      </div>
+      {guider ? <IntranetGuideStats /> : <IntranetAckMatrix />}
+    </div>
+  )
 }

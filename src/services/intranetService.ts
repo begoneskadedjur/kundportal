@@ -7,10 +7,28 @@ import type {
   IntranetContact,
   IntranetDocument,
   IntranetDocumentWithStatus,
+  IntranetGuideStat,
+  IntranetGuideView,
   IntranetPost,
   IntranetResponsibility,
   KmaStats,
 } from '../types/intranet'
+import { profilRoller } from '../types/intranet'
+
+export interface GuideStatsUser extends AckMatrixUser {
+  /** Primärroll, extra roller och admin, för vilka guider personen ska läsa */
+  roller: Set<string>
+}
+
+export interface GuideStatsData {
+  /** Handbokens publicerade guider */
+  documents: IntranetDocument[]
+  users: GuideStatsUser[]
+  /** key: `${document_id}:${user_id}` -> läsloggen sammanställd */
+  stats: Map<string, IntranetGuideStat>
+  /** key: `${document_id}:${user_id}` -> senaste Markera som läst */
+  acks: Map<string, IntranetAcknowledgement>
+}
 
 export interface AckMatrixUser {
   user_id: string
@@ -182,6 +200,95 @@ export class IntranetService {
     // Sortera på visningsnamn (profiler utan display_name hamnar annars fel)
     users.sort((a, b) => a.name.localeCompare(b.name, 'sv'))
     return { documents, users, acks }
+  }
+
+  // ─── Läsloggen för guiderna ───
+
+  /** Ny rad när en guide öppnas */
+  static async startGuideView(row: {
+    id: string
+    document_id: string
+    user_id: string
+    user_name: string | null
+    version: number
+    active_view: string
+    steps_total: number | null
+    quiz_total: number | null
+  }): Promise<void> {
+    const { error } = await supabase.from('intranet_guide_views').insert(row)
+    if (error) throw error
+  }
+
+  /** Läget medan guiden är öppen */
+  static async updateGuideView(id: string, changes: Partial<Omit<IntranetGuideView, 'id' | 'document_id' | 'user_id'>>): Promise<void> {
+    const { error } = await supabase.from('intranet_guide_views').update(changes).eq('id', id)
+    if (error) throw error
+  }
+
+  /** Admin: guiderna, personerna, läsloggen per person och guide och Markera som läst */
+  static async getGuideStats(): Promise<GuideStatsData> {
+    const [docsRes, profilesRes, statsRes] = await Promise.all([
+      supabase
+        .from('intranet_documents')
+        .select('*')
+        .eq('is_published', true)
+        .eq('section', 'handbok')
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('profiles')
+        .select('user_id, display_name, email, role, is_admin, extra_roles, technician:technicians(name)')
+        .eq('is_active', true)
+        .in('role', ['admin', 'koordinator', 'technician', 'säljare']),
+      supabase.rpc('intranet_guide_stats'),
+    ])
+    if (docsRes.error) throw docsRes.error
+    if (profilesRes.error) throw profilesRes.error
+    if (statsRes.error) throw statsRes.error
+
+    const documents = (docsRes.data || []) as IntranetDocument[]
+    const docIds = documents.map(d => d.id)
+    const acksRes = docIds.length
+      ? await supabase
+          .from('intranet_acknowledgements')
+          .select('*')
+          .in('document_id', docIds)
+          .order('acknowledged_at', { ascending: false })
+      : { data: [], error: null }
+    if (acksRes.error) throw acksRes.error
+
+    const acks = new Map<string, IntranetAcknowledgement>()
+    for (const ack of (acksRes.data || []) as IntranetAcknowledgement[]) {
+      const key = `${ack.document_id}:${ack.user_id}`
+      if (!acks.has(key)) acks.set(key, ack)
+    }
+    const stats = new Map<string, IntranetGuideStat>()
+    for (const s of (statsRes.data || []) as IntranetGuideStat[]) stats.set(`${s.document_id}:${s.user_id}`, s)
+
+    const users: GuideStatsUser[] = (profilesRes.data || []).map(p => {
+      const technician = p.technician as { name: string | null } | { name: string | null }[] | null
+      const technicianName = Array.isArray(technician) ? technician[0]?.name : technician?.name
+      return {
+        user_id: p.user_id,
+        name: p.display_name || technicianName || p.email || 'Okänd',
+        email: p.email || '',
+        role: p.role,
+        roller: profilRoller(p),
+      }
+    })
+    users.sort((a, b) => a.name.localeCompare(b.name, 'sv'))
+    return { documents, users, stats, acks }
+  }
+
+  /** Admin: varje gång en person öppnat en guide, nyast först */
+  static async getGuideViewsForUser(userId: string, limit = 200): Promise<IntranetGuideView[]> {
+    const { data, error } = await supabase
+      .from('intranet_guide_views')
+      .select('*')
+      .eq('user_id', userId)
+      .order('opened_at', { ascending: false })
+      .limit(limit)
+    if (error) throw error
+    return (data || []) as IntranetGuideView[]
   }
 
   // ─── Anslagstavla ───

@@ -50,6 +50,7 @@ import DelfakturaManadOvning from './intranet/interactive/delfakturering/Delfakt
 import AterbesokOvning from './intranet/interactive/delfakturering/AterbesokOvning'
 import AudienceModal from './intranet/AudienceModal'
 import { MallBlock, arMallguide, kollaMall, mallEnhet, mallToc } from './intranet/GuideMall'
+import { GuideSporningContext, useGuideSporning } from './intranet/guideSporning'
 import { describeAudience, forRollerna } from '../../types/intranet'
 import { Eye } from 'lucide-react'
 
@@ -336,6 +337,14 @@ export default function IntranetDocumentPage() {
     }
   }
 
+  // Läsloggen: guider som man läser för sin egen roll, inte admin som granskar alla rollers guider
+  const sporas = !!doc && doc.section === 'handbok' && !granskar
+  const sporning = useGuideSporning(
+    sporas ? doc : null,
+    user?.id ? { id: user.id, name: profile?.display_name || profile?.email || user.email || null } : null,
+    activeView
+  )
+
   const handleAcknowledge = async () => {
     if (!doc || !user?.id || acknowledging) return
     try {
@@ -512,11 +521,13 @@ export default function IntranetDocumentPage() {
       )}
 
       {/* Innehåll */}
-      <article>
-        {doc.content.map((block, i) => (
-          <BlockRenderer key={i} block={block} anchorId={anchorFor(block, i)} slug={doc.slug} enhet={mallEnhet(doc.content)} />
-        ))}
-      </article>
+      <GuideSporningContext.Provider value={sporning}>
+        <article>
+          {doc.content.map((block, i) => (
+            <BlockRenderer key={i} block={block} anchorId={anchorFor(block, i)} slug={doc.slug} enhet={mallEnhet(doc.content)} />
+          ))}
+        </article>
+      </GuideSporningContext.Provider>
 
       {/* Tillbaka till innehållet (smal skärm), ovanför mobilmenyn */}
       {toc.length > 1 && readProgress > 8 && (
