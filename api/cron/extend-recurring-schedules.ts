@@ -27,7 +27,7 @@ import type {
 } from '../../src/types/recurringSchedule'
 import type { WorkSchedule } from '../../src/types/database'
 
-export const config = { maxDuration: 120 }
+export const config = { maxDuration: 240 }
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY!
@@ -41,8 +41,10 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 //
 // Tidsbudget: ett år per schema kan ge många ärenden första natten. Scheman
 // som inte hinns med tas nästa natt (generated_until flyttas bara när ett
-// schema är klart).
-const TIME_BUDGET_MS = 90_000
+// schema är klart). Varje ärende tar ett par sekunder (krockkontroll mot
+// teknikerns kalender). 180 s med maxDuration 240 ger marginal till Vercels
+// tak på 300 s. 90 s räckte till ca 15 scheman per natt (2026-10-22: 68 uppskjutna).
+const TIME_BUDGET_MS = 180_000
 
 // Klockslag i recurring_schedules.preferred_time är svensk väggtid
 const TIME_ZONE = 'Europe/Stockholm'
@@ -70,6 +72,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         contract:contracts(id, status, terminated_at, effective_end_date, contract_start_date, start_date, contract_end_date, notice_period_months, renewal_mode, contract_length)
       `)
       .eq('status', 'active')
+      // Tidigast slut först: scheman som snart tar slut får sina besök innan
+      // tidsbudgeten tar slut, uppskjutna tas först nästa natt
+      .order('generated_until', { ascending: true, nullsFirst: true })
 
     if (fetchError) {
       console.error('[extend-schedules] Error fetching schedules:', fetchError)
