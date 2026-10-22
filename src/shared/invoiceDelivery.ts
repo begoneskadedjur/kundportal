@@ -65,10 +65,14 @@ export function isValidEmail(value: string | null | undefined): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
 }
 
-/** Adressen räcker för ett brev: gata/box, postnummer och ort */
+/**
+ * Adressen räcker för ett brev: gata/box, postnummer och ort. Orten får bara
+ * vara bokstäver, så att text efter orten (t.ex. "Östersund. Referens: Ansvar
+ * 28310") inte hamnar som ort på Fortnox-kortet. Referensen hör hemma i Er referens.
+ */
 export function isMailableAddress(value: string | null | undefined): boolean {
   const a = parseSwedishAddress(value)
-  return !!a.address1 && !!a.zipCode && !!a.city
+  return !!a.address1 && !!a.zipCode && !!a.city && /^\p{L}[\p{L} .'-]{1,39}$/u.test(a.city)
 }
 
 // --- Oneflow-fältet "Faktura adress (PDF)" -------------------------------------

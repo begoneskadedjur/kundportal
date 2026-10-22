@@ -92,6 +92,9 @@ describe('evaluateInvoiceDelivery', () => {
     expect(evaluateInvoiceDelivery(kund({ invoice_delivery_method: 'print', billing_address: 'Ansvar 28310' })).issue).toBe('address_missing')
     expect(evaluateInvoiceDelivery(kund({ invoice_delivery_method: 'print', billing_address: 'INX 9099-002, 831 90 Östersund' })).ok).toBe(true)
     expect(evaluateInvoiceDelivery(kund({ invoice_delivery_method: 'print', contact_address: 'Örkroken 15, 138 40 Älta' })).ok).toBe(true)
+    expect(evaluateInvoiceDelivery(kund({ invoice_delivery_method: 'print', billing_address: 'FE 512, 831 90 Östersund. Referens: Ansvar 28310' })).issue).toBe('address_missing')
+    expect(evaluateInvoiceDelivery(kund({ invoice_delivery_method: 'print', billing_address: 'c/o HSB, Box 191 87, 152 28 Södertälje' })).ok).toBe(true)
+    expect(evaluateInvoiceDelivery(kund({ invoice_delivery_method: 'print', billing_address: 'Box 1, 123 45 Upplands Väsby' })).ok).toBe(true)
   })
   it('e-faktura kräver organisationsnummer, inte personnummer', () => {
     expect(evaluateInvoiceDelivery(kund({ invoice_delivery_method: 'einvoice' })).ok).toBe(true)
