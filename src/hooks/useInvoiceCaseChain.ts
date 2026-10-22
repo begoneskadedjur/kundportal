@@ -24,6 +24,7 @@ export interface CaseChainData {
   invoices: ChainInvoice[]
   /** Tjänsterader (status pending) på ärendet som inte ligger på denna faktura */
   pendingCount: number
+  /** Summa inkl. moms, som fakturornas belopp i kedjan */
   pendingAmount: number
   /** Tjänstenamn på de väntande raderna — för kedjans väntar-rad när raderna är tomma */
   pendingNames: string[]
@@ -79,7 +80,7 @@ export function useInvoiceCaseChain(
             ? Promise.resolve({ data: null })
             : supabase
                 .from('case_billing_items')
-                .select('id, total_price, service_name, article_name')
+                .select('id, total_price, vat_rate, service_name, article_name')
                 .eq('case_id', caseId)
                 .eq('case_type', effectiveCaseType)
                 .eq('item_type', 'service')
@@ -130,11 +131,16 @@ export function useInvoiceCaseChain(
           (pendingRes.data as {
             id: string
             total_price: number
+            vat_rate: number | null
             service_name: string | null
             article_name: string | null
           }[] | null) || []
         ).filter(r => !linkedIds.has(r.id))
-        const pendingAmount = pendingRows.reduce((s, r) => s + Number(r.total_price || 0), 0)
+        // Inklusive moms, som fakturornas belopp i kedjan (total_amount). Förut
+        // exkl. moms, så 656 kr visades fast kunden betalar 820 kr (BE-0009026).
+        const pendingAmount = Math.round(pendingRows.reduce(
+          (s, r) => s + Number(r.total_price || 0) * (1 + Number(r.vat_rate ?? 25) / 100), 0
+        ) * 100) / 100
         const pendingNames = Array.from(
           new Set(pendingRows.map(r => r.service_name || r.article_name).filter(Boolean) as string[])
         )

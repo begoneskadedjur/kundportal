@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.80.5',
+    date: '2026-10-22',
+    title: 'Ofakturerat belopp visas inklusive moms',
+    items: [
+      { kind: 'andring', text: 'Ofakturerade rader i fakturan och i ärendets fakturakedja visas nu inklusive moms, som fakturornas belopp bredvid. Förut stod till exempel 656 kr fast kunden betalar 820 kr.' },
+    ],
+  },
+  {
     version: '3.80.4',
     date: '2026-10-22',
     title: 'Nya rader på ett redan fakturerat ärende får en egen faktura',
