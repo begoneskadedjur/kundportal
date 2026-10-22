@@ -7,10 +7,14 @@ import { TechnicianSidebar } from './TechnicianSidebar'
 import { TechnicianTopHeader } from './TechnicianTopHeader'
 import { TechnicianMobileNav } from './TechnicianMobileNav'
 import { GlobalSearch } from '../../shared/search/GlobalSearch'
+import { useNyArbetsvy } from '../../../hooks/useNyArbetsvy'
+import NyTeknikerLayout from '../ny/layout/NyTeknikerLayout'
 
 export default function TechnicianLayout() {
   const { profile, signOut, loading } = useAuth()
   const location = useLocation()
+  // Nya arbetsvyn: bara profiles.ny_arbetsvy i teknikervyn. Alla andra får exakt dagens layout nedan.
+  const { aktiv: nyArbetsvy } = useNyArbetsvy()
 
   if (loading) {
     return (
@@ -30,6 +34,10 @@ export default function TechnicianLayout() {
 
   const handleSignOut = async () => {
     await signOut()
+  }
+
+  if (nyArbetsvy) {
+    return <NyTeknikerLayout userName={userName} onSignOut={handleSignOut} />
   }
 
   return (

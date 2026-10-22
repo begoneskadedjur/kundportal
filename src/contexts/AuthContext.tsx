@@ -17,6 +17,12 @@ export type Profile = {
   can_approve_invoices?: boolean;
   is_procurement_manager?: boolean;
   can_view_marketing?: boolean;
+  // Ny arbetsvy för tekniker (migration 20261022_ny_arbetsvy). Läs via useNyArbetsvy/useHjalpInstallningar.
+  ny_arbetsvy?: boolean;
+  tekniker_far_byta?: boolean;
+  visa_hjalptexter?: boolean;
+  visa_genomgangar?: boolean;
+  sedda_genomgangar?: string[] | null;
   theme_preference?: 'dark' | 'light' | 'system' | null;
   technicians?: { name: string; role: string; email: string; } | null;
 };
@@ -62,6 +68,8 @@ type AuthContextType = {
   availableViews: ActiveView[];
   activeView: ActiveView;
   setActiveView: (view: ActiveView) => void;
+  // Uppdaterar den inlästa profilen lokalt efter en lyckad skrivning (inget nätverksanrop)
+  patchProfile: (fields: Partial<Profile>) => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -272,6 +280,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('begone_active_view', view);
   };
 
+  const patchProfile = (fields: Partial<Profile>) => {
+    setProfile(prev => (prev ? { ...prev, ...fields } : prev));
+  };
+
   const value = {
     user,
     profile,
@@ -287,6 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     availableViews,
     activeView: effectiveView,
     setActiveView,
+    patchProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

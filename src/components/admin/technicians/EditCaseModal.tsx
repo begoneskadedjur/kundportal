@@ -89,6 +89,16 @@ import { VisitService, type Visit, type VisitCaseType } from '../../../services/
 import { ProvisionService } from '../../../services/provisionService'
 import type { TechnicianShare } from '../../../types/provision'
 
+// Nya arbetsvyn (bara tekniker med profiles.ny_arbetsvy i teknikervyn): stegflödet.
+// Allt nedan används bara när useNyArbetsvy().aktiv är true.
+import type { ReactNode } from 'react'
+import { useNyArbetsvy } from '../../../hooks/useNyArbetsvy'
+import { StegRad, StegKnappar } from '../../technician/ny/steg/StegFlode'
+import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../../technician/ny/steg/ArendeVerktygArk'
+import { KlartSteg } from '../../technician/ny/steg/KlartSteg'
+import { useStegForArende, grannSteg, type StegId } from '../../technician/ny/steg/stegKonfig'
+import { HjalpText } from '../../technician/ny/hjalp/HjalpText'
+import { kontrolleraAvslut, type AvslutsHinder } from '../../../services/arendeAvslutService'
 
 registerLocale('sv', sv) // Registrera svenskt språk för komponenten
 
@@ -1056,8 +1066,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
          : 'cases';
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // val.stannaKvar används bara av nya arbetsvyn: samma sparkedja, men modalen
+  // stängs inte efteråt (ärendet fortsätter i stegen). Utan val: som tidigare.
+  const handleSubmit = async (e?: React.FormEvent, val?: { stannaKvar?: boolean }) => {
+    e?.preventDefault();
     sparatOkRef.current = false;
     const tableName = getTableName();
     if (!tableName || !currentCase) return;
@@ -1416,7 +1428,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         }
       }
 
-      setSubmitted(true);
+      if (val?.stannaKvar) {
+        // Nya arbetsvyn: modalen är kvar, så det sparade läget läses in här
+        // (status, avslutsdatum) i stället för att modalen stängs
+        setCurrentCase(prev => (prev ? { ...prev, ...updatedCaseFromDb, case_type: prev.case_type } : prev));
+      } else {
+        setSubmitted(true);
+      }
 
       // Visa lämpligt meddelande
       if (invoiceGenerated && commissionCreated) {
@@ -1437,11 +1455,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         toast.success('Ärendet har uppdaterats!');
       }
 
-      setTimeout(() => {
-        setSubmitted(false);
-        onClose();
-      }, 1500);
-      
+      if (!val?.stannaKvar) {
+        setTimeout(() => {
+          setSubmitted(false);
+          onClose();
+        }, 1500);
+      }
+
     } catch (error: any) {
       setError(`Fel vid uppdatering: ${error.message}`);
       toast.error('Kunde inte uppdatera ärendet');
@@ -1569,6 +1589,80 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
   // z-index for datepicker now handled in DatePickerDarkTheme.css
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NYA ARBETSVYN: stegflödet. Gäller bara när useNyArbetsvy().aktiv är true
+  // (profiles.ny_arbetsvy och teknikervyn). Annars används inget av detta och
+  // modalen ser ut och beter sig som tidigare. Stegen visar samma sektioner som
+  // flikarna (samma JSX, samma handlers, samma handleSubmit); inget sparas på
+  // något annat sätt. Mönstret är detsamma som i EditContractCaseModal.
+  // ═══════════════════════════════════════════════════════════════════════════
+  const { aktiv: nyArbetsvy } = useNyArbetsvy()
+  // 'steg' = stegflödet, 'flikar' = den vanliga flikvyn (Alla uppgifter)
+  const [visning, setVisning] = useState<'steg' | 'flikar'>('steg')
+  const stegLage = nyArbetsvy && visning === 'steg'
+  const [aktivtSteg, setAktivtSteg] = useState<StegId>('framme')
+  const [hinderSteg, setHinderSteg] = useState<StegId[]>([])
+  const [visaVerktyg, setVisaVerktyg] = useState(false)
+  const [stegUpptaget, setStegUpptaget] = useState(false)
+  const innehallRef = useRef<HTMLDivElement>(null)
+  const stegLista = useStegForArende('privat')
+
+  // Startsteg härlett ur ärendet: avslutat → Klart, arbetstid startad eller
+  // registrerad → Arbetet, annars Framme
+  useEffect(() => {
+    if (!isOpen || !nyArbetsvy || !caseData?.id) return
+    setVisning('steg')
+    setVisaVerktyg(false)
+    setHinderSteg([])
+    if ((caseData.status || '').toLowerCase().includes('avslutat')) {
+      setAktivtSteg('klart')
+    } else if (caseData.work_started_at || (caseData.time_spent_minutes ?? 0) > 0) {
+      setAktivtSteg('arbete')
+    } else {
+      setAktivtSteg('framme')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, nyArbetsvy, caseData?.id])
+
+  // Hela ärendet i steget Klart: status Avslutat och sedan den vanliga
+  // handleSubmit (som själv kör spärrarna, besöksposten, faktureringen och
+  // provisionen). handleSubmit läser formData, därför körs den i en effekt
+  // efter att statusen har slagit igenom i formuläret.
+  const [stangBegard, setStangBegard] = useState(false)
+  const stangSvarRef = useRef<((ok: boolean) => void) | null>(null)
+  const statusForeStangRef = useRef('')
+  useEffect(() => {
+    if (!stangBegard || formData.status !== 'Avslutat') return
+    setStangBegard(false)
+    ;(async () => {
+      await handleSubmit(undefined, { stannaKvar: true })
+      const ok = sparatOkRef.current
+      // Stoppades sparandet: formuläret får tillbaka statusen det hade
+      if (!ok) setFormData(prev => ({ ...prev, status: statusForeStangRef.current }))
+      stangSvarRef.current?.(ok)
+      stangSvarRef.current = null
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stangBegard, formData.status])
+
+  // Rapportknapparna i stegen och verktygen: osparade ändringar sparas först,
+  // sedan körs rapporthookens handler i renderingen efter sparandet, så att
+  // rapporten byggs på det som nu är sparat (hooken läser currentCase)
+  const [rapportBegaran, setRapportBegaran] = useState<'ladda' | 'tekniker' | 'kontakt' | null>(null)
+  useEffect(() => {
+    if (!rapportBegaran) return
+    const vilken = rapportBegaran
+    setRapportBegaran(null)
+    const atgard = vilken === 'ladda'
+      ? reportGeneration.downloadReport
+      : vilken === 'tekniker'
+        ? reportGeneration.sendToTechnician
+        : reportGeneration.sendToContact
+    // Hooken visar själv felet som toast
+    atgard().catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rapportBegaran])
+
   if (!currentCase) return null;
   
   if (submitted) {
@@ -1677,10 +1771,390 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     : (currentCase.kontaktperson || currentCase.title)
   const modalSubtitle = [customerLabel, formatAddress(currentCase.adress)].filter(Boolean).join(' · ')
 
+  // ═══ Nya arbetsvyn: delarna som bara renderas när nyArbetsvy är true ═══
+
+  // Sektionernas synlighet. Gamla läget: noden returneras orörd (ingen wrapper).
+  // Nya läget: samma nod i en wrapper som visas i sina steg och alltid i flikvyn.
+  const iSteg = (steg: StegId[], node: ReactNode) => {
+    if (!nyArbetsvy) return node
+    const klass = stegLage ? (steg.includes(aktivtSteg) ? 'empty:hidden' : 'hidden') : 'empty:hidden'
+    return <div className={klass}>{node}</div>
+  }
+  // Stegens egna block (rubrik, hjälptext, knappar): bara i stegflödet
+  const stegBlock = (steg: StegId) => (stegLage && aktivtSteg === steg ? 'flex flex-col gap-3' : 'hidden')
+
+  const rullaUpp = () => {
+    setTimeout(() => innehallRef.current?.parentElement?.scrollTo({ top: 0 }), 0)
+  }
+
+  const gaTillSteg = (steg: StegId) => {
+    setVisning('steg')
+    setAktivtSteg(steg)
+    rullaUpp()
+  }
+
+  const visaFlikar = (flik?: CaseModalTab) => {
+    setVisning('flikar')
+    if (flik) setActiveTab(flik)
+    rullaUpp()
+  }
+
+  const { foregaende: foregaendeSteg, nasta: nastaSteg } = grannSteg(stegLista, aktivtSteg)
+  const startaTidVidFramme = aktivtSteg === 'framme' && showTimeTracking && !isRunning && (currentCase.time_spent_minutes || 0) === 0
+  const finnsOsparat = () => harOsparat() || hasPendingImageChanges
+
+  // Samma sparkedja som Spara ändringar, men modalen är kvar
+  const sparaUtanAttStanga = async () => {
+    await handleSubmit(undefined, { stannaKvar: true })
+    return sparatOkRef.current
+  }
+
+  // Vidare: sparar med den vanliga handleSubmit om något är ändrat, startar
+  // tiden i steget Framme (befintliga handleTimeTracking('start')) och går till nästa steg
+  const gaVidare = async () => {
+    if (!nastaSteg || stegUpptaget) return
+    setStegUpptaget(true)
+    try {
+      if (finnsOsparat()) {
+        const ok = await sparaUtanAttStanga()
+        if (!ok) return
+      }
+      if (startaTidVidFramme) await handleTimeTracking('start')
+      gaTillSteg(nastaSteg.id)
+    } finally {
+      setStegUpptaget(false)
+    }
+  }
+
+  // Rapportens tre val (samma handlers som WorkReportDropdown i huvudet)
+  const rapportAtgard = async (vilken: 'ladda' | 'tekniker' | 'kontakt') => {
+    if (finnsOsparat()) {
+      const ok = await sparaUtanAttStanga()
+      if (!ok) return
+    }
+    setRapportBegaran(vilken)
+  }
+  const rapportAvstangd = !reportGeneration.canGenerateReport || reportGeneration.isGenerating
+
+  // Kundgruppen väljs i modalen och följer med till kundraden vid avslut, men
+  // sparas inte på ärendet. Samma villkor som needsCustomerGroup ovan, utan statuskravet.
+  const saknarKundgrupp =
+    currentCase.case_type === 'business' &&
+    hasBillableAmount &&
+    existingCustomerId === null &&
+    !selectedCustomerGroupId
+
+  const kontrollAvslut = async (): Promise<AvslutsHinder[]> => {
+    const hinder = await kontrolleraAvslut({
+      caseId: currentCase.id,
+      kalla: currentCase.case_type === 'business' ? 'business_cases' : 'private_cases',
+    })
+    // Kundgruppen sparas inte på ärendet och kontrolleras därför inte i
+    // servicen; modalens val (needsCustomerGroup utan statuskravet) gäller här
+    if (saknarKundgrupp) {
+      hinder.push({
+        id: 'kundgrupp-saknas',
+        text: 'Välj kundgrupp under Pris och fakturering innan ärendet kan avslutas.',
+        steg: 'pris',
+      })
+    }
+    return hinder
+  }
+
+  // Hinder från avslutskontrollen: steget om det finns, annars flikvyn
+  const gaTillHinder = (steg: StegId, hinder?: AvslutsHinder) => {
+    if (hinder?.id === 'sluttid-fore-start') {
+      visaFlikar('arende')
+      return
+    }
+    if (hinder?.id === 'rotrut-fastighet') setRotRutFastighetError(true)
+    if (!stegLista.some(s => s.id === steg)) {
+      visaFlikar(steg === 'pris' ? 'ekonomi' : 'utforande')
+      return
+    }
+    gaTillSteg(steg)
+  }
+
+  const stangHelaArendet = () => new Promise<boolean>(resolve => {
+    if (saknarKundgrupp) {
+      toast.error('Välj kundgrupp innan ärendet kan avslutas')
+      gaTillSteg('pris')
+      resolve(false)
+      return
+    }
+    stangSvarRef.current = resolve
+    statusForeStangRef.current = formData.status || ''
+    setFormData(prev => ({ ...prev, status: 'Avslutat' }))
+    setStangBegard(true)
+  })
+
+  // Bara besöket: befintliga RevisitModal. Den läser det sparade ärendet, så
+  // osparade ändringar (till exempel rapporten) sparas först.
+  const oppnaAterbesok = async () => {
+    if (finnsOsparat()) {
+      const ok = await sparaUtanAttStanga()
+      if (!ok) return
+    }
+    setShowRevisitModal(true)
+  }
+
+  const provisionText = (() => {
+    if (!commissionEligible) return 'Ärendet är inte markerat som provisionsgrundande, ingen provision registreras.'
+    if (commissionShares.length === 0) return 'Provision är vald men ingen tekniker har en andel. Fördela den under Pris och fakturering, annars registreras ingen provision.'
+    if (commissionPostsLocked) return 'Provisionen är redan på väg till utbetalning och ändras inte.'
+    return `Provisionen registreras på ${commissionShares.map(s => `${s.technician_name} ${s.share_percentage} %`).join(', ')}.`
+  })()
+
+  const vadHanderVidStang = [
+    'Ärendet får status Avslutat och dagens datum som avslutsdatum.',
+    'Besöket sparas i besökshistoriken med teknikerna, rapporten och tiden.',
+    'Raderna under Pris och fakturering blir en faktura på kunden, som går vidare till godkännande och Fortnox som i dag. Är underlaget 0 kr skapas ingen faktura.',
+    provisionText,
+    'Rapporten skickas inte av sig själv. Skicka den i steget Rapport.',
+  ]
+
+  const vadHanderVidBesok = [
+    'Du väljer ny tid i återbesöksdialogen. Ärendet får status Återbesök och stängs inte.',
+    'Besöket sparas i besökshistoriken med teknikerna och rapporten.',
+    'Delfakturering är en kryssruta i samma dialog. Den visas när ärendet har tjänster som inte är fakturerade.',
+  ]
+
+  const adressText = formatAddress(formData.adress)
+  const oneflowAvtalId = (currentCase as { oneflow_contract_id?: string | null }).oneflow_contract_id || null
+
+  const ikonKnapp = 'w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]'
+  const stegKnappKlass = 'min-h-[48px] px-4 rounded-xl border border-slate-600 bg-slate-800/60 text-white text-[15px] font-semibold flex items-center justify-center gap-2 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+
+  const nyttHuvud = (
+    <div className="flex items-center gap-0.5">
+      <button
+        type="button"
+        onClick={() => (stegLage ? visaFlikar() : gaTillSteg(aktivtSteg))}
+        aria-label={stegLage ? 'Alla uppgifter i ärendet, den vanliga flikvyn' : 'Tillbaka till stegen'}
+        title={stegLage ? 'Alla uppgifter' : 'Tillbaka till stegen'}
+        className={ikonKnapp}
+      >
+        <SvgIcon name={stegLage ? 'falt.uppgifter' : 'guide.steg'} size={24} />
+      </button>
+      <button
+        type="button"
+        onClick={() => setVisaVerktyg(true)}
+        aria-label="Ärendets verktyg"
+        aria-haspopup="dialog"
+        aria-expanded={visaVerktyg}
+        title="Ärendets verktyg"
+        className={ikonKnapp}
+      >
+        <SvgIcon name="falt.verktyg" size={24} />
+      </button>
+      {stegLage && (
+        <button type="button" onClick={onClose} aria-label="Stäng ärendet" title="Stäng" className={ikonKnapp}>
+          <SvgIcon name="allman.stang" size={24} />
+        </button>
+      )}
+    </div>
+  )
+
+  const stegFooter = (
+    <StegKnappar
+      steg={stegLista}
+      aktivt={aktivtSteg}
+      onTillbaka={foregaendeSteg ? () => gaTillSteg(foregaendeSteg.id) : undefined}
+      onNasta={nastaSteg ? gaVidare : undefined}
+      nastaText={startaTidVidFramme ? 'Jag är framme, starta tiden' : undefined}
+      upptagen={stegUpptaget || loading || timeTrackingLoading}
+    />
+  )
+
+  // Ärendets verktyg: samma val, villkor och handlers som huvudet, menyerna och sidfoten
+  const verktygGrupper: ArendeVerktygGrupp[] = !nyArbetsvy ? [] : [
+    {
+      id: 'rapporter',
+      rubrik: 'Rapporter',
+      val: [
+        {
+          id: 'ladda-ned',
+          ikon: 'rapport.ladda' as const,
+          text: 'Ladda ned rapporten',
+          beskrivning: 'Saneringsrapporten som PDF. Finns en rapport redan frågar appen om en ny version.',
+          villkorText: reportGeneration.canGenerateReport ? undefined : 'Ärendet behöver ett namn',
+          disabled: rapportAvstangd,
+          onClick: () => { void rapportAtgard('ladda') },
+        },
+        {
+          id: 'skicka-tekniker',
+          ikon: 'rapport.skicka' as const,
+          text: 'Skicka till ansvarig tekniker',
+          beskrivning: reportGeneration.technicianName ? `Skicka till ${reportGeneration.technicianName}` : 'Skicka till ansvarig tekniker',
+          villkorText: reportGeneration.hasTechnicianEmail ? undefined : 'Ingen tekniker-e-post tillgänglig',
+          disabled: rapportAvstangd,
+          onClick: () => { void rapportAtgard('tekniker') },
+        },
+        {
+          id: 'skicka-kontakt',
+          ikon: 'kontakt.mejl' as const,
+          text: 'Skicka till kontaktperson',
+          beskrivning: reportGeneration.contactName ? `Skicka till ${reportGeneration.contactName}` : 'Skicka till kontaktperson',
+          villkorText: reportGeneration.hasContactEmail ? undefined : 'Kontaktpersonen saknar e-post',
+          disabled: rapportAvstangd,
+          onClick: () => { void rapportAtgard('kontakt') },
+        },
+        {
+          id: 'specialrapport',
+          ikon: 'falt.specialrapport' as const,
+          text: 'Specialrapporter',
+          beskrivning: 'Skapa, öppna och ladda ned specialrapporter. De finns i steget Rapport.',
+          onClick: () => gaTillSteg('rapport'),
+        },
+      ],
+      not: reportGeneration.hasRecentReport && reportGeneration.currentReport && reportGeneration.getTimeSinceReport
+        ? `Rapport framtagen ${reportGeneration.getTimeSinceReport(reportGeneration.currentReport)}, version ${reportGeneration.currentReport.version} av ${reportGeneration.totalReports}${reportGeneration.currentReport.sent_to_customer ? ', skickad till kund' : ''}${reportGeneration.currentReport.sent_to_technician ? ', skickad till tekniker' : ''}.`
+        : undefined,
+    },
+    {
+      id: 'avtal-offert',
+      rubrik: 'Avtal och offert',
+      val: [
+        {
+          id: 'avtal',
+          ikon: 'dok.avtal' as const,
+          text: 'Skapa avtal',
+          beskrivning: 'Öppnar avtalskaparen i Oneflow med kunduppgifterna ifyllda.',
+          onClick: handleCreateContract,
+        },
+        {
+          id: 'offert',
+          ikon: 'dok.offert' as const,
+          text: 'Skapa offert',
+          beskrivning: 'Öppnar offertskaparen i Oneflow med ärendets tjänster och artiklar ifyllda.',
+          onClick: () => { void handleCreateOffer() },
+        },
+      ],
+      not: oneflowAvtalId ? (
+        <div className="flex items-center gap-2">
+          <span>Signerat avtal finns:</span>
+          <CustomerContractButton
+            oneflowContractId={oneflowAvtalId}
+            customerName={currentCase.kontaktperson || currentCase.title || 'Ärende'}
+          />
+        </div>
+      ) : undefined,
+    },
+    {
+      id: 'aterbesok',
+      rubrik: 'Återbesök och nytt ärende',
+      // Samma villkor som återbesöksikonen i huvudet: inte från ett följeärende
+      val: canCreateFollowUp ? [
+        {
+          id: 'boka-aterbesok',
+          ikon: 'arende.aterbesok' as const,
+          text: 'Boka återbesök',
+          beskrivning: 'Flytta ärendet till ett framtida datum. Delfakturering är en kryssruta i dialogen.',
+          onClick: () => { void oppnaAterbesok() },
+        },
+        {
+          id: 'nytt-arende',
+          ikon: 'allman.plus' as const,
+          text: 'Skapa nytt ärende',
+          beskrivning: 'Nytt problem hos samma kund (annat skadedjur).',
+          onClick: () => setShowFollowUpDialog(true),
+        },
+        {
+          id: 'duplicera',
+          ikon: 'rapport.kopia' as const,
+          text: 'Duplicera ärende',
+          beskrivning: 'Skapa en kopia och välj vad som följer med.',
+          onClick: () => setShowDuplicateDialog(true),
+        },
+      ] : [],
+    },
+    {
+      id: 'kontakt',
+      rubrik: 'Kontakt och plats',
+      val: [
+        ...(showCommunication ? [{
+          id: 'kommunikation',
+          ikon: 'kontakt.mote' as const,
+          text: 'Kommunikation',
+          beskrivning: 'Intern chatt om ärendet med kontoret och andra tekniker.',
+          onClick: () => setShowCommunicationPanel(true),
+        }] : []),
+        ...(adressText ? [{
+          id: 'kartor',
+          ikon: 'falt.navigera' as const,
+          text: 'Öppna adressen i kartor',
+          beskrivning: adressText,
+          onClick: () => openInMaps(formData.adress),
+        }] : []),
+        ...(formData.telefon_kontaktperson ? [{
+          id: 'ring',
+          ikon: 'kontakt.telefon' as const,
+          text: `Ring ${formData.kontaktperson || 'kontaktpersonen'}`,
+          beskrivning: formData.telefon_kontaktperson,
+          onClick: () => { window.location.href = `tel:${(formData.telefon_kontaktperson || '').replace(/\s/g, '')}` },
+        }] : []),
+      ],
+    },
+    {
+      id: 'arendet',
+      rubrik: 'Ärendet',
+      val: [
+        {
+          id: 'byt-namn',
+          ikon: 'rapport.penna' as const,
+          text: 'Byt ärendenamn',
+          beskrivning: `Nu ${formData.title || currentCase.title || 'utan namn'}. Namnet ändras överst i ärendet och sparas med ärendet.`,
+          onClick: () => setEditingTitle(true),
+        },
+        {
+          id: 'historik',
+          ikon: 'allman.historik' as const,
+          text: 'Historik',
+          beskrivning: 'Ändringar och händelser i ärendet.',
+          onClick: () => setShowHistoryPanel(true),
+        },
+        ...((currentCase.case_type === 'private' || currentCase.case_type === 'business') ? [{
+          id: 'lead',
+          ikon: 'lead.tips' as const,
+          text: 'Skapa lead',
+          beskrivning: 'Tipsa om ett löpande avtal eller merförsäljning. Knappen finns i steget Klart.',
+          onClick: () => gaTillSteg('klart'),
+        }] : []),
+        {
+          id: 'alla-uppgifter',
+          ikon: 'falt.uppgifter' as const,
+          text: 'Alla uppgifter',
+          beskrivning: 'Den vanliga flikvyn med Ärende, Utförande och Ekonomi. Allt som sparas där syns i stegen.',
+          onClick: () => visaFlikar(),
+        },
+        {
+          id: 'status',
+          ikon: 'arende.status' as const,
+          text: 'Ändra status',
+          beskrivning: `Nu ${formData.status || currentCase.status}. Statusstegen visas överst i Alla uppgifter. Spara efter bytet.`,
+          onClick: () => visaFlikar(),
+        },
+      ],
+    },
+    {
+      id: 'ta-bort',
+      rubrik: 'Ta bort',
+      val: [{
+        id: 'radera',
+        ikon: 'allman.radera' as const,
+        text: 'Radera ärende',
+        beskrivning: 'Frågar en gång till innan ärendet tas bort.',
+        fara: true,
+        onClick: () => setShowDeleteDialog(true),
+      }],
+    },
+  ]
+
   return (
     <>
-    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} subtitle={modalSubtitle || undefined} size="full" footer={footer} preventClose={true} allowBackdropClose={!loading && !timeTrackingLoading} usePortal={true} className="scroll-smooth"
-      headerActions={
+    <Modal isOpen={isOpen} onClose={onClose} title={modalTitle} subtitle={modalSubtitle || undefined} size="full" footer={stegLage ? stegFooter : footer} preventClose={true} allowBackdropClose={!loading && !timeTrackingLoading} usePortal={true} className="scroll-smooth"
+      mobilHelskarm={nyArbetsvy}
+      headerActions={nyArbetsvy ? nyttHuvud : (
         <div className="flex items-center gap-1.5">
           {/* Avtal */}
           <button
@@ -1764,9 +2238,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             </button>
           )}
         </div>
-      }
+      )}
     >
-      {/* Statusstepper - kopplad till samma statesetter som gamla status-selecten */}
+      {/* Statusstepper - kopplad till samma statesetter som gamla status-selecten.
+          Nya arbetsvyn: visas i flikvyn (Alla uppgifter), inte i stegflödet */}
+      {!stegLage && (
       <CaseStatusStepper
         status={formData.status || ''}
         statuses={buildStatusOptions(formData.status || '').map(o => o.value)}
@@ -1777,15 +2253,23 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           (currentCase as any).completed_date || null,
         ]}
       />
+      )}
 
-      {/* Leads etapp 5: Skapa lead (eller Lead skapad · Företag →), bara engångsärenden */}
-      {(currentCase.case_type === 'private' || currentCase.case_type === 'business') && currentCase.id && (
+      {/* Leads etapp 5: Skapa lead (eller Lead skapad · Företag →), bara engångsärenden.
+          Nya arbetsvyn: samma knapp ligger i formuläret (steget Klart och flikvyn) */}
+      {!nyArbetsvy && (currentCase.case_type === 'private' || currentCase.case_type === 'business') && currentCase.id && (
         <div className="flex items-center px-4 pt-2 min-w-0">
           <SkapaLeadKnapp caseType={currentCase.case_type} caseId={currentCase.id} />
         </div>
       )}
 
+      {/* Nya arbetsvyn: stegraden i stället för flikraden */}
+      {stegLage && (
+        <StegRad steg={stegLista} aktivt={aktivtSteg} onValj={gaTillSteg} hinder={hinderSteg} />
+      )}
+
       {/* Sticky flikrad */}
+      {!stegLage && (
       <div className="sticky top-0 z-10 flex gap-1 px-4 py-2 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50">
         {([
           { id: 'arende', label: 'Ärende', icon: FileText },
@@ -1807,8 +2291,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           </button>
         ))}
       </div>
+      )}
 
-      <div className="p-4">
+      <div ref={nyArbetsvy ? innehallRef : undefined} className="p-4">
 
         {/* Val-dialog: Återbesök eller Nytt ärende — fixed overlay */}
         {showActionDialog && (
@@ -1921,7 +2406,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
 
         <BackupRestorePrompt pendingRestore={pendingRestore} onRestore={handleSuccessfulRestore} onDismiss={clearBackup} />
 
-        <form id="edit-case-form" onSubmit={handleSubmit} className="space-y-3">
+        <form
+          id="edit-case-form"
+          onSubmit={nyArbetsvy ? (e) => { void handleSubmit(e, { stannaKvar: true }) } : handleSubmit}
+          className={stegLage ? 'flex flex-col gap-3' : 'space-y-3'}
+        >
           {error && (
             <div className="bg-red-500/20 border border-red-500/40 p-4 rounded-lg flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
@@ -1929,8 +2418,80 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             </div>
           )}
 
+          {/* ═══ Nya arbetsvyn: stegens rubriker, hjälptexter och knappar (bara stegflödet) ═══ */}
+          {nyArbetsvy && (
+            <>
+              <div className={stegBlock('framme')}>
+                <HjalpText id="steg-framme-privat" rubrik="Är du framme hos kunden?">
+                  {startaTidVidFramme
+                    ? 'Tryck på den gröna knappen när du står på plats. Då startar arbetstiden i ärendet och du behöver inte skriva in den själv.'
+                    : 'Arbetstiden är startad eller redan registrerad. Kontrollera kontakten och adressen och gå vidare.'}
+                </HjalpText>
+                {(adressText || formData.telefon_kontaktperson) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {adressText && (
+                      <button type="button" onClick={() => openInMaps(formData.adress)} className={stegKnappKlass}>
+                        <SvgIcon name="falt.navigera" size={20} />
+                        <span className="truncate">Öppna i kartor</span>
+                      </button>
+                    )}
+                    {formData.telefon_kontaktperson && (
+                      <a href={`tel:${formData.telefon_kontaktperson.replace(/\s/g, '')}`} className={stegKnappKlass}>
+                        <SvgIcon name="kontakt.telefon" size={20} />
+                        <span className="truncate">Ring {formData.kontaktperson || formData.telefon_kontaktperson}</span>
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className={stegBlock('arbete')}>
+                <HjalpText id="steg-arbete-privat" rubrik="Vad ska göras?">
+                  Uppdraget står i beskrivningen. Välj tjänsten som utförs, den styr preparaten och prisguiden.
+                </HjalpText>
+              </div>
+
+              <div className={stegBlock('foton')}>
+                <HjalpText id="steg-foton-privat" rubrik="Foton och preparat">
+                  Fotografera det kunden behöver åtgärda och lägg in preparat du har använt. Bilderna sparas när du går vidare eller sparar ärendet.
+                </HjalpText>
+              </div>
+
+              <div className={stegBlock('rapport')}>
+                <HjalpText id="steg-rapport-privat" rubrik="Rapport">
+                  Skriv vad du gjorde i saneringsrapporten. Rapporten skickas inte av sig själv, ladda ned den eller skicka den med knapparna längst ner i steget.
+                </HjalpText>
+              </div>
+
+              <div className={stegBlock('pris')}>
+                <HjalpText id="steg-pris-privat" rubrik="Pris och fakturering">
+                  Lägg in tjänster och artiklar som gick åt. Prisguiden visar inköpspris och marginal. Raderna faktureras när ärendet stängs. Provisionen fördelar du längst ner.
+                </HjalpText>
+                {currentCase.case_type === 'business' ? (
+                  <Input
+                    name="org_nr"
+                    label="Organisationsnummer"
+                    placeholder="Org.nummer"
+                    value={formData.org_nr || ''}
+                    onChange={handleChange}
+                    helperText="Fakturan och kundraden kopplas till organisationsnumret."
+                  />
+                ) : (
+                  <Input
+                    name="personnummer"
+                    label="Personnummer"
+                    placeholder="Personnummer"
+                    value={formData.personnummer || ''}
+                    onChange={handleChange}
+                    helperText="Krävs för ROT och RUT. Fastighetsbeteckningen fyller du i på ROT- eller RUT-raden nedanför."
+                  />
+                )}
+              </div>
+            </>
+          )}
+
           {/* Varningar (flyttade från gamla actionbandet) */}
-          {(reportGeneration.canGenerateReport && (!reportGeneration.hasTechnicianEmail || !reportGeneration.hasContactEmail)) && (
+          {iSteg(['rapport'], (reportGeneration.canGenerateReport && (!reportGeneration.hasTechnicianEmail || !reportGeneration.hasContactEmail)) && (
             <div className="flex items-start gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
               <span>
@@ -1938,22 +2499,23 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 {!reportGeneration.hasContactEmail && 'Ingen kontaktperson-email tillgänglig.'}
               </span>
             </div>
-          )}
-          {(!currentCase.kontaktperson || !currentCase.e_post_kontaktperson) && (
+          ))}
+          {iSteg(['framme'], (!currentCase.kontaktperson || !currentCase.e_post_kontaktperson) && (
             <div className="flex items-start gap-2 text-xs text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
               <span>Komplettera kontaktuppgifter för bästa avtal/offert-skapning</span>
             </div>
-          )}
-          {currentCase.parent_case_id && (
+          ))}
+          {iSteg([], currentCase.parent_case_id && (
             <div className="flex items-start gap-2 text-xs text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
               <Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
               <span>Detta är ett följeärende</span>
             </div>
-          )}
+          ))}
 
           {/* ════════ Flik: Ärende ════════ */}
-          <div className={activeTab === 'arende' ? 'space-y-3' : 'hidden'}>
+          <div className={stegLage ? 'contents' : activeTab === 'arende' ? 'space-y-3' : 'hidden'}>
+            {iSteg(['arbete'], (
             <CaseModalSection icon={FileText} iconClassName="text-teal-400" title="Ärendeinformation">
               <div className="space-y-3">
               <div>
@@ -2003,8 +2565,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               )}
               </div>
             </CaseModalSection>
+            ))}
 
             {/* Tekniker-tilldelningar */}
+            {iSteg([], (
             <CaseModalSection icon={User} iconClassName="text-orange-400" title="Tekniker">
               <div className="flex items-center gap-2">
                 {([
@@ -2054,9 +2618,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 })}
               </div>
             </CaseModalSection>
+            ))}
 
             {/* Schemaläggning */}
-            {showTimeTracking && (
+            {iSteg([], showTimeTracking && (
               <CaseModalSection icon={CalendarIcon} iconClassName="text-purple-400" title="Schemaläggning">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
@@ -2091,10 +2656,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                       </div>
                   </div>
               </CaseModalSection>
-            )}
+            ))}
 
             {/* Kontaktinformation */}
-            {showTimeTracking && (
+            {iSteg(['framme'], showTimeTracking && (
               <CaseModalSection icon={User} iconClassName="text-emerald-400" title="Kontaktinformation">
                 <div className="space-y-2">
                 <div className="grid grid-cols-2 gap-2">
@@ -2132,10 +2697,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 </div>
                 </div>
               </CaseModalSection>
-            )}
+            ))}
 
             {/* Företagsinfo & Fakturering (bara business cases) */}
-            {currentCase.case_type === 'business' && (
+            {iSteg(['pris'], currentCase.case_type === 'business' && (
               <CaseModalSection icon={Receipt} iconClassName="text-indigo-400" title="Företag & Fakturering">
                 <div className="grid grid-cols-2 gap-2">
                   <Input name="company_name" placeholder="Företagsnamn" value={formData.company_name || ''} onChange={handleChange} />
@@ -2144,13 +2709,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   <Input name="e_post_faktura" placeholder="E-post faktura" type="email" value={formData.e_post_faktura || ''} onChange={handleChange} />
                 </div>
               </CaseModalSection>
-            )}
+            ))}
           </div>
 
           {/* ════════ Flik: Utförande ════════ */}
-          <div className={activeTab === 'utforande' ? 'space-y-3' : 'hidden'}>
+          <div className={stegLage ? 'contents' : activeTab === 'utforande' ? 'space-y-3' : 'hidden'}>
             {/* Tidtagning - kompakt "Arbetstid"-sektion */}
-            {showTimeTracking && (
+            {iSteg(['framme', 'arbete'], showTimeTracking && (
               <CaseModalSection icon={Clock} iconClassName={isRunning ? 'text-[#20c58f]' : 'text-slate-400'} title="Arbetstid">
                 <div className="flex items-center gap-3">
                   <span className={`text-lg font-bold font-mono ${isRunning ? 'text-[#20c58f]' : 'text-white'}`}>
@@ -2189,10 +2754,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   </div>
                 </div>
               </CaseModalSection>
-            )}
+            ))}
 
             {/* Saneringsrapport sektion */}
-            {showTimeTracking && (
+            {iSteg(['rapport'], showTimeTracking && (
               <CaseModalSection icon={BookOpen} iconClassName="text-purple-400" title="Saneringsrapport">
                 <textarea
                   name="rapport"
@@ -2205,10 +2770,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   placeholder="Metoder, resultat, rekommendationer..."
                 />
               </CaseModalSection>
-            )}
+            ))}
 
-            {/* Specialrapport: fri rapport kopplad till ärendet (3.50.0) */}
-            {currentCase?.id && (
+            {/* Specialrapport: fri rapport kopplad till ärendet (3.50.0).
+                Nya arbetsvyn: samma spara, men modalen är kvar */}
+            {iSteg(['rapport'], currentCase?.id && (
               <CaseSpecialReportsSection
                 caseId={currentCase.id}
                 caseType={currentCase.case_type}
@@ -2216,15 +2782,15 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                 osparat={{
                   finns: () => harOsparat() || hasPendingImageChanges,
                   spara: async () => {
-                    await handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+                    await handleSubmit({ preventDefault: () => {} } as React.FormEvent, nyArbetsvy ? { stannaKvar: true } : undefined)
                     return sparatOkRef.current
                   },
                 }}
               />
-            )}
+            ))}
 
             {/* Använda preparat - Visas INTE för Inspektion */}
-            {currentCase && serviceArticle?.name !== 'Inspektion' && formData.skadedjur !== 'Inspektion' && (
+            {iSteg(['foton'], currentCase && serviceArticle?.name !== 'Inspektion' && formData.skadedjur !== 'Inspektion' && (
               <CaseModalSection>
                 <CasePreparationsSection
                   caseId={currentCase.id}
@@ -2235,10 +2801,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   isReadOnly={false}
                 />
               </CaseModalSection>
-            )}
+            ))}
 
             {/* Bilder sektion - visas för alla ärendetyper */}
-            {currentCase && (
+            {iSteg(['foton'], currentCase && (
               <CaseModalSection icon={ImageIcon} iconClassName="text-cyan-400" title="Bilder">
                 {/* Bildgalleri med draft-läge - ändringar sparas först när man klickar "Spara ändringar" */}
                 <CaseImageGallery
@@ -2254,13 +2820,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   onPendingChangesUpdate={setHasPendingImageChanges}
                 />
               </CaseModalSection>
-            )}
+            ))}
           </div>
 
           {/* ════════ Flik: Ekonomi ════════ */}
-          <div className={activeTab === 'ekonomi' ? 'space-y-3' : 'hidden'}>
+          <div className={stegLage ? 'contents' : activeTab === 'ekonomi' ? 'space-y-3' : 'hidden'}>
             {/* Utförda tjänster/artiklar för fakturering */}
-            {currentCase && (
+            {iSteg(['pris'], currentCase && (
               <CaseModalSection>
                 <CaseServiceSelector
                   key={servicesSelectorKey}
@@ -2275,10 +2841,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   highlightMissingFastighet={rotRutFastighetError}
                 />
               </CaseModalSection>
-            )}
+            ))}
 
             {/* Kundnummer (befintlig kund hittad via person-/org-nr) */}
-            {currentCase && existingCustomerNumber !== null && (
+            {iSteg(['pris'], currentCase && existingCustomerNumber !== null && (
               <CaseModalSection subtle>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <CheckCircle className="w-4 h-4 text-[#20c58f]" />
@@ -2287,21 +2853,21 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   <span className="text-slate-500">(återanvänds från befintlig kund)</span>
                 </div>
               </CaseModalSection>
-            )}
-            {currentCase && existingCustomerId !== null && existingCustomerNumber === null && (
+            ))}
+            {iSteg(['pris'], currentCase && existingCustomerId !== null && existingCustomerNumber === null && (
               <CaseModalSection subtle>
                 <div className="flex items-center gap-2 text-xs text-slate-400">
                   <CheckCircle className="w-4 h-4 text-[#20c58f]" />
                   <span>Kundrad finns. Kundnumret tilldelas från Fortnox när fakturan skickas.</span>
                 </div>
               </CaseModalSection>
-            )}
+            ))}
 
             {/* Kundgruppsval för företagskunder utan kundrad och utan grupp på ärendet
                 (fallback för äldre ärenden: nya ärenden får gruppen i CreateCaseModal) */}
-            {currentCase &&
+            {iSteg(['pris'], currentCase &&
               currentCase.case_type === 'business' &&
-              formData.status === 'Avslutat' &&
+              (formData.status === 'Avslutat' || nyArbetsvy) &&
               hasBillableAmount &&
               existingCustomerId === null && (
               <CaseModalSection icon={Receipt} iconClassName="text-[#20c58f]" title="Kundgrupp (för fakturering)">
@@ -2342,10 +2908,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   </div>
                 </div>
               </CaseModalSection>
-            )}
+            ))}
 
             {/* Provision sektion */}
-            {currentCase && (
+            {iSteg(['pris'], currentCase && (
               <CaseModalSection>
                 <CommissionSection
                   isEligible={commissionEligible}
@@ -2377,8 +2943,72 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   subcontractorDeduction={billingSummary?.subcontractor_total || 0}
                 />
               </CaseModalSection>
-            )}
+            ))}
           </div>
+
+          {/* ═══ Nya arbetsvyn: stegens egna delar längst ner i steget ═══ */}
+          {nyArbetsvy && (
+            <>
+              {/* Rapport: samma handlers som rapportmenyn i huvudet (WorkReportDropdown) */}
+              <div className={stegBlock('rapport')}>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <button type="button" onClick={() => { void rapportAtgard('ladda') }} disabled={rapportAvstangd} className={stegKnappKlass}>
+                    <SvgIcon name="rapport.ladda" size={20} />
+                    Ladda ned
+                  </button>
+                  <button type="button" onClick={() => { void rapportAtgard('kontakt') }} disabled={rapportAvstangd} className={stegKnappKlass}>
+                    <SvgIcon name="kontakt.mejl" size={20} />
+                    <span className="truncate">Skicka till {reportGeneration.contactName || 'kontaktperson'}</span>
+                  </button>
+                  <button type="button" onClick={() => { void rapportAtgard('tekniker') }} disabled={rapportAvstangd} className={stegKnappKlass}>
+                    <SvgIcon name="rapport.skicka" size={20} />
+                    <span className="truncate">Skicka till {reportGeneration.technicianName || 'ansvarig tekniker'}</span>
+                  </button>
+                </div>
+                {!reportGeneration.canGenerateReport && (
+                  <p className="text-sm text-slate-400">Rapporten kan tas fram när ärendet har ett namn. Byt namn under Ärendets verktyg.</p>
+                )}
+                {reportGeneration.canGenerateReport && !reportGeneration.hasContactEmail && (
+                  <p className="text-sm text-amber-300">Kontaktpersonen saknar e-post. Lägg till den i steget Framme innan du skickar rapporten.</p>
+                )}
+                {reportGeneration.hasRecentReport && reportGeneration.currentReport && (
+                  <p className="text-sm text-slate-400">
+                    Rapport framtagen {reportGeneration.getTimeSinceReport(reportGeneration.currentReport)}, version {reportGeneration.currentReport.version} av {reportGeneration.totalReports}
+                    {reportGeneration.currentReport.sent_to_customer ? ', skickad till kund' : ''}
+                    {reportGeneration.currentReport.sent_to_technician ? ', skickad till tekniker' : ''}.
+                  </p>
+                )}
+              </div>
+
+              {/* Klart */}
+              <div className={stegBlock('klart')}>
+                <KlartSteg
+                  aktiv={stegLage && aktivtSteg === 'klart'}
+                  steg={stegLista}
+                  kontroll={kontrollAvslut}
+                  onGaTillSteg={gaTillHinder}
+                  gaTillText={h => (h.id === 'sluttid-fore-start' ? 'Ändra tiden i Alla uppgifter' : undefined)}
+                  onStangHelaArendet={stangHelaArendet}
+                  onBaraBesoket={canCreateFollowUp ? () => { void oppnaAterbesok() } : undefined}
+                  onSparaUtanAttStanga={sparaUtanAttStanga}
+                  harOsparat={finnsOsparat}
+                  status={currentCase.status || formData.status || ''}
+                  arAvslutat={(currentCase.status || '').toLowerCase().includes('avslutat')}
+                  avslutsdatum={(currentCase as { completed_date?: string | null }).completed_date ?? null}
+                  vadHander={vadHanderVidStang}
+                  vadHanderBesok={vadHanderVidBesok}
+                  onHinderChange={setHinderSteg}
+                />
+              </div>
+
+              {/* Skapa lead (samma knapp som överst i gamla läget): i steget Klart och i flikvyn */}
+              {iSteg(['klart'], (currentCase.case_type === 'private' || currentCase.case_type === 'business') && currentCase.id && (
+                <div className="flex items-center min-w-0">
+                  <SkapaLeadKnapp caseType={currentCase.case_type} caseId={currentCase.id} />
+                </div>
+              ))}
+            </>
+          )}
         </form>
       </div>
 
@@ -2390,6 +3020,16 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
         caseTitle={currentCase.title}
         onCountChange={setHistoryCount}
       />
+
+      {/* Nya arbetsvyn: Ärendets verktyg */}
+      {nyArbetsvy && (
+        <ArendeVerktygArk
+          oppen={visaVerktyg}
+          onStang={() => setVisaVerktyg(false)}
+          underrubrik={[currentCase.case_number || currentCase.title, customerLabel].filter(Boolean).join(', ')}
+          grupper={verktygGrupper}
+        />
+      )}
 
       {/* Kommunikations-panel (slide-in från höger) */}
       {showCommunication && (

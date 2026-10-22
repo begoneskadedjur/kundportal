@@ -98,6 +98,13 @@ import StationInspectionModule from './pages/technician/StationInspectionModule'
 import TechnicianEquipment from './pages/technician/TechnicianEquipment';
 import TechnicianCustomerStationsPage from './pages/technician/TechnicianCustomerStationsPage';
 import TechnicianCustomerJourney from './pages/technician/TechnicianCustomerJourney';
+// Nya arbetsvyn för tekniker (bara profiles.ny_arbetsvy, växlas i VyVaxel)
+import { VyVaxel } from './components/technician/ny/VyVaxel';
+import VisningInstallningar from './components/technician/ny/VisningInstallningar';
+import NyIdag from './pages/technician/ny/NyIdag';
+import NyKarta from './pages/technician/ny/NyKarta';
+import NyMinaArenden from './pages/technician/ny/NyMinaArenden';
+import NyMer from './pages/technician/ny/NyMer';
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal';
@@ -431,9 +438,12 @@ function App() {
             {/* --- TEKNIKER ROUTES — nested under TechnicianLayout med persistent sidebar --- */}
             <Route path="/technician" element={<TechnicianLayout />}>
               <Route index element={<Navigate to="/technician/dashboard" replace />} />
-              <Route path="dashboard" element={<ProtectedRoute requiredRole="technician"><TechnicianDashboard /></ProtectedRoute>} />
+              <Route path="dashboard" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyIdag />} gammal={<TechnicianDashboard />} /></ProtectedRoute>} />
               <Route path="commissions" element={<ProtectedRoute requiredRole="technician"><TechnicianCommissionsPage /></ProtectedRoute>} />
-              <Route path="cases" element={<ProtectedRoute requiredRole="technician"><TechnicianCases /></ProtectedRoute>} />
+              <Route path="cases" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyMinaArenden />} gammal={<TechnicianCases />} /></ProtectedRoute>} />
+              {/* Bara nya arbetsvyn. Alla andra skickas till översikten som förut. */}
+              <Route path="karta" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyKarta />} gammal={<Navigate to="/technician/dashboard" replace />} /></ProtectedRoute>} />
+              <Route path="mer" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyMer />} gammal={<Navigate to="/technician/dashboard" replace />} /></ProtectedRoute>} />
               <Route path="schedule" element={<ProtectedRoute requiredRole="technician"><TechnicianSchedule /></ProtectedRoute>} />
               <Route path="inspection/:caseId" element={<ProtectedRoute requiredRole="technician"><StationInspectionModule /></ProtectedRoute>} />
               <Route path="specialrapporter" element={<ProtectedRoute requiredRole="technician"><SpecialReportsPage /></ProtectedRoute>} />
@@ -450,7 +460,7 @@ function App() {
               <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="technician"><IncidentsPage /></ProtectedRoute>} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="technician"><InternAdministration /></ProtectedRoute>} />
               <Route path="intranat/*" element={<ProtectedRoute requiredRole="technician"><IntranetPage /></ProtectedRoute>} />
-              <Route path="mitt-konto" element={<ProtectedRoute requiredRole="technician"><UserProfile embedded /></ProtectedRoute>} />
+              <Route path="mitt-konto" element={<ProtectedRoute requiredRole="technician"><VisningInstallningar /><UserProfile embedded /></ProtectedRoute>} />
               <Route path="guides/equipment-placement" element={<Navigate to="/technician/intranat/dokument/guide-placera-stationer" replace />} />
               <Route path="guides/follow-up-case" element={<Navigate to="/technician/intranat/dokument/guide-foljearenden" replace />} />
               <Route path="guides/case-deletion" element={<Navigate to="/technician/intranat/dokument/guide-avbryta-arenden" replace />} />

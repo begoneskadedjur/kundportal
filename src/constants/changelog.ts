@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.81.0',
+    date: '2026-10-22',
+    title: 'Ny arbetsvy för tekniker, på prov',
+    items: [
+      { kind: 'nyhet', text: 'På personalkortet under Användarkonton finns växlarna Ny arbetsvy och Får byta själv. Den nya teknikervyn har en startsida för dagen, karta över dagens besök, ärendelista i grupper och ärendet steg för steg. Den testas först av Christian och är avstängd för alla andra.' },
+    ],
+  },
+  {
     version: '3.80.7',
     date: '2026-10-22',
     title: 'Alla ärenden får avslutsdatum',

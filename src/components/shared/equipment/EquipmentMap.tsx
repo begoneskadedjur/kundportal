@@ -72,6 +72,12 @@ interface EquipmentMapProps {
   showTypeIcons?: boolean
   /** Färdiga stationsnummer (t.ex. samma som en lista bredvid). Går före showNumbers egen numrering. */
   stationNumbers?: Map<string, number>
+  /**
+   * Inbäddade vyer (t.ex. en flik i en modal som göms med hidden): när kartans
+   * yta går från noll till synlig storlek triggas resize och kartan zoomas om
+   * till stationerna. Av som standard, så övriga vyer beter sig som förut.
+   */
+  refitWhenVisible?: boolean
 }
 
 // CSS för pulsering av highlighted marker
@@ -116,6 +122,7 @@ export function EquipmentMap({
   showLegend = true,
   showTypeIcons = false,
   stationNumbers,
+  refitWhenVisible = false,
 }: EquipmentMapProps) {
   // Ikoner i markörerna och typring på grupperna (personal eller kund)
   const markerIcons = showProductIcons || showTypeIcons
@@ -320,6 +327,38 @@ export function EquipmentMap({
       hasAutoZoomedRef.current = true
     }
   }, [isLoaded, regionPolygons, equipment])
+
+  // refitWhenVisible: kartan skapades i en dold behållare (0 × 0) och får fel
+  // utsnitt. När ytan blir synlig: resize + zooma om till stationerna.
+  const refitEquipmentRef = useRef(equipment)
+  refitEquipmentRef.current = equipment
+  const refitDimmedRef = useRef(dimmedStationIds)
+  refitDimmedRef.current = dimmedStationIds
+  useEffect(() => {
+    if (!refitWhenVisible || !isLoaded) return
+    const el = mapContainerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let wasVisible = el.clientWidth > 0 && el.clientHeight > 0
+    const observer = new ResizeObserver(() => {
+      const visible = el.clientWidth > 0 && el.clientHeight > 0
+      if (visible && !wasVisible && mapRef.current) {
+        const map = mapRef.current
+        google.maps.event.trigger(map, 'resize')
+        const items = refitEquipmentRef.current.filter(item => !refitDimmedRef.current?.has(item.id))
+        if (items.length > 1) {
+          const bounds = new google.maps.LatLngBounds()
+          items.forEach(item => bounds.extend({ lat: item.latitude, lng: item.longitude }))
+          map.fitBounds(bounds, { top: 60, bottom: 60, left: 60, right: 60 })
+        } else if (items.length === 1) {
+          map.setCenter({ lat: items[0].latitude, lng: items[0].longitude })
+          map.setZoom(DETAIL_ZOOM)
+        }
+      }
+      wasVisible = visible
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [refitWhenVisible, isLoaded])
 
   // Hantera kartklick
   useEffect(() => {

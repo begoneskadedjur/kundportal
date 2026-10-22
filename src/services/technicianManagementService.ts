@@ -50,6 +50,8 @@ export type Technician = {
   can_approve_invoices?: boolean
   is_procurement_manager?: boolean
   can_view_marketing?: boolean
+  ny_arbetsvy?: boolean
+  tekniker_far_byta?: boolean
 }
 
 export type TechnicianFormData = {
@@ -220,6 +222,44 @@ export const technicianManagementService = {
     }
   },
 
+  /**
+   * Slår på/av den nya arbetsvyn (profiles.ny_arbetsvy) för personen. Bara
+   * administratör får ändra den åt andra (trigger a_guard_ny_arbetsvy).
+   */
+  async updateNyArbetsvy(technicianId: string, aktiv: boolean): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ ny_arbetsvy: aktiv } as never)
+        .eq('technician_id', technicianId)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating ny_arbetsvy:', error)
+      toast.error('Kunde inte uppdatera Ny arbetsvy')
+      throw error
+    }
+  },
+
+  /**
+   * Sätter om personen själv får slå av och på den nya arbetsvyn under Mitt
+   * konto (profiles.tekniker_far_byta). Bara administratör (trigger a_guard_ny_arbetsvy).
+   */
+  async updateTeknikerFarByta(technicianId: string, farByta: boolean): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ tekniker_far_byta: farByta } as never)
+        .eq('technician_id', technicianId)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating tekniker_far_byta:', error)
+      toast.error('Kunde inte uppdatera Får byta själv')
+      throw error
+    }
+  },
+
   async updateDisplayName(technicianId: string, displayName: string): Promise<void> {
     const { error } = await supabase
       .from('profiles')
@@ -278,7 +318,7 @@ export const technicianManagementService = {
     try {
       const [techniciansRes, profilesRes, recipientsRes] = await Promise.all([
         supabase.from('technicians').select('*').order('name', { ascending: true }),
-        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, extra_roles, can_approve_discounts, can_approve_invoices, is_procurement_manager, can_view_marketing'),
+        supabase.from('profiles').select('user_id, email, display_name, technician_id, is_admin, extra_roles, can_approve_discounts, can_approve_invoices, is_procurement_manager, can_view_marketing, ny_arbetsvy, tekniker_far_byta'),
         supabase.from('incident_recipients').select('user_id, incident_type')
       ]);
       if (techniciansRes.error) throw techniciansRes.error;
@@ -311,6 +351,8 @@ export const technicianManagementService = {
           can_approve_invoices: profile?.can_approve_invoices || false,
           is_procurement_manager: (profile as { is_procurement_manager?: boolean } | null)?.is_procurement_manager || false,
           can_view_marketing: (profile as { can_view_marketing?: boolean } | null)?.can_view_marketing || false,
+          ny_arbetsvy: (profile as { ny_arbetsvy?: boolean } | null)?.ny_arbetsvy || false,
+          tekniker_far_byta: (profile as { tekniker_far_byta?: boolean } | null)?.tekniker_far_byta || false,
           incident_recipient_types: profile?.user_id
             ? (recipientTypesByUserId.get(profile.user_id) || [])
             : []
@@ -585,7 +627,7 @@ export const technicianManagementService = {
 
   async getTechnicianById(id: string): Promise<Technician> {
     try {
-      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, extra_roles, can_approve_discounts, can_approve_invoices, is_procurement_manager, can_view_marketing)`).eq('id', id).single();
+      const { data, error } = await supabase.from('technicians').select(`*, profiles!profiles_technician_id_fkey(user_id, is_active, display_name, is_admin, extra_roles, can_approve_discounts, can_approve_invoices, is_procurement_manager, can_view_marketing, ny_arbetsvy, tekniker_far_byta)`).eq('id', id).single();
       if (error) throw error;
 
       // FK-join hittar profiler direkt (alla roller har nu technician_id)
@@ -611,6 +653,8 @@ export const technicianManagementService = {
         can_approve_invoices: profile?.can_approve_invoices || false,
         is_procurement_manager: (profile as { is_procurement_manager?: boolean } | null)?.is_procurement_manager || false,
         can_view_marketing: (profile as { can_view_marketing?: boolean } | null)?.can_view_marketing || false,
+        ny_arbetsvy: (profile as { ny_arbetsvy?: boolean } | null)?.ny_arbetsvy || false,
+        tekniker_far_byta: (profile as { tekniker_far_byta?: boolean } | null)?.tekniker_far_byta || false,
         incident_recipient_types: incidentRecipientTypes
       };
     } catch (error: any) {

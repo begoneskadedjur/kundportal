@@ -1,7 +1,7 @@
 // src/components/coordinator/RonderingCaseModal.tsx
 // Modal för "Rondering Trafikkontoret" — egenkontrollprogram med stationsavbockning
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../contexts/AuthContext'
@@ -46,6 +46,14 @@ import { CaseBillingService } from '../../services/caseBillingService'
 import { ContractBillingService } from '../../services/contractBillingService'
 import type { TechnicianShare } from '../../types/provision'
 import type { CaseBillingSummary } from '../../types/caseBilling'
+// Nya arbetsvyn (stegflödet). Allt nedan används bara när useNyArbetsvy().aktiv är true.
+import { useNyArbetsvy } from '../../hooks/useNyArbetsvy'
+import { StegRad, StegKnappar } from '../technician/ny/steg/StegFlode'
+import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../technician/ny/steg/ArendeVerktygArk'
+import { KlartSteg } from '../technician/ny/steg/KlartSteg'
+import { useStegForArende, grannSteg, type StegId } from '../technician/ny/steg/stegKonfig'
+import { HjalpText } from '../technician/ny/hjalp/HjalpText'
+import { kontrolleraAvslut, type AvslutsHinder } from '../../services/arendeAvslutService'
 
 registerLocale('sv', sv)
 
@@ -480,12 +488,40 @@ export default function RonderingCaseModal({
     totalReports, hasRecentReport, currentReport, getTimeSinceReport
   } = useModernWorkReportGeneration(reportData)
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NYA ARBETSVYN: stegflödet. Gäller bara när useNyArbetsvy().aktiv är true
+  // (profiles.ny_arbetsvy och teknikervyn). Annars används inget av detta och
+  // modalen ser ut och beter sig som tidigare. Stegen visar samma sektioner
+  // (samma JSX, samma handlers, samma handleSubmit); inget sparas på något annat sätt.
+  // ═══════════════════════════════════════════════════════════════════════════
+  const { aktiv: nyArbetsvy } = useNyArbetsvy()
+  // 'steg' = stegflödet, 'flikar' = den vanliga långa vyn (Alla uppgifter)
+  const [visning, setVisning] = useState<'steg' | 'flikar'>('steg')
+  const stegLage = nyArbetsvy && visning === 'steg'
+  const [aktivtSteg, setAktivtSteg] = useState<StegId>('framme')
+  const [hinderSteg, setHinderSteg] = useState<StegId[]>([])
+  const [visaVerktyg, setVisaVerktyg] = useState(false)
+  const [stegUpptaget, setStegUpptaget] = useState(false)
+  // Avvikelsekartan monteras först när den syns (Google Maps i en dold ruta får fel zoom), sedan hålls den monterad
+  const [kartaVisad, setKartaVisad] = useState(false)
+  const innehallRef = useRef<HTMLDivElement>(null)
+  // Nya arbetsvyn: sparningar mellan stegen meddelas föräldern först när modalen stängs,
+  // annars stänger föräldern modalen (OppnaArende) eller läser in ärendet på nytt mitt i flödet
+  const sparatIPassetRef = useRef(false)
+  const stegLista = useStegForArende('rondering')
+
   const handleClose = useCallback(() => {
     if (hasPendingImageChanges && imageGalleryRef.current) {
       imageGalleryRef.current.commitChanges().catch(err => console.error('Kunde inte spara bilder vid stängning:', err))
     }
+    // Bara nya arbetsvyn sätter flaggan (se handleSubmit)
+    if (sparatIPassetRef.current) {
+      sparatIPassetRef.current = false
+      // Samma anrop som handleSubmit gör i gamla läget (ärendet skickas med, föräldrarna läser det)
+      ;(onSuccess as ((arende?: unknown) => void) | undefined)?.(caseData)
+    }
     onClose()
-  }, [onClose, hasPendingImageChanges])
+  }, [onClose, hasPendingImageChanges, onSuccess, caseData])
 
   // Ladda kunddata, tekniker och stationer
   useEffect(() => {
@@ -737,7 +773,9 @@ export default function RonderingCaseModal({
       setTimeout(() => setShowSaveSuccess(false), 2000)
       sparatOkRef.current = true
       markeraSparat(formData)
-      onSuccess?.(caseData)
+      // Nya arbetsvyn: modalen stannar öppen mellan stegen, föräldern får veta det när modalen stängs
+      if (nyArbetsvy) sparatIPassetRef.current = true
+      else onSuccess?.(caseData)
     } catch (e: any) {
       toast.error(e.message || 'Kunde inte spara')
     } finally {
@@ -887,6 +925,320 @@ export default function RonderingCaseModal({
     </div>
   )
 
+  // Sparar ärendet och väntande bildändringar. Används av specialrapporterna och
+  // nya arbetsvyns steg. true = allt sparat.
+  const sparaArendeOchBilder = async (): Promise<boolean> => {
+    await handleSubmit()
+    if (!sparatOkRef.current) return false
+    if (imageGalleryRef.current?.hasPendingChanges()) {
+      const bilder = await imageGalleryRef.current.commitChanges()
+      if (!bilder.success) {
+        toast.error('Ärendet sparades men några bildändringar kunde inte sparas')
+        return false
+      }
+    }
+    return true
+  }
+
+  // ═══ Nya arbetsvyn: delarna som bara renderas när nyArbetsvy är true ═══
+
+  // Startsteg: avslutat ärende öppnas i Klart, annars Framme
+  useEffect(() => {
+    if (!isOpen || !nyArbetsvy || !caseData?.id) return
+    setVisning('steg')
+    setVisaVerktyg(false)
+    setHinderSteg([])
+    setKartaVisad(false)
+    sparatIPassetRef.current = false
+    setAktivtSteg(caseData.status === 'Avslutat' ? 'klart' : 'framme')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, nyArbetsvy, caseData?.id])
+
+  // Hela ärendet i steget Klart: status Avslutat och sedan den vanliga
+  // handleSubmit (som själv kör rabatt- och kundprisspärrarna, ad-hoc-faktureringen
+  // och provisionen). handleSubmit läser formData, därför körs den i en effekt
+  // efter att statusen har slagit igenom i formuläret.
+  const [stangBegard, setStangBegard] = useState(false)
+  const stangSvarRef = useRef<((ok: boolean) => void) | null>(null)
+  const statusForeStangRef = useRef('')
+  const stangHelaArendet = () => new Promise<boolean>(resolve => {
+    stangSvarRef.current = resolve
+    statusForeStangRef.current = formData.status
+    setFormData(prev => ({ ...prev, status: 'Avslutat' }))
+    setStangBegard(true)
+  })
+  useEffect(() => {
+    if (!stangBegard || formData.status !== 'Avslutat') return
+    setStangBegard(false)
+    ;(async () => {
+      await handleSubmit()
+      const ok = sparatOkRef.current
+      // Stoppades sparandet (spärrarna): formuläret får tillbaka statusen det hade
+      if (!ok && originalStatusRef.current !== 'Avslutat') {
+        setFormData(prev => ({ ...prev, status: statusForeStangRef.current }))
+      }
+      stangSvarRef.current?.(ok)
+      stangSvarRef.current = null
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stangBegard, formData.status])
+
+  // Sektionernas synlighet. Gamla läget: noden returneras orörd (ingen wrapper).
+  // Nya läget: samma nod i en wrapper som visas i sina steg och alltid i Alla uppgifter.
+  const iSteg = (steg: StegId[], node: ReactNode) => {
+    if (!nyArbetsvy) return node
+    const klass = stegLage ? (steg.includes(aktivtSteg) ? 'empty:hidden' : 'hidden') : 'empty:hidden'
+    return <div className={klass}>{node}</div>
+  }
+  // Stegens egna block (rubrik, hjälptext, knappar): bara i stegflödet
+  const stegBlock = (steg: StegId) => (stegLage && aktivtSteg === steg ? 'flex flex-col gap-3' : 'hidden')
+  const kartaMonterad = !nyArbetsvy || kartaVisad
+
+  const rullaUpp = () => {
+    setTimeout(() => innehallRef.current?.parentElement?.scrollTo({ top: 0 }), 0)
+  }
+  const gaTillSteg = (steg: StegId) => {
+    setVisning('steg')
+    setAktivtSteg(steg)
+    if (steg === 'arbete') setKartaVisad(true)
+    rullaUpp()
+  }
+  const visaAllaUppgifter = () => {
+    setVisning('flikar')
+    setKartaVisad(true)
+    rullaUpp()
+  }
+
+  const { foregaende: foregaendeSteg, nasta: nastaSteg } = grannSteg(stegLista, aktivtSteg)
+
+  // Vidare: sparar med den vanliga handleSubmit (och bilderna) om något är ändrat och går till nästa steg
+  const gaVidare = async () => {
+    if (!nastaSteg || stegUpptaget) return
+    setStegUpptaget(true)
+    try {
+      if (harOsparat() || hasPendingImageChanges) {
+        const ok = await sparaArendeOchBilder()
+        if (!ok) return
+      }
+      gaTillSteg(nastaSteg.id)
+    } finally {
+      setStegUpptaget(false)
+    }
+  }
+
+  // Hinder från avslutskontrollen. Tiden ändras i Framme (där datumet står i den här modalen).
+  const gaTillHinder = (steg: StegId, hinder?: AvslutsHinder) => {
+    if (hinder?.id === 'sluttid-fore-start') {
+      gaTillSteg('framme')
+      return
+    }
+    if (!stegLista.some(s => s.id === steg)) {
+      visaAllaUppgifter()
+      return
+    }
+    gaTillSteg(steg)
+  }
+
+  const kontrollAvslut = () => kontrolleraAvslut({
+    caseId: caseData.id,
+    kalla: 'cases',
+    serviceType: 'rondering_trafikkontoret',
+  })
+
+  const provisionText = (() => {
+    if (!commissionEligible) return 'Ärendet är inte markerat som provisionsgrundande, ingen provision registreras.'
+    if (existingCommissionPosts > 0) return 'Provisionen är redan registrerad och ändras inte.'
+    if (commissionShares.length === 0) return 'Provision är vald men ingen tekniker har en andel. Fördela den under Pris och fakturering, annars registreras ingen provision.'
+    return `Provisionen registreras på ${commissionShares.map(s => `${s.technician_name} ${s.share_percentage} %`).join(', ')}.`
+  })()
+
+  const vadHanderVidStang = [
+    'Ärendet får status Avslutat och dagens datum som avslutsdatum.',
+    'Stationerna du har bockat av är redan sparade och följer med som de är.',
+    'Raderna under Pris och fakturering skickas till fakturering på kunden. Utan rader skapas ingen faktura.',
+    provisionText,
+    'Rapporten skickas inte av sig själv. Skicka den i steget Rapport.',
+  ]
+
+  const ronderingAvslutad = originalStatusRef.current === 'Avslutat'
+  const kontaktTelefon = formData.contact_phone || customerData?.contact_phone || ''
+  const kontaktNamn = formData.contact_person || customerData?.contact_person || ''
+  const kundAdress: string = customerData?.contact_address || ''
+
+  const ikonKnapp = 'w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]'
+  const stegKnappKlass = 'min-h-[48px] px-4 rounded-xl border border-slate-600 bg-slate-800/60 text-white text-[15px] font-semibold flex items-center justify-center gap-2 hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors'
+
+  const nyttHuvud = (
+    <div className="flex items-center gap-0.5">
+      <button
+        type="button"
+        onClick={() => (stegLage ? visaAllaUppgifter() : gaTillSteg(aktivtSteg))}
+        aria-label={stegLage ? 'Alla uppgifter i ärendet, den vanliga vyn' : 'Tillbaka till stegen'}
+        title={stegLage ? 'Alla uppgifter' : 'Tillbaka till stegen'}
+        className={ikonKnapp}
+      >
+        <SvgIcon name={stegLage ? 'falt.uppgifter' : 'guide.steg'} size={24} />
+      </button>
+      <button
+        type="button"
+        onClick={() => setVisaVerktyg(true)}
+        aria-label="Ärendets verktyg"
+        aria-haspopup="dialog"
+        aria-expanded={visaVerktyg}
+        title="Ärendets verktyg"
+        className={ikonKnapp}
+      >
+        <SvgIcon name="falt.verktyg" size={24} />
+      </button>
+      {stegLage && (
+        <button type="button" onClick={handleClose} aria-label="Stäng ärendet" title="Stäng" className={ikonKnapp}>
+          <SvgIcon name="allman.stang" size={24} />
+        </button>
+      )}
+    </div>
+  )
+
+  const stegFooter = (
+    <StegKnappar
+      steg={stegLista}
+      aktivt={aktivtSteg}
+      onTillbaka={foregaendeSteg ? () => gaTillSteg(foregaendeSteg.id) : undefined}
+      onNasta={nastaSteg ? gaVidare : undefined}
+      upptagen={stegUpptaget || loading}
+    />
+  )
+
+  // Ärendets verktyg: samma val och handlers som ikonerna i huvudet och dialogen Vad vill du göra?
+  const verktygGrupper: ArendeVerktygGrupp[] = !nyArbetsvy ? [] : [
+    {
+      id: 'rapporter',
+      rubrik: 'Rapporter',
+      val: [
+        {
+          id: 'ladda-ned',
+          ikon: 'rapport.ladda',
+          text: 'Ladda ned rapporten',
+          beskrivning: 'Arbetsrapporten som PDF. Finns en rapport redan frågar appen om en ny version.',
+          disabled: !canGenerateReport || isGenerating,
+          onClick: () => { void downloadReport() },
+        },
+        {
+          id: 'skicka-tekniker',
+          ikon: 'rapport.skicka',
+          text: 'Skicka till ansvarig tekniker',
+          beskrivning: formData.primary_technician_name ? `Skicka till ${formData.primary_technician_name}` : 'Skicka till ansvarig tekniker',
+          disabled: !canGenerateReport || isGenerating,
+          onClick: () => { void sendToTechnician() },
+        },
+        {
+          id: 'skicka-kontakt',
+          ikon: 'kontakt.mejl',
+          text: 'Skicka till kontaktperson',
+          beskrivning: formData.contact_person ? `Skicka till ${formData.contact_person}` : 'Skicka till kontaktperson',
+          villkorText: formData.contact_email ? undefined : 'Kontaktpersonen saknar e-post',
+          disabled: !canGenerateReport || isGenerating,
+          onClick: () => { void sendToContact() },
+        },
+        ...(caseData?.id ? [{
+          id: 'specialrapport',
+          ikon: 'falt.specialrapport' as const,
+          text: 'Specialrapporter',
+          beskrivning: 'Skapa, öppna och ladda ned specialrapporter. De finns i steget Rapport.',
+          onClick: () => gaTillSteg('rapport'),
+        }] : []),
+      ],
+      not: hasRecentReport && currentReport && getTimeSinceReport
+        ? `Rapport framtagen ${getTimeSinceReport(currentReport)}, version ${currentReport.version} av ${totalReports}${currentReport.sent_to_customer ? ', skickad till kund' : ''}${currentReport.sent_to_technician ? ', skickad till tekniker' : ''}.`
+        : undefined,
+    },
+    {
+      id: 'besok',
+      rubrik: 'Besök',
+      val: [
+        {
+          id: 'delbesok',
+          ikon: 'arende.rondering',
+          text: 'Lägg till delbesök',
+          beskrivning: 'Boka in en tekniker på ett eget datum. Stationerna loggas mot det här ärendet.',
+          onClick: () => setShowAddSubVisit(true),
+        },
+        {
+          id: 'besokshistorik',
+          ikon: 'allman.historik',
+          text: 'Besökshistorik',
+          beskrivning: 'Se alla genomförda besök och loggade åtgärder.',
+          onClick: () => setShowVisitHistoryPanel(true),
+        },
+      ],
+    },
+    {
+      id: 'nytt-arende',
+      rubrik: 'Nytt ärende från det här',
+      val: [
+        {
+          id: 'kopiera',
+          ikon: 'allman.plus',
+          text: 'Kopiera ärende',
+          beskrivning: 'Nytt ärende hos samma kund. Kontakt och tekniker följer med.',
+          onClick: () => setShowFollowUpDialog(true),
+        },
+        {
+          id: 'duplicera',
+          ikon: 'rapport.kopia',
+          text: 'Duplicera ärende',
+          beskrivning: 'Skapa en kopia och välj vad som följer med.',
+          onClick: () => setShowDuplicateDialog(true),
+        },
+      ],
+    },
+    {
+      id: 'kontakt',
+      rubrik: 'Kontakt',
+      val: [
+        {
+          id: 'kommunikation',
+          ikon: 'kontakt.mote',
+          text: 'Kommunikation',
+          beskrivning: 'Intern chatt om ärendet med kontoret och andra tekniker.',
+          onClick: () => setShowCommunicationPanel(true),
+        },
+      ],
+    },
+    {
+      id: 'arendet',
+      rubrik: 'Ärendet',
+      val: [
+        {
+          id: 'alla-uppgifter',
+          ikon: 'falt.uppgifter',
+          text: 'Alla uppgifter',
+          beskrivning: 'Den vanliga vyn med alla delar av ärendet. Allt som sparas där syns i stegen.',
+          onClick: visaAllaUppgifter,
+        },
+        {
+          id: 'status',
+          ikon: 'arende.status',
+          text: 'Ändra status',
+          beskrivning: `Nu ${formData.status}. Statusen väljer du under Ärendeinformation i Alla uppgifter. Spara efter bytet.`,
+          onClick: visaAllaUppgifter,
+        },
+      ],
+    },
+    {
+      id: 'ta-bort',
+      rubrik: 'Ta bort',
+      // Samma villkor som Radera i sidfoten: dold för tekniker
+      val: profile?.role !== 'technician' ? [{
+        id: 'radera',
+        ikon: 'allman.radera',
+        text: 'Radera ärende',
+        beskrivning: 'Frågar en gång till innan ärendet tas bort.',
+        fara: true,
+        onClick: () => setShowDeleteDialog(true),
+      }] : [],
+    },
+  ]
+
   const modalFooter = (
     <div className="flex items-center justify-between w-full">
       {profile?.role !== 'technician' && (
@@ -920,11 +1272,12 @@ export default function RonderingCaseModal({
         onClose={handleClose}
         title={modalTitle}
         size="xl"
-        footer={modalFooter}
+        footer={stegLage ? stegFooter : modalFooter}
         preventClose={true}
         allowBackdropClose={!loading}
         usePortal={true}
-        headerActions={
+        mobilHelskarm={nyArbetsvy}
+        headerActions={nyArbetsvy ? nyttHuvud : (
           <div className="flex items-center gap-1">
             <button
               type="button"
@@ -951,10 +1304,18 @@ export default function RonderingCaseModal({
               <MessageSquare className="w-5 h-5" />
             </button>
           </div>
-        }
+        )}
       >
-        <div className="p-4 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-          {/* Header-actionrad med rapport */}
+        {/* Nya arbetsvyn: stegraden överst */}
+        {stegLage && (
+          <StegRad steg={stegLista} aktivt={aktivtSteg} onValj={gaTillSteg} hinder={hinderSteg} />
+        )}
+        <div
+          ref={nyArbetsvy ? innehallRef : undefined}
+          className={stegLage ? 'p-4' : 'p-4 max-h-[80vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800'}
+        >
+          {/* Header-actionrad med rapport. Nya arbetsvyn: bara i Alla uppgifter, stegen har egna knappar i Rapport */}
+          {iSteg([], (
           <div className="mb-4 -mt-4 -mx-4 px-4 py-3 bg-slate-800/30 border-b border-slate-700 flex items-center justify-end gap-2">
             <WorkReportDropdown
               onDownload={downloadReport}
@@ -969,10 +1330,67 @@ export default function RonderingCaseModal({
               getTimeSinceReport={getTimeSinceReport}
             />
           </div>
+          ))}
 
           <div className="space-y-3">
+            {/* ═══ Nya arbetsvyn: stegens rubriker och hjälptexter (bara stegflödet) ═══ */}
+            {nyArbetsvy && (
+              <>
+                <div className={stegBlock('framme')}>
+                  <HjalpText id="steg-framme-rondering" rubrik="Är du framme i regionen?">
+                    Kontrollera kontakten och den planerade tiden. Gå sedan vidare till stationerna.
+                  </HjalpText>
+                  {(kundAdress || kontaktTelefon) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {kundAdress && (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(kundAdress)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={stegKnappKlass}
+                        >
+                          <SvgIcon name="falt.navigera" size={20} />
+                          <span className="truncate">Öppna i kartor</span>
+                        </a>
+                      )}
+                      {kontaktTelefon && (
+                        <a href={`tel:${kontaktTelefon.replace(/\s/g, '')}`} className={stegKnappKlass}>
+                          <SvgIcon name="kontakt.telefon" size={20} />
+                          <span className="truncate">Ring {kontaktNamn || kontaktTelefon}</span>
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className={stegBlock('arbete')}>
+                  <HjalpText id="steg-arbete-rondering" rubrik="Bocka av stationerna">
+                    Bocka av varje station du har kontrollerat och välj hur mycket bete som gått åt. Ändra status till Åtgärd krävs eller Saknas vid behov. Allt sparas direkt. Avvikelser lägger du på kartan.
+                  </HjalpText>
+                </div>
+
+                <div className={stegBlock('foton')}>
+                  <HjalpText id="steg-foton-rondering" rubrik="Foton">
+                    Fotografera det som behöver dokumenteras. Bilderna sparas när du går vidare eller stänger ärendet.
+                  </HjalpText>
+                </div>
+
+                <div className={stegBlock('rapport')}>
+                  <HjalpText id="steg-rapport-rondering" rubrik="Rapport">
+                    Skriv vad du gjorde och vad du såg. Rapporten skickas inte av sig själv, ladda ned den eller skicka den med knapparna längst ner i steget.
+                  </HjalpText>
+                </div>
+
+                <div className={stegBlock('pris')}>
+                  <HjalpText id="steg-pris-rondering" rubrik="Pris och fakturering">
+                    Lägg in tjänster och artiklar som gick åt. Raderna faktureras när ärendet stängs. Provisionen fördelar du längst ner.
+                  </HjalpText>
+                </div>
+              </>
+            )}
+
             {/* Kundinformation */}
-            {customerData && (
+            {iSteg(['framme'], customerData && (
               <div className="bg-gradient-to-r from-sky-900/20 to-blue-900/20 rounded-xl p-4 border border-sky-500/30">
                 <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-1.5">
                   <Building className="w-4 h-4 text-sky-400" />
@@ -1015,9 +1433,10 @@ export default function RonderingCaseModal({
                   </div>
                 )}
               </div>
-            )}
+            ))}
 
             {/* Ärendeinformation */}
+            {iSteg(['framme'], (
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl space-y-3">
               <h3 className="text-sm font-semibold flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-slate-400" />
@@ -1038,7 +1457,8 @@ export default function RonderingCaseModal({
 
               {/* Status */}
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                {/* Nya arbetsvyn: statusen byts i Alla uppgifter (Ärendets verktyg, Ändra status), stängs i steget Klart */}
+                <div className={stegLage ? 'hidden' : undefined}>
                   <label className="block text-xs font-medium text-slate-400 mb-1">Status</label>
                   <Select
                     value={formData.status}
@@ -1061,8 +1481,10 @@ export default function RonderingCaseModal({
                 </div>
               </div>
             </div>
+            ))}
 
             {/* Tekniker */}
+            {iSteg(['framme'], (
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs text-slate-400 mr-0.5">Tekniker</span>
@@ -1113,9 +1535,10 @@ export default function RonderingCaseModal({
                 })}
               </div>
             </div>
+            ))}
 
             {/* Delbesök — visas bara på originalärenden (ej på delbesök) */}
-            {!caseData?.parent_case_id && (
+            {iSteg(['arbete'], !caseData?.parent_case_id && (
               <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-sm font-semibold flex items-center gap-1.5">
@@ -1163,9 +1586,10 @@ export default function RonderingCaseModal({
                   </div>
                 )}
               </div>
-            )}
+            ))}
 
             {/* Stationslista */}
+            {iSteg(['arbete'], (
             <div ref={stationListRef} className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold flex items-center gap-1.5">
@@ -1287,9 +1711,10 @@ export default function RonderingCaseModal({
                 </div>
               )}
             </div>
+            ))}
 
             {/* Beteåtgång-dialog — visas när tekniker bockar i en ny station */}
-            {baitDialog && (
+            {iSteg(['arbete'], baitDialog && (
               <div className="p-3 bg-slate-800 border border-[#20c58f]/40 rounded-xl">
                 <p className="text-sm font-semibold text-white mb-1">
                   Bete uppätet till — station {baitDialog.station.serial_number}
@@ -1315,10 +1740,10 @@ export default function RonderingCaseModal({
                   Avbryt
                 </button>
               </div>
-            )}
+            ))}
 
-            {/* Avvikelsekarta */}
-            {caseData?.id && caseData?.customer_id && (
+            {/* Avvikelsekarta. Nya arbetsvyn: monteras första gången kartan syns */}
+            {iSteg(['arbete'], kartaMonterad && caseData?.id && caseData?.customer_id && (
               <RonderingMapSection
                 stations={stations}
                 stationLogs={stationLogs}
@@ -1334,9 +1759,10 @@ export default function RonderingCaseModal({
                   el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
                 }}
               />
-            )}
+            ))}
 
             {/* Arbetsrapport */}
+            {iSteg(['rapport'], (
             <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
               <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-slate-400" />
@@ -1350,33 +1776,23 @@ export default function RonderingCaseModal({
                 placeholder="Beskriv utfört arbete, avvikelser och observationer..."
               />
             </div>
+            ))}
 
             {/* Specialrapporter (3.56.0). Delbesök visar huvudärendets rapporter */}
-            {caseData?.id && (
+            {iSteg(['rapport'], caseData?.id && (
               <CaseSpecialReportsSection
                 caseId={caseData.parent_case_id ?? caseData.id}
                 caseType="contract"
                 caseNumber={caseData.parent_case_id ? null : formData.case_number}
                 osparat={{
                   finns: () => harOsparat() || hasPendingImageChanges,
-                  spara: async () => {
-                    await handleSubmit()
-                    if (!sparatOkRef.current) return false
-                    if (imageGalleryRef.current?.hasPendingChanges()) {
-                      const bilder = await imageGalleryRef.current.commitChanges()
-                      if (!bilder.success) {
-                        toast.error('Ärendet sparades men några bildändringar kunde inte sparas')
-                        return false
-                      }
-                    }
-                    return true
-                  },
+                  spara: sparaArendeOchBilder,
                 }}
               />
-            )}
+            ))}
 
             {/* Utförda tjänster/artiklar för fakturering */}
-            {caseData?.id && (
+            {iSteg(['pris'], caseData?.id && (
               <div className="bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden p-1">
                 <CaseServiceSelector
                   caseId={caseData.id}
@@ -1388,10 +1804,10 @@ export default function RonderingCaseModal({
                   onChange={handleBillingSummaryChange}
                 />
               </div>
-            )}
+            ))}
 
             {/* Provision */}
-            {caseData?.id && (
+            {iSteg(['pris'], caseData?.id && (
               <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
                 <CommissionSection
                   isEligible={commissionEligible}
@@ -1421,10 +1837,10 @@ export default function RonderingCaseModal({
                   subcontractorDeduction={billingSummary?.subcontractor_total || 0}
                 />
               </div>
-            )}
+            ))}
 
             {/* Bilder */}
-            {caseData?.id && (
+            {iSteg(['foton'], caseData?.id && (
               <div className="p-3 bg-slate-800/30 border border-slate-700 rounded-xl">
                 <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-slate-400" />
@@ -1439,10 +1855,86 @@ export default function RonderingCaseModal({
                   onPendingChanges={setHasPendingImageChanges}
                 />
               </div>
+            ))}
+
+            {/* ═══ Nya arbetsvyn: stegens egna delar längst ner i steget ═══ */}
+            {nyArbetsvy && (
+              <>
+                {/* Rapport: samma handlers som rapportmenyn (WorkReportDropdown) */}
+                <div className={stegBlock('rapport')}>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button type="button" onClick={() => { void downloadReport() }} disabled={!canGenerateReport || isGenerating} className={stegKnappKlass}>
+                      <SvgIcon name="rapport.ladda" size={20} />
+                      Ladda ned
+                    </button>
+                    <button type="button" onClick={() => { void sendToContact() }} disabled={!canGenerateReport || isGenerating} className={stegKnappKlass}>
+                      <SvgIcon name="kontakt.mejl" size={20} />
+                      <span className="truncate">Skicka till {formData.contact_person || 'kontaktperson'}</span>
+                    </button>
+                    <button type="button" onClick={() => { void sendToTechnician() }} disabled={!canGenerateReport || isGenerating} className={stegKnappKlass}>
+                      <SvgIcon name="rapport.skicka" size={20} />
+                      <span className="truncate">Skicka till {formData.primary_technician_name || 'ansvarig tekniker'}</span>
+                    </button>
+                  </div>
+                  {!formData.contact_email && (
+                    <p className="text-sm text-amber-300">Ärendet saknar kontaktpersonens e-post, så rapporten kan inte skickas till kontaktpersonen. Be kontoret lägga in den.</p>
+                  )}
+                  {hasRecentReport && currentReport && (
+                    <p className="text-sm text-slate-400">
+                      Rapport framtagen {getTimeSinceReport(currentReport)}, version {currentReport.version} av {totalReports}
+                      {currentReport.sent_to_customer ? ', skickad till kund' : ''}
+                      {currentReport.sent_to_technician ? ', skickad till tekniker' : ''}.
+                    </p>
+                  )}
+                </div>
+
+                {/* Klart. Rondering har inget återbesök och ingen delfakturering: Bara besöket ersätts av Lägg till delbesök */}
+                {caseData?.id && (
+                  <div className={stegBlock('klart')}>
+                    <KlartSteg
+                      aktiv={stegLage && aktivtSteg === 'klart'}
+                      steg={stegLista}
+                      kontroll={kontrollAvslut}
+                      onGaTillSteg={gaTillHinder}
+                      gaTillText={h => (h.id === 'sluttid-fore-start' ? 'Ändra tiden i steget Framme' : undefined)}
+                      onStangHelaArendet={stangHelaArendet}
+                      baraBesoket={!isSubVisit ? {
+                        rubrik: 'Lägg till delbesök',
+                        text: 'Hinner du inte alla stationer? Ärendet står kvar öppet tills hela ronderingen är gjord.',
+                        knappText: 'Lägg till delbesök',
+                        ikon: 'allman.plus',
+                        vadHander: [
+                          'Delbesöket får ett eget datum och en egen tekniker.',
+                          'Stationerna loggas mot det här ärendet.',
+                          'Rondering har inget återbesök och ingen delfakturering.',
+                        ],
+                        onClick: () => setShowAddSubVisit(true),
+                      } : undefined}
+                      onSparaUtanAttStanga={sparaArendeOchBilder}
+                      harOsparat={() => harOsparat() || hasPendingImageChanges}
+                      status={formData.status}
+                      arAvslutat={ronderingAvslutad}
+                      avslutsdatum={caseData?.completed_date ?? null}
+                      vadHander={vadHanderVidStang}
+                      onHinderChange={setHinderSteg}
+                    />
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
       </Modal>
+
+      {/* Nya arbetsvyn: Ärendets verktyg */}
+      {nyArbetsvy && (
+        <ArendeVerktygArk
+          oppen={visaVerktyg}
+          onStang={() => setVisaVerktyg(false)}
+          underrubrik={[isSubVisit ? `${parentCaseNumber ?? ''} Delbesök`.trim() : formData.case_number, customerData?.company_name].filter(Boolean).join(', ')}
+          grupper={verktygGrupper}
+        />
+      )}
 
       {/* Radera-dialog — renderas via portal så den hamnar ovanpå den portal-baserade
           föräldramodalen (annars göms dialogen bakom och bara en svart backdrop syns).

@@ -34,6 +34,12 @@ interface FloorPlanViewerProps {
   showProductIcons?: boolean
   /** Kundvyer: stationstypens ikon i markören, numret i en bricka under */
   showTypeIcons?: boolean
+  /**
+   * Inbäddade vyer (t.ex. en flik i en modal som göms med hidden): räkna om
+   * bildens täckmått när behållarens storlek ändras, så planritningen inte
+   * fastnar i 0 × 0 efter att ha laddats dold. Av som standard.
+   */
+  recalcOnResize?: boolean
 }
 
 // Hämta typkonfiguration - prioriterar dynamisk data
@@ -77,7 +83,8 @@ export function FloorPlanViewer({
   relocatingStationId,
   relocatingStationName,
   showProductIcons = false,
-  showTypeIcons = false
+  showTypeIcons = false,
+  recalcOnResize = false
 }: FloorPlanViewerProps) {
   const transformRef = useRef<ReactZoomPanPinchRef>(null)
   const imageRef = useRef<HTMLImageElement>(null)
@@ -258,6 +265,28 @@ export function FloorPlanViewer({
   useEffect(() => {
     setPendingPosition(null)
   }, [placementMode])
+
+  // recalcOnResize: räkna om täckmåtten när behållaren byter storlek
+  // (t.ex. dold flik som blir synlig) och nollställ zoomen
+  useEffect(() => {
+    if (!recalcOnResize) return
+    const el = containerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let last = { w: el.clientWidth, h: el.clientHeight }
+    const observer = new ResizeObserver(() => {
+      const w = el.clientWidth
+      const h = el.clientHeight
+      if (w === last.w && h === last.h) return
+      last = { w, h }
+      const img = imageRef.current
+      if (!img || w === 0 || h === 0 || !img.naturalWidth || !img.naturalHeight) return
+      const coverScale = Math.max(w / img.naturalWidth, h / img.naturalHeight)
+      setCoverDimensions({ width: img.naturalWidth * coverScale, height: img.naturalHeight * coverScale })
+      transformRef.current?.resetTransform(0)
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [recalcOnResize])
 
   // Återställ zoom till 1x och centrera
   const handleResetZoom = useCallback(() => {

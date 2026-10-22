@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react' // useEffect lades till för att hantera klick utanför
 import {
   User, Mail, Phone, MapPin, MoreVertical, Edit,
-  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle, BadgeCheck, Receipt, Gavel, Megaphone
+  Trash2, Power, Key, UserCheck, Send, Clock, UserX, Shield, Bell, AlertTriangle, BadgeCheck, Receipt, Gavel, Megaphone, LayoutDashboard
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import Button from '../../../ui/Button'
@@ -77,6 +77,10 @@ export default function TechnicianCard({
   const [savingProcurementManager, setSavingProcurementManager] = useState(false)
   const [isMarketingViewer, setIsMarketingViewer] = useState(!!technician.can_view_marketing)
   const [savingMarketingViewer, setSavingMarketingViewer] = useState(false)
+  const [nyArbetsvy, setNyArbetsvy] = useState(!!technician.ny_arbetsvy)
+  const [savingNyArbetsvy, setSavingNyArbetsvy] = useState(false)
+  const [farByta, setFarByta] = useState(!!technician.tekniker_far_byta)
+  const [savingFarByta, setSavingFarByta] = useState(false)
 
   const handleSendNewPassword = async () => {
     if (!technician.user_id || sendingPassword) return
@@ -118,6 +122,53 @@ export default function TechnicianCard({
   useEffect(() => {
     setIsMarketingViewer(!!technician.can_view_marketing)
   }, [technician.can_view_marketing])
+
+  useEffect(() => {
+    setNyArbetsvy(!!technician.ny_arbetsvy)
+  }, [technician.ny_arbetsvy])
+
+  useEffect(() => {
+    setFarByta(!!technician.tekniker_far_byta)
+  }, [technician.tekniker_far_byta])
+
+  // Ny arbetsvy och Får byta själv: bara administratör (spärras även i databasen)
+  const toggleNyArbetsvy = async () => {
+    if (!technician.user_id || savingNyArbetsvy || !canEditMarketing) return
+    const previous = nyArbetsvy
+    const next = !previous
+
+    setNyArbetsvy(next)
+    setSavingNyArbetsvy(true)
+    try {
+      await technicianManagementService.updateNyArbetsvy(technician.id, next)
+      toast.success(next
+        ? `${technician.name} har nu den nya arbetsvyn`
+        : `${technician.name} har inte längre den nya arbetsvyn`)
+    } catch {
+      setNyArbetsvy(previous)
+    } finally {
+      setSavingNyArbetsvy(false)
+    }
+  }
+
+  const toggleFarByta = async () => {
+    if (!technician.user_id || savingFarByta || !canEditMarketing) return
+    const previous = farByta
+    const next = !previous
+
+    setFarByta(next)
+    setSavingFarByta(true)
+    try {
+      await technicianManagementService.updateTeknikerFarByta(technician.id, next)
+      toast.success(next
+        ? `${technician.name} kan nu byta vy själv`
+        : `${technician.name} kan inte längre byta vy själv`)
+    } catch {
+      setFarByta(previous)
+    } finally {
+      setSavingFarByta(false)
+    }
+  }
 
   const toggleMarketingViewer = async () => {
     if (!technician.user_id || savingMarketingViewer || !canEditMarketing) return
@@ -200,6 +251,7 @@ export default function TechnicianCard({
   }
 
   const primaryPortal = PRIMARY_ROLE_TO_PORTAL[technician.role] || null
+  const hasTechnicianView = primaryPortal === 'technician' || extraRoles.has('technician')
 
   const toggleExtraRole = async (role: ExtraPortalRole) => {
     if (!technician.user_id || savingRoles) return
@@ -707,6 +759,86 @@ export default function TechnicianCard({
         ) : (
           <p className="text-xs text-slate-500">
             Kräver aktiverad inloggning - bara personer med konto kan vara marknadsansvariga
+          </p>
+        )}
+      </div>
+
+      {/* Ny arbetsvy - bara för personer med Tekniker-vyn; gäller bara i teknikervyn */}
+      <div className="mt-4 pt-3 border-t border-slate-700">
+        <div className="flex items-center gap-1.5 mb-2">
+          <LayoutDashboard className="w-3.5 h-3.5 text-[#20c58f]" />
+          <span className="text-xs font-medium text-slate-400">Ny arbetsvy</span>
+        </div>
+        {technician.has_login && technician.user_id && (hasTechnicianView || nyArbetsvy || farByta) ? (
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-slate-500">
+                Ny startsida, ärendelista och stegen i ärendet. Samma data sparas, bara visat på ett nytt sätt.
+                {!canEditMarketing && ' (bara administratör kan ändra)'}
+              </p>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={nyArbetsvy}
+                aria-label="Ny arbetsvy"
+                onClick={toggleNyArbetsvy}
+                disabled={savingNyArbetsvy || !canEditMarketing}
+                title={!canEditMarketing
+                  ? 'Bara administratör kan ändra Ny arbetsvy'
+                  : nyArbetsvy
+                    ? 'Klicka för att stänga av den nya arbetsvyn'
+                    : 'Klicka för att slå på den nya arbetsvyn'}
+                className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${
+                  nyArbetsvy
+                    ? 'bg-[#20c58f] border-[#20c58f]'
+                    : 'bg-slate-700 border-slate-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-[#fff] transition-transform ${
+                    nyArbetsvy ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                  }`}
+                />
+              </button>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-medium text-slate-400">Får byta själv</p>
+                <p className="text-xs text-slate-500">
+                  Personen kan slå av och på den nya vyn under Mitt konto.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={farByta}
+                aria-label="Får byta själv"
+                onClick={toggleFarByta}
+                disabled={savingFarByta || !canEditMarketing}
+                title={!canEditMarketing
+                  ? 'Bara administratör kan ändra Får byta själv'
+                  : farByta
+                    ? 'Klicka för att ta bort möjligheten att byta själv'
+                    : 'Klicka för att låta personen byta vy själv'}
+                className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:ring-offset-2 focus:ring-offset-slate-900 disabled:opacity-50 ${
+                  farByta
+                    ? 'bg-[#20c58f] border-[#20c58f]'
+                    : 'bg-slate-700 border-slate-600'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 transform rounded-full bg-[#fff] transition-transform ${
+                    farByta ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-slate-500">
+            {technician.has_login && technician.user_id
+              ? 'Kräver Tekniker-vyn'
+              : 'Kräver aktiverad inloggning'}
           </p>
         )}
       </div>
