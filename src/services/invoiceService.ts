@@ -490,10 +490,14 @@ export class InvoiceService {
           await CaseBillingService.markZeroAmountRowsHandled(caseId, caseType)
           return null
         }
-        throw new Error(
-          `Fakturan för ärendet är redan skickad/låst (status: ${existing.status}) och kan inte uppdateras. ` +
-          `Makulera fakturan först om den ska göras om.`
-        )
+        // Rader med belopp som tillkommit efter att fakturan låsts (t.ex. ett
+        // återbesök bokat på ett redan avslutat och fakturerat ärende,
+        // BE-0009026 2026-10-22): de får en egen faktura med bara de
+        // ofakturerade raderna. Den låsta fakturan rörs inte. Förut kastades
+        // ett fel och raderna gick inte att fakturera alls.
+        // Typen 'partial' gör att den inte ersätts av nästa sparning.
+        await this.assertNoAlreadyInvoicedItems(caseId, caseType)
+        return this.createInvoiceFromCase(caseId, caseType, customerInfo, 'partial')
       }
 
       // Radera befintlig — invoice_items cascade:ar bort via FK

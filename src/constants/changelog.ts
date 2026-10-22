@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.80.4',
+    date: '2026-10-22',
+    title: 'Nya rader på ett redan fakturerat ärende får en egen faktura',
+    items: [
+      { kind: 'buggfix', text: 'Bokades ett återbesök på ett ärende som redan var avslutat och fakturerat gick de nya raderna inte att fakturera: avslutet stoppades av att den första fakturan var låst. Nu får de ofakturerade raderna en egen faktura när ärendet avslutas igen. Den första fakturan rörs inte.' },
+    ],
+  },
+  {
     version: '3.80.3',
     date: '2026-10-22',
     title: 'Förfallna fakturor visar rätt steg',
