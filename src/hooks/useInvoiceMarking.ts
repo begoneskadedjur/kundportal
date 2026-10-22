@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { InvoiceWithItems } from '../types/invoice'
 import type { CaseType } from '../types/communication'
+import { caseMarkingOnInvoice } from '../shared/caseMarking'
 
 export interface MarkingField {
   key: 'work_order_number' | 'work_object' | 'room_number'
@@ -22,6 +23,8 @@ export interface InvoiceMarkingInfo {
   missing: string[]
   /** Strängen som blir Er referens i Fortnox (ärendets märkning vinner), null = ingen */
   effectiveReference: string | null
+  /** Ert ordernummer i Fortnox (arbetsorder, objekt, rum), null = inget */
+  orderNumber: string | null
 }
 
 const FIELD_LABELS: Record<MarkingField['key'], string> = {
@@ -99,6 +102,7 @@ export function useInvoiceMarking(
         // märkning vinner över fakturans snapshot
         const effectiveReference = cs.invoice_marking?.trim() || invoiceMarking || null
         setInfo({
+          orderNumber: caseMarkingOnInvoice(cs).orderNumber,
           fields,
           missing: fields.filter(f => !f.value?.trim()).map(f => f.label),
           effectiveReference,

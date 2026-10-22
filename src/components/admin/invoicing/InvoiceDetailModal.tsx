@@ -64,6 +64,7 @@ import CaseModalSection from '../../shared/CaseModalSection'
 import InvoiceStatusStepper from '../../shared/InvoiceStatusStepper'
 import InvoicePulseRow from './InvoicePulseRow'
 import InvoiceDeliveryPanel from './InvoiceDeliveryPanel'
+import { caseMarkingOnInvoice } from '../../../shared/caseMarking'
 import { InvoiceDeliveryError, InvoiceDeliveryService } from '../../../services/invoiceDeliveryService'
 import { toFortnoxDeliveryType, isInvoiceDeliveryMethod, type DeliveryEvaluation } from '../../../shared/invoiceDelivery'
 import InvoiceMarkingSection from './InvoiceMarkingSection'
@@ -973,12 +974,15 @@ export default function InvoiceDetailModal({
         primary_assignee_name?: string | null
         invoice_marking?: string | null
         customer_group_id?: string | null
+        work_order_number?: string | null
+        work_object?: string | null
+        room_number?: string | null
       } | null = null
       if (invoice.case_id) {
         if (effectiveCaseType === 'contract') {
           const { data } = await supabase
             .from('cases')
-            .select('case_number, completed_date, scheduled_start, primary_technician_name, invoice_marking')
+            .select('case_number, completed_date, scheduled_start, primary_technician_name, invoice_marking, work_order_number, work_object, room_number')
             .eq('id', invoice.case_id)
             .maybeSingle()
           if (data) {
@@ -989,6 +993,9 @@ export default function InvoiceDetailModal({
               start_date: d.scheduled_start,
               primary_assignee_name: d.primary_technician_name,
               invoice_marking: d.invoice_marking,
+              work_order_number: d.work_order_number,
+              work_object: d.work_object,
+              room_number: d.room_number,
             }
           }
         } else if (invoice.case_type === 'business') {
@@ -1248,6 +1255,19 @@ export default function InvoiceDetailModal({
       if (effectiveMarking) fortnoxPayload.YourReference = effectiveMarking
       if (invoice.notes) fortnoxPayload.Remarks = invoice.notes
 
+      // Ärendemärkningen (arbetsorder, objekt, rum) till fakturan: Ert
+      // ordernummer och en textrad överst, som när fakturorna skrevs för hand
+      // (src/shared/caseMarking.ts). Förut nådde bara märkningen fakturan.
+      const caseMarking = caseMarkingOnInvoice({
+        work_order_number: caseMetaEarly?.work_order_number,
+        work_object: caseMetaEarly?.work_object,
+        room_number: caseMetaEarly?.room_number,
+      })
+      if (caseMarking.orderNumber) fortnoxPayload.YourOrderNumber = caseMarking.orderNumber
+      if (caseMarking.rowText) {
+        fortnoxPayload.InvoiceRows = [{ Description: fortnoxText(caseMarking.rowText) }, ...invoiceRows]
+      }
+
       // Årspremiefakturor (inget ärende): avtalets diarienummer som extern
       // referens och kundansvarig som Vår referens. Samlad faktura (flera
       // avtal): diarienummer från raderna, gemensam kundansvarig om alla delar.
@@ -1288,7 +1308,7 @@ export default function InvoiceDetailModal({
 
       // Fritexterna tvättas: ett enda tecken Fortnox inte godtar (t.ex. "·" i
       // avtalsfakturans anteckning) stoppar hela fakturan med 2005016.
-      for (const key of ['Remarks', 'YourReference', 'OurReference', 'ExternalInvoiceReference1', 'ExternalInvoiceReference2']) {
+      for (const key of ['Remarks', 'YourReference', 'YourOrderNumber', 'OurReference', 'ExternalInvoiceReference1', 'ExternalInvoiceReference2']) {
         const value = fortnoxPayload[key]
         if (typeof value === 'string') fortnoxPayload[key] = fortnoxText(value)
       }

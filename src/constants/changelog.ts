@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.80.2',
+    date: '2026-10-22',
+    title: 'Arbetsorder och objekt kommer med på fakturan',
+    items: [
+      { kind: 'buggfix', text: 'Arbetsorder nr och Objekt från ärendet kom inte med på fakturan i Fortnox, bara märkningen. Nu står de i Ert ordernummer och som första rad på fakturan, till exempel "Arbetsorder 000139192-00, objekt 10556". Rutan Ärendemärkning i fakturan visar vad som skickas.' },
+    ],
+  },
+  {
     version: '3.80.1',
     date: '2026-10-22',
     title: 'Fakturavägen täcker inte fakturan',

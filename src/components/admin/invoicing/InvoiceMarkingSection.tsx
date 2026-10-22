@@ -43,9 +43,15 @@ export default function InvoiceMarkingSection({ marking, customerName }: Invoice
           )
         )}
       </div>
-      <div className="mt-2 px-2.5 py-1.5 rounded-lg border border-dashed border-slate-600 bg-slate-900/50 text-[11px] text-slate-400">
-        Blir Er referens i Fortnox:{' '}
-        <span className="font-mono text-[#20c58f]">{marking.effectiveReference || '–'}</span>
+      <div className="mt-2 px-2.5 py-1.5 rounded-lg border border-dashed border-slate-600 bg-slate-900/50 text-[11px] text-slate-400 space-y-0.5">
+        <div>
+          Blir Er referens i Fortnox:{' '}
+          <span className="font-mono text-[#20c58f]">{marking.effectiveReference || '–'}</span>
+        </div>
+        <div>
+          Blir Ert ordernummer och första fakturaraden:{' '}
+          <span className="font-mono text-[#20c58f]">{marking.orderNumber || '–'}</span>
+        </div>
       </div>
     </div>
   )
