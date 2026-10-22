@@ -25,7 +25,8 @@
 // Regler:
 //  - Arket stängs innan valets onClick körs, så att dialogen som valet öppnar
 //    hamnar överst. Sätt behallOppen: true på val som ska låta arket vara kvar.
-//  - Renderas via portal till document.body ovanför portalens Modal (z-index 9999).
+//  - Renderas via portal till #modal-root (där portalens Modal ligger, z-index 9999)
+//    ovanför modalen.
 //    Klick och tangenter stoppas så att de inte bubblar genom React-trädet till
 //    värdmodalen. Escape stänger arket.
 //  - extra: valfritt innehåll under ett val, till exempel mottagarvalet för offert.
@@ -89,6 +90,13 @@ export function ArendeVerktygArk({ oppen, onStang, grupper, rubrik = 'Ärendets 
   if (!oppen || typeof document === 'undefined') return null
 
   const synligaGrupper = grupper.filter(g => g.val.length > 0)
+
+  // Värdmodalen (Modal med usePortal) ligger i #modal-root, en fast container
+  // med z-index 2147483647 direkt under body. Ett ark i body hamnar därför
+  // alltid bakom modalen oavsett eget z-index. Arket renderas i samma container
+  // så att z-[10020] jämförs med modalens 9999. Containern ägs av Portal och
+  // rensas inte här (samma mönster som DuplicateCaseDialog).
+  const mal = document.getElementById('modal-root') ?? document.body
 
   return createPortal(
     <div
@@ -162,7 +170,7 @@ export function ArendeVerktygArk({ oppen, onStang, grupper, rubrik = 'Ärendets 
         </div>
       </div>
     </div>,
-    document.body
+    mal
   )
 }
 

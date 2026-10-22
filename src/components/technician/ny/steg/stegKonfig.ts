@@ -2,6 +2,9 @@
 // Stegen i ärendet för nya arbetsvyn (Plan.dc.html avsnitt 2, matrisen).
 //
 // Sju steg finns: framme, arbete, bedomning, foton, rapport, pris, klart.
+// För återkommande besök enligt avtal (stationskontroll, rondering,
+// egenkontroll) heter steget pris Utöver avtalet och är valfritt: besöket
+// ingår i avtalet och debiteras inte.
 // Varje ärendetyp visar en delmängd. Steg som inte gäller typen tas bort och
 // numreringen räknas om (Steg 2 av 5 osv.).
 //
@@ -48,6 +51,38 @@ export const ALLA_STEG: Record<StegId, StegDef> = {
 }
 
 /**
+ * Steget pris för återkommande besök enligt kundens avtal. Besöket ingår i
+ * avtalet och debiteras inte, så steget är valfritt och gäller bara det
+ * kunden ska betala utöver avtalet. Samma id ('pris'), så hinder och
+ * innehåll (CaseServiceSelector) pekar på samma steg.
+ */
+export const PRIS_UTOVER_AVTALET: StegDef = { id: 'pris', namn: 'Utöver avtalet', ikon: 'falt.pris', valfritt: true }
+
+/**
+ * Stegtyper som är återkommande besök enligt kundens avtal: stationskontroll,
+ * rondering och egenkontroll. Extrabesök, etablering och privat/företag
+ * debiteras som vanligt.
+ */
+export const AVTALSBESOK_TYPER: ArendeStegTyp[] = ['inspection', 'rondering', 'egenkontroll']
+
+/** cases.service_type för återkommande besök enligt avtal (ingår i avtalet, debiteras inte) */
+export function arAvtalsbesok(serviceType: string | null | undefined): boolean {
+  return serviceType === 'inspection'
+    || serviceType === 'rondering_trafikkontoret'
+    || serviceType === 'egenkontroll_trafikkontoret'
+}
+
+/** "1 234 kr", med ören bara när beloppet inte är jämnt */
+export function formateraKr(belopp: number): string {
+  const avrundat = Math.round(belopp * 100) / 100
+  const text = avrundat.toLocaleString('sv-SE', {
+    minimumFractionDigits: Number.isInteger(avrundat) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })
+  return `${text} kr`
+}
+
+/**
  * Stegen per typ. Avvikelse mot matrisen: stationskontrollen har inget eget
  * steg Foton och preparat, eftersom bilderna och preparaten registreras per
  * station i kontrollrundan (steg Arbetet) och inte visas i ärendemodalen i dag.
@@ -70,24 +105,31 @@ export interface StegVal {
   utanFoton?: boolean
   /** Byt namn på ett steg för typen, till exempel { arbete: 'Saneringen' } */
   namn?: Partial<Record<StegId, string>>
+  /**
+   * Besöket ingår i kundens avtal: steget pris blir det valfria Utöver avtalet.
+   * Utelämnad: gäller stegtyperna i AVTALSBESOK_TYPER.
+   */
+  ingarIAvtalet?: boolean
 }
 
 export function stegForArende(typ: ArendeStegTyp, val: StegVal = {}): StegDef[] {
+  const ingarIAvtalet = val.ingarIAvtalet ?? AVTALSBESOK_TYPER.includes(typ)
   return STEG_PER_TYP[typ]
     .filter(id => !(val.utanPris && id === 'pris'))
     .filter(id => !(val.utanBedomning && id === 'bedomning'))
     .filter(id => !(val.utanFoton && id === 'foton'))
-    .map(id => (val.namn?.[id] ? { ...ALLA_STEG[id], namn: val.namn[id]! } : ALLA_STEG[id]))
+    .map(id => (id === 'pris' && ingarIAvtalet ? PRIS_UTOVER_AVTALET : ALLA_STEG[id]))
+    .map(def => (val.namn?.[def.id] ? { ...def, namn: val.namn[def.id]! } : def))
 }
 
 export function useStegForArende(typ: ArendeStegTyp, val: StegVal = {}): StegDef[] {
-  const { utanPris, utanBedomning, utanFoton, namn } = val
+  const { utanPris, utanBedomning, utanFoton, namn, ingarIAvtalet } = val
   const namnNyckel = namn ? JSON.stringify(namn) : ''
   return useMemo(
-    () => stegForArende(typ, { utanPris, utanBedomning, utanFoton, namn }),
+    () => stegForArende(typ, { utanPris, utanBedomning, utanFoton, namn, ingarIAvtalet }),
     // namn jämförs som text så att ett inline-objekt inte räknar om listan varje rendering
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [typ, utanPris, utanBedomning, utanFoton, namnNyckel]
+    [typ, utanPris, utanBedomning, utanFoton, namnNyckel, ingarIAvtalet]
   )
 }
 

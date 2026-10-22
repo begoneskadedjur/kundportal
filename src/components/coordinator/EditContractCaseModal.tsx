@@ -69,7 +69,8 @@ import CommissionSection from '../shared/CommissionSection'
 import { VisitService, type Visit } from '../../services/visitService'
 import { ProvisionService } from '../../services/provisionService'
 import type { TechnicianShare } from '../../types/provision'
-import type { CaseBillingSummary } from '../../types/caseBilling'
+import type { CaseBillingSummary, CaseBillingItemWithRelations } from '../../types/caseBilling'
+import { selectInvoiceableCaseRows, sumInvoiceableRows } from '../../shared/caseInvoiceRows'
 
 // Nya arbetsvyn (bara tekniker med profiles.ny_arbetsvy i teknikervyn): stegflödet.
 // Allt nedan används bara när useNyArbetsvy().aktiv är true.
@@ -78,7 +79,7 @@ import { useNyArbetsvy } from '../../hooks/useNyArbetsvy'
 import { StegRad, StegKnappar } from '../technician/ny/steg/StegFlode'
 import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../technician/ny/steg/ArendeVerktygArk'
 import { KlartSteg } from '../technician/ny/steg/KlartSteg'
-import { useStegForArende, stegTypForAvtalsarende, grannSteg, type StegId } from '../technician/ny/steg/stegKonfig'
+import { useStegForArende, stegTypForAvtalsarende, grannSteg, arAvtalsbesok, formateraKr, type StegId } from '../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../technician/ny/hjalp/HjalpText'
 import { kontrolleraAvslut, type AvslutsHinder } from '../../services/arendeAvslutService'
 const StationInspectionPanel = lazy(() => import('../technician/inspection/StationInspectionPanel'))
@@ -249,7 +250,14 @@ export default function EditContractCaseModal({
   // Provision state
   const [commissionEligible, setCommissionEligible] = useState(false)
   const [billingSummary, setBillingSummary] = useState<CaseBillingSummary | null>(null)
-  const handleBillingSummaryChange = useCallback((_items: any, summary: CaseBillingSummary) => setBillingSummary(summary), [])
+  // Det som faktureras utöver avtalet när ärendet stängs: samma urval som
+  // createAdHocItemsFromCase (tjänsterader med belopp som inte täcks av avtalet).
+  // Används bara av texterna i nya arbetsvyn.
+  const [utoverAvtaletKr, setUtoverAvtaletKr] = useState(0)
+  const handleBillingSummaryChange = useCallback((items: CaseBillingItemWithRelations[], summary: CaseBillingSummary) => {
+    setBillingSummary(summary)
+    setUtoverAvtaletKr(sumInvoiceableRows(selectInvoiceableCaseRows(items || [], 'contract_adhoc')))
+  }, [])
   const [commissionShares, setCommissionShares] = useState<TechnicianShare[]>([])
   const [commissionDeductions, setCommissionDeductions] = useState(0)
   const [commissionNotes, setCommissionNotes] = useState('')
@@ -1620,7 +1628,11 @@ export default function EditContractCaseModal({
   const [arbeteBesokt, setArbeteBesokt] = useState(false)
   const innehallRef = useRef<HTMLDivElement>(null)
   const stegServiceType: string | null = caseData?.service_type ?? null
+  // Återkommande besök enligt avtal (stationskontroll, rondering, egenkontroll):
+  // besöket ingår i avtalet och debiteras inte, steget pris blir Utöver avtalet
+  const avtalsbesok = arAvtalsbesok(stegServiceType)
   const stegLista = useStegForArende(stegTypForAvtalsarende(stegServiceType), {
+    ingarIAvtalet: avtalsbesok,
     utanPris: isCustomerView,
     // Bedömningen visas bara där sektionen visas i dag, och aldrig för stationstyperna
     utanBedomning: !caseData?.customer_id || isEstablishment || isInspection || /^(egenkontroll|rondering)/.test(stegServiceType || ''),
@@ -2035,14 +2047,22 @@ export default function EditContractCaseModal({
     if (isEstablishment || isCustomerView) return 'Ingen provision registreras för etablering.'
     if (!commissionEligible) return 'Ärendet är inte markerat som provisionsgrundande, ingen provision registreras.'
     if (existingCommissionPosts > 0) return 'Provisionen är redan registrerad och ändras inte.'
-    if (commissionShares.length === 0) return 'Provision är vald men ingen tekniker har en andel. Fördela den under Pris och fakturering, annars registreras ingen provision.'
+    if (commissionShares.length === 0) return `Provision är vald men ingen tekniker har en andel. Fördela den under ${avtalsbesok ? 'Utöver avtalet' : 'Pris och fakturering'}, annars registreras ingen provision.`
     return `Provisionen registreras på ${commissionShares.map(s => `${s.technician_name} ${s.share_percentage} %`).join(', ')}.`
   })()
+
+  // Återkommande besök enligt avtal: besöket faktureras inte, bara det som
+  // ligger under Utöver avtalet (rader med belopp som inte täcks av avtalet)
+  const utoverAvtaletText = utoverAvtaletKr > 0
+    ? `Besöket ingår i kundens avtal och faktureras inte. ${formateraKr(utoverAvtaletKr)} exkl. moms under Utöver avtalet faktureras utöver avtalet.`
+    : `Besöket ingår i kundens avtal och faktureras inte. Inget är tillagt utöver avtalet${isInspection ? '.' : ', så ingen faktura skapas.'}`
 
   const vadHanderVidStang = [
     'Ärendet får status Avslutat och dagens datum som avslutsdatum.',
     'Besöket sparas i besökshistoriken med teknikerna, rapporten och tiden.',
-    'Raderna under Pris och fakturering skickas till fakturering på kunden. Utan rader skapas ingen faktura.',
+    avtalsbesok
+      ? utoverAvtaletText
+      : 'Raderna under Pris och fakturering skickas till fakturering på kunden. Utan rader skapas ingen faktura.',
     provisionText,
     'Rapporten skickas inte av sig själv. Skicka den i steget Rapport.',
   ]
@@ -2171,7 +2191,9 @@ export default function EditContractCaseModal({
           id: 'delfakturera',
           ikon: 'sok.faktura' as const,
           text: 'Delfakturera',
-          beskrivning: 'Bockas i när du bokar återbesöket. Visas när ärendet har tillagda artiklar med inköpskostnad.',
+          beskrivning: avtalsbesok
+            ? 'Bockas i när du bokar återbesöket. Gäller bara det som är tillagt utöver avtalet, själva besöket faktureras inte.'
+            : 'Bockas i när du bokar återbesöket. Visas när ärendet har tillagda artiklar med inköpskostnad.',
           villkorText: 'Bara tillsammans med ett återbesök',
           onClick: () => setShowRevisitModal(true),
         },
@@ -2527,9 +2549,16 @@ export default function EditContractCaseModal({
             </div>
 
             <div className={stegBlock('pris')}>
-              <HjalpText id="steg-pris" rubrik="Pris och fakturering">
-                Lägg in tjänster och artiklar som gick åt. Prisguiden visar inköpspris och marginal. Raderna faktureras när ärendet stängs. Provisionen fördelar du längst ner.
-              </HjalpText>
+              {avtalsbesok ? (
+                <HjalpText id="steg-pris-avtal" rubrik="Utöver avtalet">
+                  Besöket ingår i kundens avtal och faktureras inte. Lägg bara till det kunden har beställt utöver avtalet, till exempel extra material eller arbete.
+                  {isInspection && ' Tilläggsstationer sköts i kontrollrundan, inte här.'}
+                </HjalpText>
+              ) : (
+                <HjalpText id="steg-pris" rubrik="Pris och fakturering">
+                  Lägg in tjänster och artiklar som gick åt. Prisguiden visar inköpspris och marginal. Raderna faktureras när ärendet stängs. Provisionen fördelar du längst ner.
+                </HjalpText>
+              )}
             </div>
           </>
         )}
@@ -3434,9 +3463,12 @@ export default function EditContractCaseModal({
                   avslutsdatum={localCaseData?.completed_date || formData.completed_date || null}
                   vadHander={vadHanderVidStang}
                   vadHanderBesok={vadHanderVidBesok}
+                  helaArendetText={avtalsbesok
+                    ? `Besöket avslutas och får avslutsdatum. Det ingår i kundens avtal och faktureras inte.${utoverAvtaletKr > 0 ? ` ${formateraKr(utoverAvtaletKr)} faktureras utöver avtalet.` : ''}`
+                    : undefined}
                   helaArendetViaSteg={isInspection ? {
                     steg: 'arbete',
-                    text: 'Stationskontrollen stängs med Klarmarkera i kontrollen i steget Arbetet. Där körs samma kontroller, och ärendet får status Avslutat när rundan klarmarkeras.',
+                    text: `Du stänger besöket med Klarmarkera i kontrollrundan i steget Arbetet. ${utoverAvtaletText}`,
                   } : undefined}
                   onHinderChange={setHinderSteg}
                 />

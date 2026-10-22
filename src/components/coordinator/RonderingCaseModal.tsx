@@ -45,13 +45,14 @@ import { ProvisionService } from '../../services/provisionService'
 import { CaseBillingService } from '../../services/caseBillingService'
 import { ContractBillingService } from '../../services/contractBillingService'
 import type { TechnicianShare } from '../../types/provision'
-import type { CaseBillingSummary } from '../../types/caseBilling'
+import type { CaseBillingSummary, CaseBillingItemWithRelations } from '../../types/caseBilling'
+import { selectInvoiceableCaseRows, sumInvoiceableRows } from '../../shared/caseInvoiceRows'
 // Nya arbetsvyn (stegflödet). Allt nedan används bara när useNyArbetsvy().aktiv är true.
 import { useNyArbetsvy } from '../../hooks/useNyArbetsvy'
 import { StegRad, StegKnappar } from '../technician/ny/steg/StegFlode'
 import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../technician/ny/steg/ArendeVerktygArk'
 import { KlartSteg } from '../technician/ny/steg/KlartSteg'
-import { useStegForArende, grannSteg, type StegId } from '../technician/ny/steg/stegKonfig'
+import { useStegForArende, grannSteg, formateraKr, type StegId } from '../technician/ny/steg/stegKonfig'
 import { HjalpText } from '../technician/ny/hjalp/HjalpText'
 import { kontrolleraAvslut, type AvslutsHinder } from '../../services/arendeAvslutService'
 
@@ -441,8 +442,15 @@ export default function RonderingCaseModal({
   // Provision (samma mönster som EditContractCaseModal)
   const [commissionEligible, setCommissionEligible] = useState(false)
   const [billingSummary, setBillingSummary] = useState<CaseBillingSummary | null>(null)
+  // Det som faktureras utöver avtalet när ärendet stängs: samma urval som
+  // createAdHocItemsFromCase (tjänsterader med belopp som inte täcks av avtalet).
+  // Används bara av texterna i nya arbetsvyn.
+  const [utoverAvtaletKr, setUtoverAvtaletKr] = useState(0)
   const handleBillingSummaryChange = useCallback(
-    (_items: unknown, summary: CaseBillingSummary) => setBillingSummary(summary), []
+    (items: CaseBillingItemWithRelations[], summary: CaseBillingSummary) => {
+      setBillingSummary(summary)
+      setUtoverAvtaletKr(sumInvoiceableRows(selectInvoiceableCaseRows(items || [], 'contract_adhoc')))
+    }, []
   )
   const [commissionShares, setCommissionShares] = useState<TechnicianShare[]>([])
   const [commissionDeductions, setCommissionDeductions] = useState(0)
@@ -1048,14 +1056,18 @@ export default function RonderingCaseModal({
   const provisionText = (() => {
     if (!commissionEligible) return 'Ärendet är inte markerat som provisionsgrundande, ingen provision registreras.'
     if (existingCommissionPosts > 0) return 'Provisionen är redan registrerad och ändras inte.'
-    if (commissionShares.length === 0) return 'Provision är vald men ingen tekniker har en andel. Fördela den under Pris och fakturering, annars registreras ingen provision.'
+    if (commissionShares.length === 0) return 'Provision är vald men ingen tekniker har en andel. Fördela den under Utöver avtalet, annars registreras ingen provision.'
     return `Provisionen registreras på ${commissionShares.map(s => `${s.technician_name} ${s.share_percentage} %`).join(', ')}.`
   })()
 
   const vadHanderVidStang = [
     'Ärendet får status Avslutat och dagens datum som avslutsdatum.',
     'Stationerna du har bockat av är redan sparade och följer med som de är.',
-    'Raderna under Pris och fakturering skickas till fakturering på kunden. Utan rader skapas ingen faktura.',
+    // Ronderingen är ett återkommande besök enligt avtalet och faktureras inte;
+    // bara rader med belopp som inte täcks av avtalet faktureras
+    utoverAvtaletKr > 0
+      ? `Ronderingen ingår i kundens avtal och faktureras inte. ${formateraKr(utoverAvtaletKr)} exkl. moms under Utöver avtalet faktureras utöver avtalet.`
+      : 'Ronderingen ingår i kundens avtal och faktureras inte. Inget är tillagt utöver avtalet, så ingen faktura skapas.',
     provisionText,
     'Rapporten skickas inte av sig själv. Skicka den i steget Rapport.',
   ]
@@ -1382,8 +1394,8 @@ export default function RonderingCaseModal({
                 </div>
 
                 <div className={stegBlock('pris')}>
-                  <HjalpText id="steg-pris-rondering" rubrik="Pris och fakturering">
-                    Lägg in tjänster och artiklar som gick åt. Raderna faktureras när ärendet stängs. Provisionen fördelar du längst ner.
+                  <HjalpText id="steg-pris-rondering-avtal" rubrik="Utöver avtalet">
+                    Ronderingen ingår i kundens avtal och faktureras inte. Lägg bara till det kunden har beställt utöver avtalet, till exempel extra material eller arbete.
                   </HjalpText>
                 </div>
               </>
@@ -1916,6 +1928,7 @@ export default function RonderingCaseModal({
                       arAvslutat={ronderingAvslutad}
                       avslutsdatum={caseData?.completed_date ?? null}
                       vadHander={vadHanderVidStang}
+                      helaArendetText={`Ronderingen avslutas och får avslutsdatum. Den ingår i kundens avtal och faktureras inte.${utoverAvtaletKr > 0 ? ` ${formateraKr(utoverAvtaletKr)} faktureras utöver avtalet.` : ''}`}
                       onHinderChange={setHinderSteg}
                     />
                   </div>

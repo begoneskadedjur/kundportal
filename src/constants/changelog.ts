@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.82.3',
+    date: '2026-10-22',
+    title: 'Nya arbetsvyn: avtalsbesök faktureras inte',
+    items: [
+      { kind: 'buggfix', text: 'I nya arbetsvyn öppnades Ärendets verktyg bakom ärendet. Nu hamnar det överst.' },
+      { kind: 'andring', text: 'Stationskontroller, ronderingar och egenkontroller som ingår i kundens avtal säger nu att besöket inte faktureras. Steget heter Utöver avtalet och är valfritt, för sådant kunden har beställt utöver avtalet.' },
+    ],
+  },
+  {
     version: '3.82.2',
     date: '2026-10-22',
     title: 'Specialrapporter: tekniker ser sina egna',

@@ -81,6 +81,12 @@ export interface KlartStegProps {
   onHinderChange?: (steg: StegId[]) => void
   /** Stängning inte tillåten (till exempel kundvyn) */
   lasHelaArendet?: boolean
+  /**
+   * Texten i valet Hela ärendet. Utelämnad: "Ärendet avslutas, får avslutsdatum
+   * och stängs för fakturering." Återkommande besök enligt avtal skickar en egen
+   * text, eftersom besöket ingår i avtalet och inte faktureras.
+   */
+  helaArendetText?: string
 }
 
 type Fas = 'vilar' | 'sparar' | 'kontrollerar' | 'stanger'
@@ -118,6 +124,7 @@ export function KlartSteg({
   helaArendetViaSteg,
   onHinderChange,
   lasHelaArendet = false,
+  helaArendetText = 'Ärendet avslutas, får avslutsdatum och stängs för fakturering.',
 }: KlartStegProps) {
   const [fas, setFas] = useState<Fas>('vilar')
   const [hinder, setHinder] = useState<AvslutsHinder[] | null>(null)
@@ -306,7 +313,7 @@ export function KlartSteg({
         </HjalpText>
         <div role="radiogroup" aria-label="Vad är klart?" className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {([
-            { id: 'hela' as const, rubrik: 'Hela ärendet', text: 'Ärendet avslutas, får avslutsdatum och stängs för fakturering.' },
+            { id: 'hela' as const, rubrik: 'Hela ärendet', text: helaArendetText },
             ...(andraVal ? [{ id: 'besok' as const, rubrik: andraVal.rubrik, text: andraVal.text }] : []),
           ]).map(alt => (
             <button

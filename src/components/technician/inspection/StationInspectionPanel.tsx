@@ -1472,10 +1472,10 @@ export default function StationInspectionPanel({
             ))
           }
           setPickedUpCount(prev => prev + 1)
-          toast.success('Station kontrollerad och upphämtad — den slutar faktureras efter denna runda')
+          toast.success('Station kontrollerad och upphämtad. Den slutar faktureras efter denna runda')
         } catch (pickupErr) {
           console.error('Kunde inte markera stationen som upphämtad:', pickupErr)
-          toast.error('Kontrollen sparades men stationen kunde inte markeras som upphämtad — gör det via utrustningsvyn')
+          toast.error('Kontrollen sparades men stationen kunde inte markeras som upphämtad. Gör det via utrustningsvyn')
         }
       } else {
         toast.success('Inspektion sparad!')
@@ -1595,7 +1595,7 @@ export default function StationInspectionPanel({
     )
     if (uninspectedAddons.length > 0) {
       const proceed = await askConfirm(
-        `${uninspectedAddons.length} tilläggsstation${uninspectedAddons.length === 1 ? '' : 'er'} är inte kontrollerad${uninspectedAddons.length === 1 ? '' : 'e'} — de faktureras inte i denna runda. Kontrollera eller hämta upp dem innan avslut, eller fortsätt ändå.`
+        `${uninspectedAddons.length} tilläggsstation${uninspectedAddons.length === 1 ? '' : 'er'} är inte kontrollerad${uninspectedAddons.length === 1 ? '' : 'e'}. De faktureras inte i denna runda. Kontrollera eller hämta upp dem innan avslut, eller fortsätt ändå.`
       )
       if (!proceed) return
     }
@@ -1626,7 +1626,7 @@ export default function StationInspectionPanel({
         if (session.case_id) {
           const caseUpdated = await updateCaseStatusToCompleted(session.case_id, autoReport)
           if (!caseUpdated) {
-            toast.error('Inspektionen avslutades men ärendets status kunde inte sättas till Avslutat — kontrollera ärendet')
+            toast.error('Inspektionen avslutades men ärendets status kunde inte sättas till Avslutat. Kontrollera ärendet')
           }
 
           // Fakturering: förifyll tilläggsstationsrad + kör ad-hoc-kedjan.
@@ -1642,10 +1642,10 @@ export default function StationInspectionPanel({
             })
 
             if (prefill.outcome === 'already_billed' && prefill.billedQuantityMismatch) {
-              toast(`Tilläggsstationer redan fakturerade för denna runda (${prefill.billedQuantityMismatch.billed} st). Antalet har ändrats till ${prefill.billedQuantityMismatch.current} — meddela kontoret.`, { duration: 10000, icon: '⚠️' })
+              toast(`Tilläggsstationer redan fakturerade för denna runda (${prefill.billedQuantityMismatch.billed} st). Antalet har ändrats till ${prefill.billedQuantityMismatch.current}. Meddela kontoret.`, { duration: 10000, icon: '⚠️' })
             }
             if (prefill.priceMissing && (prefill.outcome === 'created' || prefill.outcome === 'updated')) {
-              toast(`Pris saknas i prislistan för tilläggsstationer — raden skapades med 0 kr och ingen faktura genereras. Meddela kontoret.`, { duration: 10000, icon: '⚠️' })
+              toast(`Pris saknas i prislistan för tilläggsstationer. Raden skapades med 0 kr och ingen faktura genereras. Meddela kontoret.`, { duration: 10000, icon: '⚠️' })
             }
 
             // Arbetstid för att hantera tilläggen: sparas som förslag före
@@ -1666,13 +1666,13 @@ export default function StationInspectionPanel({
               workPerformed: sessionNotes ? `${autoReport}\n${sessionNotes}` : autoReport
             })
             if (billing.invoiceError) {
-              toast.error(`Fakturan kunde inte skapas: ${billing.invoiceError}. Raderna ligger kvar — kontoret fakturerar från Merförsäljning.`, { duration: 10000 })
+              toast.error(`Fakturan kunde inte skapas: ${billing.invoiceError}. Raderna ligger kvar. Kontoret fakturerar från Merförsäljning.`, { duration: 10000 })
             } else if (billing.itemsCreated > 0) {
               toast.success(`${billing.itemsCreated} rad(er) skickade till fakturering (${billing.totalAmount} kr)`)
             }
           } catch (billingErr) {
             console.error('Fakturering vid kontrollrundeavslut misslyckades:', billingErr)
-            toast.error('Faktureringen misslyckades — raderna ligger kvar, kontoret fakturerar från Merförsäljning.', { duration: 10000 })
+            toast.error('Faktureringen misslyckades. Raderna ligger kvar, kontoret fakturerar från Merförsäljning.', { duration: 10000 })
           }
         }
         toast.success('Inspektion avslutad!')

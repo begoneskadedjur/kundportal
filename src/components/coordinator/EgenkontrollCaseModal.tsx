@@ -637,7 +637,7 @@ export default function EgenkontrollCaseModal({
   }
 
   // Hinder från avslutskontrollen. Tiden ändras i Framme. Steg som egenkontrollen
-  // saknar (Pris och fakturering) visas i Alla uppgifter.
+  // saknar (pris, egenkontrollen har ingen fakturadel) visas i Alla uppgifter.
   const gaTillHinder = (steg: StegId, hinder?: AvslutsHinder) => {
     if (hinder?.id === 'sluttid-fore-start') {
       gaTillSteg('framme')
@@ -666,7 +666,7 @@ export default function EgenkontrollCaseModal({
   const vadHanderVidStang = [
     'Ärendet får status Avslutat och dagens datum som avslutsdatum.',
     'Granskningen av stationerna, noteringarna och bilderna är redan sparade när du fyllde i dem.',
-    'Egenkontrollen faktureras inte och ger ingen provision.',
+    'Egenkontrollen ingår i kundens avtal och faktureras inte. Ingen provision registreras.',
   ]
 
   const vadHanderVidBesok = [
@@ -1520,6 +1520,7 @@ export default function EgenkontrollCaseModal({
                   avslutsdatum={caseData?.completed_date ?? null}
                   vadHander={vadHanderVidStang}
                   vadHanderBesok={vadHanderVidBesok}
+                  helaArendetText="Egenkontrollen avslutas och får avslutsdatum. Den ingår i kundens avtal och faktureras inte."
                   onHinderChange={setHinderSteg}
                 />
               </div>
