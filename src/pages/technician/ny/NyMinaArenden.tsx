@@ -1,327 +1,362 @@
 // src/pages/technician/ny/NyMinaArenden.tsx
 // Mina ärenden i nya arbetsvyn (bara profiles.ny_arbetsvy, se VyVaxel i App.tsx).
 //
-// Grupper:
-//  1. Idag och denna vecka: besök från idag till och med söndag
-//  2. Väntar på dig: bokning saknas, eller datumet har passerat utan avslut
-//  3. Planerade besök framåt: allt efter denna vecka, hopfällt och grupperat per kund.
-//     Räknas aldrig som försenat.
-//  4. Avslutade: hopfällt, de senaste först
-// Alla rader öppnas i rätt modal via OppnaArende.
+// Överst en mening om läget och tre lägen med antal:
+//  Att göra   Den här veckan, Väntar på dig (Behöver en tid, Passerade besök att
+//             avsluta) och hopfällt Övriga öppna ärenden
+//  Kommande   närmaste fyra veckorna per vecka, längre fram per kund (hopfällt)
+//  Avslutade  senaste först, per månad
+// Grupperna och reglerna är desamma som förut, se components/technician/ny/arenden/arendeLogik.ts.
+//
+// Dator: listan i huvudytan och valt ärende i en högerpanel. Klick väljer,
+// dubbelklick eller ikonknappen öppnar. Telefon: tryck öppnar ärendet direkt.
+// Alla ärenden öppnas i rätt modal via OppnaArende och listan läses om efteråt.
+//
+// Djuplänk som gamla TechnicianCases: ?openCase=<id>&caseType=private|business|contract
+// (global sök, uppföljningslistan). comm=1 öppnar kommunikationen direkt.
 
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
-import { Icon } from '../../../components/icons/Icon'
-import LoadingSpinner from '../../../components/shared/LoadingSpinner'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import toast from 'react-hot-toast'
+import { useAuth } from '../../../contexts/AuthContext'
 import OppnaArende, { type ArendeRef } from '../../../components/technician/ny/OppnaArende'
-import { HjalpText } from '../../../components/technician/ny/hjalp/HjalpText'
 import { Genomgang, type GenomgangSteg } from '../../../components/technician/ny/hjalp/Genomgang'
 import { useNySidhuvud } from '../../../components/technician/ny/layout/NySidhuvud'
-import { StatusPunkt } from '../../../components/technician/ny/besokUi'
-import { TYP_IKON, statusTon } from '../../../components/technician/ny/besokTyp'
 import { useAllaArenden } from '../../../hooks/useTeknikerBesok'
+import { svenskDag, type DagBesok } from '../../../services/teknikerDagService'
+import { Icon } from '../../../components/icons/Icon'
+import { veckonummer, veckoSpann } from '../../../components/technician/ny/schema/schemaLogik'
 import {
-  svenskDag, veckansSlut, kortDag, klockslag, besokBeskrivning, vantarPaDig, type DagBesok, type VantarRad,
-} from '../../../services/teknikerDagService'
+  GAMMALT_EFTER_DAGAR, KOMMANDE_VECKOR, STANDARD_SORTERING, gruppera, kortDatum, lageFor, manadText, sammanfattning, standardFilter,
+  type ArendeFilter, type Lage, type Sortering,
+} from '../../../components/technician/ny/arenden/arendeLogik'
+import { FilterRad, LageVal } from '../../../components/technician/ny/arenden/ArendeVerktyg'
+import {
+  GruppEtikett, Hopfall, Laddar, Lista, SektionRubrik, TomRad, TomtLage, type ListaProps,
+} from '../../../components/technician/ny/arenden/ArendeSektion'
+import { ArendeForhandsvisning } from '../../../components/technician/ny/arenden/ArendeForhandsvisning'
+import { hittaKalla, kallaForCaseType } from '../../../components/technician/ny/arenden/djuplank'
+import { useArDator } from '../../../components/technician/ny/arenden/useArDator'
 
-const GENOMGANG: GenomgangSteg[] = [
-  { rubrik: 'Idag och denna vecka', text: 'Överst står det du ska göra den här veckan, i tidsordning.', mal: 'mina-vecka' },
-  { rubrik: 'Väntar på dig', text: 'Ärenden som behöver en tid, och besök som är passerade men inte avslutade.', mal: 'mina-vantar' },
-  { rubrik: 'Planerade besök framåt', text: 'Avtalskundernas besök längre fram. De flyttar upp av sig själva när det är dags, inget här är försenat.', mal: 'mina-plan' },
-  { rubrik: 'Sök', text: 'Sök på kund, adress eller ärendenummer i alla grupper på en gång.', mal: 'mina-sok' },
+const GENOMGANG_MOBIL: GenomgangSteg[] = [
+  { rubrik: 'Tre lägen', text: 'Att göra visar veckan och det som väntar på dig. Kommande och Avslutade ligger bredvid. Siffran är antalet ärenden.', mal: 'mina-lagen' },
+  { rubrik: 'Väntar på dig', text: 'Överst det som behöver en tid, sedan passerade besök som ska avslutas. Tryck på en rad för att öppna ärendet.', mal: 'mina-vantar' },
+  { rubrik: 'Filtrera och sortera', text: 'Skriv för att filtrera listan. Filter väljer typ och ålder, Sortera byter ordning.', mal: 'mina-filter' },
 ]
 
-const AVSLUTADE_MAX = 30
-
-function matchar(b: DagBesok, q: string): boolean {
-  if (!q) return true
-  return [b.kund, b.adress, b.titel, b.arendenummer, b.kontaktperson, b.skadedjur]
-    .some(f => f && f.toLowerCase().includes(q))
-}
-
-function ArendeRad({ b, idag, onOppna }: { b: DagBesok; idag: string; onOppna: () => void }) {
-  const st = statusTon(b)
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onOppna}
-        className="w-full flex items-center gap-3 px-3 py-3 min-h-[64px] text-left hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#20c58f]"
-      >
-        <span className="w-14 flex-shrink-0 flex flex-col">
-          <span className="font-mono text-sm font-semibold text-white">{klockslag(b.start) || '--:--'}</span>
-          <span className="text-xs text-slate-400">{kortDag(b.dag, idag)}</span>
-        </span>
-        <span className="flex-1 min-w-0">
-          <span className="block text-[15px] font-medium text-white truncate">{b.kund}</span>
-          <span className="flex items-center gap-1.5 text-[13px] text-slate-400 truncate">
-            <Icon name={TYP_IKON[b.typ]} size={16} className="flex-shrink-0" />
-            <span className="truncate">{besokBeskrivning(b)}</span>
-          </span>
-        </span>
-        <StatusPunkt ton={st.ton} className="hidden sm:inline-flex">{st.text}</StatusPunkt>
-        <Icon name="allman.chevron" size={16} className="text-slate-500 flex-shrink-0" />
-      </button>
-    </li>
-  )
-}
-
-function VantarRadVy({ v, onOppna }: { v: VantarRad; onOppna: () => void }) {
-  const b = v.besok
-  const text = v.orsak === 'boka'
-    ? 'Inte bokad. Kontakta kunden och boka en tid.'
-    : `Besöket ${b.dag ?? ''} är passerat men inte avslutat.`
-  return (
-    <li className="px-3 py-3 space-y-2">
-      <div className="flex items-start justify-between gap-3">
-        <span className="min-w-0">
-          <span className="block text-[15px] font-medium text-white truncate">{b.kund}</span>
-          <span className="flex items-center gap-1.5 text-[13px] text-slate-400">
-            <Icon name={TYP_IKON[b.typ]} size={16} className="flex-shrink-0" />
-            {besokBeskrivning(b)}{b.arendenummer ? `, ${b.arendenummer}` : ''}
-          </span>
-        </span>
-      </div>
-      <StatusPunkt ton={v.orsak === 'avsluta' ? 'rod' : 'gul'}>{text}</StatusPunkt>
-      <button
-        type="button"
-        onClick={onOppna}
-        className="h-11 px-4 rounded-xl border border-slate-600 text-sm font-semibold text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
-      >
-        {v.orsak === 'boka' ? 'Öppna och boka tid' : 'Öppna och avsluta'}
-      </button>
-    </li>
-  )
-}
-
-function GruppRubrik({ id, rubrik, antal, ton, children, hoger }: { id: string; rubrik: string; antal: number; ton: string; children: ReactNode; hoger?: ReactNode }) {
-  return (
-    <div className="space-y-1">
-      <div className="flex items-center gap-2">
-        <span aria-hidden="true" className={`w-2.5 h-2.5 rounded-full ${ton}`} />
-        <div className="flex-1">
-          <HjalpText id={id} rubrik={rubrik} hoger={<span className="flex items-center gap-2"><span className="font-mono text-sm text-slate-400">{antal}</span>{hoger}</span>}>
-            {children}
-          </HjalpText>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Hopfallbar({ id, rubrik, antal, oppen, onToggle }: { id: string; rubrik: string; antal: number; oppen: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-expanded={oppen}
-      aria-controls={id}
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 min-h-[48px] text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded-xl"
-    >
-      <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full bg-slate-500" />
-      <span className="flex-1 text-[15px] font-semibold text-white">{rubrik}</span>
-      <span className="font-mono text-sm text-slate-400">{antal}</span>
-      <Icon name="allman.chevron" size={20} className={`text-slate-400 transition-transform ${oppen ? 'rotate-90' : ''}`} />
-    </button>
-  )
-}
-
-interface KundGrupp {
-  nyckel: string
-  kund: string
-  besok: DagBesok[]
-}
+const GENOMGANG_DATOR: GenomgangSteg[] = [
+  GENOMGANG_MOBIL[0],
+  { rubrik: 'Väntar på dig', text: 'Överst det som behöver en tid, sedan passerade besök som ska avslutas. Ikonen längst till höger öppnar ärendet.', mal: 'mina-vantar' },
+  { rubrik: 'Valt ärende', text: 'Klicka på en rad så visas ärendet här, med Öppna ärendet, Navigera och Ring. Dubbelklick öppnar direkt.', mal: 'mina-valt' },
+  GENOMGANG_MOBIL[2],
+]
 
 export default function NyMinaArenden() {
+  const { profile } = useAuth()
+  const minId = profile?.technician_id ?? null
+  const [params, setParams] = useSearchParams()
+  const arDator = useArDator()
   const { besok: alla, laddar, fel, ladda } = useAllaArenden()
-  const [oppet, setOppet] = useState<ArendeRef | null>(null)
-  const [visaMig, setVisaMig] = useState(false)
+
+  const [lage, setLage] = useState<Lage>('attgora')
   const [sok, setSok] = useState('')
-  const [planOppen, setPlanOppen] = useState(false)
-  const [avslutadeOppen, setAvslutadeOppen] = useState(false)
-  const [utanTidOppen, setUtanTidOppen] = useState(false)
+  const [filter, setFilter] = useState<ArendeFilter>(standardFilter)
+  const [sortering, setSortering] = useState<Record<Lage, Sortering>>(STANDARD_SORTERING)
+  const [valdNyckel, setValdNyckel] = useState<string | null>(null)
+  const [oppet, setOppet] = useState<ArendeRef | null>(null)
+  const [kommunikation, setKommunikation] = useState(false)
+  const [visaMig, setVisaMig] = useState(false)
+  const [ovrigaOppen, setOvrigaOppen] = useState(false)
   const [oppnaKunder, setOppnaKunder] = useState<Set<string>>(new Set())
+  // null betyder standard: senaste månaden utfälld
+  const [oppnaManader, setOppnaManader] = useState<Set<string> | null>(null)
 
   const idag = svenskDag()
-  const veckoslut = veckansSlut(idag)
   const q = sok.trim().toLowerCase()
+  const soker = q.length > 0
 
-  const { vecka, vantar, plan, avslutade, utanTid } = useMemo(() => {
-    const filtrerade = alla.filter(b => matchar(b, q))
-    const vantarRader = vantarPaDig(filtrerade, idag)
-    const vantarNycklar = new Set(vantarRader.map(v => v.besok.nyckel))
-
-    const veckaLista = filtrerade.filter(b => b.dag && b.dag >= idag && b.dag <= veckoslut && !vantarNycklar.has(b.nyckel))
-
-    const planKarta = new Map<string, KundGrupp>()
-    for (const b of filtrerade) {
-      if (b.avslutad || !b.dag || b.dag <= veckoslut || vantarNycklar.has(b.nyckel)) continue
-      const nyckel = b.customerId || `namn:${b.kund}`
-      const g = planKarta.get(nyckel) ?? { nyckel, kund: b.kund, besok: [] }
-      g.besok.push(b)
-      planKarta.set(nyckel, g)
-    }
-    const planLista = [...planKarta.values()].sort((a, b) => (a.besok[0].dag ?? '').localeCompare(b.besok[0].dag ?? ''))
-
-    const avslutadeLista = filtrerade
-      .filter(b => b.avslutad)
-      .sort((a, b) => ((b.avslutsdatum ?? b.start)?.getTime() ?? 0) - ((a.avslutsdatum ?? a.start)?.getTime() ?? 0))
-
-    // Övriga öppna: utan tid eller med passerat datum men en status som inte väntar på
-    // teknikern, till exempel offert skickad eller ombokning
-    const utanTidLista = filtrerade.filter(b => !b.avslutad && (!b.dag || b.dag < idag) && !vantarNycklar.has(b.nyckel))
-
-    return { vecka: veckaLista, vantar: vantarRader, plan: planLista, avslutade: avslutadeLista, utanTid: utanTidLista }
-  }, [alla, q, idag, veckoslut])
-
-  const planAntal = plan.reduce((s, g) => s + g.besok.length, 0)
-  const attTaHand = vecka.filter(b => !b.avslutad).length + vantar.length
+  const g = useMemo(() => gruppera(alla, q, filter, sortering, idag), [alla, q, filter, sortering, idag])
 
   const oppnaVisaMig = useCallback(() => setVisaMig(true), [])
-  useNySidhuvud({ underrubrik: laddar ? undefined : `${attTaHand} att ta hand om nu`, onVisaMig: oppnaVisaMig })
+  useNySidhuvud({ underrubrik: laddar && alla.length === 0 ? undefined : `${g.antal.attgora} att ta hand om nu`, onVisaMig: oppnaVisaMig })
 
-  const oppna = (b: DagBesok) => setOppet({ kalla: b.kalla, id: b.id })
+  const oppna = useCallback((b: DagBesok, komm = false) => {
+    setKommunikation(komm)
+    setOppet({ kalla: b.kalla, id: b.id })
+  }, [])
+  const klick = (b: DagBesok) => {
+    if (arDator) setValdNyckel(b.nyckel)
+    else oppna(b)
+  }
+
+  // ─── Djuplänk ?openCase=<id>&caseType=<typ>(&comm=1) ───
+  const hanterad = useRef<string | null>(null)
+  useEffect(() => {
+    const id = params.get('openCase')
+    if (!id) { hanterad.current = null; return }
+    if (laddar || !minId) return
+    // Samma länk hanteras en gång, även om effekten körs två gånger innan parametrarna tagits bort
+    const nyckel = `${id}:${params.get('caseType') ?? ''}`
+    if (hanterad.current === nyckel) return
+    hanterad.current = nyckel
+    const kalla = kallaForCaseType(params.get('caseType'))
+    const komm = params.get('comm') === '1'
+    setParams(p => {
+      for (const k of ['openCase', 'caseType', 'comm', 'tab']) p.delete(k)
+      return p
+    }, { replace: true })
+
+    const b = alla.find(x => x.id === id && (!kalla || x.kalla === kalla)) ?? alla.find(x => x.id === id)
+    if (b) {
+      setLage(lageFor(b, idag))
+      setValdNyckel(b.nyckel)
+      oppna(b, komm)
+      return
+    }
+    // Inte i listan (till exempel arkiverat): öppna om teknikern är tilldelad.
+    // Avbryts inte vid omkörning: parametrarna tas bort ovan, vilket kör om effekten.
+    hittaKalla(id, minId, kalla)
+      .then(k => {
+        if (k) { setKommunikation(komm); setOppet({ kalla: k, id }) }
+        else toast.error('Ärendet kunde inte hittas bland dina ärenden')
+      })
+      .catch(() => toast.error('Ärendet kunde inte öppnas'))
+  }, [params, setParams, laddar, alla, minId, idag, oppna])
+
+  // ─── Hopfällning ───
   const vaxlaKund = (nyckel: string) => setOppnaKunder(prev => {
     const n = new Set(prev)
     if (n.has(nyckel)) n.delete(nyckel); else n.add(nyckel)
     return n
   })
+  const manadArOppen = (manad: string, i: number) => soker || (oppnaManader ? oppnaManader.has(manad) : i === 0)
+  const vaxlaManad = (manad: string, i: number) => setOppnaManader(prev => {
+    const n = new Set(prev ?? (g.avslutade[0] ? [g.avslutade[0].manad] : []))
+    if (manadArOppen(manad, i)) n.delete(manad); else n.add(manad)
+    return n
+  })
+  const visaOvriga = ovrigaOppen || soker
 
-  // Vid sökning fälls grupperna ut så träffarna syns
-  const visaPlan = planOppen || !!q
-  const visaAvslutade = avslutadeOppen || !!q
-  const visaUtanTid = utanTidOppen || !!q
+  // ─── Valt ärende på datorn: valt, annars första raden i läget ───
+  const synligaILaget = useMemo((): DagBesok[] => {
+    if (lage === 'attgora') return [...g.vecka, ...g.boka, ...g.avsluta, ...(visaOvriga ? g.ovriga : [])]
+    if (lage === 'kommande') return g.veckor.flatMap(v => v.besok)
+    return g.avslutade[0]?.besok ?? []
+  }, [lage, g, visaOvriga])
+
+  const valt = useMemo(() => {
+    if (!arDator) return null
+    if (valdNyckel) {
+      const b = alla.find(x => x.nyckel === valdNyckel)
+      if (b) return b
+    }
+    return synligaILaget[0] ?? null
+  }, [arDator, valdNyckel, alla, synligaILaget])
+
+  const bytLage = (l: Lage) => { setLage(l); setValdNyckel(null) }
+
+  const radProps: ListaProps = { idag, arDator, valdNyckel: valt?.nyckel ?? null, onKlick: klick, onOppna: b => oppna(b) }
+
+  // ─── Lägen ───
+  const attGora = () => {
+    const vantar = g.boka.length + g.avsluta.length
+    if (g.vecka.length === 0 && vantar === 0 && g.ovriga.length === 0) {
+      return soker || filter.doldaTyper.size || filter.alder !== 'alla'
+        ? <TomtLage rubrik="Inga träffar" text="Inget i Att göra matchar sökningen eller filtret." />
+        : <TomtLage rubrik="Inget att göra just nu" text="Allt är bokat och avslutat. Nya ärenden och bokade besök dyker upp här." />
+    }
+    return (
+      <div className="space-y-6">
+        <section data-genomgang="mina-vecka" className="space-y-2">
+          <SektionRubrik id="mina-vecka" rubrik="Den här veckan" ikon="falt.vecka" antal={g.vecka.length} betonad>
+            Dina besök från idag till och med söndag.
+          </SektionRubrik>
+          {g.vecka.length > 0
+            ? <Lista besok={g.vecka} sort="vecka" {...radProps} />
+            : <TomRad>{soker ? 'Inga träffar den här veckan.' : 'Inget mer inbokat den här veckan.'}</TomRad>}
+        </section>
+
+        <div data-genomgang="mina-vantar" className="space-y-5">
+          <GruppEtikett text="Väntar på dig" antal={vantar} />
+          {vantar === 0 && <TomRad>{soker ? 'Inga träffar.' : 'Inget väntar på dig.'}</TomRad>}
+          {g.boka.length > 0 && (
+            <section className="space-y-2">
+              <SektionRubrik id="mina-boka" rubrik="Behöver en tid" ikon="arendelista.boka" antal={g.boka.length}>
+                Ärendet har ingen bokad tid. Ring kunden och boka in besöket.
+              </SektionRubrik>
+              <Lista besok={g.boka} sort="boka" {...radProps} />
+            </section>
+          )}
+          {g.avsluta.length > 0 && (
+            <section className="space-y-2">
+              <SektionRubrik id="mina-avsluta" rubrik="Passerade besök att avsluta" ikon="arendelista.passerad" antal={g.avsluta.length}>
+                Datumet har passerat men besöket är inte avslutat. Orange när det gått mer än {GAMMALT_EFTER_DAGAR} dagar.
+              </SektionRubrik>
+              <Lista besok={g.avsluta} sort="avsluta" {...radProps} />
+            </section>
+          )}
+        </div>
+
+        {g.ovriga.length > 0 && (
+          <section className="space-y-2">
+            <Hopfall
+              id="mina-ovriga-lista"
+              rubrik="Övriga öppna ärenden"
+              detalj="Väntar på kunden eller kontoret, till exempel offert skickad eller ombokning"
+              antal={g.ovriga.length}
+              oppen={visaOvriga}
+              onToggle={() => setOvrigaOppen(v => !v)}
+            />
+            {visaOvriga && <div id="mina-ovriga-lista"><Lista besok={g.ovriga} sort="ovrig" {...radProps} /></div>}
+          </section>
+        )}
+      </div>
+    )
+  }
+
+  const kommande = () => {
+    if (g.antal.kommande === 0) {
+      return soker || filter.doldaTyper.size
+        ? <TomtLage rubrik="Inga träffar" text="Inget kommande matchar sökningen eller filtret." />
+        : <TomtLage rubrik="Inget planerat efter den här veckan" text="Bokade besök längre fram dyker upp här." />
+    }
+    const langreAntal = g.langreFram.reduce((s, k) => s + k.besok.length, 0)
+    return (
+      <div className="space-y-6">
+        <section className="space-y-3">
+          <SektionRubrik id="mina-kommande" rubrik={`De närmaste ${KOMMANDE_VECKOR} veckorna`} ikon="falt.vecka" antal={g.veckor.reduce((s, v) => s + v.besok.length, 0)} betonad>
+            Besöken efter den här veckan, vecka för vecka. Inget här är försenat.
+          </SektionRubrik>
+          {g.veckor.length === 0 && <TomRad>Inget bokat de närmaste veckorna.</TomRad>}
+          {g.veckor.map(v => (
+            <div key={v.mandag} className="space-y-1.5">
+              <h3 className="flex items-baseline gap-2 px-1 text-sm">
+                <span className="font-semibold text-white">Vecka {veckonummer(v.mandag)}</span>
+                <span className="text-slate-400">{veckoSpann(v.mandag)}</span>
+                <span className="ml-auto font-mono text-[13px] text-slate-400">{v.besok.length}</span>
+              </h3>
+              <Lista besok={v.besok} sort="kommande" {...radProps} />
+            </div>
+          ))}
+        </section>
+
+        {g.langreFram.length > 0 && (
+          <section data-genomgang="mina-plan" className="space-y-2">
+            <SektionRubrik id="mina-langre" rubrik="Längre fram" ikon="falt.manad" antal={langreAntal}>
+              Planerade besök längre fram, främst hos dina avtalskunder, samlade per kund. De flyttar upp av sig själva när det är dags och du behöver inte göra något med dem nu.
+            </SektionRubrik>
+            <ul className="rounded-2xl bg-slate-900 border border-slate-700/60 divide-y divide-slate-700/60 overflow-hidden">
+              {g.langreFram.map(k => {
+                const oppen = oppnaKunder.has(k.nyckel) || soker
+                const forsta = k.besok[0]
+                const id = `mina-kund-${k.nyckel.replace(/[^a-z0-9]/gi, '')}`
+                return (
+                  <li key={k.nyckel}>
+                    <Hopfall
+                      inbaddad
+                      id={id}
+                      rubrik={k.kund}
+                      detalj={`${k.besok.length} ${k.besok.length === 1 ? 'planerat besök' : 'planerade besök'}, nästa ${forsta.dag ? kortDatum(forsta.dag, idag) : ''}`}
+                      antal={k.besok.length}
+                      oppen={oppen}
+                      onToggle={() => vaxlaKund(k.nyckel)}
+                    />
+                    {oppen && (
+                      <div id={id} className="bg-slate-950/30 border-t border-slate-700/60">
+                        <Lista utanRam besok={k.besok} sort="kommande" {...radProps} />
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
+      </div>
+    )
+  }
+
+  const avslutade = () => {
+    if (g.antal.avslutade === 0) {
+      return soker || filter.doldaTyper.size || filter.alder !== 'alla'
+        ? <TomtLage rubrik="Inga träffar" text="Inga avslutade ärenden matchar sökningen eller filtret." />
+        : <TomtLage rubrik="Inga avslutade ärenden" text="Ärenden du avslutar hamnar här, senaste först." />
+    }
+    return (
+      <div className="space-y-3">
+        <SektionRubrik id="mina-avslutade" rubrik="Avslutade" ikon="arendelista.avslutade" antal={g.antal.avslutade} betonad>
+          Per månad, räknat från dagen ärendet avslutades.
+        </SektionRubrik>
+        {g.avslutade.map((m, i) => {
+          const oppen = manadArOppen(m.manad, i)
+          const id = `mina-manad-${m.manad}`
+          return (
+            <section key={m.manad} className="space-y-2">
+              <Hopfall id={id} rubrik={manadText(m.manad)} antal={m.besok.length} oppen={oppen} onToggle={() => vaxlaManad(m.manad, i)} />
+              {oppen && <div id={id}><Lista besok={m.besok} sort="avslutad" datumRubrik="Avslutat" {...radProps} /></div>}
+            </section>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const laddarForsta = laddar && alla.length === 0
 
   return (
-    <div className="max-w-3xl mx-auto p-4 lg:p-6 space-y-6">
-      <div data-genomgang="mina-sok" className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
-          <Icon name="allman.sok" size={20} />
-        </span>
-        <input
-          type="search"
-          value={sok}
-          onChange={e => setSok(e.target.value)}
-          placeholder="Sök kund, adress eller ärendenummer"
-          aria-label="Sök bland mina ärenden"
-          className="w-full h-12 pl-11 pr-3 rounded-xl bg-slate-900 border border-slate-700 text-[15px] text-white placeholder:text-slate-500 focus:outline-none focus:border-[#20c58f] focus:ring-2 focus:ring-[#20c58f]/30"
-        />
-      </div>
-
-      {laddar && alla.length === 0 ? (
-        <div className="py-16 flex justify-center"><LoadingSpinner text="Hämtar dina ärenden..." /></div>
+    <div className="max-w-[1500px] mx-auto p-4 lg:p-6 space-y-4">
+      {laddarForsta ? (
+        <Laddar />
       ) : fel ? (
-        <div className="rounded-2xl bg-slate-900 border border-red-500/40 p-4">
+        <div className="max-w-xl rounded-2xl bg-slate-900 border border-red-500/40 p-4">
           <p className="text-white font-medium">{fel}</p>
-          <button type="button" onClick={ladda} className="mt-3 h-11 px-4 rounded-xl border border-slate-600 text-white hover:bg-slate-800">Försök igen</button>
+          <button type="button" onClick={ladda} className="mt-3 h-11 px-4 rounded-xl border border-slate-600 text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]">Försök igen</button>
         </div>
       ) : (
         <>
-          <section data-genomgang="mina-vecka" className="space-y-2">
-            <GruppRubrik id="mina-vecka" rubrik="Idag och denna vecka" antal={vecka.length} ton="bg-[#20c58f]">
-              Dina besök från idag till och med söndag, i tidsordning.
-            </GruppRubrik>
-            {vecka.length === 0 ? (
-              <p className="text-sm text-slate-500">{q ? 'Inga träffar den här veckan.' : 'Inget inbokat resten av veckan.'}</p>
-            ) : (
-              <ul className="rounded-2xl bg-slate-900 border border-slate-700/60 divide-y divide-slate-700/60 overflow-hidden">
-                {vecka.map(b => <ArendeRad key={b.nyckel} b={b} idag={idag} onOppna={() => oppna(b)} />)}
-              </ul>
-            )}
-          </section>
+          <p className="flex items-start gap-2 text-[15px] leading-relaxed text-slate-300">
+            <Icon name="falt.attgora" size={20} className="mt-0.5 flex-shrink-0 text-[#20c58f]" />
+            <span>{sammanfattning(g, idag)}</span>
+          </p>
 
-          <section data-genomgang="mina-vantar" className="space-y-2">
-            <GruppRubrik id="mina-vantar" rubrik="Väntar på dig" antal={vantar.length} ton="bg-amber-500">
-              Ärenden som behöver en tid och besök som har passerat utan att avslutas.
-            </GruppRubrik>
-            {vantar.length === 0 ? (
-              <p className="text-sm text-slate-500">{q ? 'Inga träffar.' : 'Inget väntar på dig.'}</p>
-            ) : (
-              <ul className="rounded-2xl bg-slate-900 border border-slate-700/60 divide-y divide-slate-700/60 overflow-hidden">
-                {vantar.map(v => <VantarRadVy key={v.besok.nyckel} v={v} onOppna={() => oppna(v.besok)} />)}
-              </ul>
-            )}
-          </section>
-
-          <section data-genomgang="mina-plan" className="space-y-2">
-            <Hopfallbar id="mina-plan-lista" rubrik="Planerade besök framåt" antal={planAntal} oppen={visaPlan} onToggle={() => setPlanOppen(v => !v)} />
-            <div className="flex items-start gap-2 rounded-xl bg-slate-800/60 px-3 py-2.5 text-sm text-slate-300">
-              <Icon name="kund.info" size={16} className="mt-0.5 flex-shrink-0 text-slate-400" />
-              <p>Det här är planerade besök längre fram, främst hos dina avtalskunder. De dyker upp i din dag när det är dags. Inget här räknas som försenat och du behöver inte göra något med dem nu.</p>
+          <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:gap-3">
+            <LageVal lage={lage} antal={g.antal} onLage={bytLage} />
+            <div className="flex-1 min-w-0">
+              <FilterRad
+                lage={lage}
+                sok={sok}
+                onSok={setSok}
+                filter={filter}
+                onFilter={setFilter}
+                typer={g.typer}
+                sortering={sortering[lage]}
+                onSortering={s => setSortering(prev => ({ ...prev, [lage]: s }))}
+              />
             </div>
-            {visaPlan && (
-              <div id="mina-plan-lista">
-                {plan.length === 0 ? (
-                  <p className="text-sm text-slate-500">Inga planerade besök efter den här veckan.</p>
-                ) : (
-                  <ul className="rounded-2xl bg-slate-900 border border-slate-700/60 divide-y divide-slate-700/60 overflow-hidden">
-                    {plan.map(g => {
-                      const oppen = oppnaKunder.has(g.nyckel) || !!q
-                      const forsta = g.besok[0]
-                      return (
-                        <li key={g.nyckel}>
-                          <button
-                            type="button"
-                            aria-expanded={oppen}
-                            onClick={() => vaxlaKund(g.nyckel)}
-                            className="w-full flex items-center gap-3 px-3 py-3 min-h-[60px] text-left hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#20c58f]"
-                          >
-                            <span className="flex-1 min-w-0">
-                              <span className="block text-[15px] font-medium text-white truncate">{g.kund}</span>
-                              <span className="block text-[13px] text-slate-400">
-                                {g.besok.length} {g.besok.length === 1 ? 'planerat besök' : 'planerade besök'}, nästa {forsta.dag}
-                              </span>
-                            </span>
-                            <Icon name="allman.chevron" size={16} className={`text-slate-500 transition-transform ${oppen ? 'rotate-90' : ''}`} />
-                          </button>
-                          {oppen && (
-                            <ul className="bg-slate-950/40 divide-y divide-slate-700/40">
-                              {g.besok.map(b => <ArendeRad key={b.nyckel} b={b} idag={idag} onOppna={() => oppna(b)} />)}
-                            </ul>
-                          )}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </div>
-            )}
-          </section>
+          </div>
 
-          {utanTid.length > 0 && (
-            <section className="space-y-2">
-              <Hopfallbar id="mina-utantid-lista" rubrik="Övriga öppna ärenden" antal={utanTid.length} oppen={visaUtanTid} onToggle={() => setUtanTidOppen(v => !v)} />
-              {visaUtanTid && (
-                <ul id="mina-utantid-lista" className="rounded-2xl bg-slate-900 border border-slate-700/60 divide-y divide-slate-700/60 overflow-hidden">
-                  {utanTid.map(b => <ArendeRad key={b.nyckel} b={b} idag={idag} onOppna={() => oppna(b)} />)}
-                </ul>
-              )}
-            </section>
-          )}
-
-          <section className="space-y-2">
-            <Hopfallbar id="mina-avslutade-lista" rubrik="Avslutade" antal={avslutade.length} oppen={visaAvslutade} onToggle={() => setAvslutadeOppen(v => !v)} />
-            {visaAvslutade && (
-              <div id="mina-avslutade-lista" className="space-y-2">
-                {avslutade.length === 0 ? (
-                  <p className="text-sm text-slate-500">Inga avslutade ärenden.</p>
-                ) : (
-                  <>
-                    <ul className="rounded-2xl bg-slate-900 border border-slate-700/60 divide-y divide-slate-700/60 overflow-hidden">
-                      {avslutade.slice(0, AVSLUTADE_MAX).map(b => <ArendeRad key={b.nyckel} b={b} idag={idag} onOppna={() => oppna(b)} />)}
-                    </ul>
-                    {avslutade.length > AVSLUTADE_MAX && (
-                      <p className="text-[13px] text-slate-500">Visar de {AVSLUTADE_MAX} senaste. Sök för att hitta äldre ärenden.</p>
-                    )}
-                  </>
-                )}
-              </div>
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 lg:items-start">
+            <div role="tabpanel" aria-label={lage === 'attgora' ? 'Att göra' : lage === 'kommande' ? 'Kommande' : 'Avslutade'} className="min-w-0 pt-1">
+              {lage === 'attgora' ? attGora() : lage === 'kommande' ? kommande() : avslutade()}
+            </div>
+            {arDator && (
+              <aside aria-label="Valt ärende" className="sticky top-4">
+                <ArendeForhandsvisning besok={valt} idag={idag} minId={minId} onOppna={b => oppna(b)} />
+              </aside>
             )}
-          </section>
+          </div>
         </>
       )}
 
-      <OppnaArende arende={oppet} onClose={() => setOppet(null)} onSaved={ladda} />
-      {!laddar && <Genomgang id="ny-mina-arenden" steg={GENOMGANG} tvinga={visaMig} onStang={() => setVisaMig(false)} />}
+      <OppnaArende
+        arende={oppet}
+        onClose={() => { setOppet(null); setKommunikation(false) }}
+        onSaved={ladda}
+        oppnaKommunikation={kommunikation}
+      />
+      {!laddarForsta && (
+        <Genomgang id={arDator ? 'ny-mina-arenden-v2-dator' : 'ny-mina-arenden-v2'} steg={arDator ? GENOMGANG_DATOR : GENOMGANG_MOBIL} tvinga={visaMig} onStang={() => setVisaMig(false)} />
+      )}
     </div>
   )
 }

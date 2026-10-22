@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.84.0',
+    date: '2026-10-23',
+    title: 'Mina ärenden, Utrustning och Provision i nya arbetsvyn',
+    items: [
+      { kind: 'nyhet', text: 'Mina ärenden i nya arbetsvyn har lägena Att göra, Kommande och Avslutade. Det som väntar delas upp i ärenden som behöver en tid och passerade besök att avsluta, äldst först. På datorn visas valt ärende i en panel bredvid listan, och länkar från sök och notiser öppnar ärendet direkt.' },
+      { kind: 'nyhet', text: 'Utrustning i nya arbetsvyn visar en pågående etablering överst med Placera station och Färdig, kunderna med typfärger och senaste kontroll, och kundens stationer som karta, lista eller planritning. Allt som fanns finns kvar, och Färdig med etablering fakturerar tilläggsstationer precis som förut.' },
+      { kind: 'nyhet', text: 'Provision i nya arbetsvyn säger i klartext vad du tjänat och vad som kommer med nästa lön, visar de senaste tolv månaderna och förklarar varje status. Vyerna är bara påslagna för de som har Ny arbetsvy.' },
+    ],
+  },
+  {
     version: '3.83.0',
     date: '2026-10-23',
     title: 'Nytt schema i nya arbetsvyn',
