@@ -244,8 +244,13 @@ export default function NyKarta() {
   return (
     <div className="relative h-[calc(100dvh-9rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] lg:h-[calc(100dvh-3.5rem)] flex flex-col lg:flex-row">
       {/* Karta */}
-      <div className="relative flex-1 min-h-[220px] bg-slate-800">
-        <div ref={kartRef} className="absolute inset-0" aria-label="Karta över dagens besök" role="region" />
+      {/* isolate: Google Maps sätter höga z-index på sina lager. Utan egen stackningskontext
+          hamnar kartan över dagväljaren och den fasta sidomenyn. Google skriver också över
+          kartelementets position, därför ligger den i en egen absolut behållare. */}
+      <div className="relative flex-1 min-w-0 min-h-[220px] bg-slate-800 isolate">
+        <div className="absolute inset-0 z-0">
+          <div ref={kartRef} className="h-full w-full" aria-label="Karta över dagens besök" role="region" />
+        </div>
         {!mapsKlar && (
           <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400 p-4 text-center">
             {mapsFel ? 'Kartan kunde inte laddas. Listan nedan fungerar ändå.' : <LoadingSpinner text="Laddar kartan..." />}
@@ -253,7 +258,7 @@ export default function NyKarta() {
         )}
 
         {/* Dagväljare och min position */}
-        <div className="absolute top-3 inset-x-3 flex items-start justify-between gap-2 pointer-events-none">
+        <div className="absolute top-3 inset-x-3 z-10 flex items-start justify-between gap-2 pointer-events-none">
           <div data-genomgang="karta-dag" role="tablist" aria-label="Välj dag" className="pointer-events-auto flex rounded-xl bg-slate-900 border border-slate-700 p-1 shadow-lg">
             {(['idag', 'imorgon'] as const).map(d => (
               <button
@@ -284,7 +289,7 @@ export default function NyKarta() {
       {/* Bottenark (telefon) och sidopanel (dator) */}
       <section
         aria-label="Stopp"
-        className="relative z-10 -mt-4 lg:mt-0 max-h-[55%] lg:max-h-none lg:w-[400px] overflow-y-auto bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-700/60 rounded-t-3xl lg:rounded-none shadow-2xl lg:shadow-none"
+        className="relative z-10 -mt-4 lg:mt-0 max-h-[55%] lg:max-h-none lg:w-[400px] lg:flex-shrink-0 overflow-y-auto bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-700/60 rounded-t-3xl lg:rounded-none shadow-2xl lg:shadow-none"
       >
         <span aria-hidden="true" className="lg:hidden block mx-auto mt-2 w-10 h-1 rounded-full bg-slate-600" />
         <div className="p-4 space-y-3">

@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.82.1',
+    date: '2026-10-22',
+    title: 'Kartan i nya arbetsvyn visar dagväljaren',
+    items: [
+      { kind: 'buggfix', text: 'Kartan i nya arbetsvyn lade sig över valet Idag eller Imorgon och över sidomenyn, så valet blinkade bara till och listan till höger klipptes. Nu ligger kartan under dem.' },
+    ],
+  },
+  {
     version: '3.82.0',
     date: '2026-10-22',
     title: 'Restid till nästa kund i nya arbetsvyn',
