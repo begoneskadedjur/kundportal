@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.80.0',
+    date: '2026-10-22',
+    title: 'Befintliga kunder visar om kunden är färdigupplagd',
+    items: [
+      { kind: 'nyhet', text: 'Kolumnen Status i Befintliga kunder har fem ikoner: avtal, Fortnox, fakturaväg, schema och kundportalen. Grön betyder klart, en halv prick påbörjat och en ring med streck saknas. Håll muspekaren över en ikon för att se varför, och tryck för att komma direkt dit det ska åtgärdas.' },
+      { kind: 'nyhet', text: 'Snabbvyn Inte kompletta visar kunderna med flest steg kvar först. Ikonerna ovanför listan filtrerar, till exempel bara de som saknar Fortnox. Den ersätter Saknar avtalskarta, Ofullständig karta och siffran saknar Fortnox-nr.' },
+      { kind: 'andring', text: 'Kolumnen Händelse visar en ikon och ett kort datum eller antal: ny period, uppsagd eller tilläggsstationer att besluta. Hela texten syns när du håller muspekaren över.' },
+      { kind: 'nyhet', text: 'Knappen Hjälp förklarar ikonerna och hur du jobbar i vyn. På telefon visar kundpanelen Uppläggning med en knapp för det som saknas.' },
+    ],
+  },
+  {
     version: '3.79.1',
     date: '2026-10-22',
     title: 'Sök fungerar i Rondering & Schema',

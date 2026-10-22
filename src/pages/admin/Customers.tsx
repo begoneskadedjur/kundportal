@@ -1,6 +1,6 @@
 // src/pages/admin/Customers.tsx — Befintliga kunder (etapp 3 av redesignen)
 // CRM-lista à la Attio/Linear: portföljrad i text (inga KPI-kort), grupperade
-// sektioner med räknare i whisper headers, ny radanatomi med Fortnox-statuspunkt
+// sektioner med räknare i whisper headers, statuskolumn med uppläggningens fem ikoner
 // och peek-panel (?peek=<id>) som återanvänder record-innehållet från kundsidan.
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
@@ -24,12 +24,17 @@ import ImportCustomerByOrgnrModal from '../../components/admin/customers/ImportC
 import BillingSettingsModal from '../../components/admin/customers/BillingSettingsModal'
 import CustomerContactsModal from '../../components/admin/customers/CustomerContactsModal'
 import CustomerPeekPanel from '../../components/admin/customers/CustomerPeekPanel'
-import CustomerListRow, { resolveFortnoxInfo, unitsMissingFortnox } from '../../components/admin/customers/CustomerListRow'
+import CustomerListRow, { CustomerListHeader } from '../../components/admin/customers/CustomerListRow'
+import CustomersHelpPanel from '../../components/admin/customers/CustomersHelpPanel'
+import { SETUP_ICON, setupTargetPath } from '../../components/admin/customers/setupStatusPaths'
+import { Icon } from '../../components/icons/Icon'
 import Select from '../../components/ui/Select'
 import { useCustomerAnalytics } from '../../hooks/useCustomerAnalytics'
 import { useConsolidatedCustomers, type ConsolidatedCustomer } from '../../hooks/useConsolidatedCustomers'
 import { useAddonPending, findAddonPending, type AddonPendingSummary } from '../../hooks/useAddonPending'
 import { useContractMapStatus, findContractMapStatus } from '../../hooks/useContractMapStatus'
+import { useCustomerSetupExtras, setupStatusFor } from '../../hooks/useCustomerSetupStatus'
+import { SETUP_KEYS, SETUP_LABEL, type SetupKey, type SetupSummary, type SetupTarget } from '../../shared/customerSetupStatus'
 import toast from 'react-hot-toast'
 
 // "Kräver åtgärd": uppsagd med slutdatum inom 90 dgr. Avtal förlängs automatiskt
@@ -62,10 +67,18 @@ function formatAnnualSum(v: number): string {
   return `${Math.round(v / 1000).toLocaleString('sv-SE')} tkr/år`
 }
 
-// karta_saknas: inget avtalspapper alls (bara kundrad/importrest).
-// karta_ofullstandig: papper finns men vitala delar saknas i avtalskartan.
-type QuickView = 'all' | 'atgard' | 'fortnox' | 'karta_saknas' | 'karta_ofullstandig'
-const QUICK_VIEWS: QuickView[] = ['all', 'atgard', 'fortnox', 'karta_saknas', 'karta_ofullstandig']
+// inkomplett: uppläggningen är inte klar (någon statusikon påbörjad eller saknas).
+// Ersätter Saknar avtalskarta, Ofullständig karta och Saknar Fortnox-nr; de
+// gamla ?quick-värdena leder hit.
+type QuickView = 'all' | 'atgard' | 'inkomplett'
+const LEGACY_INCOMPLETE = ['fortnox', 'karta_saknas', 'karta_ofullstandig', 'inkomplett']
+
+function isOpenState(s: SetupSummary | null, key?: SetupKey | null): boolean {
+  if (!s || s.terminated || s.complete) return false
+  if (!key) return true
+  const item = s.items.find((i) => i.key === key)
+  return !!item && (item.state === 'missing' || item.state === 'partial')
+}
 
 export default function Customers() {
   const navigate = useNavigate()
@@ -179,12 +192,40 @@ export default function Customers() {
   // ?quick=atgard (från avtalskartans "Tillbaka till Kräver åtgärd")
   const [quickView, setQuickView] = useState<QuickView>(() => {
     const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('quick') : null
-    return q && (QUICK_VIEWS as string[]).includes(q) ? (q as QuickView) : 'all'
+    if (q === 'atgard') return 'atgard'
+    return q && LEGACY_INCOMPLETE.includes(q) ? 'inkomplett' : 'all'
   })
+  // Ikonfiltret i Inte kompletta: visa bara de som saknar en viss del
+  const [setupFilter, setSetupFilter] = useState<SetupKey | null>(null)
+  const [helpOpen, setHelpOpen] = useState(false)
+  const closeHelp = useCallback(() => setHelpOpen(false), [])
   const addonRows = useAddonPending()
   const addonFor = useCallback((c: ConsolidatedCustomer) => findAddonPending(addonRows, c), [addonRows])
   const mapRows = useContractMapStatus()
-  const mapFor = useCallback((c: ConsolidatedCustomer) => findContractMapStatus(mapRows, c), [mapRows])
+
+  // Uppläggningens status per rad (statusikonerna)
+  const [setupRefreshKey, setSetupRefreshKey] = useState(0)
+  const setupExtras = useCustomerSetupExtras(setupRefreshKey)
+  const setupById = useMemo(() => {
+    const m = new Map<string, SetupSummary | null>()
+    const mapLoaded = mapRows.length > 0
+    for (const c of consolidatedCustomers) {
+      m.set(c.id, setupStatusFor(c, findContractMapStatus(mapRows, c), setupExtras, mapLoaded))
+    }
+    return m
+  }, [consolidatedCustomers, mapRows, setupExtras])
+  const setupFor = useCallback((c: ConsolidatedCustomer) => setupById.get(c.id) ?? null, [setupById])
+  // Kundpanelen visar Uppläggning för radens kund (inte för en enhet som öppnats)
+  const peekSetup = useMemo(() => {
+    if (!peekCustomerId) return null
+    const org = consolidatedCustomers.find((o) => peekIdFor(o) === peekCustomerId)
+    return org ? setupFor(org) : null
+  }, [peekCustomerId, consolidatedCustomers, setupFor])
+  const goToSetupTarget = useCallback((t: SetupTarget) => navigate(setupTargetPath(t, basePath)), [navigate, basePath])
+  const refreshAll = () => {
+    refresh()
+    setSetupRefreshKey((k) => k + 1)
+  }
 
   // Paginering
 
@@ -205,21 +246,24 @@ export default function Customers() {
     })
 
     if (quickView === 'atgard') return result.filter((c) => requiresAction(c, addonFor(c)))
-    if (quickView === 'fortnox') {
-      // Kunden saknar nummer, eller en enhet som är ett eget bolag saknar nummer
-      return result.filter(c => !c.isTerminated && (resolveFortnoxInfo(c).number == null || unitsMissingFortnox(c) > 0))
-    }
-    if (quickView === 'karta_saknas') return result.filter(c => !c.isTerminated && mapFor(c)?.status === 'none')
-    if (quickView === 'karta_ofullstandig') return result.filter(c => !c.isTerminated && mapFor(c)?.status === 'incomplete')
+    if (quickView === 'inkomplett') return result.filter((c) => isOpenState(setupFor(c), setupFilter))
     return result
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [consolidatedCustomers, searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, quickView, filterConsolidatedCustomers, mapFor])
+  }, [consolidatedCustomers, searchTerm, statusFilter, healthFilter, portalFilter, managerFilter, organizationTypeFilter, quickView, filterConsolidatedCustomers, setupFor, setupFilter])
 
   // Grupperade sektioner (ersätter gamla statusgrupperna)
   const groups = useMemo(() => {
     const byName = [...filteredCustomers].sort((a, b) =>
       (a.company_name ?? '').localeCompare(b.company_name ?? '', 'sv')
     )
+
+    // Inte kompletta: en lista, flest kvar först
+    if (quickView === 'inkomplett') {
+      const rows = byName.sort((a, b) => (setupFor(b)?.remaining ?? 0) - (setupFor(a)?.remaining ?? 0))
+      return rows.length > 0
+        ? [{ key: 'inkomplett', label: 'Inte kompletta', rows, sum: null as number | null }]
+        : []
+    }
 
     const atgard: ConsolidatedCustomer[] = []
     const fornyelse: ConsolidatedCustomer[] = []
@@ -248,7 +292,7 @@ export default function Customers() {
       { key: 'pausade', label: 'Pausade', rows: pausade, sum: null as number | null },
       { key: 'uppsagda', label: 'Uppsagda', rows: uppsagda, sum: null as number | null },
     ].filter(g => g.rows.length > 0)
-  }, [filteredCustomers, addonFor])
+  }, [filteredCustomers, addonFor, quickView, setupFor])
 
   // Ingen paginering: grupperna renderas i sin helhet så att alla statusar
   // alltid går att öppna direkt. Pausade/Uppsagda är kollapsade by default.
@@ -265,13 +309,10 @@ export default function Customers() {
     const renewals = active.filter(c =>
       c.daysToNextRenewal != null && c.daysToNextRenewal > 0 && c.daysToNextRenewal <= 90
     ).length
-    // Kunder utan nummer plus enheter som är egna bolag utan eget eller delat nummer
-    const missingFortnox = active.reduce(
-      (sum, c) => sum + (resolveFortnoxInfo(c).number == null ? 1 : 0) + unitsMissingFortnox(c),
-      0
-    )
-    return { annualSum, contractCount, customerCount: active.length, renewals, missingFortnox }
-  }, [consolidatedCustomers])
+    // Kunder vars uppläggning inte är klar (någon statusikon påbörjad eller saknas)
+    const incomplete = active.filter((c) => isOpenState(setupFor(c))).length
+    return { annualSum, contractCount, customerCount: active.length, renewals, incomplete }
+  }, [consolidatedCustomers, setupFor])
 
   // Deep-link via ?customerId=... — hitta kunden, navigera till rätt sida, scrolla + flash
   useEffect(() => {
@@ -298,6 +339,7 @@ export default function Customers() {
     setManagerFilter('all')
     setOrganizationTypeFilter('all')
     setQuickView('all')
+    setSetupFilter(null)
 
     setFlashCustomerId(match.id)
 
@@ -321,14 +363,18 @@ export default function Customers() {
   const atgardCount = consolidatedCustomers.filter((c) => requiresAction(c, addonFor(c))).length
   const multisiteCount = consolidatedCustomers.filter(c => !c.isTerminated && c.organizationType === 'multisite').length
   const terminatedCount = consolidatedCustomers.filter(c => c.isTerminated).length
-  const mapMissingCount = consolidatedCustomers.filter(c => !c.isTerminated && mapFor(c)?.status === 'none').length
-  const mapIncompleteCount = consolidatedCustomers.filter(c => !c.isTerminated && mapFor(c)?.status === 'incomplete').length
+  // Ikonfiltret: hur många som saknar respektive del
+  const setupKeyCounts = useMemo(() => {
+    const counts = Object.fromEntries(SETUP_KEYS.map((k) => [k, 0])) as Record<SetupKey, number>
+    for (const c of consolidatedCustomers) {
+      for (const k of SETUP_KEYS) if (isOpenState(setupFor(c), k)) counts[k]++
+    }
+    return counts
+  }, [consolidatedCustomers, setupFor])
 
   // Aktiv preset-detektering
   const activePreset: string = quickView === 'atgard' ? 'atgard'
-    : quickView === 'fortnox' ? 'fortnox'
-    : quickView === 'karta_saknas' ? 'karta_saknas'
-    : quickView === 'karta_ofullstandig' ? 'karta_ofullstandig'
+    : quickView === 'inkomplett' ? 'inkomplett'
     : statusFilter === 'expiring' ? 'expiring'
     : statusFilter === 'terminated' ? 'terminated'
     : organizationTypeFilter === 'multisite' ? 'multisite'
@@ -338,13 +384,13 @@ export default function Customers() {
   const resetFilters = () => {
     setSearchInput(''); setStatusFilter('all'); setHealthFilter('all')
     setPortalFilter('all'); setOrganizationTypeFilter('all'); setManagerFilter('all')
-    setQuickView('all')
+    setQuickView('all'); setSetupFilter(null)
   }
 
   // Applicera preset
   const applyPreset = (preset: string) => {
     setSearchInput(''); setHealthFilter('all'); setPortalFilter('all'); setManagerFilter('all')
-    setQuickView('all')
+    setQuickView('all'); setSetupFilter(null)
 
     switch (preset) {
       case 'expiring':
@@ -353,12 +399,8 @@ export default function Customers() {
       case 'atgard':
         setStatusFilter('all'); setOrganizationTypeFilter('all'); setQuickView('atgard')
         break
-      case 'fortnox':
-        setStatusFilter('all'); setOrganizationTypeFilter('all'); setQuickView('fortnox')
-        break
-      case 'karta_saknas':
-      case 'karta_ofullstandig':
-        setStatusFilter('all'); setOrganizationTypeFilter('all'); setQuickView(preset)
+      case 'inkomplett':
+        setStatusFilter('all'); setOrganizationTypeFilter('all'); setQuickView('inkomplett')
         break
       case 'multisite':
         setStatusFilter('all'); setOrganizationTypeFilter('multisite')
@@ -487,10 +529,10 @@ export default function Customers() {
             </button>
             <span className="text-slate-700">·</span>
             <button
-              onClick={() => applyPreset('fortnox')}
-              className="hover:text-[#20c58f] transition-colors"
+              onClick={() => applyPreset('inkomplett')}
+              className="font-semibold text-amber-400 hover:text-amber-300 transition-colors rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
             >
-              <span className="text-slate-200 tabular-nums">{portfolio.missingFortnox}</span> saknar Fortnox-nr
+              <span className="tabular-nums">{portfolio.incomplete}</span> inte kompletta
             </button>
           </p>
         </div>
@@ -576,7 +618,7 @@ export default function Customers() {
           </button>
           <div className="w-px h-6 bg-slate-700" />
           <button
-            onClick={refresh}
+            onClick={refreshAll}
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-700/50 transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
@@ -595,6 +637,15 @@ export default function Customers() {
           >
             <FileText className="w-4 h-4" />
             <span className="hidden md:inline">Månadsrapport</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            className="flex items-center gap-1.5 h-[34px] px-3 rounded-lg border border-slate-700 text-sm text-slate-200 hover:border-slate-500 hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+          >
+            <Icon name="kund.hjalp" size={16} />
+            <span className="hidden sm:inline">Hjälp</span>
+            <span className="sr-only sm:hidden">Hjälp</span>
           </button>
         </div>
       </div>
@@ -708,92 +759,68 @@ export default function Customers() {
             )}
           </div>
 
-          {/* Snabbvy-knappar */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-slate-400 font-medium mr-1">Snabbvy:</span>
-            <button
-              onClick={() => resetFilters()}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                activePreset === 'all'
-                  ? 'bg-[#20c58f]/20 text-[#20c58f] border border-[#20c58f]/30'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
-              }`}
-            >
-              Alla ({consolidatedCustomers.length})
-            </button>
-            <button
-              onClick={() => applyPreset('atgard')}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                activePreset === 'atgard'
-                  ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-red-400 hover:border-red-500/30'
-              }`}
-            >
-              Kräver åtgärd ({atgardCount})
-            </button>
-            <button
-              onClick={() => applyPreset('expiring')}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                activePreset === 'expiring'
-                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-amber-400 hover:border-amber-500/30'
-              }`}
-            >
-              Utgående avtal ({expiringCount})
-            </button>
-            <button
-              onClick={() => applyPreset('multisite')}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                activePreset === 'multisite'
-                  ? 'bg-[#20c58f]/20 text-[#20c58f] border border-[#20c58f]/30'
-                  : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-white hover:border-slate-500'
-              }`}
-            >
-              Multisite ({multisiteCount})
-            </button>
-            {mapMissingCount > 0 && (
-              <button
-                onClick={() => applyPreset('karta_saknas')}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  activePreset === 'karta_saknas'
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-red-400 hover:border-red-500/30'
-                }`}
-                title="Kunder utan avtalspapper i avtalskartan (avtalet ligger bara på kundraden)"
-              >
-                Saknar avtalskarta ({mapMissingCount})
-              </button>
-            )}
-            {mapIncompleteCount > 0 && (
-              <button
-                onClick={() => applyPreset('karta_ofullstandig')}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  activePreset === 'karta_ofullstandig'
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-amber-400 hover:border-amber-500/30'
-                }`}
-                title="Avtalskartan finns men vitala delar saknas"
-              >
-                Ofullständig karta ({mapIncompleteCount})
-              </button>
-            )}
-            {terminatedCount > 0 && (
-              <button
-                onClick={() => applyPreset('terminated')}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                  activePreset === 'terminated'
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700 hover:text-red-400 hover:border-red-500/30'
-                }`}
-              >
-                Uppsagda ({terminatedCount})
-              </button>
-            )}
-          </div>
+          {/* Snabbvyer: platt text, aktiv vy understruken (inga piller) */}
+          <nav aria-label="Snabbvy" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px] text-slate-400">
+            <span className="text-slate-500">Snabbvy:</span>
+            {([
+              { key: 'all', label: 'Alla', count: consolidatedCustomers.length, onClick: () => resetFilters() },
+              { key: 'atgard', label: 'Kräver åtgärd', count: atgardCount, onClick: () => applyPreset('atgard') },
+              { key: 'inkomplett', label: 'Inte kompletta', count: portfolio.incomplete, onClick: () => applyPreset('inkomplett') },
+              { key: 'expiring', label: 'Utgående avtal', count: expiringCount, onClick: () => applyPreset('expiring') },
+              { key: 'multisite', label: 'Multisite', count: multisiteCount, onClick: () => applyPreset('multisite') },
+              ...(terminatedCount > 0
+                ? [{ key: 'terminated', label: 'Uppsagda', count: terminatedCount, onClick: () => applyPreset('terminated') }]
+                : []),
+            ]).map((v) => {
+              const active = activePreset === v.key
+              return (
+                <button
+                  key={v.key}
+                  type="button"
+                  onClick={v.onClick}
+                  aria-current={active ? 'true' : undefined}
+                  className={`rounded-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+                    active
+                      ? 'font-semibold text-emerald-400 underline decoration-2 underline-offset-[5px]'
+                      : 'hover:text-white'
+                  }`}
+                >
+                  {v.label} <span className="tabular-nums">({v.count})</span>
+                </button>
+              )
+            })}
+          </nav>
+
+          {/* Inte kompletta: ikonfilter */}
+          {quickView === 'inkomplett' && (
+            <div className="flex flex-wrap items-center gap-1.5 rounded-[10px] border border-slate-700 p-3" role="group" aria-label="Visa bara de som saknar">
+              <span className="mr-1 text-xs text-slate-500">Visa bara de som saknar:</span>
+              {SETUP_KEYS.map((k) => {
+                const on = setupFilter === k
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setSetupFilter(on ? null : k)}
+                    className={`inline-flex h-[34px] items-center gap-1.5 rounded-lg border px-2.5 text-[13px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${
+                      on
+                        ? 'border-amber-400 bg-amber-500/10 font-semibold text-amber-400'
+                        : 'border-slate-700 text-slate-300 hover:border-slate-500 hover:text-white'
+                    }`}
+                  >
+                    <Icon name={SETUP_ICON[k]} size={16} />
+                    {SETUP_LABEL[k]} <span className="tabular-nums">({setupKeyCounts[k]})</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
 
           {/* Grupperad kundlista — samma radkomponent för desktop och mobil */}
           <div className="border border-slate-800 bg-slate-900/30 rounded-xl overflow-visible">
             <ul>
+              <CustomerListHeader onHelp={() => setHelpOpen(true)} />
               {groups.map((group, groupIndex) => {
                 const collapsed = collapsedGroups[group.key] === true
                 const rowsOnPage = group.rows
@@ -833,11 +860,12 @@ export default function Customers() {
                           const a = addonFor(org)
                           if (a) navigate(`${basePath}/${a.root_customer_id}?tab=avtalskarta&panel=innehall`)
                         }}
-                        mapStatus={mapFor(org)}
-                        onOpenMap={() => {
-                          const m = mapFor(org)
-                          navigate(`${basePath}/${m?.root_customer_id ?? org.headquarterCustomer?.id ?? org.id}?tab=avtalskarta`)
+                        onOpenEvent={(kind) => {
+                          const id = peekIdFor(org)
+                          if (id) navigate(`${basePath}/${id}?tab=${kind === 'period' ? 'fakturering' : 'avtal'}`)
                         }}
+                        setup={setupFor(org)}
+                        onSetupNavigate={goToSetupTarget}
                         highlighted={
                           activeCustomerId === org.id ||
                           (peekCustomerId != null && peekIdFor(org) === peekCustomerId)
@@ -1076,7 +1104,12 @@ export default function Customers() {
         customerId={peekCustomerId}
         basePath={basePath}
         onClose={closePeek}
+        setup={peekSetup}
+        onSetupNavigate={goToSetupTarget}
       />
+
+      {/* Hjälpen: knappen Hjälp och info-ikonen vid kolumnen Status */}
+      <CustomersHelpPanel open={helpOpen} onClose={closeHelp} basePath={basePath} />
     </div>
   )
 }

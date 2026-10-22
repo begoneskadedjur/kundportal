@@ -1,10 +1,11 @@
 // src/components/admin/customers/CustomerListRow.tsx
-// Radkomponent för nya Befintliga kunder-listan (etapp 3).
-// Anatomi: [kundnr + statuspunkt] [namn + enhetsbadge] [N avtal] [årsvärde]
-// [nästa händelse i klartext] [säljare] [hover-reveal åtgärdsmeny].
+// Radkomponent för Befintliga kunder.
+// Anatomi: [kundnr] [namn + enhetsbadge] [N avtal] [årsvärde] [händelse]
+// [säljare] [status: fem uppläggningsikoner] [hover-reveal åtgärdsmeny].
+// Status och händelse följer den godkända skissen 2026-10-22 (SetupStatus.tsx).
 // Multisite-expandering visar BARA indragna enhetsrader; klick på enhet
 // navigerar till enhetens record-sida. Samma komponent används på mobil
-// (stapel-layout via responsiva klasser — ingen parallell logik).
+// (stapel-layout via responsiva klasser, ingen parallell logik).
 
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -20,11 +21,14 @@ import {
 } from 'lucide-react'
 import type { ConsolidatedCustomer, CustomerSite } from '../../../hooks/useConsolidatedCustomers'
 import type { AddonPendingSummary } from '../../../hooks/useAddonPending'
-import type { ContractMapStatus } from '../../../hooks/useContractMapStatus'
 import { unitFortnoxState } from '../../../shared/fortnoxCustomerNumbers'
+import type { SetupSummary, SetupTarget } from '../../../shared/customerSetupStatus'
+import { Icon, type IconName } from '../../icons/Icon'
+import TooltipWrapper from '../../ui/TooltipWrapper'
+import { EXPLAIN_PANEL_CLASS, ExplainPanel, SetupStatusCell, SetupStatusCompact } from './SetupStatus'
 
 // ---------------------------------------------------------------------------
-// Delade hjälpare (används även av portföljraden i Customers.tsx)
+// Delade hjälpare (används även av Customers.tsx)
 // ---------------------------------------------------------------------------
 
 /** Kundnummer + Fortnox-verifiering för raden (HK för multisite, annars sites[0]) */
@@ -61,50 +65,113 @@ export function unitsMissingFortnox(org: ConsolidatedCustomer): number {
 
 const DAY_MS = 86_400_000
 
+/** "1 nov" utan punkt */
 function formatDayMonth(iso: string): string {
-  return new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+  return new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }).replace(/\./g, '')
 }
 
+/** "nov 2027" utan punkt */
 function formatMonthYear(iso: string): string {
-  return new Date(iso).toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' })
-}
-
-/** Nästa händelse i klartext, härledd från befintliga fält */
-export function nextEventInfo(org: ConsolidatedCustomer): { text: string; className: string } {
-  if (org.isTerminated) {
-    if (org.effectiveEndDate) {
-      const past = new Date(org.effectiveEndDate).getTime() < Date.now()
-      return past
-        ? { text: `Uppsagd, slutade ${formatDayMonth(org.effectiveEndDate)}`, className: 'text-slate-500' }
-        : { text: `Uppsagd, slutar ${formatDayMonth(org.effectiveEndDate)}`, className: 'text-red-400' }
-    }
-    return { text: 'Uppsagd', className: 'text-red-400' }
-  }
-  const end = org.nextRenewalDate
-  if (!end) return { text: '–', className: 'text-slate-600' }
-  const days = org.daysToNextRenewal ?? Math.ceil((new Date(end).getTime() - Date.now()) / DAY_MS)
-  if (days <= 0) return { text: 'Fortlöpande', className: 'text-slate-500' }
-  if (days <= 90) return { text: `Ny period ${formatDayMonth(end)}`, className: 'text-amber-400' }
-  return { text: `Ny period ${formatMonthYear(end)}`, className: 'text-slate-400' }
+  return new Date(iso).toLocaleDateString('sv-SE', { month: 'short', year: 'numeric' }).replace(/\./g, '')
 }
 
 function formatKr(n: number): string {
   return `${Math.round(n).toLocaleString('sv-SE')} kr`
 }
 
-/** Portalstatus för raden (etapp 6) — härledd från hookens befintliga fält */
-export function portalStatusInfo(org: ConsolidatedCustomer): { label: string; dotClass: string } {
-  if (org.activeUsersCount > 0) {
-    return { label: 'Aktiv', dotClass: 'bg-[#20c58f]' }
+export type CustomerEventKind = 'period' | 'uppsagd' | 'beslut'
+
+export interface CustomerEvent {
+  kind: CustomerEventKind | null
+  /** Kort text i kolumnen: "1 nov" eller "12" */
+  short: string
+  /** Rubriken i förklaringen */
+  title: string
+  /** Hela texten i förklaringen */
+  full: string
+  /** "Tryck för att ...", null när händelsen inte går att trycka på */
+  action: string | null
+  /** Färgton för ikon och text */
+  tone: string
+}
+
+/** Händelsen för raden: tillägg att besluta går före, sedan uppsägning, sedan nästa period. */
+export function customerEvent(org: ConsolidatedCustomer, addon: AddonPendingSummary | null): CustomerEvent {
+  if (addon) {
+    const full = `${addon.stations} ${addon.stations === 1 ? 'tilläggsstation väntar' : 'tilläggsstationer väntar'} på beslut, ${formatKr(addon.annual_kr)}/år`
+      + `${addon.contracts > 1 ? ` på ${addon.contracts} avtal` : ''}`
+      + `${addon.first_marked_at ? `, markerade ${formatDayMonth(addon.first_marked_at)}` : ''}.`
+    return {
+      kind: 'beslut', short: String(addon.stations), title: 'Tilläggsstationer att besluta',
+      full, action: 'Tryck för att besluta', tone: 'text-amber-400',
+    }
   }
-  if (org.pendingInvitationsCount > 0 || org.portalAccessStatus !== 'none') {
-    return { label: 'Inbjuden', dotClass: 'bg-amber-400' }
+  if (org.isTerminated) {
+    if (org.effectiveEndDate) {
+      const iso = org.effectiveEndDate.slice(0, 10)
+      const past = new Date(org.effectiveEndDate).getTime() < Date.now()
+      return {
+        kind: 'uppsagd', short: formatDayMonth(org.effectiveEndDate), title: 'Uppsagd',
+        full: past ? `Avtalet är uppsagt och slutade ${iso}.` : `Avtalet är uppsagt och slutar ${iso}.`,
+        action: 'Tryck för att se avtalet', tone: past ? 'text-slate-500' : 'text-red-400',
+      }
+    }
+    return { kind: 'uppsagd', short: 'Uppsagd', title: 'Uppsagd', full: 'Avtalet är uppsagt.', action: 'Tryck för att se avtalet', tone: 'text-red-400' }
   }
-  return { label: 'Ej inbjuden', dotClass: 'bg-slate-600' }
+  const end = org.nextRenewalDate
+  if (!end) return { kind: null, short: '', title: '', full: '', action: null, tone: 'text-slate-600' }
+  const days = org.daysToNextRenewal ?? Math.ceil((new Date(end).getTime() - Date.now()) / DAY_MS)
+  if (days <= 0) return { kind: null, short: 'Fortlöpande', title: '', full: '', action: null, tone: 'text-slate-500' }
+  const iso = end.slice(0, 10)
+  const soon = days <= 90
+  return {
+    kind: 'period',
+    short: soon ? formatDayMonth(end) : formatMonthYear(end),
+    title: 'Ny period',
+    full: `Ny avtalsperiod börjar ${iso}.`,
+    action: 'Tryck för att se faktureringen',
+    tone: soon ? 'text-emerald-400' : 'text-slate-400',
+  }
+}
+
+const EVENT_ICON: Record<CustomerEventKind, IconName> = {
+  period: 'kund.period',
+  uppsagd: 'kund.uppsagd',
+  beslut: 'kund.beslut',
+}
+
+/** Kolumnen Händelse: egen ikon + kort text, hela texten vid hovring och fokus. */
+function EventCell({ event, onOpen }: { event: CustomerEvent; onOpen: () => void }) {
+  if (!event.kind) {
+    return <span className={`text-xs ${event.tone}`}>{event.short}</span>
+  }
+  return (
+    <TooltipWrapper
+      position="bottom"
+      delay={120}
+      showOnFocus
+      panelClassName={EXPLAIN_PANEL_CLASS}
+      content={<ExplainPanel title={event.title} reason={event.full} action={event.action} />}
+    >
+      <button
+        type="button"
+        aria-label={`${event.title}: ${event.full}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          onOpen()
+        }}
+        onKeyDown={(e) => e.stopPropagation()}
+        className={`inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${event.tone}`}
+      >
+        <Icon name={EVENT_ICON[event.kind]} size={20} />
+        <span className="whitespace-nowrap text-[13px] font-semibold tabular-nums">{event.short}</span>
+      </button>
+    </TooltipWrapper>
+  )
 }
 
 // ---------------------------------------------------------------------------
-// Statuspunkt för Fortnox-kundnummer
+// Statuspunkt för Fortnox-kundnummer (enhetsraderna)
 // ---------------------------------------------------------------------------
 
 function FortnoxDot({ number, verified }: { number: number | null; verified: boolean }) {
@@ -120,6 +187,38 @@ function FortnoxDot({ number, verified }: { number: number | null; verified: boo
       title="Kundnummer ej verifierat mot Fortnox"
       aria-hidden
     />
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Kolumnrubriker (samma bredder som raden)
+// ---------------------------------------------------------------------------
+
+export function CustomerListHeader({ onHelp }: { onHelp: () => void }) {
+  return (
+    <li className="list-none hidden lg:flex items-center gap-x-3 px-3 py-2.5 border-b border-slate-800 border-l-2 border-l-transparent text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+      <span className="w-20 shrink-0">Kundnr</span>
+      <span className="flex-1 min-w-0">Kund</span>
+      <span className="flex items-center gap-x-4 shrink-0">
+        <span className="w-14 text-right">Avtal</span>
+        <span className="w-24 text-right">Värde/år</span>
+        <span className="w-28">Händelse</span>
+        <span className="hidden xl:block w-28">Säljare</span>
+        <span className="flex items-center gap-1.5 w-[280px] xl:w-[310px]">
+          Status
+          <button
+            type="button"
+            onClick={onHelp}
+            aria-label="Vad betyder statusikonerna?"
+            className="inline-flex rounded p-0.5 text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+          >
+            <Icon name="kund.info" size={16} />
+          </button>
+        </span>
+      </span>
+      {/* Plats för åtgärdsmenyn */}
+      <span className="w-7 shrink-0" aria-hidden />
+    </li>
   )
 }
 
@@ -151,10 +250,12 @@ interface Props {
   addonPending?: AddonPendingSummary | null
   /** Öppna kundens avtalskarta på Innehåll och utrustning */
   onOpenAddons?: () => void
-  /** Avtalskartans status: saknar karta, N steg kvar eller komplett */
-  mapStatus?: ContractMapStatus | null
-  /** Öppna kundens avtalskarta */
-  onOpenMap?: () => void
+  /** Ny period eller uppsägning: öppna kundsidan där det syns */
+  onOpenEvent?: (kind: 'period' | 'uppsagd') => void
+  /** Uppläggningens status. null medan den hämtas */
+  setup?: SetupSummary | null
+  /** Klick på en statusikon eller nästa åtgärd */
+  onSetupNavigate?: (target: SetupTarget) => void
 }
 
 export default function CustomerListRow({
@@ -167,8 +268,9 @@ export default function CustomerListRow({
   contactCount,
   addonPending = null,
   onOpenAddons,
-  mapStatus = null,
-  onOpenMap,
+  onOpenEvent,
+  setup = null,
+  onSetupNavigate,
   highlighted = false,
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false)
@@ -191,15 +293,25 @@ export default function CustomerListRow({
   }, [menuOpen])
 
   const isMultisite = org.organizationType === 'multisite'
-  const { number, verified } = resolveFortnoxInfo(org)
-  const next = nextEventInfo(org)
-  const portal = portalStatusInfo(org)
+  const { number } = resolveFortnoxInfo(org)
+  const event = customerEvent(org, addonPending)
   const annual = org.totalAnnualValue || 0
   const contractCount = org.contractCount || 0
   const seller = org.assigned_account_manager ?? org.sales_person ?? null
+  const incomplete = !!setup && !setup.terminated && !setup.complete
+  const navigateSetup = (t: SetupTarget) => onSetupNavigate?.(t)
+  const openEvent = () => {
+    if (event.kind === 'beslut') onOpenAddons?.()
+    else if (event.kind) onOpenEvent?.(event.kind)
+  }
 
   const menuItem =
     'w-full px-3 py-2 text-left text-sm text-slate-300 hover:bg-slate-800 hover:text-white flex items-center gap-2.5 transition-colors'
+
+  // Vänsterkanten: markerad rad (grön) går före ofullständig (bärnsten)
+  const edge = highlighted
+    ? 'border-l-[#20c58f] bg-[#20c58f]/5'
+    : incomplete ? 'border-l-amber-500' : 'border-l-transparent'
 
   return (
     <li className="list-none">
@@ -212,13 +324,10 @@ export default function CustomerListRow({
         onKeyDown={(e) => {
           if (e.key === 'Enter') onPeek()
         }}
-        className={`group relative flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-0.5 px-3 py-2.5 md:py-2 cursor-pointer hover:bg-slate-900/60 transition-colors border-l-2 ${
-          highlighted ? 'border-l-[#20c58f] bg-[#20c58f]/5' : 'border-l-transparent'
-        }`}
+        className={`group relative flex flex-wrap lg:flex-nowrap items-center gap-x-3 gap-y-1 px-3 py-2.5 lg:py-2 cursor-pointer hover:bg-slate-900/60 transition-colors border-l-2 ${edge}`}
       >
-        {/* Kundnr + statuspunkt */}
-        <span className="flex items-center gap-1.5 w-20 shrink-0">
-          <FortnoxDot number={number} verified={verified} />
+        {/* Kundnr */}
+        <span className="flex items-center w-20 shrink-0">
           {number != null ? (
             <span className="font-mono text-xs text-slate-400 tabular-nums">#{number}</span>
           ) : (
@@ -227,7 +336,7 @@ export default function CustomerListRow({
         </span>
 
         {/* Namn + enhetsbadge + expandering */}
-        <span className="flex items-center gap-2 flex-1 min-w-0">
+        <span className="flex items-center gap-2 flex-1 min-w-0 pr-7 lg:pr-0">
           <span className="text-sm text-slate-100 truncate">{org.company_name}</span>
           {isMultisite && (
             <button
@@ -244,81 +353,41 @@ export default function CustomerListRow({
           )}
         </span>
 
-        {/* Nyckeltal — egen rad på mobil (stapel), kolumner på desktop */}
-        <span className="flex items-center gap-x-3 md:gap-x-4 basis-full md:basis-auto pl-[86px] md:pl-0 md:shrink-0 text-xs md:text-sm min-w-0">
-          <span className="text-slate-400 tabular-nums shrink-0 md:w-14 md:text-right">
+        {/* Nyckeltal: egen rad på mobil (stapel), kolumner på dator */}
+        <span className="flex items-center gap-x-3 lg:gap-x-4 basis-full lg:basis-auto pl-[92px] lg:pl-0 lg:shrink-0 text-xs lg:text-sm min-w-0">
+          <span className="text-slate-400 tabular-nums shrink-0 lg:w-14 lg:text-right">
             {contractCount > 0 ? `${contractCount} avtal` : '–'}
-            {/* Avtalskartans status: platt text under antalet, klick öppnar kartan.
-                Röd = inget papper alls (bara kundrad/importrest), bärnsten = papper
-                finns men vitala delar saknas. Komplett visar inget. */}
-            {mapStatus && !org.isTerminated && mapStatus.status !== 'complete' && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenMap?.()
-                }}
-                className={`block w-full md:text-right text-[10px] leading-tight font-medium hover:underline decoration-dotted ${
-                  mapStatus.status === 'none' ? 'text-red-400' : 'text-amber-400'
-                }`}
-                title={
-                  mapStatus.status === 'none'
-                    ? 'Ingen avtalskarta: avtalet finns bara på kundraden. Öppna kartan och skapa avtalet.'
-                    : `Avtalskartan saknar: ${mapStatus.missing.join(', ')}`
-                }
-              >
-                {mapStatus.status === 'none'
-                  ? 'ingen karta'
-                  : `${mapStatus.missing_count} steg kvar`}
-              </button>
-            )}
           </span>
-          <span className="text-slate-200 tabular-nums shrink-0 md:w-24 md:text-right">
+          <span className="text-slate-200 tabular-nums shrink-0 lg:w-24 lg:text-right">
             {annual > 0 ? formatKr(annual) : '–'}
             {org.manualBilling && (
               <span className="block text-[10px] leading-tight text-slate-500 font-normal">manuell fakt.</span>
             )}
           </span>
-          {addonPending ? (
-            // Tillägg att besluta går före nästa händelse: det är pengar som
-            // väntar. Platt text, bärnsten, kronor på underraden.
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation()
-                onOpenAddons?.()
-              }}
-              className="text-left md:w-44 truncate hover:underline decoration-dotted"
-              title="Öppna avtalskartan på Innehåll och utrustning"
-            >
-              <span className="block truncate font-semibold text-amber-400">
-                {addonPending.stations} tillägg att besluta
-              </span>
-              <span className="block truncate text-[10px] leading-tight text-slate-500 font-normal">
-                {formatKr(addonPending.annual_kr)}/år · {addonPending.contracts} avtal
-                {addonPending.first_marked_at && ` · markerade ${formatDayMonth(addonPending.first_marked_at)}`}
-              </span>
-            </button>
-          ) : (
-            <span className={`${next.className} truncate md:w-44`}>{next.text}</span>
-          )}
-          <span className="hidden lg:block text-slate-500 truncate w-28">{seller ?? '–'}</span>
-          {/* Portalstatus — sista kolumnen (etapp 6) */}
-          <span className="hidden lg:flex items-center gap-1.5 w-24 shrink-0">
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${portal.dotClass}`} aria-hidden />
-            <span className="text-xs text-slate-500 truncate">{portal.label}</span>
+          <span className="lg:w-28 min-w-0 flex">
+            <EventCell event={event} onOpen={openEvent} />
+          </span>
+          <span className="hidden xl:block text-slate-500 truncate w-28">{seller ?? ''}</span>
+          {/* Status: fem ikoner (dator) */}
+          <span className="hidden lg:flex items-center w-[280px] xl:w-[310px] min-w-0">
+            <SetupStatusCell summary={setup} onNavigate={navigateSetup} />
           </span>
         </span>
 
-        {/* Åtgärdsmeny — hover-reveal */}
-        <span className="relative shrink-0 ml-auto md:ml-0" ref={menuRef}>
+        {/* Status på telefon och smal skärm: 16 px utan bildtext, raden öppnar kundpanelen */}
+        <span className="lg:hidden basis-full pl-[92px]">
+          <SetupStatusCompact summary={setup} />
+        </span>
+
+        {/* Åtgärdsmeny: hover-reveal */}
+        <span className="absolute right-2 top-2 lg:static shrink-0 lg:ml-0" ref={menuRef}>
           <button
             onClick={(e) => {
               e.stopPropagation()
               setMenuOpen((v) => !v)
             }}
             className={`p-1.5 rounded text-slate-500 hover:text-slate-200 transition-all ${
-              menuOpen ? 'opacity-100' : 'md:opacity-0 md:group-hover:opacity-100'
+              menuOpen ? 'opacity-100' : 'lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100'
             }`}
             aria-label="Åtgärder"
           >

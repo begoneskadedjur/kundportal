@@ -3,6 +3,7 @@
 // (?peek=<customerId> i URL:en). Renderar en kompakt version av record-innehållet
 // via CustomerRecordContent (density='peek') — samma kod som kundsidan.
 // Esc eller klick utanför stänger. "Öppna som sida ↗" går till record-sidan.
+// Överst sektionen Uppläggning (statusikonerna i klartext med åtgärdsknappar).
 
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +11,8 @@ import { AlertTriangle, ExternalLink, X } from 'lucide-react'
 import LoadingSpinner from '../../shared/LoadingSpinner'
 import { useCustomerRecord } from '../../../hooks/useCustomerRecord'
 import CustomerRecordContent from './record/CustomerRecordContent'
+import { SetupSection } from './SetupStatus'
+import type { SetupSummary, SetupTarget } from '../../../shared/customerSetupStatus'
 
 interface Props {
   /** customers.id (org- eller enhetsrad). null = stängd. */
@@ -17,9 +20,13 @@ interface Props {
   /** T.ex. "/admin/befintliga-kunder" */
   basePath: string
   onClose: () => void
+  /** Uppläggningens status för kunden i panelen, null medan den hämtas */
+  setup?: SetupSummary | null
+  /** Åtgärdsknapparna i sektionen Uppläggning */
+  onSetupNavigate?: (target: SetupTarget) => void
 }
 
-export default function CustomerPeekPanel({ customerId, basePath, onClose }: Props) {
+export default function CustomerPeekPanel({ customerId, basePath, onClose, setup = null, onSetupNavigate }: Props) {
   const navigate = useNavigate()
   const open = customerId !== null
   const { data, loading, error } = useCustomerRecord(customerId ?? undefined)
@@ -63,6 +70,7 @@ export default function CustomerPeekPanel({ customerId, basePath, onClose }: Pro
 
         {/* Innehåll */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
+          {setup && onSetupNavigate && <SetupSection summary={setup} onNavigate={onSetupNavigate} />}
           {loading && (
             <div className="flex items-center justify-center py-16">
               <LoadingSpinner />

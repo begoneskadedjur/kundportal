@@ -75,6 +75,11 @@ interface Customer {
   customer_group_id?: string | null
   // Additivt (etapp 3): när kundnumret verifierats mot Fortnox
   fortnox_verified_at?: string | null
+  // Additivt (uppläggningsstatusen 2026-10-22): fakturavägen och uppsägningstiden
+  invoice_delivery_method?: string | null
+  invoice_delivery_source?: string | null
+  invoice_delivery_confirmed_by_name?: string | null
+  notice_period_months?: number | null
 
   // Multisite fields
   organization_id?: string | null

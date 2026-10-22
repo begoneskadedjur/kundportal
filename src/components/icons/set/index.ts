@@ -15,6 +15,7 @@ import { stationIcons } from './station'
 import { tjanstIcons } from './tjanst'
 import { upphandlingIcons } from './upphandling'
 import { guideIcons } from './guide'
+import { kundIcons } from './kund'
 
 export const ICONS = {
   ...allmanIcons,
@@ -30,6 +31,7 @@ export const ICONS = {
   ...bokningIcons,
   ...upphandlingIcons,
   ...guideIcons,
+  ...kundIcons,
 }
 
 export type IconName = keyof typeof ICONS

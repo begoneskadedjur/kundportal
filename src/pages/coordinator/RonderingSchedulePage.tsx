@@ -927,7 +927,10 @@ export function RonderingSchedulePage() {
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
-  const [searchQuery, setSearchQuery] = useState('')
+  // ?q=<kundnamn> fyller i sökrutan (statusikonen Schema i Befintliga kunder länkar hit)
+  const [searchQuery, setSearchQuery] = useState(() =>
+    typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('q') ?? '' : ''
+  )
   const [serviceTypeFilter, setServiceTypeFilter] = useState<ServiceTypeFilter>('all')
 
   const [showSelector, setShowSelector] = useState(false)

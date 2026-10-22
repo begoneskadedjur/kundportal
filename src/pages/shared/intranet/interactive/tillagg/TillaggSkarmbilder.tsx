@@ -5,6 +5,7 @@
 // Tidslinjen i Ekonomi-fliken är portalens egen komponent.
 
 import AddonBillingTimeline from '../../../../../components/shared/AddonBillingTimeline'
+import { Icon } from '../../../../../components/icons/Icon'
 import { formatKr, monthsLabel, premiumRaise } from '../../../../../shared/addonEconomics'
 import { EXEMPEL, raknaExempel } from './tillaggExempel'
 import { FakeCheckbox, FakeInput, FakeRadio, MiniScreen, SECTION, SUB_SECTION } from './tillaggShared'
@@ -103,11 +104,15 @@ export function SkarmNotisOchLista() {
         </div>
         <div className={SUB_SECTION}>
           <p className="text-slate-500 mb-1">Befintliga kunder · Kräver åtgärd</p>
-          <div className="flex items-baseline justify-between gap-2">
+          {/* Kolumnen Händelse: ikonen Tilläggsstationer att besluta + antalet */}
+          <div className="flex items-center justify-between gap-2">
             <span className="text-slate-200 font-medium">{EXEMPEL.customerName}</span>
-            <span className="text-amber-400 whitespace-nowrap"><span aria-hidden>● </span>{EXEMPEL.count} tillägg att besluta</span>
+            <span className="inline-flex items-center gap-1.5 text-amber-400 font-semibold whitespace-nowrap">
+              <Icon name="kund.beslut" size={16} />
+              <span className="tabular-nums">{EXEMPEL.count}</span>
+            </span>
           </div>
-          <p className="text-slate-500 text-right tabular-nums">{tal(annual)} kr/år · 1 avtal</p>
+          <p className="text-slate-500 text-right">Håll muspekaren över: {EXEMPEL.count} tilläggsstationer väntar på beslut, {tal(annual)} kr/år.</p>
         </div>
       </div>
     </MiniScreen>

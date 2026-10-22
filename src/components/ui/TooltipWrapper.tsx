@@ -1,4 +1,6 @@
 // src/components/ui/TooltipWrapper.tsx - Återanvändbar tooltip-komponent
+// showOnFocus (tillval): tooltipen öppnas också när något i triggern får
+// tangentbordsfokus och stängs när fokus lämnar. Escape stänger alltid en öppen tooltip.
 
 import React, { useState, useRef, useEffect } from 'react'
 import ReactDOM from 'react-dom'
@@ -10,6 +12,10 @@ interface TooltipWrapperProps {
   className?: string
   children: React.ReactNode
   disabled?: boolean
+  /** Visa även vid fokus (tangentbord), inte bara vid hovring */
+  showOnFocus?: boolean
+  /** Ersätter standardrutans klasser (bakgrund, padding, bredd) */
+  panelClassName?: string
 }
 
 export default function TooltipWrapper({
@@ -18,7 +24,9 @@ export default function TooltipWrapper({
   delay = 200,
   className = '',
   children,
-  disabled = false
+  disabled = false,
+  showOnFocus = false,
+  panelClassName,
 }: TooltipWrapperProps) {
   const [isVisible, setIsVisible] = useState(false)
   const [coords, setCoords] = useState({ x: 0, y: 0 })
@@ -33,18 +41,28 @@ export default function TooltipWrapper({
     }
   }, [])
 
-  const handleMouseEnter = () => {
+  // Escape stänger en öppen tooltip
+  useEffect(() => {
+    if (!isVisible) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsVisible(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [isVisible])
+
+  const show = (wait: number) => {
     if (disabled) return
-    
+    if (timeoutRef.current) clearTimeout(timeoutRef.current)
     timeoutRef.current = setTimeout(() => {
       if (triggerRef.current) {
         const rect = triggerRef.current.getBoundingClientRect()
         const scrollY = window.scrollY
         const scrollX = window.scrollX
-        
+
         let x = 0
         let y = 0
-        
+
         switch (position) {
           case 'top':
             x = rect.left + rect.width / 2 + scrollX
@@ -63,14 +81,16 @@ export default function TooltipWrapper({
             y = rect.top + rect.height / 2 + scrollY
             break
         }
-        
+
         setCoords({ x, y })
         setIsVisible(true)
       }
-    }, delay)
+    }, wait)
   }
 
-  const handleMouseLeave = () => {
+  const handleMouseEnter = () => show(delay)
+
+  const hide = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
     }
@@ -81,7 +101,7 @@ export default function TooltipWrapper({
     position: 'absolute',
     left: coords.x,
     top: coords.y,
-    transform: 
+    transform:
       position === 'top' ? 'translate(-50%, -100%)' :
       position === 'bottom' ? 'translate(-50%, 0)' :
       position === 'left' ? 'translate(-100%, -50%)' :
@@ -89,29 +109,40 @@ export default function TooltipWrapper({
     zIndex: 99999,
   }
 
+  const focusProps = showOnFocus
+    ? {
+        onFocus: (e: React.FocusEvent<HTMLDivElement>) => {
+          if ((e.target as HTMLElement).matches?.(':focus-visible')) show(0)
+        },
+        onBlur: hide,
+      }
+    : {}
+
   return (
     <>
       <div
         ref={triggerRef}
         onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onMouseLeave={hide}
+        {...focusProps}
         className={`inline-block ${className}`}
       >
         {children}
       </div>
-      
+
       {isVisible && content && ReactDOM.createPortal(
         <div
           style={tooltipStyle}
           className="pointer-events-none"
+          role="tooltip"
         >
-          <div className="bg-slate-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl border border-slate-700 max-w-sm whitespace-pre-line">
+          <div className={panelClassName ?? 'bg-slate-900 text-white text-xs rounded-lg px-3 py-2 shadow-xl border border-slate-700 max-w-sm whitespace-pre-line'}>
             {content}
-            
+
             {/* Arrow */}
             <div
               className={`absolute w-2 h-2 bg-slate-900 border-slate-700 transform rotate-45 ${
-                position === 'top' 
+                position === 'top'
                   ? 'bottom-[-4px] left-1/2 -translate-x-1/2 border-r border-b'
                   : position === 'bottom'
                   ? 'top-[-4px] left-1/2 -translate-x-1/2 border-l border-t'
