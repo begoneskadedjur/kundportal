@@ -15,7 +15,10 @@ import { Genomgang, type GenomgangSteg } from '../../../components/technician/ny
 import { useNySidhuvud } from '../../../components/technician/ny/layout/NySidhuvud'
 import { BesokKnappar, StatusPunkt } from '../../../components/technician/ny/besokUi'
 import { TYP_IKON } from '../../../components/technician/ny/besokTyp'
+import { RestidRad } from '../../../components/technician/ny/RestidRad'
 import { useAllaArenden } from '../../../hooks/useTeknikerBesok'
+import { useMapsKlar, useMinPosition, useRestid } from '../../../hooks/useRestid'
+import type { MinPosition, Restid } from '../../../services/restidService'
 import { useNyArbetsvy, useHjalpInstallningar } from '../../../hooks/useNyArbetsvy'
 import { useAuth } from '../../../contexts/AuthContext'
 import {
@@ -72,7 +75,13 @@ function TestarRad() {
   )
 }
 
-function NastaKort({ besok, stationer, onOppna }: { besok: DagBesok; stationer?: number; onOppna: () => void }) {
+function NastaKort({ besok, stationer, restid, position, onOppna }: {
+  besok: DagBesok
+  stationer?: number
+  restid: Restid | null
+  position: MinPosition | null
+  onOppna: () => void
+}) {
   const omTid = tidTill(besok.start)
   return (
     <article data-genomgang="idag-nasta" className="rounded-2xl bg-slate-900 border border-slate-700/60 p-4 space-y-3">
@@ -90,6 +99,7 @@ function NastaKort({ besok, stationer, onOppna }: { besok: DagBesok; stationer?:
         <h3 className="text-lg font-semibold text-white">{besok.kund}</h3>
         <p className="text-[15px] text-slate-400">{besok.adress || 'Adress saknas i ärendet'}</p>
       </div>
+      <RestidRad restid={restid} position={position} />
       {(stationer !== undefined && stationer > 0) || besok.kontaktperson ? (
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-slate-400">
           {stationer !== undefined && stationer > 0 && (
@@ -150,6 +160,11 @@ export default function NyIdag() {
   const attBoka = vantar.filter(v => v.orsak === 'boka').length
   const attAvsluta = vantar.filter(v => v.orsak === 'avsluta').length
 
+  // Restid till nästa uppdrag: bilen via Abax i första hand, annars telefonen
+  const { klar: mapsKlar } = useMapsKlar()
+  const { position } = useMinPosition(!!nasta?.adress)
+  const restid = useRestid(position, nasta?.adress, mapsKlar)
+
   useEffect(() => {
     const tek = profile?.technician_id
     if (!tek) return
@@ -191,7 +206,13 @@ export default function NyIdag() {
                 Navigera öppnar vägbeskrivningen, Ring ringer kontaktpersonen och Öppna visar hela ärendet.
               </HjalpText>
               {nasta ? (
-                <NastaKort besok={nasta} stationer={nasta.customerId ? stationer.get(nasta.customerId) : undefined} onOppna={() => oppna(nasta)} />
+                <NastaKort
+                  besok={nasta}
+                  stationer={nasta.customerId ? stationer.get(nasta.customerId) : undefined}
+                  restid={restid}
+                  position={position}
+                  onOppna={() => oppna(nasta)}
+                />
               ) : (
                 <div data-genomgang="idag-nasta" className="rounded-2xl bg-slate-900 border border-slate-700/60 p-5 flex items-center gap-3">
                   <Icon name="station.klar" size={32} className="text-[#20c58f]" />

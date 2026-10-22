@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.82.0',
+    date: '2026-10-22',
+    title: 'Restid till nästa kund i nya arbetsvyn',
+    items: [
+      { kind: 'nyhet', text: 'Nya arbetsvyn visar hur lång tid det tar att köra till nästa kund, räknat från bilens position i Abax och med trafiken just nu. Saknar bilen fordons-ID på personalkortet används telefonens position. Vyn är fortfarande bara påslagen för Christian.' },
+    ],
+  },
+  {
     version: '3.81.0',
     date: '2026-10-22',
     title: 'Ny arbetsvy för tekniker, på prov',

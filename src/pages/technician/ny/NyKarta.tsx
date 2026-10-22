@@ -16,8 +16,10 @@ import { Genomgang, type GenomgangSteg } from '../../../components/technician/ny
 import { useNySidhuvud } from '../../../components/technician/ny/layout/NySidhuvud'
 import { BesokKnappar } from '../../../components/technician/ny/besokUi'
 import { TYP_IKON } from '../../../components/technician/ny/besokTyp'
+import { RestidRad } from '../../../components/technician/ny/RestidRad'
 import { useBesok } from '../../../hooks/useTeknikerBesok'
-import { useGoogleMaps } from '../../../hooks/useGoogleMaps'
+import { useMapsKlar, useMinPosition, useRestid } from '../../../hooks/useRestid'
+import type { MinPosition } from '../../../services/restidService'
 import {
   svenskDag, laggTillDagar, klockslag, besokBeskrivning, nastaBesok, tidTill, type DagBesok,
 } from '../../../services/teknikerDagService'
@@ -26,7 +28,7 @@ const GENOMGANG: GenomgangSteg[] = [
   { rubrik: 'Idag eller imorgon', text: 'Välj dag här. Kartan visar besöken den dagen.', mal: 'karta-dag' },
   { rubrik: 'Siffrorna är ordningen', text: 'Varje besök har en siffra på kartan och i listan. Ett är dagens första besök.', mal: 'karta-lista' },
   { rubrik: 'Navigera, Ring och Öppna', text: 'Knapparna gäller stoppet som är valt. Tryck på ett annat stopp i listan för att byta.', mal: 'karta-knappar' },
-  { rubrik: 'Min position', text: 'Visar var du är just nu. Telefonen frågar om lov första gången.', mal: 'karta-position' },
+  { rubrik: 'Min position', text: 'Visar var du är just nu. Har bilen Abax används bilens position, annars telefonens. Telefonen frågar om lov första gången.', mal: 'karta-position' },
 ]
 
 type LatLng = { lat: number; lng: number }
@@ -52,19 +54,23 @@ function geokoda(geocoder: google.maps.Geocoder, adress: string): Promise<LatLng
   })
 }
 
-/** useGoogleMaps rapporterar inte laddat om en annan instans lade till skriptet, därför pollar vi också */
-function useMapsKlar(): { klar: boolean; fel: string | null } {
-  const { isLoaded, error } = useGoogleMaps({ libraries: ['geometry'] })
-  const [klar, setKlar] = useState(() => typeof window !== 'undefined' && !!window.google?.maps)
-  useEffect(() => {
-    if (isLoaded) { setKlar(true); return }
-    if (klar) return
-    const t = window.setInterval(() => {
-      if (window.google?.maps) { setKlar(true); window.clearInterval(t) }
-    }, 300)
-    return () => window.clearInterval(t)
-  }, [isLoaded, klar])
-  return { klar: klar || isLoaded, fel: error }
+// Bilen som rund markör med bilikonen (samma ritning som falt.bil, 24/1,6)
+const BIL_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">'
+  + '<circle cx="20" cy="20" r="18" fill="#0ea5e9" stroke="#ffffff" stroke-width="2.5"/>'
+  + '<g transform="translate(8 8)" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
+  + '<path d="M4.5 17v-4.5l2-5h11l2 5V17z"/><path d="M4.5 12.5h15M6.5 17v2M17.5 17v2"/>'
+  + '<circle cx="8" cy="14.8" r=".8" fill="#ffffff" stroke="none"/><circle cx="16" cy="14.8" r=".8" fill="#ffffff" stroke="none"/>'
+  + '</g></svg>'
+
+function positionsIkon(p: MinPosition): google.maps.Icon | google.maps.Symbol {
+  if (p.kalla === 'bil') {
+    return {
+      url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(BIL_SVG),
+      scaledSize: new google.maps.Size(40, 40),
+      anchor: new google.maps.Point(20, 20),
+    }
+  }
+  return { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#0ea5e9', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3 }
 }
 
 function markorIkon(vald: boolean, klar: boolean): google.maps.Symbol {
@@ -89,7 +95,7 @@ export default function NyKarta() {
   const [visaMig, setVisaMig] = useState(false)
   const [valdNyckel, setValdNyckel] = useState<string | null>(null)
   const [koordinater, setKoordinater] = useState<Map<string, LatLng | null>>(new Map())
-  const [position, setPosition] = useState<LatLng | null>(null)
+  const { position, uppdatera: uppdateraPosition } = useMinPosition(true)
 
   const { klar: mapsKlar, fel: mapsFel } = useMapsKlar()
   const kartRef = useRef<HTMLDivElement>(null)
@@ -105,6 +111,10 @@ export default function NyKarta() {
   const standard = useMemo(() => (vald === 'idag' ? nastaBesok(stopp) : stopp[0] ?? null), [vald, stopp])
   const valt = stopp.find(b => b.nyckel === valdNyckel) ?? standard
   useEffect(() => { setValdNyckel(null) }, [vald])
+
+  // Restid bara till dagens stopp som inte är klara
+  const restidMal = vald === 'idag' && valt && !valt.avslutad ? valt.adress : null
+  const restid = useRestid(position, restidMal, mapsKlar)
 
   const oppnaVisaMig = useCallback(() => setVisaMig(true), [])
   useNySidhuvud({ underrubrik: vald === 'idag' ? `Idag, ${dagIdag.length} stopp` : `Imorgon, ${dagImorgon.length} stopp`, onVisaMig: oppnaVisaMig })
@@ -194,34 +204,34 @@ export default function NyKarta() {
     if (p && valdNyckel) kartaRef.current?.panTo(p)
   }, [valt?.nyckel, valt?.adress, valdNyckel, stopp, koordinater, mapsKlar])
 
-  const visaPosition = () => {
-    if (!navigator.geolocation) {
-      toast.error('Telefonen kan inte visa din position')
+  // Rita min position (bilen eller telefonen) när den finns eller ändras
+  useEffect(() => {
+    const karta = kartaRef.current
+    if (!karta || !mapsKlar || !position) return
+    const titel = position.kalla === 'bil' ? 'Din bil' : 'Du är här'
+    if (!posMarkorRef.current) {
+      posMarkorRef.current = new google.maps.Marker({ map: karta, position, title: titel, zIndex: 200, icon: positionsIkon(position) })
+    } else {
+      posMarkorRef.current.setPosition(position)
+      posMarkorRef.current.setIcon(positionsIkon(position))
+      posMarkorRef.current.setTitle(titel)
+    }
+  }, [position, mapsKlar, laddar])
+
+  const [soker, setSoker] = useState(false)
+  const visaPosition = async () => {
+    if (soker) return
+    setSoker(true)
+    const p = await uppdateraPosition()
+    setSoker(false)
+    if (!p) {
+      toast.error('Kunde inte hämta din position. Kontrollera att platstjänster är på.')
       return
     }
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude }
-        setPosition(p)
-        const karta = kartaRef.current
-        if (!karta) return
-        if (!posMarkorRef.current) {
-          posMarkorRef.current = new google.maps.Marker({
-            map: karta,
-            position: p,
-            title: 'Du är här',
-            zIndex: 200,
-            icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: '#0ea5e9', fillOpacity: 1, strokeColor: '#ffffff', strokeWeight: 3 },
-          })
-        } else {
-          posMarkorRef.current.setPosition(p)
-        }
-        karta.panTo(p)
-        karta.setZoom(Math.max(karta.getZoom() ?? 12, 13))
-      },
-      () => toast.error('Kunde inte hämta din position. Kontrollera att platstjänster är på.'),
-      { enableHighAccuracy: true, timeout: 10000 },
-    )
+    const karta = kartaRef.current
+    if (!karta) return
+    karta.panTo(p)
+    karta.setZoom(Math.max(karta.getZoom() ?? 12, 13))
   }
 
   const bytDag = (d: 'idag' | 'imorgon') => {
@@ -262,11 +272,11 @@ export default function NyKarta() {
             type="button"
             data-genomgang="karta-position"
             onClick={visaPosition}
-            disabled={!mapsKlar}
-            aria-label="Visa min position"
+            disabled={!mapsKlar || soker}
+            aria-label={position?.kalla === 'bil' ? 'Visa min position, från bilen' : 'Visa min position'}
             className={`pointer-events-auto w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 shadow-lg flex items-center justify-center disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${position ? 'text-sky-400' : 'text-white'}`}
           >
-            <Icon name="falt.position" size={24} />
+            <Icon name={position?.kalla === 'bil' ? 'falt.bil' : 'falt.position'} size={24} />
           </button>
         </div>
       </div>
@@ -309,6 +319,11 @@ export default function NyKarta() {
                         <Icon name={TYP_IKON[valt.typ]} size={16} className="text-slate-400" />
                         {besokBeskrivning(valt)}
                       </p>
+                      {restid && (
+                        <div className="mt-2">
+                          <RestidRad restid={restid} position={position} />
+                        </div>
+                      )}
                       {valt.adress && koordinater.get(valt.adress) === null && (
                         <p className="mt-1 text-[13px] text-amber-500">Adressen hittades inte på kartan.</p>
                       )}
