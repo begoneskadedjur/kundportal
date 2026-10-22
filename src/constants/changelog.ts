@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.78.0',
+    date: '2026-10-22',
+    title: 'Varning när ett engångsjobb gäller en avtalskund',
+    items: [
+      { kind: 'nyhet', text: 'Fyller du i ett engångsjobb med en adress, ett företagsnamn eller ett organisationsnummer som tillhör en avtalskund visar Nytt ärende en gul ruta. Tryck Byt till Extrabesök så byts typen och kunden väljs, eller Det är ett engångsjobb om det verkligen är det.' },
+    ],
+  },
+  {
     version: '3.77.0',
     date: '2026-10-22',
     title: 'Fakturavägen bekräftas vid första fakturan',

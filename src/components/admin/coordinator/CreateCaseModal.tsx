@@ -35,6 +35,7 @@ import type { GeocodeResult } from '../../../services/geocoding';
 import { reverseGeocode } from '../../../services/geocoding';
 import toast from 'react-hot-toast';
 import { sluttidForeStart, SLUTTID_FORE_START_FEL } from '../../../utils/besokstid';
+import { findContractCustomerMatch, type ContractCustomerMatch } from '../../../shared/contractCustomerMatch';
 import LoadingSpinner from '../../shared/LoadingSpinner';
 import RoomNumberFields from '../../shared/RoomNumberFields';
 
@@ -159,6 +160,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Avtalskund som ett engångsjobb troligen gäller, och den som koordinatorn sagt nej till
+  const [dismissedContractMatchId, setDismissedContractMatchId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<SingleSuggestion[]>([]);
   const [teamSuggestions, setTeamSuggestions] = useState<TeamSuggestion[]>([]);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
@@ -220,6 +223,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     setSearchStartDate(new Date()); setNumberOfTechnicians(1); setSelectedTechnicianIds([]);
     setSelectedContractCustomer(null);
     setSelectedSiteId(null);
+    setDismissedContractMatchId(null);
     setExistingImages([]);
     setOfferDetails(null);
     setOfferExpanded(true);
@@ -803,6 +807,28 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     const parentCustomer = selectedContractCustomer ? contractCustomers.find(c => c.id === selectedContractCustomer) : null;
     return siteCustomer?.assigned_account_manager || parentCustomer?.assigned_account_manager || null;
   }, [selectedContractCustomer, selectedSiteId, contractCustomers]);
+
+  // Engångsjobb hos en avtalskund ska vara Extrabesök Avtalskund. Matchar
+  // org-/personnummer, adress eller företagsnamn en avtalskund visas en varning
+  // med en knapp som byter typ och väljer kunden.
+  const contractMatch = useMemo<ContractCustomerMatch | null>(() => {
+    if (caseType !== 'private' && caseType !== 'business') return null
+    const match = findContractCustomerMatch({
+      orgnr: caseType === 'business' ? formData.org_nr : formData.personnummer,
+      address: typeof formData.adress === 'string' ? formData.adress : null,
+      name: caseType === 'business' ? (formData as { company_name?: string | null }).company_name : null,
+    }, contractCustomers)
+    return match && match.customer.id !== dismissedContractMatchId ? match : null
+  }, [caseType, formData, contractCustomers, dismissedContractMatchId])
+
+  const switchToContractVisit = (match: ContractCustomerMatch) => {
+    const c = match.customer
+    setCaseType('contract')
+    setFormData(prev => ({ ...prev, status: 'Bokad' }))
+    setSelectedContractCustomer(c.parent_customer_id ?? c.id)
+    setSelectedSiteId(c.parent_customer_id ? c.id : null)
+    toast.success('Bytt till Extrabesök Avtalskund')
+  }
 
   const selectCaseType = (type: 'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering') => {
     setCaseType(type);
@@ -1786,7 +1812,31 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
                 <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><Icon name="rapport.tillbaka" className="w-4 h-4" /> Byt kundtyp</Button>
               )}
               {error && (<div className="bg-red-500/20 border border-red-500/40 p-3 rounded-xl flex items-center gap-3"><Icon name="rapport.avvikelse" className="w-4 h-4 text-red-400 flex-shrink-0" /><p className="text-sm text-red-400">{error}</p></div>)}
-              
+
+              {/* Engångsjobb hos en avtalskund: föreslå Extrabesök Avtalskund */}
+              {contractMatch && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                    <Icon name="rapport.avvikelse" className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-amber-300">{contractMatch.customer.company_name} har avtal med oss</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {contractMatch.reason === 'orgnr' ? 'Samma organisationsnummer. ' : contractMatch.reason === 'adress' ? 'Samma adress. ' : 'Samma namn. '}
+                        Arbete hos en avtalskund som inte ingår i avtalet ska vara Extrabesök Avtalskund.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button type="button" onClick={() => setDismissedContractMatchId(contractMatch.customer.id)} className="px-2.5 py-1.5 text-xs text-slate-400 hover:text-white transition-colors">
+                      Det är ett engångsjobb
+                    </button>
+                    <Button type="button" variant="primary" size="sm" onClick={() => switchToContractVisit(contractMatch)}>
+                      Byt till Extrabesök
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Avtalskund-väljare (för contract, inspection, establishment, rondering) — sökbar dropdown */}
               {(caseType === 'contract' || caseType === 'inspection' || caseType === 'establishment' || caseType === 'rondering' || caseType === 'egenkontroll') && (
                 <div className={`p-3 ${caseType === 'inspection' ? 'bg-cyan-500/10 border-cyan-500/30' : caseType === 'establishment' ? 'bg-lime-500/10 border-lime-500/30' : (caseType === 'rondering' || caseType === 'egenkontroll') ? 'bg-sky-500/10 border-sky-500/30' : 'bg-emerald-500/10 border-emerald-500/30'} border rounded-xl`}>

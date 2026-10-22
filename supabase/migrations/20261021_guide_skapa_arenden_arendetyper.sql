@@ -41,7 +41,8 @@ set
       "Arbete hos en avtalskund som inte ingår i avtalet är alltid Extrabesök Avtalskund. Ärendet kopplas till kunden och kunden ser det i sin kundportal.",
       "Osäker på om kunden har avtal? Sök fram kunden under Kunder & Avtal › Befintliga kunder innan du väljer typ.",
       "Ett engångsjobb ska aldrig vara en etablering. Etablering Avtalskund är bara utplacering av stationer hos en avtalskund.",
-      "Skicka bokningsbekräftelse? står på Nej. Väljer du ett av Ja-valen får kunden ett sms när du skapar ärendet."
+      "Skicka bokningsbekräftelse? står på Nej. Väljer du ett av Ja-valen får kunden ett sms när du skapar ärendet.",
+      "Fyller du i ett engångsjobb med en adress, ett företagsnamn eller ett organisationsnummer som tillhör en avtalskund visar formuläret en gul ruta. Tryck [[Byt till Extrabesök]] så byts typen och kunden väljs."
     ]},
     {"type":"ovning","uppdrag":"Exempel AB har inget avtal och vill bli av med möss. Skapa ärendet och boka det första förslaget från bokningsassistenten."},
     {"type":"quiz","fragor":[
