@@ -58,6 +58,7 @@ interface MultisiteCustomer {
 interface UnitRow {
   customerId: string
   siteName: string
+  companyName: string
   region: string | null
   contractEndDate: string | null
   address: string | null
@@ -125,6 +126,12 @@ function TechAvatarBadge({ name, size = 'sm' }: { name: string; size?: 'sm' | 'm
       {initials}
     </span>
   )
+}
+
+// Sökträff i något av fälten (skiftlägesokänslig, svensk jämförelse)
+function matchesSearch(query: string, ...fields: Array<string | null | undefined>): boolean {
+  if (!query) return true
+  return fields.some(f => f?.toLocaleLowerCase('sv-SE').includes(query))
 }
 
 function periodRemainingLabel(contractEndDate: string | null): string {
@@ -775,6 +782,9 @@ function OrgBatchSelector({ group, onClose, onConfirm }: OrgBatchSelectorProps) 
 
 interface OrgGroupCardProps {
   group: OrgGroup
+  /** Enheter som matchar sökningen; hela gruppen när ingen sökning är aktiv */
+  visibleUnits: UnitRow[]
+  searching: boolean
   actionLoading: string | null
   onPause: (id: string) => void
   onResume: (id: string) => void
@@ -786,9 +796,11 @@ interface OrgGroupCardProps {
 }
 
 function OrgGroupCard({
-  group, actionLoading, onPause, onResume, onCancel, onEdit, onAddUnit, onScheduleAll, onSwapTechnician
+  group, visibleUnits, searching, actionLoading, onPause, onResume, onCancel, onEdit, onAddUnit, onScheduleAll, onSwapTechnician
 }: OrgGroupCardProps) {
-  const [expanded, setExpanded] = useState(true)
+  const [expandedState, setExpanded] = useState(true)
+  // Under sökning visas alltid träffarna, även om gruppen var hopfälld
+  const expanded = expandedState || searching
 
   const totalSchedules = group.units.reduce((sum, u) => sum + u.schedules.length, 0)
   const unitsWithout = group.units.filter(u => u.schedules.length === 0 && u.serviceMode !== 'on_demand').length
@@ -812,7 +824,9 @@ function OrgGroupCard({
           <Building2 className="w-4 h-4 text-[#20c58f] shrink-0" />
           <span className="text-sm font-semibold text-white truncate">{group.parentName}</span>
           <span className="text-xs text-slate-500 shrink-0">
-            {group.units.length} {unitLabel} · {totalSchedules} schema{totalSchedules !== 1 ? 'n' : ''}
+            {searching && visibleUnits.length < group.units.length
+              ? `${visibleUnits.length} av ${group.units.length} ${unitLabel} matchar`
+              : `${group.units.length} ${unitLabel} · ${totalSchedules} schema${totalSchedules !== 1 ? 'n' : ''}`}
           </span>
           {unitsWithout > 0 && (
             <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
@@ -861,7 +875,7 @@ function OrgGroupCard({
       {/* Units list */}
       {expanded && (
         <div className="divide-y divide-slate-700/30">
-          {group.units.map(unit => (
+          {visibleUnits.map(unit => (
             <div key={unit.customerId} className="px-4 py-3">
               {unit.schedules.length === 0 ? (
                 <div className="flex items-center justify-between gap-3">
@@ -979,6 +993,7 @@ export function RonderingSchedulePage() {
       const unitRows: UnitRow[] = units.map(u => ({
         customerId: u.id,
         siteName: u.site_name || u.company_name,
+        companyName: u.company_name,
         region: u.region,
         // Enheter saknar egna avtalsdatum (går ej att sätta i "Redigera enhet"-modalen),
         // så de ärver avtalsslutdatum från huvudkontoret.
@@ -1008,12 +1023,24 @@ export function RonderingSchedulePage() {
   // IDs of customers that belong to an org group (to exclude from standalone list)
   const multisiteCustomerIds = new Set(orgGroups.flatMap(g => g.units.map(u => u.customerId)))
 
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase('sv-SE')
+  const searching = normalizedQuery.length > 0
+
   const filteredSchedules = schedules.filter(s => {
     if (multisiteCustomerIds.has(s.customer_id)) return false
-    const name = s.customer?.company_name?.toLowerCase() || ''
-    const matchSearch = !searchQuery || name.includes(searchQuery.toLowerCase())
+    const matchSearch = matchesSearch(normalizedQuery, s.customer?.company_name, s.customer?.contact_address, s.technician?.name)
     const matchType = serviceTypeFilter === 'all'
     return matchSearch && matchType
+  })
+
+  // Organisationer: träff på huvudkontoret visar alla enheter, annars bara de enheter som matchar.
+  // Gruppen skickas oförändrad till kortet så att "Schemalägg alla" och "Fördela tekniker" gäller hela organisationen.
+  const visibleOrgGroups = orgGroups.flatMap(group => {
+    if (matchesSearch(normalizedQuery, group.parentName)) return [{ group, visibleUnits: group.units }]
+    const visibleUnits = group.units.filter(u =>
+      matchesSearch(normalizedQuery, u.siteName, u.companyName, u.region, u.address, ...u.schedules.map(s => s.technician?.name))
+    )
+    return visibleUnits.length > 0 ? [{ group, visibleUnits }] : []
   })
 
   const handlePause = async (id: string) => {
@@ -1150,13 +1177,15 @@ export function RonderingSchedulePage() {
       ) : (
         <div className="space-y-4">
           {/* Org groups */}
-          {orgGroups.length > 0 && (
+          {visibleOrgGroups.length > 0 && (
             <div className="space-y-3">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Organisationer</p>
-              {orgGroups.map(group => (
+              {visibleOrgGroups.map(({ group, visibleUnits }) => (
                 <OrgGroupCard
                   key={group.organizationId}
                   group={group}
+                  visibleUnits={visibleUnits}
+                  searching={searching}
                   actionLoading={actionLoading}
                   onPause={handlePause}
                   onResume={handleResume}
@@ -1173,7 +1202,7 @@ export function RonderingSchedulePage() {
           {/* Standalone schedules */}
           {filteredSchedules.length > 0 && (
             <div className="space-y-2">
-              {orgGroups.length > 0 && (
+              {visibleOrgGroups.length > 0 && (
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Övriga kunder</p>
               )}
               {filteredSchedules.map(s => (
@@ -1191,15 +1220,15 @@ export function RonderingSchedulePage() {
             </div>
           )}
 
-          {orgGroups.length === 0 && filteredSchedules.length === 0 && (
+          {visibleOrgGroups.length === 0 && filteredSchedules.length === 0 && (
             <div className="flex flex-col items-center py-16 text-center">
               <CalendarRange className="w-10 h-10 text-slate-600 mb-3" />
               <p className="text-sm font-medium text-slate-400">
-                {searchQuery || serviceTypeFilter !== 'all'
-                  ? 'Inga scheman matchar sökningen'
+                {searching || serviceTypeFilter !== 'all'
+                  ? 'Inga kunder matchar sökningen'
                   : 'Inga aktiva scheman ännu'}
               </p>
-              {!searchQuery && serviceTypeFilter === 'all' && (
+              {!searching && serviceTypeFilter === 'all' && (
                 <button
                   onClick={() => setShowSelector(true)}
                   className="mt-3 text-xs text-[#20c58f] hover:underline"

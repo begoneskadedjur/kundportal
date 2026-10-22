@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.79.1',
+    date: '2026-10-22',
+    title: 'Sök fungerar i Rondering & Schema',
+    items: [
+      { kind: 'buggfix', text: 'Sökrutan i Rondering & Schema söker nu bland alla kunder på sidan, även organisationernas enheter. Du kan söka på kundnamn, enhet, region, adress eller tekniker. Träffar på huvudkontoret visar hela organisationen, annars visas bara de enheter som matchar.' },
+    ],
+  },
+  {
     version: '3.79.0',
     date: '2026-10-22',
     title: 'Fakturavägen sätts automatiskt',
