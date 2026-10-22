@@ -3,8 +3,11 @@
 //
 // Position: i första hand teknikerns egen bil via Abax (api/technician/my-vehicle-location,
 // som bara svarar med den inloggades bil). I andra hand telefonens position, när bilen saknar
-// Abax-ID, Abax inte svarar eller bilens position är äldre än 30 minuter. Går telefonen inte
-// heller att läsa används en äldre bilposition, och källraden visar då hur gammal den är.
+// Abax-ID, Abax inte svarar eller bilens position är för gammal. En parkerad bil rapporterar
+// sällan, så dess senaste position gäller i upp till ett dygn; en bil som står som "i rörelse"
+// men inte rapporterat på 30 minuter räknas som inaktuell (till exempel en enhet som slutat
+// sända). Går telefonen inte heller att läsa används bilpositionen om den är högst ett dygn
+// gammal, och källraden visar då hur gammal den är.
 //
 // Restid: Google Maps DistanceMatrixService i webbläsaren, bil med trafik just nu.
 // Allt fel hanteras tyst: går det inte att räkna returneras null och inget visas.
@@ -17,6 +20,8 @@ export interface MinPosition extends LatLng {
   kalla: 'bil' | 'telefon'
   /** När positionen registrerades */
   tidpunkt: Date
+  /** Bara bil: Abax säger att bilen står still */
+  parkerad?: boolean
 }
 
 export interface Restid {
@@ -29,6 +34,7 @@ type BilSvar =
   | { kalla: null; skal: 'inget_fordon' | 'abax_fel' }
 
 const BIL_MAX_ALDER_MS = 30 * 60_000
+const PARKERAD_BIL_MAX_ALDER_MS = 24 * 60 * 60_000
 const TELEFON_TIMEOUT_MS = 8_000
 const POSITION_CACHE_MS = 60_000
 const RESTID_CACHE_MS = 4 * 60_000
@@ -51,6 +57,7 @@ async function hamtaBilPosition(): Promise<MinPosition | null> {
       kalla: 'bil',
       // Saknas tidpunkt räknas positionen som gammal, så att telefonen får gå före
       tidpunkt: tid && !Number.isNaN(tid.getTime()) ? tid : new Date(0),
+      parkerad: data.iRorelse === false,
     }
   } catch {
     return null
@@ -82,11 +89,12 @@ function hamtaTelefonPosition(): Promise<MinPosition | null> {
 
 async function lasPosition(): Promise<MinPosition | null> {
   const bil = await hamtaBilPosition()
-  if (bil && Date.now() - bil.tidpunkt.getTime() <= BIL_MAX_ALDER_MS) return bil
+  const bilAlder = bil ? Date.now() - bil.tidpunkt.getTime() : Infinity
+  if (bil && (bilAlder <= BIL_MAX_ALDER_MS || (bil.parkerad && bilAlder <= PARKERAD_BIL_MAX_ALDER_MS))) return bil
   const telefon = await hamtaTelefonPosition()
   if (telefon) return telefon
   // Hellre en äldre bilposition med tiden utskriven än ingenting
-  return bil && bil.tidpunkt.getTime() > 0 ? bil : null
+  return bil && bil.tidpunkt.getTime() > 0 && bilAlder <= PARKERAD_BIL_MAX_ALDER_MS ? bil : null
 }
 
 /**

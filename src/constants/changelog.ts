@@ -50,6 +50,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: 'Restid till nästa kund i nya arbetsvyn',
     items: [
       { kind: 'nyhet', text: 'Nya arbetsvyn visar hur lång tid det tar att köra till nästa kund, räknat från bilens position i Abax och med trafiken just nu. Saknar bilen fordons-ID på personalkortet används telefonens position. Vyn är fortfarande bara påslagen för Christian.' },
+      { kind: 'andring', text: 'En parkerad bil skickar sällan sin position, så den senaste positionen från en bil som står still gäller i upp till ett dygn. En enhet som slutat skicka räknas inte, då används telefonen.' },
     ],
   },
   {
