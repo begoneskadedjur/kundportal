@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.80.1',
+    date: '2026-10-22',
+    title: 'Fakturavägen täcker inte fakturan',
+    items: [
+      { kind: 'buggfix', text: 'Rutan Fakturaväg i fakturan låg ovanpå innehållet. Nu är den en rad överst i fakturan, och varför vägen är satt syns när du håller muspekaren över den.' },
+    ],
+  },
+  {
     version: '3.80.0',
     date: '2026-10-22',
     title: 'Befintliga kunder visar om kunden är färdigupplagd',

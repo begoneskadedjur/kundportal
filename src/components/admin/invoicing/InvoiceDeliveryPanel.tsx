@@ -34,6 +34,8 @@ interface InvoiceDeliveryPanelProps {
   reloadKey?: number
   /** Efter sparat val, med kundraden som den ser ut nu */
   onSaved?: (owner: DeliveryCustomer) => void
+  /** En rad (fakturan): väg och mottagare, varför vid hover. Varning vid saknad väg. */
+  compact?: boolean
   className?: string
 }
 
@@ -50,6 +52,7 @@ export default function InvoiceDeliveryPanel({
   onEvaluation,
   reloadKey = 0,
   onSaved,
+  compact = false,
   className = '',
 }: InvoiceDeliveryPanelProps) {
   const [delivery, setDelivery] = useState<CustomerDelivery | null>(null)
@@ -128,6 +131,20 @@ export default function InvoiceDeliveryPanel({
         owner.organization_number
       )
     : 'Välj hur kunden ska få fakturan.'
+
+  if (compact && evaluation.ok) {
+    return (
+      <div
+        className={`flex items-center gap-2 min-w-0 text-xs text-slate-400 ${className}`}
+        title={`${why}${contractBillingText ? `. I avtalet stod: ${contractBillingText}` : ''}`}
+      >
+        <Mail className="w-3.5 h-3.5 flex-shrink-0 text-slate-500" />
+        <span className="flex-shrink-0">Fakturaväg:</span>
+        <span className="font-medium text-slate-200 flex-shrink-0">{ownerMethod ? INVOICE_DELIVERY_LABEL[ownerMethod] : ''}</span>
+        {destination && <span className="truncate">till {destination}</span>}
+      </div>
+    )
+  }
 
   const handleSave = async () => {
     if (!method || formError) return

@@ -1541,19 +1541,6 @@ export default function InvoiceDetailModal({
           />
         )}
 
-        {/* Fakturavägen: sätts automatiskt ur avtalet och ändras på kundsidan.
-            Här visas den bara, så att man ser vart fakturan går. */}
-        {invoice && invoice.status !== 'cancelled' && deliveryCustomerId && (
-          <InvoiceDeliveryPanel
-            className="mx-4 mt-3"
-            customerId={deliveryCustomerId}
-            canEdit={false}
-            actorName={profile?.display_name || profile?.email || 'Okänd'}
-            onEvaluation={setDeliveryEval}
-            reloadKey={deliveryReloadKey}
-          />
-        )}
-
         {/* Fortnox-kandidater: samma org.nr finns på flera (eller bara inaktiva)
             Fortnox-kunder. Koordinatorn väljer, aldrig auto-val. */}
         {invoice && fortnoxCandidates && (
@@ -1621,6 +1608,19 @@ export default function InvoiceDetailModal({
         <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
           {/* Vänster: Fakturadetaljer */}
           <div className="flex-1 min-h-0 overflow-y-auto lg:border-r lg:border-slate-700">
+            {/* Fakturavägen: en rad överst i det rullbara innehållet. Sätts
+                automatiskt ur avtalet och ändras på kundsidan; här visas den bara. */}
+            {invoice && invoice.status !== 'cancelled' && deliveryCustomerId && (
+              <InvoiceDeliveryPanel
+                compact
+                className="mx-4 mt-3"
+                customerId={deliveryCustomerId}
+                canEdit={false}
+                actorName={profile?.display_name || profile?.email || 'Okänd'}
+                onEvaluation={setDeliveryEval}
+                reloadKey={deliveryReloadKey}
+              />
+            )}
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <RefreshCw className="w-6 h-6 text-slate-400 animate-spin" />
