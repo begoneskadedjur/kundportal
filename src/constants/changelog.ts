@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.82.4',
+    date: '2026-10-23',
+    title: 'Nya arbetsvyn: etablering ingår i avtalet',
+    items: [
+      { kind: 'andring', text: 'I nya arbetsvyn räknas etablering som en del av kundens avtal, precis som stationskontroll. Det som ingår faktureras inte. Tilläggsstationer som sätts ut utöver avtalet räknas när du trycker Färdig i utplaceringen och faktureras då, som förut.' },
+    ],
+  },
+  {
     version: '3.82.3',
     date: '2026-10-22',
     title: 'Nya arbetsvyn: avtalsbesök faktureras inte',

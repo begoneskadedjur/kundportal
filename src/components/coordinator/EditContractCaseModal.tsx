@@ -2055,7 +2055,7 @@ export default function EditContractCaseModal({
   // ligger under Utöver avtalet (rader med belopp som inte täcks av avtalet)
   const utoverAvtaletText = utoverAvtaletKr > 0
     ? `Besöket ingår i kundens avtal och faktureras inte. ${formateraKr(utoverAvtaletKr)} exkl. moms under Utöver avtalet faktureras utöver avtalet.`
-    : `Besöket ingår i kundens avtal och faktureras inte. Inget är tillagt utöver avtalet${isInspection ? '.' : ', så ingen faktura skapas.'}`
+    : `Besöket ingår i kundens avtal och faktureras inte. Inget är tillagt utöver avtalet${isInspection || isEstablishment ? '.' : ', så ingen faktura skapas.'}`
 
   const vadHanderVidStang = [
     'Ärendet får status Avslutat och dagens datum som avslutsdatum.',
@@ -2312,7 +2312,7 @@ export default function EditContractCaseModal({
           beskrivning: `Nu ${formData.status}. Statusstegen visas överst i Alla uppgifter. Spara efter bytet.`,
           onClick: () => { setVisning('flikar'); rullaUpp() },
         }] : []),
-        ...(isEstablishment && profile?.role === 'technician' ? [{
+        ...(isEstablishment && (profile?.role === 'technician' || nyArbetsvy) ? [{
           id: 'utplacering',
           ikon: 'bokning.etablering' as const,
           text: 'Gå till utplacering',
@@ -2551,8 +2551,9 @@ export default function EditContractCaseModal({
             <div className={stegBlock('pris')}>
               {avtalsbesok ? (
                 <HjalpText id="steg-pris-avtal" rubrik="Utöver avtalet">
-                  Besöket ingår i kundens avtal och faktureras inte. Lägg bara till det kunden har beställt utöver avtalet, till exempel extra material eller arbete.
+                  {isEstablishment ? 'Etableringen' : 'Besöket'} ingår i kundens avtal och faktureras inte. Lägg bara till det kunden har beställt utöver avtalet, till exempel extra material eller arbete.
                   {isInspection && ' Tilläggsstationer sköts i kontrollrundan, inte här.'}
+                  {isEstablishment && ' Tilläggsstationer som du sätter ut utöver avtalet räknas när du trycker Färdig i utplaceringen och faktureras då.'}
                 </HjalpText>
               ) : (
                 <HjalpText id="steg-pris" rubrik="Pris och fakturering">
@@ -3403,7 +3404,7 @@ export default function EditContractCaseModal({
             )}
 
             {/* Arbetet, etablering: befintliga Gå till utplacering (samma villkor som sidfoten) */}
-            {isEstablishment && profile?.role === 'technician' && (
+            {isEstablishment && (profile?.role === 'technician' || nyArbetsvy) && (
               <div className={stegBlock('arbete')}>
                 <button type="button" onClick={gaTillUtplacering} className={stegKnappKlass}>
                   <SvgIcon name="bokning.etablering" size={20} />
@@ -3469,6 +3470,9 @@ export default function EditContractCaseModal({
                   helaArendetViaSteg={isInspection ? {
                     steg: 'arbete',
                     text: `Du stänger besöket med Klarmarkera i kontrollrundan i steget Arbetet. ${utoverAvtaletText}`,
+                  } : isEstablishment ? {
+                    steg: 'arbete',
+                    text: `Du avslutar etableringen med Färdig i utplaceringen, som du når från steget Arbetet. Där räknas tilläggsstationerna som satts ut, och de faktureras utöver avtalet. Det som ingår i avtalet faktureras inte.`,
                   } : undefined}
                   onHinderChange={setHinderSteg}
                 />

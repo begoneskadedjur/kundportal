@@ -59,15 +59,16 @@ export const ALLA_STEG: Record<StegId, StegDef> = {
 export const PRIS_UTOVER_AVTALET: StegDef = { id: 'pris', namn: 'Utöver avtalet', ikon: 'falt.pris', valfritt: true }
 
 /**
- * Stegtyper som är återkommande besök enligt kundens avtal: stationskontroll,
- * rondering och egenkontroll. Extrabesök, etablering och privat/företag
- * debiteras som vanligt.
+ * Stegtyper som ingår i kundens avtal: stationskontroll, rondering, egenkontroll
+ * och etablering (utplaceringen av det som ingår). Tilläggsstationer utöver avtalet
+ * faktureras ändå. Extrabesök och privat/företag debiteras som vanligt.
  */
-export const AVTALSBESOK_TYPER: ArendeStegTyp[] = ['inspection', 'rondering', 'egenkontroll']
+export const AVTALSBESOK_TYPER: ArendeStegTyp[] = ['inspection', 'establishment', 'rondering', 'egenkontroll']
 
-/** cases.service_type för återkommande besök enligt avtal (ingår i avtalet, debiteras inte) */
+/** cases.service_type för besök som ingår i avtalet (debiteras inte, bara tillägg utöver avtalet) */
 export function arAvtalsbesok(serviceType: string | null | undefined): boolean {
   return serviceType === 'inspection'
+    || serviceType === 'establishment'
     || serviceType === 'rondering_trafikkontoret'
     || serviceType === 'egenkontroll_trafikkontoret'
 }
