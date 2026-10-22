@@ -51,7 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     items: [
       { kind: 'andring', text: 'Ingen behöver välja fakturaväg. Den sätts ur avtalet: står det en e-postadress i fakturafältet går fakturan dit, står det en adress går den som brev, och står det inget går den till kontaktpersonens e-post.' },
       { kind: 'nyhet', text: 'Fakturavägen är en inställning på kundsidan under fliken Fakturering. Där står vart fakturan går, varför, och vad som stod i avtalet. Pennan ändrar vägen, och Fortnox-kortet uppdateras direkt.' },
-      { kind: 'andring', text: 'I fakturan visas fakturavägen bara, så att du ser vart fakturan går innan du godkänner. Den kan inte ändras där.' },
+      { kind: 'andring', text: 'I fakturan visas fakturavägen bara, så att du ser vart fakturan går innan du godkänner. Den kan inte ändras där. Guiden Fakturera från ärende till betalning beskriver det, och den separata guiden om fakturaväg är borttagen.' },
     ],
   },
   {
