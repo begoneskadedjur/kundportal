@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.84.3',
+    date: '2026-10-23',
+    title: 'Kontrollrundan i nya arbetsvyn går att använda',
+    items: [
+      { kind: 'buggfix', text: 'I nya arbetsvyn öppnades stationens kontroll, snabb-OK, klarmarkering och bilder bakom ärendet, så kontrollrundan gick inte att göra. Nu hamnar de överst. Stegraden har också fått helt täckande bakgrund så att text inte skymtar igenom.' },
+    ],
+  },
+  {
     version: '3.84.2',
     date: '2026-10-23',
     title: 'Kartan i Utrustning säger vems stationer den visar',

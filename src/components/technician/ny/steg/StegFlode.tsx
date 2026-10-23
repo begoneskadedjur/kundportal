@@ -47,7 +47,7 @@ export function StegRad({ steg, aktivt, onValj, hinder = [], undertext, classNam
     <nav
       ref={radRef}
       aria-label="Ärendets steg"
-      className={`sticky top-0 z-10 px-4 pt-2.5 pb-3 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/50 ${className}`}
+      className={`sticky top-0 z-20 px-4 pt-2.5 pb-3 bg-slate-900 border-b border-slate-700/50 ${className}`}
     >
       <p className="mb-2.5 flex items-baseline justify-between gap-2">
         <span className="text-[15px] font-bold text-white truncate">
@@ -172,7 +172,7 @@ export function StegFlode({ steg, aktivt, onValj, hinder, onTillbaka, onNasta, n
     <div className="flex flex-col min-h-0">
       <StegRad steg={steg} aktivt={aktivt} onValj={onValj} hinder={hinder} />
       <div className="p-4 flex flex-col gap-3">{children}</div>
-      <div className="sticky bottom-0 border-t border-slate-700/50 bg-slate-900/95 backdrop-blur-xl">
+      <div className="sticky bottom-0 z-20 border-t border-slate-700/50 bg-slate-900">
         <StegKnappar
           steg={steg}
           aktivt={aktivt}

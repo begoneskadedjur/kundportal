@@ -271,9 +271,12 @@ export default function StationInspectionPanel({
   const renderOverlay = (node: ReactNode) => {
     if (!embedded || typeof document === 'undefined') return node
     // Klick och tangenter i portalen bubblar annars genom React-trädet till värdens element
+    // Värdmodalen ligger i #modal-root (fast container med högsta z-index direkt
+    // under body). Portas överläggen till body hamnar de alltid under den, därför
+    // samma mål som modalen, där z-index jämförs mot modalens 9999.
     return createPortal(
       <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>{node}</div>,
-      document.body
+      document.getElementById('modal-root') ?? document.body
     )
   }
 
