@@ -342,6 +342,22 @@ export default function StationInspectionPanel({
   const selectedStationId = selectedStation?.id
   // Stationsmodalens läge: kontrollen eller byt typ (ersätter innehållet)
   const [modalView, setModalView] = useState<'kontroll' | 'byttyp'>('kontroll')
+
+  // Stäng stationsarket utan att spara. I inbäddat läge (nya arbetsvyn) utan
+  // stängningsanimation: arket ligger i #modal-root ovanpå ärendet, och en
+  // exit-animation som inte blir klar lämnar arket synligt fast det är stängt.
+  const stangStationsark = useCallback(() => {
+    setSelectedStation(null)
+    setModalView('kontroll')
+  }, [])
+
+  // Inbäddat: Esc stänger stationsarket (värdmodalen stängs inte av Esc)
+  useEffect(() => {
+    if (!embedded || !selectedStation) return
+    const vidTangent = (e: KeyboardEvent) => { if (e.key === 'Escape') stangStationsark() }
+    document.addEventListener('keydown', vidTangent)
+    return () => document.removeEventListener('keydown', vidTangent)
+  }, [embedded, selectedStation, stangStationsark])
   // Anteckningsfältet fälls ut från ikonrutan
   const [showNotesField, setShowNotesField] = useState(false)
   useEffect(() => {
@@ -1901,7 +1917,7 @@ export default function StationInspectionPanel({
           title={typeName}
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-[#fff] truncate">
+          <p className="text-sm font-semibold text-white truncate">
             {stationNumber} <span className="font-normal text-slate-400">{typeName}</span>
           </p>
           {detail && <p className="text-[11px] truncate">{detail}</p>}
@@ -1955,7 +1971,7 @@ export default function StationInspectionPanel({
               <div className="flex-1 min-w-0" />
             ) : (
               <div className="flex-1 min-w-0">
-                <h1 className="text-[17px] font-bold text-[#fff] leading-tight">Stationskontroll</h1>
+                <h1 className="text-[17px] font-bold text-white leading-tight">Stationskontroll</h1>
                 <p className="text-xs text-slate-400 truncate">{session?.customer?.company_name}</p>
               </div>
             )}
@@ -2860,14 +2876,14 @@ export default function StationInspectionPanel({
               key="station-modal"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
+              exit={embedded ? undefined : { opacity: 0 }}
               className={`fixed inset-0 ${overlayZ} bg-black/70 flex items-end sm:items-center justify-center p-4 overflow-y-auto`}
-              onClick={() => setSelectedStation(null)}
+              onClick={stangStationsark}
             >
               <motion.div
                 initial={{ y: 100, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 100, opacity: 0 }}
+                exit={embedded ? undefined : { y: 100, opacity: 0 }}
                 onClick={(e) => e.stopPropagation()}
                 className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
               >
@@ -2902,7 +2918,7 @@ export default function StationInspectionPanel({
                         addon={selectedStation.is_addon === true}
                       />
                       <div className="flex-1 min-w-0">
-                        <h2 className="text-lg font-bold text-[#fff] truncate">Station {selNumber}</h2>
+                        <h2 className="text-lg font-bold text-white truncate">Station {selNumber}</h2>
                         <p className="text-[13px] text-slate-400 truncate">
                           {selTypeName}
                           {selectedStation.is_addon === true && <span className="text-violet-400"> · tillägg</span>}
@@ -2910,7 +2926,7 @@ export default function StationInspectionPanel({
                       </div>
                       <button
                         type="button"
-                        onClick={() => setSelectedStation(null)}
+                        onClick={stangStationsark}
                         aria-label="Stäng"
                         className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
                       >
@@ -3108,7 +3124,7 @@ export default function StationInspectionPanel({
                           green: 'text-green-400',
                           amber: 'text-amber-400',
                           red: 'text-red-400',
-                          default: 'text-[#fff]'
+                          default: 'text-white'
                         }[color]
                         const unit = unitShort(stType.measurement_unit)
                         // Steg 5 för gram, annars 1 (st och övriga enheter)
@@ -3237,7 +3253,7 @@ export default function StationInspectionPanel({
                             className={`h-14 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-[13px] transition-colors ${
                               photoPreview
                                 ? 'border-[#20c58f] text-[#20c58f]'
-                                : 'border-slate-600 text-slate-300 hover:border-slate-500 hover:text-[#fff]'
+                                : 'border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white'
                             }`}
                           >
                             <Icon name="allman.foto" size={20} />
@@ -3251,7 +3267,7 @@ export default function StationInspectionPanel({
                             className={`h-14 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-[13px] transition-colors ${
                               showNotesField || inspectionNotes
                                 ? 'border-[#20c58f] text-[#20c58f]'
-                                : 'border-slate-600 text-slate-300 hover:border-slate-500 hover:text-[#fff]'
+                                : 'border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white'
                             }`}
                           >
                             <Icon name="allman.anteckning" size={20} />

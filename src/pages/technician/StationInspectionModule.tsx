@@ -1791,7 +1791,7 @@ export default function StationInspectionModule() {
           title={typeName}
         />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-[#fff] truncate">
+          <p className="text-sm font-semibold text-white truncate">
             {stationNumber} <span className="font-normal text-slate-400">{typeName}</span>
           </p>
           {detail && <p className="text-[11px] truncate">{detail}</p>}
@@ -1839,7 +1839,7 @@ export default function StationInspectionModule() {
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="flex-1 min-w-0">
-              <h1 className="text-[17px] font-bold text-[#fff] leading-tight">Stationskontroll</h1>
+              <h1 className="text-[17px] font-bold text-white leading-tight">Stationskontroll</h1>
               <p className="text-xs text-slate-400 truncate">{session?.customer?.company_name}</p>
             </div>
 
@@ -2747,7 +2747,7 @@ export default function StationInspectionModule() {
                         addon={selectedStation.is_addon === true}
                       />
                       <div className="flex-1 min-w-0">
-                        <h2 className="text-lg font-bold text-[#fff] truncate">Station {selNumber}</h2>
+                        <h2 className="text-lg font-bold text-white truncate">Station {selNumber}</h2>
                         <p className="text-[13px] text-slate-400 truncate">
                           {selTypeName}
                           {selectedStation.is_addon === true && <span className="text-violet-400"> · tillägg</span>}
@@ -2953,7 +2953,7 @@ export default function StationInspectionModule() {
                           green: 'text-green-400',
                           amber: 'text-amber-400',
                           red: 'text-red-400',
-                          default: 'text-[#fff]'
+                          default: 'text-white'
                         }[color]
                         const unit = unitShort(stType.measurement_unit)
                         // Steg 5 för gram, annars 1 (st och övriga enheter)
@@ -3082,7 +3082,7 @@ export default function StationInspectionModule() {
                             className={`h-14 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-[13px] transition-colors ${
                               photoPreview
                                 ? 'border-[#20c58f] text-[#20c58f]'
-                                : 'border-slate-600 text-slate-300 hover:border-slate-500 hover:text-[#fff]'
+                                : 'border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white'
                             }`}
                           >
                             <Icon name="allman.foto" size={20} />
@@ -3096,7 +3096,7 @@ export default function StationInspectionModule() {
                             className={`h-14 rounded-2xl border border-dashed flex items-center justify-center gap-2 text-[13px] transition-colors ${
                               showNotesField || inspectionNotes
                                 ? 'border-[#20c58f] text-[#20c58f]'
-                                : 'border-slate-600 text-slate-300 hover:border-slate-500 hover:text-[#fff]'
+                                : 'border-slate-600 text-slate-300 hover:border-slate-500 hover:text-white'
                             }`}
                           >
                             <Icon name="allman.anteckning" size={20} />

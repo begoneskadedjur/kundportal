@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.84.6',
+    date: '2026-10-23',
+    title: 'Stationsarket går att stänga utan att spara',
+    items: [
+      { kind: 'buggfix', text: 'I nya arbetsvyn gick stationsarket i kontrollrundan inte att stänga med krysset om man öppnat fel station. Nu stänger krysset, ett klick utanför och Esc arket utan att spara.' },
+      { kind: 'buggfix', text: 'Stationens nummer, rubriken Stationskontroll och mätvärdet syntes inte i ljust tema i kontrollrundan. Nu följer texten temat, även i den vanliga kontrollrundan.' },
+    ],
+  },
+  {
     version: '3.84.5',
     date: '2026-10-23',
     title: 'Kontrollrundan läsbar i ljust tema',
