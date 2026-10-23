@@ -69,6 +69,8 @@ interface CollapsibleMapSectionProps {
   // Skickas den in styr föräldern valet, annars väljs kund lokalt i filtret.
   focusCustomerId?: string | null
   onFocusCustomerChange?: (customerId: string | null) => void
+  // Rubrik över statistiken. Ska följa valet Alla/Mina hos föräldern.
+  rubrik?: string
 }
 
 export function CollapsibleMapSection({
@@ -77,6 +79,7 @@ export function CollapsibleMapSection({
   onEquipmentClick,
   defaultExpanded = true,
   className = '',
+  rubrik = 'Alla stationer',
   focusCustomerId: focusCustomerIdProp,
   onFocusCustomerChange
 }: CollapsibleMapSectionProps) {
@@ -331,7 +334,7 @@ export function CollapsibleMapSection({
             <div className="w-8 h-8 bg-emerald-500/10 rounded-lg flex items-center justify-center">
               <Building2 className="w-4 h-4 text-emerald-400" />
             </div>
-            <h3 className="text-lg font-semibold text-white">Utplacerat av mig</h3>
+            <h3 className="text-lg font-semibold text-white">{rubrik}</h3>
           </div>
 
           {/* Totalt */}

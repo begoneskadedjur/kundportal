@@ -314,6 +314,7 @@ export default function NyUtrustning() {
               <CollapsibleMapSection
                 equipment={allEquipment}
                 stats={stats}
+                rubrik={scope === 'own' ? 'Utplacerat av mig' : 'Alla stationer'}
                 onEquipmentClick={(e) => { if (e.customer_id) navigate(`/technician/equipment/customer/${e.customer_id}`) }}
                 defaultExpanded={true}
                 focusCustomerId={mapFocusCustomerId}

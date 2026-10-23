@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.84.2',
+    date: '2026-10-23',
+    title: 'Kartan i Utrustning säger vems stationer den visar',
+    items: [
+      { kind: 'buggfix', text: 'Rubriken över statistiken i fliken Karta under Utrustning sa alltid Utplacerat av mig, fast siffrorna och kartan visade alla stationer. Nu står det Alla stationer, eller Utplacerat av mig när du har valt Mina.' },
+    ],
+  },
+  {
     version: '3.84.1',
     date: '2026-10-23',
     title: 'Utrustning i nya arbetsvyn öppnas igen',

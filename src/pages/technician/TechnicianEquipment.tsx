@@ -1128,6 +1128,7 @@ export default function TechnicianEquipment() {
               <CollapsibleMapSection
                 equipment={allEquipment}
                 stats={stats}
+                rubrik={stationScope === 'own' ? 'Utplacerat av mig' : 'Alla stationer'}
                 onEquipmentClick={handleEquipmentClick}
                 defaultExpanded={true}
                 focusCustomerId={mapFocusCustomerId}
