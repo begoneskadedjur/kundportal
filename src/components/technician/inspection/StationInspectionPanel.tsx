@@ -1945,7 +1945,7 @@ export default function StationInspectionPanel({
                 type="button"
                 onClick={() => onExit?.()}
                 aria-label="Tillbaka"
-                className="w-11 h-11 -ml-2 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-300 hover:text-[#fff] hover:bg-slate-800 transition-colors"
+                className="w-11 h-11 -ml-2 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -2060,7 +2060,7 @@ export default function StationInspectionPanel({
                 disabled={sessionPhotoUploading || sessionPhotos.length >= 10}
                 aria-label={`Lägg till bild, ${sessionPhotos.length} av 10`}
                 title={`Bilder ${sessionPhotos.length} av 10`}
-                className="w-11 h-11 flex-shrink-0 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-[#fff] hover:border-slate-700 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-11 h-11 flex-shrink-0 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {sessionPhotoUploading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon name="allman.foto" size={20} />}
               </button>
@@ -2075,7 +2075,7 @@ export default function StationInspectionPanel({
               className={`w-11 h-11 flex-shrink-0 rounded-xl border flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                 showSummary
                   ? 'bg-[#20c58f]/10 border-[#20c58f]/60 text-[#20c58f]'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-[#fff] hover:border-slate-700'
+                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
               }`}
             >
               <Icon name="station.summa" size={20} />
@@ -2912,7 +2912,7 @@ export default function StationInspectionPanel({
                         type="button"
                         onClick={() => setSelectedStation(null)}
                         aria-label="Stäng"
-                        className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#fff] hover:bg-slate-800 transition-colors"
+                        className="w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
                       >
                         <X className="w-5 h-5" />
                       </button>
@@ -3195,7 +3195,7 @@ export default function StationInspectionPanel({
                               id={`prep-${selectedStation.id}`}
                               value={selectedPreparationId || ''}
                               onChange={(e) => setSelectedPreparationId(e.target.value || null)}
-                              className="w-full h-12 bg-slate-800 border border-slate-700 rounded-xl px-3 text-sm text-[#fff] focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                              className="w-full h-12 bg-slate-800 border border-slate-700 rounded-xl px-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f]"
                             >
                               <option value="">Inget preparat</option>
                               {(['biocidprodukt', 'giftfritt', 'desinfektionsmedel'] as const).map(cat => {
@@ -3292,7 +3292,7 @@ export default function StationInspectionPanel({
                             placeholder="Beskriv eventuella fynd"
                             aria-label="Anteckning"
                             rows={3}
-                            className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-[#fff] placeholder-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f]"
+                            className="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm text-white placeholder-slate-500 resize-none focus:outline-none focus:ring-1 focus:ring-[#20c58f] focus:border-[#20c58f]"
                           />
                         )}
                       </div>

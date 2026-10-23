@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.84.5',
+    date: '2026-10-23',
+    title: 'Kontrollrundan läsbar i ljust tema',
+    items: [
+      { kind: 'buggfix', text: 'I kontrollrundan var valt preparat och anteckningen vit text på ljus bakgrund i ljust tema, så det gick inte att läsa. Nu följer texten temat.' },
+    ],
+  },
+  {
     version: '3.84.4',
     date: '2026-10-23',
     title: 'Kartan i nya Utrustning visar dina stationer',
