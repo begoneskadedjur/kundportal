@@ -307,7 +307,8 @@ function Innehall({ userName, onSignOut }: Props) {
       <Sidhuvud current={current} ticketAntal={ticketAntal} onSkapa={oppnaSkapa} />
       <GlobalSearch portal="technician" />
 
-      <main className="min-h-screen pt-[calc(4rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pt-14 lg:pb-0 lg:pl-64">
+      {/* --bottenlist: bottenmenyns höjd, så att sidornas fasta bottenlister (t.ex. avtalswizarden) hamnar ovanför den */}
+      <main className="min-h-screen pt-[calc(4rem+env(safe-area-inset-top))] pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pt-14 lg:pb-0 lg:pl-64 [--bottenlist:calc(4rem+env(safe-area-inset-bottom))] lg:[--bottenlist:0px]">
         <Outlet />
       </main>
 

@@ -49,15 +49,20 @@ const signDatum = (o: FollowUpOffer) => (o as FollowUpOffer & { signed_at?: stri
 // ─── Teknikern bakom dokumentet ───
 
 export interface DokTekniker {
-  /** Gemener, avsändarens e-post. '' när den saknas */
+  /** Grupperingsnyckel: namnet i gemener, annars e-posten. '' när båda saknas */
   nyckel: string
+  /** Gemener, avsändarens e-post. '' när den saknas */
+  epost: string
   namn: string
 }
 
 export function dokTekniker(o: FollowUpOffer): DokTekniker {
   const epost = (o.begone_employee_email || o.created_by_email || '').toLowerCase()
   const namn = o.technician_name || o.begone_employee_name || o.created_by_name || 'Okänd avsändare'
-  return { nyckel: epost, namn }
+  // Samma person kan ha skickat från flera adresser: gruppera på namnet när det finns,
+  // annars blir det ett val per adress och filtret visar bara en del av dokumenten
+  const harNamn = !!(o.technician_name || o.begone_employee_name || o.created_by_name)
+  return { nyckel: harNamn ? namn.trim().toLowerCase() : epost, epost, namn }
 }
 
 export const fornamn = (namn: string | null | undefined) => (namn || '').trim().split(/\s+/)[0] || ''

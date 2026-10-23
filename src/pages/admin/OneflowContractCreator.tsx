@@ -2434,7 +2434,7 @@ export default function OneflowContractCreator() {
 
       {/* Fast bottenlist: Föregående, valideringstips, Nästa */}
       {phase === 'wizard' && (
-        <div className="sticky bottom-0 z-20 bg-slate-900/90 backdrop-blur border-t border-slate-700 shadow-[0_-8px_24px_rgba(15,31,46,0.05)]">
+        <div className="sticky bottom-[var(--bottenlist,0px)] z-20 bg-slate-900/90 backdrop-blur border-t border-slate-700 shadow-[0_-8px_24px_rgba(15,31,46,0.05)]">
           <div className="max-w-[1180px] mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
             <button
               type="button"

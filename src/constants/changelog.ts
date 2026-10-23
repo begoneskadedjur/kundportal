@@ -45,6 +45,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.89.4',
+    date: '2026-10-24',
+    title: 'Avtalswizarden i nya arbetsvyn och kundportalens kommande besök',
+    items: [
+      { kind: 'buggfix', text: 'Nya arbetsvyn i mobilen: knapparna Tillbaka och Nästa i Skapa avtal eller offert låg dolda bakom bottenmenyn. De ligger nu ovanför den.' },
+      { kind: 'buggfix', text: 'Kundportalen: avslutade besök visas inte längre som kommande, och ett besök senare samma dag heter Idag i stället för Imorgon.' },
+      { kind: 'buggfix', text: 'Dokumentsignering för kontoret: en tekniker som skickat från flera e-postadresser visas en gång i teknikerfiltret och filtret visar alla deras dokument.' },
+    ],
+  },
+  {
     version: '3.89.3',
     date: '2026-10-24',
     title: 'Rättningar i nya arbetsvyn efter testkörningen',

@@ -39,7 +39,7 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
         setTotalInspectionsCount(totalInspections)
 
         const upcomingInspections = casesData
-          ?.filter(caseItem => caseItem.scheduled_start && caseItem.service_type === 'inspection')
+          ?.filter(caseItem => caseItem.scheduled_start && caseItem.service_type === 'inspection' && !isCompletedStatus(caseItem.status) && caseItem.status !== 'Borttaget')
           ?.map(caseItem => ({
             start: new Date(caseItem.scheduled_start!),
             end: caseItem.scheduled_end ? new Date(caseItem.scheduled_end) : null
@@ -55,7 +55,7 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
         }
 
         const upcomingVisits = casesData
-          ?.filter(caseItem => caseItem.scheduled_start && caseItem.service_type !== 'inspection')
+          ?.filter(caseItem => caseItem.scheduled_start && caseItem.service_type !== 'inspection' && !isCompletedStatus(caseItem.status) && caseItem.status !== 'Borttaget')
           ?.map(caseItem => ({
             start: new Date(caseItem.scheduled_start!),
             end: caseItem.scheduled_end ? new Date(caseItem.scheduled_end) : null
@@ -103,7 +103,9 @@ const ServiceExcellenceDashboard: React.FC<ServiceExcellenceDashboardProps> = ({
       const startDate = new Date(start)
       const endDate = end ? new Date(end) : null
       const now = new Date()
-      const diffDays = Math.ceil((startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      // Kalenderdagar i lokal tid: ett besök senare i dag är Idag, inte Imorgon
+      const dagStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+      const diffDays = Math.round((dagStart(startDate) - dagStart(now)) / (1000 * 60 * 60 * 24))
       const startTime = startDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
       const endTime = endDate?.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
       const timeRange = endTime ? `${startTime}–${endTime}` : startTime

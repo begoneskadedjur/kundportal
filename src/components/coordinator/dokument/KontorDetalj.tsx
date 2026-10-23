@@ -248,7 +248,7 @@ export const KontorDetalj = forwardRef<KontorDetaljRef, Props>(function KontorDe
   const avskriven = !!o.action?.dismissed_at
   const utkastDok = o.status === 'draft'
   const pagaende = o.status === 'pending' || o.status === 'overdue'
-  const kanPaminna = b.atgarder && !!tek.nyckel && tek.nyckel !== minEpost && o.status !== 'signed' && o.status !== 'declined' && !avskriven
+  const kanPaminna = b.atgarder && !!tek.epost && tek.epost !== minEpost && o.status !== 'signed' && o.status !== 'declined' && !avskriven
   const steg = kontorNastaSteg(o, plats, kontaktlage, bokning, kanPaminna)
   const typ = o.type === 'offer' ? 'Offert' : 'Avtal'
   const belopp = kr(o.total_value)
@@ -531,7 +531,7 @@ export const KontorDetalj = forwardRef<KontorDetaljRef, Props>(function KontorDe
           onSkicka={skicka}
           kontakt={kontakt}
           lista={<Kontaktlogg poster={poster} laddar={internaLaddar} minNamn={userName} />}
-          internText={tek.nyckel && tek.nyckel !== minEpost ? `Syns för kontoret och ${tekFornamn}, inte för kunden.` : 'Syns för kontoret, inte för kunden.'}
+          internText={tek.epost && tek.epost !== minEpost ? `Syns för kontoret och ${tekFornamn}, inte för kunden.` : 'Syns för kontoret, inte för kunden.'}
         />
       </div>
       <div className={flik === 'innehall' ? '' : 'hidden'}>

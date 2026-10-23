@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Case } from '../../types/cases'
 import LoadingSpinner from '../shared/LoadingSpinner'
 import toast from 'react-hot-toast'
+import { isCompletedStatus } from '../../types/database'
 
 interface ServiceAssessmentSummaryProps {
   customerId: string
@@ -112,7 +113,8 @@ const ServiceAssessmentSummary: React.FC<ServiceAssessmentSummaryProps> = ({
       const latestAssessment = casesWithAssessments.length > 0 ? casesWithAssessments[0] : null
 
       const upcomingVisits: UpcomingVisit[] = (cases || [])
-        .filter(c => c.scheduled_start && new Date(c.scheduled_start) > new Date())
+        // Avslutade och borttagna besök är inte kommande, även om tiden inte har passerat
+        .filter(c => c.scheduled_start && new Date(c.scheduled_start) > new Date() && !isCompletedStatus(c.status) && c.status !== 'Borttaget')
         .sort((a, b) => new Date(a.scheduled_start!).getTime() - new Date(b.scheduled_start!).getTime())
         .slice(0, 3)
         .map(c => ({
