@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.84.7',
+    date: '2026-10-23',
+    title: 'Klick i kontrollrundan når fram',
+    items: [
+      { kind: 'buggfix', text: 'I nya arbetsvyn gick klick i stationsarket och kontrollrundans andra fönster rakt igenom till ärendet bakom, så krysset och andra knappar svarade inte. Nu tar fönstren emot klicken.' },
+    ],
+  },
+  {
     version: '3.84.6',
     date: '2026-10-23',
     title: 'Stationsarket går att stänga utan att spara',

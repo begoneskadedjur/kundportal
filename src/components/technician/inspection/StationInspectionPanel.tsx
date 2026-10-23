@@ -275,7 +275,9 @@ export default function StationInspectionPanel({
     // under body). Portas överläggen till body hamnar de alltid under den, därför
     // samma mål som modalen, där z-index jämförs mot modalens 9999.
     return createPortal(
-      <div onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>{node}</div>,
+      // #modal-root har pointer-events: none (Portal.tsx), barnen måste slå på det igen,
+      // annars går klick och dubbelklick rakt igenom till ärendet bakom
+      <div style={{ pointerEvents: 'auto' }} onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>{node}</div>,
       document.getElementById('modal-root') ?? document.body
     )
   }
