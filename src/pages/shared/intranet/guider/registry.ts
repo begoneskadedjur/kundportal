@@ -13,6 +13,11 @@ import type { ComponentType } from 'react'
 export interface GuideModul {
   Visning?: ComponentType<{ steg: number; onNasta: () => void }>
   Ovning?: ComponentType
+  /**
+   * Enheter guiden ritar. ['mobil', 'dator'] = läsaren väljer (EnhetValjare), och
+   * skärmarna läser useGuideEnhet(). Utelämnad: guidens intro.enhet gäller.
+   */
+  enheter?: ('mobil' | 'dator')[]
 }
 
 // Filer som börjar med _ är delade hjälpdelar för flera guider, inga moduler

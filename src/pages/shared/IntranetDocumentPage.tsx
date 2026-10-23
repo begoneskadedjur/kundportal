@@ -50,6 +50,8 @@ import DelfakturaManadOvning from './intranet/interactive/delfakturering/Delfakt
 import AterbesokOvning from './intranet/interactive/delfakturering/AterbesokOvning'
 import AudienceModal from './intranet/AudienceModal'
 import { MallBlock, arMallguide, kollaMall, mallEnhet, mallToc } from './intranet/GuideMall'
+import { GuideEnhetProvider } from './intranet/skarmkit/nyvy'
+import { GUIDE_MODULER } from './intranet/guider/registry'
 import { GuideSporningContext, useGuideSporning } from './intranet/guideSporning'
 import { describeAudience, forRollerna } from '../../types/intranet'
 import { Eye } from 'lucide-react'
@@ -57,7 +59,15 @@ import { Eye } from 'lucide-react'
 // Interaktiva demos - innehållsblock av typen interactive slår upp
 // sin komponent här via nyckeln i blockets component-fält
 // variant skickas vidare från blocket (t.ex. 'tekniker' eller 'kontor')
+// Interaktiva delar för nya arbetsvyns guider: varje fil i interactive/nyvy/ blir
+// komponenten "nyvy/<Filnamn>" utan att registreras här.
+const NYVY_INTERAKTIVA: Record<string, ComponentType<{ variant?: string }>> = Object.fromEntries(
+  Object.entries(import.meta.glob<{ default: ComponentType<{ variant?: string }> }>('./intranet/interactive/nyvy/*.tsx', { eager: true }))
+    .map(([sokvag, modul]) => [`nyvy/${sokvag.split('/').pop()!.replace(/.tsx$/, '')}`, modul.default])
+)
+
 const INTERACTIVE_COMPONENTS: Record<string, ComponentType<{ variant?: string }>> = {
+  ...NYVY_INTERAKTIVA,
   'prissattning-demo': PrissattningDemo,
   'dokumentsignering-demo': DokumentsigneringDemo,
   'fakturering-demo': FaktureringDemo,
@@ -522,11 +532,14 @@ export default function IntranetDocumentPage() {
 
       {/* Innehåll */}
       <GuideSporningContext.Provider value={sporning}>
-        <article>
-          {doc.content.map((block, i) => (
-            <BlockRenderer key={i} block={block} anchorId={anchorFor(block, i)} slug={doc.slug} enhet={mallEnhet(doc.content)} />
-          ))}
-        </article>
+        {/* Guider med både telefon och dator: läsaren väljer, standard efter skärmen */}
+        <GuideEnhetProvider dubbel={(GUIDE_MODULER[doc.slug]?.enheter?.length ?? 0) > 1} fast={mallEnhet(doc.content)}>
+          <article>
+            {doc.content.map((block, i) => (
+              <BlockRenderer key={i} block={block} anchorId={anchorFor(block, i)} slug={doc.slug} enhet={mallEnhet(doc.content)} />
+            ))}
+          </article>
+        </GuideEnhetProvider>
       </GuideSporningContext.Provider>
 
       {/* Tillbaka till innehållet (smal skärm), ovanför mobilmenyn */}

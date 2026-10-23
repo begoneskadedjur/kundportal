@@ -66,3 +66,15 @@ Handboken visar guiderna för vyn man står i (`activeView`). Guidens `audience_
 ## När en funktion ändras
 
 Guiden ändras i samma leverans, precis som uppdateringsloggen.
+
+## Guiderna för nya arbetsvyn (2026-10-24)
+
+Teknikernas handbok har fullt fokus på nya arbetsvyn. Varje teknikerguide ritar **både telefon och dator**:
+
+- Modulen exporterar `enheter: ['mobil', 'dator']`. Läsaren får då väljaren Telefon/Dator överst, standard efter skärmen hen läser på (sparas i webbläsaren). `intro.enhet` sätts till `mobil`.
+- Skärmarna läser `useGuideEnhet()` och byggs med `skarmkit/nyvy.tsx`: `NySkarm` (telefonens sidhuvud och bottenmeny eller datorns sidomeny, hämtade ur `nyNavConfig`), `NyArende` (ärendet i stegflödet med stegraden ur `stegKonfig`), `NyRad`, `NyGrupp`, `NyHjalp`. Markörer på ramen: `markor={{ pa, nr, mal }}` där `mal` är `nav:Idag`, `nav:Mer`, `nav:<menynamn>`, `skapa`, `sok`, `tillbud`, `tickets`, `visamig`, och i ärendet `nasta`, `tillbaka`, `steg:<id>`, `verktyg`, `flikvy`, `stang`.
+- Texten ska fungera för båda enheterna. Skiljer det sig, skriv båda: "I telefonen: tryck Mer. På datorn står det i sidomenyn."
+- Interaktiva delar (räknare, jämförelser, exempel man kan prova) läggs som filer i `interactive/nyvy/<Namn>.tsx` och används med blocket `{"type":"interactive","component":"nyvy/<Namn>"}` efter en del i mallen. De registreras automatiskt.
+- Facit: `guider/guide-roller-och-vyer.tsx` och `supabase/migrations/20261024_handbok_nyvy_00_hitta_ratt.sql`.
+- Den gröna knappen i steget Framme heter **Jag är framme**. Arbetstiden räknas i bakgrunden och visas inte i stegen. Skriv aldrig att teknikern ska starta, pausa eller stoppa en klocka.
+- Sidan för frågor till kollegor heter **Tickets**, och en ny tråd heter **Ny ticket**.

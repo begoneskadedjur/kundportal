@@ -11,6 +11,7 @@ import { useRoleBasePath } from '../../../hooks/useRoleBasePath'
 import type { GuideFraga, GuideRoll, GuideSteg, IntranetBlock } from '../../../types/intranet'
 import { GUIDE_MODULER } from './guider/registry'
 import { useGuideSporningen } from './guideSporning'
+import { EnhetValjare, useGuideDubbel, useGuideEnhet } from './skarmkit/nyvy'
 
 export const GUIDE_DELAR = {
   visning: { id: 'gor-sa-har', titel: 'Gör så här', ikon: 'guide.steg' },
@@ -76,6 +77,7 @@ function Rubrik({ del }: { del: GuideDelTyp }) {
 // ─── 1 och 2 ───────────────────────────────────────
 
 function Intro({ block }: { block: Extract<IntranetBlock, { type: 'intro' }> }) {
+  const dubbel = useGuideDubbel()
   const rutor: { ikon: IconName; rubrik: string; text: ReactNode }[] = [
     {
       ikon: block.roller.length === 1 ? ROLL_TEXT[block.roller[0]].ikon : 'roll.koordinator',
@@ -83,7 +85,7 @@ function Intro({ block }: { block: Extract<IntranetBlock, { type: 'intro' }> }) 
       text: block.roller.map(r => ROLL_TEXT[r].text).join(' och '),
     },
     { ikon: 'guide.var', rubrik: 'Var', text: <MallText text={block.var} /> },
-    { ikon: block.enhet === 'mobil' ? 'guide.mobil' : 'guide.dator', rubrik: 'Tar', text: `${block.tar}, ${block.enhet === 'mobil' ? 'i telefonen' : 'på datorn'}` },
+    { ikon: block.enhet === 'mobil' ? 'guide.mobil' : 'guide.dator', rubrik: 'Tar', text: `${block.tar}, ${dubbel ? 'i telefonen eller på datorn' : block.enhet === 'mobil' ? 'i telefonen' : 'på datorn'}` },
   ]
   if (block.behover) rutor.push({ ikon: 'guide.du-behover', rubrik: 'Du behöver', text: <MallText text={block.behover} /> })
   return (
@@ -115,7 +117,9 @@ function Kortsvar({ text }: { text: string }) {
 
 // ─── 3 Gör så här ──────────────────────────────────
 
-function Visning({ steg, modul, enhet }: { steg: GuideSteg[]; modul?: string; enhet: 'mobil' | 'dator' }) {
+function Visning({ steg, modul }: { steg: GuideSteg[]; modul?: string }) {
+  // Läsarens val när guiden har både telefon och dator, annars guidens egen enhet
+  const enhet = useGuideEnhet()
   const [aktiv, setAktivState] = useState(0)
   const sporning = useGuideSporningen()
   // Läsloggen: steget räknas när man själv väljer det, inte första steget som visas från start
@@ -375,9 +379,9 @@ function Avslut({ lankar, fraga }: { lankar: { slug: string; label: string; desc
 /** Renderar ett av mallens block, annars null (då tar den vanliga renderaren över) */
 export function MallBlock({ block, slug, enhet = 'mobil' }: { block: IntranetBlock; slug: string; enhet?: 'mobil' | 'dator' }) {
   switch (block.type) {
-    case 'intro': return <Intro block={block} />
+    case 'intro': return <><Intro block={block} /><EnhetValjare /></>
     case 'kortsvar': return <Kortsvar text={block.text} />
-    case 'visning': return <Visning steg={block.steg} modul={block.modul ?? slug} enhet={enhet} />
+    case 'visning': return <Visning steg={block.steg} modul={block.modul ?? slug} />
     case 'felsok': return <Felsok items={block.items} />
     case 'bra': return <Bra items={block.items} />
     case 'ovning': return <Ovning uppdrag={block.uppdrag} modul={block.modul ?? slug} />
