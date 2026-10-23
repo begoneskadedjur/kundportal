@@ -1875,6 +1875,13 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     gaTillSteg(steg)
   }
 
+  // Arbetstiden startar av sig själv vid Framme. Går klockan när besöket
+  // stängs stoppas den först, annars sparas besöket med 0 minuter och
+  // klockan fortsätter på ett avslutat ärende.
+  const stoppaKlockan = async () => {
+    if (currentCase?.work_started_at) await handleTimeTracking('complete')
+  }
+
   const stangHelaArendet = () => new Promise<boolean>(resolve => {
     if (saknarKundgrupp) {
       toast.error('Välj kundgrupp innan ärendet kan avslutas')
@@ -1883,14 +1890,20 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       return
     }
     stangSvarRef.current = resolve
+    void stangEfterKlockan()
+  })
+
+  const stangEfterKlockan = async () => {
+    await stoppaKlockan()
     statusForeStangRef.current = formData.status || ''
     setFormData(prev => ({ ...prev, status: 'Avslutat' }))
     setStangBegard(true)
-  })
+  }
 
   // Bara besöket: befintliga RevisitModal. Den läser det sparade ärendet, så
   // osparade ändringar (till exempel rapporten) sparas först.
   const oppnaAterbesok = async () => {
+    await stoppaKlockan()
     if (finnsOsparat()) {
       const ok = await sparaUtanAttStanga()
       if (!ok) return

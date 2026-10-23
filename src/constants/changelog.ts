@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.89.2',
+    date: '2026-10-24',
+    title: 'Arbetstiden följer med när ärendet stängs i nya arbetsvyn',
+    items: [
+      { kind: 'buggfix', text: 'Nya arbetsvyn: går klockan när du stänger ärendet eller väljer Bara besöket stoppas den först, så att besöket får rätt tid. Tidigare blev tiden 0 och klockan fortsatte på det avslutade ärendet.' },
+    ],
+  },
+  {
     version: '3.89.1',
     date: '2026-10-23',
     title: 'Tätare behörigheter för kommentarer, bilagor, notiser och fakturarader',
