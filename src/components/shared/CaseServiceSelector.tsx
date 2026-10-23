@@ -299,7 +299,7 @@ export default function CaseServiceSelector({
         // inte i pending-läsningen och skulle annars auto-skapas igen →
         // dubbelfaktura vid nästa avslut.
         let finalItems = itemsData
-        if (caseId && svc && !itemsData.some(i => i.item_type === 'service' && i.service_id === primaryServiceId)) {
+        if (caseId && svc && !readOnly && !itemsData.some(i => i.item_type === 'service' && i.service_id === primaryServiceId)) {
           const allStatusItems = await CaseBillingService.getCaseBillingItems(caseId, caseType, 'all')
           const stillMissing = !allStatusItems.some(
             i => i.item_type === 'service' && i.service_id === primaryServiceId
@@ -309,20 +309,26 @@ export default function CaseServiceSelector({
             const customerPrice = customerPricesData[svc.id]
             const coveredByContract = coverageData.coveredServiceIds.has(svc.id)
             const priceToUse = coveredByContract ? 0 : customerPrice !== undefined ? customerPrice : (svc.base_price ?? 0)
-            await CaseBillingService.addServiceToCase({
-              case_id: caseId,
-              case_type: caseType,
-              customer_id: customerId,
-              service_id: svc.id,
-              service_code: svc.code,
-              service_name: svc.name,
-              quantity: 1,
-              unit_price: priceToUse,
-              vat_rate: 25,
-              added_by_technician_id: technicianId || undefined,
-              added_by_technician_name: technicianName || undefined,
-              covered_by_contract: coveredByContract,
-            })
+            try {
+              await CaseBillingService.addServiceToCase({
+                case_id: caseId,
+                case_type: caseType,
+                customer_id: customerId,
+                service_id: svc.id,
+                service_code: svc.code,
+                service_name: svc.name,
+                quantity: 1,
+                unit_price: priceToUse,
+                vat_rate: 25,
+                added_by_technician_id: technicianId || undefined,
+                added_by_technician_name: technicianName || undefined,
+                covered_by_contract: coveredByContract,
+              })
+            } catch (autoError) {
+              // Ingen skrivrätt på ärendet (t.ex. en kollega som öppnat det via en
+              // tråd): raden skapas av den som äger ärendet, inget fel att visa.
+              console.warn('[CaseServiceSelector] Primärtjänstens rad skapades inte:', autoError)
+            }
             finalItems = await CaseBillingService.getCaseBillingItems(caseId, caseType)
           } else {
             finalItems = freshItems

@@ -490,9 +490,22 @@ export function useEtableringsflode({ technicianId, technicianName, fetchedEquip
   // Stäng etableringsärendet (RLS-verifierat: 0 uppdaterade rader = behörighet saknas).
   // workReport: systematisk avslutstext, skrivs bara när fältet är tomt.
   const closeEstablishmentCase = async (caseId: string, workReport?: string): Promise<boolean> => {
+    // Klockan startade vid Framme i ärendet: räkna in tiden och stoppa den
+    const { data: tidRad } = await supabase
+      .from('cases')
+      .select('work_started_at, time_spent_minutes')
+      .eq('id', caseId)
+      .maybeSingle()
+    const klocka = tidRad?.work_started_at
+      ? {
+          work_started_at: null,
+          time_spent_minutes: (tidRad.time_spent_minutes || 0)
+            + Math.max(0, Math.floor((Date.now() - new Date(tidRad.work_started_at).getTime()) / 60000)),
+        }
+      : {}
     const { data: updatedRows, error: updateError } = await supabase
       .from('cases')
-      .update({ status: 'Avslutat', completed_date: toLocalISOStringWithOffset() })
+      .update({ status: 'Avslutat', completed_date: toLocalISOStringWithOffset(), ...klocka })
       .eq('id', caseId)
       .select('id, work_report')
 

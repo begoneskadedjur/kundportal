@@ -53,6 +53,9 @@ export const CHANGELOG: ChangelogEntry[] = [
       { kind: 'buggfix', text: 'Steget Klart säger nu att ingen provision registreras när underlaget är under provisionsgränsen, i stället för att lova provision.' },
       { kind: 'buggfix', text: 'Stationslistan i kontrollen visas i nummerordning, station 1 först.' },
       { kind: 'buggfix', text: 'Frågan om att återställa förlorad arbetstid försvinner när tiden redan har sparats.' },
+      { kind: 'buggfix', text: 'Klarmarkera i stationskontrollen och Avsluta etablering stoppar klockan och sparar arbetstiden.' },
+      { kind: 'buggfix', text: 'En kollega som öppnar ett ärende via en tråd lägger inte längre in fakturarader på det.' },
+      { kind: 'buggfix', text: 'Koordinatorer som skapats via personalkortet ser kollegorna, till exempel i Ny fråga eller uppdrag.' },
     ],
   },
   {

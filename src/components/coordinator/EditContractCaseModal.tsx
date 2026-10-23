@@ -3416,6 +3416,8 @@ export default function EditContractCaseModal({
                           .then(h => h.filter(x => x.id !== 'stationer-okontrollerade').map(x => x.text))
                       }
                       onCompleted={async () => {
+                        // Klockan startade vid Framme: stoppa den så att tiden sparas på ärendet
+                        if (isTimerRunning) await handleStopTimer()
                         await refreshCaseData()
                         onSuccess?.()
                         gaTillSteg('klart')
