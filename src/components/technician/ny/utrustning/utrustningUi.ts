@@ -131,3 +131,5 @@ export function avvikelseOrd(h: HealthStatus): { ton: Ton; text: string } {
 export const RADKNAPP = 'h-11 px-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-600 bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] disabled:opacity-60'
 /** Ikonknapp med ram, 44 px */
 export const RAM_IKONKNAPP = 'w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-xl border border-slate-600 bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] disabled:opacity-60'
+/** Liten primärknapp i rader, 44 px hög (Avsluta etablering när allt är ute) */
+export const RADKNAPP_PRIMAR = 'h-11 px-3 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#20c58f] text-[#04281c] text-sm font-semibold hover:bg-[#1bb07f] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 focus-visible:ring-[#20c58f] disabled:opacity-60'

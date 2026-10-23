@@ -1,12 +1,15 @@
 // src/components/technician/ny/utrustning/usePagaendeEtableringar.ts
 // Teknikerns öppna etableringsärenden som har startat (bokade idag eller
 // tidigare, eller där arbetet är påbörjat), en rad per kund, med antal
-// stationer placerade sedan ärendet öppnades (samma räkning som avslutsspärren).
+// stationer placerade sedan ärendet öppnades (samma räkning som avslutsspärren)
+// och avtalets antal mot placerade avtalsstationer (avtaletsStationer.ts).
+// Avslutet rörs inte här, det går alltid via useEtableringsflode.
 
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import { AddonStationBillingService } from '../../../../services/addonStationBillingService'
 import { svenskDag, formateraAdress } from '../../../../services/teknikerDagService'
+import { hamtaAvtalsLage, type AvtalsLage } from './avtaletsStationer'
 
 export interface PagaendeEtableringRad {
   caseId: string
@@ -15,6 +18,8 @@ export interface PagaendeEtableringRad {
   adress: string | null
   bokad: string | null
   placerade: number | null
+  /** Avtalets antal mot placerade avtalsstationer, null om det inte kunde hämtas */
+  avtal: AvtalsLage | null
 }
 
 /**
@@ -36,7 +41,7 @@ export function usePagaendeEtableringar(technicianId: string) {
     try {
       const { data, error } = await supabase
         .from('cases')
-        .select('id, customer_id, created_at, scheduled_start, work_started_at, address, customer:customers(company_name, contact_address)')
+        .select('id, customer_id, created_at, scheduled_start, work_started_at, address, customer:customers(company_name, contact_address, agreement_text)')
         .eq('service_type', 'establishment')
         .not('status', 'ilike', '%avslutat%')
         .neq('status', 'Borttaget')
@@ -46,10 +51,11 @@ export function usePagaendeEtableringar(technicianId: string) {
         .limit(20)
       if (error) throw error
       const idag = svenskDag()
+      type Kund = { company_name: string | null; contact_address: string | null; agreement_text: string | null }
       type Rad = {
         id: string; customer_id: string | null; created_at: string; scheduled_start: string | null
         work_started_at: string | null; address: unknown
-        customer: { company_name: string | null; contact_address: string | null } | { company_name: string | null; contact_address: string | null }[] | null
+        customer: Kund | Kund[] | null
       }
       const startade = ((data ?? []) as unknown as Rad[]).filter(r =>
         !!r.customer_id && (!!r.work_started_at || (!!r.scheduled_start && bokadSenastIdag(r.scheduled_start, idag)))
@@ -62,10 +68,13 @@ export function usePagaendeEtableringar(technicianId: string) {
       }
       const lista = await Promise.all(Array.from(perKund.values()).map(async r => {
         const kund = Array.isArray(r.customer) ? r.customer[0] : r.customer
-        let placerade: number | null = null
-        try {
-          placerade = await AddonStationBillingService.countStationsPlacedSince(r.customer_id, r.created_at, false)
-        } catch { placerade = null }
+        const [placerade, avtal] = await Promise.all([
+          AddonStationBillingService.countStationsPlacedSince(r.customer_id, r.created_at, false).catch(() => null),
+          hamtaAvtalsLage(r.customer_id, kund?.agreement_text ?? null).catch((e: unknown) => {
+            console.error('Kunde inte hämta avtalets stationer:', e)
+            return null
+          }),
+        ])
         return {
           caseId: r.id,
           customerId: r.customer_id,
@@ -74,6 +83,7 @@ export function usePagaendeEtableringar(technicianId: string) {
           adress: formateraAdress(r.address) || formateraAdress(kund?.contact_address) || null,
           bokad: r.scheduled_start,
           placerade,
+          avtal,
         }
       }))
       setRader(lista)

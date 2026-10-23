@@ -43,7 +43,7 @@
 //    StationInspectionPanel.tsx:1137-1180                       → StationArk Flytta
 //  Hämta upp tilläggsstation med betald-spärr                  → StationArk Hämta upp
 //  Stationskarta-PDF (api/generate-station-map-pdf)            → sidhuvudets knapp
-//  Pågående etablering hos kunden med Färdig med etablering   → överst när den finns
+//  Pågående etablering hos kunden med Avsluta etablering      → överst när den finns
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

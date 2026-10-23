@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.86.0',
+    date: '2026-10-23',
+    title: 'Etableringen visar avtalets stationer',
+    items: [
+      { kind: 'nyhet', text: 'En pågående etablering på Stationer visar hur många av avtalets stationer som är ute, till exempel 18 av 24 stationer placerade, och per typ när avtalet anger typ. Antalet läses ur avtalets text. Saknas det står Avtalets antal saknas.' },
+      { kind: 'andring', text: 'Färdig heter nu Avsluta etablering och frågar alltid först. När alla stationer är ute är knappen grön, annars står det hur många som saknas innan du kan avsluta ändå.' },
+    ],
+  },
+  {
     version: '3.85.0',
     date: '2026-10-23',
     title: 'Stationer i nya arbetsvyn',

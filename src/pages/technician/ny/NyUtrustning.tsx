@@ -73,7 +73,7 @@ type Flik = 'kunder' | 'karta' | 'kontroller'
 const GENOMGANG: GenomgangSteg[] = [
   { rubrik: 'Placera station', text: 'Här placerar du ut nya stationer. Du väljer kund, ute eller inne och sedan platsen.', mal: 'utr-placera' },
   { rubrik: 'Att göra', text: 'Här står pågående etableringar och kontroller som väntar. En etablering utan stationer efter 30 dagar blir gul, kontrollera då ärendet.', mal: 'utr-attgora' },
-  { rubrik: 'Pågående etablering', text: 'Tryck Färdig när alla stationer är ute. Då stängs ärendet och tilläggen går till fakturering.', mal: 'utr-etablering' },
+  { rubrik: 'Pågående etablering', text: 'Raden visar hur många av avtalets stationer som är ute. Tryck Avsluta etablering när alla är placerade. Då stängs ärendet och tilläggsstationer faktureras.', mal: 'utr-etablering' },
   { rubrik: 'Kunder, Karta och Kontroller', text: 'Kunder listar alla kunder med stationer. Karta visar stationerna du själv placerat. Kontroller visar försenade och bokade kontroller och kunder utan schema.', mal: 'utr-flikar' },
   { rubrik: 'Alla eller Mina', text: 'Alla visar kunder där någon i teamet placerat stationer. Mina visar bara kunder där du själv placerat.', mal: 'utr-omfang' },
   { rubrik: 'Tryck på en kund', text: 'Då ser du kundens stationer på karta, i lista och på planritningar. Där flyttar du, byter typ och hämtar upp. Schema öppnar kundens kontroller.', mal: 'utr-kunder' },
