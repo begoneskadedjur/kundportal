@@ -110,7 +110,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'AI Assistent', icon: Sparkles, path: '/admin/ai-assistent' },
       { label: 'Gemensam bildbank', icon: ImageIcon, path: '/admin/bildbank' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
+      { label: 'Frågor och uppdrag', icon: MessageSquareText, path: '/admin/tickets' },
       { label: 'Skapa avtal', icon: FileText, path: '/admin/skapa-avtal' },
       { label: 'Larocenter', icon: GraduationCap, path: '/admin/larosate' },
     ]

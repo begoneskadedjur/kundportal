@@ -45,6 +45,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.89.0',
+    date: '2026-10-23',
+    title: 'Tickets blir Frågor och uppdrag',
+    items: [
+      { kind: 'nyhet', text: 'Tickets heter nu Frågor och uppdrag i alla roller. Sidan visar det som väntar på dig, det du väntar svar på, det du är nämnd i för kännedom och det som är klart, med tråden bredvid listan på datorn och som egen vy i telefonen.' },
+      { kind: 'nyhet', text: 'Ny fråga eller uppdrag skickar en fråga till en kollega, en roll eller alla, om ett ärende du väljer. Tråden sparas i ärendets kommunikation, så den syns både där och i mottagarens inkorg. I nya teknikervyn öppnar Skapa dialogen direkt.' },
+      { kind: 'nyhet', text: 'Admin och koordinator har läget Alla med filter på mottagare, avsändare, ärendetyp, status och olästa, och kan välja Jag tar den på frågor till en roll. Anteckningar utan mottagare ligger på en egen rad och räknas inte som öppna.' },
+      { kind: 'buggfix', text: 'Frågor till @admin, @koordinator, @tekniker och @alla syns nu hos alla i gruppen. Siffran i menyn, klockan och sidan är densamma överallt, och den som är nämnd i en tråd kan markera den som klar även i ärendets kommunikation.' },
+      { kind: 'andring', text: 'Kommentarer och trådar i ärenden kan bara läsas av personalen. Kundkonton och organisationernas konton ser dem inte längre.' },
+    ],
+  },
+  {
     version: '3.88.0',
     date: '2026-10-23',
     title: 'Min kundresa i nya arbetsvyn och stängda behörigheter',

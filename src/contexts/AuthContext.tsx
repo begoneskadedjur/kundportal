@@ -13,6 +13,8 @@ export type Profile = {
   customer_id: string | null; user_id: string; technician_id?: string | null;
   role?: 'admin' | 'customer' | 'technician' | 'koordinator' | 'säljare'; display_name?: string | null;
   extra_roles?: string[] | null;
+  /** Äldre flagga, räknas som koordinatorroll (bl.a. i set_case_comment_status) */
+  is_koordinator?: boolean | null;
   can_approve_discounts?: boolean;
   can_approve_invoices?: boolean;
   is_procurement_manager?: boolean;

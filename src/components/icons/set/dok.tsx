@@ -45,4 +45,11 @@ export const dokIcons = {
       <path d="M18 13.5v6M15 16.5h6" />
     </>
   ),
+  // Omnämnd: snabel-a (Frågor och uppdrag, gruppen Omnämnd för kännedom och Nämn en kollega)
+  'dok.omnamnd': (
+    <>
+      <circle cx="12" cy="12" r="3.6" />
+      <path d="M15.6 8.4v4.8a2.4 2.4 0 0 0 4.8 0V12a8.4 8.4 0 1 0-3.3 6.7" />
+    </>
+  ),
 } satisfies Record<`dok.${string}`, ReactNode>

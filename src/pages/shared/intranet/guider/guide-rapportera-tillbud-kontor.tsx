@@ -78,7 +78,7 @@ const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du står p
 
 const TIPS: Record<string, string> = {
   cta: 'Öppna schema öppnar planeringen. Rapporten gör du med den gula knappen.',
-  notis: 'Klockan öppnar dina tickets. Rapporten gör du med den gula knappen.',
+  notis: 'Klockan öppnar Frågor och uppdrag. Rapporten gör du med den gula knappen.',
   sok: 'Sök letar efter ärenden och kunder. Rapporten gör du med den gula knappen.',
   intranat: 'Intranätet har policyerna. Själva rapporten gör du med den gula knappen.',
   uppdateringar: 'Uppdateringar visar nyheter. Tryck på den gula knappen.',

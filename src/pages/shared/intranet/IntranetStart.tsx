@@ -55,7 +55,7 @@ function quickLinksFor(basePath: string) {
     links.push(
       { label: 'Mitt schema', icon: Calendar, path: '/technician/schedule' },
       { label: 'Mina ärenden', icon: ClipboardCheck, path: '/technician/cases' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/technician/tickets' },
+      { label: 'Frågor och uppdrag', icon: MessageSquareText, path: '/technician/tickets' },
       { label: 'Provisioner', icon: Wallet, path: '/technician/commissions' },
       { label: 'AI Assistent', icon: Sparkles, path: '/technician/team-chat' },
     )
@@ -63,7 +63,7 @@ function quickLinksFor(basePath: string) {
     links.push(
       { label: 'Schema & Planering', icon: Calendar, path: '/koordinator/schema' },
       { label: 'Ärenden', icon: ClipboardCheck, path: '/koordinator/arenden' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets' },
+      { label: 'Frågor och uppdrag', icon: MessageSquareText, path: '/koordinator/tickets' },
       { label: 'AI Assistent', icon: Sparkles, path: '/koordinator/team-chat' },
     )
   } else if (basePath === '/saljare') {
@@ -75,7 +75,7 @@ function quickLinksFor(basePath: string) {
   } else {
     links.push(
       { label: 'Schema & Planering', icon: Calendar, path: '/koordinator/schema' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets' },
+      { label: 'Frågor och uppdrag', icon: MessageSquareText, path: '/admin/tickets' },
       { label: 'Användarkonton (Personal)', icon: Users, path: '/admin/anvandarkonton-personal' },
       { label: 'AI Assistent', icon: Sparkles, path: '/admin/ai-assistent' },
     )

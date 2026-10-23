@@ -1534,8 +1534,11 @@ export async function getTicketsWithEvents(
   userId: string,
   limit: number = 50,
   offset: number = 0,
-  includeArchived: boolean = false
+  includeArchived: boolean = false,
+  /** Rollerna användaren hör till, så att gruppnämningar räknas in (3.89.0) */
+  roles: string[] = []
 ): Promise<{ tickets: Ticket[]; totalCount: number }> {
+  // ÄLDRE: sidan Frågor och uppdrag använder getInboxThreads, som filtrerar i frågan.
   // Hämta ALLA kommentarer (vi behöver både roots och replies)
   const { data: allComments, error: commentsError } = await supabase
     .from('case_comments')
@@ -1592,6 +1595,10 @@ export async function getTicketsWithEvents(
   // 2. De är nämnda i root-kommentaren
   // 3. De är author av ett reply
   // 4. De är nämnda i ett reply
+  // 5. De är nämnda via en grupp de hör till (mentioned_roles) eller via @alla
+  const rollSet = new Set(roles);
+  const namndViaGrupp = (c: { mentions_all?: boolean | null; mentioned_roles?: string[] | null }) =>
+    !!c.mentions_all || (c.mentioned_roles || []).some(r => rollSet.has(r));
   const relevantTickets = rootComments.filter(root => {
     const rootId = root.id;
     const replies = repliesMap.get(rootId) || [];
@@ -1599,11 +1606,13 @@ export async function getTicketsWithEvents(
     // Kolla root
     if (root.author_id === userId) return true;
     if (root.mentioned_user_ids?.includes(userId)) return true;
+    if (namndViaGrupp(root)) return true;
 
     // Kolla replies
     for (const reply of replies) {
       if (reply.author_id === userId) return true;
       if (reply.mentioned_user_ids?.includes(userId)) return true;
+      if (namndViaGrupp(reply)) return true;
     }
 
     return false;
@@ -2034,5 +2043,339 @@ export async function getTicketBasedStats(userId: string): Promise<TicketStats> 
     repliesToMe,
     waitingForReplies,
     newActivity
+  };
+}
+
+// =============================================================================
+// FRÅGOR OCH UPPDRAG (sidan /<roll>/tickets, 3.89.0)
+// =============================================================================
+// En tråd är fortfarande en rotkommentar i case_comments med sina svar. Sidan hämtar
+// EN gång per vy, med filtret i frågan:
+//   * 'mine': bara kommentarer där användaren är författare, nämnd personligen,
+//     nämnd via en grupp hen hör till (mentioned_roles) eller via @alla. Sedan hela
+//     trådarna i just de ärendena, så att svar i flera led kan följas till roten.
+//   * 'all' (bara admin och koordinator): alla öppna rotkommentarer och de senast
+//     klara, sidvis. Sedan trådarna i de ärendena.
+// Klara trådar sidas med klaraGrans. Gruppering och statustext görs i
+// src/components/fragor/fragorLogik.ts, inte här.
+
+export interface InkorgArende {
+  id: string;
+  typ: CaseType;
+  nummer: string | null;
+  kund: string;
+  titel: string;
+  adress: string | null;
+  skadedjur: string | null;
+  /** Bokad start som ISO-sträng */
+  bokad: string | null;
+  tekniker: string | null;
+  status: string | null;
+  serviceType: string | null;
+}
+
+export interface InkorgKvitto {
+  commentId: string;
+  userId: string;
+  userName: string;
+  readAt: string;
+}
+
+export interface InkorgData {
+  /** Alla kommentarer (rot och svar) i de trådar som hör till vyn */
+  kommentarer: CaseComment[];
+  /** Id på rotkommentarerna som hör till vyn */
+  rotIds: string[];
+  arenden: Map<string, InkorgArende>;
+  kvitton: InkorgKvitto[];
+  /** Antal klara trådar totalt i vyn (för Visa fler) */
+  klaraTotalt: number;
+}
+
+export interface InkorgOptions {
+  userId: string;
+  /** Rollerna användaren hör till: 'admin' | 'koordinator' | 'technician' */
+  roller: string[];
+  lage: 'mine' | 'all';
+  /** Hur många klara trådar som hämtas (nyast klara först). 0 = inga. */
+  klaraGrans: number;
+}
+
+const IN_CHUNK = 150;
+
+function chunka<T>(lista: T[], storlek = IN_CHUNK): T[][] {
+  const ut: T[][] = [];
+  for (let i = 0; i < lista.length; i += storlek) ut.push(lista.slice(i, i + storlek));
+  return ut;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normaliseraKommentar(c: any): CaseComment {
+  return {
+    ...c,
+    case_type: c.case_type as CaseType,
+    author_role: c.author_role as AuthorRole,
+    attachments: c.attachments || [],
+    mentioned_user_ids: c.mentioned_user_ids || [],
+    mentioned_user_names: c.mentioned_user_names || [],
+    mentioned_roles: c.mentioned_roles || [],
+    mentions_all: c.mentions_all || false,
+    is_system_comment: c.is_system_comment || false,
+    system_event_type: c.system_event_type || null,
+    is_edited: c.is_edited || false,
+    edited_at: c.edited_at || null,
+    parent_comment_id: c.parent_comment_id || null,
+    depth: c.depth || 0,
+    reply_count: c.reply_count || 0,
+    status: (c.status || 'open') as CommentStatus,
+    resolved_at: c.resolved_at || null,
+    resolved_by: c.resolved_by || null,
+  };
+}
+
+/** Rotens id för varje kommentar, genom att följa parent-kedjan */
+export function rotIdFor(kommentarer: { id: string; parent_comment_id: string | null }[]): Map<string, string> {
+  const perId = new Map(kommentarer.map(k => [k.id, k]));
+  const rot = new Map<string, string>();
+  const hitta = (id: string, varv = 0): string | null => {
+    const kand = rot.get(id);
+    if (kand) return kand;
+    const k = perId.get(id);
+    if (!k) return null;
+    if (!k.parent_comment_id) return k.id;
+    if (varv > 50) return null;
+    return hitta(k.parent_comment_id, varv + 1);
+  };
+  for (const k of kommentarer) {
+    const r = hitta(k.id);
+    if (r) rot.set(k.id, r);
+  }
+  return rot;
+}
+
+async function hamtaKommentarerForArenden(caseIds: string[]): Promise<CaseComment[]> {
+  if (caseIds.length === 0) return [];
+  const delar = await Promise.all(
+    chunka(caseIds).map(ids =>
+      supabase
+        .from('case_comments')
+        .select('*')
+        .eq('is_system_comment', false)
+        .in('case_id', ids)
+    )
+  );
+  const ut: CaseComment[] = [];
+  for (const d of delar) {
+    if (d.error) throw d.error;
+    for (const c of d.data || []) ut.push(normaliseraKommentar(c));
+  }
+  return ut;
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+async function hamtaInkorgArenden(
+  par: { id: string; typ: CaseType }[]
+): Promise<Map<string, InkorgArende>> {
+  const karta = new Map<string, InkorgArende>();
+  const privat = [...new Set(par.filter(p => p.typ === 'private').map(p => p.id))];
+  const foretag = [...new Set(par.filter(p => p.typ === 'business').map(p => p.id))];
+  const avtal = [...new Set(par.filter(p => p.typ === 'contract').map(p => p.id))];
+
+  const fraga = async (tabell: string, falt: string, ids: string[], arkivfilter: boolean): Promise<any[]> => {
+    if (ids.length === 0) return [];
+    const svar = await Promise.all(chunka(ids).map(del => {
+      let q = supabase.from(tabell).select(falt).in('id', del);
+      // ClickUp-ärenden före 2026-05-01 är arkiverade och visas inte i arbetsvyer
+      if (arkivfilter) q = q.is('legacy_archived_at', null);
+      return q;
+    }));
+    const rader: any[] = [];
+    for (const s of svar) {
+      if (s.error) throw s.error;
+      rader.push(...((s.data as any[]) || []));
+    }
+    return rader;
+  };
+
+  const [p, b, c] = await Promise.all([
+    fraga('private_cases', 'id, title, case_number, kontaktperson, adress, skadedjur, start_date, primary_assignee_name, status', privat, true),
+    fraga('business_cases', 'id, title, case_number, kontaktperson, adress, skadedjur, start_date, primary_assignee_name, status, bestallare, company_name', foretag, true),
+    fraga('cases', 'id, title, case_number, address, pest_type, scheduled_start, primary_technician_name, status, service_type, customer:customers(company_name, contact_address)', avtal, false),
+  ]);
+
+  for (const r of p) {
+    karta.set(`private:${r.id}`, {
+      id: r.id, typ: 'private', nummer: r.case_number || null,
+      kund: r.kontaktperson || r.title || 'Privatperson', titel: r.title || '',
+      adress: formatAddress(r.adress), skadedjur: r.skadedjur || null,
+      bokad: r.start_date || null, tekniker: r.primary_assignee_name || null,
+      status: r.status || null, serviceType: null,
+    });
+  }
+  for (const r of b) {
+    karta.set(`business:${r.id}`, {
+      id: r.id, typ: 'business', nummer: r.case_number || null,
+      kund: r.company_name || r.bestallare || r.kontaktperson || r.title || 'Företag', titel: r.title || '',
+      adress: formatAddress(r.adress), skadedjur: r.skadedjur || null,
+      bokad: r.start_date || null, tekniker: r.primary_assignee_name || null,
+      status: r.status || null, serviceType: null,
+    });
+  }
+  for (const r of c) {
+    const kund = Array.isArray(r.customer) ? r.customer[0] : r.customer;
+    karta.set(`contract:${r.id}`, {
+      id: r.id, typ: 'contract', nummer: r.case_number || null,
+      kund: kund?.company_name || r.title || 'Avtalskund', titel: r.title || '',
+      adress: formatAddress(r.address) || kund?.contact_address || null, skadedjur: r.pest_type || null,
+      bokad: r.scheduled_start || null, tekniker: r.primary_technician_name || null,
+      status: r.status || null, serviceType: r.service_type || null,
+    });
+  }
+  return karta;
+}
+
+/** Läskvitton med namn för en mängd kommentarer, i en fråga plus en för namnen */
+export async function getReadReceiptsForComments(commentIds: string[]): Promise<InkorgKvitto[]> {
+  if (commentIds.length === 0) return [];
+  const delar = await Promise.all(
+    chunka(commentIds).map(ids =>
+      supabase.from('comment_read_receipts').select('comment_id, user_id, read_at').in('comment_id', ids)
+    )
+  );
+  const rader: { comment_id: string; user_id: string; read_at: string }[] = [];
+  for (const d of delar) {
+    if (d.error) {
+      console.error('Fel vid hämtning av läskvitton:', d.error);
+      continue;
+    }
+    rader.push(...((d.data as any[]) || []));
+  }
+  const userIds = [...new Set(rader.map(r => r.user_id))];
+  const namn = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: profiler } = await supabase
+      .from('profiles')
+      .select('id, display_name, technicians(name)')
+      .in('id', userIds);
+    for (const pr of (profiler as any[]) || []) {
+      const tek = Array.isArray(pr.technicians) ? pr.technicians[0] : pr.technicians;
+      namn.set(pr.id, pr.display_name || tek?.name || 'Okänd');
+    }
+  }
+  return rader.map(r => ({
+    commentId: r.comment_id,
+    userId: r.user_id,
+    userName: namn.get(r.user_id) || 'Okänd',
+    readAt: r.read_at,
+  }));
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+/**
+ * Hämtar trådarna för sidan Frågor och uppdrag (och räknaren i menyn).
+ * Se kommentaren ovanför InkorgArende för vad som hämtas i vilket läge.
+ */
+export async function getInboxThreads(opts: InkorgOptions): Promise<InkorgData> {
+  const { userId, roller, lage, klaraGrans } = opts;
+  let rotKandidater: Set<string> | null = null;
+  let traffIds: Set<string> = new Set();
+  let caseIds: string[] = [];
+  let klaraTotalt = 0;
+
+  if (lage === 'all') {
+    const oppnaFraga = supabase
+      .from('case_comments')
+      .select('id, case_id')
+      .eq('is_system_comment', false)
+      .is('parent_comment_id', null)
+      .eq('status', 'open');
+    const klaraFraga = supabase
+      .from('case_comments')
+      .select('id, case_id', { count: 'exact' })
+      .eq('is_system_comment', false)
+      .is('parent_comment_id', null)
+      .eq('status', 'resolved')
+      .order('resolved_at', { ascending: false, nullsFirst: false })
+      .range(0, Math.max(klaraGrans, 1) - 1);
+    const [oppna, klara] = await Promise.all([oppnaFraga, klaraFraga]);
+    if (oppna.error) throw oppna.error;
+    if (klara.error) throw klara.error;
+    klaraTotalt = klara.count || 0;
+    const klaraRader = klaraGrans > 0 ? (klara.data || []) : [];
+    const rader = [...(oppna.data || []), ...klaraRader];
+    rotKandidater = new Set(rader.map(r => r.id));
+    caseIds = [...new Set(rader.map(r => r.case_id))];
+  } else {
+    const villkor = [
+      `author_id.eq.${userId}`,
+      `mentioned_user_ids.cs.{${userId}}`,
+      'mentions_all.eq.true',
+    ];
+    const giltiga = roller.filter(r => ['admin', 'koordinator', 'technician'].includes(r));
+    if (giltiga.length > 0) villkor.push(`mentioned_roles.ov.{${giltiga.join(',')}}`);
+    const { data, error } = await supabase
+      .from('case_comments')
+      .select('id, case_id')
+      .eq('is_system_comment', false)
+      .or(villkor.join(','));
+    if (error) throw error;
+    traffIds = new Set((data || []).map(r => r.id));
+    caseIds = [...new Set((data || []).map(r => r.case_id))];
+  }
+
+  if (caseIds.length === 0) {
+    return { kommentarer: [], rotIds: [], arenden: new Map(), kvitton: [], klaraTotalt };
+  }
+
+  const allaIArendena = await hamtaKommentarerForArenden(caseIds);
+  const rotAv = rotIdFor(allaIArendena);
+
+  // Vilka rötter hör till vyn
+  const rotSet = new Set<string>();
+  if (rotKandidater) {
+    for (const id of rotKandidater) rotSet.add(id);
+  } else {
+    for (const id of traffIds) {
+      const r = rotAv.get(id);
+      if (r) rotSet.add(r);
+    }
+  }
+
+  let kommentarer = allaIArendena.filter(k => {
+    const r = rotAv.get(k.id);
+    return !!r && rotSet.has(r);
+  });
+
+  // Klara i 'mine' sidas här, nyast klara först
+  if (lage === 'mine') {
+    const klaraRotter = kommentarer
+      .filter(k => !k.parent_comment_id && k.status === 'resolved')
+      .sort((a, b) => (b.resolved_at || b.updated_at || '').localeCompare(a.resolved_at || a.updated_at || ''));
+    klaraTotalt = klaraRotter.length;
+    const behall = new Set(klaraRotter.slice(0, klaraGrans).map(k => k.id));
+    const bort = new Set(klaraRotter.filter(k => !behall.has(k.id)).map(k => k.id));
+    if (bort.size > 0) {
+      kommentarer = kommentarer.filter(k => !bort.has(rotAv.get(k.id) || ''));
+    }
+  }
+
+  const rotter = kommentarer.filter(k => !k.parent_comment_id);
+  const [arenden, kvitton] = await Promise.all([
+    hamtaInkorgArenden(rotter.map(r => ({ id: r.case_id, typ: r.case_type }))),
+    getReadReceiptsForComments(kommentarer.map(k => k.id)),
+  ]);
+
+  // Trådar vars ärende är borttaget eller arkiverat visas inte
+  const synligaRotter = new Set(
+    rotter.filter(r => arenden.has(`${r.case_type}:${r.case_id}`)).map(r => r.id)
+  );
+  kommentarer = kommentarer.filter(k => synligaRotter.has(rotAv.get(k.id) || ''));
+
+  return {
+    kommentarer,
+    rotIds: [...synligaRotter],
+    arenden,
+    kvitton,
+    klaraTotalt,
   };
 }

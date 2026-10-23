@@ -1,7 +1,7 @@
 // src/components/communication/CommentSection.tsx
 // Huvudkomponent för kommentarer på ärenden med tråd-stöd
 
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { CaseType, CaseComment } from '../../types/communication';
 import { useCaseComments } from '../../hooks/useCaseComments';
 import CommentInput from './CommentInput';
@@ -13,6 +13,8 @@ interface CommentSectionProps {
   caseType: CaseType;
   caseTitle?: string;
   compact?: boolean;
+  /** Rotkommentar som ska markeras och visas (från Frågor och uppdrag, Visa i ärendets kommunikation) */
+  markeradTradId?: string | null;
 }
 
 interface ReplyingTo {
@@ -26,6 +28,7 @@ export default function CommentSection({
   caseType,
   caseTitle,
   compact = false,
+  markeradTradId = null,
 }: CommentSectionProps) {
   const {
     comments,
@@ -37,6 +40,15 @@ export default function CommentSection({
     removeComment,
     changeStatus,
   } = useCaseComments({ caseId, caseType, caseTitle });
+
+  // Markerad tråd: scrolla dit när kommentarerna har laddats
+  const markeradRef = useRef<HTMLDivElement | null>(null);
+  const harKommentarer = comments.length > 0;
+  useEffect(() => {
+    if (!markeradTradId || !harKommentarer) return;
+    const t = setTimeout(() => markeradRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 150);
+    return () => clearTimeout(t);
+  }, [markeradTradId, harKommentarer]);
 
   // State för att svara på kommentar
   const [replyingTo, setReplyingTo] = useState<ReplyingTo | null>(null);
@@ -85,11 +97,17 @@ export default function CommentSection({
   const renderCommentWithReplies = (comment: CaseComment, depth: number = 0) => {
     const replies = repliesByParent.get(comment.id) || [];
 
-    // Visa status på kommentarer som har @mentions (tickets)
-    const hasMentions = comment.mentioned_user_ids && comment.mentioned_user_ids.length > 0;
+    // Visa status på kommentarer som har mottagare: person, grupp eller @alla (trådar)
+    const hasMentions = (comment.mentioned_user_ids?.length || 0) > 0 ||
+      (comment.mentioned_roles?.length || 0) > 0 || !!comment.mentions_all;
+    const markerad = depth === 0 && markeradTradId === comment.id;
 
     return (
-      <div key={comment.id}>
+      <div
+        key={comment.id}
+        ref={markerad ? markeradRef : undefined}
+        className={markerad ? 'rounded-lg ring-2 ring-[#20c58f]/60 bg-[#20c58f]/5' : undefined}
+      >
         <CommentItem
           comment={comment}
           onEdit={editComment}

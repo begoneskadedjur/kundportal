@@ -1,10 +1,9 @@
 // src/pages/shared/intranet/guider/_allmant.tsx
-// Delade hjälpdelar för de allmänna guiderna (tickets, roller och vyer, tillbud).
+// Delade hjälpdelar för de allmänna guiderna (roller och vyer, tillbud, menyerna i Frågor och uppdrag).
 // Efterbildningar av portalens menyer och sidor. Etiketterna är exakt samma ord som i:
 //   TechnicianMobileNav, technicianNavConfig, coordinatorNavConfig, CoordinatorSidebar,
 //   CoordinatorTopHeader, ViewSwitcher, ReportIncidentButton, IntranetLink, ChangelogLink,
-//   ProfileLink, InternAdministration, TicketCard, CommentInput, CommentItem,
-//   MentionSuggestions, communicationService.getMentionSuggestions och IncidentsPage.
+//   ProfileLink och IncidentsPage. Skärmarna för Frågor och uppdrag ligger i _fragor.tsx.
 //
 // Lokala ikoner (pratbubbla, klocka, meny med streck, hus, svarspil, hemskärm, mynt)
 // finns inte i ikonbiblioteket ännu. De ritas här enligt ikonstandarden:
@@ -159,7 +158,7 @@ export interface MenyGruppData { label: string; items: string[] }
 
 /** Grupperna i teknikerns meny (technicianNavConfig) */
 export const TEKNIKER_GRUPPER: MenyGruppData[] = [
-  { label: 'Ärenden & Fält', items: ['Mina ärenden', 'Schema', 'Specialrapporter', 'Utrustning', 'Tickets'] },
+  { label: 'Ärenden & Fält', items: ['Mina ärenden', 'Schema', 'Specialrapporter', 'Utrustning', 'Frågor och uppdrag'] },
   { label: 'Försäljning', items: ['Mina leads och tips', 'Skapa Avtal & Offerter', 'Dokumentsignering', 'Min Kundresa'] },
   { label: 'Verktyg', items: ['AI Assistent', 'Provisioner', 'Tillbud & Avvikelser'] },
 ]
@@ -249,7 +248,7 @@ export function TeknikerMeny({ tryck, markera, nr, oppen, vyer, aktivVy = 'Tekni
 
 /** Grupperna i koordinatorns sidomeny (coordinatorNavConfig). Planering och Kunder & Avtal är öppna från början (pinned). */
 export const KOORD_GRUPPER: MenyGruppData[] = [
-  { label: 'Planering', items: ['Ärenden', 'Specialrapporter', 'Ordlistan', 'Rondering & Schema', 'Schemaoptimerare', 'Tickets', 'Tillbud & Avvikelser'] },
+  { label: 'Planering', items: ['Ärenden', 'Specialrapporter', 'Ordlistan', 'Rondering & Schema', 'Schemaoptimerare', 'Frågor och uppdrag', 'Tillbud & Avvikelser'] },
   { label: 'Kunder & Avtal', items: ['Befintliga kunder', 'Trafikljusöversikt', 'Kundprognos', 'Användarkonton (Kund)'] },
   { label: 'Försäljning', items: ['Försäljningspipeline', 'Försäljningsmöjligheter', 'Leads (B2B)', 'Leads (Webb)', 'Dokumentsignering'] },
   { label: 'Fakturering', items: ['Fakturering'] },
@@ -322,180 +321,6 @@ export function SidRubrik({ titel, under, ikon, knappar }: { titel: string; unde
         </div>
       </div>
       {knappar && <div className="flex flex-wrap gap-1.5">{knappar}</div>}
-    </div>
-  )
-}
-
-// ─── Tickets ───────────────────────────────────────
-
-/** Skrivrutan (CommentInput). Telefonen visar bara pappersplanet, datorn också ordet Skicka. */
-export function KommentarFalt({ text, platshallare = 'Skriv kommentar...', svararPa, dator, onFalt, onSkicka, onGem, markorFalt, markorSkicka }: {
-  text: string; platshallare?: string; svararPa?: string; dator?: boolean
-  onFalt?: () => void; onSkicka?: () => void; onGem?: () => void
-  markorFalt?: MarkorProps; markorSkicka?: MarkorProps
-}) {
-  const tom = !text.trim()
-  return (
-    <div className="rounded-md border border-slate-700/80 bg-slate-800/40">
-      {svararPa && (
-        <div className="flex items-center gap-1.5 border-b border-slate-700/60 bg-slate-700/20 px-2.5 py-1 text-[11px]">
-          <LokalIkon namn="svara" size={16} className="h-3 w-3 text-[#20c58f]" />
-          <span className="text-slate-500">Svarar</span>
-          <span className="font-medium text-slate-300">{svararPa}</span>
-        </div>
-      )}
-      <Markor markor={markorFalt} block>
-        <button type="button" onClick={onFalt}
-          className={`block min-h-[34px] w-full px-2.5 py-2 text-left text-[12.5px] ${tom ? 'text-slate-500' : 'text-slate-200'}`}>
-          {tom ? platshallare : text}
-        </button>
-      </Markor>
-      <div className="flex items-center justify-between border-t border-slate-700/40 px-1.5 py-1">
-        <span className="flex items-center gap-1.5">
-          <button type="button" onClick={onGem} aria-label="Bifoga fil (bilder eller PDF)" className="p-1 text-slate-500">
-            <Icon name="rapport.gem" size={16} className="h-3.5 w-3.5" />
-          </button>
-          <span className="text-[10.5px] text-slate-600">@ nämn</span>
-        </span>
-        <Markor markor={markorSkicka}>
-          <button type="button" onClick={onSkicka} aria-label="Skicka" aria-disabled={tom}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11.5px] font-medium ${tom ? 'bg-slate-700/50 text-slate-500' : 'bg-[#20c58f] text-[#fff]'}`}>
-            <Icon name="rapport.skicka" size={16} className="h-3 w-3" />
-            {dator && 'Skicka'}
-          </button>
-        </Markor>
-      </div>
-    </div>
-  )
-}
-
-/** Listan som öppnas när man skriver @ (MentionSuggestions) */
-export function NamnLista({ tryck, markera, nr }: SkarmProps) {
-  const grupper: [string, string][] = [['@tekniker', 'Alla tekniker (8)'], ['@koordinator', 'Alla koordinatorer (2)'], ['@admin', 'Alla admins (2)'], ['@alla', 'Alla användare (12)']]
-  const personer: [string, string, string][] = [['anna', 'Anna Exempel', 'Koordinator'], ['erik', 'Erik Exempel', 'Tekniker'], ['sara', 'Sara Exempel', 'Admin']]
-  return (
-    <div className="w-full overflow-hidden rounded-md border border-slate-700 bg-slate-800 shadow-xl">
-      <p className="border-b border-slate-700/60 px-2.5 py-1 text-[9.5px] font-medium uppercase tracking-wider text-slate-500">@ Nämn</p>
-      <p className="bg-slate-900/30 px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-600">Grupper</p>
-      {grupper.map(([namn, under]) => (
-        <button key={namn} type="button" onClick={() => tryck(`namn-${namn}`)} className="flex w-full items-center gap-2 px-2.5 py-1 text-left hover:bg-slate-700/40">
-          <span className="text-[11.5px] font-medium text-slate-200">{namn}</span>
-          <span className="truncate text-[10px] text-slate-500">{under}</span>
-        </button>
-      ))}
-      <p className="bg-slate-900/30 px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-600">Personer</p>
-      {personer.map(([id, namn, roll]) => (
-        <Markor key={id} markor={mk(markera, `namn-${id}`, nr)} block>
-          <button type="button" onClick={() => tryck(`namn-${id}`)} className="flex w-full items-center justify-between gap-2 px-2.5 py-1 text-left hover:bg-slate-700/40">
-            <span className="text-[11.5px] font-medium text-slate-200">{namn}</span>
-            <span className="text-[10px] text-slate-500">{roll}</span>
-          </button>
-        </Markor>
-      ))}
-    </div>
-  )
-}
-
-/** En kommentar i tråden (CommentItem). Ticketstatus visas som punkt och text. */
-export function Kommentar({ namn, roll, tid, text, status, indrag, onSvara, markorSvara, onTryck }: {
-  namn: string; roll: string; tid: string; text: ReactNode; status?: 'Öppen' | 'Löst'; indrag?: boolean
-  onSvara?: () => void; markorSvara?: MarkorProps; onTryck?: () => void
-}) {
-  return (
-    <div className={`grid gap-0.5 rounded-md px-2 py-1.5 ${indrag ? 'ml-5 border-l border-slate-700/60' : ''}`} onClick={onTryck}>
-      <div className="flex items-center gap-1.5">
-        <span className="text-[12px] font-medium text-slate-200">{namn}</span>
-        <span className="text-[10px] text-slate-500">{roll}</span>
-        <span className="text-[10px] text-slate-600">{tid}</span>
-        {status && <span className="ml-auto"><Status text={status} farg={status === 'Löst' ? 'bg-green-400' : 'bg-blue-400'} /></span>}
-      </div>
-      <p className="text-[12px] leading-snug text-slate-300">{text}</p>
-      {onSvara && (
-        <Markor markor={markorSvara}>
-          <button type="button" onClick={e => { e.stopPropagation(); onSvara() }} className="flex items-center gap-1 text-[10.5px] text-slate-500 hover:text-[#20c58f]">
-            <LokalIkon namn="svara" size={16} className="h-3 w-3" />
-            Svara
-          </button>
-        </Markor>
-      )}
-    </div>
-  )
-}
-
-/** Namn i texten, som portalen färgar */
-export const Nmn = ({ children }: { children: ReactNode }) => <span className="font-medium text-[#20c58f]">{children}</span>
-
-/** Flikarna på sidan Tickets. Telefonen visar de korta namnen. */
-export const TICKET_FLIKAR: { id: string; lang: string; kort: string; farg: string }[] = [
-  { id: 'mentions', lang: 'Väntar på ditt svar', kort: 'Att göra', farg: 'text-red-400' },
-  { id: 'replies_to_me', lang: 'Svar till dig', kort: 'Svar', farg: 'text-orange-400' },
-  { id: 'replies', lang: 'Väntar på andras svar', kort: 'Bevaka', farg: 'text-amber-400' },
-  { id: 'activity', lang: 'Ny aktivitet', kort: 'Nytt', farg: 'text-blue-400' },
-  { id: 'all', lang: 'Alla tickets', kort: 'Alla', farg: 'text-slate-400' },
-  { id: 'archived', lang: 'Avslutade', kort: 'Klart', farg: 'text-green-400' },
-]
-
-export function TicketFlikar({ dator, aktiv, antal, tryck, markera, nr }: SkarmProps & { dator?: boolean; aktiv: string; antal: Record<string, number> }) {
-  return (
-    <div className="mb-2 flex flex-wrap gap-1 rounded-lg bg-slate-800/50 p-1">
-      {TICKET_FLIKAR.map(f => (
-        <Markor key={f.id} markor={mk(markera, `flik-${f.id}`, nr)}>
-          <button type="button" onClick={() => tryck(`flik-${f.id}`)}
-            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium ${f.id === aktiv ? 'bg-slate-700 text-white' : `${f.farg} hover:bg-slate-700/50`}`}>
-            {dator ? f.lang : f.kort}
-            <span className="text-[10px] font-bold opacity-80">{antal[f.id] ?? 0}</span>
-          </button>
-        </Markor>
-      ))}
-    </div>
-  )
-}
-
-/** Ett ticketkort (TicketCard). Pilen fäller ut tråden och knapparna. */
-export function TicketKort({ fran, till, text, sammanfattning, kantfarg = 'border-l-red-500', utfalld, arkiv, tryck, markera, nr }: SkarmProps & {
-  fran: string; till: string; text: string; sammanfattning: string; kantfarg?: string; utfalld?: boolean; arkiv?: boolean
-}) {
-  return (
-    <div className={`overflow-hidden rounded-lg border border-l-4 border-slate-700/50 ${kantfarg} bg-slate-800/40`}>
-      <Markor markor={mk(markera, 'ticket', nr)} block>
-        <div role="button" tabIndex={0} onClick={() => tryck('ticket')} onKeyDown={e => { if (e.key === 'Enter') tryck('ticket') }}
-          className="flex cursor-pointer items-start gap-2 p-2.5 hover:bg-slate-700/20">
-          <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-slate-700/50 text-slate-400"><Icon name="arende.privat" size={16} /></span>
-          <div className="min-w-0 flex-1">
-            <p className="flex items-center gap-1.5 text-[12px] font-medium text-slate-100">
-              <span className="truncate">Råttor i källaren</span>
-              <span className="flex-none text-[10px] text-slate-500">Privat</span>
-            </p>
-            <p className="truncate text-[10.5px] text-slate-400">Exempelvägen 4, Södertälje</p>
-            <div className="mt-1 rounded border border-slate-700/30 bg-slate-900/50 p-1.5">
-              <p className="text-[10.5px]"><span className="font-medium text-slate-300">{fran}</span> <span className="text-red-400">→ @{till}</span></p>
-              <p className="line-clamp-2 text-[10.5px] text-slate-400">{text}</p>
-            </div>
-            <p className="mt-1 text-[10.5px] text-slate-300">{sammanfattning}</p>
-          </div>
-          <Markor markor={mk(markera, 'utfall', nr)}>
-            <button type="button" aria-label={utfalld ? 'Dölj innehåll' : 'Visa innehåll'} onClick={e => { e.stopPropagation(); tryck('utfall') }}
-              className="rounded p-1 text-slate-400 hover:bg-slate-700/50">
-              <Icon name="allman.chevron" size={16} className={utfalld ? '-rotate-90' : 'rotate-90'} />
-            </button>
-          </Markor>
-        </div>
-      </Markor>
-      {utfalld && (
-        <div className="flex flex-wrap gap-1.5 border-t border-slate-700/50 px-2.5 py-2">
-          <button type="button" onClick={() => tryck('oppna')} className="rounded bg-slate-700 px-2.5 py-1 text-[11px] text-slate-200">Öppna ärende</button>
-          {arkiv ? (
-            <button type="button" onClick={() => tryck('ateroppna')} className="rounded border border-amber-500/30 bg-amber-600/20 px-2.5 py-1 text-[11px] text-amber-400">Återöppna</button>
-          ) : (
-            <Markor markor={mk(markera, 'markera-lost', nr)}>
-              <button type="button" onClick={() => tryck('markera-lost')} className="flex items-center gap-1 rounded border border-green-500/30 bg-green-600/20 px-2.5 py-1 text-[11px] text-green-400">
-                <Icon name="allman.bock" size={16} className="h-3 w-3" />
-                Markera löst
-              </button>
-            </Markor>
-          )}
-        </div>
-      )}
     </div>
   )
 }

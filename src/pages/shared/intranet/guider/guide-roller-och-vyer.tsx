@@ -108,7 +108,7 @@ const TIPS_HEM: Record<string, string> = {
   schema: 'Schema visar dina besök. Det du letar efter ligger i menyn under Mer.',
   provision: 'Provision visar din provision. Det du letar efter ligger i menyn under Mer.',
   sok: 'Sök letar efter ärenden och kunder. Öppna menyn i stället.',
-  notis: 'Klockan visar dina tickets. Öppna menyn i stället.',
+  notis: 'Klockan öppnar Frågor och uppdrag. Öppna menyn i stället.',
 }
 
 const TIPS_MENY: Record<string, string> = {

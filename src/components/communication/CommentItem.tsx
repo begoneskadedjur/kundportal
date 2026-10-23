@@ -81,8 +81,22 @@ export default function CommentItem({
   const isOwnComment = user?.id === comment.author_id;
   const canEdit = isOwnComment && !comment.is_system_comment;
   const canDelete = isOwnComment || profile?.role === 'admin';
-  // Endast författaren till kommentaren kan ändra status
-  const canChangeStatus = isOwnComment && !comment.is_system_comment;
+  // Samma regel som RPC:n set_case_comment_status: författaren, den som är nämnd
+  // (personligen, via en grupp hen hör till eller @alla) samt admin och koordinator.
+  // Databasen prövar till slut, här styrs bara om valet visas.
+  const minaRoller = new Set<string>([
+    ...(profile?.role ? [profile.role] : []),
+    ...(profile?.is_admin ? ['admin'] : []),
+    ...(profile?.is_koordinator ? ['koordinator'] : []),
+    ...(profile?.extra_roles || []),
+  ]);
+  const arKontor = minaRoller.has('admin') || minaRoller.has('koordinator');
+  const arNamnd = !!user && (
+    (comment.mentioned_user_ids || []).includes(user.id) ||
+    !!comment.mentions_all ||
+    (comment.mentioned_roles || []).some(r => minaRoller.has(r))
+  );
+  const canChangeStatus = !comment.is_system_comment && (isOwnComment || arKontor || arNamnd);
 
   const roleColors = ROLE_COLORS[comment.author_role as AuthorRole] || ROLE_COLORS.technician;
 
@@ -347,7 +361,7 @@ export default function CommentItem({
         <div className="flex-1 min-w-0">
           {/* Header - REDESIGN: Tightare, mer kompakt */}
           <div className="flex items-baseline flex-wrap gap-x-1.5 gap-y-0.5 mb-0.5">
-            <span className="font-medium text-slate-100 text-[13px] leading-tight">
+            <span className="font-medium text-slate-100 text-sm leading-tight">
               {comment.author_name}
             </span>
             <span className={`
@@ -433,7 +447,7 @@ export default function CommentItem({
               </div>
             </div>
           ) : (
-            <p className="text-[13px] text-slate-300 whitespace-pre-wrap break-words leading-relaxed">
+            <p className="text-sm text-slate-300 whitespace-pre-wrap break-words leading-relaxed">
               {renderContent(comment.content)}
             </p>
           )}

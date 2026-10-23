@@ -1,5 +1,5 @@
 // src/components/technician/layout/TechnicianMobileNav.tsx
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bell, Menu, X, LogOut, Bug, Search } from 'lucide-react'
 import { openGlobalSearch } from '../../shared/search/globalSearchEvents'
@@ -12,8 +12,7 @@ import { IntranetLink } from '../../shared/IntranetLink'
 import { ChangelogLink } from '../../shared/ChangelogLink'
 import { ProfileLink } from '../../shared/ProfileLink'
 import { ThemeToggle } from '../../shared/ThemeToggle'
-import { useAuth } from '../../../contexts/AuthContext'
-import { getTicketStats } from '../../../services/communicationService'
+import { useTicketsBadge } from '../../../hooks/useTicketsBadge'
 
 interface TechnicianMobileNavProps {
   currentPath: string
@@ -23,15 +22,8 @@ interface TechnicianMobileNavProps {
 export function TechnicianMobileNav({ currentPath, onSignOut }: TechnicianMobileNavProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showBugModal, setShowBugModal] = useState(false)
-  const { profile } = useAuth()
-  const [ticketCount, setTicketCount] = useState(0)
-
-  useEffect(() => {
-    if (!profile?.id) return
-    getTicketStats(profile.id).then(stats => {
-      setTicketCount(stats.open)
-    }).catch(() => {})
-  }, [profile?.id])
+  // Samma räkning som sidan Frågor och uppdrag: det som väntar på dig
+  const ticketCount = useTicketsBadge()
 
   return (
     <>

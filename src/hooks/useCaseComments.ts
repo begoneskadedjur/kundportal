@@ -117,59 +117,17 @@ export function useCaseComments({
       try {
         setIsSubmitting(true);
 
-        // Ladda upp bilagor först
-        const uploadedAttachments: CommentAttachment[] = [];
-        if (attachments && attachments.length > 0) {
-          for (const file of attachments) {
-            const attachment = await uploadCommentAttachment(file, user.id);
-            uploadedAttachments.push(attachment);
-          }
-        }
-
-        // Hämta användarnamn
-        const authorName = await getAuthorName(user.id, profile.role);
-
-        // Extrahera mentions-data från TrackedMention[]
-        const mentionedUserIds: string[] = [];
-        const mentionedUserNames: string[] = [];  // Spara display names för highlighting
-        const mentionedRoles: string[] = [];
-        let mentionsAll = false;
-
-        if (mentions && mentions.length > 0) {
-          for (const mention of mentions) {
-            if (mention.type === 'all') {
-              mentionsAll = true;
-            } else if (mention.type === 'role' && mention.role) {
-              if (!mentionedRoles.includes(mention.role)) {
-                mentionedRoles.push(mention.role);
-              }
-            } else if (mention.type === 'user') {
-              if (!mentionedUserIds.includes(mention.userId)) {
-                mentionedUserIds.push(mention.userId);
-                // Spara display name (ta bort @ prefix om det finns)
-                const cleanName = mention.displayName.replace(/^@/, '');
-                mentionedUserNames.push(cleanName);
-              }
-            }
-          }
-        }
-
-        const commentData: CaseCommentInsert = {
-          case_id: caseId,
-          case_type: caseType,
-          author_id: user.id,
-          author_name: authorName,
-          author_role: profile.role as AuthorRole,
-          content: content.trim(),
-          attachments: uploadedAttachments,
-          mentioned_user_ids: mentionedUserIds,
-          mentioned_user_names: mentionedUserNames,  // Inkludera display names
-          mentioned_roles: mentionedRoles,
-          mentions_all: mentionsAll,
-          parent_comment_id: parentCommentId || null,  // Tråd-stöd
-        };
-
-        const newComment = await createComment(commentData, caseTitle);
+        const newComment = await skickaKommentar({
+          userId: user.id,
+          role: profile.role as AuthorRole,
+          caseId,
+          caseType,
+          caseTitle,
+          content,
+          attachments,
+          mentions,
+          parentCommentId,
+        });
 
         // Lägg till kommentaren direkt i listan (optimistisk uppdatering)
         // Realtime subscription kan vara långsam eller inaktiverad
@@ -262,6 +220,83 @@ export function useCaseComments({
     changeStatus,
     refresh: fetchComments,
   };
+}
+
+export interface SkickaKommentarInput {
+  userId: string;
+  role: AuthorRole;
+  caseId: string;
+  caseType: CaseType;
+  caseTitle?: string;
+  content: string;
+  attachments?: File[];
+  mentions?: TrackedMention[];
+  parentCommentId?: string | null;
+}
+
+/**
+ * Sparar en kommentar på samma sätt som kommunikationspanelen: laddar upp bilagor,
+ * hämtar författarnamnet, gör om spårade @-nämningar till id, roller och @alla och
+ * skapar kommentaren via createComment (notiser till nämnda, återöppning vid svar).
+ * Används av panelen (addComment ovan) och av sidan Frågor och uppdrag, så att en
+ * tråd blir likadan oavsett var den skrivs.
+ */
+export async function skickaKommentar(input: SkickaKommentarInput): Promise<CaseComment> {
+  const { userId, role, caseId, caseType, caseTitle, content, attachments, mentions, parentCommentId } = input;
+
+  // Ladda upp bilagor först
+  const uploadedAttachments: CommentAttachment[] = [];
+  if (attachments && attachments.length > 0) {
+    for (const file of attachments) {
+      const attachment = await uploadCommentAttachment(file, userId);
+      uploadedAttachments.push(attachment);
+    }
+  }
+
+  // Hämta användarnamn
+  const authorName = await getAuthorName(userId, role);
+
+  // Extrahera mentions-data från TrackedMention[]
+  const mentionedUserIds: string[] = [];
+  const mentionedUserNames: string[] = [];  // Spara display names för highlighting
+  const mentionedRoles: string[] = [];
+  let mentionsAll = false;
+
+  if (mentions && mentions.length > 0) {
+    for (const mention of mentions) {
+      if (mention.type === 'all') {
+        mentionsAll = true;
+      } else if (mention.type === 'role' && mention.role) {
+        if (!mentionedRoles.includes(mention.role)) {
+          mentionedRoles.push(mention.role);
+        }
+      } else if (mention.type === 'user') {
+        if (!mentionedUserIds.includes(mention.userId)) {
+          mentionedUserIds.push(mention.userId);
+          // Spara display name (ta bort @ prefix om det finns)
+          const cleanName = mention.displayName.replace(/^@/, '');
+          mentionedUserNames.push(cleanName);
+        }
+      }
+    }
+  }
+
+  const commentData: CaseCommentInsert = {
+    case_id: caseId,
+    case_type: caseType,
+    author_id: userId,
+    author_name: authorName,
+    author_role: role,
+    content: content.trim(),
+    attachments: uploadedAttachments,
+    mentioned_user_ids: mentionedUserIds,
+    mentioned_user_names: mentionedUserNames,  // Inkludera display names
+    mentioned_roles: mentionedRoles,
+    mentions_all: mentionsAll,
+    parent_comment_id: parentCommentId || null,  // Tråd-stöd
+  };
+
+  return createComment(commentData, caseTitle);
 }
 
 // Hjälpfunktion för att hämta användarnamn

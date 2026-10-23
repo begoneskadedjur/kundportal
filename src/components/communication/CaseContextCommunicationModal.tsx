@@ -37,6 +37,8 @@ interface CaseContextCommunicationModalProps {
   caseType: CaseType;
   caseTitle: string;
   onOpenFullCase?: (caseId: string, caseType: CaseType) => void;
+  /** Tråd (rotkommentar) som markeras och visas, från Frågor och uppdrag */
+  markeradTradId?: string | null;
 }
 
 // Helper to format phone for tel: link
@@ -420,7 +422,8 @@ export default function CaseContextCommunicationModal({
   caseId,
   caseType,
   caseTitle,
-  onOpenFullCase
+  onOpenFullCase,
+  markeradTradId = null
 }: CaseContextCommunicationModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const [mobileContextExpanded, setMobileContextExpanded] = useState(false);
@@ -590,6 +593,7 @@ export default function CaseContextCommunicationModal({
                 caseType={caseType}
                 caseTitle={caseTitle}
                 compact={true}
+                markeradTradId={markeradTradId}
               />
             </div>
           </div>

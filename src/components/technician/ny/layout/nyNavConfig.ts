@@ -27,6 +27,7 @@ export const NY_NAV_GRUPPER: NyNavGrupp[] = [
       { label: 'Karta', path: '/technician/karta', ikon: 'falt.karta' },
       { label: 'Schema', path: '/technician/schedule', ikon: 'allman.kalender' },
       { label: 'Mina ärenden', path: '/technician/cases', ikon: 'arende.arende' },
+      { label: 'Frågor och uppdrag', path: '/technician/tickets', ikon: 'dok.konversation', badge: 'tickets' },
     ],
   },
   {
@@ -57,7 +58,6 @@ export const NY_NAV_GRUPPER: NyNavGrupp[] = [
     label: 'Hjälp',
     lankar: [
       { label: 'Intranät och guider', path: '/technician/intranat', ikon: 'guide.las-ocksa' },
-      { label: 'Meddelande till kontoret', path: '/technician/tickets', ikon: 'guide.fraga', badge: 'tickets' },
       { label: 'AI-assistent', path: '/technician/team-chat', ikon: 'kalla.ai' },
     ],
   },
@@ -78,7 +78,7 @@ export const NY_RUBRIKER: Record<string, string> = {
   '/technician/leads': 'Leads och tips',
   '/technician/commissions': 'Provision',
   '/technician/intranat': 'Intranät och guider',
-  '/technician/tickets': 'Meddelande till kontoret',
+  '/technician/tickets': 'Frågor och uppdrag',
   '/technician/team-chat': 'AI-assistent',
   '/technician/tillbud-avvikelser': 'Tillbud och avvikelser',
   '/technician/mitt-konto': 'Mitt konto',

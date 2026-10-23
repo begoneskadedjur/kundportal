@@ -44,7 +44,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Ordlistan', icon: BookCheck, path: '/koordinator/ordlista' },
       { label: 'Rondering & Schema', icon: CalendarRange, path: '/koordinator/rondering-schema' },
       { label: 'Schemaoptimerare', icon: Wand2, path: '/koordinator/booking-assistant' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/koordinator/tickets', badgeKey: 'tickets' },
+      { label: 'Frågor och uppdrag', icon: MessageSquareText, path: '/koordinator/tickets', badgeKey: 'tickets' },
       { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/koordinator/tillbud-avvikelser', badgeKey: 'incidents' },
     ],
   },
@@ -122,7 +122,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/koordinator/fakturering': 'Fakturering',
 
   // Organisation
-  '/koordinator/tickets': 'Tickets',
+  '/koordinator/tickets': 'Frågor och uppdrag',
   '/koordinator/tillbud-avvikelser': 'Tillbud & Avvikelser',
   '/koordinator/intranat': 'Intranät',
   '/koordinator/mitt-konto': 'Mitt konto',

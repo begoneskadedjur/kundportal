@@ -42,14 +42,14 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { label: 'Schema', path: '/koordinator/schema', icon: Calendar },
     { label: 'Sök ärenden', path: '/koordinator/sok-arenden', icon: Search },
-    { label: 'Tickets', path: '/admin/tickets', icon: MessageSquareText },
+    { label: 'Frågor och uppdrag', path: '/admin/tickets', icon: MessageSquareText },
     { label: 'Intranät & Hjälpcenter', path: '/admin/intranat', icon: GraduationCap },
   ],
   koordinator: [
     { label: 'Dashboard', path: '/koordinator/dashboard', icon: LayoutDashboard },
     { label: 'Schema', path: '/koordinator/schema', icon: Calendar },
     { label: 'Sök ärenden', path: '/koordinator/sok-arenden', icon: Search },
-    { label: 'Tickets', path: '/koordinator/tickets', icon: MessageSquareText },
+    { label: 'Frågor och uppdrag', path: '/koordinator/tickets', icon: MessageSquareText },
     { label: 'Intranät & Hjälpcenter', path: '/koordinator/intranat', icon: GraduationCap },
   ],
   technician: [
@@ -57,7 +57,7 @@ const NAV_ITEMS: Record<string, NavItem[]> = {
     { label: 'Schema', path: '/technician/schedule', icon: Calendar },
     { label: 'Mina ärenden', path: '/technician/cases', icon: Search },
     { label: 'Mina offerter', path: '/technician/offer-follow-up', icon: FileSignature },
-    { label: 'Tickets', path: '/technician/tickets', icon: MessageSquareText },
+    { label: 'Frågor och uppdrag', path: '/technician/tickets', icon: MessageSquareText },
     { label: 'Intranät & Hjälpcenter', path: '/technician/intranat', icon: GraduationCap },
   ],
 };

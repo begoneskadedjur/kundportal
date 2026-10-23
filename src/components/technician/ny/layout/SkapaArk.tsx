@@ -1,6 +1,7 @@
 // src/components/technician/ny/layout/SkapaArk.tsx
 // Skapa-arket i nya arbetsvyn: bottenark i telefonen, ruta på datorn.
-// Varje val leder till en befintlig sida. Tillbud ligger avskilt längst ner.
+// Varje val leder till en befintlig sida, utom Fråga eller uppdrag till en kollega som
+// öppnar dialogen direkt (NyFragaDialog i layouten). Tillbud ligger avskilt längst ner.
 
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +11,7 @@ interface Val {
   rubrik: string
   text: string
   ikon: IconName
+  /** Sida att gå till, eller 'fraga' för dialogen Ny fråga eller uppdrag */
   to: string
 }
 
@@ -18,16 +20,18 @@ const VAL: Val[] = [
   { rubrik: 'Specialrapport', text: 'Inspektion, sanering eller annan rapport med bilder.', ikon: 'falt.specialrapport', to: '/technician/specialrapporter' },
   { rubrik: 'Ny station', text: 'Välj kunden på Stationer och placera stationen på kartan.', ikon: 'falt.nystation', to: '/technician/equipment' },
   { rubrik: 'Tips om ny kund', text: 'Någon som behöver hjälp? Skriv namn och vad det gäller.', ikon: 'lead.tips', to: '/technician/leads?ny=1' },
-  { rubrik: 'Meddelande till kontoret', text: 'Fråga eller be om hjälp. Svaret kommer under klockan.', ikon: 'guide.fraga', to: '/technician/tickets' },
+  { rubrik: 'Fråga eller uppdrag till en kollega', text: 'Till en kollega, en roll eller alla, om ett ärende.', ikon: 'dok.konversation', to: 'fraga' },
   { rubrik: 'Fråga AI-assistenten', text: 'Om skadedjur, metoder eller hur portalen fungerar.', ikon: 'kalla.ai', to: '/technician/team-chat' },
 ]
 
 interface Props {
   oppen: boolean
   onClose: () => void
+  /** Öppnar dialogen Ny fråga eller uppdrag */
+  onNyFraga: () => void
 }
 
-export function SkapaArk({ oppen, onClose }: Props) {
+export function SkapaArk({ oppen, onClose, onNyFraga }: Props) {
   const navigate = useNavigate()
   const stangRef = useRef<HTMLButtonElement>(null)
 
@@ -43,7 +47,8 @@ export function SkapaArk({ oppen, onClose }: Props) {
 
   const ga = (to: string) => {
     onClose()
-    navigate(to)
+    if (to === 'fraga') onNyFraga()
+    else navigate(to)
   }
 
   return (

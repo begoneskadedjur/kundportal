@@ -104,7 +104,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: 'Teknikerstatistik', icon: BarChart3, path: '/admin/teknikerstatistik' },
       { label: 'Användarkonton (Personal)', icon: UserCheck, path: '/admin/anvandarkonton-personal' },
-      { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets', badgeKey: 'tickets' },
+      { label: 'Frågor och uppdrag', icon: MessageSquareText, path: '/admin/tickets', badgeKey: 'tickets' },
       { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/admin/tillbud-avvikelser', badgeKey: 'incidents' },
       { label: 'Buggrapporter', icon: Bug, path: '/admin/bug-reports' },
     ]
@@ -185,7 +185,7 @@ export const breadcrumbMap: Record<string, string> = {
 
   '/admin/ai-assistent': 'AI Assistent',
   '/admin/bildbank': 'Gemensam bildbank',
-  '/admin/tickets': 'Tickets',
+  '/admin/tickets': 'Frågor och uppdrag',
   '/admin/skapa-avtal': 'Skapa avtal',
   '/admin/avtalsdiagnostik': 'Avtalsdiagnostik',
   '/admin/webhook-config': 'Webhook-config',

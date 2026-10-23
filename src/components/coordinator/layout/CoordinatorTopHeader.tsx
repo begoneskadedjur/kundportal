@@ -1,13 +1,12 @@
 // src/components/coordinator/layout/CoordinatorTopHeader.tsx
-import { useState, useEffect } from 'react'
+
 import { useLocation, Link } from 'react-router-dom'
 import { ChevronRight, Search, RefreshCw, Bell } from 'lucide-react'
 import { breadcrumbMap } from './coordinatorNavConfig'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { openGlobalSearch } from '../../shared/search/globalSearchEvents'
-import { useAuth } from '../../../contexts/AuthContext'
-import { getTicketStats } from '../../../services/communicationService'
+import { useTicketsBadge } from '../../../hooks/useTicketsBadge'
 
 interface CoordinatorTopHeaderProps {
   sidebarCollapsed: boolean
@@ -16,17 +15,10 @@ interface CoordinatorTopHeaderProps {
 
 export function CoordinatorTopHeader({ sidebarCollapsed, userName }: CoordinatorTopHeaderProps) {
   const location = useLocation()
-  const { profile } = useAuth()
   // Undersidor (t.ex. /specialrapporter/:id) ärver förälderns namn
   const currentLabel = breadcrumbMap[location.pathname] || breadcrumbMap[location.pathname.replace(/\/[^/]+$/, '')] || 'Översikt'
-  const [ticketCount, setTicketCount] = useState(0)
-
-  useEffect(() => {
-    if (!profile?.id) return
-    getTicketStats(profile.id).then(stats => {
-      setTicketCount(stats.open)
-    }).catch(() => {})
-  }, [profile?.id])
+  // Samma räkning som sidan Frågor och uppdrag: det som väntar på dig
+  const ticketCount = useTicketsBadge()
 
   return (
     <header

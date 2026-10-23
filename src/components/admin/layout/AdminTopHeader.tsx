@@ -1,13 +1,11 @@
 // src/components/admin/layout/AdminTopHeader.tsx
-import { useState, useEffect } from 'react'
 import { useLocation, Link } from 'react-router-dom'
 import { ChevronRight, Search, RefreshCw, Bell } from 'lucide-react'
 import { breadcrumbMap } from './adminNavConfig'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { openGlobalSearch } from '../../shared/search/globalSearchEvents'
-import { useAuth } from '../../../contexts/AuthContext'
-import { getTicketStats } from '../../../services/communicationService'
+import { useTicketsBadge } from '../../../hooks/useTicketsBadge'
 
 interface AdminTopHeaderProps {
   sidebarCollapsed: boolean
@@ -16,16 +14,9 @@ interface AdminTopHeaderProps {
 
 export function AdminTopHeader({ sidebarCollapsed, userName }: AdminTopHeaderProps) {
   const location = useLocation()
-  const { profile } = useAuth()
   const currentLabel = breadcrumbMap[location.pathname] || 'Översikt'
-  const [ticketCount, setTicketCount] = useState(0)
-
-  useEffect(() => {
-    if (!profile?.id) return
-    getTicketStats(profile.id).then(stats => {
-      setTicketCount(stats.open)
-    }).catch(() => {})
-  }, [profile?.id])
+  // Samma räkning som sidan Frågor och uppdrag: det som väntar på dig
+  const ticketCount = useTicketsBadge()
 
   return (
     <header

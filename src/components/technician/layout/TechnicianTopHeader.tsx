@@ -1,13 +1,12 @@
 // src/components/technician/layout/TechnicianTopHeader.tsx
-import { useState, useEffect } from 'react'
+
 import { useLocation, Link } from 'react-router-dom'
 import { ChevronRight, Search, Bell } from 'lucide-react'
 import { breadcrumbMap } from './technicianNavConfig'
 import { ViewSwitcher } from '../../shared/ViewSwitcher'
 import { ThemeToggle } from '../../shared/ThemeToggle'
 import { openGlobalSearch } from '../../shared/search/globalSearchEvents'
-import { useAuth } from '../../../contexts/AuthContext'
-import { getTicketStats } from '../../../services/communicationService'
+import { useTicketsBadge } from '../../../hooks/useTicketsBadge'
 
 interface TechnicianTopHeaderProps {
   userName: string
@@ -15,17 +14,10 @@ interface TechnicianTopHeaderProps {
 
 export function TechnicianTopHeader({ userName }: TechnicianTopHeaderProps) {
   const location = useLocation()
-  const { profile } = useAuth()
   // Undersidor (t.ex. /specialrapporter/:id) ärver förälderns namn
   const currentLabel = breadcrumbMap[location.pathname] || breadcrumbMap[location.pathname.replace(/\/[^/]+$/, '')] || 'Översikt'
-  const [ticketCount, setTicketCount] = useState(0)
-
-  useEffect(() => {
-    if (!profile?.id) return
-    getTicketStats(profile.id).then(stats => {
-      setTicketCount(stats.open)
-    }).catch(() => {})
-  }, [profile?.id])
+  // Samma räkning som sidan Frågor och uppdrag: det som väntar på dig
+  const ticketCount = useTicketsBadge()
 
   return (
     <header className="hidden lg:flex fixed top-0 right-0 left-64 h-12 bg-slate-900/80 backdrop-blur-sm border-b border-slate-700/30 z-30 items-center justify-between px-6">

@@ -85,7 +85,7 @@ function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void
               </button>
             </Markor>
             <button type="button" onClick={() => tryck('annan-notis')} className="mt-1 grid w-full gap-0.5 rounded-lg p-2 text-left">
-              <span className="text-[12px] text-slate-300">Ny ticket från Anna Exempel</span>
+              <span className="text-[12px] text-slate-300">Anna Exempel nämnde dig</span>
             </button>
           </div>
         )}
@@ -180,7 +180,7 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du har fått en notis om tillägg hos Exempel AB. Öppna den.' }
 
 const TIPS: Record<string, string> = {
-  'annan-notis': 'Det är en ticket. Notisen om tillägget ligger överst.',
+  'annan-notis': 'Det är en fråga från Anna Exempel. Notisen om tillägget ligger överst.',
   papper: 'Pappret visar avtalet. Beslutet tar du via remsan överst.',
   'i-avtalet': 'Lägg till i avtalet höjer premien. Uppdraget var att fakturera fällorna som tillägg utöver avtalet.',
   'lage-included': 'Lägg till i avtalet höjer premien. Uppdraget var tillägg utöver avtalet.',

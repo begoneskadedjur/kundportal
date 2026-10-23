@@ -1,94 +1,249 @@
 // src/pages/shared/intranet/guider/guide-ticket-systemet.tsx
-// Guidemodul: Skicka och svara på en ticket (tekniker, telefon).
-// Etiketterna kommer från EditCaseModal (pratbubblan Öppna kommunikation),
-// CommunicationSlidePanel (Kommunikation), CommentInput (Skriv kommentar..., @ nämn,
-// pappersplanet som bara visar ikonen i telefonen), MentionSuggestions (Nämn, Grupper,
-// Personer), CommentItem (Svara, Öppen), TechnicianMobileNav (klockan Notifieringar) och
-// InternAdministration (Tickets, korta fliknamn i telefonen). Påhittade namn, ingenting sparas.
+// Guidemodul: Fråga en kollega och svara i Frågor och uppdrag (tekniker, telefon).
+// Sidan hette Tickets fram till 2026-10-23 (3.89.0). Slugen behålls så att länkar fungerar.
+// Efterbildning av TechnicianMobileNav (klockan Notifieringar, Meny), InternAdministration
+// ("0 väntar på dig, du väntar på svar i 0", Ny fråga eller uppdrag, grupperna Väntar på dig
+// med Svar till dig, Du väntar på svar, Omnämnd, för kännedom och Klara), NyFragaDialog
+// (1 Till vem?, En kollega, En roll, Alla, Sök kollega, 2 Om vilket ärende?, Förslag: dina
+// ärenden i dag och i morgon, 3 Vad gäller det?, Meddelande, 4 Bild eller fil, Skicka till
+// Anna, toasten "Skickat till Anna") och TradVy (Markera som klar, toasten "Markerad som
+// klar", Nytt sedan du läste, Läst av). Påhittade namn, ingenting skickas.
 
 import { useState, type ReactNode } from 'react'
-import { Ark, ArendeHuvud, Flikar, IkonKnapp, Kort, Rad, Status, Telefon, OvningRam, type OvningSvar } from '../skarmkit'
+import { Markor, Notis, OvningRam, Telefon, type OvningSvar } from '../skarmkit'
 import type { GuideModul } from './registry'
-import {
-  KommentarFalt, Kommentar, LokalIkonKnapp, NamnLista, Nmn, SidRubrik, TeknikerBotten, TeknikerHuvud, TicketFlikar, TicketKort, mk,
-} from './_allmant'
+import { gorMk, type Mk, type Tryck } from './_arenden'
+import { TeknikerBotten, TeknikerHuvud } from './_allmant'
+import { Bokstav, Grupp, Knapp, Namn, SidHuvud, SokRuta, Trad, TradRad, UnderGrupp, type ArendeKort, type Inlagg, type RadData } from './_fragor'
+import { Icon } from '../../../../components/icons/Icon'
 
-type Vy = 'arende' | 'panel' | 'namn' | 'namnvalt' | 'skriven' | 'skickad' | 'vantar' | 'tickets' | 'svarvy' | 'svarar' | 'svarskriven' | 'klart'
+type Vy = 'lista' | 'd-vem' | 'd-arende' | 'd-text' | 'd-klar' | 'skickad' | 'lista-svar' | 'trad-svar' | 'klar'
 
 const FRAGA = 'Vill kunden ha kvittot på mejl?'
-const ANNA_SVAR = 'Ja, till kund@exempel.se. Kan du skicka det i dag?'
-const MITT_SVAR = 'Ja, jag skickar det i kväll.'
+const ANNA_SVAR = 'Ja, till kund@exempel.se. Skicka det i dag.'
 
-function Skarm({ vy, tryck, markera, nr }: { vy: Vy; tryck: (id: string) => void; markera?: string; nr: number }) {
-  const harSvar = ['vantar', 'tickets', 'svarvy', 'svarar', 'svarskriven', 'klart'].includes(vy)
-  const iArendet = ['arende', 'panel', 'namn', 'namnvalt', 'skriven', 'skickad', 'vantar'].includes(vy)
-  const text = vy === 'namn' ? '@' : vy === 'namnvalt' ? '@Anna Exempel ' : vy === 'skriven' ? `@Anna Exempel ${FRAGA}` : vy === 'svarskriven' ? MITT_SVAR : ''
+const ARENDE: ArendeKort = {
+  kund: 'Familjen Exempel', nummer: 'BE-0001234',
+  rad: 'Råttor, Exempelvägen 4, Södertälje', info: 'Privat, bokat 2026-10-23 13:00 hos dig, bokad',
+}
 
-  let innehall: ReactNode
-  if (iArendet) {
-    innehall = <>
-      <ArendeHuvud
-        nr="BE-0001234"
-        status={<Status text="Bokad" />}
-        kund="Familjen Exempel · Exempelvägen 4, Södertälje"
-        ikoner={<>
-          <IkonKnapp ikon="arende.aterbesok" etikett="Boka återbesök eller skapa nytt ärende" onClick={() => tryck('fotspar')} />
-          <IkonKnapp ikon="allman.historik" etikett="Ärendehistorik" onClick={() => tryck('historik')} />
-          <LokalIkonKnapp ikon="prat" etikett="Öppna kommunikation" onClick={() => tryck('prat')} markor={mk(markera, 'prat', nr)} />
+const RAD_SVAR: RadData = {
+  id: 'rad', amne: FRAGA, ton: 'gron', status: 'Anna svarade 10:40, läs och markera som klar',
+  citat: ANNA_SVAR, tid: '10:40', kund: 'Familjen Exempel', franTill: 'Du till Anna', motpart: 'Anna Exempel', olast: true,
+}
+
+// ─── Listan ───
+
+function Lista({ svar, mk, tryck }: { svar: boolean; mk: Mk; tryck: Tryck }) {
+  return (
+    <div className="grid content-start gap-2.5 p-2.5">
+      <SidHuvud vantar={svar ? 1 : 0} jagVantar={0} mk={mk} tryck={tryck} />
+      <SokRuta tryck={tryck} />
+      <Grupp ikon="falt.attgora" farg="text-amber-500" rubrik="Väntar på dig" antal={svar ? 1 : 0} text="Någon har frågat dig något eller svarat på din fråga.">
+        {svar && <><UnderGrupp rubrik="Svar till dig" antal={1} /><TradRad r={RAD_SVAR} mk={mk} tryck={tryck} /></>}
+      </Grupp>
+      <Grupp ikon="falt.vantar" rubrik="Du väntar på svar" antal={0} text="Du har frågat. Svaret hamnar under Väntar på dig." />
+      <Grupp ikon="dok.omnamnd" rubrik="Omnämnd, för kännedom" antal={0} text="Skickat till en grupp du hör till, eller trådar du är med i där inget väntar på dig." />
+      <Grupp ikon="falt.klart" farg="text-[#20c58f]" rubrik="Klara" antal={4} hopfalld id="grupp-klara" mk={mk} tryck={tryck}
+        text="Markerade som klara, senast klara först. Ett nytt svar öppnar tråden igen." />
+    </div>
+  )
+}
+
+// ─── Dialogen Ny fråga eller uppdrag ───
+
+function Steg({ n, titel }: { n: number; titel: string }) {
+  return (
+    <p className="flex items-center gap-1.5 text-[12px] font-semibold text-white">
+      <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-600 font-mono text-[10px] text-slate-300">{n}</span>
+      {titel}
+    </p>
+  )
+}
+
+function ValKort({ id, ikon, titel, text, aktiv, mk, tryck }: { id: string; ikon: 'rapport.person' | 'dok.omnamnd' | 'allman.foretag'; titel: string; text: string; aktiv?: boolean; mk: Mk; tryck: Tryck }) {
+  return (
+    <Markor markor={mk(id)} block>
+      <button type="button" onClick={() => tryck(id)}
+        className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1 text-left ${aktiv ? 'border-[#20c58f] bg-[#20c58f]/10' : 'border-slate-700 bg-slate-900'}`}>
+        <Icon name={ikon} size={16} className="flex-none text-slate-300" />
+        <span><span className="block text-[11px] font-semibold text-white">{titel}</span><span className="block text-[10px] text-slate-400">{text}</span></span>
+      </button>
+    </Markor>
+  )
+}
+
+function Rad({ id, namn, under, ikon, mk, tryck }: { id: string; namn: ReactNode; under: string; ikon: ReactNode; mk: Mk; tryck: Tryck }) {
+  return (
+    <Markor markor={mk(id)} block>
+      <button type="button" onClick={() => tryck(id)} className="flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left hover:bg-slate-800">
+        {ikon}
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[11px] text-white">{namn}</span>
+          <span className="block truncate text-[10px] text-slate-400">{under}</span>
+        </span>
+      </button>
+    </Markor>
+  )
+}
+
+function Dialog({ vy, mk, tryck }: { vy: Vy; mk: Mk; tryck: Tryck }) {
+  const anna = vy !== 'd-vem'
+  const arende = vy === 'd-text' || vy === 'd-klar'
+  const text = vy === 'd-klar'
+  const fran = vy === 'd-vem' ? 1 : vy === 'd-klar' ? 3 : 2
+  const kan = anna && arende && text
+
+  const delar: { n: number; innehall: ReactNode }[] = [
+    {
+      n: 1,
+      innehall: <>
+        <Steg n={1} titel="Till vem?" />
+        <ValKort id="typ-personer" ikon="rapport.person" titel="En kollega" text="En eller flera personer" aktiv mk={mk} tryck={tryck} />
+        <ValKort id="typ-roll" ikon="dok.omnamnd" titel="En roll" text="Admin, koordinator eller tekniker" mk={mk} tryck={tryck} />
+        <ValKort id="typ-alla" ikon="allman.foretag" titel="Alla" text="För kännedom, 12 personer" mk={mk} tryck={tryck} />
+        <button type="button" onClick={() => tryck('sok-kollega')} className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-950 px-2 py-1 text-left text-[10.5px] text-slate-500">
+          <Icon name="allman.sok" size={16} className="h-3.5 w-3.5 text-slate-400" />Sök kollega
+        </button>
+        <div className="grid">
+          <Rad id="kollega-anna" namn="Anna Exempel" under="Koordinator" ikon={<Bokstav namn="Anna" />} mk={mk} tryck={tryck} />
+          <Rad id="kollega-jonas" namn="Jonas Exempel" under="Tekniker" ikon={<Bokstav namn="Jonas" />} mk={mk} tryck={tryck} />
+          <Rad id="kollega-sara" namn="Sara Exempel" under="Admin" ikon={<Bokstav namn="Sara" />} mk={mk} tryck={tryck} />
+        </div>
+      </>,
+    },
+    {
+      n: 2,
+      innehall: <>
+        <Steg n={2} titel="Om vilket ärende?" />
+        <p className="text-[10px] text-slate-400">Tråden sparas i ärendet, så den som öppnar ärendet ser den också. Kunden ser den aldrig.</p>
+        {arende ? (
+          <div className="flex items-center gap-2 rounded-lg border border-[#20c58f]/40 bg-[#20c58f]/5 px-2 py-1.5">
+            <Icon name="arende.privat" size={16} className="flex-none text-slate-300" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[11px] font-semibold text-white">Familjen Exempel <span className="font-mono text-[10px] font-normal text-slate-400">BE-0001234</span></span>
+              <span className="block truncate text-[10px] text-slate-400">2026-10-23 13:00, Råttor, Exempelvägen 4</span>
+            </span>
+            <button type="button" onClick={() => tryck('byt-arende')} className="rounded-lg border border-slate-600 px-1.5 py-0.5 text-[10px] text-white">Byt ärende</button>
+          </div>
+        ) : <>
+          <button type="button" onClick={() => tryck('sok-arende')} className="flex items-center gap-1.5 rounded-lg border border-slate-600 bg-slate-950 px-2 py-1 text-left text-[10.5px] text-slate-500">
+            <Icon name="allman.sok" size={16} className="h-3.5 w-3.5 text-slate-400" />Sök på ärendenummer, kund eller adress
+          </button>
+          <p className="text-[10px] text-slate-400">Förslag: dina ärenden i dag och i morgon. Sök för andra.</p>
+          <div className="grid gap-1">
+            <Rad id="arende-familj" namn={<>Familjen Exempel <span className="font-mono text-[10px] text-slate-400">BE-0001234</span></>} under="2026-10-23 13:00, Råttor, Exempelvägen 4" ikon={<Icon name="arende.privat" size={16} className="flex-none text-slate-400" />} mk={mk} tryck={tryck} />
+            <Rad id="arende-brf" namn={<>Brf Exempelgården <span className="font-mono text-[10px] text-slate-400">BE-0001240</span></>} under="2026-10-24 08:00, Myror, Exempelgatan 2" ikon={<Icon name="allman.foretag" size={16} className="flex-none text-slate-400" />} mk={mk} tryck={tryck} />
+          </div>
         </>}
-      />
-      <Flikar flikar={['Ärende', 'Utförande', 'Ekonomi']} aktiv={0} onClick={() => tryck('flik')} />
-      <Kort titel="Ärendeinformation" ikon="arende.arende"><Rad v="Råttor i källaren, spår vid tvättstugan." /></Kort>
-      <Kort titel="Schemaläggning" ikon="allman.kalender"><Rad v="Tisdag 2026-10-20, 08:00 till 09:00" /></Kort>
-    </>
-  } else {
-    innehall = (
-      <div className="p-3">
-        <SidRubrik titel="Tickets" under="Intern kommunikation med @mentions" />
-        <TicketFlikar aktiv="mentions" antal={{ mentions: 1, replies_to_me: 0, replies: 0, activity: 1, all: 1, archived: 4 }} tryck={tryck} nr={nr} />
-        <TicketKort fran="Erik Exempel" till="Anna Exempel" text={FRAGA} sammanfattning="1 obesvarad fråga till dig • Svar mottaget" tryck={tryck} markera={markera} nr={nr} />
-      </div>
-    )
-  }
-
-  const panel = vy !== 'arende' && vy !== 'vantar' && vy !== 'tickets'
-  const svarslage = vy === 'svarar' || vy === 'svarskriven' || vy === 'klart'
+      </>,
+    },
+    {
+      n: 3,
+      innehall: <>
+        <Steg n={3} titel="Vad gäller det?" />
+        <p className="text-[10.5px] font-medium text-slate-300">Meddelande</p>
+        <Markor markor={mk('meddelande')} block>
+          <button type="button" onClick={() => tryck('meddelande')} className={`block min-h-[44px] w-full rounded-lg border border-slate-600 bg-slate-950 px-2 py-1.5 text-left text-[11px] ${text ? 'text-white' : 'text-slate-500'}`}>
+            {text ? FRAGA : ' '}
+          </button>
+        </Markor>
+        <p className="text-[10px] text-slate-400">Skriv som om du ringde: vad behöver du, och till när.</p>
+      </>,
+    },
+    {
+      n: 4,
+      innehall: <>
+        <Steg n={4} titel="Bild eller fil" />
+        <p className="text-[10px] text-slate-400">Valfritt. Bilder och PDF upp till 5 MB.</p>
+        <div className="flex gap-1.5">
+          <Knapp id="ta-bild" ikon="allman.foto" mk={mk} tryck={tryck}>Ta bild</Knapp>
+          <Knapp id="valj-fil" ikon="rapport.gem" mk={mk} tryck={tryck}>Välj fil</Knapp>
+        </div>
+      </>,
+    },
+  ]
 
   return (
-    <Telefon>
-      <TeknikerHuvud tryck={tryck} markera={markera} nr={nr} siffra={vy === 'vantar' ? 1 : undefined} />
-      {innehall}
-      <TeknikerBotten tryck={tryck} nr={nr} />
-
-      {panel && (
-        <Ark titel="Kommunikation" under="Råttor i källaren">
-          <button type="button" onClick={() => tryck('stang')} className="-mt-9 justify-self-end rounded-md px-2 py-1 text-[11px] text-slate-400 hover:bg-slate-800" aria-label="Stäng panel">Stäng</button>
-          <div className="relative">
-            <KommentarFalt
-              text={text}
-              svararPa={svarslage && vy !== 'klart' ? 'Anna Exempel' : undefined}
-              onFalt={() => tryck('falt')} onSkicka={() => tryck('skicka')} onGem={() => tryck('gem')}
-              markorFalt={mk(markera, 'falt', nr)} markorSkicka={mk(markera, 'skicka', nr)}
-            />
-            {vy === 'namn' && <div className="mt-1"><NamnLista tryck={tryck} markera={markera} nr={nr} /></div>}
+    <div className="absolute inset-0 z-20 flex items-end bg-black/60">
+      <section className="flex max-h-[96%] w-full flex-col rounded-t-2xl border-t border-slate-700 bg-slate-900">
+        <header className="flex items-start justify-between gap-2 border-b border-slate-700/60 px-3 pb-2 pt-2.5">
+          <div>
+            <p className="text-[13px] font-semibold text-white">Ny fråga eller uppdrag</p>
+            <p className="text-[10px] text-slate-400">Den du skickar till får en notis och ser tråden under Väntar på dig.</p>
           </div>
-          {vy !== 'namn' && (
-            <div className="grid gap-0.5">
-              {(vy === 'skickad' || harSvar) && (
-                <Kommentar namn="Erik Exempel" roll="Tekniker" tid={harSvar ? '1 tim sedan' : 'Just nu'} status="Öppen"
-                  text={<><Nmn>@Anna Exempel</Nmn> {FRAGA}</>} />
-              )}
-              {harSvar && (
-                <Kommentar indrag namn="Anna Exempel" roll="Koordinator" tid="5 min sedan"
-                  text={<><Nmn>@Erik Exempel</Nmn> {ANNA_SVAR}</>}
-                  onSvara={() => tryck('svara')} markorSvara={mk(markera, 'svara', nr)} />
-              )}
-              {vy === 'klart' && <Kommentar indrag namn="Erik Exempel" roll="Tekniker" tid="Just nu" text={MITT_SVAR} />}
-              {!harSvar && vy !== 'skickad' && <p className="py-3 text-center text-[11.5px] text-slate-500">Inga kommentarer ännu<br /><span className="text-[10.5px] text-slate-600">Använd @namn för att nämna någon</span></p>}
-            </div>
-          )}
-        </Ark>
-      )}
+          <button type="button" onClick={() => tryck('stang')} aria-label="Stäng" className="p-1 text-slate-400"><Icon name="allman.stang" size={16} /></button>
+        </header>
+        <div className="grid min-h-0 flex-1 content-start gap-3 overflow-hidden px-3 py-2.5">
+          {delar.filter(d => d.n >= fran).map(d => <div key={d.n} className="grid gap-1.5">{d.innehall}</div>)}
+        </div>
+        <footer className="grid gap-1.5 border-t border-slate-700/60 px-3 py-2">
+          <p className="text-[10px] text-slate-400">{anna ? 'Anna får en notis direkt.' : 'Välj vem som ska få frågan.'}</p>
+          <div className="flex gap-1.5">
+            <button type="button" onClick={() => tryck('avbryt')} className="flex-1 rounded-lg border border-slate-600 px-2 py-1.5 text-[11px] font-medium text-white">Avbryt</button>
+            <Markor markor={mk('skicka')}>
+              <button type="button" onClick={() => tryck('skicka')} aria-disabled={!kan}
+                className={`flex items-center gap-1.5 rounded-lg bg-[#20c58f] px-3 py-1.5 text-[11px] font-semibold text-[#04281c] ${kan ? '' : 'opacity-50'}`}>
+                <Icon name="rapport.skicka" size={16} className="h-3.5 w-3.5" />
+                {anna ? 'Skicka till Anna' : 'Skicka'}
+              </button>
+            </Markor>
+          </div>
+        </footer>
+      </section>
+    </div>
+  )
+}
+
+// ─── Tråden ───
+
+function MinTrad({ vy, mk, tryck }: { vy: Vy; mk: Mk; tryck: Tryck }) {
+  const svar = vy === 'trad-svar' || vy === 'klar'
+  const klar = vy === 'klar'
+  const inlagg: Inlagg[] = [
+    { id: 'c1', namn: 'Erik Exempel', egen: true, tid: '2026-10-23 10:12', text: <><Namn>@Anna Exempel</Namn> {FRAGA}</>, last: svar ? 'Läst av Anna 10:31' : undefined },
+  ]
+  if (svar) inlagg.push({ id: 'c2', namn: 'Anna Exempel', roll: 'koordinator', tid: '2026-10-23 10:40', text: ANNA_SVAR })
+  return (
+    <div className="p-2.5">
+      <Trad
+        tillbaka
+        amne={FRAGA}
+        ton={klar ? 'gron' : svar ? 'gron' : 'gra'}
+        status={klar ? 'Klar 10:42' : svar ? 'Anna svarade 10:40, läs och markera som klar' : 'Väntar på Anna sedan 10:12'}
+        knappar={klar
+          ? <Knapp id="oppna-igen" ikon="allman.aterstall" mk={mk} tryck={tryck}>Öppna igen</Knapp>
+          : <Knapp id="klar" ikon="allman.bock" prim mk={mk} tryck={tryck}>Markera som klar</Knapp>}
+        hjalp={!klar}
+        arende={ARENDE}
+        med={[
+          { namn: 'Du', beskrivning: 'Tekniker, startade tråden', ton: 'gra', lage: svar ? undefined : 'Väntar på svar' },
+          { namn: 'Anna Exempel', beskrivning: 'Tillfrågad', ton: svar ? 'gron' : 'gra', lage: svar ? 'Har svarat' : 'Inte svarat än' },
+        ]}
+        inlagg={inlagg}
+        nyttFran={vy === 'trad-svar' ? 'c2' : undefined}
+        svar={{ etikett: svar ? 'Svar till Anna' : 'Svar', text: '', hint: '' }}
+        mk={mk}
+        tryck={tryck}
+      />
+    </div>
+  )
+}
+
+function Skarm({ vy, mk, tryck }: { vy: Vy; mk: Mk; tryck: Tryck }) {
+  const iTrad = vy === 'skickad' || vy === 'trad-svar' || vy === 'klar'
+  const listaSvar = vy === 'lista-svar'
+  const siffra = listaSvar || vy === 'trad-svar' ? 1 : undefined
+  return (
+    <Telefon>
+      <TeknikerHuvud tryck={tryck} nr={0} siffra={siffra} />
+      <div className="absolute bottom-12 left-0 right-0 top-11 overflow-hidden">
+        {iTrad ? <MinTrad vy={vy} mk={mk} tryck={tryck} /> : <Lista svar={listaSvar} mk={mk} tryck={tryck} />}
+      </div>
+      <TeknikerBotten tryck={tryck} nr={0} />
+      {vy.startsWith('d-') && <Dialog vy={vy} mk={mk} tryck={tryck} />}
+      {vy === 'skickad' && <Notis text="Skickat till Anna" />}
+      {vy === 'klar' && <Notis text="Markerad som klar" />}
     </Telefon>
   )
 }
@@ -96,117 +251,121 @@ function Skarm({ vy, tryck, markera, nr }: { vy: Vy; tryck: (id: string) => void
 // ─── Visning: en skärm per steg i guidens visning-block ───
 
 const VISNING: { vy: Vy; markera: string }[] = [
-  { vy: 'arende', markera: 'prat' },
-  { vy: 'namn', markera: 'namn-anna' },
-  { vy: 'skriven', markera: 'skicka' },
-  { vy: 'vantar', markera: 'notis' },
-  { vy: 'tickets', markera: 'ticket' },
-  { vy: 'svarvy', markera: 'svara' },
+  { vy: 'lista', markera: 'ny' },
+  { vy: 'd-vem', markera: 'kollega-anna' },
+  { vy: 'd-arende', markera: 'arende-familj' },
+  { vy: 'd-text', markera: 'meddelande' },
+  { vy: 'd-klar', markera: 'skicka' },
+  { vy: 'lista-svar', markera: 'rad' },
+  { vy: 'trad-svar', markera: 'klar' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
   const v = VISNING[Math.min(steg, VISNING.length - 1)]
-  return <Skarm vy={v.vy} markera={v.markera} nr={steg + 1} tryck={id => { if (id === v.markera) onNasta() }} />
+  return <Skarm vy={v.vy} mk={gorMk(v.markera, steg + 1)} tryck={id => { if (id === v.markera) onNasta() }} />
 }
 
 // ─── Övning: samma skärmar utan markörer ───
 
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du står i ärendet hos Familjen Exempel. Leta upp knappen för intern kommunikation och tryck på den.' }
+const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du står på Frågor och uppdrag. Fråga koordinatorn Anna Exempel om Familjen Exempel vill ha kvittot på mejl.' }
 
 const TIPS: Record<string, string> = {
-  fotspar: 'Fotspåren bokar återbesök. Frågan till kontoret skriver du i pratbubblan.',
-  historik: 'Klockan med pilen är ärendehistoriken. Pratbubblan längst till höger är kommunikationen.',
-  flik: 'Flikarna byter vy i ärendet. Kommunikationen öppnar du med pratbubblan uppe till höger.',
-  sok: 'Sök letar efter ärenden och kunder. Här ska du skriva i ärendet du redan står i.',
-  meny: 'Menyn behövs inte nu. Allt du behöver finns i ärendet.',
-  gem: 'Gemet bifogar en bild eller PDF. Det behövs inte för den här frågan.',
-  'namn-@koordinator': '@koordinator går till alla koordinatorer. Uppdraget var att fråga Anna.',
-  'namn-@tekniker': '@tekniker går till alla tekniker. Frågan ska till Anna.',
-  'namn-@admin': '@admin går till alla admins. Frågan ska till Anna.',
-  'namn-@alla': '@alla går till alla användare. Använd den sparsamt. Frågan ska till Anna.',
-  'namn-erik': 'Erik Exempel är du själv i övningen. Välj Anna.',
-  'namn-sara': 'Sara är admin. Frågan ska till koordinatorn Anna.',
+  notis: 'Klockan öppnar Frågor och uppdrag, och där står du redan.',
+  meny: 'Menyn behövs inte nu. Allt du behöver finns på sidan.',
+  sok: 'Sök i sidhuvudet letar efter ärenden och kunder. Här ska du skriva en fråga.',
+  'sok-sida': 'Sökrutan letar bland dina trådar. Du ska skriva en ny fråga.',
+  'grupp-klara': 'Klara är trådar som redan är avslutade.',
+  hem: 'Hem tar dig till Översikt. Stanna på Frågor och uppdrag.',
+  arenden: 'Ärenden visar dina ärenden. Frågan skriver du här på Frågor och uppdrag.',
+  schema: 'Schemat behövs inte nu.',
+  provision: 'Provision behövs inte nu.',
+  mer: 'Menyn behövs inte nu.',
+  'typ-roll': 'En roll går till alla koordinatorer, och då hamnar frågan under Omnämnd, för kännedom hos dem. Uppdraget var att fråga Anna. Välj henne under En kollega.',
+  'typ-alla': 'Alla är för kännedom till alla i portalen. Frågan ska bara till Anna.',
+  'kollega-jonas': 'Jonas är tekniker. Frågan ska till koordinatorn Anna.',
+  'kollega-sara': 'Sara är admin. Frågan ska till koordinatorn Anna.',
+  'arende-brf': 'Brf Exempelgården är ett annat ärende. Frågan gäller Familjen Exempel.',
+  'ta-bild': 'En bild behövs inte för den här frågan.',
+  'valj-fil': 'En fil behövs inte för den här frågan.',
+  avbryt: 'Avbryt stänger dialogen och ingenting skickas.',
+  stang: 'Krysset stänger dialogen och ingenting skickas.',
+  'oppna-arende': 'Öppna ärendet visar hela ärendet. Det behövs inte nu.',
+  'visa-komm': 'Visa i ärendets kommunikation visar samma tråd i ärendet. Det behövs inte nu.',
+  'namn-knapp': 'Du behöver inte nämna någon mer.',
 }
 
-const FRAMSTEG: Record<Vy, number> = { arende: 0, panel: 1, namn: 1, namnvalt: 2, skriven: 3, skickad: 4, vantar: 5, tickets: 6, svarvy: 6, svarar: 7, svarskriven: 8, klart: 9 }
+const FRAMSTEG: Record<Vy, number> = { lista: 0, 'd-vem': 1, 'd-arende': 2, 'd-text': 3, 'd-klar': 4, skickad: 5, 'lista-svar': 6, 'trad-svar': 7, klar: 8 }
 
 function Ovning() {
-  const [vy, setVy] = useState<Vy>('arende')
+  const [vy, setVy] = useState<Vy>('lista')
   const [svar, setSvar] = useState<OvningSvar>(BORJA)
   const [fel, setFel] = useState(0)
 
   const miss = (text: string) => { setFel(f => f + 1); setSvar({ typ: 'fel', titel: 'Inte där', text }) }
   const tips = (titel: string, text: string) => setSvar({ typ: 'tips', titel, text })
   const ga = (ny: Vy, titel: string, text: string) => { setVy(ny); tips(titel, text) }
+  const annars = (id: string, rad: string) => miss(TIPS[id] ? `${TIPS[id]} ${rad}` : rad)
 
   const tryck = (id: string) => {
-    if (vy === 'klart') return
+    if (vy === 'klar') return
     switch (vy) {
-      case 'arende':
-        if (id === 'prat') ga('panel', 'Kommunikation är öppen', 'Tryck i rutan och skriv @ för att välja vem frågan ska till.')
-        else miss(TIPS[id] ?? 'Leta efter pratbubblan uppe till höger i ärendet.')
+      case 'lista':
+        if (id === 'ny') ga('d-vem', 'Ny fråga eller uppdrag', 'Dialogen öppnades. Under Till vem? är En kollega valt. Välj Anna.')
+        else annars(id, 'Tryck Ny fråga eller uppdrag.')
         break
-      case 'panel':
-        if (id === 'falt') ga('namn', 'Listan Nämn öppnades', 'Du skrev @. Välj vem som ska få frågan.')
-        else if (id === 'skicka') miss('Rutan är tom. Tryck i rutan och skriv @ först.')
-        else if (id === 'stang') miss('Stäng stänger panelen. Skriv frågan först.')
-        else miss(TIPS[id] ?? 'Tryck i rutan där det står Skriv kommentar.')
+      case 'd-vem':
+        if (id === 'kollega-anna') ga('d-arende', 'Anna är vald', 'Längst ner står Anna får en notis direkt. Välj nu vilket ärende frågan gäller.')
+        else if (id === 'typ-personer') tips('En kollega är redan valt', 'Tryck på Anna Exempel i listan.')
+        else if (id === 'sok-kollega') tips('Du kan söka', 'Men Anna syns redan i listan. Tryck på henne.')
+        else if (id === 'skicka') miss('Knappen är grå. Välj vem som ska få frågan först.')
+        else annars(id, 'Tryck på Anna Exempel under Till vem?')
         break
-      case 'namn':
-        if (id === 'namn-anna') ga('namnvalt', 'Anna är vald', '@Anna Exempel står i rutan. Tryck i rutan igen och skriv frågan.')
-        else miss(TIPS[id] ?? 'Välj Anna Exempel under Personer.')
+      case 'd-arende':
+        if (id === 'arende-familj') ga('d-text', 'Ärendet är valt', 'Familjen Exempel står i en grön ruta. Tryck i rutan Meddelande och skriv frågan.')
+        else if (id === 'sok-arende') tips('Du kan söka', 'Men ärendet hos Familjen Exempel syns redan bland förslagen.')
+        else if (id === 'skicka') miss('Välj ärendet först. Frågan sparas i ärendet.')
+        else annars(id, 'Tryck på Familjen Exempel bland förslagen.')
         break
-      case 'namnvalt':
-        if (id === 'falt') ga('skriven', 'Frågan är skriven', 'Nu kan du skicka. Knappen med pappersplanet blev grön.')
-        else if (id === 'skicka') miss('Bara namnet står i rutan. Tryck i rutan och skriv frågan, annars vet Anna inte vad du undrar.')
-        else miss(TIPS[id] ?? 'Tryck i rutan och skriv frågan.')
+      case 'd-text':
+        if (id === 'meddelande') ga('d-klar', 'Frågan är skriven', 'Nu är knappen Skicka till Anna grön. Tryck på den.')
+        else if (id === 'byt-arende') miss('Ärendet är rätt. Skriv frågan i rutan Meddelande.')
+        else if (id === 'skicka') miss('Skriv frågan i rutan Meddelande först.')
+        else annars(id, 'Tryck i rutan Meddelande och skriv frågan.')
         break
-      case 'skriven':
-        if (id === 'skicka') ga('skickad', 'Skickat', 'Kommentaren syns med status Öppen och Anna fick en notis. Stäng panelen och fortsätt jobba.')
-        else if (id === 'falt') tips('Frågan står redan där', 'Tryck på pappersplanet för att skicka.')
-        else miss(TIPS[id] ?? 'Skicka frågan med pappersplanet.')
+      case 'd-klar':
+        if (id === 'skicka') ga('skickad', 'Skickat till Anna', 'Tråden öppnades. Det står Väntar på Anna sedan 10:12. Gå tillbaka till listan med Frågor och uppdrag uppe till vänster.')
+        else if (id === 'meddelande') tips('Frågan står redan där', 'Tryck Skicka till Anna.')
+        else annars(id, 'Tryck Skicka till Anna.')
         break
       case 'skickad':
-        if (id === 'stang') ga('vantar', 'En stund senare', 'Anna har svarat och frågar dig något. Ser du siffran på klockan uppe till höger? Hitta svaret.')
-        else miss('Frågan är skickad. Tryck Stäng uppe i panelen.')
+        if (id === 'tillbaka') ga('lista-svar', 'En stund senare', 'Anna har svarat. Siffran 1 på klockan visar att något väntar på dig. Öppna tråden under Svar till dig.')
+        else if (id === 'klar') miss('Anna har inte svarat än. Vänta på svaret innan du markerar tråden som klar.')
+        else if (id === 'svar-falt' || id === 'skicka-svar') miss('Du behöver inte skriva mer nu. Gå tillbaka till listan.')
+        else annars(id, 'Tryck Frågor och uppdrag uppe till vänster.')
         break
-      case 'vantar':
-        if (id === 'notis') ga('tickets', 'Sidan Tickets', 'Du står på fliken Att göra. Där ligger allt som väntar på ditt svar. Öppna ticketen.')
-        else if (id === 'prat') ga('svarvy', 'Det går också', 'Annas svar syns i ärendet. Svara henne i tråden.')
-        else miss(TIPS[id] ?? 'Siffran på klockan visar att någon skrivit till dig. Tryck på klockan.')
+      case 'lista-svar':
+        if (id === 'rad') ga('trad-svar', 'Annas svar', 'Det står under Nytt sedan du läste. Under din fråga står Läst av Anna. Svaret räcker, så avsluta tråden.')
+        else if (id === 'ny') miss('Du ska läsa Annas svar, inte skriva en ny fråga. Tryck på tråden under Svar till dig.')
+        else annars(id, 'Tryck på tråden under Svar till dig.')
         break
-      case 'tickets':
-        if (id === 'ticket') ga('svarvy', 'Hela tråden', 'Annas svar ligger under din fråga. Svara henne i samma tråd.')
-        else if (id === 'utfall') miss('Pilen visar knapparna Öppna ärende och Markera löst. Tryck på själva ticketen för att läsa och svara.')
-        else if (id.startsWith('flik-')) miss('Du står redan på rätt flik. Att göra är det som väntar på ditt svar.')
-        else miss('Tryck på ticketen i listan.')
-        break
-      case 'svarvy':
-        if (id === 'svara') ga('svarar', 'Svarar Anna Exempel', 'Det står ovanför rutan. Tryck i rutan och skriv ditt svar.')
-        else if (id === 'falt') miss('Skriver du direkt i rutan blir det en ny ticket. Tryck Svara under Annas kommentar först, så hamnar svaret i samma tråd.')
-        else miss('Tryck Svara under Annas kommentar.')
-        break
-      case 'svarar':
-        if (id === 'falt') ga('svarskriven', 'Svaret är skrivet', 'Tryck på pappersplanet för att skicka.')
-        else if (id === 'skicka') miss('Rutan är tom. Skriv ditt svar först.')
-        else miss('Tryck i rutan och skriv ditt svar.')
-        break
-      case 'svarskriven':
-        if (id === 'skicka') {
-          setVy('klart')
+      case 'trad-svar':
+        if (id === 'klar') {
+          setVy('klar')
           setSvar({
             typ: 'ok',
             titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-            text: `Du frågade Anna, hittade hennes svar och svarade i samma tråd. Ticketen försvann från Att göra, och Anna ser ditt svar.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
+            text: `Du frågade Anna om ärendet, läste hennes svar och markerade tråden som klar. Den ligger nu under Klara, och siffran på klockan är borta.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
           })
-        } else miss('Skicka svaret med pappersplanet.')
+        } else if (id === 'svar-falt' || id === 'skicka-svar') miss('Svaret räcker, du behöver inte skriva mer. Tryck Markera som klar.')
+        else if (id === 'tillbaka') miss('Tråden ligger kvar under Väntar på dig tills du markerar den som klar.')
+        else annars(id, 'Tryck Markera som klar.')
         break
     }
   }
 
   return (
-    <OvningRam framsteg={FRAMSTEG[vy]} totalt={9} svar={svar} onBorjaOm={() => { setVy('arende'); setSvar(BORJA); setFel(0) }}>
-      <Skarm vy={vy} tryck={tryck} nr={0} />
+    <OvningRam framsteg={FRAMSTEG[vy]} totalt={8} svar={svar} onBorjaOm={() => { setVy('lista'); setSvar(BORJA); setFel(0) }}>
+      <Skarm vy={vy} mk={() => undefined} tryck={tryck} />
     </OvningRam>
   )
 }

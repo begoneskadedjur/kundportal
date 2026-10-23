@@ -18,11 +18,11 @@ import { ThemeToggle } from '../../../shared/ThemeToggle'
 import { BugReportModal } from '../../../shared/BugReportModal'
 import { ChangelogModal } from '../../../shared/ChangelogModal'
 import { useChangelogBadge } from '../../../../hooks/useChangelogBadge'
-import { useAuth } from '../../../../contexts/AuthContext'
-import { getTicketStats } from '../../../../services/communicationService'
+import { useTicketsBadge } from '../../../../hooks/useTicketsBadge'
 import { NY_NAV_GRUPPER, rubrikFor, arAktiv, type NyNavLank } from './nyNavConfig'
 import { NySidhuvudProvider, useSidhuvudInfo } from './NySidhuvud'
 import { SkapaArk } from './SkapaArk'
+import NyFragaDialog from '../../../fragor/NyFragaDialog'
 
 interface Props {
   userName: string
@@ -31,22 +31,15 @@ interface Props {
 
 const IKONKNAPP = 'w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] relative'
 
+// Samma räkning som sidan Frågor och uppdrag och de andra menyerna: det som väntar på dig
 function useTicketAntal(): number {
-  const { profile } = useAuth()
-  const [antal, setAntal] = useState(0)
-  const location = useLocation()
-  useEffect(() => {
-    if (!profile?.id) return
-    getTicketStats(profile.id).then(s => setAntal(s.open)).catch(() => {})
-    // Läs om vid sidbyte, så räknaren följer med när teknikern svarat
-  }, [profile?.id, location.pathname])
-  return antal
+  return useTicketsBadge()
 }
 
 function Raknare({ antal, liten = false }: { antal: number; liten?: boolean }) {
   if (antal <= 0) return null
   return (
-    <span className={`absolute ${liten ? 'top-1.5 right-1.5 w-4 h-4 text-[9px]' : 'top-1 right-1 w-5 h-5 text-[10px]'} bg-red-500 rounded-full text-[#fff] font-bold flex items-center justify-center`}>
+    <span className={`absolute ${liten ? 'top-1.5 right-1.5 w-4 h-4 text-[9px]' : 'top-1 right-1 w-5 h-5 text-[10px]'} bg-[#20c58f] rounded-full text-[#04281c] font-bold flex items-center justify-center`}>
       {antal > 9 ? '9+' : antal}
     </span>
   )
@@ -54,7 +47,7 @@ function Raknare({ antal, liten = false }: { antal: number; liten?: boolean }) {
 
 function NotisKnapp({ antal }: { antal: number }) {
   return (
-    <Link to="/technician/tickets" className={IKONKNAPP} aria-label={antal > 0 ? `Notiser, ${antal} olästa` : 'Notiser'}>
+    <Link to="/technician/tickets" className={IKONKNAPP} aria-label={antal > 0 ? `Frågor och uppdrag, ${antal} väntar på dig` : 'Frågor och uppdrag'}>
       <Icon name="upphandling.notis" size={24} />
       <Raknare antal={antal} liten />
     </Link>
@@ -89,7 +82,7 @@ function SidoLank({ lank, current, ticketAntal, indrag = false }: { lank: NyNavL
     >
       {!indrag && <Icon name={lank.ikon} size={20} className="flex-shrink-0" />}
       <span className="flex-1 min-w-0 truncate">{lank.label}</span>
-      {antal > 0 && <span className="font-mono text-xs text-red-400">{antal > 9 ? '9+' : antal}</span>}
+      {antal > 0 && <span className="font-mono text-sm text-[#20c58f]" aria-label={`${antal} väntar på dig`}>{antal > 9 ? '9+' : antal}</span>}
     </Link>
   )
 }
@@ -301,6 +294,9 @@ function Innehall({ userName, onSignOut }: Props) {
   const [skapaOppen, setSkapaOppen] = useState(false)
   const oppnaSkapa = useCallback(() => setSkapaOppen(true), [])
   const stangSkapa = useCallback(() => setSkapaOppen(false), [])
+  const [nyFragaOppen, setNyFragaOppen] = useState(false)
+  const oppnaNyFraga = useCallback(() => setNyFragaOppen(true), [])
+  const stangNyFraga = useCallback(() => setNyFragaOppen(false), [])
 
   // Stäng arket vid sidbyte
   useEffect(() => { setSkapaOppen(false) }, [current])
@@ -316,7 +312,9 @@ function Innehall({ userName, onSignOut }: Props) {
       </main>
 
       <Bottenmeny current={current} onSkapa={oppnaSkapa} />
-      <SkapaArk oppen={skapaOppen} onClose={stangSkapa} />
+      <SkapaArk oppen={skapaOppen} onClose={stangSkapa} onNyFraga={oppnaNyFraga} />
+      {/* Skapa-arkets Fråga eller uppdrag öppnar dialogen här, utan sidbyte */}
+      <NyFragaDialog oppen={nyFragaOppen} onClose={stangNyFraga} />
     </div>
   )
 }
