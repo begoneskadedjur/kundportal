@@ -45,6 +45,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.89.1',
+    date: '2026-10-23',
+    title: 'Tätare behörigheter för kommentarer, bilagor, notiser och fakturarader',
+    items: [
+      { kind: 'andring', text: 'Tekniker ser kommunikationen i ärenden de är delaktiga i, och i trådar där de har skrivit eller är nämnda som person, som Tekniker eller via Alla. Admin, koordinator och säljare ser allt som förut.' },
+      { kind: 'andring', text: 'Bilagor i ärendets kommunikation öppnas med en tidsbegränsad länk och kan inte längre nås av någon utanför portalen.' },
+      { kind: 'andring', text: 'Tekniker kan ändra faktureringsrader bara i ärenden de är delaktiga i. Säljare ändrar bara avtalsrader i avtalskartan. Läsningen är oförändrad för det arbete var och en gör.' },
+      { kind: 'buggfix', text: 'Notiser om rabattsvar och rabattbegäran sparas nu, och avsändaren är alltid den som är inloggad.' },
+      { kind: 'buggfix', text: 'De 41 avslutade ärenden som saknade avslutsdatum har fått datum från senaste besöket, annars från senaste ändringen.' },
+    ],
+  },
+  {
     version: '3.89.0',
     date: '2026-10-23',
     title: 'Tickets blir Frågor och uppdrag',

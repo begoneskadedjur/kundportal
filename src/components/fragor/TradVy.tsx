@@ -11,6 +11,7 @@ import type { AuthorRole, CaseComment } from '../../types/communication'
 import type { InkorgKvitto } from '../../services/communicationService'
 import { deleteComment, markCommentAsRead, updateComment, updateCommentStatus } from '../../services/communicationService'
 import { skickaKommentar } from '../../hooks/useCaseComments'
+import { useBilagaUrl } from '../communication/useBilagaUrl'
 import type { TrackedMention } from '../../hooks/useMentions'
 import {
   datumTid, fornamn, fragorITrad, kanAndraStatus, kanTaDen, lastAvText, rollMottagare, rollText,
@@ -124,25 +125,33 @@ function Bilagor({ kommentar }: { kommentar: CaseComment }) {
   return (
     <ul className="mt-2 flex flex-wrap gap-2">
       {kommentar.attachments.map(a => (
-        <li key={a.url}>
-          {a.mimetype?.startsWith('image/') ? (
-            <a href={a.url} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border border-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]">
-              <img src={a.url} alt={a.filename} className="w-28 h-28 object-cover" loading="lazy" />
-            </a>
-          ) : (
-            <a
-              href={a.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="min-h-[44px] inline-flex items-center gap-2 px-3 rounded-lg border border-slate-700 text-sm text-slate-200 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
-            >
-              <Icon name="rapport.gem" size={16} className="text-slate-400" />
-              <span className="truncate max-w-[220px]">{a.filename}</span>
-            </a>
-          )}
-        </li>
+        <li key={a.url}><Bilaga bilaga={a} /></li>
       ))}
     </ul>
+  )
+}
+
+function Bilaga({ bilaga: a }: { bilaga: NonNullable<CaseComment['attachments']>[number] }) {
+  const url = useBilagaUrl(a.url)
+  if (a.mimetype?.startsWith('image/')) {
+    if (!url) return <div className="w-28 h-28 rounded-lg border border-slate-700 bg-slate-800 animate-pulse" />
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="block rounded-lg overflow-hidden border border-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]">
+        <img src={url} alt={a.filename} className="w-28 h-28 object-cover" loading="lazy" />
+      </a>
+    )
+  }
+  return (
+    <a
+      href={url ?? undefined}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-disabled={!url}
+      className="min-h-[44px] inline-flex items-center gap-2 px-3 rounded-lg border border-slate-700 text-sm text-slate-200 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+    >
+      <Icon name="rapport.gem" size={16} className="text-slate-400" />
+      <span className="truncate max-w-[220px]">{a.filename}</span>
+    </a>
   )
 }
 

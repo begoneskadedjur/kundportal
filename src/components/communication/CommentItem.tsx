@@ -16,6 +16,7 @@ import {
 } from '../../types/communication';
 import { useAuth } from '../../contexts/AuthContext';
 import { markCommentAsRead, getReadReceipts, updateCommentStatus } from '../../services/communicationService';
+import { useBilagaUrl } from './useBilagaUrl';
 import {
   User,
   Pencil,
@@ -459,11 +460,11 @@ export default function CommentItem({
                 <AttachmentPreview
                   key={index}
                   attachment={attachment}
-                  onClick={() => {
+                  onClick={(url) => {
                     if (attachment.mimetype.startsWith('image/')) {
-                      setShowImageModal(attachment.url);
+                      setShowImageModal(url);
                     } else {
-                      window.open(attachment.url, '_blank');
+                      window.open(url, '_blank');
                     }
                   }}
                 />
@@ -618,18 +619,22 @@ function AttachmentPreview({
   onClick,
 }: {
   attachment: CommentAttachment;
-  onClick: () => void;
+  onClick: (url: string) => void;
 }) {
   const isImage = attachment.mimetype.startsWith('image/');
+  const url = useBilagaUrl(attachment.url);
 
   return (
     <button
-      onClick={onClick}
+      onClick={() => { if (url) onClick(url); }}
+      disabled={!url}
       className="group/attachment relative rounded-md overflow-hidden border border-slate-700 hover:border-slate-600 transition-all duration-150 hover:shadow-lg"
     >
-      {isImage ? (
+      {isImage && !url ? (
+        <div className="w-16 h-16 bg-slate-800 animate-pulse" />
+      ) : isImage ? (
         <img
-          src={attachment.url}
+          src={url!}
           alt={attachment.filename}
           className="w-16 h-16 object-cover"
         />
