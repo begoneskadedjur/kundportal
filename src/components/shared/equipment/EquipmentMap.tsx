@@ -24,6 +24,7 @@ import { numberStations } from '../../../shared/stationNumbering'
 import { createFanOut, type FanOutEntry, type FanOutHandle } from './markerFanOut'
 import RelocateBar from '../stations/RelocateBar'
 import { distanceMeters } from '../../../utils/equipmentMapUtils'
+import { Icon as SvgIcon } from '../../icons/Icon'
 
 interface EquipmentMapProps {
   equipment: EquipmentPlacementWithRelations[]
@@ -78,6 +79,12 @@ interface EquipmentMapProps {
    * till stationerna. Av som standard, så övriga vyer beter sig som förut.
    */
   refitWhenVisible?: boolean
+  /**
+   * Knappen Visa alla stationer ovanför Min position: zoomar ut till alla
+   * stationer (samma fitBounds som när kartan öppnas, nedtonade grannar räknas
+   * inte). Av som standard, så övriga vyer ser ut som förut.
+   */
+  showFitAllButton?: boolean
 }
 
 // CSS för pulsering av highlighted marker
@@ -123,6 +130,7 @@ export function EquipmentMap({
   showTypeIcons = false,
   stationNumbers,
   refitWhenVisible = false,
+  showFitAllButton = false,
 }: EquipmentMapProps) {
   // Ikoner i markörerna och typring på grupperna (personal eller kund)
   const markerIcons = showProductIcons || showTypeIcons
@@ -236,6 +244,21 @@ export function EquipmentMap({
       )
     }
   }, [])
+
+  // Visa alla stationer (showFitAllButton): samma utsnitt som när kartan öppnas
+  const fitAllStations = useCallback(() => {
+    const map = mapRef.current
+    if (!map) return
+    const items = dimmedStationIds?.size ? equipment.filter(item => !dimmedStationIds.has(item.id)) : equipment
+    if (items.length > 1) {
+      const bounds = new google.maps.LatLngBounds()
+      items.forEach(item => bounds.extend({ lat: item.latitude, lng: item.longitude }))
+      map.fitBounds(bounds, { top: 50, bottom: 50, left: 50, right: 50 })
+    } else if (items.length === 1) {
+      map.setCenter({ lat: items[0].latitude, lng: items[0].longitude })
+      map.setZoom(DETAIL_ZOOM)
+    }
+  }, [equipment, dimmedStationIds])
 
   // Injicera CSS
   useEffect(() => {
@@ -884,8 +907,20 @@ export function EquipmentMap({
       )}
 
       {/* Kontroller */}
-      {showControls && (
+      {(showControls || showFitAllButton) && (
         <div className={`absolute right-3 z-40 flex flex-col gap-2 ${relocatingStationId ? 'bottom-[150px]' : 'bottom-3'}`}>
+          {showFitAllButton && (
+            <button
+              type="button"
+              onClick={fitAllStations}
+              className="p-2.5 bg-white rounded-lg shadow-md hover:bg-slate-50 active:bg-slate-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center text-[#334155]"
+              aria-label="Visa alla stationer på kartan"
+              title="Visa alla stationer"
+            >
+              <SvgIcon name="sok.stationer" size={20} />
+            </button>
+          )}
+          {showControls && (
           <button
             onClick={centerOnUserLocation}
             className="p-2.5 bg-white rounded-lg shadow-md hover:bg-slate-50 active:bg-slate-100 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -893,6 +928,7 @@ export function EquipmentMap({
           >
             <Navigation className="w-5 h-5 text-slate-600" />
           </button>
+          )}
         </div>
       )}
 

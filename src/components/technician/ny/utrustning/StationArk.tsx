@@ -11,6 +11,12 @@
 //    (useAddonRemovalGuard + AddonRemovalNotice). Upphämtning = status Borttagen,
 //    sedan syncAfterStationChange så § 5-rader, pro rata och etableringsraden följer med
 //    (samma kedja som TechnicianEquipment.tsx:446-455 efter en ändring).
+//
+// Två lägen: som ark över sidan (telefon, standard) eller inline (dator, prop
+// inline), då raden i listan bredvid kartan fälls ut till arket och kartan
+// syns hela tiden. Innehåll och spärrar är desamma i båda.
+// Senaste kontroll visas för stationer inne (latest_inspection) och ute
+// (första raden ur getOutdoorInspectionsByStation, samma källa som Historik).
 
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -45,6 +51,10 @@ const KONTROLL_TON: Partial<Record<InspectionStatus, Ton>> = {
 interface Props {
   vald: ValdStation | null
   nummer: number | null
+  /** Antal stationer på samma plats (ute eller planritningen), för "Station 7 av 18" */
+  antalPaPlatsen?: number
+  /** Dator: visas i listan i stället för som ark över sidan */
+  inline?: boolean
   planNamn?: string | null
   customerId: string
   technicianId: string
@@ -58,6 +68,9 @@ interface Props {
 }
 
 export function StationArk(props: Props) {
+  if (props.inline) {
+    return props.vald ? <ArkInnehall key={props.vald.station.id} {...props} vald={props.vald} /> : null
+  }
   return (
     <AnimatePresence>
       {props.vald && <ArkInnehall key={props.vald.station.id} {...props} vald={props.vald} />}
@@ -65,7 +78,7 @@ export function StationArk(props: Props) {
   )
 }
 
-function ArkInnehall({ vald, nummer, planNamn, customerId, technicianId, technicianName, onClose, onFlytta, onBytTyp, onAndra, onAndrad }: Props & { vald: ValdStation }) {
+function ArkInnehall({ vald, nummer, antalPaPlatsen, inline = false, planNamn, customerId, technicianId, technicianName, onClose, onFlytta, onBytTyp, onAndra, onAndrad }: Props & { vald: ValdStation }) {
   const s = vald.station
   const inne = vald.typ === 'inne'
   const t = typInfo(s)
@@ -80,6 +93,16 @@ function ArkInnehall({ vald, nummer, planNamn, customerId, technicianId, technic
   const [historik, setHistorik] = useState<Historik[] | null>(null)
   const [bekraftaUpphamtning, setBekraftaUpphamtning] = useState(false)
   const [hamtar, setHamtar] = useState(false)
+  // Senaste kontrollen ute (inne finns den redan på stationen)
+  const [senasteUte, setSenasteUte] = useState<{ nar: string; status: string } | null>(null)
+  useEffect(() => {
+    if (inne) return
+    let avbruten = false
+    getOutdoorInspectionsByStation(s.id, 1)
+      .then(rader => { if (!avbruten && rader[0]) setSenasteUte({ nar: rader[0].inspected_at, status: rader[0].status }) })
+      .catch(() => { /* bara information i arket */ })
+    return () => { avbruten = true }
+  }, [inne, s.id])
 
   // Historiken hämtas första gången den visas
   useEffect(() => {
@@ -154,30 +177,18 @@ function ArkInnehall({ vald, nummer, planNamn, customerId, technicianId, technic
   const inneStation = inne ? (s as IndoorStationWithRelations) : null
   const uteStation = !inne ? (s as EquipmentPlacementWithRelations) : null
 
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center sm:p-4"
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ y: 60, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 60, opacity: 0 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="station-ark-rubrik"
-        onClick={e => e.stopPropagation()}
-        className="w-full sm:max-w-lg max-h-[88dvh] flex flex-col bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden"
-      >
-        <span aria-hidden="true" className="sm:hidden block mx-auto mt-2 w-10 h-1 rounded-full bg-slate-600" />
+  const rubrikId = `station-ark-rubrik-${s.id}`
+  const senaste = inneStation?.latest_inspection
+    ? { nar: inneStation.latest_inspection.inspected_at, status: inneStation.latest_inspection.status }
+    : senasteUte
+
+  const innehall = (
+      <>
+        {!inline && <span aria-hidden="true" className="sm:hidden block mx-auto mt-2 w-10 h-1 rounded-full bg-slate-600" />}
         <div className="flex items-center gap-3 border-b border-slate-800 py-3 pl-4 pr-2">
           <StationTypeTile size={44} color={t.farg} icon={t.ikon} addon={arTillagg && aktiv} title={t.namn} />
           <div className="flex-1 min-w-0">
-            <h2 id="station-ark-rubrik" className="text-lg font-bold text-white truncate">{rubrik}</h2>
+            <h2 id={rubrikId} className="text-lg font-bold text-white truncate">{rubrik}</h2>
             <p className="text-[13px] text-slate-400 truncate">
               {t.namn}
               {arTillagg && <span className="text-violet-300">, tillägg utöver avtal</span>}
@@ -207,7 +218,7 @@ function ArkInnehall({ vald, nummer, planNamn, customerId, technicianId, technic
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className={inline ? 'p-4 space-y-4' : 'flex-1 overflow-y-auto p-4 space-y-4'}>
           {bekraftaUpphamtning && (
             <div className="rounded-2xl border border-violet-500/40 bg-violet-500/5 p-3 space-y-3" role="group" aria-label="Hämta upp stationen">
               <p className="text-[15px] font-semibold text-white">Hämta upp {rubrik.toLowerCase()}?</p>
@@ -259,12 +270,23 @@ function ArkInnehall({ vald, nummer, planNamn, customerId, technicianId, technic
                 </dd>
               </div>
             )}
-            {inneStation?.latest_inspection && (
+            {senaste && (
               <div>
                 <dt className="text-slate-500">Senaste kontroll</dt>
-                <dd className="mt-0.5 text-slate-200">{datum(inneStation.latest_inspection.inspected_at)}</dd>
+                <dd className="mt-0.5 text-slate-200">
+                  {datum(senaste.nar)}
+                  {INSPECTION_STATUS_CONFIG[senaste.status as InspectionStatus] && (
+                    <span className="block"><StatusPunkt ton={KONTROLL_TON[senaste.status as InspectionStatus] ?? 'gra'}>{INSPECTION_STATUS_CONFIG[senaste.status as InspectionStatus].label}</StatusPunkt></span>
+                  )}
+                </dd>
               </div>
             )}
+            {nummer && antalPaPlatsen ? (
+              <div>
+                <dt className="text-slate-500">Nummer</dt>
+                <dd className="mt-0.5 text-slate-200">Station {nummer} av {antalPaPlatsen} {inne ? 'på ritningen' : 'ute'}</dd>
+              </div>
+            ) : null}
             {(inneStation?.location_description || s.comment) && (
               <div className="col-span-2">
                 <dt className="text-slate-500">{inneStation?.location_description ? 'Plats' : 'Kommentar'}</dt>
@@ -312,7 +334,7 @@ function ArkInnehall({ vald, nummer, planNamn, customerId, technicianId, technic
           )}
         </div>
 
-        <div className="border-t border-slate-800 p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] grid grid-cols-2 gap-2">
+        <div className={`border-t border-slate-800 p-3 grid grid-cols-2 gap-2 ${inline ? '' : 'pb-[calc(0.75rem+env(safe-area-inset-bottom))]'}`}>
           <button type="button" onClick={() => onAndra(vald)} className={KNAPP_SEKUNDAR}>
             <Icon name="rapport.penna" size={20} />
             Ändra uppgifter
@@ -326,6 +348,37 @@ function ArkInnehall({ vald, nummer, planNamn, customerId, technicianId, technic
             <button type="button" onClick={onClose} className={KNAPP_SEKUNDAR}>Stäng</button>
           )}
         </div>
+      </>
+  )
+
+  if (inline) {
+    return (
+      <div role="region" aria-labelledby={rubrikId} className="bg-slate-900 border-y border-[#20c58f]/50">
+        {innehall}
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center sm:p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: 60, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 60, opacity: 0 }}
+        transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={rubrikId}
+        onClick={e => e.stopPropagation()}
+        className="w-full sm:max-w-lg max-h-[88dvh] flex flex-col bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden"
+      >
+        {innehall}
       </motion.div>
     </motion.div>
   )

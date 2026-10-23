@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.85.0',
+    date: '2026-10-23',
+    title: 'Stationer i nya arbetsvyn',
+    items: [
+      { kind: 'nyhet', text: 'Utrustning heter Stationer i nya arbetsvyn och är omgjord. Pågående etableringar och kontroller som väntar står i Att göra vid sidan av, och en etablering utan stationer efter 30 dagar markeras så att den inte glöms bort. Kunderna visas som tabell med senaste och nästa kontroll, avvikelser och schema.' },
+      { kind: 'nyhet', text: 'Kontroller grupperas efter läge: försenade äldst först, idag, denna vecka, resten av månaden och kunder utan schema. Kundens stationer visar listan bredvid kartan på datorn, och stationsarket visar senaste kontroll även för stationer ute. Kartan har fått knappen Visa alla stationer.' },
+    ],
+  },
+  {
     version: '3.84.7',
     date: '2026-10-23',
     title: 'Klick i kontrollrundan når fram',

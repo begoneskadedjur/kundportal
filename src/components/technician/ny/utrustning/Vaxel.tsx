@@ -11,6 +11,8 @@ export interface VaxelVal<T extends string> {
   kort?: string
   ikon: IconName
   antal?: number
+  /** Antalet i orange, till exempel försenade kontroller */
+  antalVarning?: boolean
 }
 
 interface Props<T extends string> {
@@ -45,7 +47,7 @@ export function Vaxel<T extends string>({ val, valt, onVal, etikett, className =
               </>
             ) : <span className="truncate">{v.text}</span>}
             {v.antal !== undefined && (
-              <span className={`tabular-nums text-[13px] ${aktiv ? 'text-[#04281c]/70' : 'text-slate-500'}`}>{v.antal}</span>
+              <span className={`tabular-nums text-[13px] ${aktiv ? 'text-[#04281c]/70' : v.antalVarning ? 'font-semibold text-orange-400' : 'text-slate-500'}`}>{v.antal}</span>
             )}
           </button>
         )

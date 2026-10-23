@@ -19,6 +19,8 @@ export interface BookedInspection {
   total_stations: number
   frequency: string | null
   isOverdue: boolean
+  /** Kontrollens ärende (cases.id) när det finns, så nya vyn kan öppna det */
+  case_id?: string | null
 }
 
 export interface InspectionOverview {
@@ -30,6 +32,7 @@ export interface InspectionOverview {
 interface SessionRow {
   id: string
   customer_id: string
+  case_id: string | null
   scheduled_at: string
   scheduled_end: string | null
   status: string
@@ -71,6 +74,7 @@ export class TechnicianEquipmentService {
         .select(`
           id,
           customer_id,
+          case_id,
           scheduled_at,
           scheduled_end,
           status,
@@ -117,7 +121,8 @@ export class TechnicianEquipmentService {
           (row.total_outdoor_stations || 0) + (row.total_indoor_stations || 0),
         frequency: row.recurring_schedule?.frequency || null,
         isOverdue:
-          row.status === 'scheduled' && new Date(deadline).getTime() < nowMs
+          row.status === 'scheduled' && new Date(deadline).getTime() < nowMs,
+        case_id: row.case_id ?? null
       }
     })
 

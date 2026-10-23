@@ -7,7 +7,7 @@
 
 import { StationIcon } from '../stationIcons'
 
-export type StationTypeTileSize = 32 | 40 | 44 | 56
+export type StationTypeTileSize = 20 | 24 | 32 | 40 | 44 | 56
 
 export interface StationTypeTileProps {
   /** Typens färg, t.ex. station_types.color. Saknas den blir rutan grå. */

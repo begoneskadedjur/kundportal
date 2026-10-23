@@ -100,3 +100,34 @@ export function senast(iso: string | null | undefined): string {
 export function antalText(n: number, en: string, flera: string): string {
   return `${n} ${n === 1 ? en : flera}`
 }
+
+/** Antal kalenderdagar från en YYYY-MM-DD till en annan (svenska kalenderdagar in, inga klockslag) */
+export function dagarMellan(fran: string, till: string): number {
+  const [y1, m1, d1] = fran.split('-').map(Number)
+  const [y2, m2, d2] = till.split('-').map(Number)
+  return Math.round((Date.UTC(y2, m2 - 1, d2) - Date.UTC(y1, m1 - 1, d1)) / 86_400_000)
+}
+
+/**
+ * Avvikelser i ord. Gränserna är desamma som kundens hälsa i
+ * calculateHealthStatus (StationHealthBadge.tsx), andelen aktiva stationer
+ * som saknas, är skadade eller behöver service:
+ *   Inga     0 %
+ *   Enstaka  under 10 %
+ *   Flera    10 till under 30 %
+ *   Många    30 % eller mer
+ * Bara Inga är grön. Rött används inte, avvikelser är inte akuta i sig.
+ */
+export function avvikelseOrd(h: HealthStatus): { ton: Ton; text: string } {
+  switch (h) {
+    case 'excellent': return { ton: 'gron', text: 'Inga' }
+    case 'good': return { ton: 'gul', text: 'Enstaka' }
+    case 'fair': return { ton: 'gul', text: 'Flera' }
+    default: return { ton: 'gul', text: 'Många' }
+  }
+}
+
+/** Liten knapp i rader och sidokolumnen, 44 px hög */
+export const RADKNAPP = 'h-11 px-3 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-600 bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] disabled:opacity-60'
+/** Ikonknapp med ram, 44 px */
+export const RAM_IKONKNAPP = 'w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-xl border border-slate-600 bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] disabled:opacity-60'

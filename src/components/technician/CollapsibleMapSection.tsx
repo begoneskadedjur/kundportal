@@ -71,6 +71,8 @@ interface CollapsibleMapSectionProps {
   onFocusCustomerChange?: (customerId: string | null) => void
   // Rubrik över statistiken. Ska följa valet Alla/Mina hos föräldern.
   rubrik?: string
+  // Knappen Visa alla stationer på kartan (EquipmentMap.showFitAllButton). Av som standard.
+  showFitAllButton?: boolean
 }
 
 export function CollapsibleMapSection({
@@ -81,7 +83,8 @@ export function CollapsibleMapSection({
   className = '',
   rubrik = 'Alla stationer',
   focusCustomerId: focusCustomerIdProp,
-  onFocusCustomerChange
+  onFocusCustomerChange,
+  showFitAllButton = false
 }: CollapsibleMapSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const [showMobileFilter, setShowMobileFilter] = useState(false)
@@ -414,6 +417,7 @@ export function CollapsibleMapSection({
                     showControls={true}
                     readOnly={true}
                     enableClustering={!effectiveFocusId}
+                    showFitAllButton={showFitAllButton}
                   />
                 </div>
                 {othersToggle}
@@ -519,6 +523,7 @@ export function CollapsibleMapSection({
                       showControls={false}
                       readOnly={true}
                       enableClustering={!effectiveFocusId}
+                      showFitAllButton={showFitAllButton}
                     />
                     {othersToggle}
                     {mapHint}

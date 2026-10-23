@@ -32,7 +32,7 @@ export const NY_NAV_GRUPPER: NyNavGrupp[] = [
   {
     label: 'Hos kunden',
     lankar: [
-      { label: 'Utrustning', path: '/technician/equipment', ikon: 'arende.station' },
+      { label: 'Stationer', path: '/technician/equipment', ikon: 'arende.station' },
       { label: 'Specialrapporter', path: '/technician/specialrapporter', ikon: 'falt.specialrapport' },
     ],
   },
@@ -69,7 +69,7 @@ export const NY_RUBRIKER: Record<string, string> = {
   '/technician/karta': 'Karta',
   '/technician/cases': 'Mina ärenden',
   '/technician/schedule': 'Schema',
-  '/technician/equipment': 'Utrustning',
+  '/technician/equipment': 'Stationer',
   '/technician/specialrapporter': 'Specialrapporter',
   '/technician/oneflow': 'Avtal och offerter',
   '/technician/oneflow-contract-creator': 'Avtal och offerter',

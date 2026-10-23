@@ -16,7 +16,7 @@ interface Val {
 const VAL: Val[] = [
   { rubrik: 'Avtal eller offert', text: 'Skickas till kunden som signerar i mobilen.', ikon: 'dok.avtal', to: '/technician/oneflow' },
   { rubrik: 'Specialrapport', text: 'Inspektion, sanering eller annan rapport med bilder.', ikon: 'falt.specialrapport', to: '/technician/specialrapporter' },
-  { rubrik: 'Ny station', text: 'Välj kunden på Utrustning och placera stationen på kartan.', ikon: 'falt.nystation', to: '/technician/equipment' },
+  { rubrik: 'Ny station', text: 'Välj kunden på Stationer och placera stationen på kartan.', ikon: 'falt.nystation', to: '/technician/equipment' },
   { rubrik: 'Tips om ny kund', text: 'Någon som behöver hjälp? Skriv namn och vad det gäller.', ikon: 'lead.tips', to: '/technician/leads?ny=1' },
   { rubrik: 'Meddelande till kontoret', text: 'Fråga eller be om hjälp. Svaret kommer under klockan.', ikon: 'guide.fraga', to: '/technician/tickets' },
   { rubrik: 'Fråga AI-assistenten', text: 'Om skadedjur, metoder eller hur portalen fungerar.', ikon: 'kalla.ai', to: '/technician/team-chat' },

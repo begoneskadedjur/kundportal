@@ -1,5 +1,11 @@
 // src/pages/technician/ny/NyKundStationer.tsx
 // Kundens stationer i nya arbetsvyn: /technician/equipment/customer/:customerId
+// Layout (skisserna KundStationerDator, KundStationerLista, KundStationerMobil):
+//  Dator  kundhuvud med Stationskarta PDF och Placera ny station, kartan med
+//         listan i en kolumn bredvid. Vald station (på kartan eller i listan)
+//         fälls ut till arket i listan och markeras blå på kartan. Fliken Lista
+//         är tabeller per plats (ute och varje planritning), arket står till höger.
+//  Telefon som förut: kartan och arket nedifrån.
 // (bara profiles.ny_arbetsvy, se VyVaxel i App.tsx). Gamla
 // TechnicianCustomerStationsPage.tsx och CustomerStationsModal.tsx är orörda.
 //
@@ -7,7 +13,7 @@
 // TechnicianCustomerStationsPage.tsx
 //  Kunden hämtas (identitet, multisite, avtalsdatum)          → här, samma select
 //  Kunden hittades inte + Till kundlistan                     → här, tomt läge
-//  Tillbaka till Utrustning                                   → här, ikonknapp överst
+//  Tillbaka till Utrustning (nu Stationer)                    → här, ikonknapp överst
 //  ?tab=outdoor|indoor|schedule styr startfliken              → här, outdoor=Karta, indoor=Planritning,
 //                                                               schedule=Schema (nya värden karta|lista|planritning|schema går också)
 //  Lägg till station → /technician/equipment?customer=<id>    → här, Placera ny station öppnar wizarden förvald
@@ -86,8 +92,10 @@ import { PagaendeEtablering } from '../../../components/technician/ny/utrustning
 import { usePagaendeEtableringar } from '../../../components/technician/ny/utrustning/usePagaendeEtableringar'
 import { EtableringsFlode } from '../../../components/technician/ny/utrustning/EtableringsFlode'
 import { useEtableringsflode } from '../../../components/technician/ny/utrustning/useEtableringsflode'
+import { useSenasteKontroller } from '../../../components/technician/ny/utrustning/useSenasteKontroller'
+import { useArDator } from '../../../components/technician/ny/arenden/useArDator'
 import {
-  IKONKNAPP, KNAPP_PRIMAR, KNAPP_SEKUNDAR, KORT, antalText, datum, halsa, stationStatus, typInfo,
+  IKONKNAPP, KNAPP_PRIMAR, KNAPP_SEKUNDAR, KORT, RADKNAPP, antalText, datum, halsa, stationStatus, typInfo,
 } from '../../../components/technician/ny/utrustning/utrustningUi'
 
 type Flik = 'karta' | 'lista' | 'planritning' | 'schema'
@@ -112,7 +120,7 @@ interface Kontakt {
 const GENOMGANG: GenomgangSteg[] = [
   { rubrik: 'Placera ny station', text: 'Öppnar placeringen direkt på den här kunden. Välj ute eller inne och sätt ut stationen.', mal: 'kund-placera' },
   { rubrik: 'Karta, Lista, Planritning och Schema', text: 'Karta visar stationerna ute. Lista visar alla. Planritning visar stationerna inne. Schema visar kontrollerna.', mal: 'kund-flikar' },
-  { rubrik: 'Tryck på en station', text: 'Då kan du flytta den, byta typ, se historiken och hämta upp tilläggsstationer.', mal: 'kund-innehall' },
+  { rubrik: 'Tryck på en station', text: 'På kartan eller i listan. Då kan du flytta den, byta typ, se historiken och hämta upp tilläggsstationer. På datorn fälls den ut i listan bredvid kartan.', mal: 'kund-innehall' },
   { rubrik: 'Stationskarta', text: 'Laddar ned stationskartan som PDF, samma som kunden kan ta ut i sin portal.', mal: 'kund-pdf' },
 ]
 
@@ -275,6 +283,8 @@ export default function NyKundStationer() {
   const urlFlik = flikUrUrl(searchParams.get('tab'))
   const flik: Flik = urlFlik ?? (aktivaUte.length === 0 && aktivaInne.length > 0 ? 'planritning' : 'karta')
   const setFlik = (f: Flik) => {
+    // Ett valt ark hör till fliken det öppnades i
+    if (f !== flik) setVald(null)
     setSearchParams(prev => { const n = new URLSearchParams(prev); n.set('tab', f); return n }, { replace: true })
   }
 
@@ -283,6 +293,30 @@ export default function NyKundStationer() {
 
   const nummerFor = (v: ValdStation | null) => (v ? (v.typ === 'ute' ? uteNummer.get(v.station.id) : inneNummer.get(v.station.id)) ?? null : null)
   const planNamnFor = (v: ValdStation | null) => (v?.typ === 'inne' ? planer.find(p => p.id === v.station.floor_plan_id)?.name ?? null : null)
+  const antalPaPlatsen = (v: ValdStation | null) => (!v ? undefined : v.typ === 'ute'
+    ? aktivaUte.length
+    : aktivaInne.filter(s => s.floor_plan_id === v.station.floor_plan_id).length)
+
+  // Dator: arket fälls ut i listan bredvid kartan (ute) eller står till höger
+  // om tabellerna (Lista). Telefon och planritningen: arket som förut.
+  const arDator = useArDator()
+  const inlineArk = arDator && !!vald && ((flik === 'karta' && vald.typ === 'ute') || flik === 'lista')
+
+  // Senaste kontroll per station i fliken Lista
+  const uteIds = useMemo(() => ute.map(s => s.id), [ute])
+  const inneIds = useMemo(() => inne.map(s => s.id), [inne])
+  const senasteKontroll = useSenasteKontroller(uteIds, inneIds, flik === 'lista')
+
+  // Listan bredvid kartan följer valet: den valda raden rullas fram
+  const listaRef = useRef<HTMLUListElement>(null)
+  const valdId = vald?.station.id
+  useEffect(() => {
+    if (!valdId || !arDator) return
+    const t = window.setTimeout(() => {
+      listaRef.current?.querySelector(`[data-station="${valdId}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }, 60)
+    return () => window.clearTimeout(t)
+  }, [valdId, arDator])
 
   // ── Flytta (kopia av StationInspectionPanel.tsx:1137-1180) ──
   const flyttaUte = async (lat: number, lng: number) => {
@@ -485,16 +519,37 @@ export default function NyKundStationer() {
     return <div className="py-16 flex justify-center"><LoadingSpinner text="Hämtar kundens stationer..." /></div>
   }
 
+  const valdArk = (v: ValdStation) => (
+    <StationArk
+      inline
+      vald={v}
+      nummer={nummerFor(v)}
+      antalPaPlatsen={antalPaPlatsen(v)}
+      planNamn={planNamnFor(v)}
+      customerId={customerId}
+      technicianId={technicianId}
+      technicianName={technicianName}
+      onClose={() => setVald(null)}
+      onFlytta={startaFlytt}
+      onBytTyp={(x) => { setVald(null); setBytTyp(x) }}
+      onAndra={oppnaAndra}
+      onAndrad={() => { void laddaOm() }}
+    />
+  )
+
   const listaRad = (v: ValdStation, nr: number | undefined) => {
     const t = typInfo(v.station)
     const st = stationStatus(v.station.status)
     const aktiv = v.station.status !== 'removed'
+    const ar = vald?.station.id === v.station.id
+    if (ar && inlineArk && flik === 'karta') return <li key={v.station.id} data-station={v.station.id}>{valdArk(v)}</li>
     return (
-      <li key={v.station.id}>
+      <li key={v.station.id} data-station={v.station.id}>
         <button
           type="button"
           onClick={() => setVald(v)}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 min-h-[60px] text-left hover:bg-slate-800/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#20c58f] ${aktiv ? '' : 'opacity-60'}`}
+          aria-label={`Station ${nr ?? ''}, ${t.namn}${v.station.is_addon ? ', tillägg' : ''}, ${st.text}`}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 min-h-[60px] text-left hover:bg-slate-800/60 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#20c58f] ${aktiv ? '' : 'opacity-60'} ${ar ? 'bg-slate-800/60' : ''}`}
         >
           <StationTypeTile size={40} color={t.farg} icon={t.ikon} addon={v.station.is_addon === true && aktiv} />
           <span className="flex-1 min-w-0">
@@ -515,60 +570,123 @@ export default function NyKundStationer() {
     )
   }
 
+  // Dator: tabellrad i fliken Lista (Nummer, Typ, Status, Senaste kontroll, Placerad av, Öppna)
+  const TABELL = 'lg:grid lg:grid-cols-[150px_minmax(0,1fr)_130px_130px_minmax(0,160px)_44px] lg:items-center lg:gap-3'
+  const tabellRad = (v: ValdStation, nr: number | undefined) => {
+    const t = typInfo(v.station)
+    const st = stationStatus(v.station.status)
+    const aktiv = v.station.status !== 'removed'
+    const ar = vald?.station.id === v.station.id
+    const sk = senasteKontroll.get(v.station.id)
+    return (
+      <li key={v.station.id} role="row" className={`${TABELL} px-3 py-2 min-h-[56px] ${aktiv ? '' : 'opacity-60'} ${ar ? 'bg-[#20c58f]/10' : ''}`}>
+        <span role="cell" className="flex items-center gap-2.5 min-w-0">
+          <StationTypeTile size={32} color={t.farg} icon={t.ikon} addon={v.station.is_addon === true && aktiv} title={t.namn} />
+          <span className="text-[15px] font-semibold text-white">{nr ? `Station ${nr}` : 'Utan nummer'}</span>
+        </span>
+        <span role="cell" className="block text-[13px] text-slate-300 truncate">
+          {t.namn}{v.station.is_addon ? ', tillägg' : ''}
+          {v.typ === 'inne' && v.station.station_number && <span className="font-mono text-slate-500">, {v.station.station_number}</span>}
+        </span>
+        <span role="cell"><StatusPunkt ton={st.ton}>{st.text}</StatusPunkt></span>
+        <span role="cell" className={`font-mono text-[13px] ${sk ? 'text-slate-300' : 'text-slate-500'}`}>{sk ? datum(sk) : 'Ingen än'}</span>
+        <span role="cell" className="block text-[13px] text-slate-400 truncate">{v.station.technician?.name ?? ''}</span>
+        <span role="cell" className="flex justify-end">
+          <button type="button" onClick={() => setVald(v)} className={IKONKNAPP} aria-label={`Öppna station ${nr ?? ''}, ${t.namn}`} title="Öppna">
+            <Icon name="allman.chevron" size={20} />
+          </button>
+        </span>
+      </li>
+    )
+  }
+
   const uteLista = (visaUpphamtade ? ute : aktivaUte).slice().sort((a, b) => (uteNummer.get(a.id) ?? 9999) - (uteNummer.get(b.id) ?? 9999))
+  const uteListaAktiva = aktivaUte.slice().sort((a, b) => (uteNummer.get(a.id) ?? 9999) - (uteNummer.get(b.id) ?? 9999))
+  const kontaktKnapp = `${KNAPP_SEKUNDAR} px-2 lg:h-11 lg:px-3 lg:text-sm`
+  const tabellHuvud = (
+    <div role="row" className={`${TABELL} px-3 py-2 border-b border-slate-700/60 bg-slate-800/40 text-[12px] font-semibold text-slate-400`}>
+      <span role="columnheader">Nummer</span>
+      <span role="columnheader">Typ</span>
+      <span role="columnheader">Status</span>
+      <span role="columnheader">Senaste kontroll</span>
+      <span role="columnheader">Placerad av</span>
+      <span role="columnheader" className="sr-only">Öppna</span>
+    </div>
+  )
 
   return (
-    <div className="max-w-5xl mx-auto p-4 lg:p-6 space-y-4 pb-8">
+    <div className="max-w-[1600px] mx-auto p-4 lg:p-6 space-y-4 pb-8">
       {/* Kunden */}
-      <section className={`${KORT} p-4 space-y-3`}>
-        <div className="flex items-start gap-2">
-          <button type="button" onClick={() => navigate('/technician/equipment')} className={`${IKONKNAPP} -ml-2`} aria-label="Tillbaka till Utrustning">
-            <Icon name="allman.chevron" size={20} className="rotate-180" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-xl font-bold text-white leading-snug break-words">{kund.customer_name}</h2>
-            {kund.customer_address && <p className="text-[15px] text-slate-400">{kund.customer_address}</p>}
-            {kontakt?.contact_person && <p className="text-[13px] text-slate-500">{kontakt.contact_person}</p>}
-          </div>
-          <button
-            type="button"
-            data-genomgang="kund-pdf"
-            onClick={laddaNerKarta}
-            disabled={pdfLaddar}
-            className={IKONKNAPP}
-            aria-label="Ladda ned stationskarta som PDF"
-            title="Stationskarta, PDF"
-          >
-            <Icon name={pdfLaddar ? 'allman.laddar' : 'utrustning.stationskarta'} size={24} className={pdfLaddar ? 'animate-spin' : ''} />
-          </button>
-        </div>
-        <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-slate-300">
-          <span className="inline-flex items-center gap-1"><Icon name="station.ute" size={16} className="text-slate-500" />{antalText(aktivaUte.length, 'ute', 'ute')}</span>
-          <span className="inline-flex items-center gap-1"><Icon name="station.inne" size={16} className="text-slate-500" />{antalText(aktivaInne.length, 'inne', 'inne')}</span>
-          {aktivaUte.length + aktivaInne.length > 0 && (
-            <StatusPunkt ton={h.ton}>
-              {halsoInfo.problematicCount > 0 ? `${halsoInfo.problematicCount} med avvikelse` : h.text}
-            </StatusPunkt>
-          )}
-        </p>
-        {(kontakt?.contact_phone || kontakt?.contact_email || kund.customer_address || aktivaUte[0]) && (
-          <div className="grid grid-cols-3 gap-2">
-            {kontakt?.contact_phone ? (
-              <a href={telUrl(kontakt.contact_phone)} className={`${KNAPP_SEKUNDAR} px-2`}><Icon name="kontakt.telefon" size={20} />Ring</a>
-            ) : <span className={`${KNAPP_SEKUNDAR} px-2 opacity-40`} aria-disabled="true"><Icon name="kontakt.telefon" size={20} />Ring</span>}
-            {kontakt?.contact_email ? (
-              <a href={`mailto:${kontakt.contact_email}`} className={`${KNAPP_SEKUNDAR} px-2`}><Icon name="kontakt.mejl" size={20} />Mejla</a>
-            ) : <span className={`${KNAPP_SEKUNDAR} px-2 opacity-40`} aria-disabled="true"><Icon name="kontakt.mejl" size={20} />Mejla</span>}
-            <a
-              href={aktivaUte[0] ? `https://www.google.com/maps/dir/?api=1&destination=${aktivaUte[0].latitude},${aktivaUte[0].longitude}` : navigeraUrl(kund.customer_address || kund.customer_name)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`${KNAPP_SEKUNDAR} px-2`}
+      <section className={`${KORT} p-4 lg:p-5`}>
+        <div className="flex flex-col lg:flex-row lg:items-start gap-3 lg:gap-6">
+          <div className="flex items-start gap-2 flex-1 min-w-0">
+            <button type="button" onClick={() => navigate('/technician/equipment')} className={`${IKONKNAPP} -ml-2`} aria-label="Tillbaka till Stationer" title="Stationer">
+              <Icon name="allman.chevron" size={20} className="rotate-180" />
+            </button>
+            <div className="flex-1 min-w-0 space-y-1">
+              <h2 className="text-xl font-bold text-white leading-snug break-words">{kund.customer_name}</h2>
+              {kund.customer_address && <p className="text-[15px] text-slate-400">{kund.customer_address}</p>}
+              {kontakt?.contact_person && <p className="text-[13px] text-slate-500">Kontakt: {kontakt.contact_person}</p>}
+              <p className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-1 text-[13px] text-slate-300">
+                <span className="inline-flex items-center gap-1"><Icon name="station.ute" size={16} className="text-slate-500" />{antalText(aktivaUte.length, 'ute', 'ute')}</span>
+                <span className="inline-flex items-center gap-1"><Icon name="station.inne" size={16} className="text-slate-500" />{antalText(aktivaInne.length, 'inne', 'inne')}</span>
+                {aktivaUte.length + aktivaInne.length > 0 && (
+                  <StatusPunkt ton={h.ton === 'rod' ? 'gul' : h.ton}>
+                    {halsoInfo.problematicCount > 0 ? `${halsoInfo.problematicCount} med avvikelse` : h.text}
+                  </StatusPunkt>
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              data-genomgang="kund-pdf"
+              onClick={laddaNerKarta}
+              disabled={pdfLaddar}
+              className={`lg:hidden ${IKONKNAPP}`}
+              aria-label="Ladda ned stationskarta som PDF"
+              title="Stationskarta, PDF"
             >
-              <Icon name="falt.navigera" size={20} />Navigera
-            </a>
+              <Icon name={pdfLaddar ? 'allman.laddar' : 'utrustning.stationskarta'} size={24} className={pdfLaddar ? 'animate-spin' : ''} />
+            </button>
           </div>
-        )}
+          <div className="flex flex-col gap-2 lg:items-end">
+            <div className="hidden lg:flex items-center gap-2">
+              <button
+                type="button"
+                data-genomgang="kund-pdf"
+                onClick={laddaNerKarta}
+                disabled={pdfLaddar}
+                className={RADKNAPP}
+                aria-label="Ladda ned stationskarta som PDF"
+              >
+                <Icon name={pdfLaddar ? 'allman.laddar' : 'utrustning.stationskarta'} size={20} className={pdfLaddar ? 'animate-spin' : ''} />
+                Stationskarta, PDF
+              </button>
+              {kundensEtablering.length === 0 && (
+                <button type="button" data-genomgang="kund-placera" onClick={() => flode.openWizard(customerId)} className={`${KNAPP_PRIMAR} h-12`}>
+                  <Icon name="falt.nystation" size={20} />
+                  Placera ny station
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-3 lg:flex gap-2">
+              {kontakt?.contact_phone ? (
+                <a href={telUrl(kontakt.contact_phone)} className={kontaktKnapp}><Icon name="kontakt.telefon" size={20} />Ring</a>
+              ) : <span className={`${kontaktKnapp} opacity-40`} aria-disabled="true"><Icon name="kontakt.telefon" size={20} />Ring</span>}
+              {kontakt?.contact_email ? (
+                <a href={`mailto:${kontakt.contact_email}`} className={kontaktKnapp}><Icon name="kontakt.mejl" size={20} />Mejla</a>
+              ) : <span className={`${kontaktKnapp} opacity-40`} aria-disabled="true"><Icon name="kontakt.mejl" size={20} />Mejla</span>}
+              <a
+                href={aktivaUte[0] ? `https://www.google.com/maps/dir/?api=1&destination=${aktivaUte[0].latitude},${aktivaUte[0].longitude}` : navigeraUrl(kund.customer_address || kund.customer_name)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={kontaktKnapp}
+              >
+                <Icon name="falt.navigera" size={20} />Navigera
+              </a>
+            </div>
+          </div>
+        </div>
       </section>
 
       <PagaendeEtablering
@@ -578,13 +696,13 @@ export default function NyKundStationer() {
       />
 
       {kundensEtablering.length === 0 && (
-        <button type="button" data-genomgang="kund-placera" onClick={() => flode.openWizard(customerId)} className={`w-full sm:w-auto ${KNAPP_PRIMAR}`}>
+        <button type="button" data-genomgang="kund-placera" onClick={() => flode.openWizard(customerId)} className={`lg:hidden w-full ${KNAPP_PRIMAR}`}>
           <Icon name="falt.nystation" size={20} />
           Placera ny station
         </button>
       )}
 
-      <div data-genomgang="kund-flikar">
+      <div data-genomgang="kund-flikar" className="lg:max-w-2xl">
         <Vaxel<Flik>
           etikett="Visa stationerna som"
           valt={flik}
@@ -599,7 +717,7 @@ export default function NyKundStationer() {
       </div>
 
       <div data-genomgang="kund-innehall" ref={ytaRef}>
-        {/* Karta */}
+        {/* Karta, på datorn med listan bredvid */}
         {flik === 'karta' && (
           aktivaUte.length === 0 ? (
             <TomtLage ikon="station.ute" text="Inga stationer utomhus hos kunden än." knapp="Placera station utomhus" onKnapp={() => flode.openWizard(customerId)} />
@@ -608,66 +726,118 @@ export default function NyKundStationer() {
               <HjalpText id="kund-karta" rubrik="Stationer utomhus" niva="h3">
                 Siffran är stationens nummer. Tryck på en station för att flytta, byta typ eller se historiken.
               </HjalpText>
-              {/* isolate: Google Maps-lagren får inte hamna över sidhuvud och meny */}
-              <div className="relative isolate z-0 rounded-2xl overflow-hidden border border-slate-700/60 h-[min(62dvh,560px)]">
-                <EquipmentMap
-                  showProductIcons
-                  equipment={aktivaUte}
-                  stationNumbers={uteNummer}
-                  onEquipmentClick={(eq) => { if (!flyttar) setVald({ typ: 'ute', station: eq }) }}
-                  height="100%"
-                  showControls={true}
-                  readOnly={true}
-                  enableClustering={false}
-                  showNumbers={true}
-                  relocatingStationId={flyttar?.typ === 'ute' ? flyttar.station.id : null}
-                  relocatingStationName={flyttar?.typ === 'ute' ? `station ${uteNummer.get(flyttar.station.id) ?? ''}`.trim() : null}
-                  onRelocateClick={flyttaUte}
-                  onCancelRelocate={() => setFlyttar(null)}
-                />
+              <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-4 lg:items-start">
+                {/* isolate: Google Maps-lagren får inte hamna över sidhuvud och meny */}
+                <div className="relative isolate z-0 min-w-0 rounded-2xl overflow-hidden border border-slate-700/60 h-[min(62dvh,560px)] lg:h-[max(520px,calc(100dvh-17rem))]">
+                  <EquipmentMap
+                    showProductIcons
+                    equipment={aktivaUte}
+                    stationNumbers={uteNummer}
+                    onEquipmentClick={(eq) => { if (!flyttar) setVald({ typ: 'ute', station: eq }) }}
+                    height="100%"
+                    showControls={true}
+                    showFitAllButton
+                    readOnly={true}
+                    enableClustering={false}
+                    showNumbers={true}
+                    highlightedStationId={arDator && !flyttar && vald?.typ === 'ute' ? vald.station.id : null}
+                    relocatingStationId={flyttar?.typ === 'ute' ? flyttar.station.id : null}
+                    relocatingStationName={flyttar?.typ === 'ute' ? `station ${uteNummer.get(flyttar.station.id) ?? ''}`.trim() : null}
+                    onRelocateClick={flyttaUte}
+                    onCancelRelocate={() => setFlyttar(null)}
+                  />
+                </div>
+                {arDator && (
+                  <aside aria-labelledby="kund-listan-rubrik" className={`${KORT} overflow-hidden flex flex-col h-[max(520px,calc(100dvh-17rem))]`}>
+                    <div className="px-3.5 py-3 border-b border-slate-700/60">
+                      <h3 id="kund-listan-rubrik" className="flex items-center gap-2 text-[15px] font-semibold text-white">
+                        <Icon name="allman.lista" size={20} className="text-slate-400" />
+                        Listan
+                        <span className="text-sm font-medium text-slate-400 tabular-nums">{aktivaUte.length} ute</span>
+                      </h3>
+                      <p className="text-[13px] text-slate-400">Följer kartan. Vald station fälls ut här.</p>
+                    </div>
+                    <ul ref={listaRef} className="flex-1 overflow-y-auto divide-y divide-slate-700/60">
+                      {uteListaAktiva.map(s => listaRad({ typ: 'ute', station: s }, uteNummer.get(s.id)))}
+                    </ul>
+                  </aside>
+                )}
               </div>
             </div>
           )
         )}
 
-        {/* Lista */}
+        {/* Lista: tabeller per plats, på datorn med arket till höger */}
         {flik === 'lista' && (
-          <div className="space-y-4">
-            {aktivaUte.length + aktivaInne.length === 0 && upphamtade === 0 ? (
-              <TomtLage ikon="arende.station" text="Kunden har inga stationer än." knapp="Placera station" onKnapp={() => flode.openWizard(customerId)} />
-            ) : (
-              <>
-                {(uteLista.length > 0) && (
-                  <section aria-label="Utomhus" className="space-y-2">
-                    <h3 className="flex items-center gap-2 text-sm font-semibold text-white"><Icon name="station.ute" size={16} className="text-slate-400" />Utomhus</h3>
-                    <ul className={`${KORT} divide-y divide-slate-700/60 overflow-hidden`}>
-                      {uteLista.map(s => listaRad({ typ: 'ute', station: s }, uteNummer.get(s.id)))}
-                    </ul>
-                  </section>
-                )}
-                {planer.map(p => {
-                  const lista = inne
-                    .filter(s => s.floor_plan_id === p.id && (visaUpphamtade || s.status !== 'removed'))
-                    .sort((a, b) => (inneNummer.get(a.id) ?? 9999) - (inneNummer.get(b.id) ?? 9999))
-                  if (lista.length === 0) return null
-                  return (
-                    <section key={p.id} aria-label={p.name} className="space-y-2">
-                      <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
-                        <Icon name="utrustning.planritning" size={16} className="text-slate-400" />
-                        {p.building_name ? `${p.building_name}, ${p.name}` : p.name}
+          <div className={inlineArk ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-4 lg:items-start' : ''}>
+            <div className="space-y-5 min-w-0">
+              {aktivaUte.length + aktivaInne.length === 0 && upphamtade === 0 ? (
+                <TomtLage ikon="arende.station" text="Kunden har inga stationer än." knapp="Placera station" onKnapp={() => flode.openWizard(customerId)} />
+              ) : (
+                <>
+                  <HjalpText id="kund-lista" rubrik="Lista" utanRubrik>
+                    Tryck på en station för att öppna den. Arket har samma verktyg som på kartan.
+                  </HjalpText>
+                  {uteLista.length > 0 && (
+                    <section aria-labelledby="lista-ute" className="space-y-2">
+                      <h3 id="lista-ute" className="flex items-center gap-2 text-sm font-semibold text-white">
+                        <Icon name="station.ute" size={16} className="text-slate-400" />Utomhus
+                        <span className="font-medium text-slate-400 tabular-nums">{uteLista.length}</span>
                       </h3>
-                      <ul className={`${KORT} divide-y divide-slate-700/60 overflow-hidden`}>
-                        {lista.map(s => listaRad({ typ: 'inne', station: s }, inneNummer.get(s.id)))}
-                      </ul>
+                      {arDator ? (
+                        <div role="table" aria-label="Stationer utomhus" className={`${KORT} overflow-hidden`}>
+                          {tabellHuvud}
+                          <ul className="divide-y divide-slate-700/60">
+                            {uteLista.map(s => tabellRad({ typ: 'ute', station: s }, uteNummer.get(s.id)))}
+                          </ul>
+                        </div>
+                      ) : (
+                        <ul className={`${KORT} divide-y divide-slate-700/60 overflow-hidden`}>
+                          {uteLista.map(s => listaRad({ typ: 'ute', station: s }, uteNummer.get(s.id)))}
+                        </ul>
+                      )}
                     </section>
-                  )
-                })}
-                {upphamtade > 0 && (
-                  <button type="button" onClick={() => setVisaUpphamtade(v => !v)} className="min-h-[44px] px-1 text-sm font-medium text-slate-300 hover:text-white">
-                    {visaUpphamtade ? 'Dölj upphämtade' : `Visa upphämtade (${upphamtade})`}
-                  </button>
-                )}
-              </>
+                  )}
+                  {planer.map(p => {
+                    const lista = inne
+                      .filter(s => s.floor_plan_id === p.id && (visaUpphamtade || s.status !== 'removed'))
+                      .sort((a, b) => (inneNummer.get(a.id) ?? 9999) - (inneNummer.get(b.id) ?? 9999))
+                    if (lista.length === 0) return null
+                    const namn = p.building_name ? `${p.building_name}, ${p.name}` : p.name
+                    return (
+                      <section key={p.id} aria-labelledby={`lista-${p.id}`} className="space-y-2">
+                        <h3 id={`lista-${p.id}`} className="flex items-center gap-2 text-sm font-semibold text-white">
+                          <Icon name="utrustning.planritning" size={16} className="text-slate-400" />
+                          {namn}
+                          <span className="font-medium text-slate-400 tabular-nums">{lista.length}</span>
+                        </h3>
+                        {arDator ? (
+                          <div role="table" aria-label={namn} className={`${KORT} overflow-hidden`}>
+                            {tabellHuvud}
+                            <ul className="divide-y divide-slate-700/60">
+                              {lista.map(s => tabellRad({ typ: 'inne', station: s }, inneNummer.get(s.id)))}
+                            </ul>
+                          </div>
+                        ) : (
+                          <ul className={`${KORT} divide-y divide-slate-700/60 overflow-hidden`}>
+                            {lista.map(s => listaRad({ typ: 'inne', station: s }, inneNummer.get(s.id)))}
+                          </ul>
+                        )}
+                      </section>
+                    )
+                  })}
+                  {upphamtade > 0 && (
+                    <button type="button" onClick={() => setVisaUpphamtade(v => !v)} className="min-h-[44px] px-1 text-sm font-medium text-slate-300 hover:text-white">
+                      {visaUpphamtade ? 'Dölj upphämtade' : `Visa upphämtade (${upphamtade})`}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+            {inlineArk && vald && (
+              <div className={`${KORT} hidden lg:block sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto`}>
+                {valdArk(vald)}
+              </div>
             )}
           </div>
         )}
@@ -786,10 +956,11 @@ export default function NyKundStationer() {
         </p>
       )}
 
-      {/* Stationens ark */}
+      {/* Stationens ark: på telefon och för planritningen som ark över sidan, på datorn inline ovan */}
       <StationArk
-        vald={vald}
+        vald={inlineArk ? null : vald}
         nummer={nummerFor(vald)}
+        antalPaPlatsen={antalPaPlatsen(vald)}
         planNamn={planNamnFor(vald)}
         customerId={customerId}
         technicianId={technicianId}
@@ -925,7 +1096,7 @@ export default function NyKundStationer() {
         onTypeChanged={() => { void laddaOm() }}
       />
 
-      <Genomgang id="ny-kund-stationer" steg={GENOMGANG} tvinga={visaMig} onStang={() => setVisaMig(false)} />
+      <Genomgang id="ny-kund-stationer-2" steg={GENOMGANG} tvinga={visaMig} onStang={() => setVisaMig(false)} />
     </div>
   )
 }
