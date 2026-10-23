@@ -111,6 +111,7 @@ import NyProvision from './pages/technician/ny/NyProvision';
 import NyUtrustning from './pages/technician/ny/NyUtrustning';
 import NyKundStationer from './pages/technician/ny/NyKundStationer';
 import NyDokumentsignering from './pages/technician/ny/NyDokumentsignering';
+import NyMinKundresa from './pages/technician/ny/NyMinKundresa';
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal';
@@ -459,7 +460,7 @@ function App() {
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyDokumentsignering />} gammal={<OfferFollowUp />} /></ProtectedRoute>} />
               <Route path="offer-follow-up" element={<Navigate to="/technician/dokumentsignering" replace />} />
-              <Route path="min-kundresa" element={<ProtectedRoute requiredRole="technician"><TechnicianCustomerJourney /></ProtectedRoute>} />
+              <Route path="min-kundresa" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyMinKundresa />} gammal={<TechnicianCustomerJourney />} /></ProtectedRoute>} />
               <Route path="equipment" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyUtrustning />} gammal={<TechnicianEquipment />} /></ProtectedRoute>} />
               <Route path="equipment/customer/:customerId" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyKundStationer />} gammal={<TechnicianCustomerStationsPage />} /></ProtectedRoute>} />
               <Route path="team-chat" element={<ProtectedRoute requiredRole="technician"><TeamChat /></ProtectedRoute>} />

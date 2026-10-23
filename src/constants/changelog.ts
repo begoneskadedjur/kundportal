@@ -45,6 +45,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.88.0',
+    date: '2026-10-23',
+    title: 'Min kundresa i nya arbetsvyn och stängda behörigheter',
+    items: [
+      { kind: 'nyhet', text: 'Min kundresa i nya arbetsvyn visar vägen från skickad offert eller avtal till signerat som ett flöde, med det som förföll eller raderades som egna grenar och tiden mellan stegen. Jämförelser görs bara mot din egen tidigare period, aldrig mot kollegor.' },
+      { kind: 'andring', text: 'Behörigheterna för fakturor och Oneflows händelselogg är åtstramade. Tekniker ser och hanterar fakturor på sina egna ärenden och kunder, kunder kan inte längre ändra fakturarader och händelseloggen syns bara för kontoret. Arbetet går som förut för alla roller.' },
+    ],
+  },
+  {
     version: '3.87.0',
     date: '2026-10-23',
     title: 'Ny Dokumentsignering för kontoret och Boka in',
