@@ -27,6 +27,8 @@ import CreateAbsenceModal from '../../components/admin/coordinator/CreateAbsence
 import AbsenceDetailsModal from '../../components/admin/coordinator/AbsenceDetailsModal'
 import PendingRequestsNotifier from '../../components/coordinator/PendingRequestsNotifier'
 import GlobalCoordinatorChat from '../../components/coordinator/GlobalCoordinatorChat'
+import BokaIn from '../../components/coordinator/bokaIn/BokaIn'
+import type { ArendeTabell } from '../../services/bokaInService'
 
 const DEFAULT_ACTIVE_STATUSES = ALL_VALID_STATUSES.filter(
   s => s !== 'Avslutat' && s !== 'Borttaget'
@@ -108,6 +110,8 @@ export default function CoordinatorSchedule() {
   const [openCommunicationOnLoad, setOpenCommunicationOnLoad] = useState(false)
   const [isActionableDrawerOpen, setIsActionableDrawerOpen] = useState(false)
   const [actionMap, setActionMap] = useState<Record<string, CoordinatorCaseAction>>({})
+  // Boka in från lådan Att boka in: förstegsdialog + förifylld bokning (BokaIn)
+  const [bokaIn, setBokaIn] = useState<{ caseId: string; tabell: ArendeTabell } | null>(null)
 
   // ─── Data-fetching (identisk med befintlig CoordinatorSchedule) ───
 
@@ -498,9 +502,14 @@ export default function CoordinatorSchedule() {
     setIsCreateModalOpen(true)
   }
 
+  // Signerat dokument: Boka in skapar ett nytt ärende, flyttar offertens rader,
+  // stänger ursprungsärendet och markerar dokumentet bokat (bokaInService)
   const handleScheduleFromDrawer = useCallback((caseData: BeGoneCaseRow) => {
-    setSelectedCase(caseData)
-    setIsCreateModalOpen(true)
+    const caseType = (caseData as { case_type?: string }).case_type
+    const tabell: ArendeTabell = caseType === 'private'
+      ? 'private_cases'
+      : caseType === 'business' ? 'business_cases' : 'cases'
+    setBokaIn({ caseId: caseData.id, tabell })
     setIsActionableDrawerOpen(false)
   }, [])
 
@@ -760,6 +769,15 @@ export default function CoordinatorSchedule() {
         initialContractCustomerId={createContractPrefill?.customerId ?? null}
         initialSiteId={createContractPrefill?.siteId ?? null}
       />
+      {bokaIn && (
+        <BokaIn
+          kalla={{ typ: 'arende', caseId: bokaIn.caseId, tabell: bokaIn.tabell }}
+          oppen
+          onStang={() => setBokaIn(null)}
+          onKlar={() => { setBokaIn(null); fetchData() }}
+          tekniker={technicians}
+        />
+      )}
       <CreateAbsenceModal
         isOpen={isAbsenceModalOpen}
         onClose={() => setIsAbsenceModalOpen(false)}

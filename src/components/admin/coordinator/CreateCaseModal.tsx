@@ -88,8 +88,19 @@ interface CreateCaseModalProps {
   allowedCaseTypes?: Array<'contract' | 'inspection' | 'establishment'> | null;
   /** Förvald avtalskund i avtalsläge (huvudkontoret när en enhet är vald). */
   initialContractCustomerId?: string | null;
-  /** Förvald enhet i avtalsläge. */
+  /** Förvald enhet i avtalsläge. Med initialCaseType: förvald enhet direkt i formuläret. */
   initialSiteId?: string | null;
+  /**
+   * Tekniker som är ibockade för bokningsassistenten när modalen öppnas (t.ex. dokumentets
+   * ansvariga tekniker från Boka in). Utelämnad: alla skadedjurstekniker som förut.
+   */
+  initialTechnicianIds?: string[] | null;
+  /** Förvald tjänst (services.id) för ett nytt ärende med initialCaseType. */
+  initialServiceId?: string | null;
+  /** Ruta överst i formuläret, t.ex. vad Boka in gör efter att ärendet sparats. */
+  bookingNotice?: React.ReactNode;
+  /** Ersätter modalens rubrik. */
+  titleOverride?: string | null;
 }
 
 /**
@@ -139,7 +150,7 @@ function resolveAssigneeFields(form: Record<string, string | null | undefined>, 
   };
 }
 
-export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType, initialFormData, initialImages, onCaseCreated, allowedCaseTypes, initialContractCustomerId, initialSiteId }: CreateCaseModalProps) {
+export default function CreateCaseModal({ isOpen, onClose, onSuccess, technicians, initialCaseData, initialCaseType, initialFormData, initialImages, onCaseCreated, allowedCaseTypes, initialContractCustomerId, initialSiteId, initialTechnicianIds, initialServiceId, bookingNotice, titleOverride }: CreateCaseModalProps) {
   const [step, setStep] = useState<'selectType' | 'form'>('selectType');
   const [caseType, setCaseType] = useState<'private' | 'business' | 'contract' | 'inspection' | 'establishment' | 'rondering' | 'egenkontroll' | null>(null);
   const [formData, setFormData] = useState<Partial<PrivateCasesInsert & BusinessCasesInsert>>({});
@@ -404,6 +415,16 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
       if (initialFormData) {
         setFormData({ ...initialFormData });
       }
+      // Boka in m.fl.: kund, enhet, tjänst och tekniker förväljs direkt. I avtalsläge
+      // (allowedCaseTypes) sker kundvalet i selectCaseType i stället.
+      if (!(allowedCaseTypes && allowedCaseTypes.length > 0) && initialContractCustomerId) {
+        setSelectedContractCustomer(initialContractCustomerId);
+        setSelectedSiteId(initialSiteId ?? null);
+      }
+      if (initialServiceId) setServiceId(initialServiceId);
+      if (initialTechnicianIds && initialTechnicianIds.length > 0) {
+        setSelectedTechnicianIds(initialTechnicianIds);
+      }
       if (initialImages && initialImages.length > 0) {
         setSelectedImages(initialImages.slice(0, 10).map(file => ({
           file,
@@ -437,12 +458,19 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
     const hasTechniciansInData = initialCaseData?.primary_assignee_id ||
                                   (initialCaseData as any)?.primary_technician_id;
 
+    // Förvalda tekniker från den som öppnade modalen (Boka in: dokumentets ansvariga)
+    const preferred = (initialTechnicianIds || []).filter(id => technicians.some(t => t.id === id));
+    if (!initialCaseData && preferred.length > 0) {
+      setSelectedTechnicianIds(preferred);
+      return;
+    }
+
     // Om inga tekniker är tilldelade, förvälja Skadedjurstekniker
     if (!hasTechniciansInData) {
       const defaultSelectedTechnicians = technicians.filter(tech => tech.role === 'Skadedjurstekniker');
       setSelectedTechnicianIds(defaultSelectedTechnicians.map(t => t.id));
     }
-  }, [isOpen, technicians, selectedTechnicianIds.length, initialCaseData]);
+  }, [isOpen, technicians, selectedTechnicianIds.length, initialCaseData, initialTechnicianIds]);
 
   // Hämta befintliga bilder från kund om vi öppnar ett befintligt ärende
   useEffect(() => {
@@ -1326,7 +1354,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         const regionCustomer = contractCustomers.find(c => c.id === regionCustomerId);
         const customerName = regionCustomer?.company_name || 'Okänd region';
 
-        const { error } = await supabase.from('cases').insert([{
+        const { data: createdRondering, error } = await supabase.from('cases').insert([{
           customer_id: regionCustomerId,
           site_id: regionCustomerId,
           title: caseNumber,
@@ -1344,8 +1372,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
           case_number: caseNumber,
           service_id: serviceId || null,
-        }]);
+        }]).select('id').single();
         if (error) throw error;
+        avtalslageCaseId = createdRondering?.id ?? null;
 
         toast.success(`Rondering inbokad för ${customerName}!`);
 
@@ -1355,7 +1384,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         const regionCustomer = contractCustomers.find(c => c.id === regionCustomerId);
         const customerName = regionCustomer?.company_name || 'Okänd region';
 
-        const { error } = await supabase.from('cases').insert([{
+        const { data: createdEgenkontroll, error } = await supabase.from('cases').insert([{
           customer_id: regionCustomerId,
           site_id: regionCustomerId,
           title: caseNumber,
@@ -1373,8 +1402,9 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
           contact_phone: formData.telefon_kontaktperson || customer?.contact_phone || null,
           case_number: caseNumber,
           service_id: serviceId || null,
-        }]);
+        }]).select('id').single();
         if (error) throw error;
+        avtalslageCaseId = createdEgenkontroll?.id ?? null;
 
         toast.success(`Egenkontroll inbokad för ${customerName}!`);
 
@@ -1525,7 +1555,8 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
         } catch (callbackError) {
           console.error('onCaseCreated misslyckades:', callbackError);
         }
-      } else if (onCaseCreated && avtalslage && avtalslageCaseId && !initialCaseData?.id) {
+      } else if (onCaseCreated && avtalslageCaseId && !initialCaseData?.id) {
+        // Stationskontroll, etablering, rondering och egenkontroll (cases-tabellen)
         try {
           await onCaseCreated(avtalslageCaseId, 'contract');
         } catch (callbackError) {
@@ -1696,6 +1727,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
 
   // Dynamisk titel för modalen
   const getModalTitle = () => {
+    if (titleOverride) return titleOverride;
     if (initialCaseData) return `Boka in: ${initialCaseData.title}`;
     if (step === 'selectType') return 'Välj ärendetyp';
     switch (caseType) {
@@ -1811,6 +1843,7 @@ export default function CreateCaseModal({ isOpen, onClose, onSuccess, technician
               {!initialCaseData && !initialCaseType && (
                 <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="flex items-center gap-2 text-slate-400 hover:text-white -ml-2"><Icon name="rapport.tillbaka" className="w-4 h-4" /> Byt kundtyp</Button>
               )}
+              {bookingNotice}
               {error && (<div className="bg-red-500/20 border border-red-500/40 p-3 rounded-xl flex items-center gap-3"><Icon name="rapport.avvikelse" className="w-4 h-4 text-red-400 flex-shrink-0" /><p className="text-sm text-red-400">{error}</p></div>)}
 
               {/* Engångsjobb hos en avtalskund: föreslå Extrabesök Avtalskund */}

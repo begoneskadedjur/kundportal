@@ -2,6 +2,7 @@
 // Dashboard-kort för notifikationer
 
 import React, { useState } from 'react';
+import { arDokumentPaminnelse, dokumentPaminnelseLank } from '../../shared/dokumentNotis';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../../hooks/useNotifications';
 import { Notification } from '../../types/communication';
@@ -52,6 +53,11 @@ export default function NotificationCenter({
       // Navigera till rätt sida baserat på användarens portal
       const pathname = window.location.pathname;
 
+      // Påminnelse om ett dokument: Dokumentsigneringen med dokumentet öppet
+      if (arDokumentPaminnelse(notification)) {
+        navigate(dokumentPaminnelseLank(notification.case_id, window.location.pathname));
+        return;
+      }
       // Webbförfrågan (Leads (Webb)): sidan med förfrågan öppen
       if (notification.case_type === 'web_inquiry') {
         const base = window.location.pathname.includes('/koordinator') ? '/koordinator' : window.location.pathname.includes('/saljare') ? '/saljare' : '/admin';

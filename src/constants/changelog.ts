@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.87.0',
+    date: '2026-10-23',
+    title: 'Ny Dokumentsignering för kontoret och Boka in',
+    items: [
+      { kind: 'nyhet', text: 'Dokumentsignering för koordinator och admin är omgjord. Kön visar Att boka in, Väntar på kontoret, Fastnat hos tekniker och Bokade, och varje dokument har en kontaktlogg med samtal, Oneflow-meddelanden, förlängningar och påminnelser. Koordinatorstatusen är borta. Påminn teknikern skickar en notis, och Skriv av tar bort en död affär med anledning.' },
+      { kind: 'nyhet', text: 'Boka in väljer rätt ärendetyp efter avtalet eller offertmallen, visar underlaget från signeringen och öppnar Nytt ärende med bara den ansvariga teknikern ibockad. Ursprungsärendet stängs och offertens rader flyttas till det nya ärendet. Avropsavtal kan bokas in som Inget ärende. Boka in finns också i schemats Att boka in.' },
+      { kind: 'nyhet', text: 'Lades kunden inte upp automatiskt vid signeringen visar Boka in vad som saknas. Koordinatorn kan fylla i det, provköra och köra signeringen igen.' },
+      { kind: 'nyhet', text: 'Tekniker med Ny arbetsvy får en egen Dokumentsignering ordnad efter vad de själva ska göra, med Nästa steg och Förläng och påminn.' },
+    ],
+  },
+  {
     version: '3.86.0',
     date: '2026-10-23',
     title: 'Etableringen visar avtalets stationer',

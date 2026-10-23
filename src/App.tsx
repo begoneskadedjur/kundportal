@@ -87,6 +87,7 @@ import CaseSearch from './pages/coordinator/CaseSearch';
 import CasesPage from './pages/coordinator/CasesPage';
 import CasePipeline from './pages/coordinator/CasePipeline';
 import OfferFollowUp from './pages/coordinator/OfferFollowUp';
+import KontorDokumentsignering from './pages/coordinator/KontorDokumentsignering';
 import CoordinatorAnalytics from './pages/coordinator/CoordinatorAnalytics';
 
 // TEKNIKER PAGES
@@ -109,6 +110,7 @@ import NySchema from './pages/technician/ny/NySchema';
 import NyProvision from './pages/technician/ny/NyProvision';
 import NyUtrustning from './pages/technician/ny/NyUtrustning';
 import NyKundStationer from './pages/technician/ny/NyKundStationer';
+import NyDokumentsignering from './pages/technician/ny/NyDokumentsignering';
 
 // Customer pages
 import CustomerPortal from './pages/customer/Portal';
@@ -370,7 +372,7 @@ function App() {
               <Route path="booking-assistant" element={<ProtectedRoute requiredRole="koordinator"><ScheduleOptimizer /></ProtectedRoute>} />
 
               {/* Ärenden (koordinator-specifik) */}
-              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="koordinator"><OfferFollowUp /></ProtectedRoute>} />
+              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="koordinator"><KontorDokumentsignering /></ProtectedRoute>} />
               <Route path="offerthantering" element={<Navigate to="/koordinator/dokumentsignering" replace />} />
               <Route path="sok-arenden" element={<ProtectedRoute requiredRole="koordinator"><CaseSearch /></ProtectedRoute>} />
               <Route path="arenden" element={<ProtectedRoute requiredRole="koordinator"><CasesPage /></ProtectedRoute>} />
@@ -455,7 +457,7 @@ function App() {
               <Route path="leads" element={<ProtectedRoute requiredRole="technician"><Leads /></ProtectedRoute>} />
               <Route path="oneflow" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />
               <Route path="oneflow-contract-creator" element={<ProtectedRoute requiredRole="technician"><OneflowContractCreator /></ProtectedRoute>} />
-              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="technician"><OfferFollowUp /></ProtectedRoute>} />
+              <Route path="dokumentsignering" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyDokumentsignering />} gammal={<OfferFollowUp />} /></ProtectedRoute>} />
               <Route path="offer-follow-up" element={<Navigate to="/technician/dokumentsignering" replace />} />
               <Route path="min-kundresa" element={<ProtectedRoute requiredRole="technician"><TechnicianCustomerJourney /></ProtectedRoute>} />
               <Route path="equipment" element={<ProtectedRoute requiredRole="technician"><VyVaxel ny={<NyUtrustning />} gammal={<TechnicianEquipment />} /></ProtectedRoute>} />

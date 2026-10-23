@@ -1,172 +1,210 @@
 // src/pages/shared/intranet/guider/guide-dokumentsignering.tsx
-// Guidemodul: Skicka en offert eller ett avtal för signering (koordinator och säljare, dator).
-// Efterbildning av OfferFollowUp (Dokumentsignering, Arbetskö/Statistik, Sök kund, ärendenr…,
-// Båda/Offerter/Avtal), DocumentQueueList (kategorin Utkast, ej skickade) och
-// DocumentDetailPanel: väntarraden "Utkast, inte skickat till kunden. Granska PDF:en och skicka.",
-// Visa PDF, Skicka för signering (offert: Skicka offerten), webbläsarens fråga
-// "Skicka avtalet till <e-post> från info@begone.se?" och toasten
-// "Avtalet är skickat för signering". Påhittad kund, ingenting skickas.
+// Guidemodul: Följ upp offerter och avtal i Dokumentsignering (admin och koordinator, dator).
+// Kontorets sida byggdes om 2026-10-23 (KontorDokumentsignering). Säljaren har kvar den
+// gamla sidan och sin egen guide (guide-dokumentsignering-saljare).
+// Efterbildning av KontorLista (Att boka in, Väntar på kontoret, Fastnat hos tekniker med
+// Påminn Erik, hopfällda Väntar på kunden och Klara), KontorDetalj (Nästa steg-rutan:
+// "Förföll för 2 dagar sedan", "påminn Erik att förlänga och ringa kunden, eller förläng
+// och ring själv.", Påminn Erik, Ring, Logga kontakt, Förläng frist, Svara kunden, Skriv av),
+// PaminnTekniker (Påminnelsen till Erik, Skicka påminnelsen, toasten "Erik har fått
+// påminnelsen") och LoggaSamtal (Logga kontakt med, Kanal, Hur gick det, Ring igen,
+// Spara samtalet, toasten "Samtalet är loggat, du ringer igen 2026-10-24").
+// Påhittad kund och kollegor, ingenting skickas.
 
 import { useState } from 'react'
-import { Dator, DatorSida, Knapprad, Markor, Notis, OvningRam, PKnapp, Status, type OvningSvar } from '../skarmkit'
-import { Icon } from '../../../../components/icons/Icon'
+import { Notis, OvningRam, PKnapp, type OvningSvar } from '../skarmkit'
 import type { GuideModul } from './registry'
 import { gorMk, type Mk, type Tryck } from './_arenden'
+import {
+  DetaljHuvud, Grupp, Hopfalld, KoRad, KontaktloggFlik, KontorSida, NastaRuta, UnderRubrik,
+  type KoRadData, type LoggPost,
+} from './_dokument'
 
-type Vy = 'ko' | 'vald' | 'pdf' | 'fraga' | 'klart'
-interface Lage { vy: Vy; sett: boolean }
+type Panel = null | 'paminn' | 'samtal'
+interface Lage {
+  vald: 'brf' | 'ab'
+  panel: Panel
+  paminnd: boolean
+  utfall: 'reached' | 'no_answer'
+  ring: boolean
+  loggat: boolean
+  notis: string | null
+}
 
-const MENY = ['Översikt', 'Skapa Avtal & Offerter', 'Ärenden', 'Försäljningspipeline', 'Leads (B2B)', 'Dokumentsignering']
-const EPOST = 'anna@exempel.se'
+const IDAG = '2026-10-23'
+const IMORGON = '2026-10-24'
 
-function KoRad({ id, kund, typ, vald, mk, tryck }: { id: string; kund: string; typ: string; vald?: boolean; mk: Mk; tryck: Tryck }) {
+const BRF: KoRadData = { id: 'rad-brf', namn: 'Brf Exempelgården', ton: 'gron', status: 'Signerad igår 14:05', detalj: 'Ingen kontakt sedan signeringen', belopp: '4 900 kr', typ: 'Offert, Erik' }
+const FAMILJ: KoRadData = { id: 'rad-familj', namn: 'Familjen Exempel', ton: 'bla', status: 'Skrev idag 09:12, inget svar än', detalj: 'Kunden i Oneflow: "Kan ni komma en fredag?"', belopp: '2 750 kr', typ: 'Offert, Sara' }
+
+function abRad(l: Lage): KoRadData {
+  const detalj = l.loggat ? `Ringd ${IDAG} av Sara, inget svar` : l.paminnd ? `Teknikern påmind ${IDAG}` : 'Ingen kontakt loggad'
+  return { id: 'rad-ab', namn: 'Exempel AB', ton: 'rod', status: 'Förföll för 2 dagar sedan', detalj, belopp: '12 500 kr', typ: 'Avtal, Erik' }
+}
+
+function Val({ id, text, vald, mk, tryck }: { id: string; text: string; vald: boolean; mk: Mk; tryck: Tryck }) {
+  const m = mk(id)
   return (
-    <Markor markor={mk(id)} block>
+    <span className={`relative ${m ? 'z-10 rounded-lg ring-[2.5px] ring-[#20c58f] ring-offset-2 ring-offset-slate-900 motion-safe:animate-pulse' : ''}`}>
       <button type="button" onClick={() => tryck(id)}
-        className={`grid w-full gap-0.5 border-l-2 px-2.5 py-1.5 text-left ${vald ? 'border-[#20c58f] bg-slate-800/70' : 'border-transparent hover:bg-slate-800/40'}`}>
-        <span className="truncate text-[12px] font-medium text-slate-200">{kund}</span>
-        <span className="text-[10.5px] text-slate-500">{typ}</span>
+        className={`w-full rounded-lg border px-2 py-1 text-left text-[11px] font-medium ${vald ? 'border-[#20c58f] bg-[#20c58f]/15 text-white' : 'border-slate-600 bg-slate-900 text-slate-300'}`}>
+        {text}
       </button>
-    </Markor>
+      {m && <span className="pointer-events-none absolute -right-2 -top-2 flex h-4 w-4 items-center justify-center rounded-full bg-[#20c58f] text-[10px] font-bold text-[#fff]" aria-hidden>{m.nr}</span>}
+    </span>
   )
 }
 
-function Panel({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
-  if (l.vy === 'ko') {
-    return (
-      <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
-        <p className="text-[12px] text-slate-500">Välj ett dokument i kön</p>
-        <p className="text-[10.5px] text-slate-600">Pil upp/ned bläddrar · Enter öppnar</p>
-      </div>
-    )
-  }
-  const klar = l.vy === 'klart'
+function PaminnPanel({ mk, tryck }: { mk: Mk; tryck: Tryck }) {
   return (
-    <div className="relative flex min-w-0 flex-1 flex-col">
-      <div className="border-b border-slate-800 px-3 py-2.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-white">Exempel AB {klar ? <Status text="Pågående" farg="bg-blue-400" /> : <Status text="Utkast" />}</p>
-            <p className="text-[10.5px] text-slate-500">Avtal · 12 500 kr · {klar ? 'Skickad' : 'Skapad'} 16 okt. 2026 av Anna Exempel</p>
-            <p className="text-[10.5px] text-slate-400">Anna Exempel · {EPOST}</p>
-          </div>
-          <button type="button" onClick={() => tryck('oneflow')} className="flex flex-none items-center gap-1 rounded-lg border border-slate-700 px-2 py-0.5 text-[10.5px] text-slate-400">
-            <Icon name="rapport.lank" size={16} className="h-3 w-3" />Oneflow
-          </button>
-        </div>
+    <div className="grid gap-1.5 rounded-lg border border-slate-700 bg-slate-900 p-2.5">
+      <p className="text-[12px] font-semibold text-white">Påminnelsen till Erik</p>
+      <p className="text-[10.5px] text-slate-300">Går som notis i portalen och öppnar dokumentet i Eriks Dokumentsignering.</p>
+      <div className="rounded-lg border border-slate-700 bg-slate-950/40 px-2 py-1.5">
+        <p className="text-[11px] font-semibold text-white">Påminnelse: följ upp avtal 1234567, Exempel AB</p>
+        <p className="text-[10.5px] text-slate-300">Sara Exempel vill att du följer upp avtal 1234567 till Exempel AB. Öppna dokumentet i Dokumentsignering.</p>
       </div>
-      {!klar && (
-        <div className="border-b border-slate-800 px-3 py-2">
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-2.5 py-1.5">
-            <span className="text-[11px] text-amber-300">Utkast, inte skickat till kunden. Granska PDF:en och skicka.</span>
-            <button type="button" onClick={() => tryck('visa-pdf')} className="flex-none rounded-md bg-[#20c58f] px-2 py-0.5 text-[11px] font-medium text-[#fff]">Visa PDF</button>
-          </div>
-        </div>
-      )}
-      <div className="flex gap-2 border-b border-slate-800 px-3 pt-1.5 text-[11px]">
-        {['Konversation', 'Aktivitet', 'Innehåll'].map((t, i) => (
-          <button key={t} type="button" onClick={() => tryck('flik')} className={`border-b-2 px-1.5 pb-1 ${i === 0 ? 'border-[#20c58f] text-white' : 'border-transparent text-slate-500'}`}>{t}</button>
-        ))}
+      <p className="text-[10px] text-slate-400">Påminnelsen blir en post i kontaktloggen.</p>
+      <div className="flex justify-end gap-1.5">
+        <PKnapp onClick={() => tryck('paminn-avbryt')}>Avbryt</PKnapp>
+        <PKnapp prim ikon="upphandling.notis" onClick={() => tryck('skicka-paminnelse')} markor={mk('skicka-paminnelse')}>Skicka påminnelsen</PKnapp>
       </div>
-      <p className="flex-1 px-3 py-5 text-center text-[11px] text-slate-500">Ingen konversation ännu</p>
-      <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-800 px-3 py-2">
-        {klar ? (
-          <>
-            <PKnapp onClick={() => tryck('ring')}>Ring upp</PKnapp>
-            <PKnapp onClick={() => tryck('logga')}>Logga samtal</PKnapp>
-            <PKnapp onClick={() => tryck('forlang')}>Förläng frist</PKnapp>
-          </>
-        ) : (
-          <>
-            <PKnapp prim ikon="rapport.skicka" onClick={() => tryck('skicka')} markor={mk('skicka')}>Skicka för signering</PKnapp>
-            <PKnapp onClick={() => tryck('visa-pdf')} markor={mk('visa-pdf')}>Visa PDF</PKnapp>
-          </>
-        )}
-      </div>
-
-      {l.vy === 'pdf' && (
-        <div className="absolute inset-0 z-20 flex flex-col bg-slate-900">
-          <div className="border-b border-slate-700 px-3 py-2">
-            <p className="text-[12.5px] font-bold text-white">Avtal, Exempel AB</p>
-            <p className="text-[10.5px] text-slate-400">Utkast i Oneflow · ID 1234567</p>
-          </div>
-          <div className="flex-1 overflow-hidden bg-slate-800/40 p-3">
-            <div className="mx-auto grid max-w-xs gap-1.5 rounded bg-white p-3 text-[10.5px] text-slate-700 shadow">
-              <p className="text-[12px] font-bold text-slate-900">Avtal om skadedjursbekämpning</p>
-              <p>Kund: Exempel AB, Exempelgatan 12, Solna</p>
-              <p>Kontaktperson: Anna Exempel</p>
-              <div className="flex justify-between border-t border-slate-200 pt-1"><span>Årspremie</span><span>12 500 kr</span></div>
-              <p className="text-slate-400">Signering: Exempel AB och BeGone</p>
-            </div>
-          </div>
-          <div className="flex justify-end gap-1.5 border-t border-slate-700 px-3 py-2">
-            <PKnapp onClick={() => tryck('stang-pdf')}>Stäng</PKnapp>
-            <PKnapp prim onClick={() => tryck('skicka-pdf')} markor={mk('skicka-pdf')}>Skicka för signering</PKnapp>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
-  const klar = l.vy === 'klart'
+function SamtalPanel({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
   return (
-    <Dator adress="koordinator › dokumentsignering">
-      <DatorSida meny={MENY} aktiv="Dokumentsignering" titel="Dokumentsignering">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <div className="flex rounded-lg bg-slate-800/50 p-0.5 text-[10.5px]">
-            <span className="rounded-md bg-[#20c58f] px-2 py-0.5 font-medium text-[#fff]">Arbetskö</span>
-            <button type="button" onClick={() => tryck('statistik')} className="px-2 py-0.5 text-slate-400">Statistik</button>
+    <div className="grid gap-1.5 rounded-lg border border-slate-700 bg-slate-900 p-2.5">
+      <p className="text-[12px] font-semibold text-white">Logga kontakt med Anna Exempel</p>
+      <p className="text-[10.5px] font-semibold text-slate-300">Kanal</p>
+      <div className="grid grid-cols-3 gap-1.5">
+        <Val id="kanal-telefon" text="Telefon" vald mk={mk} tryck={tryck} />
+        <Val id="kanal-mejl" text="Mejl" vald={false} mk={mk} tryck={tryck} />
+        <Val id="kanal-sms" text="Sms" vald={false} mk={mk} tryck={tryck} />
+      </div>
+      <p className="text-[10.5px] font-semibold text-slate-300">Hur gick det</p>
+      <div className="grid grid-cols-3 gap-1.5">
+        <Val id="utfall-nadde" text="Nådde kunden" vald={l.utfall === 'reached'} mk={mk} tryck={tryck} />
+        <Val id="utfall-rost" text="Röstbrevlåda" vald={false} mk={mk} tryck={tryck} />
+        <Val id="utfall-inget" text="Inget svar" vald={l.utfall === 'no_answer'} mk={mk} tryck={tryck} />
+      </div>
+      <p className="text-[10.5px] font-semibold text-slate-300">Ring igen</p>
+      <div className="flex flex-wrap gap-1.5">
+        <Val id="ring-ingen" text="Ingen" vald={!l.ring} mk={mk} tryck={tryck} />
+        <Val id="ring-imorgon" text="Imorgon" vald={l.ring} mk={mk} tryck={tryck} />
+        <Val id="ring-tre" text="Om 3 dagar" vald={false} mk={mk} tryck={tryck} />
+        <Val id="ring-mandag" text="Måndag" vald={false} mk={mk} tryck={tryck} />
+      </div>
+      <div className="flex justify-end gap-1.5">
+        <PKnapp onClick={() => tryck('samtal-avbryt')}>Avbryt</PKnapp>
+        <PKnapp prim ikon="allman.bock" onClick={() => tryck('spara-samtal')} markor={mk('spara-samtal')}>Spara samtalet</PKnapp>
+      </div>
+    </div>
+  )
+}
+
+function Detalj({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
+  if (l.vald === 'brf') {
+    const poster: LoggPost[] = [
+      { ikon: 'rapport.skicka', vem: 'Erik Exempel', etikett: 'skickade i Oneflow', nar: '2026-10-15 10:02' },
+      { ikon: 'falt.signera', vem: 'Oneflow', etikett: 'signeringshändelse', nar: '2026-10-22 14:05' },
+    ]
+    return (
+      <>
+        <DetaljHuvud namn="Brf Exempelgården" rad1="Offert, 4 900 kr, BE-0001200, säljare Erik Exempel" rad2="Skickad 2026-10-15 av Erik Exempel" kontakt="Karin Exempel" tryck={tryck} />
+        <NastaRuta ton="gron" status="Signerad igår 14:05" text="boka in och schemalägg. Ursprungsärendet stängs och offertens rader följer med till det nya ärendet.">
+          <div className="flex flex-wrap gap-1.5">
+            <PKnapp prim ikon="arendelista.boka" onClick={() => tryck('boka-in')}>Boka in</PKnapp>
+            <PKnapp ikon="kontakt.telefon" onClick={() => tryck('ring')}>Ring Karin Exempel</PKnapp>
+            <PKnapp ikon="allman.anteckning" onClick={() => tryck('logga-brf')}>Logga kontakt</PKnapp>
           </div>
-          <button type="button" onClick={() => tryck('sok')} className="flex w-40 items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/60 px-2 py-1 text-left text-[10.5px] text-slate-500">
-            <Icon name="allman.sok" size={16} className="h-3 w-3" />Sök kund, ärendenr…
-          </button>
-          <div className="flex rounded-lg bg-slate-800/50 p-0.5 text-[10.5px]">
-            {['Båda', 'Offerter', 'Avtal'].map((t, i) => (
-              <button key={t} type="button" onClick={() => tryck('typfilter')} className={`rounded-md px-2 py-0.5 ${i === 0 ? 'bg-[#20c58f] font-medium text-[#fff]' : 'text-slate-400'}`}>{t}</button>
-            ))}
-          </div>
+        </NastaRuta>
+        <KontaktloggFlik poster={poster} tryck={tryck} />
+      </>
+    )
+  }
+
+  const poster: LoggPost[] = [
+    { ikon: 'rapport.skicka', vem: 'Erik Exempel', etikett: 'skickade i Oneflow', nar: '2026-10-07 09:40' },
+    { ikon: 'allman.klocka', vem: 'Oneflow', etikett: 'signeringshändelse', nar: '2026-10-21 00:05' },
+  ]
+  if (l.paminnd) poster.push({ ikon: 'upphandling.notis', vem: 'Kontoret', etikett: 'påminnelse', nar: `${IDAG} 10:15`, text: 'Påminnelse till Erik Exempel skickad av Sara Exempel' })
+  if (l.loggat) poster.push({ ikon: 'kontakt.telefon', vem: 'Du', etikett: 'samtal', nar: `${IDAG} 10:20`, text: 'Inget svar.' })
+
+  return (
+    <>
+      <DetaljHuvud namn="Exempel AB" rad1="Avtal, 12 500 kr, säljare Erik Exempel" rad2="Skickad 2026-10-07 av Erik Exempel, fristen gick ut 2026-10-21" kontakt="Anna Exempel" tryck={tryck} />
+      <NastaRuta
+        ton="rod"
+        status={`Förföll för 2 dagar sedan${l.paminnd || l.loggat ? `, senaste kontakt ${IDAG}` : ''}`}
+        text="påminn Erik att förlänga och ringa kunden, eller förläng och ring själv."
+        fot="Samtal, förlängning och påminnelse hamnar i kontaktloggen. Skriv av är för döda affärer: du anger en anledning och dokumentet flyttas till Klara."
+      >
+        {l.panel !== 'paminn' && (
+          <div><PKnapp prim ikon="upphandling.notis" onClick={() => tryck('paminn')} markor={mk('paminn')}>Påminn Erik</PKnapp></div>
+        )}
+        {l.panel === 'paminn' && <PaminnPanel mk={mk} tryck={tryck} />}
+        {l.panel === 'samtal' && <SamtalPanel l={l} mk={mk} tryck={tryck} />}
+        <div className="flex flex-wrap gap-1.5">
+          <PKnapp ikon="kontakt.telefon" onClick={() => tryck('ring')}>Ring Anna Exempel</PKnapp>
+          <PKnapp ikon="allman.anteckning" onClick={() => tryck('logga')} markor={mk('logga')}>Logga kontakt</PKnapp>
+          <PKnapp ikon="upphandling.forlangning" onClick={() => tryck('forlang')}>Förläng frist</PKnapp>
+          <PKnapp ikon="dok.konversation" onClick={() => tryck('svara')}>Svara kunden</PKnapp>
+          <PKnapp ikon="allman.arkiv" onClick={() => tryck('skriv-av')}>Skriv av</PKnapp>
         </div>
-        <div className="relative flex min-h-[300px] overflow-hidden rounded-xl border border-slate-800 bg-slate-900/40">
-          <div className="w-[42%] flex-none border-r border-slate-800 py-1">
-            {!klar && (
-              <>
-                <p className="flex justify-between px-2.5 py-1 text-[10.5px] font-semibold text-slate-300">Utkast, ej skickade <span className="text-amber-400">1</span></p>
-                <KoRad id="rad-utkast" kund="Exempel AB" typ="Avtal · 12 500 kr" vald={l.vy !== 'ko'} mk={mk} tryck={tryck} />
-              </>
-            )}
-            <p className="mt-1 flex justify-between px-2.5 py-1 text-[10.5px] font-semibold text-slate-300">Bevakas <span className="text-slate-500">{klar ? 2 : 1}</span></p>
-            {klar && <KoRad id="rad-utkast" kund="Exempel AB" typ="Avtal · 12 500 kr" vald mk={mk} tryck={tryck} />}
-            <KoRad id="rad-bevakas" kund="Brf Exempelgården" typ="Offert · 4 900 kr" mk={mk} tryck={tryck} />
-          </div>
-          <Panel l={l} mk={mk} tryck={tryck} />
-          {l.vy === 'fraga' && (
-            <div className="absolute inset-0 z-30 flex items-start justify-center bg-black/50 p-4">
-              <div className="grid w-full max-w-xs gap-2 rounded-lg border border-slate-600 bg-slate-800 p-3 shadow-2xl">
-                <p className="text-[10.5px] text-slate-400">portal.begone.se</p>
-                <p className="text-[12px] text-white">Skicka avtalet till {EPOST} från info@begone.se?</p>
-                <Knapprad>
-                  <PKnapp onClick={() => tryck('fraga-avbryt')}>Avbryt</PKnapp>
-                  <PKnapp prim onClick={() => tryck('ok')} markor={mk('ok')}>OK</PKnapp>
-                </Knapprad>
-              </div>
-            </div>
-          )}
-        </div>
-      </DatorSida>
-      {klar && <Notis text="Avtalet är skickat för signering" />}
-    </Dator>
+      </NastaRuta>
+      <KontaktloggFlik poster={poster} tryck={tryck} />
+    </>
+  )
+}
+
+function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
+  const lista = (
+    <>
+      <Grupp ikon="arendelista.boka" farg="text-[#20c58f]" rubrik="Att boka in" antal={1} text="Signerade och inte inbokade, äldst först.">
+        <KoRad r={BRF} vald={l.vald === 'brf'} mk={mk} tryck={tryck} />
+      </Grupp>
+      <Grupp ikon="falt.attgora" farg="text-sky-400" rubrik="Väntar på kontoret" antal={1}>
+        <UnderRubrik>Kunden har skrivit <span className="font-mono font-medium text-slate-400">1</span></UnderRubrik>
+        <KoRad r={FAMILJ} mk={mk} tryck={tryck} />
+      </Grupp>
+      <Grupp ikon="allman.hand" farg="text-amber-500" rubrik="Fastnat hos tekniker" antal={1} text="Förfallna, nära fristen, aldrig öppnade, obesvarade och utkast. Per tekniker.">
+        <UnderRubrik>
+          <span className="text-white">Erik Exempel</span>
+          <span className="font-normal text-slate-400">1 dokument</span>
+          <button type="button" onClick={() => tryck('paminn-alla')} className="ml-auto rounded-md border border-slate-600 px-1.5 py-0.5 text-[10px] font-medium text-slate-200">Påminn Erik</button>
+        </UnderRubrik>
+        <KoRad r={abRad(l)} vald={l.vald === 'ab'} mk={mk} tryck={tryck} />
+      </Grupp>
+      <div className="grid gap-1.5">
+        <Hopfalld ikon="falt.vantar" rubrik="Väntar på kunden" antal={3} onClick={() => tryck('vantar')} />
+        <Hopfalld ikon="falt.klart" rubrik="Klara" antal={5} onClick={() => tryck('klara')} />
+      </div>
+    </>
+  )
+  return (
+    <KontorSida
+      raknare="1 att boka in, 1 väntar på kontoret, 1 fastnat hos tekniker, 0 bokade"
+      lista={lista}
+      detalj={<Detalj l={l} mk={mk} tryck={tryck} />}
+      notis={l.notis ? <Notis text={l.notis} /> : undefined}
+    />
   )
 }
 
 // ─── Visning ───
 
+const BAS: Lage = { vald: 'brf', panel: null, paminnd: false, utfall: 'reached', ring: false, loggat: false, notis: null }
+
 const VISNING: { lage: Lage; markera: string }[] = [
-  { lage: { vy: 'ko', sett: false }, markera: 'rad-utkast' },
-  { lage: { vy: 'vald', sett: false }, markera: 'visa-pdf' },
-  { lage: { vy: 'pdf', sett: true }, markera: 'skicka-pdf' },
-  { lage: { vy: 'fraga', sett: true }, markera: 'ok' },
+  { lage: BAS, markera: 'rad-ab' },
+  { lage: { ...BAS, vald: 'ab' }, markera: 'paminn' },
+  { lage: { ...BAS, vald: 'ab', panel: 'paminn' }, markera: 'skicka-paminnelse' },
+  { lage: { ...BAS, vald: 'ab', paminnd: true, notis: 'Erik har fått påminnelsen' }, markera: 'logga' },
+  { lage: { ...BAS, vald: 'ab', paminnd: true, panel: 'samtal' }, markera: 'utfall-inget' },
+  { lage: { ...BAS, vald: 'ab', paminnd: true, panel: 'samtal', utfall: 'no_answer' }, markera: 'ring-imorgon' },
+  { lage: { ...BAS, vald: 'ab', paminnd: true, panel: 'samtal', utfall: 'no_answer', ring: true }, markera: 'spara-samtal' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
@@ -176,66 +214,88 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 
 // ─── Övning ───
 
-const START: Lage = { vy: 'ko', sett: false }
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Avtalet till Exempel AB ligger som utkast överst i kön. Öppna det.' }
+const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Avtalet till Exempel AB har förfallit och ligger hos Erik under Fastnat hos tekniker. Öppna det.' }
 
 const TIPS: Record<string, string> = {
-  'rad-bevakas': 'Brf Exempelgården är redan skickad och bevakas. Utkastet ligger överst.',
+  'rad-brf': 'Brf Exempelgården är signerad och ska bokas in. Det är en annan uppgift. Exempel AB ligger under Fastnat hos tekniker.',
+  'rad-familj': 'Familjen Exempel har skrivit i Oneflow och väntar på svar från kontoret. Ditt uppdrag gäller Exempel AB.',
+  'boka-in': 'Boka in är för signerade dokument. Exempel AB har inte signerat. Öppna Exempel AB under Fastnat hos tekniker.',
+  'paminn-alla': 'Påminn Erik på teknikerns rad skickar en påminnelse för vart och ett av Eriks dokument efter en fråga. Använd knappen i Nästa steg-rutan, där ser du notisen först.',
   oneflow: 'Du behöver inte öppna Oneflow. Allt görs härifrån.',
-  statistik: 'Statistiken visar siffror. Utkastet skickar du från arbetskön.',
-  sok: 'Sökfältet behövs inte, utkastet syns redan överst i kön.',
-  typfilter: 'Filtret visar bara offerter eller avtal. Utkastet syns redan.',
-  flik: 'Flikarna visar konversation, aktivitet och innehåll. Granska i stället PDF:en.',
+  vantar: 'Väntar på kunden är dokument inom fristen. Exempel AB har förfallit och ligger under Fastnat hos tekniker.',
+  klara: 'Klara är avböjda, avskrivna och bokade sedan länge. Exempel AB är inte klar.',
+  forlang: 'Förläng frist går, men uppdraget är att låta Erik göra det. Påminn honom först.',
+  svara: 'Svara kunden skriver i Oneflow. Uppdraget är att påminna Erik och logga ditt samtal.',
+  'skriv-av': 'Skriv av är för döda affärer. Avtalet går fortfarande att rädda.',
+  ring: 'Telefonen ringer på riktigt i portalen. Här har du redan ringt: logga samtalet med Logga kontakt.',
+  innehall: 'Innehåll visar dokumentets rader. Du följer upp, du granskar inte.',
 }
 
 function Ovning() {
-  const [l, setL] = useState<Lage>(START)
+  const [l, setL] = useState<Lage>(BAS)
   const [svar, setSvar] = useState<OvningSvar>(BORJA)
   const [fel, setFel] = useState(0)
+  const [klar, setKlar] = useState(false)
 
   const miss = (text: string) => { setFel(f => f + 1); setSvar({ typ: 'fel', titel: 'Inte där', text }) }
   const tips = (titel: string, text: string) => setSvar({ typ: 'tips', titel, text })
 
   const tryck = (id: string) => {
-    if (l.vy === 'klart') return
-    if (l.vy === 'fraga') {
-      if (id === 'ok') {
-        setL({ ...l, vy: 'klart' })
+    if (klar) return
+    if (l.panel === 'samtal') {
+      if (id === 'utfall-inget') { setL({ ...l, utfall: 'no_answer' }); tips('Inget svar', 'Välj när du ska ringa igen under Ring igen.'); return }
+      if (id === 'utfall-nadde' || id === 'utfall-rost') { miss('Anna svarade inte. Välj Inget svar.'); return }
+      if (id === 'ring-imorgon') { setL({ ...l, ring: true }); tips('Imorgon är vald', 'Tryck Spara samtalet.'); return }
+      if (id.startsWith('ring-')) { miss('Uppdraget säger imorgon. Välj Imorgon.'); return }
+      if (id.startsWith('kanal-')) { if (id !== 'kanal-telefon') miss('Du ringde. Kanalen ska vara Telefon.'); return }
+      if (id === 'samtal-avbryt') { setL({ ...l, panel: null }); miss('Avbryt sparar ingenting. Tryck Logga kontakt igen.'); return }
+      if (id === 'spara-samtal') {
+        if (l.utfall !== 'no_answer') { miss('Välj Inget svar under Hur gick det först.'); return }
+        if (!l.ring) { miss('Välj Imorgon under Ring igen, så kommer dokumentet tillbaka till dig.'); return }
+        setL({ ...l, panel: null, loggat: true, notis: `Samtalet är loggat, du ringer igen ${IMORGON}` })
+        setKlar(true)
         setSvar({
           typ: 'ok',
           titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-          text: `Avtalet är skickat från info@begone.se till ${EPOST}. Det har lämnat Utkast, ej skickade och bevakas nu i kön tills kunden signerar.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
+          text: `Erik har fått en notis och samtalet står i kontaktloggen. I morgon ligger Exempel AB under Ring idag i Väntar på kontoret.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
         })
-      } else if (id === 'fraga-avbryt') { setL({ ...l, vy: l.sett ? 'pdf' : 'vald' }); miss('Avbryt skickar ingenting. Stämmer e-postadressen trycker du OK.') }
-      else miss('Svara på frågan: tryck OK för att skicka.')
+        return
+      }
+      miss('Fyll i rutan Logga kontakt: Inget svar, Imorgon och Spara samtalet.')
       return
     }
-    if (l.vy === 'pdf') {
-      if (id === 'skicka-pdf') { setL({ ...l, vy: 'fraga' }); tips('En fråga visas', 'Kontrollera e-postadressen och tryck OK.') }
-      else if (id === 'stang-pdf') { setL({ ...l, vy: 'vald' }); tips('PDF:en är stängd', 'Du har sett den. Tryck Skicka för signering.') }
-      else miss('Läs PDF:en och tryck Skicka för signering längst ner.')
+    if (l.panel === 'paminn') {
+      if (id === 'skicka-paminnelse') {
+        setL({ ...l, panel: null, paminnd: true, notis: 'Erik har fått påminnelsen' })
+        tips('Erik är påmind', 'Du ringde också Anna Exempel utan att få svar. Logga samtalet med Logga kontakt.')
+        return
+      }
+      if (id === 'paminn-avbryt') { setL({ ...l, panel: null }); miss('Avbryt skickar ingenting. Tryck Påminn Erik igen.'); return }
+      miss('Läs notisen och tryck Skicka påminnelsen.')
       return
     }
-    if (id === 'rad-utkast') {
-      if (l.vy === 'ko') { setL({ ...l, vy: 'vald' }); tips('Utkastet är öppet', 'Granska PDF:en innan du skickar.') }
+    if (id === 'rad-ab') {
+      if (l.vald !== 'ab') { setL({ ...l, vald: 'ab' }); tips('Exempel AB är öppet', 'Läs Nästa steg och påminn Erik.') }
       return
     }
-    if (id === 'visa-pdf') {
-      if (l.vy === 'ko') { miss('Öppna utkastet i kön först.'); return }
-      setL({ ...l, vy: 'pdf', sett: true }); tips('Så ser kunden avtalet', 'Stämmer kund, kontaktperson och premie? Tryck Skicka för signering.')
+    if (id === 'paminn') {
+      if (l.vald !== 'ab') { miss('Öppna Exempel AB först.'); return }
+      if (l.paminnd) { miss('Erik är redan påmind. Logga ditt samtal med Logga kontakt.'); return }
+      setL({ ...l, panel: 'paminn', notis: null }); tips('Påminnelsen visas', 'Så här ser Eriks notis ut. Tryck Skicka påminnelsen.')
       return
     }
-    if (id === 'skicka') {
-      if (!l.sett) { miss('Granska PDF:en först. Tryck Visa PDF, så ser du exakt vad kunden får.'); return }
-      setL({ ...l, vy: 'fraga' }); tips('En fråga visas', 'Kontrollera e-postadressen och tryck OK.')
+    if (id === 'logga') {
+      if (!l.paminnd) { miss('Påminn Erik först, som Nästa steg säger.'); return }
+      setL({ ...l, panel: 'samtal', notis: null }); tips('Logga kontakt', 'Anna svarade inte. Välj Inget svar.')
       return
     }
-    miss(TIPS[id] ?? 'Öppna utkastet, granska PDF:en och skicka.')
+    if (id === 'logga-brf') { miss(TIPS['rad-brf']); return }
+    miss(TIPS[id] ?? 'Öppna Exempel AB, påminn Erik och logga samtalet.')
   }
 
-  const framsteg = l.vy === 'ko' ? 0 : l.vy === 'klart' ? 4 : l.vy === 'fraga' ? 3 : l.sett ? 2 : 1
+  const framsteg = klar ? 7 : l.panel === 'samtal' ? (l.ring ? 6 : l.utfall === 'no_answer' ? 5 : 4) : l.paminnd ? 3 : l.panel === 'paminn' ? 2 : l.vald === 'ab' ? 1 : 0
   return (
-    <OvningRam bred framsteg={framsteg} totalt={4} svar={svar} onBorjaOm={() => { setL(START); setSvar(BORJA); setFel(0) }}>
+    <OvningRam bred framsteg={framsteg} totalt={7} svar={svar} onBorjaOm={() => { setL(BAS); setSvar(BORJA); setFel(0); setKlar(false) }}>
       <Skarm l={l} mk={() => undefined} tryck={tryck} />
     </OvningRam>
   )

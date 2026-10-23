@@ -67,7 +67,8 @@ export const HANDBOK_SEKTIONER: HandbokSektion[] = [
     ikon: 'dok.offert',
     slugs: [
       'guide-dokumentsignering-tekniker', 'guide-leads-tekniker',
-      'guide-leads-saljare', 'guide-dokumentsignering', 'guide-leads-kontor',
+      'guide-dokumentsignering-saljare', 'guide-leads-saljare',
+      'guide-dokumentsignering', 'guide-boka-in', 'guide-leads-kontor',
     ],
   },
 ]

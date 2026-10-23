@@ -2,6 +2,7 @@
 // Header-klocka med dropdown för snabb access till notifikationer
 
 import React, { useState, useRef, useEffect } from 'react';
+import { arDokumentPaminnelse, dokumentPaminnelseLank } from '../../shared/dokumentNotis';
 import { useNotifications } from '../../hooks/useNotifications';
 import { Notification } from '../../types/communication';
 import NotificationItem from './NotificationItem';
@@ -72,6 +73,11 @@ export default function NotificationBell({
       // Navigera till Tickets-sidan med ärendet öppet
       const pathname = window.location.pathname;
 
+      // Påminnelse om ett dokument: Dokumentsigneringen med dokumentet öppet
+      if (arDokumentPaminnelse(notification)) {
+        window.location.href = dokumentPaminnelseLank(notification.case_id, window.location.pathname);
+        return;
+      }
       // Webbförfrågan (Leads (Webb)): sidan med förfrågan öppen
       if (notification.case_type === 'web_inquiry') {
         const base = window.location.pathname.includes('/koordinator') ? '/koordinator' : window.location.pathname.includes('/saljare') ? '/saljare' : '/admin';

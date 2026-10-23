@@ -68,6 +68,7 @@ import {
   type ContractServiceItem,
 } from '../../src/shared/contractInvoiceRows'
 import { deriveDeliveryFromContract, type DerivedDelivery } from '../../src/shared/invoiceDelivery'
+import { tolkaIdNummer } from '../../src/shared/webLeadUppgifter'
 
 export interface SigningOptions {
   /** Inga skrivningar: rapporten beskriver vad som skulle göras */
@@ -1091,4 +1092,136 @@ async function notifyInvoiceApprovers(ctx: Ctx, contract: Row, customerId: strin
     // Aldrig kritiskt: signeringen får inte fallera på en notis
     console.error('⚠️ Kunde inte notifiera faktureringsansvariga:', err instanceof Error ? err.message : err)
   }
+}
+
+// === Diagnos före omkörning ===========================================================
+//
+// Vad som hindrar (eller påverkar) att kunden läggs upp när signeringen körs om.
+// Läser bara databasen. Varje post säger vilket fält det gäller, vad som står
+// nu och var det rättas. Används av api/oneflow/reprocess-signed.ts och visas
+// för koordinatorn i Boka in (src/components/coordinator/bokaIn/KorOmSignering.tsx).
+
+export type SigningDiagnosisLevel = 'hinder' | 'varning' | 'info'
+
+export interface SigningDiagnosisItem {
+  /** Kolumnen på contracts som posten gäller, null när det inte är ett fält */
+  field: 'company_name' | 'contact_email' | 'organization_number' | 'contact_person' | 'contact_phone' | 'contact_address' | null
+  label: string
+  current: string | null
+  level: SigningDiagnosisLevel
+  problem: string
+  /** 'portal' = kan fyllas i på avtalsraden före omkörningen, 'oneflow' = bara i dokumentet, 'ingen' = inget att rätta */
+  fixIn: 'portal' | 'oneflow' | 'ingen'
+}
+
+export interface SigningDiagnosis {
+  contractId: string
+  /** Kunden kan läggas upp eller kopplas när signeringen körs om */
+  canCreateCustomer: boolean
+  customerId: string | null
+  items: SigningDiagnosisItem[]
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export async function diagnoseSignedContract(db: Db, contractId: string): Promise<SigningDiagnosis> {
+  const { data } = await db
+    .from('contracts')
+    .select('id, type, status, customer_id, company_name, contact_email, organization_number, contact_person, contact_phone, contact_address, sent_organization_number, oneflow_contract_id')
+    .eq('id', contractId)
+    .maybeSingle()
+  const items: SigningDiagnosisItem[] = []
+  if (!data) {
+    items.push({ field: null, label: 'Avtalet', current: null, level: 'hinder', problem: 'Avtalet finns inte i databasen.', fixIn: 'ingen' })
+    return { contractId, canCreateCustomer: false, customerId: null, items }
+  }
+  const c = data as Row
+  if (c.type !== 'contract' || !isSignedContractStatus(str(c.status))) {
+    items.push({
+      field: null,
+      label: 'Avtalet',
+      current: `${str(c.type)}, ${str(c.status)}`,
+      level: 'hinder',
+      problem: 'Bara signerade avtal kan köras om. Offerter blir aldrig kund i signeringen.',
+      fixIn: 'ingen',
+    })
+    return { contractId, canCreateCustomer: false, customerId: str(c.customer_id), items }
+  }
+  if (str(c.customer_id)) {
+    items.push({ field: null, label: 'Kund', current: str(c.customer_id), level: 'info', problem: 'Avtalet är redan kopplat till en kund.', fixIn: 'ingen' })
+    return { contractId, canCreateCustomer: true, customerId: str(c.customer_id), items }
+  }
+
+  const companyName = str(c.company_name)
+  const email = str(c.contact_email)
+  if (!companyName) {
+    items.push({ field: 'company_name', label: 'Kundnamn', current: null, level: 'hinder', problem: 'Kundnamnet saknas. Utan namn läggs ingen kund upp.', fixIn: 'portal' })
+  }
+  if (!email) {
+    items.push({ field: 'contact_email', label: 'Kontaktens e-post', current: null, level: 'hinder', problem: 'Kontaktens e-post saknas. Utan e-post läggs ingen kund upp.', fixIn: 'portal' })
+  } else if (!EMAIL_RE.test(email)) {
+    items.push({ field: 'contact_email', label: 'Kontaktens e-post', current: email, level: 'hinder', problem: 'E-postadressen ser inte giltig ut.', fixIn: 'portal' })
+  }
+
+  const orgnr = str(c.organization_number)
+  const identity = compareIdentityNumbers(str(c.sent_organization_number), orgnr)
+  if (!orgnr) {
+    items.push({ field: 'organization_number', label: 'Org/personnummer', current: null, level: 'varning', problem: 'Numret saknas. Kunden läggs upp utan nummer och kan inte matchas mot en befintlig kund på nummer.', fixIn: 'portal' })
+  } else {
+    const t = tolkaIdNummer(orgnr)
+    if (!t.tolkat || !t.kontrollsiffraOk) {
+      items.push({
+        field: 'organization_number',
+        label: 'Org/personnummer',
+        current: orgnr,
+        level: 'varning',
+        problem: identity.status === 'changed_invalid'
+          ? `${identity.message ?? 'Numret är ogiltigt.'}`
+          : 'Numret klarar inte kontrollsiffran. Rätta det innan kunden läggs upp.',
+        fixIn: 'portal',
+      })
+    }
+    const variants = identityNumberVariants(orgnr)
+    if (variants.length > 0) {
+      const { data: same } = await db
+        .from('customers')
+        .select('id, company_name, site_type')
+        .in('organization_number', variants)
+        .order('created_at', { ascending: true })
+        .limit(10)
+      const rows = (same ?? []) as Row[]
+      const preferred = rows.find((r) => r.site_type === 'huvudkontor') ?? rows[0]
+      if (preferred) {
+        items.push({
+          field: 'organization_number',
+          label: 'Befintlig kund',
+          current: str(preferred.company_name),
+          level: 'info',
+          problem: `Numret finns redan i kundregistret. Avtalet kopplas till ${str(preferred.company_name) ?? 'den kunden'} i stället för att en ny kund skapas.`,
+          fixIn: 'ingen',
+        })
+      }
+    }
+  }
+  if (email && EMAIL_RE.test(email) && !items.some((i) => i.label === 'Befintlig kund')) {
+    const { data: byMail } = await db.from('customers').select('id, company_name').eq('contact_email', email).limit(1).maybeSingle()
+    if (byMail) {
+      items.push({
+        field: 'contact_email',
+        label: 'Befintlig kund',
+        current: str((byMail as Row).company_name),
+        level: 'info',
+        problem: `E-postadressen finns redan i kundregistret. Avtalet kopplas till ${str((byMail as Row).company_name) ?? 'den kunden'}.`,
+        fixIn: 'ingen',
+      })
+    }
+  }
+  if (!str(c.contact_person)) {
+    items.push({ field: 'contact_person', label: 'Kontaktperson', current: null, level: 'varning', problem: 'Kontaktperson saknas på kunden som skapas.', fixIn: 'portal' })
+  }
+  if (!str(c.contact_address)) {
+    items.push({ field: 'contact_address', label: 'Adress', current: null, level: 'varning', problem: 'Adress saknas. Etableringen och fakturan behöver en adress.', fixIn: 'portal' })
+  }
+  const canCreateCustomer = !items.some((i) => i.level === 'hinder')
+  return { contractId, canCreateCustomer, customerId: null, items }
 }
