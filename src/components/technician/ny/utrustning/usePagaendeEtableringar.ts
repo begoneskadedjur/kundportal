@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../../../lib/supabase'
 import { AddonStationBillingService } from '../../../../services/addonStationBillingService'
-import { svenskDag } from '../../../../services/teknikerDagService'
+import { svenskDag, formateraAdress } from '../../../../services/teknikerDagService'
 
 export interface PagaendeEtableringRad {
   caseId: string
@@ -48,7 +48,7 @@ export function usePagaendeEtableringar(technicianId: string) {
       const idag = svenskDag()
       type Rad = {
         id: string; customer_id: string | null; created_at: string; scheduled_start: string | null
-        work_started_at: string | null; address: string | null
+        work_started_at: string | null; address: unknown
         customer: { company_name: string | null; contact_address: string | null } | { company_name: string | null; contact_address: string | null }[] | null
       }
       const startade = ((data ?? []) as unknown as Rad[]).filter(r =>
@@ -70,7 +70,8 @@ export function usePagaendeEtableringar(technicianId: string) {
           caseId: r.id,
           customerId: r.customer_id,
           kund: kund?.company_name || 'Kund',
-          adress: r.address || kund?.contact_address || null,
+          // cases.address är jsonb ({ formatted_address }), aldrig rendera det rått
+          adress: formateraAdress(r.address) || formateraAdress(kund?.contact_address) || null,
           bokad: r.scheduled_start,
           placerade,
         }

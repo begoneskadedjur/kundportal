@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.84.1',
+    date: '2026-10-23',
+    title: 'Utrustning i nya arbetsvyn öppnas igen',
+    items: [
+      { kind: 'buggfix', text: 'Utrustning i nya arbetsvyn blev helt vit när en pågående etablering hade adressen sparad i ärendet. Nu visas adressen som text och sidan öppnas.' },
+    ],
+  },
+  {
     version: '3.84.0',
     date: '2026-10-23',
     title: 'Mina ärenden, Utrustning och Provision i nya arbetsvyn',
