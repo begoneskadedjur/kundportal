@@ -87,6 +87,7 @@ import CommissionSection from '../../shared/CommissionSection'
 import type { CaseBillingSummary } from '../../../types/caseBilling'
 import { VisitService, type Visit, type VisitCaseType } from '../../../services/visitService'
 import { ProvisionService } from '../../../services/provisionService'
+import { useProvisionsgrans, underProvisionsgrans } from '../../technician/ny/steg/provisionsgrans'
 import type { TechnicianShare } from '../../../types/provision'
 
 // Nya arbetsvyn (bara tekniker med profiles.ny_arbetsvy i teknikervyn): stegflödet.
@@ -338,6 +339,8 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
     if (!currentCase) return;
     const backupKey = `time_backup_${currentCase.id}`;
     const backup = localStorage.getItem(backupKey);
+    // Ingen kopia kvar (tiden har sparats): frågan om återställning gäller inte längre
+    if (!backup) setPendingRestore(null);
     if (backup) {
       try {
         const data: BackupData = JSON.parse(backup);
@@ -356,7 +359,7 @@ const useTimeBackupSystem = (currentCase: TechnicianCase | null) => {
         localStorage.removeItem(backupKey);
       }
     }
-  }, [currentCase?.id]);
+  }, [currentCase?.id, currentCase?.time_spent_minutes, currentCase?.work_started_at]);
 
   useEffect(() => {
     if (!currentCase?.work_started_at) return;
@@ -1604,6 +1607,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const [hinderSteg, setHinderSteg] = useState<StegId[]>([])
   const [visaVerktyg, setVisaVerktyg] = useState(false)
   const [stegUpptaget, setStegUpptaget] = useState(false)
+  const provisionsgrans = useProvisionsgrans(nyArbetsvy)
   const innehallRef = useRef<HTMLDivElement>(null)
   const stegLista = useStegForArende('privat')
 
@@ -1914,6 +1918,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const provisionText = (() => {
     if (!commissionEligible) return 'Ärendet är inte markerat som provisionsgrundande, ingen provision registreras.'
     if (commissionShares.length === 0) return 'Provision är vald men ingen tekniker har en andel. Fördela den under Pris och fakturering, annars registreras ingen provision.'
+    const underGrans = underProvisionsgrans(billingSummary?.subtotal || Number(formData.case_price) || 0, provisionsgrans)
+    if (underGrans) return underGrans
     if (commissionPostsLocked) return 'Provisionen är redan på väg till utbetalning och ändras inte.'
     return `Provisionen registreras på ${commissionShares.map(s => `${s.technician_name} ${s.share_percentage} %`).join(', ')}.`
   })()

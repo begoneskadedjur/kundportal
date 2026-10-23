@@ -76,6 +76,7 @@ import { selectInvoiceableCaseRows, sumInvoiceableRows } from '../../shared/case
 // Allt nedan används bara när useNyArbetsvy().aktiv är true.
 import { lazy, Suspense, type ReactNode } from 'react'
 import { useNyArbetsvy } from '../../hooks/useNyArbetsvy'
+import { useProvisionsgrans, underProvisionsgrans } from '../technician/ny/steg/provisionsgrans'
 import { StegRad, StegKnappar } from '../technician/ny/steg/StegFlode'
 import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../technician/ny/steg/ArendeVerktygArk'
 import { KlartSteg } from '../technician/ny/steg/KlartSteg'
@@ -1617,6 +1618,7 @@ export default function EditContractCaseModal({
   // något annat sätt.
   // ═══════════════════════════════════════════════════════════════════════════
   const { aktiv: nyArbetsvy } = useNyArbetsvy()
+  const provisionsgrans = useProvisionsgrans(nyArbetsvy)
   // 'steg' = stegflödet, 'flikar' = den vanliga flikvyn (Alla uppgifter)
   const [visning, setVisning] = useState<'steg' | 'flikar'>('steg')
   const stegLage = nyArbetsvy && visning === 'steg'
@@ -1692,11 +1694,30 @@ export default function EditContractCaseModal({
   // efter att statusen har slagit igenom i formuläret.
   const [stangBegard, setStangBegard] = useState(false)
   const stangSvarRef = useRef<((ok: boolean) => void) | null>(null)
+  // Arbetstiden startar av sig själv vid Framme. Går klockan när ärendet
+  // stängs räknas tiden in i samma sparning och klockan stoppas, annars får
+  // besöket 0 minuter och klockan fortsätter på ett avslutat ärende.
   const stangHelaArendet = () => new Promise<boolean>(resolve => {
     stangSvarRef.current = resolve
-    setFormData(prev => ({ ...prev, status: 'Avslutat' }))
+    const klockanGar = isTimerRunning
+    setFormData(prev => {
+      const tid = klockanGar && prev.work_started_at
+        ? { time_spent_minutes: prev.time_spent_minutes + Math.max(0, Math.floor((Date.now() - new Date(prev.work_started_at).getTime()) / 60000)), work_started_at: null }
+        : {}
+      return { ...prev, ...tid, status: 'Avslutat' }
+    })
+    if (klockanGar) {
+      setIsTimerRunning(false)
+      setSessionMinutes(0)
+    }
     setStangBegard(true)
   })
+
+  // Bara besöket: klockan stoppas och tiden sparas innan återbesöksdialogen öppnas
+  const oppnaAterbesokSteg = async () => {
+    if (isTimerRunning) await handleStopTimer()
+    setShowRevisitModal(true)
+  }
   useEffect(() => {
     if (!stangBegard || formData.status !== 'Avslutat') return
     setStangBegard(false)
@@ -2048,6 +2069,8 @@ export default function EditContractCaseModal({
     if (!commissionEligible) return 'Ärendet är inte markerat som provisionsgrundande, ingen provision registreras.'
     if (existingCommissionPosts > 0) return 'Provisionen är redan registrerad och ändras inte.'
     if (commissionShares.length === 0) return `Provision är vald men ingen tekniker har en andel. Fördela den under ${avtalsbesok ? 'Utöver avtalet' : 'Pris och fakturering'}, annars registreras ingen provision.`
+    const underGrans = underProvisionsgrans(billingSummary?.subtotal || Number(formData.price) || 0, provisionsgrans)
+    if (underGrans) return underGrans
     return `Provisionen registreras på ${commissionShares.map(s => `${s.technician_name} ${s.share_percentage} %`).join(', ')}.`
   })()
 
@@ -3456,7 +3479,7 @@ export default function EditContractCaseModal({
                   onGaTillSteg={gaTillHinder}
                   gaTillText={h => (h.id === 'sluttid-fore-start' ? 'Ändra tiden i Alla uppgifter' : undefined)}
                   onStangHelaArendet={stangHelaArendet}
-                  onBaraBesoket={() => setShowRevisitModal(true)}
+                  onBaraBesoket={() => { void oppnaAterbesokSteg() }}
                   onSparaUtanAttStanga={sparaUtanAttStanga}
                   harOsparat={() => harOsparat() || hasPendingImageChanges}
                   status={localCaseData?.status || formData.status}

@@ -2443,7 +2443,7 @@ export default function StationInspectionPanel({
                   {/* Lista under kartan */}
                   <div className="space-y-2 mt-4">
                     <p className="text-sm text-slate-400 px-1">{outdoorStations.length} utomhusstationer</p>
-                    {outdoorStations.map(station => renderStationRow(station, outdoorNumberMap[station.id] || '?'))}
+                    {[...outdoorStations].sort((a, b) => (outdoorNumberMap[a.id] ?? 0) - (outdoorNumberMap[b.id] ?? 0)).map(station => renderStationRow(station, outdoorNumberMap[station.id] || '?'))}
                   </div>
                 </>
               )}
@@ -2605,7 +2605,7 @@ export default function StationInspectionPanel({
                   <p className="text-sm text-slate-500">
                     {filteredIndoorStations.length} stationer på denna planritning
                   </p>
-                  {filteredIndoorStations.map(station => renderStationRow(station, indoorNumberMap[station.id] || '?'))}
+                  {[...filteredIndoorStations].sort((a, b) => (indoorNumberMap[a.id] ?? 0) - (indoorNumberMap[b.id] ?? 0)).map(station => renderStationRow(station, indoorNumberMap[station.id] || '?'))}
                 </div>
               )}
             </motion.div>

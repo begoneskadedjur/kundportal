@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.89.3',
+    date: '2026-10-24',
+    title: 'Rättningar i nya arbetsvyn efter testkörningen',
+    items: [
+      { kind: 'buggfix', text: 'Avtalsärenden i nya arbetsvyn: arbetstiden räknas in och klockan stoppas när ärendet stängs eller när du väljer Bara besöket.' },
+      { kind: 'buggfix', text: 'Steget Klart säger nu att ingen provision registreras när underlaget är under provisionsgränsen, i stället för att lova provision.' },
+      { kind: 'buggfix', text: 'Stationslistan i kontrollen visas i nummerordning, station 1 först.' },
+      { kind: 'buggfix', text: 'Frågan om att återställa förlorad arbetstid försvinner när tiden redan har sparats.' },
+    ],
+  },
+  {
     version: '3.89.2',
     date: '2026-10-24',
     title: 'Arbetstiden följer med när ärendet stängs i nya arbetsvyn',

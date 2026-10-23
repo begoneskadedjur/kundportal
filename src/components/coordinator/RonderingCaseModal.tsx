@@ -49,6 +49,7 @@ import type { CaseBillingSummary, CaseBillingItemWithRelations } from '../../typ
 import { selectInvoiceableCaseRows, sumInvoiceableRows } from '../../shared/caseInvoiceRows'
 // Nya arbetsvyn (stegflödet). Allt nedan används bara när useNyArbetsvy().aktiv är true.
 import { useNyArbetsvy } from '../../hooks/useNyArbetsvy'
+import { useProvisionsgrans, underProvisionsgrans } from '../technician/ny/steg/provisionsgrans'
 import { StegRad, StegKnappar } from '../technician/ny/steg/StegFlode'
 import { ArendeVerktygArk, type ArendeVerktygGrupp } from '../technician/ny/steg/ArendeVerktygArk'
 import { KlartSteg } from '../technician/ny/steg/KlartSteg'
@@ -503,6 +504,7 @@ export default function RonderingCaseModal({
   // (samma JSX, samma handlers, samma handleSubmit); inget sparas på något annat sätt.
   // ═══════════════════════════════════════════════════════════════════════════
   const { aktiv: nyArbetsvy } = useNyArbetsvy()
+  const provisionsgrans = useProvisionsgrans(nyArbetsvy)
   // 'steg' = stegflödet, 'flikar' = den vanliga långa vyn (Alla uppgifter)
   const [visning, setVisning] = useState<'steg' | 'flikar'>('steg')
   const stegLage = nyArbetsvy && visning === 'steg'
@@ -1057,6 +1059,8 @@ export default function RonderingCaseModal({
     if (!commissionEligible) return 'Ärendet är inte markerat som provisionsgrundande, ingen provision registreras.'
     if (existingCommissionPosts > 0) return 'Provisionen är redan registrerad och ändras inte.'
     if (commissionShares.length === 0) return 'Provision är vald men ingen tekniker har en andel. Fördela den under Utöver avtalet, annars registreras ingen provision.'
+    const underGrans = underProvisionsgrans(billingSummary?.subtotal || 0, provisionsgrans)
+    if (underGrans) return underGrans
     return `Provisionen registreras på ${commissionShares.map(s => `${s.technician_name} ${s.share_percentage} %`).join(', ')}.`
   })()
 
