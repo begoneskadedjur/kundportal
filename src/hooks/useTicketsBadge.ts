@@ -1,5 +1,5 @@
 // src/hooks/useTicketsBadge.ts
-// EN räkning för Frågor och uppdrag överallt (sidomenyer, klockan och nya teknikervyn):
+// EN räkning för Tickets överallt (sidomenyer, klockan och nya teknikervyn):
 // antalet trådar som väntar på den inloggade, alltså Frågor till dig + Svar till dig
 // på sidan. Samma uträkning som sidan (fragorLogik.analysMin), och när sidan är öppen
 // skickar den sin siffra hit (publiceraVantarAntal) så att de aldrig visar olika.
@@ -94,7 +94,7 @@ function ensureStarted(userId: string, roller: string[]) {
   store.interval = setInterval(refetch, 180000)
 }
 
-/** Sidan Frågor och uppdrag skickar sin siffra hit, så att menyn visar samma sak */
+/** Sidan Tickets skickar sin siffra hit, så att menyn visar samma sak */
 export function publiceraVantarAntal(userId: string, n: number) {
   if (store.userId && store.userId !== userId) return
   satt(n)

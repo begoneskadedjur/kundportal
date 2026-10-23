@@ -176,6 +176,18 @@ export class VisitService {
   }
 
   /** Ärendets besök i kronologisk ordning (besök 1 först). */
+  /**
+   * Besökets egen arbetstid: ärendets totala tid minus det som redan ligger på
+   * tidigare besök. time_spent_minutes på ärendet är summan för alla besök.
+   */
+  static async besoketsMinuter(caseId: string, totalMinuter: number | null | undefined): Promise<number | null> {
+    if (!totalMinuter) return null
+    const { data } = await supabase.from('visits').select('time_spent_minutes').eq('case_id', caseId)
+    const tidigare = (data ?? []).reduce((s, v) => s + (v.time_spent_minutes || 0), 0)
+    const egen = totalMinuter - tidigare
+    return egen > 0 ? egen : null
+  }
+
   static async getVisitsForCase(caseId: string): Promise<Visit[]> {
     const { data, error } = await supabase
       .from('visits')

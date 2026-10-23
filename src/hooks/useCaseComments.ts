@@ -238,7 +238,7 @@ export interface SkickaKommentarInput {
  * Sparar en kommentar på samma sätt som kommunikationspanelen: laddar upp bilagor,
  * hämtar författarnamnet, gör om spårade @-nämningar till id, roller och @alla och
  * skapar kommentaren via createComment (notiser till nämnda, återöppning vid svar).
- * Används av panelen (addComment ovan) och av sidan Frågor och uppdrag, så att en
+ * Används av panelen (addComment ovan) och av sidan Tickets, så att en
  * tråd blir likadan oavsett var den skrivs.
  */
 export async function skickaKommentar(input: SkickaKommentarInput): Promise<CaseComment> {

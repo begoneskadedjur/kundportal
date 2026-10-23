@@ -3143,7 +3143,7 @@ export default function StationInspectionPanel({
                         return (
                           <div className="space-y-2">
                             <label htmlFor={inputId} className="block text-[13px] font-medium text-slate-300">
-                              {activeThresholds.label ?? stType.measurement_label}{unit ? ` (${unit})` : ''}
+                              {activeThresholds.label ?? stType.measurement_label}{unit && !String(activeThresholds.label ?? stType.measurement_label ?? '').includes(`(${unit})`) ? ` (${unit})` : ''}
                             </label>
                             <div className="flex items-stretch gap-2">
                               <button

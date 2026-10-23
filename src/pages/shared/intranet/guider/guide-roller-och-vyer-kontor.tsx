@@ -111,7 +111,7 @@ const TIPS: Record<string, string> = {
   cta: 'Öppna schema öppnar planeringen. Lösenordet byter du under Mitt konto.',
   intranat: 'Intranätet har handboken och policyerna. Lösenordet byter du under Mitt konto.',
   uppdateringar: 'Uppdateringar visar nyheter i portalen. Lösenordet byter du under Mitt konto.',
-  notis: 'Klockan öppnar Frågor och uppdrag. Lösenordet byter du under Mitt konto.',
+  notis: 'Klockan öppnar Tickets. Lösenordet byter du under Mitt konto.',
   sok: 'Sök letar efter ärenden och kunder. Lösenordet byter du under Mitt konto.',
   'logga-ut': 'Då loggas du ut. Lösenordet byter du under Mitt konto.',
 }

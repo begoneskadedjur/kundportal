@@ -31,7 +31,7 @@ interface Props {
 
 const IKONKNAPP = 'w-11 h-11 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] relative'
 
-// Samma räkning som sidan Frågor och uppdrag och de andra menyerna: det som väntar på dig
+// Samma räkning som sidan Tickets och de andra menyerna: det som väntar på dig
 function useTicketAntal(): number {
   return useTicketsBadge()
 }
@@ -47,7 +47,7 @@ function Raknare({ antal, liten = false }: { antal: number; liten?: boolean }) {
 
 function NotisKnapp({ antal }: { antal: number }) {
   return (
-    <Link to="/technician/tickets" className={IKONKNAPP} aria-label={antal > 0 ? `Frågor och uppdrag, ${antal} väntar på dig` : 'Frågor och uppdrag'}>
+    <Link to="/technician/tickets" className={IKONKNAPP} aria-label={antal > 0 ? `Tickets, ${antal} väntar på dig` : 'Tickets'}>
       <Icon name="upphandling.notis" size={24} />
       <Raknare antal={antal} liten />
     </Link>
@@ -314,7 +314,7 @@ function Innehall({ userName, onSignOut }: Props) {
 
       <Bottenmeny current={current} onSkapa={oppnaSkapa} />
       <SkapaArk oppen={skapaOppen} onClose={stangSkapa} onNyFraga={oppnaNyFraga} />
-      {/* Skapa-arkets Fråga eller uppdrag öppnar dialogen här, utan sidbyte */}
+      {/* Skapa-arkets Ticket öppnar dialogen här, utan sidbyte */}
       <NyFragaDialog oppen={nyFragaOppen} onClose={stangNyFraga} />
     </div>
   )

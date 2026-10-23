@@ -1,5 +1,5 @@
 // src/components/fragor/fragorLogik.ts
-// Logiken bakom sidan Frågor och uppdrag (/<roll>/tickets, 3.89.0).
+// Logiken bakom sidan Tickets (/<roll>/tickets, 3.89.0).
 //
 // En tråd är en rotkommentar i case_comments med alla svar, kopplad till ett ärende.
 // Här byggs trådarna ur InkorgData (communicationService.getInboxThreads) och varje

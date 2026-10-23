@@ -1,5 +1,5 @@
 // src/components/fragor/NyFragaDialog.tsx
-// Ny fråga eller uppdrag: fyra steg (till vem, om vilket ärende, vad det gäller, bild
+// Ny ticket: fyra steg (till vem, om vilket ärende, vad det gäller, bild
 // eller fil). Tråden sparas som en rotkommentar i ärendets kommunikation med samma kod
 // som panelen (skickaKommentar), så den syns i ärendet och i mottagarnas inkorg.
 // Mottagare: en eller flera personer, en roll (admin, koordinator, tekniker) eller alla.
@@ -277,7 +277,7 @@ export default function NyFragaDialog({ oppen, onClose, onSkickad, forslag = [] 
       >
         <header className="flex items-start justify-between gap-3 px-5 pt-4 pb-3 border-b border-slate-700/60">
           <div>
-            <h2 id="ny-fraga-rubrik" className="text-lg font-semibold text-white">Ny fråga eller uppdrag</h2>
+            <h2 id="ny-fraga-rubrik" className="text-lg font-semibold text-white">Ny ticket</h2>
             <p className="text-sm text-slate-400">Den du skickar till får en notis och ser tråden under Väntar på dig.</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Stäng" className={IKONKNAPP}>

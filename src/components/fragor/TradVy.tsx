@@ -1,5 +1,5 @@
 // src/components/fragor/TradVy.tsx
-// En tråd i Frågor och uppdrag: ärendet som kort med Öppna ärendet och Visa i ärendets
+// En tråd i Tickets: ärendet som kort med Öppna ärendet och Visa i ärendets
 // kommunikation, Vem är med, konversationen med läskvitton och Nytt sedan du läste,
 // och svarsrutan. Svar sparas med samma kod som kommunikationspanelen (skickaKommentar),
 // så tråden är densamma här och i ärendet.
@@ -278,7 +278,7 @@ export default function TradVy({
       {onTillbaka && (
         <button type="button" onClick={onTillbaka} className="self-start min-h-[44px] -ml-2 px-2 inline-flex items-center gap-1 rounded-xl text-[15px] font-medium text-slate-300 hover:text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]">
           <Icon name="allman.chevron-vanster" size={20} />
-          Frågor och uppdrag
+          Tickets
         </button>
       )}
 

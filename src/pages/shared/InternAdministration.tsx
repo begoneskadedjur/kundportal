@@ -1,9 +1,9 @@
 // src/pages/shared/InternAdministration.tsx
-// Frågor och uppdrag (tidigare Tickets), samma sida för admin (/admin/tickets),
+// Tickets (hette Frågor och uppdrag 3.89.0–3.89.4), samma sida för admin (/admin/tickets),
 // koordinator (/koordinator/tickets) och tekniker (/technician/tickets).
 //
 // En tråd är en rotkommentar i ärendets kommunikation (case_comments). Den skapas här
-// (Ny fråga eller uppdrag) eller i ärendets kommunikationspanel genom att nämna någon,
+// (Ny ticket) eller i ärendets kommunikationspanel genom att nämna någon,
 // och är samma tråd på båda ställena. Sidan visar det som kräver något av mig:
 //   Väntar på dig (Frågor till dig, Svar till dig), Du väntar på svar,
 //   Omnämnd för kännedom och Klara (hopfälld).
@@ -329,7 +329,7 @@ export default function InternAdministration() {
       {visaListan && (
         <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="min-w-0">
-            {!nyAktiv && <h1 className="text-2xl font-bold text-white leading-tight">Frågor och uppdrag</h1>}
+            {!nyAktiv && <h1 className="text-2xl font-bold text-white leading-tight">Tickets</h1>}
             {!laddar && (
               <p className="mt-1 text-[15px] text-slate-300">
                 {lage === 'all' ? sammanfattning : (
@@ -343,7 +343,7 @@ export default function InternAdministration() {
           </div>
           <button type="button" onClick={() => setNyOppen(true)} className={`${KNAPP_PRIMAR} w-full sm:w-auto`}>
             <Icon name="allman.plus" size={20} />
-            Ny fråga eller uppdrag
+            Ny ticket
           </button>
         </header>
       )}
@@ -376,7 +376,7 @@ export default function InternAdministration() {
 
             <label className="h-11 flex items-center gap-2 px-3 rounded-xl border border-slate-600 bg-slate-900 text-slate-400 focus-within:border-[#20c58f]">
               <Icon name="allman.sok" size={20} />
-              <span className="sr-only">Sök i frågor och uppdrag</span>
+              <span className="sr-only">Sök i tickets</span>
               <input
                 ref={sokRef}
                 type="search"
@@ -432,14 +432,14 @@ export default function InternAdministration() {
             {laddar && rader.length === 0 ? (
               <div className="flex items-center gap-2 py-10 justify-center text-[15px] text-slate-400" role="status">
                 <Icon name="allman.laddar" size={20} className="animate-spin" />
-                Hämtar frågor och uppdrag...
+                Hämtar tickets...
               </div>
             ) : rader.length === 0 && !fel ? (
               <div className="py-10 flex flex-col items-center text-center gap-2">
                 <Icon name="dok.konversation" size={32} className="text-slate-500" />
                 <p className="text-[17px] font-semibold text-white">Inga frågor eller uppdrag än</p>
                 <p className="max-w-md text-[15px] text-slate-400">
-                  Skriv till en kollega med Ny fråga eller uppdrag, eller nämn någon med @ i ett ärendes kommunikation.
+                  Skriv till en kollega med Ny ticket, eller nämn någon med @ i ett ärendes kommunikation.
                 </p>
               </div>
             ) : (

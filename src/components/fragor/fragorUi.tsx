@@ -1,5 +1,5 @@
 // src/components/fragor/fragorUi.tsx
-// Små delar för Frågor och uppdrag: status som punkt och text (aldrig piller),
+// Små delar för Tickets: status som punkt och text (aldrig piller),
 // initial-rund, text med markerade @-nämningar och knappklasser.
 
 import type { ReactNode } from 'react'

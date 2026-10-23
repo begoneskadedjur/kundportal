@@ -1,5 +1,5 @@
 // src/components/fragor/TradLista.tsx
-// Listan i Frågor och uppdrag: grupper med rubrik, förklaring och rader. Raden visar
+// Listan i Tickets: grupper med rubrik, förklaring och rader. Raden visar
 // ämnet, status som punkt och text, senaste repliken, tid, kund och vem som skrev.
 
 import { useState, type ReactNode } from 'react'

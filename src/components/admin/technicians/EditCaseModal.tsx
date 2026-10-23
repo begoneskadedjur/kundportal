@@ -1261,7 +1261,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             { id: formData.tertiary_assignee_id || null, name: formData.tertiary_assignee_name || '', role: 'tertiary' as const },
           ].filter(t => t.name.trim().length > 0),
           workPerformed: formData.rapport,
-          timeSpentMinutes: currentCase.time_spent_minutes ?? null,
+          timeSpentMinutes: await VisitService.besoketsMinuter(currentCase.id, currentCase.time_spent_minutes),
         });
         if (!finalVisit) {
           toast.error('Besöket kunde inte sparas i historiken. Ärendet är avslutat, men kontakta admin.', { duration: 10000 });
@@ -1804,7 +1804,11 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   }
 
   const { foregaende: foregaendeSteg, nasta: nastaSteg } = grannSteg(stegLista, aktivtSteg)
-  const startaTidVidFramme = aktivtSteg === 'framme' && showTimeTracking && !isRunning && (currentCase.time_spent_minutes || 0) === 0
+  // En kollega som öppnat ärendet via en tråd (inte tilldelad) ska inte starta tiden
+  const arKollega = nyArbetsvy && !!profile?.technician_id && !profile?.is_admin && !profile?.is_koordinator
+    && ![currentCase.primary_assignee_id, currentCase.secondary_assignee_id, currentCase.tertiary_assignee_id].includes(profile.technician_id)
+  // Tiden räknas i bakgrunden: den startar varje gång teknikern är framme, även vid återbesök
+  const startaTidVidFramme = aktivtSteg === 'framme' && showTimeTracking && !isRunning && !arKollega
   const finnsOsparat = () => harOsparat() || hasPendingImageChanges
 
   // Samma sparkedja som Spara ändringar, men modalen är kvar
@@ -1980,7 +1984,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
       aktivt={aktivtSteg}
       onTillbaka={foregaendeSteg ? () => gaTillSteg(foregaendeSteg.id) : undefined}
       onNasta={nastaSteg ? gaVidare : undefined}
-      nastaText={startaTidVidFramme ? 'Jag är framme, starta tiden' : undefined}
+      nastaText={startaTidVidFramme ? 'Jag är framme' : undefined}
       upptagen={stegUpptaget || loading || timeTrackingLoading}
     />
   )
@@ -2442,9 +2446,9 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
             <>
               <div className={stegBlock('framme')}>
                 <HjalpText id="steg-framme-privat" rubrik="Är du framme hos kunden?">
-                  {startaTidVidFramme
-                    ? 'Tryck på den gröna knappen när du står på plats. Då startar arbetstiden i ärendet och du behöver inte skriva in den själv.'
-                    : 'Arbetstiden är startad eller redan registrerad. Kontrollera kontakten och adressen och gå vidare.'}
+                  {arKollega
+                    ? 'Du är inte tilldelad ärendet. Du kan läsa det och svara i kommunikationen, men ärendet sköts av den som har det.'
+                    : 'Tryck på den gröna knappen när du står på plats. Kontrollera kontakten och adressen.'}
                 </HjalpText>
                 {(adressText || formData.telefon_kontaktperson) && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2734,7 +2738,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           {/* ════════ Flik: Utförande ════════ */}
           <div className={stegLage ? 'contents' : activeTab === 'utforande' ? 'space-y-3' : 'hidden'}>
             {/* Tidtagning - kompakt "Arbetstid"-sektion */}
-            {iSteg(['framme', 'arbete'], showTimeTracking && (
+            {/* Nya arbetsvyn: tiden räknas i bakgrunden och visas inte i stegen */}
+            {iSteg([], showTimeTracking && (
               <CaseModalSection icon={Clock} iconClassName={isRunning ? 'text-[#20c58f]' : 'text-slate-400'} title="Arbetstid">
                 <div className="flex items-center gap-3">
                   <span className={`text-lg font-bold font-mono ${isRunning ? 'text-[#20c58f]' : 'text-white'}`}>

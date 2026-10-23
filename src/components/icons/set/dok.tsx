@@ -45,7 +45,7 @@ export const dokIcons = {
       <path d="M18 13.5v6M15 16.5h6" />
     </>
   ),
-  // Omnämnd: snabel-a (Frågor och uppdrag, gruppen Omnämnd för kännedom och Nämn en kollega)
+  // Omnämnd: snabel-a (Tickets, gruppen Omnämnd för kännedom och Nämn en kollega)
   'dok.omnamnd': (
     <>
       <circle cx="12" cy="12" r="3.6" />

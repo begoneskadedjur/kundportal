@@ -15,7 +15,7 @@ interface AdminTopHeaderProps {
 export function AdminTopHeader({ sidebarCollapsed, userName }: AdminTopHeaderProps) {
   const location = useLocation()
   const currentLabel = breadcrumbMap[location.pathname] || 'Översikt'
-  // Samma räkning som sidan Frågor och uppdrag: det som väntar på dig
+  // Samma räkning som sidan Tickets: det som väntar på dig
   const ticketCount = useTicketsBadge()
 
   return (

@@ -1,8 +1,8 @@
 // src/pages/shared/intranet/guider/guide-ticket-systemet.tsx
-// Guidemodul: Fråga en kollega och svara i Frågor och uppdrag (tekniker, telefon).
+// Guidemodul: Fråga en kollega och svara i Tickets (tekniker, telefon).
 // Sidan hette Tickets fram till 2026-10-23 (3.89.0). Slugen behålls så att länkar fungerar.
 // Efterbildning av TechnicianMobileNav (klockan Notifieringar, Meny), InternAdministration
-// ("0 väntar på dig, du väntar på svar i 0", Ny fråga eller uppdrag, grupperna Väntar på dig
+// ("0 väntar på dig, du väntar på svar i 0", Ny ticket, grupperna Väntar på dig
 // med Svar till dig, Du väntar på svar, Omnämnd, för kännedom och Klara), NyFragaDialog
 // (1 Till vem?, En kollega, En roll, Alla, Sök kollega, 2 Om vilket ärende?, Förslag: dina
 // ärenden i dag och i morgon, 3 Vad gäller det?, Meddelande, 4 Bild eller fil, Skicka till
@@ -50,7 +50,7 @@ function Lista({ svar, mk, tryck }: { svar: boolean; mk: Mk; tryck: Tryck }) {
   )
 }
 
-// ─── Dialogen Ny fråga eller uppdrag ───
+// ─── Dialogen Ny ticket ───
 
 function Steg({ n, titel }: { n: number; titel: string }) {
   return (
@@ -169,7 +169,7 @@ function Dialog({ vy, mk, tryck }: { vy: Vy; mk: Mk; tryck: Tryck }) {
       <section className="flex max-h-[96%] w-full flex-col rounded-t-2xl border-t border-slate-700 bg-slate-900">
         <header className="flex items-start justify-between gap-2 border-b border-slate-700/60 px-3 pb-2 pt-2.5">
           <div>
-            <p className="text-[13px] font-semibold text-white">Ny fråga eller uppdrag</p>
+            <p className="text-[13px] font-semibold text-white">Ny ticket</p>
             <p className="text-[10px] text-slate-400">Den du skickar till får en notis och ser tråden under Väntar på dig.</p>
           </div>
           <button type="button" onClick={() => tryck('stang')} aria-label="Stäng" className="p-1 text-slate-400"><Icon name="allman.stang" size={16} /></button>
@@ -267,16 +267,16 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 
 // ─── Övning: samma skärmar utan markörer ───
 
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du står på Frågor och uppdrag. Fråga koordinatorn Anna Exempel om Familjen Exempel vill ha kvittot på mejl.' }
+const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du står på Tickets. Fråga koordinatorn Anna Exempel om Familjen Exempel vill ha kvittot på mejl.' }
 
 const TIPS: Record<string, string> = {
-  notis: 'Klockan öppnar Frågor och uppdrag, och där står du redan.',
+  notis: 'Klockan öppnar Tickets, och där står du redan.',
   meny: 'Menyn behövs inte nu. Allt du behöver finns på sidan.',
   sok: 'Sök i sidhuvudet letar efter ärenden och kunder. Här ska du skriva en fråga.',
   'sok-sida': 'Sökrutan letar bland dina trådar. Du ska skriva en ny fråga.',
   'grupp-klara': 'Klara är trådar som redan är avslutade.',
-  hem: 'Hem tar dig till Översikt. Stanna på Frågor och uppdrag.',
-  arenden: 'Ärenden visar dina ärenden. Frågan skriver du här på Frågor och uppdrag.',
+  hem: 'Hem tar dig till Översikt. Stanna på Tickets.',
+  arenden: 'Ärenden visar dina ärenden. Frågan skriver du här på Tickets.',
   schema: 'Schemat behövs inte nu.',
   provision: 'Provision behövs inte nu.',
   mer: 'Menyn behövs inte nu.',
@@ -310,8 +310,8 @@ function Ovning() {
     if (vy === 'klar') return
     switch (vy) {
       case 'lista':
-        if (id === 'ny') ga('d-vem', 'Ny fråga eller uppdrag', 'Dialogen öppnades. Under Till vem? är En kollega valt. Välj Anna.')
-        else annars(id, 'Tryck Ny fråga eller uppdrag.')
+        if (id === 'ny') ga('d-vem', 'Ny ticket', 'Dialogen öppnades. Under Till vem? är En kollega valt. Välj Anna.')
+        else annars(id, 'Tryck Ny ticket.')
         break
       case 'd-vem':
         if (id === 'kollega-anna') ga('d-arende', 'Anna är vald', 'Längst ner står Anna får en notis direkt. Välj nu vilket ärende frågan gäller.')
@@ -333,7 +333,7 @@ function Ovning() {
         else annars(id, 'Tryck i rutan Meddelande och skriv frågan.')
         break
       case 'd-klar':
-        if (id === 'skicka') ga('skickad', 'Skickat till Anna', 'Tråden öppnades. Det står Väntar på Anna sedan 10:12. Gå tillbaka till listan med Frågor och uppdrag uppe till vänster.')
+        if (id === 'skicka') ga('skickad', 'Skickat till Anna', 'Tråden öppnades. Det står Väntar på Anna sedan 10:12. Gå tillbaka till listan med Tickets uppe till vänster.')
         else if (id === 'meddelande') tips('Frågan står redan där', 'Tryck Skicka till Anna.')
         else annars(id, 'Tryck Skicka till Anna.')
         break
@@ -341,7 +341,7 @@ function Ovning() {
         if (id === 'tillbaka') ga('lista-svar', 'En stund senare', 'Anna har svarat. Siffran 1 på klockan visar att något väntar på dig. Öppna tråden under Svar till dig.')
         else if (id === 'klar') miss('Anna har inte svarat än. Vänta på svaret innan du markerar tråden som klar.')
         else if (id === 'svar-falt' || id === 'skicka-svar') miss('Du behöver inte skriva mer nu. Gå tillbaka till listan.')
-        else annars(id, 'Tryck Frågor och uppdrag uppe till vänster.')
+        else annars(id, 'Tryck Tickets uppe till vänster.')
         break
       case 'lista-svar':
         if (id === 'rad') ga('trad-svar', 'Annas svar', 'Det står under Nytt sedan du läste. Under din fråga står Läst av Anna. Svaret räcker, så avsluta tråden.')

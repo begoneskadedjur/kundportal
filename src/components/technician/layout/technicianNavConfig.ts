@@ -36,7 +36,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Schema', icon: Calendar, path: '/technician/schedule' },
       { label: 'Specialrapporter', icon: FileText, path: '/technician/specialrapporter' },
       { label: 'Utrustning', icon: Package, path: '/technician/equipment' },
-      { label: 'Frågor och uppdrag', icon: MessageSquareText, path: '/technician/tickets', badgeKey: 'tickets' },
+      { label: 'Tickets', icon: MessageSquareText, path: '/technician/tickets', badgeKey: 'tickets' },
     ],
   },
   {
@@ -81,7 +81,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/technician/min-kundresa': 'Min Kundresa',
   '/technician/team-chat': 'AI Assistent',
   '/technician/tillbud-avvikelser': 'Tillbud & Avvikelser',
-  '/technician/tickets': 'Frågor och uppdrag',
+  '/technician/tickets': 'Tickets',
   '/technician/intranat': 'Intranät',
   '/technician/mitt-konto': 'Mitt konto',
 }

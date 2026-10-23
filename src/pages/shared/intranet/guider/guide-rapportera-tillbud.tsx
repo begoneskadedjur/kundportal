@@ -98,7 +98,7 @@ const TIPS: Record<string, string> = {
   arenden: 'Rapporten skrivs inte i ärendet. Öppna menyn med Mer.',
   schema: 'Schemat visar dina besök. Öppna menyn med Mer.',
   provision: 'Provision visar din provision. Öppna menyn med Mer.',
-  notis: 'Klockan öppnar Frågor och uppdrag. Rapporten skriver du på sidan Tillbud & Avvikelser.',
+  notis: 'Klockan öppnar Tickets. Rapporten skriver du på sidan Tillbud & Avvikelser.',
   sok: 'Sök letar efter ärenden och kunder. Öppna menyn med Mer.',
   'snabb-annan': 'Den snabbknappen gör något annat. Leta efter Rapportera tillbud/olycka.',
   intranat: 'Intranätet har policyerna. Själva rapporten skickar du med den gula knappen.',

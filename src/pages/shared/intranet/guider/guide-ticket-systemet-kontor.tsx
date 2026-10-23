@@ -1,7 +1,7 @@
 // src/pages/shared/intranet/guider/guide-ticket-systemet-kontor.tsx
-// Guidemodul: Ta hand om frågor och uppdrag till kontoret (admin och koordinator, dator).
+// Guidemodul: Ta hand om tickets till kontoret (admin och koordinator, dator).
 // Sidan hette Tickets fram till 2026-10-23 (3.89.0). Slugen behålls så att länkar fungerar.
-// Efterbildning av coordinatorNavConfig (Planering › Frågor och uppdrag), InternAdministration
+// Efterbildning av coordinatorNavConfig (Planering › Tickets), InternAdministration
 // (Min inkorg och Alla, filtren Till, Från, Ärendetyp, Status och Bara olästa, sammanfattningen
 // "1 till en roll utan svar, 1 väntar på en person, 0 besvarade men inte klara"), kontorets
 // grupper i Alla (Till en roll eller alla, ingen har svarat, Väntar på en person, Besvarade,
@@ -160,7 +160,7 @@ function Skarm({ vy, markera, nr, tryck }: { vy: Vy; markera?: string; nr: numbe
     : '0 till en roll utan svar, 2 väntar på en person, 0 besvarade men inte klara'
   return (
     <Dator adress={pa ? 'koordinator › tickets' : 'koordinator › arenden'}>
-      <KontorSida sida={pa ? 'Frågor och uppdrag' : 'Ärenden'} aktivPost={pa ? 'Frågor och uppdrag' : 'Ärenden'} siffra={siffra} tryck={tryck} markera={markera} nr={nr}>
+      <KontorSida sida={pa ? 'Tickets' : 'Ärenden'} aktivPost={pa ? 'Tickets' : 'Ärenden'} siffra={siffra} tryck={tryck} markera={markera} nr={nr}>
         {!pa ? (
           <div className="grid gap-2">
             <p className="text-[15px] font-bold text-white">Ärenden</p>
@@ -191,7 +191,7 @@ function Skarm({ vy, markera, nr, tryck }: { vy: Vy; markera?: string; nr: numbe
 // ─── Visning: en skärm per steg i guidens visning-block ───
 
 const VISNING: { vy: Vy; markera: string }[] = [
-  { vy: 'arenden', markera: 'post-Frågor och uppdrag' },
+  { vy: 'arenden', markera: 'post-Tickets' },
   { vy: 'min', markera: 'flik-alla' },
   { vy: 'alla', markera: 'ta-den' },
   { vy: 'tagen', markera: 'svar-falt' },
@@ -216,7 +216,7 @@ const TIPS: Record<string, string> = {
   uppdateringar: 'Uppdateringar visar nyheter i portalen.',
   'mitt-konto': 'Mitt konto är dina uppgifter.',
   'logga-ut': 'Då loggas du ut.',
-  ny: 'Ny fråga eller uppdrag skriver en ny fråga. Här ska du svara på Eriks.',
+  ny: 'Ny ticket skriver en ny fråga. Här ska du svara på Eriks.',
   'rad-sara': 'Saras fråga är till dig personligen och ligger kvar. Uppdraget gäller Eriks fråga till koordinatorerna.',
   'grupp-klara': 'Klara är trådar som redan är avslutade.',
   'grupp-anteckning': 'Anteckningar utan mottagare är noteringar i ärenden. Ingen väntar på svar.',
@@ -248,9 +248,9 @@ function Ovning() {
     if (vy === 'svarad') return
     switch (vy) {
       case 'arenden':
-        if (id === 'post-Frågor och uppdrag' || id === 'notis') ga('min', 'Min inkorg', 'Sidan öppnas på Min inkorg. Eriks fråga till koordinatorerna ligger under Omnämnd, för kännedom. Byt till Alla för att se alla frågor som väntar på kontoret.')
-        else if (id.startsWith('post-') || id.startsWith('grupp-')) miss('Frågor och uppdrag ligger i menyn under Planering, eller bakom klockan uppe till höger.')
-        else annars(id, 'Tryck Frågor och uppdrag i menyn under Planering.')
+        if (id === 'post-Tickets' || id === 'notis') ga('min', 'Min inkorg', 'Sidan öppnas på Min inkorg. Eriks fråga till koordinatorerna ligger under Omnämnd, för kännedom. Byt till Alla för att se alla frågor som väntar på kontoret.')
+        else if (id.startsWith('post-') || id.startsWith('grupp-')) miss('Tickets ligger i menyn under Planering, eller bakom klockan uppe till höger.')
+        else annars(id, 'Tryck Tickets i menyn under Planering.')
         break
       case 'min':
         if (id === 'flik-alla') ga('alla', 'Alla', 'Eriks fråga ligger överst under Till en roll eller alla, ingen har svarat, och är öppen till höger. Ta den, så vet de andra koordinatorerna att du svarar.')

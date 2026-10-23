@@ -271,6 +271,8 @@ export default function RevisitModal({ caseData, onSuccess, onClose }: RevisitMo
           { id: caseData.tertiary_assignee_id ?? null, name: caseData.tertiary_assignee_name ?? '', role: 'tertiary' as const },
         ].filter(t => t.name.trim().length > 0),
         workPerformed: caseData.rapport,
+        // Besökets egen tid (klockan stoppades innan dialogen öppnades)
+        timeSpentMinutes: await VisitService.besoketsMinuter(caseData.id, (caseData as { time_spent_minutes?: number | null }).time_spent_minutes),
       })
       if (!visit) {
         toast.error('Besökshistoriken kunde inte sparas. Bokningen fortsätter, men kontakta admin.', { duration: 10000 })

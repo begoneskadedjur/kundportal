@@ -17,7 +17,7 @@ export function CoordinatorTopHeader({ sidebarCollapsed, userName }: Coordinator
   const location = useLocation()
   // Undersidor (t.ex. /specialrapporter/:id) ärver förälderns namn
   const currentLabel = breadcrumbMap[location.pathname] || breadcrumbMap[location.pathname.replace(/\/[^/]+$/, '')] || 'Översikt'
-  // Samma räkning som sidan Frågor och uppdrag: det som väntar på dig
+  // Samma räkning som sidan Tickets: det som väntar på dig
   const ticketCount = useTicketsBadge()
 
   return (

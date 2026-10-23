@@ -45,6 +45,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.90.0',
+    date: '2026-10-24',
+    title: 'Tickets heter Tickets igen och arbetstiden räknas i bakgrunden',
+    items: [
+      { kind: 'andring', text: 'Sidan Frågor och uppdrag heter Tickets igen. Allt fungerar som förut: personer, roller och Alla, och trådarna ligger kvar i ärendet.' },
+      { kind: 'andring', text: 'Nya arbetsvyn: den gröna knappen heter Jag är framme. Arbetstiden räknas i bakgrunden från det du är framme tills du stänger besöket, utan någon klocka att hålla koll på.' },
+      { kind: 'andring', text: 'En kollega som öppnar ditt ärende via en ticket ser det men får ingen Jag är framme-knapp och startar ingen tid.' },
+      { kind: 'buggfix', text: 'Varje besök får sin egen arbetstid i besökshistoriken, även vid återbesök. Tidigare saknades tiden vid återbesök och slutbesöket fick hela ärendets tid.' },
+      { kind: 'buggfix', text: 'Stationskontrollen visar enheten en gång, till exempel Förbrukning (g).' },
+    ],
+  },
+  {
     version: '3.89.4',
     date: '2026-10-24',
     title: 'Avtalswizarden i nya arbetsvyn och kundportalens kommande besök',

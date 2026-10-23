@@ -37,7 +37,7 @@ interface CaseContextCommunicationModalProps {
   caseType: CaseType;
   caseTitle: string;
   onOpenFullCase?: (caseId: string, caseType: CaseType) => void;
-  /** Tråd (rotkommentar) som markeras och visas, från Frågor och uppdrag */
+  /** Tråd (rotkommentar) som markeras och visas, från Tickets */
   markeradTradId?: string | null;
 }
 

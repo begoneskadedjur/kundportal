@@ -13,7 +13,7 @@ interface CommentSectionProps {
   caseType: CaseType;
   caseTitle?: string;
   compact?: boolean;
-  /** Rotkommentar som ska markeras och visas (från Frågor och uppdrag, Visa i ärendets kommunikation) */
+  /** Rotkommentar som ska markeras och visas (från Tickets, Visa i ärendets kommunikation) */
   markeradTradId?: string | null;
 }
 

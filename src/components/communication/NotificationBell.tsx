@@ -104,10 +104,10 @@ export default function NotificationBell({
         return;
       }
 
-      // Frågor och uppdrag med tråden vald (source_comment_id kan vara ett svar, sidan hittar tråden)
+      // Tickets med tråden vald (source_comment_id kan vara ett svar, sidan hittar tråden)
       const trad = notification.source_comment_id ? `&thread=${notification.source_comment_id}` : '';
       if (pathname.includes('/technician')) {
-        // Tekniker: gå till Frågor och uppdrag
+        // Tekniker: gå till Tickets
         window.location.href = `/technician/tickets?caseId=${notification.case_id}&caseType=${notification.case_type}${trad}`;
       } else if (pathname.includes('/admin')) {
         // Admin: gå till tickets

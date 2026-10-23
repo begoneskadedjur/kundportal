@@ -20,7 +20,7 @@ interface AdminMobileNavProps {
 
 export function AdminMobileNav({ currentPath, onSignOut }: AdminMobileNavProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  // Samma räkning som sidan Frågor och uppdrag: det som väntar på dig
+  // Samma räkning som sidan Tickets: det som väntar på dig
   const ticketCount = useTicketsBadge()
 
   return (

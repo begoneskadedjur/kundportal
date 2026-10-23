@@ -1403,7 +1403,7 @@ export default function EditContractCaseModal({
           workPerformed: cleanedFormData.work_report,
           recommendations: cleanedFormData.recommendations,
           materialsUsed: cleanedFormData.materials_used,
-          timeSpentMinutes: cleanedFormData.time_spent_minutes ?? null,
+          timeSpentMinutes: await VisitService.besoketsMinuter(caseData.id, cleanedFormData.time_spent_minutes),
           pestLevel: cleanedFormData.pest_level ?? null,
           problemRating: cleanedFormData.problem_rating ?? null,
           findings: cleanedFormData.pest_level != null
@@ -2023,7 +2023,11 @@ export default function EditContractCaseModal({
   const stegBlock = (steg: StegId) => (stegLage && aktivtSteg === steg ? 'flex flex-col gap-3' : 'hidden')
 
   const { foregaende: foregaendeSteg, nasta: nastaSteg } = grannSteg(stegLista, aktivtSteg)
-  const startaTidVidFramme = aktivtSteg === 'framme' && !isCustomerView && !isTimerRunning && formData.time_spent_minutes === 0
+  // En kollega som öppnat ärendet (inte tilldelad) ska inte starta tiden
+  const arKollega = nyArbetsvy && !!profile?.technician_id && !profile?.is_admin && !profile?.is_koordinator
+    && ![formData.primary_technician_id, formData.secondary_technician_id, formData.tertiary_technician_id].includes(profile.technician_id)
+  // Tiden räknas i bakgrunden: den startar varje gång teknikern är framme
+  const startaTidVidFramme = aktivtSteg === 'framme' && !isCustomerView && !isTimerRunning && !arKollega
 
   // Vidare: sparar med den vanliga handleSubmit om något är ändrat, startar
   // tiden i steget Framme (befintliga handleStartTimer) och går till nästa steg
@@ -2141,7 +2145,7 @@ export default function EditContractCaseModal({
       aktivt={aktivtSteg}
       onTillbaka={foregaendeSteg ? () => gaTillSteg(foregaendeSteg.id) : undefined}
       onNasta={nastaSteg ? gaVidare : undefined}
-      nastaText={startaTidVidFramme ? 'Jag är framme, starta tiden' : undefined}
+      nastaText={startaTidVidFramme ? 'Jag är framme' : undefined}
       upptagen={stegUpptaget || loading}
     />
   )
@@ -2470,9 +2474,9 @@ export default function EditContractCaseModal({
           <>
             <div className={stegBlock('framme')}>
               <HjalpText id="steg-framme" rubrik="Är du framme hos kunden?">
-                {startaTidVidFramme
-                  ? 'Tryck på den gröna knappen när du står på plats. Då startar arbetstiden i ärendet och du behöver inte skriva in den själv.'
-                  : 'Arbetstiden är startad eller redan registrerad. Kontrollera kontakten och gå vidare.'}
+                {arKollega
+                  ? 'Du är inte tilldelad ärendet. Du kan läsa det och svara i kommunikationen, men ärendet sköts av den som har det.'
+                  : 'Tryck på den gröna knappen när du står på plats. Kontrollera kontakten.'}
               </HjalpText>
               {(formData.address || formData.contact_phone) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2830,7 +2834,8 @@ export default function EditContractCaseModal({
         {/* ═══ Flik: Utförande ═══ */}
         <div className={stegLage ? 'contents' : activeTab === 'utforande' ? 'space-y-3' : 'hidden'}>
           {/* Arbetstid - tidtagning */}
-          {iSteg(['framme', 'arbete'], !isCustomerView && (
+          {/* Nya arbetsvyn: tiden räknas i bakgrunden och visas inte i stegen */}
+          {iSteg([], !isCustomerView && (
             <CaseModalSection icon={Clock} iconClassName="text-purple-400" title="Arbetstid">
                   <div className="flex items-center gap-3">
                     <span className={`text-lg font-bold font-mono ${isTimerRunning ? 'text-green-400' : 'text-white'}`}>
@@ -3672,6 +3677,8 @@ export default function EditContractCaseModal({
             scheduled_end: formData.scheduled_end,
             work_report: formData.work_report,
             customer_id: formData.customer_id,
+            // Tiden som just stoppades ligger i formuläret, inte i localCaseData
+            time_spent_minutes: formData.time_spent_minutes,
             id: localCaseData.id
           }}
           onSuccess={async (updatedCase) => {

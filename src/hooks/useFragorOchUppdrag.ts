@@ -1,5 +1,5 @@
 // src/hooks/useFragorOchUppdrag.ts
-// Data för sidan Frågor och uppdrag: EN hämtning per vy (getInboxThreads) med filtret i
+// Data för sidan Tickets: EN hämtning per vy (getInboxThreads) med filtret i
 // frågan, realtid på case_comments och den inloggades läskvitton, och Visa fler för Klara.
 // Räknaren i menyerna (useTicketsBadge) får samma siffra härifrån när sidan är öppen.
 
@@ -65,7 +65,7 @@ export function useFragorOchUppdrag(lage: FragorLage) {
     } catch (e) {
       if (seq !== sekvens.current) return
       console.error('[FragorOchUppdrag]', e)
-      setFel('Kunde inte hämta frågor och uppdrag')
+      setFel('Kunde inte hämta tickets')
     } finally {
       if (seq === sekvens.current) setLaddar(false)
     }

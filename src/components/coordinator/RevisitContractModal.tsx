@@ -304,7 +304,7 @@ export default function RevisitContractModal({ caseData, onSuccess, onClose }: R
           recommendations: caseData.recommendations,
           findings: caseData.pest_level != null ? `Skadedjursnivå: ${caseData.pest_level}` : null,
           materialsUsed: caseData.materials_used,
-          timeSpentMinutes: caseData.time_spent_minutes ?? null,
+          timeSpentMinutes: await VisitService.besoketsMinuter(caseData.id, caseData.time_spent_minutes),
           pestLevel: caseData.pest_level ?? null,
           problemRating: caseData.problem_rating ?? null,
         })

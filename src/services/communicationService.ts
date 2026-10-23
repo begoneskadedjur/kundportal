@@ -1538,7 +1538,7 @@ export async function getTicketsWithEvents(
   /** Rollerna användaren hör till, så att gruppnämningar räknas in (3.89.0) */
   roles: string[] = []
 ): Promise<{ tickets: Ticket[]; totalCount: number }> {
-  // ÄLDRE: sidan Frågor och uppdrag använder getInboxThreads, som filtrerar i frågan.
+  // ÄLDRE: sidan Tickets använder getInboxThreads, som filtrerar i frågan.
   // Hämta ALLA kommentarer (vi behöver både roots och replies)
   const { data: allComments, error: commentsError } = await supabase
     .from('case_comments')
@@ -2272,7 +2272,7 @@ export async function getReadReceiptsForComments(commentIds: string[]): Promise<
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 /**
- * Hämtar trådarna för sidan Frågor och uppdrag (och räknaren i menyn).
+ * Hämtar trådarna för sidan Tickets (och räknaren i menyn).
  * Se kommentaren ovanför InkorgArende för vad som hämtas i vilket läge.
  */
 export async function getInboxThreads(opts: InkorgOptions): Promise<InkorgData> {

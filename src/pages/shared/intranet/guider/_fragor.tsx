@@ -1,7 +1,7 @@
 // src/pages/shared/intranet/guider/_fragor.tsx
-// Delade skärmdelar för guiderna om Frågor och uppdrag (guide-ticket-systemet och
+// Delade skärmdelar för guiderna om Tickets (guide-ticket-systemet och
 // guide-ticket-systemet-kontor). Efterbildningar av InternAdministration (rubriken,
-// "X väntar på dig, du väntar på svar i Y", Ny fråga eller uppdrag, Min inkorg och Alla,
+// "X väntar på dig, du väntar på svar i Y", Ny ticket, Min inkorg och Alla,
 // sökrutan), TradLista (grupperna med förklaring, raderna med status som punkt och text),
 // TradVy (Öppna ärendet, Visa i ärendets kommunikation, Vem är med, Konversation,
 // Nytt sedan du läste, Jag tar den, Markera som klar) och SvarsRuta (Svar till ..., Skicka svar).
@@ -56,7 +56,7 @@ export function Knapp({ id, ikon, prim, full, mk, tryck, children }: {
 
 // ─── Listan ────────────────────────────────────────
 
-/** Rubriken överst på sidan: Frågor och uppdrag, sammanfattningen och Ny fråga eller uppdrag */
+/** Rubriken överst på sidan: Tickets, sammanfattningen och Ny ticket */
 export function SidHuvud({ vantar, jagVantar, alla, dator, mk, tryck }: {
   vantar: number; jagVantar: number
   /** Sammanfattningen i läget Alla, till exempel "1 till en roll utan svar, ..." */
@@ -66,12 +66,12 @@ export function SidHuvud({ vantar, jagVantar, alla, dator, mk, tryck }: {
   return (
     <div className={`flex gap-2 ${dator ? 'items-start justify-between' : 'flex-col'}`}>
       <div className="min-w-0">
-        <p className="text-[15px] font-bold leading-tight text-white">Frågor och uppdrag</p>
+        <p className="text-[15px] font-bold leading-tight text-white">Tickets</p>
         <p className="mt-0.5 text-[11px] text-slate-300">
           {alla ?? <><strong className={`font-semibold ${vantar > 0 ? 'text-amber-500' : 'text-slate-200'}`}>{vantar} väntar på dig</strong>, du väntar på svar i {jagVantar}</>}
         </p>
       </div>
-      <Knapp id="ny" ikon="allman.plus" prim full={!dator} mk={mk} tryck={tryck}>Ny fråga eller uppdrag</Knapp>
+      <Knapp id="ny" ikon="allman.plus" prim full={!dator} mk={mk} tryck={tryck}>Ny ticket</Knapp>
     </div>
   )
 }
@@ -229,7 +229,7 @@ export function Trad({ amne, ton, status, knappar, hjalp, arende, med, inlagg, n
       {tillbaka && (
         <button type="button" onClick={() => tryck('tillbaka')} className="-ml-1 flex items-center gap-0.5 justify-self-start text-[11.5px] font-medium text-slate-300">
           <Icon name="allman.chevron-vanster" size={16} />
-          Frågor och uppdrag
+          Tickets
         </button>
       )}
       <header className="grid gap-1.5">

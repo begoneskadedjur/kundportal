@@ -1,9 +1,9 @@
 // src/pages/shared/intranet/guider/_allmant.tsx
-// Delade hjälpdelar för de allmänna guiderna (roller och vyer, tillbud, menyerna i Frågor och uppdrag).
+// Delade hjälpdelar för de allmänna guiderna (roller och vyer, tillbud, menyerna i Tickets).
 // Efterbildningar av portalens menyer och sidor. Etiketterna är exakt samma ord som i:
 //   TechnicianMobileNav, technicianNavConfig, coordinatorNavConfig, CoordinatorSidebar,
 //   CoordinatorTopHeader, ViewSwitcher, ReportIncidentButton, IntranetLink, ChangelogLink,
-//   ProfileLink och IncidentsPage. Skärmarna för Frågor och uppdrag ligger i _fragor.tsx.
+//   ProfileLink och IncidentsPage. Skärmarna för Tickets ligger i _fragor.tsx.
 //
 // Lokala ikoner (pratbubbla, klocka, meny med streck, hus, svarspil, hemskärm, mynt)
 // finns inte i ikonbiblioteket ännu. De ritas här enligt ikonstandarden:
@@ -158,7 +158,7 @@ export interface MenyGruppData { label: string; items: string[] }
 
 /** Grupperna i teknikerns meny (technicianNavConfig) */
 export const TEKNIKER_GRUPPER: MenyGruppData[] = [
-  { label: 'Ärenden & Fält', items: ['Mina ärenden', 'Schema', 'Specialrapporter', 'Utrustning', 'Frågor och uppdrag'] },
+  { label: 'Ärenden & Fält', items: ['Mina ärenden', 'Schema', 'Specialrapporter', 'Utrustning', 'Tickets'] },
   { label: 'Försäljning', items: ['Mina leads och tips', 'Skapa Avtal & Offerter', 'Dokumentsignering', 'Min Kundresa'] },
   { label: 'Verktyg', items: ['AI Assistent', 'Provisioner', 'Tillbud & Avvikelser'] },
 ]
@@ -248,7 +248,7 @@ export function TeknikerMeny({ tryck, markera, nr, oppen, vyer, aktivVy = 'Tekni
 
 /** Grupperna i koordinatorns sidomeny (coordinatorNavConfig). Planering och Kunder & Avtal är öppna från början (pinned). */
 export const KOORD_GRUPPER: MenyGruppData[] = [
-  { label: 'Planering', items: ['Ärenden', 'Specialrapporter', 'Ordlistan', 'Rondering & Schema', 'Schemaoptimerare', 'Frågor och uppdrag', 'Tillbud & Avvikelser'] },
+  { label: 'Planering', items: ['Ärenden', 'Specialrapporter', 'Ordlistan', 'Rondering & Schema', 'Schemaoptimerare', 'Tickets', 'Tillbud & Avvikelser'] },
   { label: 'Kunder & Avtal', items: ['Befintliga kunder', 'Trafikljusöversikt', 'Kundprognos', 'Användarkonton (Kund)'] },
   { label: 'Försäljning', items: ['Försäljningspipeline', 'Försäljningsmöjligheter', 'Leads (B2B)', 'Leads (Webb)', 'Dokumentsignering'] },
   { label: 'Fakturering', items: ['Fakturering'] },

@@ -1,6 +1,6 @@
 // src/components/technician/ny/layout/SkapaArk.tsx
 // Skapa-arket i nya arbetsvyn: bottenark i telefonen, ruta på datorn.
-// Varje val leder till en befintlig sida, utom Fråga eller uppdrag till en kollega som
+// Varje val leder till en befintlig sida, utom Ticket till en kollega som
 // öppnar dialogen direkt (NyFragaDialog i layouten). Tillbud ligger avskilt längst ner.
 
 import { useEffect, useRef } from 'react'
@@ -11,7 +11,7 @@ interface Val {
   rubrik: string
   text: string
   ikon: IconName
-  /** Sida att gå till, eller 'fraga' för dialogen Ny fråga eller uppdrag */
+  /** Sida att gå till, eller 'fraga' för dialogen Ny ticket */
   to: string
 }
 
@@ -20,14 +20,14 @@ const VAL: Val[] = [
   { rubrik: 'Specialrapport', text: 'Inspektion, sanering eller annan rapport med bilder.', ikon: 'falt.specialrapport', to: '/technician/specialrapporter' },
   { rubrik: 'Ny station', text: 'Välj kunden på Stationer och placera stationen på kartan.', ikon: 'falt.nystation', to: '/technician/equipment' },
   { rubrik: 'Tips om ny kund', text: 'Någon som behöver hjälp? Skriv namn och vad det gäller.', ikon: 'lead.tips', to: '/technician/leads?ny=1' },
-  { rubrik: 'Fråga eller uppdrag till en kollega', text: 'Till en kollega, en roll eller alla, om ett ärende.', ikon: 'dok.konversation', to: 'fraga' },
+  { rubrik: 'Ticket till en kollega', text: 'Till en kollega, en roll eller alla, om ett ärende.', ikon: 'dok.konversation', to: 'fraga' },
   { rubrik: 'Fråga AI-assistenten', text: 'Om skadedjur, metoder eller hur portalen fungerar.', ikon: 'kalla.ai', to: '/technician/team-chat' },
 ]
 
 interface Props {
   oppen: boolean
   onClose: () => void
-  /** Öppnar dialogen Ny fråga eller uppdrag */
+  /** Öppnar dialogen Ny ticket */
   onNyFraga: () => void
 }
 

@@ -1,5 +1,5 @@
 // src/components/fragor/filer.ts
-// Bilagor i Frågor och uppdrag: samma gränser som kommunikationspanelen
+// Bilagor i Tickets: samma gränser som kommunikationspanelen
 // (bilder och PDF, högst 5 MB, bucket comment-attachments).
 
 import toast from 'react-hot-toast'
