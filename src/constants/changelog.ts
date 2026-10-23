@@ -45,6 +45,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.84.4',
+    date: '2026-10-23',
+    title: 'Kartan i nya Utrustning visar dina stationer',
+    items: [
+      { kind: 'andring', text: 'Fliken Karta under Utrustning i nya arbetsvyn visar nu bara stationer du själv har satt ut, med antal ute, inne och kunder. Kundlistan har kvar valet Alla eller Mina.' },
+    ],
+  },
+  {
     version: '3.84.3',
     date: '2026-10-23',
     title: 'Kontrollrundan i nya arbetsvyn går att använda',

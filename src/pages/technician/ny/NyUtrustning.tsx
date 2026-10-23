@@ -179,6 +179,21 @@ export default function NyUtrustning() {
     return { total: ute.length + inne, outdoor: ute.length, indoor: inne, byStatus, customerCount: allCustomers.length }
   }, [allEquipment, allCustomers])
 
+  // Kartfliken visar alltid teknikerns egna stationer (placerade av teknikern),
+  // oavsett valet Alla/Mina i kundlistan (Christian 2026-10-23).
+  const kartEquipment = useMemo(
+    () => fetchedEquipment.filter(e => e.placed_by_technician_id === technicianId),
+    [fetchedEquipment, technicianId]
+  )
+  const kartStats = useMemo(() => {
+    const ute = kartEquipment.filter(e => e.latitude && e.longitude)
+    const byStatus: Record<string, number> = {}
+    ute.forEach(e => { byStatus[e.status] = (byStatus[e.status] || 0) + 1 })
+    const egnaKunder = fetchedCustomers.filter(c => c.own_outdoor_count + c.own_indoor_count > 0)
+    const inne = egnaKunder.reduce((s, c) => s + c.own_indoor_count, 0)
+    return { total: ute.length + inne, outdoor: ute.length, indoor: inne, byStatus, customerCount: egnaKunder.length }
+  }, [kartEquipment, fetchedCustomers])
+
   // Utomhustyper per kund (färgpunkter i kundlistan), aktiva stationer
   const typerPerKund = useMemo(() => {
     const m = new Map<string, Map<string, TypRad>>()
@@ -312,9 +327,9 @@ export default function NyUtrustning() {
             // isolate: Google Maps-lagren har höga z-index och får inte hamna över sidhuvud och meny
             <div className="relative isolate z-0">
               <CollapsibleMapSection
-                equipment={allEquipment}
-                stats={stats}
-                rubrik={scope === 'own' ? 'Utplacerat av mig' : 'Alla stationer'}
+                equipment={kartEquipment}
+                stats={kartStats}
+                rubrik="Utplacerat av mig"
                 onEquipmentClick={(e) => { if (e.customer_id) navigate(`/technician/equipment/customer/${e.customer_id}`) }}
                 defaultExpanded={true}
                 focusCustomerId={mapFocusCustomerId}
