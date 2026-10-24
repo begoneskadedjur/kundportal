@@ -343,7 +343,7 @@ export default function Leads() {
       )}
 
       {/* Fast knapp på mobil */}
-      <div className="md:hidden fixed bottom-4 inset-x-4 z-30">
+      <div className="md:hidden fixed bottom-[calc(var(--bottenlist,0px)+1rem)] inset-x-4 z-30">
         <Button variant="primary" fullWidth onClick={() => setVisaNy(true)} className="min-h-[44px] shadow-lg">
           <Plus className="w-4 h-4 mr-1.5" /> {arTekniker ? 'Tipsa om en lead' : 'Ny lead'}
         </Button>

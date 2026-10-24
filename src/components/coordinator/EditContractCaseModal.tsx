@@ -2508,7 +2508,7 @@ export default function EditContractCaseModal({
                 </HjalpText>
               ) : isEstablishment ? (
                 <HjalpText id="steg-arbete-etablering" rubrik="Placera ut stationerna">
-                  Utplaceringen görs på sidan Utrustning, som tidigare. Kom tillbaka till ärendet för rapport och avslut.
+                  Utplaceringen görs på sidan Stationer. När du trycker Färdig med etablering där avslutas ärendet.
                 </HjalpText>
               ) : (
                 <HjalpText id="steg-arbete" rubrik="Vad ska göras?">
@@ -2834,8 +2834,8 @@ export default function EditContractCaseModal({
         {/* ═══ Flik: Utförande ═══ */}
         <div className={stegLage ? 'contents' : activeTab === 'utforande' ? 'space-y-3' : 'hidden'}>
           {/* Arbetstid - tidtagning */}
-          {/* Nya arbetsvyn: tiden räknas i bakgrunden och visas inte i stegen */}
-          {iSteg([], !isCustomerView && (
+          {/* Nya arbetsvyn: tiden räknas i bakgrunden och visas inte, varken i stegen eller i flikvyn */}
+          {iSteg([], !nyArbetsvy && !isCustomerView && (
             <CaseModalSection icon={Clock} iconClassName="text-purple-400" title="Arbetstid">
                   <div className="flex items-center gap-3">
                     <span className={`text-lg font-bold font-mono ${isTimerRunning ? 'text-green-400' : 'text-white'}`}>

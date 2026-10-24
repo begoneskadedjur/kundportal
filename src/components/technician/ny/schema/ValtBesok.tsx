@@ -9,7 +9,7 @@ import {
   TYP_ETIKETT, klockslag, navigeraUrl, telUrl, tidTill, type DagBesok,
 } from '../../../../services/teknikerDagService'
 import { dagRubrik, kollegor, schemaStatus, visaStationer } from './schemaLogik'
-import { ArbetsTid } from './SchemaDelar'
+import { ArbetsTid, VISA_ARBETSTID } from './SchemaDelar'
 
 const SEKUNDAR = 'h-11 flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]'
 const AV = 'h-11 flex items-center justify-center gap-2 rounded-xl border border-slate-700 text-sm font-semibold text-slate-500 cursor-not-allowed'
@@ -70,7 +70,7 @@ export function ValtBesok({ besok: b, idag, kortid, stationer, minId, onOppna }:
         {med.length > 0 && (
           <li className="flex items-center gap-2"><Icon name="bokning.team" size={16} className="text-slate-400" />Med {med.join(' och ')}</li>
         )}
-        {(b.arbeteStartat || b.arbetadeMinuter > 0) && (
+        {VISA_ARBETSTID && (b.arbeteStartat || b.arbetadeMinuter > 0) && (
           <li className="flex items-center gap-2"><Icon name="allman.klocka" size={16} className="text-slate-400" /><ArbetsTid b={b} /></li>
         )}
         {b.arendenummer && (

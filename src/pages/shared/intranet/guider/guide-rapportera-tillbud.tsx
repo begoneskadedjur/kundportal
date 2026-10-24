@@ -1,170 +1,234 @@
 // src/pages/shared/intranet/guider/guide-rapportera-tillbud.tsx
-// Guidemodul: Rapportera ett tillbud, en avvikelse eller en olycka (tekniker, telefon).
-// Etiketterna kommer från TechnicianMobileNav (Mer, gula knappen ReportIncidentButton),
-// TechnicianDashboard (snabbknappen Rapportera tillbud/olycka) och IncidentsPage
-// (Tillbud & Avvikelser, Rapportera händelse, Oj! Aj! Hmm, Vad har hänt?, När inträffade
-// händelsen?, Berörda anställda, Skicka rapport, Tillbud rapporterad). Teknikern står redan
-// med som berörd. Påhittade namn, ingenting sparas.
+// Guidemodul: Rapportera ett tillbud, en avvikelse eller en olycka (tekniker, nya
+// arbetsvyn, telefon och dator). Omskriven 2026-10-24, slugen behålls för läsloggen.
+// Källor: NyTeknikerLayout (den gula knappen "Rapportera tillbud, avvikelse eller olycka"
+// i sidhuvudet, går till /technician/tillbud-avvikelser), IncidentsPage (rubriken
+// Tillbud & Avvikelser, Rapportera händelse, typerna Oj! Tillbud, Aj! Olycka, Hmm
+// Avvikelse med texterna ur INCIDENT_TYPE_CONFIG, påminnelsen om Arbetsmiljöverket vid
+// Olycka, Vad har hänt?, Vad har ni redan gjort?, När inträffade händelsen?, Rapportör,
+// Berörda anställda, Koppla till ärende, Avbryt, Skicka rapport, "Tillbud rapporterad",
+// status Ny). Påhittade kunder och kollegor.
 
 import { useState } from 'react'
-import { Kort, Markor, Notis, OvningRam, Rad, Telefon, type OvningSvar } from '../skarmkit'
 import { Icon } from '../../../../components/icons/Icon'
+import { INCIDENT_TYPE_CONFIG, ALL_INCIDENT_TYPES, type IncidentType } from '../../../../types/caseIncidents'
+import { Markor, Notis, OvningRam, type OvningSvar } from '../skarmkit'
+import { NySkarm, useGuideEnhet, type NyMarkor } from '../skarmkit/nyvy'
 import type { GuideModul } from './registry'
-import { TeknikerBotten, TeknikerHuvud, TeknikerMeny, TillbudFormular, TillbudRad, TillbudRubrik, SidRubrik, mk, type TillbudTyp } from './_allmant'
+import { IdagSida, Punkt, Rulla, UNDER_IDAG, gorMk, ingenMk, type Mk, type Tryck } from './_nyvy_min_dag'
 
-type Vy = 'hem' | 'meny' | 'sida' | 'form' | 'klart'
+const NAMN = 'Anna Exempel'
+const TEXT = 'Stegen gled på det blöta golvet i lagret hos Exempel AB. Jag tog emot mig, ingen skadades.'
 
-interface Lage {
-  vy: Vy
-  oppen?: string
-  typ: TillbudTyp
-  text: boolean
+interface Vy {
+  sida: 'start' | 'lista' | 'form' | 'skickad'
+  typ: IncidentType
+  text?: boolean
+  koppla?: boolean
 }
 
-const BESKRIVNING = 'Stegen gled på det blöta golvet i källaren hos Exempel AB. Jag tog emot mig, ingen skadades.'
-const LABEL: Record<TillbudTyp, string> = { tillbud: 'Tillbud', olycka: 'Olycka', avvikelse: 'Avvikelse' }
+const KORT_FARG: Record<IncidentType, string> = {
+  tillbud: 'border-amber-500/40 bg-amber-500/10 text-amber-400',
+  olycka: 'border-red-500/40 bg-red-500/10 text-red-400',
+  avvikelse: 'border-blue-500/40 bg-blue-500/10 text-blue-400',
+}
 
-function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void; markera?: string; nr: number }) {
+function Lista({ ny, mk, tryck }: { ny: boolean; mk: Mk; tryck?: Tryck }) {
+  const rader = [
+    ...(ny ? [{ typ: 'tillbud' as IncidentType, text: 'Stegen gled på det blöta golvet i lagret hos Exempel AB.', datum: '2026-10-26', status: 'Ny', ton: 'gul' as const }] : []),
+    { typ: 'avvikelse' as IncidentType, text: 'Betesstationer saknades vid lastkajen hos Brf Exempelgården.', datum: '2026-10-12', status: 'Åtgärdad', ton: 'gron' as const },
+  ]
   return (
-    <Telefon>
-      <TeknikerHuvud tryck={tryck} nr={nr} />
-
-      {(l.vy === 'hem' || l.vy === 'meny') && (
-        <div className="p-3">
-          <SidRubrik titel="God morgon, Erik" under="fredag 16 oktober" />
-          <Kort titel="Dagens schema" ikon="allman.kalender"><Rad v="08:00 Exempel AB" /></Kort>
-          <div className="m-2.5 grid grid-cols-3 gap-1.5">
-            {['Skapa avtal', 'AI Assistent'].map(t => (
-              <button key={t} type="button" onClick={() => tryck('snabb-annan')} className="rounded-xl border border-slate-700 bg-slate-800/30 p-2 text-[10px] font-medium text-slate-300">{t}</button>
-            ))}
-            <Markor markor={mk(markera, 'snabb', nr)} block>
-              <button type="button" onClick={() => tryck('snabb')} className="flex w-full flex-col items-center gap-1 rounded-xl border border-slate-700 bg-slate-800/30 p-2 text-[10px] font-medium leading-tight text-slate-300">
-                <Icon name="rapport.avvikelse" size={16} className="text-amber-400" />
-                Rapportera tillbud/olycka
-              </button>
-            </Markor>
+    <div className="grid gap-2">
+      <div className="flex items-start gap-2">
+        <span className="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 text-[#fff]"><Icon name="rapport.avvikelse" size={20} className="h-4 w-4" /></span>
+        <p className="text-[14px] font-bold text-white">Tillbud & Avvikelser</p>
+      </div>
+      <div className="flex gap-1.5">
+        <Markor markor={mk('rapportera')}>
+          <button type="button" onClick={() => tryck?.('rapportera')} className="flex h-8 items-center gap-1 rounded-lg bg-[#20c58f] px-2.5 text-[11.5px] font-medium text-[#fff]">
+            <Icon name="allman.plus" size={16} className="h-3.5 w-3.5" />Rapportera händelse
+          </button>
+        </Markor>
+        <span className="flex h-8 items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2.5 text-[11.5px] text-white"><Icon name="allman.aterstall" size={16} className="h-3.5 w-3.5" />Uppdatera</span>
+      </div>
+      <div className="overflow-hidden rounded-lg border border-slate-700 bg-slate-900">
+        {rader.map((r, i) => (
+          <div key={i} className="grid gap-0.5 border-b border-slate-700/60 px-2 py-1.5 last:border-b-0">
+            <div className="flex items-center justify-between">
+              <span className={`text-[11px] font-semibold ${KORT_FARG[r.typ].split(' ').pop()}`}>{INCIDENT_TYPE_CONFIG[r.typ].label}</span>
+              <Punkt ton={r.ton}>{r.status}</Punkt>
+            </div>
+            <span className="truncate text-[11px] text-slate-300">{r.text}</span>
+            <span className="text-[9.5px] text-slate-500">{r.datum} · {NAMN}</span>
           </div>
-        </div>
-      )}
-
-      {(l.vy === 'sida' || l.vy === 'klart') && (
-        <div className="p-3">
-          <TillbudRubrik tryck={tryck} markera={markera} nr={nr} />
-          <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-800/50">
-            {l.vy === 'klart' && <TillbudRad typ={l.typ} status="Ny" text={BESKRIVNING} datum="2026-10-16 09:45" />}
-            <TillbudRad typ="avvikelse" status="Avslutad" text="Spill av preparat i bilen." datum="2026-09-02 14:10" onClick={() => tryck('rad')} />
-          </div>
-        </div>
-      )}
-
-      {l.vy === 'form' && (
-        <div className="p-2">
-          <TillbudFormular typ={l.typ} beskrivning={l.text ? BESKRIVNING : ''} berorda={['Erik Exempel']} kontorVal=""
-            tryck={tryck} markera={markera} nr={nr} />
-        </div>
-      )}
-
-      <TeknikerBotten tryck={tryck} markera={markera} nr={nr} aktiv={l.vy === 'hem' ? 'hem' : undefined} />
-      {l.vy === 'meny' && <TeknikerMeny tryck={tryck} markera={markera} nr={nr} oppen={l.oppen} />}
-      {l.vy === 'klart' && <Notis text={`${LABEL[l.typ]} rapporterad`} />}
-    </Telefon>
+        ))}
+      </div>
+    </div>
   )
 }
 
-// ─── Visning: en skärm per steg i guidens visning-block ───
+function Formular({ vy, mk, tryck }: { vy: Vy; mk: Mk; tryck?: Tryck }) {
+  const enhet = useGuideEnhet()
+  const kanSkicka = !!vy.text
+  const falt = 'w-full rounded-lg border border-slate-700 bg-slate-900/50 px-2 py-1.5 text-left text-[11px]'
+  const etikett = 'mb-0.5 block text-[10px] font-medium text-slate-400'
+  return (
+    <div className="grid gap-2 rounded-xl border border-slate-700 bg-slate-800/50 p-2.5">
+      <div className="flex items-center justify-between">
+        <p className="flex items-center gap-1 text-[11.5px] font-semibold text-white"><Icon name="rapport.avvikelse" size={16} className="h-3.5 w-3.5 text-amber-400" />Rapportera händelse</p>
+        <Icon name="allman.stang" size={16} className="h-3.5 w-3.5 text-slate-400" />
+      </div>
+      <div className={`grid gap-1.5 ${enhet === 'dator' ? 'grid-cols-3' : ''}`}>
+        {ALL_INCIDENT_TYPES.map(t => {
+          const c = INCIDENT_TYPE_CONFIG[t]
+          const vald = vy.typ === t
+          return (
+            <Markor key={t} markor={mk(`typ:${t}`)} block>
+              <button type="button" onClick={() => tryck?.(`typ:${t}`)}
+                className={`w-full rounded-lg border p-1.5 text-left ${vald ? KORT_FARG[t] : 'border-slate-700 bg-slate-800 text-slate-300'}`}>
+                <span className="flex items-baseline gap-1.5">
+                  <span className="text-[13px] font-extrabold leading-none">{c.exclamation}</span>
+                  <span className="text-[11px] font-semibold">{c.label}</span>
+                </span>
+                <span className="block text-[9.5px] leading-snug text-slate-500">{c.description}</span>
+              </button>
+            </Markor>
+          )
+        })}
+      </div>
+      {vy.typ === 'olycka' && (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-1.5 text-[9.5px] text-red-300">Vid allvarlig olycka eller allvarligt tillbud ska arbetsgivaren utan dröjsmål anmäla till Arbetsmiljöverket. anmalarbetsskada.se</p>
+      )}
+      <div>
+        <span className={etikett}>Vad har hänt? <span className="text-red-400">*</span></span>
+        <Markor markor={mk('vad')} block>
+          <button type="button" onClick={() => tryck?.('vad')} className={`${falt} min-h-[44px] ${vy.text ? 'text-white' : 'text-slate-500'}`}>
+            {vy.text ? TEXT : 'Beskriv händelsen: vad hände, var och hur?'}
+          </button>
+        </Markor>
+      </div>
+      <div>
+        <span className={etikett}>Vad har ni redan gjort? <span className="text-slate-600">(valfritt)</span></span>
+        <span className={`${falt} block text-slate-500`}>T.ex. sanerat platsen, uppsökt vårdcentral, kontaktat kund...</span>
+      </div>
+      <div className={`grid gap-1.5 ${enhet === 'dator' ? 'grid-cols-2' : ''}`}>
+        <div><span className={etikett}>När inträffade händelsen?</span><span className={`${falt} block text-white`}>2026-10-26 07:30</span></div>
+        <div><span className={etikett}>Rapportör</span><span className={`${falt} block text-slate-400`}>{NAMN}</span></div>
+      </div>
+      <div>
+        <span className={etikett}>Berörda anställda <span className="text-red-400">*</span></span>
+        <span className="inline-flex rounded-md border border-slate-600 bg-slate-700/50 px-1.5 py-0.5 text-[10.5px] text-white">{NAMN}</span>
+        <span className={`${falt} mt-1 block text-slate-500`}>Lägg till anställd...</span>
+      </div>
+      <div>
+        <span className={etikett}>Koppla till ärende <span className="text-slate-600">(valfritt)</span></span>
+        <Markor markor={mk('koppla')} block>
+          <button type="button" onClick={() => tryck?.('koppla')} className={`${falt} flex items-center gap-1 ${vy.koppla ? 'text-white' : 'text-slate-500'}`}>
+            <Icon name="allman.sok" size={16} className="h-3 w-3 text-slate-500" />{vy.koppla ? 'BE-0001340 Exempel AB' : 'Sök bland dina ärenden...'}
+          </button>
+        </Markor>
+      </div>
+      <div className="flex items-center justify-end gap-2 border-t border-slate-700/50 pt-1.5">
+        <span className="px-2 text-[11px] text-slate-400">Avbryt</span>
+        <Markor markor={mk('skicka')}>
+          <button type="button" onClick={() => tryck?.('skicka')} aria-disabled={!kanSkicka}
+            className={`rounded-lg bg-[#20c58f] px-3 py-1.5 text-[11.5px] font-medium text-[#fff] ${kanSkicka ? '' : 'opacity-50'}`}>Skicka rapport</button>
+        </Markor>
+      </div>
+    </div>
+  )
+}
 
-const START: Lage = { vy: 'hem', typ: 'tillbud', text: false }
+function Skarm({ vy, markor, tryck }: { vy: Vy; markor?: NyMarkor; tryck: Tryck }) {
+  const mk = markor ? gorMk(markor) : ingenMk
+  if (vy.sida === 'start') {
+    return <NySkarm sida="idag" titel="Idag" under={UNDER_IDAG} onRam={tryck} markor={markor}><IdagSida /></NySkarm>
+  }
+  return (
+    <NySkarm sida="tillbud" titel="Tillbud och avvikelser" onRam={tryck} markor={markor}
+      over={vy.sida === 'skickad' ? <Notis text="Tillbud rapporterad" /> : undefined}>
+      <Rulla>{vy.sida === 'form' ? <Formular vy={vy} mk={mk} tryck={tryck} /> : <Lista ny={vy.sida === 'skickad'} mk={mk} tryck={tryck} />}</Rulla>
+    </NySkarm>
+  )
+}
 
-const VISNING: { lage: Lage; markera: string }[] = [
-  { lage: START, markera: 'mer' },
-  { lage: { ...START, vy: 'meny' }, markera: 'gul' },
-  { lage: { ...START, vy: 'sida' }, markera: 'ny' },
-  { lage: { ...START, vy: 'form' }, markera: 'typ-tillbud' },
-  { lage: { ...START, vy: 'form' }, markera: 'beskrivning' },
-  { lage: { ...START, vy: 'form', text: true }, markera: 'skicka' },
+const STEG: { vy: Vy; mal: string }[] = [
+  { vy: { sida: 'start', typ: 'tillbud' }, mal: 'tillbud' },
+  { vy: { sida: 'lista', typ: 'tillbud' }, mal: 'rapportera' },
+  { vy: { sida: 'form', typ: 'tillbud' }, mal: 'typ:tillbud' },
+  { vy: { sida: 'form', typ: 'tillbud' }, mal: 'vad' },
+  { vy: { sida: 'form', typ: 'tillbud', text: true }, mal: 'koppla' },
+  { vy: { sida: 'form', typ: 'tillbud', text: true, koppla: true }, mal: 'skicka' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
-  const v = VISNING[Math.min(steg, VISNING.length - 1)]
-  return <Skarm l={v.lage} markera={v.markera} nr={steg + 1} tryck={id => { if (id === v.markera) onNasta() }} />
+  const s = STEG[Math.min(steg, STEG.length - 1)]
+  return <Skarm vy={s.vy} markor={{ pa: true, nr: steg + 1, mal: s.mal }} tryck={m => { if (m === s.mal) onNasta() }} />
 }
 
-// ─── Övning: samma skärmar utan markörer ───
-
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du står på Översikt. Hitta vägen till rapporteringen.' }
-
-const TIPS: Record<string, string> = {
-  hem: 'Du står redan på Översikt. Öppna menyn med Mer, eller använd snabbknappen.',
-  arenden: 'Rapporten skrivs inte i ärendet. Öppna menyn med Mer.',
-  schema: 'Schemat visar dina besök. Öppna menyn med Mer.',
-  provision: 'Provision visar din provision. Öppna menyn med Mer.',
-  notis: 'Klockan öppnar Tickets. Rapporten skriver du på sidan Tillbud & Avvikelser.',
-  sok: 'Sök letar efter ärenden och kunder. Öppna menyn med Mer.',
-  'snabb-annan': 'Den snabbknappen gör något annat. Leta efter Rapportera tillbud/olycka.',
-  intranat: 'Intranätet har policyerna. Själva rapporten skickar du med den gula knappen.',
-  uppdateringar: 'Uppdateringar visar nyheter. Tryck på den gula knappen.',
-  'mitt-konto': 'Mitt konto är dina uppgifter. Tryck på den gula knappen.',
-  utanfor: 'Trycker du bredvid stängs menyn. Tryck på den gula knappen.',
-  rad: 'Det är en gammal rapport. Gör en ny med Rapportera händelse.',
-  exportera: 'Tryck Rapportera händelse.',
-  nar: 'Tiden är redan satt till nu. Ändra bara om det hände tidigare.',
-  'valj-anstalld': 'Du står redan med som berörd. Lägg bara till fler om någon mer var med.',
-  'lagg-till': 'Du står redan med som berörd. Lägg bara till fler om någon mer var med.',
-  avbryt: 'Avbryt stänger formuläret och allt du skrivit försvinner. Fortsätt i stället.',
-  stang: 'Krysset stänger formuläret och allt du skrivit försvinner. Fortsätt i stället.',
-}
-
+// Övningen: stegen gled, ingen skadades
 function Ovning() {
-  const [l, setL] = useState<Lage>(START)
-  const [svar, setSvar] = useState<OvningSvar>(BORJA)
-  const [fel, setFel] = useState(0)
+  const enhet = useGuideEnhet()
+  const startVy: Vy = { sida: 'start', typ: 'tillbud' }
+  const [vy, setVy] = useState<Vy>(startVy)
+  const [framsteg, setFramsteg] = useState(0)
+  const start: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Stegen gled på det blöta golvet hos Exempel AB. Du tog emot dig och ingen skadades. Rapportera det.' }
+  const [svar, setSvar] = useState<OvningSvar>(start)
 
-  const miss = (text: string) => { setFel(f => f + 1); setSvar({ typ: 'fel', titel: 'Inte där', text }) }
-  const tips = (titel: string, text: string) => setSvar({ typ: 'tips', titel, text })
-  const tillSida = () => { setL({ ...l, vy: 'sida' }); tips('Tillbud & Avvikelser', 'Här ser du dina egna rapporter. Gör en ny.') }
-
-  const tryck = (id: string) => {
-    if (l.vy === 'klart') return
-    if (l.vy === 'hem') {
-      if (id === 'mer' || id === 'meny') { setL({ ...l, vy: 'meny' }); tips('Menyn är öppen', 'Leta efter den gula knappen.') }
-      else if (id === 'snabb') tillSida()
-      else miss(TIPS[id] ?? 'Tryck på Mer längst ner till höger.')
-    } else if (l.vy === 'meny') {
-      if (id === 'gul' || id === 'post-Tillbud & Avvikelser') tillSida()
-      else if (id.startsWith('grupp-')) { const g = id.slice(6); setL({ ...l, oppen: l.oppen === g ? undefined : g }); tips(g, 'Den gula knappen längre ner går snabbare.') }
-      else miss(TIPS[id] ?? 'Tryck på den gula knappen Rapportera tillbud, avvikelse eller olycka.')
-    } else if (l.vy === 'sida') {
-      if (id === 'ny') { setL({ ...l, vy: 'form' }); tips('Formuläret är öppet', 'Vad hände? Ingen skadades, men det kunde ha gått illa. Välj rätt typ.') }
-      else miss(TIPS[id] ?? 'Tryck Rapportera händelse.')
-    } else {
-      if (id.startsWith('typ-')) {
-        const typ = id.slice(4) as TillbudTyp
-        setL({ ...l, typ })
-        if (typ === 'tillbud') tips('Oj! Tillbud', 'Rätt. Det kunde ha gått illa, men ingen skadades. Beskriv nu vad som hände.')
-        else if (typ === 'olycka') miss('Aj! Olycka är när någon skadades. Ingen skadades här.')
-        else miss('Hmm Avvikelse är när en rutin eller ett krav inte följs. Här var det nära att gå illa.')
-      } else if (id === 'beskrivning') { setL({ ...l, text: true }); tips('Beskrivningen är skriven', 'Vad hände, var och hur. Skicka rapporten.') }
-      else if (id === 'skicka') {
-        if (!l.text) miss('Knappen fungerar först när Vad har hänt? är ifyllt.')
-        else if (l.typ !== 'tillbud') miss('Kontrollera typen. Ingen skadades, men det kunde ha gått illa.')
-        else {
-          setL({ ...l, vy: 'klart' })
-          setSvar({
-            typ: 'ok',
-            titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-            text: `Det står Tillbud rapporterad. Rapporten ligger överst i listan med status Ny, och de som tar emot tillbud fick en notis och ett mejl.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
-          })
-        }
-      } else miss(TIPS[id] ?? 'Välj typ, beskriv och skicka.')
+  const tryck = (mal: string) => {
+    if (vy.sida === 'start') {
+      if (mal === 'tillbud') {
+        setVy({ ...vy, sida: 'lista' }); setFramsteg(1)
+        setSvar({ typ: 'tips', titel: 'Rätt knapp', text: 'Sidan Tillbud och avvikelser är öppen. Starta en ny rapport.' })
+        return
+      }
+      setSvar({ typ: 'fel', titel: 'Inte där', text: 'Leta efter den gula varningsknappen uppe till höger. Den finns på varje sida.' })
+      return
+    }
+    if (vy.sida === 'lista') {
+      if (mal === 'rapportera') {
+        setVy({ ...vy, sida: 'form' }); setFramsteg(2)
+        setSvar({ typ: 'tips', titel: 'Formuläret är öppet', text: 'Välj typ och beskriv vad som hände.' })
+        return
+      }
+      setSvar({ typ: 'fel', titel: 'Inte den', text: 'Tryck på den gröna knappen Rapportera händelse.' })
+      return
+    }
+    if (vy.sida === 'form') {
+      if (mal.startsWith('typ:')) {
+        const t = mal.slice(4) as IncidentType
+        setVy({ ...vy, typ: t })
+        setSvar(t === 'tillbud'
+          ? { typ: 'tips', titel: 'Tillbud', text: 'Det kunde ha gått illa men ingen skadades. Beskriv nu vad som hände.' }
+          : { typ: 'fel', titel: t === 'olycka' ? 'Ingen skadades' : 'Mer än en avvikelse', text: t === 'olycka' ? 'En olycka är när någon skadas. Här skadades ingen, så det är ett tillbud.' : 'Det kunde ha gått illa. Det är ett tillbud, inte en avvikelse från rutinen.' })
+        return
+      }
+      if (mal === 'vad') {
+        setVy({ ...vy, text: true }); setFramsteg(3)
+        setSvar({ typ: 'tips', titel: 'Beskrivningen är skriven', text: 'Ditt namn står redan under Berörda anställda. Skicka rapporten.' })
+        return
+      }
+      if (mal === 'koppla') {
+        setVy({ ...vy, koppla: true })
+        setSvar({ typ: 'tips', titel: 'Kopplad', text: 'Kopplingen är valfri. Skicka nu rapporten.' })
+        return
+      }
+      if (mal === 'skicka') {
+        if (!vy.text) { setSvar({ typ: 'fel', titel: 'Knappen är grå', text: 'Skicka rapport går inte förrän Vad har hänt? är ifyllt.' }); return }
+        if (vy.typ !== 'tillbud') { setSvar({ typ: 'fel', titel: 'Kolla typen', text: 'Ingen skadades och det kunde ha gått illa. Välj Oj! Tillbud innan du skickar.' }); return }
+        setVy({ ...vy, sida: 'skickad' }); setFramsteg(4)
+        setSvar({ typ: 'ok', titel: 'Klart', text: 'Det står Tillbud rapporterad. Rapporten ligger överst i listan med status Ny, och de som tar emot tillbud får en notis och ett mejl.' })
+      }
     }
   }
+  const borjaOm = () => { setVy(startVy); setFramsteg(0); setSvar(start) }
 
-  const framsteg = l.vy === 'hem' ? 0 : l.vy === 'meny' ? 1 : l.vy === 'sida' ? 2 : l.vy === 'klart' ? 5 : l.text ? 4 : 3
   return (
-    <OvningRam framsteg={framsteg} totalt={5} svar={svar} onBorjaOm={() => { setL(START); setSvar(BORJA); setFel(0) }}>
-      <Skarm l={l} tryck={tryck} nr={0} />
+    <OvningRam framsteg={framsteg} totalt={4} svar={svar} onBorjaOm={borjaOm} bred={enhet === 'dator'}>
+      <Skarm vy={vy} tryck={tryck} />
     </OvningRam>
   )
 }
 
-export default { Visning, Ovning } satisfies GuideModul
+export default { Visning, Ovning, enheter: ['mobil', 'dator'] } satisfies GuideModul

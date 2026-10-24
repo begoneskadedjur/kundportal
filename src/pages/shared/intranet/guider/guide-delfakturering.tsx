@@ -1,207 +1,130 @@
 // src/pages/shared/intranet/guider/guide-delfakturering.tsx
-// Guidemodul: Delfakturera ett ärende (tekniker, telefon).
-// Etiketterna kommer från EditCaseModal (fliken Ekonomi, fotspåren, Vad vill du göra?),
-// CaseServiceSelector (Tjänster & fakturarader, Inga tjänster tillagda än) och
-// RevisitModal (Visa förslag →, Skapa delfaktura för nuvarande tjänster, Boka återbesök,
-// Återbesök bokat och delfaktura ... skapad!). Övningen är fallet en faktura per månad.
-// Påhittad kund, ingenting sparas.
+// Guidemodul: Delfakturera ett ärende (tekniker, nya arbetsvyn, telefon och dator).
+// Delfakturan är kryssrutan Skapa delfaktura för nuvarande tjänster i RevisitModal, som
+// nya vyn öppnar från steget Klart › Bara besöket › Boka återbesök. Rutan visas när
+// ärendet har ofakturerade rader (annars "Inga ofakturerade tjänster på ärendet") och är
+// grå när ärendet har ett anpassat pris för hela jobbet. Raderna visas exkl. moms med
+// Totalt (exkl. moms). Företagskund i exemplet, påhittad, inget sparas.
 
 import { useState } from 'react'
-import { ArendeHuvud, Flikar, IkonKnapp, Notis, OvningRam, Status, Telefon, type OvningSvar } from '../skarmkit'
+import { OvningRam, type OvningSvar } from '../skarmkit'
+import { useGuideEnhet } from '../skarmkit/nyvy'
+import { ArendeRam, AterbesokRuta, KlartInnehall, Notis, RapportInnehall, type AterbesokLage } from './_nyvy_arendet'
 import type { GuideModul } from './registry'
-import { RevisitSteg1, RevisitSteg2, TjansterKort, ValArk, mk, type FRad, type Tid } from './_fakturering'
 
-type Vy = 'arende' | 'val' | 'steg1' | 'steg2' | 'klart'
+const KUNDEN = 'Brf Exempelgården · Exempelgatan 2, Södertälje'
+const ARENDE = 'BE-0001240'
+const RADER: [string, number][] = [['Råttbekämpning, första besöket', 1800], ['Tätning av ventil', 950]]
 
-interface Lage {
-  vy: Vy
-  flik: number
-  datum: boolean
-  tid: string | null
-  delfaktura: boolean
-}
+type Vy = 'rapport' | 'klart' | 'dialog' | 'bokat'
+interface Lage { vy: Vy; val: 'hela' | 'besok'; a: AterbesokLage }
 
-interface Besok {
-  /** Dagens besök, som står i schemaläggningen */
-  idag: string
-  /** Datumet som väljs för återbesöket */
-  nasta: string
-  nastaKort: string
-  rader: FRad[]
-  total: string
-}
+const A0: AterbesokLage = { steg: 1, datum: true, langd: 60, manuellt: false, tid: null, anteckning: false, delfaktura: false, rader: RADER }
 
-const VISNING_BESOK: Besok = {
-  idag: 'Tisdag 2026-10-13, 08:00 till 09:00',
-  nasta: 'tisdag 2026-10-20',
-  nastaKort: 'tisdag 20 oktober',
-  rader: [['Råttbekämpning, första besöket', '1 800 kr'], ['Tätning av ventil', '950 kr']],
-  total: '2 750 kr',
-}
-
-const TIDER: Tid[] = [
-  { id: 't1', tid: '08:00 till 09:00', tekniker: 'Anna Exempel' },
-  { id: 't2', tid: '13:30 till 14:30', tekniker: 'Anna Exempel' },
-]
-
-function Skarm({ l, b, tryck, markera, nr, notis }: { l: Lage; b: Besok; tryck: (id: string) => void; markera?: string; nr: number; notis?: string }) {
-  const klar = l.vy === 'klart'
-  const rader = klar && l.delfaktura ? [] : b.rader
+function Skarm({ l, markera, nr, tryck }: { l: Lage; markera?: string; nr: number; tryck: (id: string) => void }) {
+  const bokat = l.vy === 'bokat'
   return (
-    <Telefon>
-      <ArendeHuvud
-        nr="BE-0001234"
-        status={klar ? <Status text="Återbesök" farg="bg-[#20c58f]" /> : <Status text="Bokad" />}
-        kund="Brf Exempelgården · Exempelgatan 12, Huddinge"
-        ikoner={<>
-          <IkonKnapp ikon="arende.aterbesok" etikett="Boka återbesök eller skapa nytt ärende" onClick={() => tryck('fotspar')} markor={mk(markera, 'fotspar', nr)} />
-          <IkonKnapp ikon="allman.historik" etikett="Ärendehistorik" onClick={() => tryck('historik')} />
-        </>}
-      />
-      <Flikar
-        flikar={['Ärende', 'Utförande', 'Ekonomi']}
-        aktiv={l.flik}
-        onClick={i => tryck(i === 2 ? 'flik-ekonomi' : 'flik')}
-        markor={markera === 'flik-ekonomi' ? { flik: 2, pa: true, nr } : undefined}
-      />
-      {l.flik === 2 ? (
-        <TjansterKort rader={rader} summa={b.total} />
-      ) : (
-        <div className="m-2.5 grid gap-1.5 rounded-xl border border-slate-700 bg-slate-800/40 p-2.5 text-xs text-slate-400">
-          <p className="font-semibold text-white">Schemaläggning</p>
-          <p>{b.idag}</p>
-        </div>
-      )}
-
-      {l.vy === 'val' && <ValArk tryck={tryck} markera={markera} nr={nr} />}
-      {l.vy === 'steg1' && <RevisitSteg1 datum={l.datum} datumText={b.nasta} tryck={tryck} markera={markera} nr={nr} />}
-      {l.vy === 'steg2' && (
-        <RevisitSteg2 under={`Förslag · ${b.nastaKort}`} tider={TIDER} tid={l.tid} delfaktura={l.delfaktura} rader={b.rader} total={b.total} tryck={tryck} markera={markera} nr={nr} />
-      )}
-      {notis && <Notis text={notis} />}
-    </Telefon>
+    <ArendeRam aktivt={l.vy === 'rapport' ? 'rapport' : 'klart'} markera={markera} nr={nr} tryck={tryck} kund={KUNDEN} arendeNr={ARENDE}
+      status={bokat ? 'Återbesök' : 'Bokad'} statusFarg={bokat ? 'bg-teal-400' : undefined}
+      over={l.vy === 'dialog' ? <AterbesokRuta a={l.a} markera={markera} nr={nr} tryck={tryck} />
+        : bokat ? <Notis text={l.a.delfaktura ? 'Återbesök bokat och delfaktura INV-202610-10042 skapad!' : 'Återbesök bokat!'} /> : undefined}>
+      {l.vy === 'rapport'
+        ? <RapportInnehall nr={nr} tryck={tryck} skrivet skickad />
+        : <KlartInnehall k={{ hinder: [], val: l.val, provisionText: 'Underlaget 2 750 kr exkl. moms är under gränsen för provision (4 000 kr), ingen provision registreras.' }} markera={markera} nr={nr} tryck={tryck} />}
+    </ArendeRam>
   )
 }
 
-// ─── Visning: en skärm per steg i guidens visning-block ───
+// ─── Visning ───
 
-const V = (vy: Vy, flik: number, datum: boolean, tid: string | null, delfaktura: boolean): Lage => ({ vy, flik, datum, tid, delfaktura })
-
-const VISNING: { lage: Lage; markera?: string; notis?: string }[] = [
-  { lage: V('arende', 0, false, null, false), markera: 'flik-ekonomi' },
-  { lage: V('arende', 2, false, null, false), markera: 'fotspar' },
-  { lage: V('val', 2, false, null, false), markera: 'val-aterbesok' },
-  { lage: V('steg1', 2, true, null, false), markera: 'visa' },
-  { lage: V('steg2', 2, true, null, false), markera: 'tid-t1' },
-  { lage: V('steg2', 2, true, 't1', false), markera: 'delfaktura' },
-  { lage: V('steg2', 2, true, 't1', true), markera: 'boka' },
+const VISNING: { l: Lage; markera: string }[] = [
+  { l: { vy: 'rapport', val: 'hela', a: A0 }, markera: 'steg:klart' },
+  { l: { vy: 'klart', val: 'hela', a: A0 }, markera: 'besok' },
+  { l: { vy: 'klart', val: 'besok', a: A0 }, markera: 'boka' },
+  { l: { vy: 'dialog', val: 'besok', a: A0 }, markera: 'visa' },
+  { l: { vy: 'dialog', val: 'besok', a: { ...A0, steg: 2 } }, markera: 'tid:08:00' },
+  { l: { vy: 'dialog', val: 'besok', a: { ...A0, steg: 2, tid: '08:00' } }, markera: 'delfaktura' },
+  { l: { vy: 'dialog', val: 'besok', a: { ...A0, steg: 2, tid: '08:00', delfaktura: true } }, markera: 'boka-ok' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
   const v = VISNING[Math.min(steg, VISNING.length - 1)]
-  return <Skarm l={v.lage} b={VISNING_BESOK} markera={v.markera} nr={steg + 1} notis={v.notis} tryck={id => { if (id === v.markera) onNasta() }} />
+  return <Skarm l={v.l} markera={v.markera} nr={steg + 1} tryck={id => { if (id === v.markera) onNasta() }} />
 }
 
-// ─── Övning: en faktura per månad ───
-// Två besök i oktober. Mitt i månaden bokas återbesöket utan kryss, på månadens
-// sista besök med kryss. Delfakturan tar då alla ofakturerade rader, hela oktober.
+// ─── Övning ───
 
-const OKT_13: Besok = {
-  idag: 'Tisdag 2026-10-13, 08:00 till 09:00',
-  nasta: 'tisdag 2026-10-27',
-  nastaKort: 'tisdag 27 oktober',
-  rader: [['Råttbekämpning, 2026-10-06', '1 800 kr'], ['Uppföljningsbesök, 2026-10-13', '1 200 kr']],
-  total: '3 000 kr',
-}
-
-const OKT_27: Besok = {
-  idag: 'Tisdag 2026-10-27, 08:00 till 09:00',
-  nasta: 'tisdag 2026-11-03',
-  nastaKort: 'tisdag 3 november',
-  rader: [...OKT_13.rader, ['Uppföljningsbesök, 2026-10-27', '1 200 kr']],
-  total: '4 200 kr',
-}
-
-const START: Lage = V('arende', 2, false, null, false)
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Besöket 2026-10-13', text: 'Det är mitt i oktober. Boka nästa besök, tisdag 2026-10-27 klockan 08:00.' }
+const START: Lage = { vy: 'rapport', val: 'hela', a: { ...A0, datum: false } }
+const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Brf Exempelgården ska få faktura för det som är gjort nu. Du kommer tillbaka tisdag 2026-10-27 kl 08:00. Gå till steget Klart.' }
 
 const TIPS: Record<string, string> = {
-  historik: 'Klockan visar ärendehistoriken. Återbesöket bokar du med fotspåren.',
-  flik: 'Du behöver inte byta flik. Fotspåren uppe till höger finns i alla flikar.',
-  'flik-ekonomi': 'Du är redan i Ekonomi. Här ser du raderna som väntar. Tryck på fotspåren.',
-  'val-nytt': 'Det är samma råttproblem, så det är ett återbesök.',
-  'val-duplicera': 'Duplicera gör ett nytt ärende. Raderna ska ligga kvar i det här.',
-  'val-avbryt': 'Avbryt stänger rutan. Välj Boka återbesök.',
-  avbryt: 'Avbryt stänger rutan och du får börja om. Fortsätt i stället.',
-  langd: 'En timme passar. Välj datum.',
-  manuellt: 'Det går också, men förslaget 08:00 passar redan.',
-  'tid-t2': 'Det är eftermiddag. Uppdraget var 08:00.',
-  'byt-datum': 'Datumet är rätt. Välj tiden 08:00.',
+  hela: 'Hela ärendet stänger ärendet. Du ska tillbaka, så välj Bara besöket.',
+  'stang-hela': 'Det stänger hela ärendet. Du ska tillbaka.',
+  'spara-utan': 'Spara utan att stänga gör ingen faktura och bokar inget.',
+  lead: 'Skapa lead är för tips om avtal eller mer arbete.',
+  'tid:10:30': 'Du kommer tillbaka kl 08:00.',
+  'tid:13:30': 'Du kommer tillbaka kl 08:00.',
+  manuellt: 'Det går också, men 08:00 finns bland förslagen.',
+  avbryt: 'Avbryt stänger dialogen. Fortsätt i stället.',
+  'stang-aterbesok': 'Krysset stänger dialogen. Fortsätt i stället.',
+  anteckning: 'En anteckning är bra, men uppdraget handlar om fakturan.',
+  'byt-datum': 'Datumet är rätt.',
 }
 
 function Ovning() {
-  const [fas, setFas] = useState<1 | 2>(1)
+  const enhet = useGuideEnhet()
   const [l, setL] = useState<Lage>(START)
   const [svar, setSvar] = useState<OvningSvar>(BORJA)
   const [fel, setFel] = useState(0)
-  const [notis, setNotis] = useState<string | undefined>()
-
-  const b = fas === 1 ? OKT_13 : OKT_27
-  const miss = (text: string) => { setFel(f => f + 1); setSvar({ typ: 'fel', titel: 'Inte riktigt', text }) }
+  const miss = (text: string) => { setFel(f => f + 1); setSvar({ typ: 'fel', titel: 'Inte där', text }) }
   const tips = (titel: string, text: string) => setSvar({ typ: 'tips', titel, text })
+  const a = l.a
+  const setA = (n: Partial<AterbesokLage>) => setL({ ...l, a: { ...a, ...n } })
 
   const tryck = (id: string) => {
-    if (l.vy === 'klart') return
-    setNotis(undefined)
-    if (l.vy === 'arende') {
-      if (id === 'fotspar') { setL({ ...l, vy: 'val' }); tips('Bra', 'Välj det som passar samma problem.') }
-      else miss(TIPS[id] ?? 'Leta efter fotspåren uppe till höger.')
-    } else if (l.vy === 'val') {
-      if (id === 'val-aterbesok') { setL({ ...l, vy: 'steg1' }); tips('Rätt val', `Välj datum, ${b.nasta}.`) }
-      else miss(TIPS[id] ?? 'Välj Boka återbesök.')
-    } else if (l.vy === 'steg1') {
-      if (id === 'datum') { setL({ ...l, datum: true }); tips('Datum valt', 'Tryck Visa förslag →.') }
-      else if (id === 'visa') {
-        if (!l.datum) miss('Knappen fungerar först när du har valt datum.')
-        else { setL({ ...l, vy: 'steg2' }); tips('Här är förslagen', 'Välj 08:00. Tänk sedan på krysset: ska det faktureras nu?') }
-      } else miss(TIPS[id] ?? 'Välj datum först.')
-    } else {
-      if (id === 'tid-t1') { setL({ ...l, tid: 't1' }); tips('Bra tid', fas === 1 ? 'Ska kunden få en faktura nu, mitt i månaden?' : 'Det här är oktobers sista besök. Vad gör du med krysset?') }
-      else if (id === 'delfaktura') {
-        const pa = !l.delfaktura
-        setL({ ...l, delfaktura: pa })
-        if (fas === 1 && pa) tips('Tänk efter', 'Kryssar du i nu blir det en faktura bara för början av oktober. Kunden vill ha en för hela månaden.')
-        else if (fas === 2 && pa) tips('Krysset är i', `Du ser alla tre besöken i oktober, totalt ${b.total}. Tryck Boka återbesök.`)
-        else tips('Krysset är borta', fas === 1 ? 'Raderna ligger kvar på ärendet. Tryck Boka återbesök.' : 'Uppdraget var en faktura för oktober.')
-      } else if (id === 'boka') {
-        if (!l.tid) miss('Välj en tid först.')
-        else if (fas === 1 && l.delfaktura) miss('Det här är mitt i månaden. Ta bort krysset i Skapa delfaktura, så kommer raderna med på månadens sista besök.')
-        else if (fas === 2 && !l.delfaktura) miss('Det här är oktobers sista besök. Kryssa i Skapa delfaktura, annars kommer november med på samma faktura.')
-        else if (fas === 1) {
-          setFas(2)
-          setL(START)
-          setNotis('Återbesök bokat!')
-          tips('Besöket 2026-10-27', 'Återbesöket bokades utan delfaktura. Nu är det oktobers sista besök. Raderna från 6 och 13 oktober ligger kvar. Boka nästa besök, tisdag 2026-11-03 klockan 08:00.')
-        } else {
-          setL({ ...l, vy: 'klart' })
-          setNotis('Återbesök bokat och delfaktura INV-202610-0042 skapad!')
-          setSvar({
-            typ: 'ok',
-            titel: fel === 0 ? 'Felfritt, en faktura för oktober' : 'Klart, en faktura för oktober',
-            text: `Delfakturan tog alla ofakturerade rader på ärendet, alltså alla tre besöken i oktober, ${b.total} exkl. moms. Ärendet börjar november från noll. Det sista besöket behöver inget kryss: det som är kvar blir slutfakturan när ärendet avslutas.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
-          })
-        }
-      } else miss(TIPS[id] ?? 'Välj tid, tänk på krysset och boka.')
+    if (l.vy === 'bokat') return
+    if (l.vy === 'rapport') {
+      if (id === 'steg:klart') { setL({ ...l, vy: 'klart' }); tips('Klart', 'Ärendet ska fortsätta med ett återbesök.') }
+      else miss(TIPS[id] ?? 'Tryck på ikonen Klart längst till höger i stegraden.')
+      return
     }
+    if (l.vy === 'klart') {
+      if (id === 'besok') { setL({ ...l, val: 'besok' }); tips('Bara besöket', 'Delfakturan är en kryssruta i återbesöksdialogen. Öppna den.') }
+      else if (id === 'boka' && l.val === 'besok') { setL({ ...l, vy: 'dialog' }); tips('Boka återbesök', 'Välj tisdag 27 oktober och visa förslagen.') }
+      else miss(TIPS[id] ?? 'Välj Bara besöket.')
+      return
+    }
+    if (a.steg === 1) {
+      if (id === 'datum') { setA({ datum: true }); tips('Datum valt', 'Tryck Visa förslag →.') }
+      else if (id === 'visa') {
+        if (!a.datum) miss('Knappen fungerar först när du har valt datum.')
+        else { setA({ steg: 2 }); tips('Förslagen', 'Välj 08:00. Delfakturan finns längre ner.') }
+      } else if (id.startsWith('langd:')) { setA({ langd: Number(id.split(':')[1]) as AterbesokLage['langd'] }); tips('Längd vald', 'Längden spelar ingen roll för fakturan. Välj datum och visa förslagen.') }
+      else miss(TIPS[id] ?? 'Välj datum under Datum för återbesök *.')
+      return
+    }
+    if (id === 'tid:08:00') { setA({ tid: '08:00' }); tips('08:00', a.delfaktura ? 'Tryck Boka återbesök.' : 'Kunden ska faktureras nu. Vad kryssar du i?') }
+    else if (id === 'delfaktura') {
+      const pa = !a.delfaktura
+      setA({ delfaktura: pa })
+      tips(pa ? 'Delfakturan är med' : 'Bortkryssad', pa ? `Du ser raderna och Totalt (exkl. moms) 2 750 kr.${a.tid ? ' Tryck Boka återbesök.' : ' Välj tid också.'}` : 'Uppdraget var att fakturera nu.')
+    } else if (id === 'boka-ok') {
+      if (!a.tid) miss('Välj en tid först.')
+      else if (!a.delfaktura) miss('Kunden ska faktureras nu. Kryssa i Skapa delfaktura för nuvarande tjänster.')
+      else {
+        setL({ ...l, vy: 'bokat' })
+        setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Återbesöket är bokat och delfakturan på 2 750 kr exkl. moms är skapad. Den går vidare till godkännande och Fortnox, kunden får inget direkt. Raderna är fakturerade och borta från ärendet, så nästa besök börjar från noll.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'}.` : ''}` })
+      }
+    } else miss(TIPS[id] ?? 'Välj tid, kryssa i delfakturan och boka.')
   }
 
-  const iFas = l.vy === 'arende' ? 0 : l.vy === 'val' ? 1 : l.vy === 'steg1' ? (l.datum ? 3 : 2) : l.vy === 'klart' ? 6 : l.tid ? 5 : 4
-  const framsteg = (fas === 1 ? 0 : 6) + iFas
+  const framsteg = l.vy === 'rapport' ? 0 : l.vy === 'klart' ? (l.val === 'besok' ? 2 : 1) : l.vy === 'bokat' ? 7
+    : a.steg === 1 ? 3 : 4 + (a.tid ? 1 : 0) + (a.delfaktura ? 1 : 0)
   return (
-    <OvningRam framsteg={framsteg} totalt={12} svar={svar} onBorjaOm={() => { setFas(1); setL(START); setSvar(BORJA); setFel(0); setNotis(undefined) }}>
-      <Skarm l={l} b={b} tryck={tryck} nr={0} notis={notis} />
+    <OvningRam framsteg={framsteg} totalt={7} svar={svar} onBorjaOm={() => { setL(START); setSvar(BORJA); setFel(0) }} bred={enhet === 'dator'}>
+      <Skarm l={l} nr={0} tryck={tryck} />
     </OvningRam>
   )
 }
 
-export default { Visning, Ovning } satisfies GuideModul
+export default { Visning, Ovning, enheter: ['mobil', 'dator'] } satisfies GuideModul

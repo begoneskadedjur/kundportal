@@ -13,7 +13,7 @@ import { TYP_ETIKETT, klockslag, ortUrAdress, type DagBesok } from '../../../../
 import {
   arbetstid, dagRubrik, franvaroForDag, kollegor, luckor, schemaStatus, varaktighet, visaStationer, type Franvaro,
 } from './schemaLogik'
-import { ArbetsTid } from './SchemaDelar'
+import { ArbetsTid, VISA_ARBETSTID } from './SchemaDelar'
 import { kortidText } from './useKortid'
 
 interface Props {
@@ -52,7 +52,7 @@ function Underrad({ b, antal }: { b: DagBesok; antal?: number }) {
   if (visaStationer(b) && antal) delar.push(`${antal} stationer`)
   if ((b.typ === 'private' || b.typ === 'business') && b.skadedjur) delar.push(b.skadedjur.toLowerCase())
   const tid = <ArbetsTid key="tid" b={b} />
-  if (b.arbeteStartat || b.arbetadeMinuter > 0) delar.push(tid)
+  if (VISA_ARBETSTID && (b.arbeteStartat || b.arbetadeMinuter > 0)) delar.push(tid)
   if (delar.length === 0) return null
   return (
     <span className="text-[13px] text-slate-400">
@@ -210,7 +210,7 @@ export function DagTidslinje(p: Props) {
                         Med {med.join(' och ')}
                       </li>
                     )}
-                    {(b.arbeteStartat || b.arbetadeMinuter > 0) && (
+                    {VISA_ARBETSTID && (b.arbeteStartat || b.arbetadeMinuter > 0) && (
                       <li className="flex items-center gap-2">
                         <Icon name="allman.klocka" size={16} className="text-slate-400" />
                         <ArbetsTid b={b} />

@@ -1,148 +1,98 @@
 // src/pages/shared/intranet/guider/guide-placera-stationer.tsx
-// Guidemodul: Placera en station eller fälla (tekniker, telefon).
-// Etiketterna följer EditContractCaseModal (Gå till utplacering), AddStationWizard
-// (Välj typ, Var ska stationen placeras?, Utomhus, Inomhus), EquipmentPlacementForm
-// (Ny utrustningsplacering, Utrustningstyp, Hämta GPS, Välj på karta, Skapa placering,
-// GPS-position krävs) och TechnicianEquipment (Station placerad!, Placera fler utomhus,
-// Placera inomhus, Färdig med etablering, Återkommande kontroller). Påhittad kund.
+// Guidemodul: Gör en etablering och placera stationerna (tekniker, nya arbetsvyn,
+// telefon och dator). Slugen behålls för länkar och läsloggen.
+// Etiketterna följer EditContractCaseModal i stegflödet (service_type establishment:
+// Framme, Arbetet, Foton och preparat, Rapport, Utöver avtalet, Klart; Jag är framme;
+// HjalpText Placera ut stationerna; Gå till utplacering som går till Stationer med
+// ?customer=), AddStationWizard (Välj typ, Vald kund, Var ska stationen placeras?,
+// Utomhus, Inomhus), EtableringsFlode (Placera station utomhus, Stäng och avsluta
+// placeringen, Stationen är placerad, N stationer placerade nu, Placera fler utomhus,
+// Placera inomhus, Färdig med etablering, Återkommande kontroller, Senare, Lägg upp
+// schema), EquipmentPlacementForm (Utrustningstyp *, Tillägg utöver avtal, GPS-position *,
+// Hämta GPS, Välj på karta, GPS hämtad, Noggrannhet, Avbryt, Skapa placering, felet
+// GPS-position krävs. Tryck på Hämta GPS.) och PagaendeEtablering/AvslutaEtablering
+// (Pågående etablering, X av Y stationer placerade, Placera station, Avsluta etablering,
+// Avsluta ändå). Kontrollerat 2026-10-24. Påhittad kund.
 
 import { useState } from 'react'
-import {
-  Ark, ArendeHuvud, Falt, Flikar, Knapprad, Kort, Markor, OvningRam, PKnapp, Rad, Status, Telefon,
-  type MarkorProps, type OvningSvar,
-} from '../skarmkit'
+import { Icon } from '../../../../components/icons/Icon'
+import { OvningRam, type OvningSvar } from '../skarmkit'
+import { NyArende, NySkarm, useGuideEnhet } from '../skarmkit/nyvy'
 import type { GuideModul } from './registry'
-import { ArkHuvud, Dubbelknapp, LokalIkon, StortVal, TYPER, TypRuta, type TypNyckel } from './_stationer'
+import {
+  FrammeSteg, Hjalp, PlaceraUtomhus, Placerad, SchemaFraga, StationerSida, Toast, ValjTyp,
+  type Placering, type TypNyckel,
+} from './_nyvy_stationer'
 
-type Vy = 'arende' | 'typ' | 'form' | 'klar' | 'schema'
+type Vy = 'framme' | 'arbete' | 'typ' | 'form' | 'placerad' | 'schema' | 'klar'
 
 interface Lage {
   vy: Vy
-  typ: TypNyckel
-  gps: boolean
-  foto: boolean
-  fel: string | null
+  p: Placering
+  placerade: number
+  toast: string | null
 }
 
-const RUTOR: TypNyckel[] = ['betes', 'betong', 'mekanisk', 'plat', 'ljus', 'krypande']
-const KUND = 'Exempel AB · Exempelgatan 12, Gävle'
-
-const mk = (markera: string | undefined, id: string, nr: number): MarkorProps | undefined =>
-  markera === id ? { pa: true, nr } : undefined
+const KUND = 'Exempel AB'
+const AVTALAT = 3
 
 function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void; markera?: string; nr: number }) {
-  if (l.vy === 'arende') {
+  if (l.vy === 'framme' || l.vy === 'arbete') {
     return (
-      <Telefon>
-        <ArendeHuvud nr="BE-0004512" status={<Status text="Bokad" />} kund={KUND} />
-        <Flikar flikar={['Ärende', 'Utförande', 'Ekonomi']} aktiv={0} onClick={() => tryck('flik')} />
-        <Kort titel="Ärendeinformation" ikon="arende.arende">
-          <Rad v="Etablering Avtalskund" />
-          <Rad v="Sätt ut 4 betongstationer runt fastigheten enligt avtalet." />
-        </Kort>
-        <Kort titel="Schemaläggning" ikon="allman.kalender"><Rad v="Torsdag 2026-10-22, 08:00 till 10:00" /></Kort>
-        <div className="absolute inset-x-0 bottom-0 flex justify-end gap-1.5 border-t border-slate-700 bg-slate-900 px-3 py-2.5">
-          <PKnapp onClick={() => tryck('stang')}>Stäng</PKnapp>
-          <PKnapp prim onClick={() => tryck('utplacering')} markor={mk(markera, 'utplacering', nr)}>
-            <LokalIkon namn="nal" storlek={16} />Gå till utplacering
-          </PKnapp>
-        </div>
-      </Telefon>
+      <NySkarm sida="arenden" titel="Mina ärenden" under="3 att ta hand om nu" onRam={tryck}
+        over={
+          <NyArende typ="establishment" aktivt={l.vy} nr="BE-0004512" status="Bokad" kund={`${KUND}, Exempelgatan 12, Gävle`}
+            nastaText={l.vy === 'framme' ? 'Jag är framme' : undefined} onNasta={() => tryck('nasta')} onTillbaka={() => tryck('tillbaka')}
+            onSteg={id => tryck(`steg:${id}`)} onIkon={tryck} markor={markera === 'nasta' ? { pa: true, nr, mal: 'nasta' } : undefined}>
+            {l.vy === 'framme' && <FrammeSteg kontakt="Anna Exempel" />}
+            {l.vy === 'arbete' && (
+              <div className="grid gap-1.5">
+                <Hjalp rubrik="Placera ut stationerna">Utplaceringen görs på sidan Stationer. När du trycker Färdig med etablering där avslutas ärendet.</Hjalp>
+                <span className={markera === 'utplacering' ? 'block rounded-xl ring-[2.5px] ring-[#20c58f] ring-offset-2 ring-offset-slate-900 motion-safe:animate-pulse' : 'block'}>
+                  <button type="button" onClick={() => tryck('utplacering')} className="relative flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800/60 text-[12.5px] font-semibold text-white">
+                    <Icon name="bokning.etablering" size={20} />Gå till utplacering
+                    {markera === 'utplacering' && <span className="absolute -right-2.5 -top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-[#20c58f] text-[11px] font-bold text-[#fff]">{nr}</span>}
+                  </button>
+                </span>
+                <div className="rounded-lg border border-slate-700/60 bg-slate-800/30 p-2 text-[10.5px] text-slate-400">
+                  <p className="font-semibold text-slate-200">Ärendeinformation</p>
+                  <p>Etablering enligt avtal: {AVTALAT} betongstationer runt fastigheten.</p>
+                </div>
+              </div>
+            )}
+          </NyArende>
+        }>
+        <p className="text-[11px] text-slate-400">Mina ärenden</p>
+      </NySkarm>
     )
   }
-
-  if (l.vy === 'typ') {
-    return (
-      <Telefon>
-        <ArkHuvud titel="Välj typ" onStang={() => tryck('stang')} />
-        <div className="grid gap-2.5 p-3.5">
-          <div className="rounded-xl border border-slate-700/50 bg-slate-800/40 p-2.5">
-            <p className="text-[11px] text-slate-400">Vald kund</p>
-            <p className="text-[13px] font-medium text-white">Exempel AB</p>
-          </div>
-          <p className="text-xs text-slate-400">Var ska stationen placeras?</p>
-          <StortVal titel="Utomhus" text="Placera på karta med GPS-position" ikon={<LokalIkon namn="nal" />} onClick={() => tryck('utomhus')} markor={mk(markera, 'utomhus', nr)} />
-          <StortVal titel="Inomhus" text="Placera på planritning" ikon={<LokalIkon namn="hus" />} onClick={() => tryck('inomhus')} />
-        </div>
-      </Telefon>
-    )
-  }
-
-  if (l.vy === 'klar' || l.vy === 'schema') {
-    return (
-      <Telefon>
-        <div className="grid justify-items-center gap-1 p-6 pt-16 text-center">
-          <span className="mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
-            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m5 12.5 4.5 4.5L19 7.5" /></svg>
-          </span>
-          <p className="text-base font-semibold text-white">Station placerad!</p>
-          <p className="text-xs text-slate-400">Exempel AB</p>
-          <p className="mb-4 text-[11px] text-slate-500">1 station placerade denna session</p>
-          <div className="grid w-full gap-2">
-            <PKnapp prim onClick={() => tryck('fler')}>Placera fler utomhus</PKnapp>
-            <PKnapp onClick={() => tryck('inne')}>Placera inomhus</PKnapp>
-            <PKnapp onClick={() => tryck('fardig')} markor={mk(markera, 'fardig', nr)}>Färdig med etablering</PKnapp>
-          </div>
-        </div>
-        {l.vy === 'schema' && (
-          <Ark titel="Återkommande kontroller">
-            <p className="text-xs text-slate-400">Vill du schemalägga återkommande kontroller för Exempel AB? Du kan även göra detta senare under kundens schema-flik.</p>
-            <Knapprad>
-              <PKnapp onClick={() => tryck('senare')}>Senare</PKnapp>
-              <PKnapp prim onClick={() => tryck('ja-schema')}>Ja, schemalägg</PKnapp>
-            </Knapprad>
-          </Ark>
-        )}
-      </Telefon>
-    )
-  }
-
-  // Formuläret
+  const etablering = { kund: KUND, placerade: l.placerade, avtalat: AVTALAT }
   return (
-    <Telefon>
-      <ArkHuvud titel="Ny utrustningsplacering" onStang={() => tryck('kryss')} />
-      <div className="grid gap-2 px-3 py-2">
-        <p className="text-[11.5px] font-medium text-slate-400">Utrustningstyp *</p>
-        <div className="grid grid-cols-3 gap-1.5">
-          {RUTOR.map(k => (
-            <TypRuta key={k} typ={TYPER[k]} vald={l.typ === k} onClick={() => tryck(`typ-${k}`)} markor={mk(markera, `typ-${k}`, nr)} />
-          ))}
-        </div>
-        <Falt etikett={`Serienummer${l.typ === 'mekanisk' ? ' *' : ''}`} varde={l.typ === 'mekanisk' ? 'Ange serienummer' : 'Valfritt serienummer'} tom onClick={() => tryck('serienummer')} />
-        <p className="text-[11.5px] font-medium text-slate-400">GPS-position *</p>
-        <div className="grid grid-cols-2 gap-1.5">
-          <Dubbelknapp titel={l.gps ? 'GPS hämtad' : 'Hämta GPS'} klar={l.gps} ikon={<LokalIkon namn="gps" />} onClick={() => tryck('gps')} markor={mk(markera, 'gps', nr)} />
-          <Dubbelknapp titel="Välj på karta" ikon={<LokalIkon namn="karta" />} onClick={() => tryck('karta')} />
-        </div>
-        {l.gps && <Rad v="Noggrannhet" h={<span className="text-green-400">4 m (Utmärkt)</span>} />}
-        {l.fel && <p className="text-[11.5px] text-red-400">{l.fel}</p>}
-        <Markor markor={mk(markera, 'foto', nr)} block>
-          <button type="button" onClick={() => tryck('foto')}
-            className={`flex w-full items-center gap-2 rounded-xl border-2 border-dashed p-2 text-[11.5px] ${l.foto ? 'border-[#20c58f] text-[#20c58f]' : 'border-slate-700 text-slate-400'}`}>
-            <LokalIkon namn="kamera" storlek={18} />
-            {l.foto ? 'Foto valt: soptunnorna och stationen' : 'Klicka för att ta foto eller välja från galleri'}
-          </button>
-        </Markor>
-      </div>
-      <div className="absolute inset-x-0 bottom-0 grid grid-cols-2 gap-1.5 border-t border-slate-700 bg-slate-900 px-3 py-2.5">
-        <PKnapp onClick={() => tryck('avbryt')}>Avbryt</PKnapp>
-        <PKnapp prim onClick={() => tryck('skapa')} markor={mk(markera, 'skapa', nr)}>Skapa placering</PKnapp>
-      </div>
-    </Telefon>
+    <NySkarm sida="stationer" titel="Stationer" under="3 kunder, 26 stationer" onRam={tryck}
+      over={<>
+        {l.vy === 'typ' && <ValjTyp kund={KUND} tryck={tryck} markera={markera} nr={nr} />}
+        {l.vy === 'form' && <PlaceraUtomhus kund={KUND} p={l.p} tryck={tryck} markera={markera} nr={nr} />}
+        {l.vy === 'placerad' && <Placerad kund={KUND} antal={l.placerade} tryck={tryck} markera={markera} nr={nr} />}
+        {l.vy === 'schema' && <SchemaFraga kund={KUND} tryck={tryck} markera={markera} nr={nr} />}
+        {l.toast && <Toast text={l.toast} />}
+      </>}>
+      <StationerSida etablering={l.vy === 'klar' || l.vy === 'schema' ? undefined : etablering} tryck={tryck} nr={nr} />
+    </NySkarm>
   )
 }
 
 // ─── Visning ───
 
-const BAS: Lage = { vy: 'arende', typ: 'betes', gps: false, foto: false, fel: null }
+const TOM: Placering = { typ: null, tillagg: false, betalas: null, gps: false, fel: null, placerade: 0 }
+const BAS: Lage = { vy: 'framme', p: TOM, placerade: 0, toast: null }
 const VISNING: { lage: Lage; markera: string }[] = [
-  { lage: BAS, markera: 'utplacering' },
+  { lage: BAS, markera: 'nasta' },
+  { lage: { ...BAS, vy: 'arbete' }, markera: 'utplacering' },
   { lage: { ...BAS, vy: 'typ' }, markera: 'utomhus' },
   { lage: { ...BAS, vy: 'form' }, markera: 'typ-betong' },
-  { lage: { ...BAS, vy: 'form', typ: 'betong' }, markera: 'gps' },
-  { lage: { ...BAS, vy: 'form', typ: 'betong', gps: true }, markera: 'foto' },
-  { lage: { ...BAS, vy: 'form', typ: 'betong', gps: true, foto: true }, markera: 'skapa' },
-  { lage: { ...BAS, vy: 'klar', typ: 'betong', gps: true, foto: true }, markera: 'fardig' },
+  { lage: { ...BAS, vy: 'form', p: { ...TOM, typ: 'betong' } }, markera: 'gps' },
+  { lage: { ...BAS, vy: 'form', p: { ...TOM, typ: 'betong', gps: true } }, markera: 'skapa' },
+  { lage: { ...BAS, vy: 'placerad', placerade: 1 }, markera: 'fardig' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
@@ -150,70 +100,86 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
   return <Skarm l={v.lage} markera={v.markera} nr={steg + 1} tryck={id => { if (id === v.markera) onNasta() }} />
 }
 
-// ─── Övning ───
+// ─── Övning: tre betongstationer enligt avtalet ───
 
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du står i etableringsärendet hos Exempel AB. Leta upp knappen som tar dig till utplaceringen.' }
-
-const TIPS: Record<string, string> = {
-  flik: 'Flikarna byter vy i ärendet. Stationerna sätter du ut via knappen längst ner.',
-  stang: 'Stäng tar dig bort från ärendet. Du ska till utplaceringen.',
-  inomhus: 'Inomhus är för planritningen. Soptunnorna står ute, så välj Utomhus.',
-  kryss: 'Krysset avslutar utplaceringen. Sätt ut stationen först.',
-  avbryt: 'Avbryt avslutar utplaceringen. Sätt ut stationen först.',
-  serienummer: 'Serienummer behövs bara för mekaniska fällor. En betongstation klarar sig utan.',
-  karta: 'Det går också, men du står vid soptunnorna. Då är Hämta GPS snabbast.',
-  fler: 'Uppdraget var en station. Avsluta etableringen i stället.',
-  inne: 'Uppdraget var en station ute. Avsluta etableringen i stället.',
-}
+const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: `Du står utanför ${KUND}. Avtalet har ${AVTALAT} betongstationer runt fastigheten. Tala om att du är framme.` }
 
 function Ovning() {
+  const enhet = useGuideEnhet()
   const [l, setL] = useState<Lage>(BAS)
   const [svar, setSvar] = useState<OvningSvar>(BORJA)
   const [fel, setFel] = useState(0)
 
-  const miss = (text: string) => { setFel(f => f + 1); setSvar({ typ: 'fel', titel: 'Inte där', text }) }
+  const miss = (text: string) => { setFel(f => f + 1); setSvar({ typ: 'fel', titel: 'Inte riktigt', text }) }
   const tips = (titel: string, text: string) => setSvar({ typ: 'tips', titel, text })
 
   const tryck = (id: string) => {
-    if (l.vy === 'schema') return
-    if (l.vy === 'arende') {
-      if (id === 'utplacering') { setL({ ...l, vy: 'typ' }); tips('Bra', 'Kunden är redan vald. Var står soptunnorna?') }
-      else miss(TIPS[id] ?? 'Knappen finns längst ner i ärendet.')
-    } else if (l.vy === 'typ') {
-      if (id === 'utomhus') { setL({ ...l, vy: 'form' }); tips('Rätt', 'Välj vilken sorts station du sätter ut.') }
-      else miss(TIPS[id] ?? 'Välj Utomhus.')
-    } else if (l.vy === 'form') {
+    if (l.vy === 'klar') return
+    if (l.vy === 'framme') {
+      if (id === 'nasta') { setL({ ...l, vy: 'arbete' }); tips('Du är framme', 'Steget Arbetet har knappen som tar dig till utplaceringen.') }
+      else miss('Tryck på den gröna knappen Jag är framme längst ner.')
+      return
+    }
+    if (l.vy === 'arbete') {
+      if (id === 'utplacering') { setL({ ...l, vy: 'typ' }); tips('Sidan Stationer', 'Kunden är redan vald. Var ska stationerna stå?') }
+      else if (id === 'nasta') miss('Vidare går till nästa steg i ärendet. Stationerna placerar du med Gå till utplacering.')
+      else miss('Tryck Gå till utplacering i steget Arbetet.')
+      return
+    }
+    if (l.vy === 'typ') {
+      if (id === 'utomhus') { setL({ ...l, vy: 'form', p: { ...TOM, placerade: l.placerade } }); tips('Placera station utomhus', 'Välj typ och hämta positionen vid stationen.') }
+      else if (id === 'inomhus') miss('Stationerna ska stå ute runt fastigheten. Välj Utomhus.')
+      else miss('Välj Utomhus.')
+      return
+    }
+    if (l.vy === 'form') {
       if (id.startsWith('typ-')) {
         const k = id.slice(4) as TypNyckel
-        setL({ ...l, typ: k, fel: null })
+        setL({ ...l, p: { ...l.p, typ: k, fel: null } })
         if (k === 'betong') tips('Betongstation vald', 'Stå vid stationen och hämta positionen.')
-        else miss(`Du valde ${TYPER[k].namn}. Uppdraget var en betongstation.`)
-      } else if (id === 'gps') { setL({ ...l, gps: true, fel: null }); tips('GPS hämtad', 'Noggrannheten är utmärkt. Ta gärna ett foto så hittar nästa tekniker rätt.') }
-      else if (id === 'foto') { setL({ ...l, foto: true }); tips('Foto valt', 'Bilden visar stationen och soptunnorna. Spara placeringen.') }
-      else if (id === 'skapa') {
-        if (l.typ !== 'betong') miss('Kolla typen först. Uppdraget var en betongstation.')
-        else if (!l.gps) { setL({ ...l, fel: 'GPS-position krävs. Klicka på "Hämta GPS-position"' }); miss('Portalen sparar inte utan position. Tryck Hämta GPS först.') }
-        else if (!l.foto) miss('Uppdraget var att ta med ett foto. Tryck på fotorutan först.')
-        else { setL({ ...l, vy: 'klar' }); tips('Station placerad', 'Nu kan du sätta ut fler, eller avsluta etableringen.') }
-      } else miss(TIPS[id] ?? 'Välj typ, hämta GPS, ta foto och tryck Skapa placering.')
-    } else if (l.vy === 'klar') {
-      if (id === 'fardig') {
-        setL({ ...l, vy: 'schema' })
-        setSvar({
-          typ: 'ok',
-          titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-          text: `Betongstationen är sparad med position och foto, och etableringsärendet är stängt. Kunden har inget återkommande schema än, därför frågar portalen om kontrollerna.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
-        })
-      } else miss(TIPS[id] ?? 'Tryck Färdig med etablering.')
+        else miss('Avtalet gäller betongstationer. Välj Betongstation.')
+      } else if (id === 'tillagg') {
+        setL({ ...l, p: { ...l.p, tillagg: !l.p.tillagg } })
+        if (!l.p.tillagg) miss('Stationerna ingår i avtalet. Tillägg utöver avtal är bara för stationer kunden betalar för utöver avtalet. Bocka ur den.')
+        else tips('Rätt', 'Stationen ingår i avtalet.')
+      } else if (id === 'gps' || id === 'karta') {
+        setL({ ...l, p: { ...l.p, gps: true, fel: null } })
+        tips('Positionen är hämtad', 'Tryck Skapa placering.')
+      } else if (id === 'skapa') {
+        if (l.p.typ !== 'betong') miss('Välj Betongstation under Utrustningstyp först.')
+        else if (l.p.tillagg) miss('Bocka ur Tillägg utöver avtal. Avtalsstationerna faktureras inte.')
+        else if (!l.p.gps) { setL({ ...l, p: { ...l.p, fel: 'GPS-position krävs. Tryck på Hämta GPS.' } }); miss('Portalen sparar inte utan position. Tryck Hämta GPS först.') }
+        else {
+          const n = l.placerade + 1
+          setL({ ...l, vy: 'placerad', placerade: n, toast: 'Utrustning placerad!' })
+          tips(`${n} av ${AVTALAT}`, n < AVTALAT ? 'Avtalet har fler stationer. Fortsätt med nästa.' : 'Alla tre är ute. Avsluta etableringen.')
+        }
+      } else if (id === 'form-stang' || id === 'avbryt') {
+        miss('Krysset och Avbryt avslutar placeringen och går vidare till avslutet av etableringen. Placera stationen först.')
+      } else miss('Välj typ, hämta GPS och tryck Skapa placering.')
+      return
+    }
+    if (l.vy === 'placerad') {
+      if (id === 'fler') { setL({ ...l, vy: 'form', toast: null, p: { ...TOM, typ: 'betong', placerade: l.placerade } }); tips('Typen är kvar', 'Betongstation är redan vald från förra stationen. Gå till nästa plats och hämta GPS.') }
+      else if (id === 'inne') miss('Alla stationer i avtalet står ute.')
+      else if (id === 'fardig') {
+        if (l.placerade < AVTALAT) miss(`Avtalet har ${AVTALAT} stationer och du har placerat ${l.placerade}. Tryck Placera fler utomhus.`)
+        else { setL({ ...l, vy: 'schema', toast: null }); tips('Etableringen är stängd', 'Kunden har inget schema än, därför frågar portalen om kontrollerna.') }
+      }
+      return
+    }
+    if (l.vy === 'schema' && (id === 'senare' || id === 'schema')) {
+      setL({ ...l, vy: 'klar' })
+      setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Tre betongstationer är ute med position och etableringsärendet är stängt. Etableringen ingår i avtalet och faktureras inte. ${id === 'senare' ? 'Schemat lägger du upp senare under kundens Schema.' : 'Nu öppnas schemaläggningen.'}${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'}, det gör inget.` : ''}` })
     }
   }
 
-  const framsteg = l.vy === 'arende' ? 0 : l.vy === 'typ' ? 1 : l.vy === 'form' ? 2 + (l.typ === 'betong' ? 1 : 0) + (l.gps ? 1 : 0) + (l.foto ? 1 : 0) : l.vy === 'klar' ? 6 : 7
+  const framsteg = l.vy === 'framme' ? 0 : l.vy === 'arbete' ? 1 : l.vy === 'klar' ? 7 : l.vy === 'schema' ? 6 : 2 + l.placerade
   return (
-    <OvningRam framsteg={framsteg} totalt={7} svar={svar} onBorjaOm={() => { setL(BAS); setSvar(BORJA); setFel(0) }}>
+    <OvningRam framsteg={Math.min(framsteg, 7)} totalt={7} svar={svar} onBorjaOm={() => { setL(BAS); setSvar(BORJA); setFel(0) }} bred={enhet === 'dator'}>
       <Skarm l={l} tryck={tryck} nr={0} />
     </OvningRam>
   )
 }
 
-export default { Visning, Ovning } satisfies GuideModul
+export default { Visning, Ovning, enheter: ['mobil', 'dator'] } satisfies GuideModul

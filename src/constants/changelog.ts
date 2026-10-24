@@ -45,6 +45,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.91.0',
+    date: '2026-10-24',
+    title: 'Ny handbok för teknikerna i nya arbetsvyn',
+    items: [
+      { kind: 'nyhet', text: 'Handboken för tekniker är omskriven för nya arbetsvyn: 27 guider steg för steg, från menyn och din dag till stationskontroll, pris, provision och avtal.' },
+      { kind: 'nyhet', text: 'Varje guide visar skärmarna för telefonen eller datorn. Den väljer efter skärmen du läser på, och du kan byta överst i guiden.' },
+      { kind: 'nyhet', text: 'Guiderna har övningar, prov och interaktiva exempel, till exempel en ROT-räknare, en provisionsräknare och vad som händer när du stänger ärendet eller bara besöket.' },
+      { kind: 'andring', text: 'Nya arbetsvyn: arbetstiden visas inte längre någonstans, varken i ärendet, schemat eller Mina ärenden. Den räknas i bakgrunden.' },
+      { kind: 'andring', text: 'Sökrutan visar nya arbetsvyns sidor med deras namn, till exempel Idag, Stationer och Provision.' },
+      { kind: 'buggfix', text: 'Knappen Tipsa om en lead i telefonen ligger ovanför bottenmenyn i nya arbetsvyn.' },
+      { kind: 'buggfix', text: 'Etableringen hänvisar till sidan Stationer, snabb-OK visas som OK, schemasidan har å, ä och ö och GPS-felet säger Tryck på Hämta GPS.' },
+    ],
+  },
+  {
     version: '3.90.0',
     date: '2026-10-24',
     title: 'Tickets heter Tickets igen och arbetstiden räknas i bakgrunden',

@@ -25,6 +25,7 @@ import {
   breadcrumbMap as saljCrumbs,
 } from '../../saljare/layout/saljareNavConfig'
 import type { NavGroup, NavItem } from '../../admin/layout/adminNavConfig'
+import { NY_NAV_GRUPPER, NY_RUBRIKER } from '../../technician/ny/layout/nyNavConfig'
 import { isPrivateIdNumber, openOneflowCreator, type PrefillCustomer } from '../../../utils/oneflowPrefill'
 
 export type SearchPortal = 'admin' | 'koordinator' | 'technician' | 'säljare'
@@ -595,15 +596,28 @@ const PAGES: Record<SearchPortal, PageEntry[]> = {
   säljare: pagesFrom(saljTop, saljGroups, saljCrumbs),
 }
 
+// Nya arbetsvyn: sidorna med nya vyns namn (Idag, Stationer, Provision ...)
+const NYA_VYNS_SIDOR: PageEntry[] = (() => {
+  const out: PageEntry[] = []
+  const sett = new Set<string>()
+  const add = (p: PageEntry) => { if (!sett.has(p.path)) { sett.add(p.path); out.push(p) } }
+  for (const g of NY_NAV_GRUPPER) for (const l of g.lankar) {
+    add({ label: l.label, path: l.path, section: g.label })
+    for (const u of l.under ?? []) add({ label: u.label, path: u.path, section: g.label })
+  }
+  for (const [path, label] of Object.entries(NY_RUBRIKER)) add({ label, path, section: 'Sida' })
+  return out
+})()
+
 function matchesAll(haystack: string, tokens: string[]): boolean {
   const h = normalize(haystack)
   return tokens.every(t => h.includes(t))
 }
 
-function pageItems(portal: SearchPortal, term: string): SearchItem[] {
+function pageItems(portal: SearchPortal, term: string, nyArbetsvy = false): SearchItem[] {
   const tokens = normalize(term).split(/\s+/).filter(Boolean)
   if (tokens.length === 0) return []
-  return PAGES[portal]
+  return (portal === 'technician' && nyArbetsvy ? NYA_VYNS_SIDOR : PAGES[portal])
     .filter(p => matchesAll(`${p.label} ${p.section}`, tokens))
     .sort((a, b) => Number(matchesAll(b.label, tokens)) - Number(matchesAll(a.label, tokens)))
     .slice(0, MAX_PER_GROUP)
@@ -811,6 +825,8 @@ export function buildGroups(
   portal: SearchPortal,
   parsed: ParsedQuery,
   data: GlobalSearchResponse | null,
+  /** Teknikern har nya arbetsvyn: sidorna får nya vyns namn */
+  nyArbetsvy = false,
 ): SearchGroup[] {
   const buckets: Record<GroupKey, SearchItem[]> = {
     recent: [], exact: [], cases: [], customers: [], documents: [], archive: [],
@@ -843,7 +859,7 @@ export function buildGroups(
   }
 
   if (parsed.kind === 'text' || (parsed.verb && !parsed.term)) {
-    buckets.pages = parsed.term ? pageItems(portal, parsed.term) : []
+    buckets.pages = parsed.term ? pageItems(portal, parsed.term, nyArbetsvy) : []
   }
 
   const topCustomer = data?.customers?.[0]

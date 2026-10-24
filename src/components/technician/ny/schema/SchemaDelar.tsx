@@ -75,6 +75,12 @@ function useSekund(aktiv: boolean): Date {
   return nu
 }
 
+/**
+ * Arbetstiden räknas i bakgrunden och visas inte för teknikern (Christian 2026-10-24).
+ * Komponenten finns kvar om det ska slås på igen.
+ */
+export const VISA_ARBETSTID = false
+
 /** "Pågår 00:12:34" eller "arbetat 52 min". Ingenting när ingen tid finns. */
 export function ArbetsTid({ b, kort = false }: { b: DagBesok; kort?: boolean }) {
   const nu = useSekund(!!b.arbeteStartat)

@@ -133,6 +133,8 @@ function unitShort(unit: string | null | undefined): string {
 // Statusens etikett i gemener för löptext ("ingen aktivitet")
 function statusText(status: string): string {
   const label = INSPECTION_STATUS_CONFIG[status as InspectionStatus]?.label || status
+  // Förkortningar som OK behåller versalerna
+  if (/^[A-ZÅÄÖ]{2}/.test(label)) return label
   return label.charAt(0).toLowerCase() + label.slice(1)
 }
 

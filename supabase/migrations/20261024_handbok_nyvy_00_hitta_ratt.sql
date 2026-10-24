@@ -9,7 +9,7 @@ values (
   'guide-roller-och-vyer',
   'Hitta rätt i nya arbetsvyn',
   'Bottenmenyn i telefonen, sidomenyn på datorn, Skapa, Tickets och var allt annat ligger.',
-  'handbok', 'kom-igang',
+  'handbok', 'introduktion',
   $json$[
     {"type":"intro","roller":["technician"],"var":"Överallt i portalen: menyn längst ner i telefonen, till vänster på datorn","tar":"4 min","enhet":"mobil"},
     {"type":"kortsvar","text":"I telefonen når du det du gör varje dag i menyn längst ner: [[Idag|falt.idag]], [[Karta|falt.karta]], [[Skapa|allman.plus]], [[Ärenden|arende.arende]] och [[Mer|allman.meny]]. På datorn ligger alla sidor i sidomenyn till vänster. Klockan uppe till höger går till Tickets."},

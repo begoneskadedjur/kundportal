@@ -12,7 +12,7 @@ import {
   besokBeskrivning, klockslag, navigeraUrl, telUrl, type DagBesok,
 } from '../../../../services/teknikerDagService'
 import { dagRubrik, kollegor, schemaStatus } from '../schema/schemaLogik'
-import { ArbetsTid } from '../schema/SchemaDelar'
+import { ArbetsTid, VISA_ARBETSTID } from '../schema/SchemaDelar'
 import { alderTon, avslutsdag, dagarSedan, langDatum, sedanText } from './arendeLogik'
 
 const SEKUNDAR = 'h-11 flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-900 text-sm font-semibold text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]'
@@ -122,7 +122,7 @@ export function ArendeForhandsvisning({ besok: b, idag, minId, onOppna }: Props)
             <dd className="text-slate-300">Med {med.join(' och ')}</dd>
           </div>
         )}
-        {(b.arbeteStartat || b.arbetadeMinuter > 0) && (
+        {VISA_ARBETSTID && (b.arbeteStartat || b.arbetadeMinuter > 0) && (
           <div className="flex gap-2">
             <dt className="sr-only">Arbetstid</dt>
             <Icon name="allman.klocka" size={16} className="mt-0.5 flex-shrink-0 text-slate-400" />

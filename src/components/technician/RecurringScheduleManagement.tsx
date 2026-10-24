@@ -148,9 +148,9 @@ export function RecurringScheduleManagement({
           <Calendar className="w-8 h-8 text-slate-600" />
         </div>
         <div className="text-center">
-          <p className="text-slate-400 text-sm">Inget aterkommande kontrollschema</p>
+          <p className="text-slate-400 text-sm">Inget återkommande kontrollschema</p>
           <p className="text-slate-600 text-xs mt-1">
-            Skapa ett schema for att automatiskt boka in kontroller
+            Skapa ett schema för att automatiskt boka in kontroller
           </p>
         </div>
         <button
@@ -294,7 +294,7 @@ export function RecurringScheduleManagement({
         className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-slate-700 rounded-lg text-sm text-slate-500 hover:text-blue-400 hover:border-blue-500/50 transition"
       >
         <Plus className="w-4 h-4" />
-        Lagg till nytt schema
+        Lägg till nytt schema
       </button>
     </div>
   )

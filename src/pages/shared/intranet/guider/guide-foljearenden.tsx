@@ -1,129 +1,170 @@
 // src/pages/shared/intranet/guider/guide-foljearenden.tsx
-// Guidemodul: Skapa ett följeärende (tekniker, telefon).
-// EditCaseModal: fotspåren (Boka återbesök eller skapa nytt ärende) syns bara i privat- och
-// företagsärenden som inte själva är följeärenden (canCreateFollowUp). Vad vill du göra? ›
-// Skapa nytt ärende › Skadedjurstyp * › Skapa nytt ärende. Följeärendet får ett eget BE-nummer
-// (CaseNumberService, samma väg som nya ärenden). Toasten är "Följeärende <nummer> skapat för
-// <skadedjur>!" och det nya ärendet visas med raden "Detta är ett följeärende".
-// Påhittad kund, ingenting sparas.
+// Guidemodul: Skapa ett nytt ärende för ett nytt skadedjur (tekniker, nya arbetsvyn,
+// telefon och dator). Slugen behålls så att länkar och läsloggen fungerar.
+//
+// Efterbildning av EditCaseModal i nya vyn: Ärendets verktyg › Återbesök och nytt ärende ›
+// Skapa nytt ärende ("Nytt problem hos samma kund (annat skadedjur).") och dialogen
+// Skapa nytt ärende ("Välj skadedjurstyp. Kundinformation, adress och schemaläggning
+// kopieras automatiskt.", Skadedjurstyp *, Välj skadedjurstyp..., Avbryt, Skapa nytt ärende),
+// toasten "Följeärende skapat för Getingar!". Det nya ärendet öppnas i samma ruta och
+// börjar i steget Framme. Gruppen syns inte i ett följeärende (canCreateFollowUp).
 
 import { useState } from 'react'
-import { ArendeHuvud, Notis, OvningRam, Status, Telefon, type OvningSvar } from '../skarmkit'
+import { Icon } from '../../../../components/icons/Icon'
+import { Markor, Notis, OvningRam, type OvningSvar } from '../skarmkit'
+import { useGuideEnhet, type NyMarkor } from '../skarmkit/nyvy'
 import type { GuideModul } from './registry'
-import { ArendeIkoner, ArendeInnehall, FoljeArk, TelefonFot, ValArk, gorMk, type ArendeData, type Mk, type Tryck } from './_arenden'
+import { gorMk, ingenMk, type Mk, type Tryck } from './_arenden'
+import { ArendeRam, MittRuta, RutKnapp, VerktygArk } from './_nyvy_tickets'
 
-type Vy = 'arende' | 'val' | 'folje' | 'klart'
-interface Lage { vy: Vy; lista: boolean; djur: string | null }
+type Vy = 'lista' | 'arende' | 'verktyg' | 'dialog' | 'dialog-valt' | 'valj' | 'klart'
 
-const URSPRUNG: ArendeData = {
-  nr: 'BE-0001234',
-  status: 'Bokad',
-  kund: 'Familjen Exempel · Exempelvägen 4, Södertälje',
-  beskrivning: 'Råttor i källaren, spår vid tvättstugan.',
-  tid: 'Tisdag 2026-10-20, 09:00 till 10:00',
-}
-// Följeärendet bär samma ärendenummer som ursprunget
-const NYTT_NR = 'BE-0001234'
-const nyttArende = (djur: string): ArendeData => ({
-  ...URSPRUNG,
-  nr: NYTT_NR,
-  beskrivning: `Följeärende från ursprungsärende. Nytt skadedjursproblem: ${djur}`,
-  foljearende: true,
-})
+const SKADEDJUR = ['Råttor', 'Möss', 'Vägglöss', 'Silverfisk', 'Getingar', 'Kackerlackor', 'Myror']
 
-function Skarm({ l, mk, tryck }: { l: Lage; mk: Mk; tryck: Tryck }) {
-  const klar = l.vy === 'klart'
-  const a = klar && l.djur ? nyttArende(l.djur) : URSPRUNG
+function Dialog({ valt, oppen, mk, tryck }: { valt: boolean; oppen: boolean; mk: Mk; tryck: Tryck }) {
   return (
-    <Telefon>
-      <ArendeHuvud nr={a.nr} status={<Status text={a.status} />} kund={a.kund}
-        ikoner={<ArendeIkoner mk={mk} tryck={tryck} fotspar={!klar} />} />
-      <ArendeInnehall a={a} tryck={tryck} />
-      <TelefonFot mk={mk} tryck={tryck} />
-      {l.vy === 'val' && <ValArk mk={mk} tryck={tryck} />}
-      {l.vy === 'folje' && <FoljeArk valt={l.djur} listaOppen={l.lista} mk={mk} tryck={tryck} />}
-      {klar && l.djur && <Notis text={`Följeärende skapat för ${l.djur}!`} />}
-    </Telefon>
+    <MittRuta titel="Skapa nytt ärende" ikon="allman.plus" under="Välj skadedjurstyp. Kundinformation, adress och schemaläggning kopieras automatiskt.">
+      <div className="grid gap-1">
+        <span className="text-[10.5px] font-medium text-slate-400">Skadedjurstyp *</span>
+        <div className="relative">
+          <RutValj valt={valt} mk={mk} tryck={tryck} />
+          {oppen && (
+            <ul className="absolute inset-x-0 top-full z-10 mt-1 max-h-40 overflow-hidden rounded-lg border border-slate-600 bg-slate-900 shadow-xl">
+              {SKADEDJUR.map(s => (
+                <li key={s}>
+                  <Markor markor={mk(`djur-${s}`)} block>
+                    <button type="button" onClick={() => tryck(`djur-${s}`)} className="block w-full px-2 py-1 text-left text-[11px] text-slate-200 hover:bg-slate-800">{s}</button>
+                  </Markor>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <RutKnapp id="avbryt" mk={mk} tryck={tryck}>Avbryt</RutKnapp>
+        <RutKnapp id="skapa" prim inaktiv={!valt} mk={mk} tryck={tryck}>Skapa nytt ärende</RutKnapp>
+      </div>
+    </MittRuta>
+  )
+}
+
+function RutValj({ valt, mk, tryck }: { valt: boolean; mk: Mk; tryck: Tryck }) {
+  return (
+    <Markor markor={mk('valj')} block>
+      <button type="button" onClick={() => tryck('valj')}
+        className={`flex w-full items-center justify-between rounded-lg border border-slate-600 bg-slate-900 px-2 py-1.5 text-left text-[11.5px] ${valt ? 'text-white' : 'text-slate-500'}`}>
+        {valt ? 'Getingar' : 'Välj skadedjurstyp...'}
+        <Icon name="allman.chevron" size={16} className="h-3.5 w-3.5 rotate-90 text-slate-400" />
+      </button>
+    </Markor>
+  )
+}
+
+function Skarm({ vy, mk, tryck, markor }: { vy: Vy; mk: Mk; tryck: Tryck; markor?: NyMarkor }) {
+  const dialog = vy === 'dialog' || vy === 'valj' || vy === 'dialog-valt'
+  return (
+    <ArendeRam
+      stangt={vy === 'lista'}
+      markor={markor}
+      onRam={tryck}
+      mk={mk}
+      tryck={tryck}
+      ovanpa={<>
+        {vy === 'verktyg' && <VerktygArk fran="aterbesok" oppen="aterbesok" mk={mk} tryck={tryck} />}
+        {dialog && <Dialog valt={vy === 'dialog-valt'} oppen={vy === 'valj'} mk={mk} tryck={tryck} />}
+      </>}
+      notis={vy === 'klart' ? <Notis text="Följeärende skapat för Getingar!" /> : undefined}
+    />
   )
 }
 
 // ─── Visning ───
 
-const VISNING: { lage: Lage; markera: string }[] = [
-  { lage: { vy: 'arende', lista: false, djur: null }, markera: 'fotspar' },
-  { lage: { vy: 'val', lista: false, djur: null }, markera: 'val-nytt' },
-  { lage: { vy: 'folje', lista: false, djur: null }, markera: 'skadedjur' },
-  { lage: { vy: 'folje', lista: false, djur: 'Getingar' }, markera: 'skapa-folje' },
+const VISNING: { vy: Vy; markera: string }[] = [
+  { vy: 'lista', markera: 'rad-familj' },
+  { vy: 'arende', markera: 'verktyg' },
+  { vy: 'verktyg', markera: 'nytt-arende' },
+  { vy: 'valj', markera: 'djur-Getingar' },
+  { vy: 'dialog-valt', markera: 'skapa' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
   const v = VISNING[Math.min(steg, VISNING.length - 1)]
-  return <Skarm l={v.lage} mk={gorMk(v.markera, steg + 1)} tryck={id => { if (id === v.markera) onNasta() }} />
+  const markor: NyMarkor | undefined = v.markera === 'verktyg' ? { pa: true, nr: steg + 1, mal: 'verktyg' } : undefined
+  return <Skarm vy={v.vy} mk={gorMk(v.markera, steg + 1)} markor={markor} tryck={id => { if (id === v.markera) onNasta() }} />
 }
 
 // ─── Övning ───
 
-const START: Lage = { vy: 'arende', lista: false, djur: null }
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du står i råttärendet. Leta upp knappen för nytt ärende uppe till höger.' }
+const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Du är hos Familjen Exempel för råttorna och ser ett getingbo under taket. Öppna ärendet.' }
 
 const TIPS: Record<string, string> = {
-  historik: 'Klockan är ärendehistoriken. Där skapar du inget nytt ärende.',
-  komm: 'Pratbubblan är för kommentarer. Det nya ärendet skapar du med fotspåren.',
-  flik: 'Flikarna byter vy i ärendet. Leta efter fotspåren uppe till höger.',
-  radera: 'Radera tar bort råttärendet. Det ska vara kvar.',
-  spara: 'Spara ändringar sparar råttärendet. Du ska skapa ett nytt.',
-  'avbryt-arende': 'Avbryt stänger ärendet. Leta efter fotspåren uppe till höger.',
-  'val-aterbesok': 'Återbesök är för samma problem, alltså råttorna. Getingarna är ett nytt problem.',
-  'val-duplicera': 'Duplicera gör en kopia av råttärendet. Välj det som gäller ett annat skadedjur.',
-  'val-avbryt': 'Avbryt stänger rutan. Välj i stället det som passar ett nytt skadedjur.',
-  'avbryt-folje': 'Avbryt stänger rutan och inget ärende skapas.',
+  'rad-ab': 'Exempel AB är en annan kund.',
+  'rad-brf': 'Brf Exempelgården är en annan kund.',
+  nasta: 'Jag är framme räknar arbetstiden i bakgrunden för råttärendet. Det nya ärendet skapar du under Ärendets verktyg.',
+  tillbaka: 'Du står redan i första steget.',
+  flikvy: 'Alla uppgifter är den vanliga flikvyn. Det nya ärendet skapar du under Ärendets verktyg.',
+  stang: 'Krysset stänger ärendet.',
+  kartor: 'Kartan behövs inte nu.',
+  ring: 'Du behöver inte ringa kunden för det här.',
+  'boka-aterbesok': 'Ett återbesök är nästa besök för samma problem. Getingarna är ett nytt skadedjur.',
+  duplicera: 'Duplicera gör en kopia av hela ärendet. Du vill ha ett nytt ärende för getingarna.',
+  'verktyg-stang': 'Krysset stänger verktygen.',
+  avbryt: 'Avbryt stänger rutan och inget ärende skapas.',
 }
 
+const FRAMSTEG: Record<Vy, number> = { lista: 0, arende: 1, verktyg: 2, dialog: 3, valj: 3, 'dialog-valt': 4, klart: 5 }
+
 function Ovning() {
-  const [l, setL] = useState<Lage>(START)
+  const enhet = useGuideEnhet()
+  const [vy, setVy] = useState<Vy>('lista')
   const [svar, setSvar] = useState<OvningSvar>(BORJA)
   const [fel, setFel] = useState(0)
 
   const miss = (text: string) => { setFel(f => f + 1); setSvar({ typ: 'fel', titel: 'Inte där', text }) }
-  const tips = (titel: string, text: string) => setSvar({ typ: 'tips', titel, text })
+  const ga = (ny: Vy, titel: string, text: string) => { setVy(ny); setSvar({ typ: 'tips', titel, text }) }
+  const annars = (id: string, rad: string) => miss(TIPS[id] ? `${TIPS[id]} ${rad}` : rad)
 
   const tryck = (id: string) => {
-    if (l.vy === 'klart') return
-    if (l.vy === 'arende') {
-      if (id === 'fotspar') { setL({ ...l, vy: 'val' }); tips('Bra', 'Getingarna är ett nytt problem hos samma kund. Vilket val passar?') }
-      else miss(TIPS[id] ?? 'Leta efter fotspåren uppe till höger.')
-    } else if (l.vy === 'val') {
-      if (id === 'val-nytt') { setL({ ...l, vy: 'folje' }); tips('Rätt val', 'Kund, adress och tid kopieras. Välj skadedjurstyp.') }
-      else miss(TIPS[id] ?? 'Välj det som gäller ett annat skadedjur.')
-    } else {
-      if (id === 'skadedjur') { setL({ ...l, lista: !l.lista }); tips('Listan är öppen', 'Välj skadedjuret du hittade.') }
-      else if (id.startsWith('djur-')) {
-        const djur = id.slice(5)
-        setL({ ...l, lista: false, djur })
-        if (djur === 'Getingar') tips('Getingar är valt', 'Tryck Skapa nytt ärende.')
-        else if (djur === 'Råttor') miss('Råttorna har redan ett ärende, det du står i. Välj det nya skadedjuret.')
-        else miss(`Du valde ${djur}. Du hittade ett getingbo.`)
-      } else if (id === 'skapa-folje') {
-        if (!l.djur) miss('Knappen fungerar först när du har valt skadedjurstyp.')
-        else if (l.djur !== 'Getingar') miss('Byt till Getingar först. Det var det du hittade.')
-        else {
-          setL({ ...l, vy: 'klart' })
-          setSvar({
-            typ: 'ok',
-            titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart',
-            text: `Ett nytt ärende för getingarna är skapat hos Familjen Exempel, med samma ärendenummer, BE-0001234, och samma adress, tid och tekniker som råttärendet. Det har status Bokad, eget pris och egen arbetstid. I Mina ärenden ligger båda ärendena.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}`,
-          })
-        }
-      } else miss(TIPS[id] ?? 'Välj skadedjurstyp och skapa ärendet.')
+    switch (vy) {
+      case 'lista':
+        if (id === 'rad-familj') ga('arende', 'Ärendet är öppet', 'Det står i steget Framme. Leta upp Ärendets verktyg uppe till höger, ikonen i mitten.')
+        else annars(id, 'Tryck på Familjen Exempel i listan.')
+        break
+      case 'arende':
+        if (id === 'verktyg') ga('verktyg', 'Ärendets verktyg', `Verktygen öppnades ${enhet === 'dator' ? 'uppe till höger' : 'nerifrån'}. Leta under Återbesök och nytt ärende.`)
+        else annars(id, 'Tryck på verktygen uppe till höger.')
+        break
+      case 'verktyg':
+        if (id === 'nytt-arende') ga('dialog', 'Skapa nytt ärende', 'Kunden, adressen och tiden kopieras. Välj skadedjurstyp.')
+        else annars(id, 'Tryck Skapa nytt ärende.')
+        break
+      case 'dialog':
+        if (id === 'valj') ga('valj', 'Listan är öppen', 'Välj Getingar.')
+        else if (id === 'skapa') miss('Knappen är grå. Välj skadedjurstyp först.')
+        else annars(id, 'Tryck på Välj skadedjurstyp...')
+        break
+      case 'valj':
+        if (id === 'djur-Getingar') ga('dialog-valt', 'Getingar är valt', 'Nu går knappen Skapa nytt ärende att trycka på.')
+        else if (id.startsWith('djur-')) miss(`Det var getingar du såg, inte ${id.slice(5).toLowerCase()}.`)
+        else annars(id, 'Välj Getingar i listan.')
+        break
+      case 'dialog-valt':
+        if (id === 'skapa') {
+          setVy('klart')
+          setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Det nya ärendet för getingarna öppnades i steget Framme, med samma kund, adress, tid och ärendenummer. Råttärendet ligger kvar.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
+        } else if (id === 'valj') ga('valj', 'Byta skadedjur?', 'Getingar var rätt. Välj Getingar igen.')
+        else annars(id, 'Tryck Skapa nytt ärende.')
+        break
     }
   }
 
-  const framsteg = l.vy === 'arende' ? 0 : l.vy === 'val' ? 1 : l.vy === 'klart' ? 4 : l.djur ? 3 : 2
   return (
-    <OvningRam framsteg={framsteg} totalt={4} svar={svar} onBorjaOm={() => { setL(START); setSvar(BORJA); setFel(0) }}>
-      <Skarm l={l} mk={() => undefined} tryck={tryck} />
+    <OvningRam framsteg={FRAMSTEG[vy]} totalt={5} svar={svar} onBorjaOm={() => { setVy('lista'); setSvar(BORJA); setFel(0) }} bred={enhet === 'dator'}>
+      <Skarm vy={vy} mk={ingenMk} tryck={vy === 'klart' ? () => {} : tryck} />
     </OvningRam>
   )
 }
 
-export default { Visning, Ovning } satisfies GuideModul
+export default { Visning, Ovning, enheter: ['mobil', 'dator'] } satisfies GuideModul

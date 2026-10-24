@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { supabase } from '../../../lib/supabase'
 import { useAuth } from '../../../contexts/AuthContext'
+import { useNyArbetsvy } from '../../../hooks/useNyArbetsvy'
 import { SearchGlass, SearchIconTile } from './SearchIcons'
 import { OPEN_GLOBAL_SEARCH_EVENT } from './globalSearchEvents'
 import {
@@ -59,6 +60,7 @@ interface GlobalSearchProps {
 
 export function GlobalSearch({ portal: requestedPortal }: GlobalSearchProps) {
   const { profile, isAdmin, availableViews } = useAuth()
+  const { aktiv: nyArbetsvy } = useNyArbetsvy()
   const navigate = useNavigate()
 
   // Adminlayouten släpper även in koordinatorer; de söker med koordinatorns omfång
@@ -172,8 +174,8 @@ export function GlobalSearch({ portal: requestedPortal }: GlobalSearchProps) {
       out.push({ key: 'actions', label: GROUP_LABELS.actions, items: commonActions(portal) })
       return out
     }
-    return buildGroups(portal, parsed, searchable ? data : null)
-  }, [query, parsed, data, searchable, portal, recent])
+    return buildGroups(portal, parsed, searchable ? data : null, nyArbetsvy)
+  }, [query, parsed, data, searchable, portal, recent, nyArbetsvy])
 
   const flat = useMemo(() => groups.flatMap(g => g.items), [groups])
 

@@ -472,7 +472,7 @@ export function EquipmentPlacementForm({
 
     // Validera koordinater
     if (!formData.latitude || !formData.longitude) {
-      newErrors.latitude = 'GPS-position krävs. Klicka på "Hämta GPS-position"'
+      newErrors.latitude = 'GPS-position krävs. Tryck på Hämta GPS.'
     }
 
     setErrors(newErrors)

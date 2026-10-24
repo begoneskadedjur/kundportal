@@ -2738,8 +2738,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           {/* ════════ Flik: Utförande ════════ */}
           <div className={stegLage ? 'contents' : activeTab === 'utforande' ? 'space-y-3' : 'hidden'}>
             {/* Tidtagning - kompakt "Arbetstid"-sektion */}
-            {/* Nya arbetsvyn: tiden räknas i bakgrunden och visas inte i stegen */}
-            {iSteg([], showTimeTracking && (
+            {/* Nya arbetsvyn: tiden räknas i bakgrunden och visas inte, varken i stegen eller i flikvyn */}
+            {iSteg([], !nyArbetsvy && showTimeTracking && (
               <CaseModalSection icon={Clock} iconClassName={isRunning ? 'text-[#20c58f]' : 'text-slate-400'} title="Arbetstid">
                 <div className="flex items-center gap-3">
                   <span className={`text-lg font-bold font-mono ${isRunning ? 'text-[#20c58f]' : 'text-white'}`}>
