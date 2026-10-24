@@ -1600,22 +1600,14 @@ export default function EgenkontrollCaseModal({
         <DeleteCaseConfirmDialog
           isOpen={showDeleteDialog}
           onClose={() => setShowDeleteDialog(false)}
-          onConfirm={async () => {
-            const { data: deletedRows, error: deleteError } = await supabase
-              .from('cases')
-              .delete()
-              .eq('id', caseData.id)
-              .select('id')
-            if (deleteError || !deletedRows || deletedRows.length === 0) {
-              console.error('Kunde inte radera ärendet:', deleteError)
-              toast.error('Ärendet kunde inte raderas — behörighet kan saknas')
-              return
-            }
+          caseId={caseData?.id || ''}
+          caseType="contract"
+          caseTitle={formData.case_number || caseData?.title || 'Egenkontroll'}
+          onDeleted={() => {
             setShowDeleteDialog(false)
             onSuccess?.()
             onClose()
           }}
-          caseNumber={formData.case_number}
         />
       )}
 

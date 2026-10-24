@@ -349,6 +349,13 @@ export interface MinAnalys {
   olasta: number
   /** Första olästa kommentaren, för Nytt sedan du läste */
   forstaOlasta: string | null
+  /** En fråga till din roll eller Alla som ingen har svarat på och som du inte har läst */
+  nyGruppfraga?: boolean
+}
+
+/** Räknas på klockan: frågor och svar till dig, och olästa obesvarade frågor till din roll eller Alla */
+export function raknasPaKlockan(a: MinAnalys): boolean {
+  return a.grupp === 'fragor' || a.grupp === 'svar' || (a.grupp === 'kannedom' && !!a.nyGruppfraga)
 }
 
 export interface KontorAnalys {
@@ -446,7 +453,7 @@ export function analysMin(trad: Trad, mig: Mig, kvitton: InkorgKvitto[], kvittoK
   ))
   if (gruppTillMig) {
     const till = gruppTillMig.typ === 'alla' ? 'alla' : rollMottagare(gruppTillMig.roll || '')
-    return { ...bas, grupp: 'kannedom', status: { ton: 'gra', text: `För kännedom, till ${till}` } }
+    return { ...bas, grupp: 'kannedom', nyGruppfraga: !gruppTillMig.besvarad && bas.olasta > 0, status: { ton: 'gra', text: `För kännedom, till ${till}` } }
   }
   if (minaFragor.length > 0) {
     return { ...bas, grupp: 'kannedom', status: { ton: 'gron', text: 'Besvarad, markera som klar' } }

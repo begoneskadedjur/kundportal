@@ -1,7 +1,7 @@
 // src/hooks/useTicketsBadge.ts
 // EN räkning för Tickets överallt (sidomenyer, klockan och nya teknikervyn):
-// antalet trådar som väntar på den inloggade, alltså Frågor till dig + Svar till dig
-// på sidan. Samma uträkning som sidan (fragorLogik.analysMin), och när sidan är öppen
+// antalet trådar som väntar på den inloggade: Frågor till dig + Svar till dig, och
+// olästa obesvarade frågor till ens roll eller Alla (Christian 2026-10-24). Samma uträkning som sidan (fragorLogik.analysMin), och när sidan är öppen
 // skickar den sin siffra hit (publiceraVantarAntal) så att de aldrig visar olika.
 // Modul-singleton så att flera komponenter kan använda hooken utan dubbla
 // prenumerationer. Realtid via postgres_changes på case_comments och läskvitton,
@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { getInboxThreads } from '../services/communicationService'
-import { analysMin, byggTradar, effektivaRoller, kvittonPerKommentar, type Mig } from '../components/fragor/fragorLogik'
+import { analysMin, byggTradar, effektivaRoller, kvittonPerKommentar, raknasPaKlockan, type Mig } from '../components/fragor/fragorLogik'
 
 type Listener = (count: number) => void
 
@@ -47,8 +47,8 @@ async function refetch() {
     const mig: Mig = { id: userId, namn: '', roller: store.roller as Mig['roller'], arKontor: false }
     const karta = kvittonPerKommentar(data.kvitton)
     const n = byggTradar(data)
-      .map(t => analysMin(t, mig, data.kvitton, karta).grupp)
-      .filter(g => g === 'fragor' || g === 'svar').length
+      .map(t => analysMin(t, mig, data.kvitton, karta))
+      .filter(raknasPaKlockan).length
     satt(n)
   } catch {
     // Tyst - räknaren är inte kritisk

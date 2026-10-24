@@ -45,6 +45,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.91.1',
+    date: '2026-10-24',
+    title: 'Tickets till din roll räknas, anledning när ärenden tas bort',
+    items: [
+      { kind: 'andring', text: 'Siffran på Tickets-klockan räknar nu också olästa frågor till din roll eller till Alla som ingen har svarat på. Den försvinner när du har läst tråden.' },
+      { kind: 'andring', text: 'När ett ärende tas bort väljer du en anledning, till exempel Kund avbokade eller Dublett. Vid Övrigt skriver du en kommentar. Anledningen sparas på ärendet.' },
+      { kind: 'buggfix', text: 'Återbesök går att boka även i ett följeärende, så samma ärende kan få flera återbesök. Skapa nytt ärende och Duplicera görs fortfarande från huvudärendet.' },
+      { kind: 'buggfix', text: 'Ta bort ärende i egenkontroller fungerar igen.' },
+    ],
+  },
+  {
     version: '3.91.0',
     date: '2026-10-24',
     title: 'Ny handbok för teknikerna i nya arbetsvyn',

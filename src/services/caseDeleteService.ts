@@ -239,6 +239,17 @@ export interface CaseCloseReason {
  * Den enda vägen för att ta bort ärenden: Radera i ärendemodalen och
  * teknikerns papperskorg (med closeReason) går båda hit.
  */
+/** Anledningar när ett ärende tas bort (samma som Mina ärendens stängning) */
+export const ORSAKER_TA_BORT = [
+  { value: 'kund_accepterade_inte_pris', label: 'Kund accepterade inte kostnadsförslaget' },
+  { value: 'kund_aterkopplade_aldrig', label: 'Kund återkopplade aldrig' },
+  { value: 'lost_vid_inspektion', label: 'Löst vid inspektion' },
+  { value: 'kund_avbokade', label: 'Kund avbokade' },
+  { value: 'kund_ej_narbar', label: 'Kund ej nåbar' },
+  { value: 'dublett', label: 'Dublett' },
+  { value: 'ovrigt', label: 'Övrigt' },
+] as const
+
 export async function deleteCase(
   caseId: string,
   caseType: DeleteableCaseType,

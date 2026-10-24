@@ -908,6 +908,10 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
   const canCreateFollowUp = currentCase &&
     (currentCase.case_type === 'private' || currentCase.case_type === 'business') &&
     !currentCase.parent_case_id;
+  // Återbesök går att boka i alla privat- och företagsärenden, även följeärenden
+  // (flera återbesök i samma ärende). Bara nytt ärende och duplicering kräver huvudärendet.
+  const kanBokaAterbesok = !!currentCase &&
+    (currentCase.case_type === 'private' || currentCase.case_type === 'business');
 
   // Initialisera modal när ett NYTT ärende öppnas (baserat på id)
   // Uppdatera endast currentCase när caseData ändras för att behålla tidloggningsdata
@@ -2066,8 +2070,8 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
     {
       id: 'aterbesok',
       rubrik: 'Återbesök och nytt ärende',
-      // Samma villkor som återbesöksikonen i huvudet: inte från ett följeärende
-      val: canCreateFollowUp ? [
+      // Återbesök i alla privat- och företagsärenden; nytt ärende och kopia bara från huvudärendet
+      val: kanBokaAterbesok ? [
         {
           id: 'boka-aterbesok',
           ikon: 'arende.aterbesok' as const,
@@ -2075,7 +2079,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           beskrivning: 'Flytta ärendet till ett framtida datum. Delfakturering är en kryssruta i dialogen.',
           onClick: () => { void oppnaAterbesok() },
         },
-        {
+        ...(canCreateFollowUp ? [{
           id: 'nytt-arende',
           ikon: 'allman.plus' as const,
           text: 'Skapa nytt ärende',
@@ -2088,7 +2092,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
           text: 'Duplicera ärende',
           beskrivning: 'Skapa en kopia och välj vad som följer med.',
           onClick: () => setShowDuplicateDialog(true),
-        },
+        }] : []),
       ] : [],
     },
     {
@@ -2229,7 +2233,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
               customerName={currentCase.kontaktperson || currentCase.title || 'Ärende'}
             />
           )}
-          {canCreateFollowUp && (
+          {kanBokaAterbesok && (
             <button
               type="button"
               onClick={() => setShowActionDialog(true)}
@@ -2345,6 +2349,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   </div>
                 </div>
               </button>
+              {canCreateFollowUp && (<>
               <button
                 type="button"
                 onClick={() => { setShowFollowUpDialog(true); setShowActionDialog(false) }}
@@ -2371,6 +2376,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   </div>
                 </div>
               </button>
+              </>)}
               <button
                 type="button"
                 onClick={() => setShowActionDialog(false)}
@@ -3013,7 +3019,7 @@ export default function EditCaseModal({ isOpen, onClose, onSuccess, caseData, op
                   onGaTillSteg={gaTillHinder}
                   gaTillText={h => (h.id === 'sluttid-fore-start' ? 'Ändra tiden i Alla uppgifter' : undefined)}
                   onStangHelaArendet={stangHelaArendet}
-                  onBaraBesoket={canCreateFollowUp ? () => { void oppnaAterbesok() } : undefined}
+                  onBaraBesoket={kanBokaAterbesok ? () => { void oppnaAterbesok() } : undefined}
                   onSparaUtanAttStanga={sparaUtanAttStanga}
                   harOsparat={finnsOsparat}
                   status={currentCase.status || formData.status || ''}

@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { getInboxThreads, type InkorgData } from '../services/communicationService'
 import {
-  analysKontor, analysMin, byggTradar, effektivaRoller, kvittonPerKommentar,
+  analysKontor, analysMin, byggTradar, effektivaRoller, kvittonPerKommentar, raknasPaKlockan,
   type KontorAnalys, type Mig, type MinAnalys, type Trad,
 } from '../components/fragor/fragorLogik'
 import { publiceraVantarAntal } from './useTicketsBadge'
@@ -108,7 +108,7 @@ export function useFragorOchUppdrag(lage: FragorLage) {
   // En räkning överallt: det som väntar på mig (Frågor till dig + Svar till dig)
   useEffect(() => {
     if (!data || !migId || lage !== 'mine') return
-    publiceraVantarAntal(migId, rader.filter(r => r.min.grupp === 'fragor' || r.min.grupp === 'svar').length)
+    publiceraVantarAntal(migId, rader.filter(r => raknasPaKlockan(r.min)).length)
   }, [rader, data, migId, lage])
 
   const klaraTotalt = data?.klaraTotalt || 0
