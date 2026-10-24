@@ -22,6 +22,13 @@ export function useNyArbetsvy(): { aktiv: boolean; farByta: boolean } {
   }
 }
 
+/** true om Mitt konto ska visa teknikerns rader under Visning (VisningInstallningar) */
+export function useHarTeknikerVisning(): boolean {
+  const { activeView } = useAuth()
+  const { aktiv, farByta } = useNyArbetsvy()
+  return aktiv || (farByta && activeView === 'technician')
+}
+
 type ProfilFalt = Pick<Profile, 'ny_arbetsvy' | 'visa_hjalptexter' | 'visa_genomgangar' | 'sedda_genomgangar'>
 
 export function useHjalpInstallningar(): {

@@ -4,6 +4,7 @@
 // id öppnar en lead och hör inte till filtret.
 
 import type { Lead } from '../../../types/database'
+import type { IconName } from '../../icons/Icon'
 import { KALLA_ETIKETT, STAGE_ETIKETT, URSPRUNG_ETIKETT, arOppen, type LeadSource, type LeadStage } from '../../../types/leads'
 import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
 import { formatSvTid, svDatum } from '../webLeads/format'
@@ -100,6 +101,18 @@ export const GRUPP_ETIKETT: Record<Grupp, string> = {
   vaknar: 'Parkerade som vaknar i dag',
 }
 export const GRUPP_ORDNING: Grupp[] = ['forsenade', 'idag', 'saknar', 'vaknar']
+export const GRUPP_BESKRIVNING: Record<Grupp, string> = {
+  forsenade: 'Datumet för nästa steg har passerat. Gör steget eller välj ett nytt.',
+  idag: 'Nästa steg ska göras i dag.',
+  saknar: 'Leaden har inget nästa steg. Bestäm vad som ska hända och när.',
+  vaknar: 'Parkerade leads vars datum är i dag. Återuppta eller parkera igen.',
+}
+export const GRUPP_IKON: Record<Grupp, IconName> = {
+  forsenade: 'lead.forsenad',
+  idag: 'falt.idag',
+  saknar: 'lead.nasta-steg',
+  vaknar: 'lead.vaknar',
+}
 
 export function idagSv(): string {
   return svDatum(new Date())
@@ -196,20 +209,47 @@ export function ursprungText(l: Lead, namnFor: (id: string | null) => string): s
 
 
 // ---------------------------------------------------------------------------
-// Klasser enligt modalstandarden (inget Card, sektioner p-3 bg-slate-800/30)
+// Klasser enligt modalstandarden (inget Card, sektioner p-3 bg-slate-800/30) och nya vyns mått
+// (som Tickets): fält och knappar minst 44 px höga, text 15 px, fel alltid som text under fältet.
 // ---------------------------------------------------------------------------
 export const FALT =
-  'w-full px-3 py-1.5 bg-slate-900/50 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent'
+  'w-full min-h-[44px] px-3 py-2 bg-slate-900 border border-slate-600 rounded-xl text-[15px] text-white placeholder-slate-500 focus:outline-none focus:border-[#20c58f] focus-visible:ring-2 focus-visible:ring-[#20c58f]'
+/** Fältet med röd ram vid fel. Felet skrivs också ut som text (FELTEXT). */
+export const faltFel = (fel: boolean, bas: string = FALT) => (fel ? bas.replace('border-slate-600', 'border-red-500/70') : bas)
 export const DATUMFALT = `${FALT} pl-9`
-export const ETIKETT = 'block text-xs font-medium text-slate-400 mb-1'
+export const ETIKETT = 'block text-sm font-medium text-slate-300 mb-1'
+export const FELTEXT = 'mt-1 text-sm text-red-400'
+export const HJALPTEXT = 'mt-1 text-sm text-slate-400'
 export const SEKTION = 'p-3 bg-slate-800/30 border border-slate-700 rounded-xl'
-export const SEKTION_RUBRIK = 'text-sm font-semibold text-white flex items-center gap-1.5 mb-2'
-/** Understrukna segmentval (inga piller). */
+export const SEKTION_RUBRIK = 'text-[15px] font-semibold text-white flex items-center gap-2 mb-2'
+/** Understrukna segmentval (inga piller), 44 px höga. */
 export function segment(aktiv: boolean): string {
-  return `px-2.5 py-1 text-sm -mb-px border-b-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${
+  return `min-h-[44px] px-3 text-[15px] -mb-px border-b-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${
     aktiv ? 'border-[#20c58f] text-white font-medium' : 'border-transparent text-slate-400 hover:text-white'
   }`
 }
+
+/** Knappar som i Tickets (fragorUi): 44 px, rundade, text 15 px. */
+export const KNAPP_PRIMAR =
+  'min-h-[44px] px-4 inline-flex items-center justify-center gap-2 rounded-xl bg-[#20c58f] text-[#04281c] text-[15px] font-semibold hover:bg-[#1bb07f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 focus-visible:ring-[#20c58f] whitespace-nowrap'
+export const KNAPP_SEKUNDAR =
+  'min-h-[44px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-900 text-white text-[15px] font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] whitespace-nowrap'
+export const KNAPP_FARA =
+  'min-h-[44px] px-4 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 text-[#fff] text-[15px] font-semibold hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-400 whitespace-nowrap'
+export const KNAPP_TEXT =
+  'min-h-[44px] px-3 inline-flex items-center justify-center gap-2 rounded-xl text-[15px] font-medium text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] whitespace-nowrap'
+export const IKONKNAPP =
+  'w-11 h-11 flex-shrink-0 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]'
+/** Knappar i leadens åtgärdsrad och rutor: 44 px i telefonen, 40 px på datorn */
+export const ATGARD =
+  'min-h-[44px] lg:min-h-[40px] px-3 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-600 bg-slate-900 text-white text-[15px] font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] whitespace-nowrap'
+export const ATGARD_PRIMAR =
+  'min-h-[44px] lg:min-h-[40px] px-3 inline-flex items-center justify-center gap-2 rounded-xl bg-[#20c58f] text-[#04281c] text-[15px] font-semibold hover:bg-[#1bb07f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] whitespace-nowrap'
+/** Valkort (radioknapp som ruta), som i Ny ticket */
+export const valKort = (aktiv: boolean) =>
+  `w-full min-h-[56px] flex items-center gap-3 px-3 py-2 rounded-xl border text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${
+    aktiv ? 'border-[#20c58f] bg-[#20c58f]/10' : 'border-slate-700 bg-slate-900 hover:bg-slate-800'
+  }`
 
 /** Rollens leadssida utifrån adressen (admin, koordinator, säljare och tekniker har alla /leads). */
 export function leadsSidaFor(pathname: string): string {

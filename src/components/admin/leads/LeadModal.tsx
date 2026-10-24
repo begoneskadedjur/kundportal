@@ -1,8 +1,9 @@
 // src/components/admin/leads/LeadModal.tsx
 // Detaljvyn för en lead (?id= i adressen, Bakåt stänger, helskärm på mobil). Strukturen följer
 // WebLeadDetailModal: huvud med status, ägare, delad med, årspremie, tipsare och org.nr; åtgärdsrad;
-// rutan Nästa steg överst; sektionerna Kontakt, Affär, Ursprung och kopplingar, Aktivitet och ett
-// hopfällt Mer uppgifter. Redigering sker på plats och sparar bara ändrade fält.
+// rutan Nästa steg överst; sektionerna Vad gäller det? (notes, där teknikerns tips står), Kontakt,
+// Affär, Ursprung och kopplingar, Aktivitet och ett hopfällt Mer uppgifter. Redigering sker på plats
+// och sparar bara ändrade fält. Knappar 44 px höga i telefonen, egna SVG-ikoner (Icon).
 // Steg som sätts för hand: Ny, Kontaktad, Parkerad, Förlorad och Återuppta. Besök bokat, Offert skickad
 // och Vunnen sätts automatiskt sedan etapp 5: Boka besök (admin/koordinator) öppnar ärendemodalen
 // förifylld och kopplar ärendet (RPC lead_koppla_besok); Skapa offert öppnar Oneflow-guiden med
@@ -13,9 +14,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { ChevronDown, ChevronRight } from 'lucide-react'
 import Modal from '../../ui/Modal'
-import Button from '../../ui/Button'
 import CreateCaseModal from '../coordinator/CreateCaseModal'
 import CreateCustomerManuallyModal from '../customers/CreateCustomerManuallyModal'
 import { Icon } from '../../icons/Icon'
@@ -45,7 +44,7 @@ import LeadAktivitet, { type LeadAktivitetRef } from './LeadAktivitet'
 import LeadDelning from './LeadDelning'
 import LeadKundKoppling from './LeadKundKoppling'
 import { StatusText } from './LeadsTabell'
-import { SEKTION, SEKTION_RUBRIK, kr, segment, ursprungText } from './leadLogik'
+import { ATGARD, ATGARD_PRIMAR, SEKTION, SEKTION_RUBRIK, kr, segment, ursprungText } from './leadLogik'
 
 interface Props {
   lead: Lead | null
@@ -234,10 +233,12 @@ export default function LeadModal({ lead, personal, namnFor, minProfilId, arLead
       { nyckel: 'company_size', etikett: 'Företagsstorlek', typ: 'val', val: STORLEK },
       { nyckel: 'business_type', etikett: 'Verksamhetstyp' },
       { nyckel: 'business_description', etikett: 'Om verksamheten', typ: 'textarea' },
-      { nyckel: 'notes', etikett: 'Beskrivning och behov', typ: 'textarea' },
     ],
     [],
   )
+
+  // Vad det gäller står högt upp: där ligger teknikerns tips och kundens behov
+  const behovFalt: FaltDef[] = useMemo(() => [{ nyckel: 'notes', etikett: 'Beskrivning och behov', typ: 'textarea' }], [])
 
   if (!lead) return null
 
@@ -306,10 +307,10 @@ export default function LeadModal({ lead, personal, namnFor, minProfilId, arLead
   ]
 
   const atgard = (ikon: Parameters<typeof Icon>[0]['name'], text: string, onClick: () => void, primar = false) => (
-    <Button variant={primar ? 'primary' : 'secondary'} size="sm" onClick={onClick} disabled={arbetar}>
-      <Icon name={ikon} size={16} className="mr-1.5" />
+    <button type="button" className={primar ? ATGARD_PRIMAR : ATGARD} onClick={onClick} disabled={arbetar}>
+      <Icon name={ikon} size={20} />
       {text}
-    </Button>
+    </button>
   )
 
   return (
@@ -324,7 +325,7 @@ export default function LeadModal({ lead, personal, namnFor, minProfilId, arLead
     >
       <div className="p-4 space-y-3">
         {/* Huvud */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[15px]">
           <StatusText lead={lead} />
           <span className="flex items-center gap-1.5 text-slate-300" title="Ägare">
             <Icon name="lead.agare" size={16} className="text-slate-500" />
@@ -356,7 +357,7 @@ export default function LeadModal({ lead, personal, namnFor, minProfilId, arLead
         {/* Manuella steg: Ny och Kontaktad */}
         {kanRedigera && (lead.stage === 'ny' || lead.stage === 'kontaktad') && (
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-400">Steg</span>
+            <span className="text-sm text-slate-400">Steg</span>
             <div className="flex border-b border-slate-700/50" role="tablist" aria-label="Steg">
               {(['ny', 'kontaktad'] as const).map((s) => (
                 <button key={s} type="button" role="tab" aria-selected={lead.stage === s} disabled={arbetar} className={segment(lead.stage === s)} onClick={() => lead.stage !== s && void sparaTyst({ stage: s })}>
@@ -364,7 +365,7 @@ export default function LeadModal({ lead, personal, namnFor, minProfilId, arLead
                 </button>
               ))}
             </div>
-            <span className="text-xs text-slate-500">Besök bokat, Offert skickad och Vunnen sätts automatiskt.</span>
+            <span className="text-sm text-slate-500">Besök bokat, Offert skickad och Vunnen sätts automatiskt.</span>
           </div>
         )}
 
@@ -406,6 +407,8 @@ export default function LeadModal({ lead, personal, namnFor, minProfilId, arLead
           onLoggad={() => void laddaHistorik()}
         />
 
+        <LeadFaltSektion titel="Vad gäller det?" ikon="lead.behov" lead={lead} falt={behovFalt} kanRedigera={kanRedigera} onSpara={spara} />
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <LeadFaltSektion titel="Kontakt" ikon="kontakt.telefon" lead={lead} falt={kontaktFalt} kanRedigera={kanRedigera} onSpara={spara} />
           <LeadFaltSektion titel="Affär" ikon="lead.varde" lead={lead} falt={affarFalt} kanRedigera={kanRedigera} onSpara={spara} />
@@ -418,27 +421,27 @@ export default function LeadModal({ lead, personal, namnFor, minProfilId, arLead
           </h3>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
             <div>
-              <dt className="text-xs text-slate-400">Källa</dt>
+              <dt className="text-sm text-slate-400">Källa</dt>
               <dd className="text-white">
                 {lead.source ? KALLA_ETIKETT[lead.source] : 'Inte angiven'}
                 {tipsare ? ` · tips från ${tipsare}` : ''}
               </dd>
             </div>
             <div>
-              <dt className="text-xs text-slate-400">Ursprungsärende</dt>
+              <dt className="text-sm text-slate-400">Ursprungsärende</dt>
               <dd className="text-white">
                 {lead.origin_case_type ? URSPRUNG_ETIKETT[lead.origin_case_type] : <span className="text-slate-500">Inget</span>}
               </dd>
             </div>
             {lead.booked_case_type && (
               <div>
-                <dt className="text-xs text-slate-400">Bokat besök</dt>
+                <dt className="text-sm text-slate-400">Bokat besök</dt>
                 <dd className="text-white">{URSPRUNG_ETIKETT[lead.booked_case_type]}</dd>
               </div>
             )}
             {lead.web_inquiry_id && (
               <div>
-                <dt className="text-xs text-slate-400">Webbförfrågan</dt>
+                <dt className="text-sm text-slate-400">Webbförfrågan</dt>
                 <dd>
                   {visaWebbLank ? (
                     <Link to={`${basePath}/leads-webb?id=${lead.web_inquiry_id}`} className="text-[#20c58f] hover:underline">Öppna förfrågan</Link>
@@ -449,21 +452,21 @@ export default function LeadModal({ lead, personal, namnFor, minProfilId, arLead
               </div>
             )}
             <div>
-              <dt className="text-xs text-slate-400">Kund</dt>
+              <dt className="text-sm text-slate-400">Kund</dt>
               <dd className="text-white">
                 {lead.customer_id ? kundnamn ?? 'Kopplad kund' : <span className="text-slate-400">Ingen kund ännu. Kopplas när leaden vinns.</span>}
               </dd>
             </div>
             {(lead.offer_contract_id || lead.agreement_contract_id) && (
               <div>
-                <dt className="text-xs text-slate-400">Oneflow</dt>
+                <dt className="text-sm text-slate-400">Oneflow</dt>
                 <dd className="text-white">
                   {lead.agreement_contract_id ? 'Avtal kopplat' : 'Offert kopplad'}
                 </dd>
               </div>
             )}
             {lead.won_at && (
-              <div><dt className="text-xs text-slate-400">Vunnen</dt><dd className="text-white font-mono">{svDatum(lead.won_at)}</dd></div>
+              <div><dt className="text-sm text-slate-400">Vunnen</dt><dd className="text-white font-mono">{svDatum(lead.won_at)}</dd></div>
             )}
           </dl>
         </div>
@@ -488,18 +491,18 @@ export default function LeadModal({ lead, personal, namnFor, minProfilId, arLead
             type="button"
             onClick={() => setVisaMer((v) => !v)}
             aria-expanded={visaMer}
-            className="w-full flex items-center gap-1.5 text-sm font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded"
+            className="w-full min-h-[44px] flex flex-wrap items-center gap-x-2 text-left text-[15px] font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded-lg"
           >
-            {visaMer ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
+            <Icon name="allman.chevron" size={20} className={`text-slate-400 transition-transform ${visaMer ? 'rotate-90' : ''}`} />
             Mer uppgifter
-            <span className="text-xs font-normal text-slate-400">org.nr, hemsida, storlek, beskrivning, fler kontakter</span>
+            <span className="text-sm font-normal text-slate-400">org.nr, hemsida, storlek, verksamhet, fler kontakter</span>
           </button>
           {visaMer && (
             <div className="mt-3 space-y-3">
               <LeadFaltSektion titel="Företaget" ikon="allman.foretag" lead={lead} falt={merFalt} kanRedigera={kanRedigera} onSpara={spara} ramlos />
               {kontakter.filter((k) => !k.is_primary).length > 0 && (
                 <div className="pt-3 border-t border-slate-700/50">
-                  <p className="text-xs font-medium text-slate-400 mb-1">Fler kontakter</p>
+                  <p className="text-sm font-medium text-slate-400 mb-1">Fler kontakter</p>
                   <ul className="space-y-1 text-sm">
                     {kontakter.filter((k) => !k.is_primary).map((k) => (
                       <li key={k.id} className="text-slate-200">
@@ -512,7 +515,7 @@ export default function LeadModal({ lead, personal, namnFor, minProfilId, arLead
                   </ul>
                 </div>
               )}
-              <div className="pt-3 border-t border-slate-700/50 text-xs text-slate-500 space-y-0.5">
+              <div className="pt-3 border-t border-slate-700/50 text-sm text-slate-500 space-y-0.5">
                 <p>Skapad {formatSvTid(lead.created_at)}{lead.created_by ? ` av ${namnFor(lead.created_by) || 'okänd'}` : ''}. Senast ändrad {formatSvTid(lead.updated_at)}.</p>
                 {lead.source_fritext && <p>Källa i gamla Leads: {lead.source_fritext}</p>}
                 {lead.stage_changed_at && <p>I steget {STAGE_ETIKETT[lead.stage]} sedan {svDatum(lead.stage_changed_at)}.</p>}

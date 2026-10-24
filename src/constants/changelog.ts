@@ -45,6 +45,40 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '3.94.0',
+    date: '2026-10-24',
+    title: 'Leads och tips i ny form',
+    items: [
+      { kind: 'andring', text: 'Leads och tips är omgjord för telefon och dator: grupper med en förklaring, sök med / och filter bakom en knapp i telefonen. Läget står i en mening överst, inga sifferkort.' },
+      { kind: 'nyhet', text: 'Tips om ny kund har fyra frågor: Vem gäller det?, Vad gäller det?, Hur når vi dem? och Vem tar det vidare? Teknikerns tips går till koordinatorn om du inte väljer att ta det själv.' },
+      { kind: 'andring', text: 'I leaden står Vad gäller det? direkt under Nästa steg, och fel visas som text vid fältet.' },
+      { kind: 'buggfix', text: 'Knappen för nytt tips i telefonen ligger ovanför bottenmenyn. Menyerna heter Tillbud och avvikelser.' },
+    ],
+  },
+  {
+    version: '3.93.0',
+    date: '2026-10-24',
+    title: 'Tillbud och avvikelser i ny form',
+    items: [
+      { kind: 'andring', text: 'Sidan Tillbud och avvikelser öppnas med formuläret direkt och fungerar lika bra i telefonen som på datorn. Formuläret har fyra steg och visar vad som saknas innan du kan skicka.' },
+      { kind: 'nyhet', text: 'Under Mina rapporter ser du rapporter du har skickat eller står som berörd i, och hur långt de har kommit. Tryck på en rapport för att se åtgärd och uppföljning.' },
+      { kind: 'nyhet', text: 'Koppla till ärende visar dina besök i går och i dag och hittar nu även avtalsärenden.' },
+      { kind: 'andring', text: 'Den som tar emot rapporter utreder dem under Registret, grupperat efter status, med filter och export. Länken i mejlet öppnar rapporten direkt.' },
+    ],
+  },
+  {
+    version: '3.92.0',
+    date: '2026-10-24',
+    title: 'Mitt konto i ny form för alla',
+    items: [
+      { kind: 'andring', text: 'Mitt konto är omgjort i tydliga grupper: Profil, Visning, Appen på hemskärmen, Säkerhet och Konto. Sidan fungerar lika bra i telefonen som på datorn.' },
+      { kind: 'nyhet', text: 'Under Visning väljer du tema direkt: Mörkt, Ljust eller Som enheten. Valet sparas på ditt konto.' },
+      { kind: 'nyhet', text: 'Lösenordsbytet visar med punkter vad som är uppfyllt och om de två nya lösenorden är lika. Ögat i fältet visar vad du skriver.' },
+      { kind: 'andring', text: 'På datorn visas stegen för att lägga portalen på hemskärmen i iPhone och Android. Tekniker med rätt att byta vy kan slå på nya arbetsvyn igen under Visning.' },
+      { kind: 'buggfix', text: 'Namnet du sparar under Profil syns direkt i menyn, och Spara ändringar går att trycka först när något är ändrat.' },
+    ],
+  },
+  {
     version: '3.91.1',
     date: '2026-10-24',
     title: 'Tickets till din roll räknas, anledning när ärenden tas bort',

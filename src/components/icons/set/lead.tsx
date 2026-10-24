@@ -104,4 +104,47 @@ export const leadIcons = {
       <path d="M20 2.5v4M18 4.5h4" />
     </>
   ),
+  // Pågående: tre steg i rad med pil framåt (fliken Pågående)
+  'lead.pagaende': (
+    <>
+      <circle cx="5" cy="12" r="2" />
+      <circle cx="12" cy="12" r="2" />
+      <path d="M7 12h3M14 12h4.5" />
+      <path d="M16.5 9.5 19 12l-2.5 2.5" />
+    </>
+  ),
+  // Försenad: klocka med utropstecken bredvid
+  'lead.forsenad': (
+    <>
+      <path d="M17.5 13A7 7 0 1 1 11 6" />
+      <path d="M11 9v4l2.5 1.5" />
+      <path d="M18.5 3.5v4.5" />
+      <circle cx="18.5" cy="10.8" r="0.6" fill="currentColor" stroke="none" />
+    </>
+  ),
+  // Vaknar: halv sol över en horisont
+  'lead.vaknar': (
+    <>
+      <path d="M3.5 17.5h17M7 21h10" />
+      <path d="M7.5 17.5a4.5 4.5 0 0 1 9 0" />
+      <path d="M12 6.5v2.5M5.6 9.6l1.7 1.7M18.4 9.6l-1.7 1.7M3.5 13.5h2M18.5 13.5h2" />
+    </>
+  ),
+  // Vad det gäller: pratbubbla med två textrader
+  'lead.behov': (
+    <>
+      <path d="M5 4.5h14a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5h-7.5L7 20v-3.5H5A1.5 1.5 0 0 1 3.5 15V6A1.5 1.5 0 0 1 5 4.5z" />
+      <path d="M7.5 9h9M7.5 12.5h6" />
+    </>
+  ),
+  // Fördela: pil från en låda till en person (koordinatorn fördelar)
+  'lead.fordela': (
+    <>
+      <rect x="3.5" y="9" width="6.5" height="6.5" rx="1.5" />
+      <path d="M10 12.25h4.5" />
+      <path d="M12.5 10l2.25 2.25-2.25 2.25" />
+      <circle cx="18.5" cy="9" r="2.3" />
+      <path d="M15.3 18.5a3.2 3.2 0 0 1 6.4 0" />
+    </>
+  ),
 } satisfies Record<`lead.${string}`, ReactNode>

@@ -1,7 +1,7 @@
 // src/pages/shared/intranet/interactive/nyvy/AppenPaHemskarmen.tsx
-// Interaktiv del i guiden Ställ in Mitt konto och visningen (tekniker): så lägger du portalen
-// på hemskärmen i iPhone eller Android. Texterna följer PwaInstallSection.tsx (rutan Använd som
-// app under Mitt konto, visas bara i telefonen):
+// Interaktiv del i guiden Ställ in Mitt konto (tekniker): så lägger du portalen
+// på hemskärmen i iPhone eller Android. Texterna följer PwaInstallSection.tsx (gruppen Appen på hemskärmen
+// under Mitt konto. Knappen finns i telefonen, på datorn visas bara stegen):
 //   Android med installationsdialog  knappen Lägg till på hemskärmen, notisen
 //                                    "Klart. Ikonen ligger nu på hemskärmen."
 //   iPhone och övriga                knappen Så lägger du till appen med tre steg
@@ -30,7 +30,7 @@ export default function AppenPaHemskarmen() {
     <div className="my-5 grid gap-4 rounded-xl border border-slate-700 bg-slate-800/30 p-4">
       <div>
         <p className="text-sm font-semibold text-white">Lägg portalen på hemskärmen</p>
-        <p className="text-sm text-slate-400">Under Mitt konto finns rutan Använd som app. Den syns bara i telefonen. Välj din telefon.</p>
+        <p className="text-sm text-slate-400">Under Mitt konto finns gruppen Appen på hemskärmen. Gör det i telefonen. Välj din telefon.</p>
       </div>
       <div role="radiogroup" aria-label="Telefon" className="flex gap-2">
         {([['iphone', 'iPhone'], ['android', 'Android']] as const).map(([t, text]) => (

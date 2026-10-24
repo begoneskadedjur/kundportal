@@ -58,7 +58,7 @@ values
     ]},
     {"type":"avslut","lankar":[
       {"slug":"guide-roller-och-vyer","label":"Hitta rätt i nya arbetsvyn","description":"Bottenmenyn, sidomenyn, Skapa och klockan."},
-      {"slug":"guide-avbryta-arenden","label":"Avbryt eller ta bort ett ärende","description":"Kommunikation och Radera ärende under Ärendets verktyg."},
+      {"slug":"guide-avbryta-arenden","label":"Avbryt eller ta bort ett ärende","description":"Radera ärende och anledningen under Ärendets verktyg."},
       {"slug":"guide-sokrutan-tekniker","label":"Sökrutan","description":"Hitta ärenden och kunder snabbt."}
     ],"fraga":"Koordinatorn, eller skriv en ticket till rollen Koordinator."}
   ]$json$::jsonb,
@@ -82,7 +82,7 @@ values
       {"text":"Tryck [[Skapa nytt ärende|allman.plus]].","ser":"Det står Följeärende skapat för Getingar! och det nya ärendet öppnas i steget Framme, med samma ärendenummer som det första. Båda ärendena ligger i Mina ärenden."}
     ]},
     {"type":"felsok","items":[
-      {"fraga":"Jag ser ingen Återbesök och nytt ärende under verktygen","svar":"Du står i ett följeärende, eller i ett avtalsärende. Från ett följeärende går det inte att skapa ett till: öppna det första ärendet och gör det där. I ett avtalsärende heter gruppen Nytt ärende från det här och valet [[Kopiera ärende|allman.plus]]."},
+      {"fraga":"Jag ser inte Skapa nytt ärende under verktygen","svar":"Du står i ett följeärende eller i ett avtalsärende. I ett följeärende finns bara [[Boka återbesök|arende.aterbesok]]: öppna det första ärendet för att skapa ett nytt. I ett avtalsärende heter gruppen Nytt ärende från det här och valet [[Kopiera ärende|allman.plus]]."},
       {"fraga":"Knappen Skapa nytt ärende går inte att trycka på","svar":"Du har inte valt skadedjurstyp. Tryck på Skadedjurstyp * och välj."},
       {"fraga":"Det står Kunde inte skapa följeärende","svar":"Inget nytt ärende skapades. Försök igen. Går det inte, skriv en ticket till rollen Koordinator om ärendet."},
       {"fraga":"Jag hittar inte det första ärendet efteråt","svar":"Det nya ärendet öppnas i samma ruta. Stäng det med krysset uppe till höger, så ligger båda ärendena i Mina ärenden."}
@@ -112,36 +112,35 @@ values
 (
   'guide-avbryta-arenden',
   'Avbryt eller ta bort ett ärende',
-  'Avbokar kunden skriver du varför i ärendets kommunikation och tar sedan bort ärendet under Ärendets verktyg. Ingenting raderas på riktigt.',
+  'Avbokar kunden tar du bort ärendet under Ärendets verktyg och väljer en anledning. Ingenting raderas på riktigt.',
   'handbok', 'arenden',
   $json$[
-    {"type":"intro","roller":["technician"],"var":"Ärendet › Ärendets verktyg uppe till höger › Kommunikation och Radera ärende","tar":"2 min","behover":"Ett privat- eller företagsärende som inte ska göras","enhet":"mobil"},
-    {"type":"kortsvar","text":"Skriv först i ärendets kommunikation varför det avbryts. Tryck sedan på verktygen uppe till höger, [[Radera ärende|allman.radera]] och [[Ta bort|allman.radera]]. Ärendet får status Borttaget och försvinner ur Mina ärenden, men all data finns kvar."},
+    {"type":"intro","roller":["technician"],"var":"Ärendet › Ärendets verktyg uppe till höger › Ta bort › Radera ärende","tar":"2 min","behover":"Ett ärende som inte ska göras","enhet":"mobil"},
+    {"type":"kortsvar","text":"Tryck på verktygen uppe till höger i ärendet och sedan [[Radera ärende|allman.radera]]. Välj en anledning, skriv en kommentar om det behövs och tryck [[Ta bort|allman.radera]]. Ärendet får status Borttaget och försvinner ur Mina ärenden, men all data finns kvar."},
     {"type":"visning","steg":[
-      {"text":"I ärendet: tryck på verktygen uppe till höger, ikonen i mitten.","ser":"Ärendets verktyg öppnas. I telefonen kommer listan nerifrån, på datorn uppe till höger."},
-      {"text":"Tryck Kommunikation under Kontakt och plats.","ser":"Panelen Kommunikation öppnas. Längst ner står Skriv en kommentar... (använd @ för att nämna någon)."},
-      {"text":"Skriv varför ärendet avbryts, till exempel att kunden avbokade, och tryck på den gröna pilen. På datorn heter knappen Skicka.","ser":"Kommentaren står i panelen. Den finns kvar i ärendet efteråt."},
-      {"text":"Stäng panelen med krysset uppe till höger.","ser":"Du är tillbaka i ärendet."},
-      {"text":"Tryck på verktygen uppe till höger igen.","ser":"Ärendets verktyg öppnas. Längst ner står gruppen Ta bort."},
-      {"text":"Tryck [[Radera ärende|allman.radera]] under Ta bort.","ser":"Rutan Ta bort ärende öppnas: Ärendet markeras som borttaget och döljs från alla vyer. All data behålls."},
+      {"text":"I ärendet: tryck på verktygen uppe till höger, ikonen i mitten.","ser":"Ärendets verktyg öppnas. I telefonen kommer listan nerifrån, på datorn uppe till höger. Längst ner står gruppen Ta bort."},
+      {"text":"Tryck [[Radera ärende|allman.radera]] under Ta bort.","ser":"Rutan Ta bort ärende öppnas: Ärendet markeras som borttaget och döljs från alla vyer. All data behålls. Knappen Ta bort är avstängd."},
+      {"text":"Tryck på Anledning *, där det står Välj anledning...","ser":"Listan öppnas: Kund accepterade inte kostnadsförslaget, Kund återkopplade aldrig, Löst vid inspektion, Kund avbokade, Kund ej nåbar, Dublett och Övrigt."},
+      {"text":"Tryck på den anledning som stämmer, här Kund avbokade.","ser":"Anledningen står i fältet. Under den visas Kommentar (valfritt), där du kan skriva till exempel vad kunden sa. Knappen Ta bort går nu att trycka på."},
       {"text":"Tryck [[Ta bort|allman.radera]].","ser":"Det står Ärendet har tagits bort. Ärendet stängs och är borta ur Mina ärenden."}
     ]},
     {"type":"felsok","items":[
+      {"fraga":"Knappen Ta bort går inte att trycka på","svar":"Du har inte valt någon anledning. Tryck på Anledning * och välj. Har du valt Övrigt måste du också skriva i Kommentar *."},
       {"fraga":"Jag hittar inte Radera ärende","svar":"Det står längst ner under Ärendets verktyg, i gruppen Ta bort. Rulla ner i listan. I ronderingar och egenkontroller kan tekniker inte ta bort ärendet: skriv en ticket till rollen Koordinator."},
       {"fraga":"Det står Kunde inte markera ärendet som borttaget","svar":"Ingenting ändrades och ärendet ligger kvar. Försök igen. Går det inte, skriv en ticket till rollen Koordinator om ärendet."},
-      {"fraga":"Jag tog bort fel ärende","svar":"Skriv till koordinatorn direkt och ange ärendenumret. Ingenting är raderat, all data finns kvar."},
-      {"fraga":"Knappen i kommunikationen är grå","svar":"Den blir grön när du har skrivit något i rutan."}
+      {"fraga":"Jag tog bort fel ärende","svar":"Skriv till koordinatorn direkt och ange ärendenumret. Ingenting är raderat, all data finns kvar."}
     ]},
     {"type":"bra","items":[
       "Ta bort raderar inget på riktigt. Ärendet får status Borttaget och döljs. Kommentarer, bilder och historik finns kvar.",
-      "Skriv alltid varför i kommunikationen innan du tar bort. Rutan Ta bort ärende frågar inte efter någon anledning, så kommentaren är det enda som visar vad som hände.",
+      "Anledningen och kommentaren sparas på ärendet. Välj den anledning som stämmer, Övrigt bara när ingen annan passar. Då är kommentaren obligatorisk.",
+      "Behöver fler veta, till exempel koordinatorn, kan du skriva i ärendets kommunikation: tryck på verktygen och sedan Kommunikation.",
       "Ta bara bort ärenden som inte ska göras: kunden avbokar, kunden går inte att nå eller ärendet är en dubblett.",
       "Ska besöket bara flyttas tar du inte bort något. Skriv en ticket till koordinatorn i stället, eller boka ett återbesök om ärendet ska fortsätta."
     ]},
-    {"type":"ovning","uppdrag":"Familjen Exempel har ringt och avbokat. Skriv i ärendets kommunikation att kunden avbokade och ta sedan bort ärendet."},
+    {"type":"ovning","uppdrag":"Familjen Exempel har ringt och avbokat. Ta bort ärendet med rätt anledning."},
     {"type":"quiz","fragor":[
-      {"fraga":"Vad gör du först när kunden avbokar?","alternativ":["Trycker Radera ärende direkt","Skriver i kommunikationen varför ärendet avbryts","Ändrar status till Avslutat"],"ratt":1,"forklaring":"Kommentaren finns kvar efteråt och visar varför ärendet avbröts."},
-      {"fraga":"Vad händer med bilderna när du tar bort ett ärende?","alternativ":["De raderas","De finns kvar","De skickas till kunden"],"ratt":1,"forklaring":"All data behålls. Ärendet får bara status Borttaget och döljs."},
+      {"fraga":"Kunden ringer och avbokar. Vilken anledning väljer du?","alternativ":["Övrigt","Kund avbokade","Kund ej nåbar"],"ratt":1,"forklaring":"Välj den anledning som stämmer. Övrigt är bara för sådant som inte står i listan, och då måste du skriva en kommentar."},
+      {"fraga":"Vad händer med bilderna när du tar bort ett ärende?","alternativ":["De raderas","De finns kvar","De skickas till kunden"],"ratt":1,"forklaring":"All data behålls. Ärendet får status Borttaget och döljs."},
       {"fraga":"Kunden vill ha en annan dag. Vad gör du?","alternativ":["Tar bort ärendet och skapar ett nytt","Skriver en ticket till koordinatorn om att flytta besöket","Ingenting"],"ratt":1,"forklaring":"Ärendet ska vara kvar, bara tiden ändras."}
     ]},
     {"type":"avslut","lankar":[

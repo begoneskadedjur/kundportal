@@ -2,29 +2,39 @@
 // Guidemodul: Avbryt eller ta bort ett ärende (tekniker, nya arbetsvyn, telefon och dator).
 // Slugen behålls så att länkar och läsloggen fungerar.
 //
-// Efterbildning av EditCaseModal i nya vyn: Ärendets verktyg › Kontakt och plats ›
-// Kommunikation (CommunicationSlidePanel, "Skriv en kommentar... (använd @ för att nämna
-// någon)", den gröna pilen, på datorn Skicka, Stäng panel) och Ärendets verktyg › Ta bort ›
-// Radera ärende ("Frågar en gång till innan ärendet tas bort."), DeleteCaseConfirmDialog
-// (Ta bort ärende, "Ärendet markeras som borttaget och döljs från alla vyer. All data
-// behålls.", Avbryt, Ta bort, toasten "Ärendet har tagits bort"). caseDeleteService sätter
-// status Borttaget och deleted_at, ingenting raderas.
+// Efterbildning av EditCaseModal i nya vyn: Ärendets verktyg › Ta bort › Radera ärende
+// ("Frågar en gång till innan ärendet tas bort.") och DeleteCaseConfirmDialog (Ta bort
+// ärende, "Ärendet markeras som borttaget och döljs från alla vyer. All data behålls.",
+// Anledning * med Välj anledning... och valen ur ORSAKER_TA_BORT, Kommentar som är
+// obligatorisk vid Övrigt och annars valfri, Avbryt, Ta bort som är avstängd tills en
+// anledning är vald, toasten "Ärendet har tagits bort"). caseDeleteService sätter status
+// Borttaget, deleted_at och close_reason/close_reason_notes. Ingenting raderas.
 
 import { useState } from 'react'
 import { Icon } from '../../../../components/icons/Icon'
-import { Ark, Notis, OvningRam, type OvningSvar } from '../skarmkit'
+import { Ark, Markor, Notis, OvningRam, type OvningSvar } from '../skarmkit'
 import { useGuideEnhet, type NyMarkor } from '../skarmkit/nyvy'
 import type { GuideModul } from './registry'
 import { gorMk, ingenMk, type Mk, type Tryck } from './_arenden'
-import { ArendeRam, KommPanel, NR, RutKnapp, VerktygArk, type Kommentar } from './_nyvy_tickets'
+import { ArendeRam, NR, RutKnapp, VerktygArk } from './_nyvy_tickets'
 
-type Vy = 'arende' | 'verktyg1' | 'komm' | 'komm-text' | 'komm-skickad' | 'arende2' | 'verktyg2' | 'fraga' | 'borta'
+type Vy = 'arende' | 'verktyg' | 'fraga' | 'lista' | 'vald' | 'ovrigt' | 'borta'
 
-const ORSAK = 'Kunden ringde och avbokade. Råttorna har försvunnit, de hör av sig om de kommer tillbaka.'
+/** Valen ur ORSAKER_TA_BORT i caseDeleteService */
+const ORSAKER = [
+  { id: 'kund_accepterade_inte_pris', text: 'Kund accepterade inte kostnadsförslaget' },
+  { id: 'kund_aterkopplade_aldrig', text: 'Kund återkopplade aldrig' },
+  { id: 'lost_vid_inspektion', text: 'Löst vid inspektion' },
+  { id: 'kund_avbokade', text: 'Kund avbokade' },
+  { id: 'kund_ej_narbar', text: 'Kund ej nåbar' },
+  { id: 'dublett', text: 'Dublett' },
+  { id: 'ovrigt', text: 'Övrigt' },
+]
 
-const SKICKAD: Kommentar[] = [{ id: 'k1', namn: 'Du', egen: true, tid: '2026-10-26 07:40', text: ORSAK }]
-
-function TaBortRuta({ mk, tryck }: { mk: Mk; tryck: Tryck }) {
+function TaBortRuta({ vy, mk, tryck }: { vy: Vy; mk: Mk; tryck: Tryck }) {
+  const anledning = vy === 'vald' ? 'Kund avbokade' : vy === 'ovrigt' ? 'Övrigt' : ''
+  const kravKommentar = vy === 'ovrigt'
+  const kan = vy === 'vald'
   return (
     <div className="absolute inset-0 z-40">
       <Ark titel="Ta bort ärende">
@@ -35,9 +45,40 @@ function TaBortRuta({ mk, tryck }: { mk: Mk; tryck: Tryck }) {
             <p className="text-[11px] leading-snug text-slate-400">Ärendet markeras som borttaget och döljs från alla vyer. All data behålls.</p>
           </div>
         </div>
+        <div className="grid gap-1">
+          <span className="text-[10.5px] font-medium text-slate-400">Anledning <span className="text-red-400">*</span></span>
+          <div className="relative">
+            <Markor markor={mk('anledning')} block>
+              <button type="button" onClick={() => tryck('anledning')}
+                className={`flex w-full items-center justify-between rounded-lg border border-slate-600 bg-slate-900 px-2 py-1.5 text-left text-[11.5px] ${anledning ? 'text-white' : 'text-slate-500'}`}>
+                {anledning || 'Välj anledning...'}
+                <Icon name="allman.chevron" size={16} className="h-3.5 w-3.5 rotate-90 text-slate-400" />
+              </button>
+            </Markor>
+            {vy === 'lista' && (
+              <ul className="mt-1 overflow-hidden rounded-lg border border-slate-600 bg-slate-900 shadow-xl">
+                {ORSAKER.map(o => (
+                  <li key={o.id}>
+                    <Markor markor={mk(`orsak-${o.id}`)} block>
+                      <button type="button" onClick={() => tryck(`orsak-${o.id}`)} className="block w-full px-2 py-1 text-left text-[11px] text-slate-200 hover:bg-slate-800">{o.text}</button>
+                    </Markor>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        {anledning && (
+          <div className="grid gap-1">
+            <span className="text-[10.5px] font-medium text-slate-400">Kommentar {kravKommentar ? <span className="text-red-400">*</span> : <span className="text-slate-500">(valfritt)</span>}</span>
+            <button type="button" onClick={() => tryck('kommentar')} className="block min-h-[36px] w-full rounded-lg border border-slate-600 bg-slate-800/50 px-2 py-1.5 text-left text-[11px] text-slate-500">
+              {kravKommentar ? 'Beskriv varför ärendet tas bort' : 'Till exempel vad kunden sa'}
+            </button>
+          </div>
+        )}
         <div className="flex gap-2 border-t border-slate-700/50 pt-2">
           <RutKnapp id="avbryt" mk={mk} tryck={tryck}>Avbryt</RutKnapp>
-          <RutKnapp id="ta-bort" fara ikon="allman.radera" mk={mk} tryck={tryck}>Ta bort</RutKnapp>
+          <RutKnapp id="ta-bort" fara inaktiv={!kan} ikon="allman.radera" mk={mk} tryck={tryck}>Ta bort</RutKnapp>
         </div>
       </Ark>
     </div>
@@ -45,7 +86,7 @@ function TaBortRuta({ mk, tryck }: { mk: Mk; tryck: Tryck }) {
 }
 
 function Skarm({ vy, mk, tryck, markor }: { vy: Vy; mk: Mk; tryck: Tryck; markor?: NyMarkor }) {
-  const komm = vy === 'komm' || vy === 'komm-text' || vy === 'komm-skickad'
+  const ruta = vy === 'fraga' || vy === 'lista' || vy === 'vald' || vy === 'ovrigt'
   return (
     <ArendeRam
       stangt={vy === 'borta'}
@@ -55,10 +96,8 @@ function Skarm({ vy, mk, tryck, markor }: { vy: Vy; mk: Mk; tryck: Tryck; markor
       mk={mk}
       tryck={tryck}
       ovanpa={<>
-        {vy === 'verktyg1' && <VerktygArk fran="kontakt" oppen="kontakt" mk={mk} tryck={tryck} />}
-        {vy === 'verktyg2' && <VerktygArk fran="arendet" oppen="ta-bort" mk={mk} tryck={tryck} />}
-        {komm && <KommPanel kommentarer={vy === 'komm-skickad' ? SKICKAD : []} text={vy === 'komm-text' ? ORSAK : ''} mk={mk} tryck={tryck} />}
-        {vy === 'fraga' && <TaBortRuta mk={mk} tryck={tryck} />}
+        {vy === 'verktyg' && <VerktygArk fran="arendet" oppen="ta-bort" mk={mk} tryck={tryck} />}
+        {ruta && <TaBortRuta vy={vy} mk={mk} tryck={tryck} />}
       </>}
       notis={vy === 'borta' ? <Notis text="Ärendet har tagits bort" /> : undefined}
     />
@@ -69,12 +108,10 @@ function Skarm({ vy, mk, tryck, markor }: { vy: Vy; mk: Mk; tryck: Tryck; markor
 
 const VISNING: { vy: Vy; markera: string }[] = [
   { vy: 'arende', markera: 'verktyg' },
-  { vy: 'verktyg1', markera: 'kommunikation' },
-  { vy: 'komm-text', markera: 'komm-skicka' },
-  { vy: 'komm-skickad', markera: 'panel-stang' },
-  { vy: 'arende2', markera: 'verktyg' },
-  { vy: 'verktyg2', markera: 'radera' },
-  { vy: 'fraga', markera: 'ta-bort' },
+  { vy: 'verktyg', markera: 'radera' },
+  { vy: 'fraga', markera: 'anledning' },
+  { vy: 'lista', markera: 'orsak-kund_avbokade' },
+  { vy: 'vald', markera: 'ta-bort' },
 ]
 
 function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
@@ -85,7 +122,7 @@ function Visning({ steg, onNasta }: { steg: number; onNasta: () => void }) {
 
 // ─── Övning ───
 
-const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Familjen Exempel har ringt och avbokat. Ärendet är öppet. Skriv först i ärendets kommunikation varför det avbryts.' }
+const BORJA: OvningSvar = { typ: 'tips', titel: 'Börja här', text: 'Familjen Exempel har ringt och avbokat. Ärendet är öppet. Ta bort det med rätt anledning.' }
 
 const TIPS: Record<string, string> = {
   nasta: 'Jag är framme är för när du står hos kunden. Besöket blir inte av.',
@@ -95,16 +132,16 @@ const TIPS: Record<string, string> = {
   kartor: 'Kartan behövs inte nu.',
   ring: 'Kunden har redan ringt.',
   'verktyg-stang': 'Krysset stänger verktygen.',
-  'boka-aterbesok': 'Ett återbesök flyttar ärendet framåt. Kunden har avbokat.',
-  duplicera: 'Duplicera gör en kopia. Ärendet ska bort.',
-  'nytt-arende': 'Ett nytt ärende behövs inte.',
   historik: 'Historiken visar ändringar. Det behövs inte nu.',
   status: 'Status ändrar du inte för en avbokning. Ärendet tas bort med Radera ärende.',
   'alla-uppgifter': 'Den vanliga flikvyn behövs inte.',
+  'byt-namn': 'Namnet behöver inte ändras.',
+  lead: 'Ett tips om en ny kund behövs inte nu.',
   avbryt: 'Avbryt stänger rutan och ärendet ligger kvar.',
+  kommentar: 'Kommentaren är valfri här. Behövs den inte kan du trycka Ta bort direkt.',
 }
 
-const FRAMSTEG: Record<Vy, number> = { arende: 0, verktyg1: 1, komm: 2, 'komm-text': 2, 'komm-skickad': 3, arende2: 4, verktyg2: 5, fraga: 6, borta: 7 }
+const FRAMSTEG: Record<Vy, number> = { arende: 0, verktyg: 1, fraga: 2, lista: 3, vald: 4, ovrigt: 3, borta: 5 }
 
 function Ovning() {
   const enhet = useGuideEnhet()
@@ -119,48 +156,39 @@ function Ovning() {
   const tryck = (id: string) => {
     switch (vy) {
       case 'arende':
-        if (id === 'verktyg') ga('verktyg1', 'Ärendets verktyg', 'Kommunikation står under Kontakt och plats.')
+        if (id === 'verktyg') ga('verktyg', 'Ärendets verktyg', `Verktygen öppnades ${enhet === 'dator' ? 'uppe till höger' : 'nerifrån'}. Radera ärende står längst ner, under Ta bort.`)
         else annars(id, 'Tryck på verktygen uppe till höger, ikonen i mitten.')
         break
-      case 'verktyg1':
-        if (id === 'kommunikation') ga('komm', 'Kommunikation', 'Panelen öppnades. Tryck i rutan längst ner och skriv varför ärendet avbryts.')
-        else if (id === 'radera') miss('Skriv varför i kommunikationen först, så vet kontoret vad som hände. Tryck Kommunikation.')
-        else annars(id, 'Tryck Kommunikation under Kontakt och plats.')
-        break
-      case 'komm':
-        if (id === 'komm-falt') ga('komm-text', 'Orsaken är skriven', enhet === 'dator' ? 'Tryck Skicka.' : 'Tryck på den gröna pilen.')
-        else if (id === 'komm-skicka') miss('Knappen är grå. Skriv orsaken i rutan först.')
-        else if (id === 'panel-stang') miss('Skriv orsaken innan du stänger panelen.')
-        else annars(id, 'Tryck i rutan längst ner.')
-        break
-      case 'komm-text':
-        if (id === 'komm-skicka') ga('komm-skickad', 'Kommentaren är sparad', 'Den står i panelen och finns kvar i ärendet. Stäng panelen med krysset.')
-        else if (id === 'panel-stang') miss('Kommentaren är inte skickad än. Skicka den först.')
-        else annars(id, enhet === 'dator' ? 'Tryck Skicka.' : 'Tryck på den gröna pilen.')
-        break
-      case 'komm-skickad':
-        if (id === 'panel-stang') ga('arende2', 'Tillbaka i ärendet', 'Nu tar du bort ärendet. Öppna verktygen igen.')
-        else annars(id, 'Stäng panelen med krysset uppe till höger.')
-        break
-      case 'arende2':
-        if (id === 'verktyg') ga('verktyg2', 'Ärendets verktyg', 'Radera ärende står längst ner, under Ta bort.')
-        else annars(id, 'Tryck på verktygen uppe till höger.')
-        break
-      case 'verktyg2':
-        if (id === 'radera') ga('fraga', 'Ta bort ärende', 'Rutan frågar en gång till. All data behålls.')
+      case 'verktyg':
+        if (id === 'radera') ga('fraga', 'Ta bort ärende', 'Rutan frågar en gång till. Välj först en anledning.')
         else annars(id, 'Tryck Radera ärende under Ta bort.')
         break
       case 'fraga':
+      case 'ovrigt':
+        if (id === 'anledning') ga('lista', 'Listan är öppen', 'Välj den anledning som stämmer. Kunden har avbokat.')
+        else if (id === 'ta-bort') miss(vy === 'ovrigt' ? 'Vid Övrigt måste du skriva en kommentar. Här finns en bättre anledning: tryck på Anledning och välj Kund avbokade.' : 'Knappen är avstängd tills du har valt en anledning.')
+        else if (id === 'kommentar') miss('Vid Övrigt måste du skriva varför. Men kunden har avbokat, så välj Kund avbokade i stället.')
+        else annars(id, 'Tryck på Anledning *.')
+        break
+      case 'lista':
+        if (id === 'orsak-kund_avbokade') ga('vald', 'Kund avbokade', 'Nu visas Kommentar, som är valfri här. Tryck Ta bort.')
+        else if (id === 'orsak-ovrigt') { setFel(f => f + 1); setVy('ovrigt'); setSvar({ typ: 'fel', titel: 'Det finns en bättre anledning', text: 'Övrigt kräver en kommentar och är för sådant som inte står i listan. Kunden har avbokat. Tryck på Anledning och välj Kund avbokade.' }) }
+        else if (id.startsWith('orsak-')) miss('Den anledningen stämmer inte. Kunden ringde och avbokade.')
+        else annars(id, 'Välj Kund avbokade i listan.')
+        break
+      case 'vald':
         if (id === 'ta-bort') {
           setVy('borta')
-          setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Ärendet fick status Borttaget och är borta ur Mina ärenden. Kommentaren om avbokningen finns kvar i ärendet.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
-        } else annars(id, 'Tryck Ta bort.')
+          setSvar({ typ: 'ok', titel: fel === 0 ? 'Felfritt, du kan det här' : 'Klart', text: `Ärendet fick status Borttaget med anledningen Kund avbokade och är borta ur Mina ärenden. All data finns kvar.${fel ? ` Du tryckte fel ${fel} ${fel === 1 ? 'gång' : 'gånger'} på vägen, det gör inget.` : ''}` })
+        } else if (id === 'kommentar') setSvar({ typ: 'tips', titel: 'Kommentaren är valfri', text: 'Här kan du skriva till exempel vad kunden sa. Det behövs inte nu. Tryck Ta bort.' })
+        else if (id === 'anledning') ga('lista', 'Byta anledning?', 'Kund avbokade var rätt. Välj den igen.')
+        else annars(id, 'Tryck Ta bort.')
         break
     }
   }
 
   return (
-    <OvningRam framsteg={FRAMSTEG[vy]} totalt={7} svar={svar} onBorjaOm={() => { setVy('arende'); setSvar(BORJA); setFel(0) }} bred={enhet === 'dator'}>
+    <OvningRam framsteg={FRAMSTEG[vy]} totalt={5} svar={svar} onBorjaOm={() => { setVy('arende'); setSvar(BORJA); setFel(0) }} bred={enhet === 'dator'}>
       <Skarm vy={vy} mk={ingenMk} tryck={vy === 'borta' ? () => {} : tryck} />
     </OvningRam>
   )

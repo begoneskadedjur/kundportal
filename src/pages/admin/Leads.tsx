@@ -1,20 +1,22 @@
 // src/pages/admin/Leads.tsx
-// Leads (B2B) sedan etapp 4 (2026-10-10). Samma motor som Leads (Webb): flikar och filter i adressen,
-// ?id= öppnar en lead (Bakåt stänger), tangentbord (pil upp/ned, Enter, N för ny lead).
-// Flikar: Att göra (Försenade, I dag, Saknar nästa steg, Parkerade som vaknar i dag), Pågående, Nya tips
-// (utan ägare eller nya med tipsare, koordinatorns fördelningskö) och Alla. Ingen KPI-rad: antal och
-// pipelinevärde står i sidfoten. Status som punkt och text, aldrig piller.
+// Leads och tips (2026-10-24: samma formspråk som Tickets och Mina ärenden). Samma motor som sedan
+// etapp 4: flikar och filter i adressen, ?id= öppnar en lead (Bakåt stänger), ?ny=1 öppnar Ny lead.
+// Tangentbord på datorn: pil upp och ned flyttar, Enter öppnar, N ny lead, / söker.
+// Flikar: Att göra (Försenade, I dag, Saknar nästa steg, Parkerade som vaknar i dag), Pågående,
+// Nya tips (utan ägare eller nya med tipsare, koordinatorns fördelningskö), Alla och Statistik
+// (inte för tekniker). Inga KPI-kort: läget står i en mening under rubriken, antal och
+// pipelinevärde i sidfoten. Status som punkt och text, aldrig piller.
 // Används av /admin, /koordinator, /saljare och /technician (leads). RLS avgör vad var och en ser:
 // admin och koordinator allt, övriga det de äger, har tipsat om eller fått delat med sig.
+// I nya teknikervyn står rubriken i sidhuvudet (NY_RUBRIKER: Leads och tips), så sidans h1 göms.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import toast from 'react-hot-toast'
-import { Plus, RefreshCw, X } from 'lucide-react'
-import Button from '../../components/ui/Button'
-import { Icon } from '../../components/icons/Icon'
-import { SearchGlass } from '../../components/shared/search/SearchIcons'
+import { Icon, type IconName } from '../../components/icons/Icon'
 import { useAuth } from '../../contexts/AuthContext'
+import { useNyArbetsvy } from '../../hooks/useNyArbetsvy'
+import { useNySidhuvud } from '../../components/technician/ny/layout/NySidhuvud'
 import { LeadService } from '../../services/leadService'
 import type { Lead } from '../../types/database'
 import { KALLA_ETIKETT, LEAD_KALLOR, LEAD_STAGES, STAGE_ETIKETT, arOppen, type LeadPerson } from '../../types/leads'
@@ -25,6 +27,9 @@ import LeadsStatistik from '../../components/admin/leads/statistik/LeadsStatisti
 import {
   FILTER_NYCKLAR,
   GRUPP_ORDNING,
+  IKONKNAPP,
+  KNAPP_PRIMAR,
+  KNAPP_SEKUNDAR,
   arNyttTips,
   filtrera,
   gruppFor,
@@ -38,18 +43,22 @@ import {
   type Mig,
 } from '../../components/admin/leads/leadLogik'
 
-const FALT_BAS = 'h-9 px-3 bg-slate-800 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#20c58f] focus:border-transparent'
-const falt = (aktiv: boolean) => `${FALT_BAS} ${aktiv ? 'border-[#20c58f]/60 text-white' : 'border-slate-700 text-slate-300'}`
+const SELECT =
+  'h-11 w-full sm:w-auto px-3 rounded-xl border bg-slate-900 text-[15px] focus:outline-none focus:border-[#20c58f] focus-visible:ring-2 focus-visible:ring-[#20c58f]'
+const select = (aktiv: boolean) => `${SELECT} ${aktiv ? 'border-[#20c58f]/60 text-white' : 'border-slate-600 text-slate-200'}`
 
 export default function Leads() {
   const location = useLocation()
   const { profile, isAdmin, isKoordinator, isTechnician } = useAuth()
+  const { aktiv: nyAktiv } = useNyArbetsvy()
   const [searchParams, setSearchParams] = useSearchParams()
   const [leads, setLeads] = useState<Lead[]>([])
   const [personal, setPersonal] = useState<LeadPerson[]>([])
   const [delade, setDelade] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [visaNy, setVisaNy] = useState(false)
+  const [visaFilter, setVisaFilter] = useState(false)
+  const sokRef = useRef<HTMLInputElement>(null)
 
   const base = location.pathname.startsWith('/koordinator')
     ? '/koordinator'
@@ -62,6 +71,7 @@ export default function Leads() {
   const extra = (profile?.extra_roles ?? []) as string[]
   const arLeadAdmin = isAdmin || isKoordinator || extra.includes('admin') || extra.includes('koordinator')
   const arTekniker = isTechnician && !arLeadAdmin
+  const iTeknikervyn = base === '/technician'
   const valtId = searchParams.get('id')
   const flik = lasFlik(searchParams)
   const filter = useMemo(() => lasFilter(searchParams), [searchParams])
@@ -127,26 +137,30 @@ export default function Leads() {
   const oppna = (id: string) => setSearchParams((p) => { p.set('id', id); return p })
   const stang = () => setSearchParams((p) => { p.delete('id'); return p })
 
-  // ?ny=1 (till exempel säljarens knapp Ny Lead i sidomenyn) öppnar Ny lead
+  // ?ny=1 (Skapa › Tips om ny kund, säljarens Ny Lead i sidomenyn) öppnar Ny lead
   useEffect(() => {
     if (searchParams.get('ny') !== '1') return
     setVisaNy(true)
     setSearchParams((p) => { p.delete('ny'); return p }, { replace: true })
   }, [searchParams, setSearchParams])
 
-  // N öppnar Ny lead (inte i fält och inte när en lead är öppen)
+  // N öppnar Ny lead och / fokuserar sökningen (inte i fält och inte när en lead är öppen)
   useEffect(() => {
     const tangent = (e: KeyboardEvent) => {
-      if (e.key !== 'n' && e.key !== 'N') return
       if (e.ctrlKey || e.metaKey || e.altKey || valtId || visaNy) return
       const t = e.target as HTMLElement | null
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return
-      e.preventDefault()
-      setVisaNy(true)
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault()
+        setVisaNy(true)
+      } else if (e.key === '/' && flik !== 'statistik') {
+        e.preventDefault()
+        sokRef.current?.focus()
+      }
     }
     document.addEventListener('keydown', tangent)
     return () => document.removeEventListener('keydown', tangent)
-  }, [valtId, visaNy])
+  }, [valtId, visaNy, flik])
 
   const idag = idagSv()
   const synliga = useMemo(() => filtrera(leads, filter, flik, mig), [leads, filter, flik, mig])
@@ -170,6 +184,7 @@ export default function Leads() {
     [leads, filter.agare, mig],
   )
   const attGoraAntal = useMemo(() => agarUrval.filter((l) => gruppFor(l, idag) !== null).length, [agarUrval, idag])
+  const forsenadeAntal = useMemo(() => agarUrval.filter((l) => gruppFor(l, idag) === 'forsenade').length, [agarUrval, idag])
   const nyaTipsAntal = useMemo(() => leads.filter(arNyttTips).length, [leads])
   const oppnaIUrval = agarUrval.filter((l) => arOppen(l.stage))
   const pipeline = oppnaIUrval.reduce((s, l) => s + (Number(l.estimated_value) || 0), 0)
@@ -187,21 +202,28 @@ export default function Leads() {
     }
   }
 
-  const harFilter = !!(filter.q || filter.kalla || filter.status || filter.agare !== 'mina')
-  const tomText = harFilter
-    ? 'Inga leads matchar filtret.'
-    : flik === 'att-gora'
-      ? 'Inget att göra just nu. Alla leads har ett nästa steg framåt i tiden.'
-      : flik === 'nya-tips'
-        ? 'Inga nya tips att fördela.'
-        : 'Inga leads än. Tryck N eller Ny lead för att lägga till.'
+  // Läget i en mening (ingen KPI-rad). Samma mening i nya vyns sidhuvud.
+  const sammanfattning = attGoraAntal === 0
+    ? `Inget att göra just nu, ${oppnaIUrval.length} öppna`
+    : `${attGoraAntal} att göra${forsenadeAntal ? `, varav ${forsenadeAntal} ${forsenadeAntal === 1 ? 'försenad' : 'försenade'}` : ''}, ${oppnaIUrval.length} öppna`
+  useNySidhuvud({ underrubrik: loading && leads.length === 0 ? undefined : sammanfattning })
 
-  const flikar: { id: Flik; label: string; antal?: number; varna?: boolean; ikon?: boolean }[] = [
-    { id: 'att-gora', label: 'Att göra', antal: attGoraAntal, varna: true },
-    { id: 'pagaende', label: 'Pågående' },
-    { id: 'nya-tips', label: 'Nya tips', antal: nyaTipsAntal, varna: arLeadAdmin },
-    { id: 'alla', label: 'Alla' },
-    ...(arTekniker ? [] : [{ id: 'statistik' as Flik, label: 'Statistik', ikon: true }]),
+  const harFilter = !!(filter.q || filter.kalla || filter.status || filter.agare !== 'mina')
+  const antalFilter = [filter.kalla, filter.status, filter.agare !== 'mina' && flik !== 'nya-tips'].filter(Boolean).length
+  const [tomRubrik, tomText] = harFilter
+    ? ['Inga träffar', 'Inga leads matchar sökningen eller filtret.']
+    : flik === 'att-gora'
+      ? ['Inget att göra just nu', 'Alla leads har ett nästa steg framåt i tiden.']
+      : flik === 'nya-tips'
+        ? ['Inga nya tips', 'Inga nya tips att fördela.']
+        : ['Inga leads än', arTekniker ? 'Tryck Nytt tips när en kund eller granne behöver mer hjälp.' : 'Tryck Ny lead för att lägga till en. På datorn kan du också trycka N.']
+
+  const flikar: { id: Flik; label: string; ikon: IconName; antal?: number; varna?: boolean }[] = [
+    { id: 'att-gora', label: 'Att göra', ikon: 'lead.att-gora', antal: attGoraAntal, varna: true },
+    { id: 'pagaende', label: 'Pågående', ikon: 'lead.pagaende' },
+    { id: 'nya-tips', label: 'Nya tips', ikon: 'lead.tips', antal: nyaTipsAntal, varna: arLeadAdmin },
+    { id: 'alla', label: 'Alla', ikon: 'allman.lista' },
+    ...(arTekniker ? [] : [{ id: 'statistik' as Flik, label: 'Statistik', ikon: 'allman.statistik' as IconName }]),
   ]
 
   const agarVal = [
@@ -211,35 +233,47 @@ export default function Leads() {
   ]
 
   const statusTom = flik === 'alla' ? 'Alla statusar' : 'Alla öppna'
+  const nyText = arTekniker ? 'Nytt tips' : 'Ny lead'
+  const rubrik = iTeknikervyn ? 'Leads och tips' : 'Leads (B2B)'
+  const beskrivning = arTekniker
+    ? 'Det du har tipsat om, äger eller fått delat med dig.'
+    : 'Företag och föreningar som kan bli avtalskunder.'
 
   return (
-    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 pb-24 md:pb-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="max-w-[1500px] mx-auto p-4 lg:p-6 flex flex-col gap-5 pb-28 lg:pb-6">
+      <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-white">{arTekniker ? 'Mina leads och tips' : 'Leads (B2B)'}</h1>
-            <button
-              type="button"
-              onClick={() => { setLoading(true); void ladda() }}
-              className="p-1.5 text-slate-400 hover:text-white rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
-              aria-label="Uppdatera"
-              title="Uppdatera"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-          <p className="text-sm text-slate-400 mt-1">
-            {arTekniker ? 'Det du har tipsat om, äger eller fått delat med dig.' : 'Företag och föreningar som kan bli avtalskunder.'}
-          </p>
+          {!nyAktiv && (
+            <div className="flex items-center gap-1">
+              <h1 className="text-2xl font-bold text-white leading-tight">{rubrik}</h1>
+              <button
+                type="button"
+                onClick={() => { setLoading(true); void ladda() }}
+                className={IKONKNAPP}
+                aria-label="Uppdatera"
+                title="Uppdatera"
+              >
+                <Icon name="provision.uppdatera" size={20} className={loading ? 'animate-spin' : ''} />
+              </button>
+            </div>
+          )}
+          <p className="mt-1 text-[15px] text-slate-300">{beskrivning}</p>
+          {!loading && flik !== 'statistik' && (
+            <p className="mt-0.5 text-[15px] text-slate-400">
+              <strong className={`font-semibold ${forsenadeAntal > 0 ? 'text-red-400' : attGoraAntal > 0 ? 'text-amber-500' : 'text-slate-200'}`}>
+                {attGoraAntal === 0 ? 'Inget att göra just nu' : `${attGoraAntal} att göra${forsenadeAntal ? `, varav ${forsenadeAntal} ${forsenadeAntal === 1 ? 'försenad' : 'försenade'}` : ''}`}
+              </strong>
+              , {oppnaIUrval.length} öppna{pipeline > 0 && <> för <span className="font-mono">{kr(pipeline)}</span> i årspremie</>}
+            </p>
+          )}
         </div>
-        <div className="hidden md:flex items-center gap-2">
-          <Button variant="primary" size="sm" onClick={() => setVisaNy(true)} title="Ny lead (N)">
-            <Plus className="w-4 h-4 mr-1.5" /> {arTekniker ? 'Nytt tips' : 'Ny lead'}
-          </Button>
-        </div>
-      </div>
+        <button type="button" onClick={() => setVisaNy(true)} className={`${KNAPP_PRIMAR} hidden lg:inline-flex`} title={`${nyText} (N)`}>
+          <Icon name={arTekniker ? 'lead.tips' : 'allman.plus'} size={20} />
+          {nyText}
+        </button>
+      </header>
 
-      <div className="flex border-b border-slate-700/50 overflow-x-auto" role="tablist">
+      <div role="tablist" aria-label="Visa" className="flex gap-4 sm:gap-6 border-b border-slate-700 overflow-x-auto">
         {flikar.map((f) => (
           <button
             key={f.id}
@@ -247,19 +281,14 @@ export default function Leads() {
             role="tab"
             aria-selected={flik === f.id}
             onClick={() => bytFlik(f.id)}
-            className={`px-4 py-2 text-sm -mb-px border-b-2 whitespace-nowrap transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${
-              flik === f.id ? 'border-[#20c58f] text-white font-medium' : 'border-transparent text-slate-400 hover:text-white'
+            className={`min-h-[44px] -mb-px border-b-2 inline-flex items-center gap-1.5 sm:gap-2 whitespace-nowrap text-sm sm:text-[15px] font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] ${
+              flik === f.id ? 'border-[#20c58f] text-white' : 'border-transparent text-slate-400 hover:text-white'
             }`}
           >
-            {f.ikon ? (
-              <span className="inline-flex items-center gap-1.5">
-                <Icon name="allman.statistik" size={16} /> {f.label}
-              </span>
-            ) : (
-              f.label
-            )}
+            <Icon name={f.ikon} size={20} className="hidden sm:block" />
+            {f.label}
             {f.antal ? (
-              <span className={`ml-1.5 font-mono text-xs ${flik === f.id ? 'text-[#20c58f]' : f.varna ? 'text-amber-400' : 'text-slate-500'}`}>{f.antal}</span>
+              <span className={`font-medium ${flik === f.id ? 'text-[#20c58f]' : f.varna ? 'text-amber-500' : 'text-slate-400'}`}>{f.antal}</span>
             ) : null}
           </button>
         ))}
@@ -268,85 +297,105 @@ export default function Leads() {
       {flik === 'statistik' ? (
         <LeadsStatistik personal={personal} />
       ) : (
-      <>
-      {/* Filterrad */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px] max-w-md">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
-              <SearchGlass className="w-4 h-4" />
-            </span>
-            <input
-              type="search"
-              value={filter.q}
-              onChange={(e) => andraParam('q', e.target.value)}
-              placeholder="Sök företag, kontakt, org.nr eller telefon"
-              aria-label="Sök leads"
-              className={`${falt(!!filter.q)} w-full pl-9 placeholder:text-slate-500`}
-            />
-          </div>
-          {flik !== 'nya-tips' && (
-            <select aria-label="Ägare" className={falt(filter.agare !== 'mina')} value={filter.agare} onChange={(e) => andraParam('agare', e.target.value === 'mina' ? '' : e.target.value)}>
-              {agarVal.map((o) => <option key={o.value} value={o.value}>{o.value === 'mina' || o.value === 'alla' ? `Ägare: ${o.label}` : o.label}</option>)}
-            </select>
-          )}
-          <select aria-label="Källa" className={falt(!!filter.kalla)} value={filter.kalla} onChange={(e) => andraParam('kalla', e.target.value)}>
-            <option value="">Alla källor</option>
-            {LEAD_KALLOR.map((k) => <option key={k} value={k}>{KALLA_ETIKETT[k]}</option>)}
-          </select>
-          <select aria-label="Status" className={falt(!!filter.status)} value={filter.status} onChange={(e) => andraParam('status', e.target.value)}>
-            <option value="">{statusTom}</option>
-            {flik === 'alla' && <option value="oppna">Alla öppna</option>}
-            {LEAD_STAGES.filter((s) => flik === 'alla' || arOppen(s)).map((s) => <option key={s} value={s}>{STAGE_ETIKETT[s]}</option>)}
-          </select>
-        </div>
-        {harFilter && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-            <span className="text-slate-500">Filter:</span>
-            {filter.q && <AktivtFilter text={`Sök: ${filter.q}`} onTa={() => andraParam('q', '')} />}
-            {filter.agare !== 'mina' && flik !== 'nya-tips' && (
-              <AktivtFilter text={`Ägare: ${filter.agare === 'alla' ? 'alla' : namnFor(filter.agare) || 'okänd'}`} onTa={() => andraParam('agare', '')} />
+        <>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <label className="flex-1 min-w-0 h-11 flex items-center gap-2 px-3 rounded-xl border border-slate-600 bg-slate-900 text-slate-400 focus-within:border-[#20c58f]">
+                <Icon name="allman.sok" size={20} />
+                <span className="sr-only">Sök leads</span>
+                <input
+                  ref={sokRef}
+                  type="search"
+                  value={filter.q}
+                  onChange={(e) => andraParam('q', e.target.value)}
+                  placeholder="Sök företag, kontakt, org.nr eller telefon"
+                  className="flex-1 min-w-0 bg-transparent text-[15px] text-white placeholder-slate-500 focus:outline-none"
+                />
+                <kbd aria-hidden="true" title="Tryck / för att söka" className="hidden lg:inline font-mono text-sm text-slate-500 border border-slate-600 rounded-md px-1.5">/</kbd>
+              </label>
+              <button
+                type="button"
+                onClick={() => setVisaFilter((v) => !v)}
+                aria-expanded={visaFilter}
+                aria-controls="leads-filter"
+                className={`${KNAPP_SEKUNDAR} sm:hidden px-3 ${antalFilter ? 'border-[#20c58f]/60' : ''}`}
+              >
+                <Icon name="allman.filter" size={20} />
+                Filter{antalFilter ? <span className="text-[#20c58f]">{antalFilter}</span> : null}
+              </button>
+            </div>
+
+            <fieldset id="leads-filter" className={`${visaFilter ? 'grid' : 'hidden'} sm:flex grid-cols-1 sm:flex-wrap sm:items-end gap-3`}>
+              <legend className="sr-only">Filter</legend>
+              {flik !== 'nya-tips' && (
+                <label className="flex flex-col gap-1 text-sm text-slate-400">
+                  Ägare
+                  <select className={select(filter.agare !== 'mina')} value={filter.agare} onChange={(e) => andraParam('agare', e.target.value === 'mina' ? '' : e.target.value)}>
+                    {agarVal.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </label>
+              )}
+              <label className="flex flex-col gap-1 text-sm text-slate-400">
+                Källa
+                <select className={select(!!filter.kalla)} value={filter.kalla} onChange={(e) => andraParam('kalla', e.target.value)}>
+                  <option value="">Alla källor</option>
+                  {LEAD_KALLOR.map((k) => <option key={k} value={k}>{KALLA_ETIKETT[k]}</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-sm text-slate-400">
+                Status
+                <select className={select(!!filter.status)} value={filter.status} onChange={(e) => andraParam('status', e.target.value)}>
+                  <option value="">{statusTom}</option>
+                  {flik === 'alla' && <option value="oppna">Alla öppna</option>}
+                  {LEAD_STAGES.filter((s) => flik === 'alla' || arOppen(s)).map((s) => <option key={s} value={s}>{STAGE_ETIKETT[s]}</option>)}
+                </select>
+              </label>
+            </fieldset>
+
+            {harFilter && (
+              <div className="flex flex-wrap items-center gap-x-1 gap-y-0 text-sm">
+                <span className="text-slate-400 mr-1">Filter:</span>
+                {filter.q && <AktivtFilter text={`Sök: ${filter.q}`} onTa={() => andraParam('q', '')} />}
+                {filter.agare !== 'mina' && flik !== 'nya-tips' && (
+                  <AktivtFilter text={`Ägare: ${filter.agare === 'alla' ? 'alla' : namnFor(filter.agare) || 'okänd'}`} onTa={() => andraParam('agare', '')} />
+                )}
+                {filter.kalla && <AktivtFilter text={`Källa: ${KALLA_ETIKETT[filter.kalla]}`} onTa={() => andraParam('kalla', '')} />}
+                {filter.status && <AktivtFilter text={`Status: ${filter.status === 'oppna' ? 'alla öppna' : STAGE_ETIKETT[filter.status]}`} onTa={() => andraParam('status', '')} />}
+                <button type="button" onClick={rensaFilter} className="min-h-[44px] px-2 font-medium text-[#20c58f] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded-lg">
+                  Rensa
+                </button>
+              </div>
             )}
-            {filter.kalla && <AktivtFilter text={`Källa: ${KALLA_ETIKETT[filter.kalla]}`} onTa={() => andraParam('kalla', '')} />}
-            {filter.status && <AktivtFilter text={`Status: ${filter.status === 'oppna' ? 'alla öppna' : STAGE_ETIKETT[filter.status]}`} onTa={() => andraParam('status', '')} />}
-            <button type="button" onClick={rensaFilter} className="text-[#20c58f] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f] rounded">
-              Rensa
-            </button>
           </div>
-        )}
-      </div>
 
-      <LeadsTabell
-        sektioner={sektioner}
-        laddar={loading}
-        namnFor={namnFor}
-        kanTa={arLeadAdmin}
-        onOppna={oppna}
-        onTa={(id) => void ta(id)}
-        tomText={tomText}
-        harFilter={harFilter}
-        onRensaFilter={rensaFilter}
-      />
+          <LeadsTabell
+            sektioner={sektioner}
+            laddar={loading}
+            namnFor={namnFor}
+            kanTa={arLeadAdmin}
+            onOppna={oppna}
+            onTa={(id) => void ta(id)}
+            tomRubrik={tomRubrik}
+            tomText={tomText}
+            harFilter={harFilter}
+            onRensaFilter={rensaFilter}
+          />
 
-      {!(loading && leads.length === 0) && (
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-          <span>
-            {visasAntal === 1 ? '1 lead visas' : `${visasAntal} leads visas`}
-            {' · '}
-            {oppnaIUrval.length} öppna
-            {pipeline > 0 && <> · <span className="font-mono text-slate-400">{kr(pipeline)}</span> i pipeline</>}
-          </span>
-          <span className="hidden md:inline">Pil upp och ned flyttar, Enter öppnar, N ny lead</span>
-        </div>
-      )}
-      </>
+          {!(loading && leads.length === 0) && visasAntal > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-400">
+              <span>{visasAntal === 1 ? '1 lead visas' : `${visasAntal} leads visas`}</span>
+              <span className="hidden lg:inline">Pil upp och ned flyttar, Enter öppnar, N {arTekniker ? 'nytt tips' : 'ny lead'}, / söker</span>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Fast knapp på mobil */}
-      <div className="md:hidden fixed bottom-[calc(var(--bottenlist,0px)+1rem)] inset-x-4 z-30">
-        <Button variant="primary" fullWidth onClick={() => setVisaNy(true)} className="min-h-[44px] shadow-lg">
-          <Plus className="w-4 h-4 mr-1.5" /> {arTekniker ? 'Tipsa om en lead' : 'Ny lead'}
-        </Button>
+      {/* Fast knapp i telefonen, ovanför nya vyns bottenmeny */}
+      <div className="lg:hidden fixed bottom-[calc(var(--bottenlist,0px)+1rem)] inset-x-4 z-30">
+        <button type="button" onClick={() => setVisaNy(true)} className={`${KNAPP_PRIMAR} w-full shadow-lg`}>
+          <Icon name={arTekniker ? 'lead.tips' : 'allman.plus'} size={20} />
+          {arTekniker ? 'Tipsa om en ny kund' : 'Ny lead'}
+        </button>
       </div>
 
       <LeadModal
@@ -383,16 +432,14 @@ export default function Leads() {
 
 function AktivtFilter({ text, onTa }: { text: string; onTa: () => void }) {
   return (
-    <span className="flex items-center gap-1 text-slate-300">
+    <button
+      type="button"
+      onClick={onTa}
+      className="min-h-[44px] inline-flex items-center gap-1.5 px-2 rounded-lg text-slate-200 hover:text-white hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
+      aria-label={`Ta bort filtret ${text}`}
+    >
       {text}
-      <button
-        type="button"
-        onClick={onTa}
-        className="p-0.5 text-slate-500 hover:text-white rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-[#20c58f]"
-        aria-label={`Ta bort filtret ${text}`}
-      >
-        <X className="w-3 h-3" />
-      </button>
-    </span>
+      <Icon name="allman.stang" size={16} className="text-slate-400" />
+    </button>
   )
 }

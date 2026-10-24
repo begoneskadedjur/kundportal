@@ -101,7 +101,6 @@ import TechnicianCustomerStationsPage from './pages/technician/TechnicianCustome
 import TechnicianCustomerJourney from './pages/technician/TechnicianCustomerJourney';
 // Nya arbetsvyn för tekniker (bara profiles.ny_arbetsvy, växlas i VyVaxel)
 import { VyVaxel } from './components/technician/ny/VyVaxel';
-import VisningInstallningar from './components/technician/ny/VisningInstallningar';
 import NyIdag from './pages/technician/ny/NyIdag';
 import NyKarta from './pages/technician/ny/NyKarta';
 import NyMinaArenden from './pages/technician/ny/NyMinaArenden';
@@ -467,7 +466,7 @@ function App() {
               <Route path="tillbud-avvikelser" element={<ProtectedRoute requiredRole="technician"><IncidentsPage /></ProtectedRoute>} />
               <Route path="tickets" element={<ProtectedRoute requiredRole="technician"><InternAdministration /></ProtectedRoute>} />
               <Route path="intranat/*" element={<ProtectedRoute requiredRole="technician"><IntranetPage /></ProtectedRoute>} />
-              <Route path="mitt-konto" element={<ProtectedRoute requiredRole="technician"><VisningInstallningar /><UserProfile embedded /></ProtectedRoute>} />
+              <Route path="mitt-konto" element={<ProtectedRoute requiredRole="technician"><UserProfile embedded /></ProtectedRoute>} />
               <Route path="guides/equipment-placement" element={<Navigate to="/technician/intranat/dokument/guide-placera-stationer" replace />} />
               <Route path="guides/follow-up-case" element={<Navigate to="/technician/intranat/dokument/guide-foljearenden" replace />} />
               <Route path="guides/case-deletion" element={<Navigate to="/technician/intranat/dokument/guide-avbryta-arenden" replace />} />

@@ -52,7 +52,7 @@ export function manadText(manad: string, medAr = true): string {
 
 /** Dagar med en decimal under tio, annars heltal: 0,4 d, 3,5 d, 42 d. */
 export function dagarText(d: number | null | undefined): string {
-  if (d == null || !Number.isFinite(d)) return '–'
+  if (d == null || !Number.isFinite(d)) return 'ingen'
   return `${tal(d, d < 10 ? 1 : 0)}${NB}d`
 }
 

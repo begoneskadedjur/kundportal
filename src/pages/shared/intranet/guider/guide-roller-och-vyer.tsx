@@ -5,7 +5,7 @@
 // Etiketterna kommer från NyTeknikerLayout (Bottenmeny: Idag, Karta, Skapa, Ärenden,
 // Mer; Sidhuvud: sök, tillbud, Tickets, Visa mig hur; datorn: Skapa och sökrutan),
 // nyNavConfig (grupperna Min dag, Hos kunden, Sälja, Hjälp), SkapaArk (valen) och
-// NyMer (Konto: Mitt konto och visning, Rapportera bugg, Logga ut). Påhittade kunder.
+// NyMer (Konto: Mitt konto, Rapportera bugg, Logga ut). Påhittade kunder.
 
 import { useState } from 'react'
 import { Icon, type IconName } from '../../../../components/icons/Icon'
@@ -68,7 +68,7 @@ function Innehall({ vy, enhet, onRam }: { vy: Vy; enhet: 'mobil' | 'dator'; onRa
         <div>
           <p className="px-1 text-[9.5px] font-semibold uppercase tracking-wider text-slate-500">Konto</p>
           <div className="rounded-lg border border-slate-700/60 bg-slate-900">
-            <p className="flex items-center gap-2 px-2 py-1.5 text-[12px] text-slate-200"><Icon name="rapport.person" size={16} className="text-slate-400" />Mitt konto och visning</p>
+            <p className="flex items-center gap-2 px-2 py-1.5 text-[12px] text-slate-200"><Icon name="rapport.person" size={16} className="text-slate-400" />Mitt konto</p>
           </div>
         </div>
       </div>

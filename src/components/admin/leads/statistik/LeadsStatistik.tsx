@@ -102,7 +102,7 @@ function TipsRuta({ active, payload, label }: { active?: boolean; payload?: Arra
 
 /** Andel kontaktade inom 2 arbetsdagar, med målet 90 %. */
 function KontaktAndel({ h }: { h: Pick<LeadStatHygien, 'nya_bedomda' | 'nya_inom'> }) {
-  if (!h.nya_bedomda) return <span className="text-slate-600">–</span>
+  if (!h.nya_bedomda) return <span className="text-slate-500">ingen</span>
   const andel = h.nya_inom / h.nya_bedomda
   const farg = andel >= 0.9 ? 'bg-[#20c58f]' : andel >= 0.7 ? 'bg-amber-400' : 'bg-red-400'
   return (
@@ -337,13 +337,13 @@ export default function LeadsStatistik({ personal }: { personal: LeadPerson[] })
             <Matt etikett="Vunna" varde={tal(s!.vunna)} under={`${tal(s!.forlorade)} förlorade`} />
             <Matt
               etikett="Vinstgrad"
-              varde={avslutade ? andelText(s!.vunna, avslutade) : '–'}
+              varde={avslutade ? andelText(s!.vunna, avslutade) : 'ingen'}
               dampad={!avslutade}
               under={avslutade ? `av ${tal(avslutade)} avslutade` : 'inga avslutade'}
             />
             <Matt
               etikett="Vunnen årspremie"
-              varde={s!.vunnen_premie ? kr(s!.vunnen_premie) : '–'}
+              varde={s!.vunnen_premie ? kr(s!.vunnen_premie) : '0 kr'}
               dampad={!s!.vunnen_premie}
               under={s!.vunnen_utokning ? `${kr(s!.vunnen_utokning)} utökning` : 'nya avtal'}
             />
@@ -368,7 +368,7 @@ export default function LeadsStatistik({ personal }: { personal: LeadPerson[] })
                       <Punkt farg={STAGE_FARG[p.steg].punkt} />
                       <span className="text-slate-200 flex-1">{STAGE_ETIKETT[p.steg]}</span>
                       <span className={`tabular-nums ${nollKlass(p.antal, true)}`}>{tal(p.antal)}</span>
-                      <span className={`w-28 text-right tabular-nums ${p.varde ? 'text-slate-300' : 'text-slate-600'}`}>{p.varde ? kr(p.varde) : '–'}</span>
+                      <span className={`w-28 text-right tabular-nums ${p.varde ? 'text-slate-300' : 'text-slate-600'}`}>{p.varde ? kr(p.varde) : '0 kr'}</span>
                     </div>
                     <div className="mt-1 pl-4">
                       <Andelsstapel andel={p.antal / pipelineMax} farg={STAGE_FARG[p.steg].punkt} />
@@ -405,7 +405,7 @@ export default function LeadsStatistik({ personal }: { personal: LeadPerson[] })
                           <td className={`${TD} ${nollKlass(r.besok_bokat)}`}>{tal(r.besok_bokat)}</td>
                           <td className={`${TD} ${nollKlass(r.offert_skickad)}`}>{tal(r.offert_skickad)}</td>
                           <td className={`${TD} ${nollKlass(r.antal, true)}`}>{tal(r.antal)}</td>
-                          <td className={`${TD} ${r.varde ? 'text-slate-200' : 'text-slate-600'}`}>{r.varde ? kr(Number(r.varde)) : '–'}</td>
+                          <td className={`${TD} ${r.varde ? 'text-slate-200' : 'text-slate-600'}`}>{r.varde ? kr(Number(r.varde)) : '0 kr'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -646,7 +646,7 @@ export default function LeadsStatistik({ personal }: { personal: LeadPerson[] })
                       <td className={`${TD} ${nollKlass(t.oppna)}`}>{tal(t.oppna)}</td>
                       <td className={`${TD} ${t.vunna ? 'text-[#20c58f] font-medium' : 'text-slate-600'}`}>{tal(t.vunna)}</td>
                       <td className={`${TD} ${nollKlass(t.forlorade)}`}>{tal(t.forlorade)}</td>
-                      <td className={`${TD} ${t.vunnen_premie ? 'text-slate-200' : 'text-slate-600'}`}>{t.vunnen_premie ? kr(Number(t.vunnen_premie)) : '–'}</td>
+                      <td className={`${TD} ${t.vunnen_premie ? 'text-slate-200' : 'text-slate-600'}`}>{t.vunnen_premie ? kr(Number(t.vunnen_premie)) : '0 kr'}</td>
                     </tr>
                   ))}
                 </tbody>

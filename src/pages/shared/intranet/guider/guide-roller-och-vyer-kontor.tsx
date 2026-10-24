@@ -3,11 +3,12 @@
 // Exemplet är koordinatorns sidomeny. Etiketterna kommer från coordinatorNavConfig och
 // CoordinatorSidebar (grupperna, Intranät & Hjälpcenter, Uppdateringar, Mitt konto),
 // SidebarNavGroup (fäll ut en grupp), CoordinatorTopHeader och ViewSwitcher (växlaren uppe
-// till höger, Koordinator, Tekniker), UserProfile (Min profil, Byt lösenord, Nuvarande
+// till höger, Koordinator, Tekniker), UserProfile (Mitt konto: Profil, Visning med Tema, Säkerhet med Byt lösenord, Nuvarande
 // lösenord, Nytt lösenord, Bekräfta nytt lösenord, Lösenordskrav:, Lösenord uppdaterat!,
 // Lösenorden matchar inte). Påhittade namn, ingenting sparas.
 
 import { useState } from 'react'
+import { Icon } from '../../../../components/icons/Icon'
 import { Dator, Falt, Kort, Notis, OvningRam, PKnapp, Rad, type OvningSvar } from '../skarmkit'
 import type { GuideModul } from './registry'
 import { KontorSida, SidRubrik, VyVaxlare, mk } from './_allmant'
@@ -55,13 +56,14 @@ function Skarm({ l, tryck, markera, nr }: { l: Lage; tryck: (id: string) => void
           )}
           {konto && (
             <>
-              <SidRubrik titel="Min profil" under="Hantera dina kontouppgifter och inställningar" />
-              <Kort titel="Profilinformation" ikon="rapport.person">
+              <SidRubrik titel="Mitt konto" under="Dina uppgifter, visningen och lösenordet." />
+              <Kort titel="Profil" ikon="rapport.person">
                 <Rad v="Namn" h="Anna Exempel" />
                 <Rad v="E-postadress" h="anna@exempel.se" />
               </Kort>
               <div className="m-2.5 grid gap-2 rounded-xl border border-slate-700 bg-slate-800/40 p-2.5">
-                <p className="text-xs font-semibold text-white">Byt lösenord</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Säkerhet</p>
+                <p className="flex items-center gap-1.5 text-xs font-semibold text-white"><Icon name="allman.las" size={16} className="text-slate-400" />Byt lösenord</p>
                 <Falt etikett="Nuvarande lösenord" varde="••••••••" tom={!l.nuvarande} onClick={() => tryck('nuvarande')} markor={mk(markera, 'nuvarande', nr)} />
                 <Falt etikett="Nytt lösenord" varde={l.nytt ? '•••••••••••' : 'Minst 8 tecken'} tom={!l.nytt} onClick={() => tryck('nytt')} markor={mk(markera, 'nytt', nr)} />
                 <Falt etikett="Bekräfta nytt lösenord" varde={l.bekrafta ? '•••••••••••' : 'Upprepa lösenordet'} tom={!l.bekrafta} onClick={() => tryck('bekrafta')} markor={mk(markera, 'bekrafta', nr)} />
@@ -145,7 +147,7 @@ function Ovning() {
       return
     }
     if (id === 'mitt-konto') {
-      if (l.vy === 'oversikt') { setL({ ...l, vy: 'konto' }); tips('Min profil', 'Fyll i de tre fälten under Byt lösenord.') }
+      if (l.vy === 'oversikt') { setL({ ...l, vy: 'konto' }); tips('Mitt konto', 'Fyll i de tre fälten under Säkerhet, Byt lösenord.') }
       return
     }
     if (l.vy === 'oversikt') { miss(TIPS[id] ?? (id.startsWith('post-') ? `${id.slice(5)} är en sida i portalen. Mitt konto ligger längst ner i menyn.` : 'Mitt konto ligger längst ner i menyn till vänster.')); return }

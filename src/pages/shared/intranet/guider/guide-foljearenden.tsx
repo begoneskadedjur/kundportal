@@ -7,7 +7,8 @@
 // Skapa nytt ärende ("Välj skadedjurstyp. Kundinformation, adress och schemaläggning
 // kopieras automatiskt.", Skadedjurstyp *, Välj skadedjurstyp..., Avbryt, Skapa nytt ärende),
 // toasten "Följeärende skapat för Getingar!". Det nya ärendet öppnas i samma ruta och
-// börjar i steget Framme. Gruppen syns inte i ett följeärende (canCreateFollowUp).
+// börjar i steget Framme. I ett följeärende visas bara Boka återbesök i gruppen: Skapa nytt
+// ärende och Duplicera kräver huvudärendet (canCreateFollowUp).
 
 import { useState } from 'react'
 import { Icon } from '../../../../components/icons/Icon'

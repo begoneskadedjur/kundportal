@@ -9,13 +9,12 @@
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import Button from '../../ui/Button'
 import { Icon } from '../../icons/Icon'
 import { LeadService } from '../../../services/leadService'
 import { WebInquiryService } from '../../../services/webInquiryService'
 import type { Lead } from '../../../types/database'
 import { KUND_MATCH_LABEL, type KundMatchning } from '../../../types/webInquiry'
-import { FALT, SEKTION_RUBRIK } from './leadLogik'
+import { ATGARD, ATGARD_PRIMAR, ETIKETT, FALT, SEKTION_RUBRIK } from './leadLogik'
 
 interface Props {
   lead: Lead
@@ -96,11 +95,12 @@ export default function LeadKundKoppling({ lead, kanSkapaKund, onKoppla, onSkapa
     <li key={k.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-800/20 border border-slate-700/50 rounded-xl">
       <span className="min-w-0 text-sm">
         <span className="text-white">{k.namn}</span>
-        {k.info && <span className="block text-xs text-slate-400">{k.info}</span>}
+        {k.info && <span className="block text-sm text-slate-400">{k.info}</span>}
       </span>
-      <Button variant="secondary" size="sm" onClick={() => void koppla(k.id)} loading={arbetar === k.id} disabled={!!arbetar}>
+      <button type="button" className={ATGARD} onClick={() => void koppla(k.id)} disabled={!!arbetar}>
+        {arbetar === k.id && <Icon name="allman.laddar" size={20} className="animate-spin" />}
         Koppla
-      </Button>
+      </button>
     </li>
   )
 
@@ -110,32 +110,32 @@ export default function LeadKundKoppling({ lead, kanSkapaKund, onKoppla, onSkapa
         <h3 className={SEKTION_RUBRIK}>
           <Icon name="lead.vunnen" size={16} className="text-[#20c58f]" /> Koppla eller skapa kund
         </h3>
-        <p className="text-xs text-slate-400 -mt-1">
+        <p className="text-sm text-slate-400 -mt-1">
           Leaden är vunnen men har ingen kund. Koppla den till kundregistret så att avtal, fakturering och statistik hänger ihop.
         </p>
       </div>
 
       {forslag.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-slate-400 mb-1">Förslag (matchat på {satt})</p>
+          <p className="text-sm font-medium text-slate-400 mb-1">Förslag (matchat på {satt})</p>
           <ul className="space-y-2">{forslag.map(rad)}</ul>
         </div>
       )}
 
       <div>
-        <label className="block text-xs font-medium text-slate-400 mb-1" htmlFor="lead-kund-sok">Sök kund</label>
+        <label className={ETIKETT} htmlFor="lead-kund-sok">Sök kund</label>
         <input id="lead-kund-sok" className={FALT} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Namn, org.nr eller kundnummer" />
         {sok.length > 0 && <ul className="space-y-2 mt-2">{sok.filter((s) => !forslag.some((f) => f.id === s.id)).map(rad)}</ul>}
-        {q.trim().length >= 2 && sok.length === 0 && <p className="text-xs text-slate-500 mt-1">Ingen kund hittades.</p>}
+        {q.trim().length >= 2 && sok.length === 0 && <p className="text-sm text-slate-500 mt-1">Ingen kund hittades.</p>}
       </div>
 
       {kanSkapaKund && (
         <div className="pt-2 border-t border-slate-700/50 flex flex-wrap items-center justify-between gap-2">
-          <span className="text-xs text-slate-400">Finns kunden inte? Skapa den med uppgifterna från leaden.</span>
-          <Button variant="primary" size="sm" onClick={onSkapaKund} disabled={!!arbetar}>
-            <Icon name="allman.plus" size={16} className="mr-1.5" />
+          <span className="text-sm text-slate-400">Finns kunden inte? Skapa den med uppgifterna från leaden.</span>
+          <button type="button" className={ATGARD_PRIMAR} onClick={onSkapaKund} disabled={!!arbetar}>
+            <Icon name="allman.plus" size={20} />
             Skapa kund
-          </Button>
+          </button>
         </div>
       )}
     </div>

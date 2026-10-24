@@ -47,7 +47,7 @@ function Cell({ antal, av, stark }: { antal: number; av?: number; stark?: boolea
       <span className={`tabular-nums ${antal ? (stark ? 'text-white font-medium' : 'text-slate-200') : 'text-slate-600'}`}>{tal(antal)}</span>
       {av != null && (
         <div className="mt-1 ml-auto w-16">
-          <div className={`text-[11px] leading-none mb-0.5 tabular-nums ${antal ? 'text-slate-400' : 'text-slate-600'}`}>{av ? andelText(antal, av) : '–'}</div>
+          <div className={`text-[11px] leading-none mb-0.5 tabular-nums ${antal ? 'text-slate-400' : 'text-slate-600'}`}>{av ? andelText(antal, av) : 'ingen'}</div>
           <Andelsstapel andel={av ? antal / av : 0} />
         </div>
       )}
@@ -125,7 +125,7 @@ export default function LeadsStatistikKedja({
       <Cell antal={r.forlorade} stark={stark} />
       <Cell antal={r.oppna} stark={stark} />
       <td className={`px-2 py-2 text-right align-top whitespace-nowrap tabular-nums ${r.vunnen_premie ? 'text-slate-200' : 'text-slate-600'}`}>
-        {r.vunnen_premie ? kr(Number(r.vunnen_premie)) : '–'}
+        {r.vunnen_premie ? kr(Number(r.vunnen_premie)) : '0 kr'}
       </td>
     </>
   )

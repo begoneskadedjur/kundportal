@@ -5,8 +5,8 @@
 //
 // Efterbildningar av:
 //   NyMer.tsx          Mer-sidan i telefonen: grupperna ur nyNavConfig utan Idag, Karta och
-//                      Mina ärenden, Uppdateringar under Hjälp, och Konto (Mitt konto och
-//                      visning, temaraden ur ThemeToggle, Rapportera bugg, Logga ut)
+//                      Mina ärenden, Uppdateringar under Hjälp, och Konto (Mitt konto,
+//                      temaraden ur ThemeToggle, Rapportera bugg, Logga ut)
 //   Vaxel.tsx          växlarna (Arbetskö/Statistik, Offerter/Avtal, Intjänat/Lönen)
 //   dokumentUi.tsx     statuspunkten (Punkt), aldrig piller
 // Etiketterna kommer från portalens egna konfigurationer där det går.
@@ -107,11 +107,13 @@ export function Rubrik({ ikon, farg, text, antal, under }: { ikon: IconName; far
 export const TEMA_ORDNING = ['Mörkt tema', 'Ljust tema', 'Följer systemet'] as const
 export type Tema = typeof TEMA_ORDNING[number]
 export const nastaTema = (t: Tema): Tema => TEMA_ORDNING[(TEMA_ORDNING.indexOf(t) + 1) % TEMA_ORDNING.length]
+/** Ikonen för temat, samma som ThemeToggle visar */
+export const temaIkon = (t: Tema): IconName => t === 'Ljust tema' ? 'konto.sol' : t === 'Följer systemet' ? 'konto.system' : 'allman.tema'
 
 /**
  * Mer-sidan (NyMer). Länkarna trycks med id nav:<menynamn>, samma id som
  * sidomenyn på datorn i NySkarm, så att samma tryck-funktion fungerar för båda.
- * Konto: 'konto' (Mitt konto och visning), 'tema', 'bugg', 'loggaut'. Hjälp: 'uppdateringar'.
+ * Konto: 'konto' (Mitt konto), 'tema', 'bugg', 'loggaut'. Hjälp: 'uppdateringar'.
  */
 export function MerSida({ tryck, mk, tema = 'Mörkt tema', grupper }: { tryck: Tryck; mk: Mk; tema?: Tema; grupper?: string[] }) {
   // grupper = de grupper som syns, som när man har scrollat (telefonens skärm rymmer inte alla)
@@ -150,10 +152,10 @@ export function MerSida({ tryck, mk, tema = 'Mörkt tema', grupper }: { tryck: T
       {syns('Konto') && <div>
         <p className="px-1 text-[9px] font-semibold uppercase tracking-wider text-slate-500">Konto</p>
         <div className="rounded-lg border border-slate-700/60 bg-slate-900 p-0.5">
-          {rad('konto', 'rapport.person', 'Mitt konto och visning')}
+          {rad('konto', 'rapport.person', 'Mitt konto')}
           <Markor markor={mk('tema')} block>
             <button type="button" onClick={() => tryck('tema')} className="flex min-h-[26px] w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[11px] text-slate-400 hover:bg-slate-800">
-              <Icon name="allman.tema" size={16} className="flex-none" />
+              <Icon name={temaIkon(tema)} size={16} className="flex-none" />
               <span className="font-medium">{tema}</span>
               <span className="ml-auto truncate text-[9.5px] text-slate-500">Byt till {nastaTema(tema).toLowerCase()}</span>
             </button>

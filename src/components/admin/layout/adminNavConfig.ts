@@ -105,7 +105,7 @@ export const navGroups: NavGroup[] = [
       { label: 'Teknikerstatistik', icon: BarChart3, path: '/admin/teknikerstatistik' },
       { label: 'Användarkonton (Personal)', icon: UserCheck, path: '/admin/anvandarkonton-personal' },
       { label: 'Tickets', icon: MessageSquareText, path: '/admin/tickets', badgeKey: 'tickets' },
-      { label: 'Tillbud & Avvikelser', icon: AlertTriangle, path: '/admin/tillbud-avvikelser', badgeKey: 'incidents' },
+      { label: 'Tillbud och avvikelser', icon: AlertTriangle, path: '/admin/tillbud-avvikelser', badgeKey: 'incidents' },
       { label: 'Buggrapporter', icon: Bug, path: '/admin/bug-reports' },
     ]
   },
@@ -199,7 +199,7 @@ export const breadcrumbMap: Record<string, string> = {
   '/admin/installningar/fortnox': 'Fortnox',
   '/admin/installningar/avtalsmallar': 'Avtalsmallar',
   '/admin/installningar/betalningsvillkor': 'Betalningsvillkor',
-  '/admin/tillbud-avvikelser': 'Tillbud & Avvikelser',
+  '/admin/tillbud-avvikelser': 'Tillbud och avvikelser',
   '/admin/intranat': 'Intranät',
   '/admin/mitt-konto': 'Mitt konto',
   '/admin/bug-reports': 'Buggrapporter',

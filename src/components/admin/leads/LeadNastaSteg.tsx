@@ -2,11 +2,11 @@
 // Rutan Nästa steg överst i leaden. Visar steget och datumet (röd ram när det är försenat).
 // "Klar, välj nästa" loggar vad som gjordes och tvingar fram ett nytt nästa steg eller ett avslut
 // (parkera med datum eller förlorad med orsak). Samma ruta används för Ändra, Boka besök, Parkera,
-// Förlorad och Återuppta från åtgärdsraden, så att inga modaler staplas på varandra.
+// Förlorad och Återuppta från åtgärdsraden, så att inga modaler staplas på varandra. Fel skrivs som
+// text i rutan (Skriv nästa steg och välj datum, Välj ett datum framåt i tiden ..., Välj orsak).
 
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
-import Button from '../../ui/Button'
 import Select from '../../ui/Select'
 import DateField from '../../ui/DateField'
 import { Icon } from '../../icons/Icon'
@@ -23,7 +23,7 @@ import {
   type LeadForlustorsak,
 } from '../../../types/leads'
 import { toLocalISOStringWithOffset } from '../../../utils/dateHelpers'
-import { DATUMFALT, ETIKETT, FALT, arForsenad, forslagNastaDag, fransLokal, idagSv, nastaStegDatum, segment, tillLokal } from './leadLogik'
+import { ATGARD, ATGARD_PRIMAR, DATUMFALT, ETIKETT, FALT, FELTEXT, KNAPP_FARA, KNAPP_PRIMAR, KNAPP_TEXT, arForsenad, forslagNastaDag, fransLokal, idagSv, nastaStegDatum, segment, tillLokal } from './leadLogik'
 
 export type NastaLage = 'visa' | 'klar' | 'andra' | 'besok' | 'parkera' | 'forlorad' | 'ateruppta'
 type Sedan = 'nasta' | 'parkera' | 'forlorad'
@@ -48,6 +48,7 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
   const [orsak, setOrsak] = useState<LeadForlustorsak | ''>('')
   const [orsakText, setOrsakText] = useState('')
   const [sparar, setSparar] = useState(false)
+  const [fel, setFel] = useState<string | null>(null)
 
   useEffect(() => {
     setGjort('samtal')
@@ -58,6 +59,7 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
     setParkTill('')
     setOrsak('')
     setOrsakText('')
+    setFel(null)
   }, [lage, lead.id, lead.next_action, lead.next_action_at])
 
   const forsenad = arForsenad(lead)
@@ -69,7 +71,7 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
     if (sedan === 'nasta') {
       const iso = nar ? fransLokal(nar) : null
       if (!text.trim() || !iso) {
-        toast.error('Skriv nästa steg och välj datum')
+        setFel('Skriv nästa steg och välj datum')
         return
       }
       andring.next_action = text.trim()
@@ -77,7 +79,7 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
       if (lage === 'ateruppta' || lead.stage === 'parkerad' || lead.stage === 'forlorad') andring.stage = 'kontaktad'
     } else if (sedan === 'parkera') {
       if (!parkTill || parkTill <= idagSv()) {
-        toast.error('Välj ett datum framåt i tiden då leaden ska vakna')
+        setFel('Välj ett datum framåt i tiden då leaden ska vakna')
         return
       }
       andring.stage = 'parkerad'
@@ -85,7 +87,7 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
       andring.next_action = text.trim() || lead.next_action || 'Hör av oss igen'
     } else {
       if (!orsak) {
-        toast.error('Välj orsak')
+        setFel('Välj orsak')
         return
       }
       andring.stage = 'forlorad'
@@ -93,6 +95,7 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
       andring.lost_note = orsakText.trim() || null
     }
 
+    setFel(null)
     setSparar(true)
     try {
       // "Klar": logga vad som gjordes innan steget byts
@@ -118,16 +121,16 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
       return (
         <div className={`p-3 border rounded-xl ${lead.stage === 'vunnen' ? 'bg-[#20c58f]/10 border-[#20c58f]/40' : 'bg-slate-800/30 border-slate-700'}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-white flex items-center gap-1.5">
+            <p className="text-[15px] text-white flex items-center gap-1.5">
               <Icon name={lead.stage === 'vunnen' ? 'lead.vunnen' : 'lead.forlorad'} size={16} className={lead.stage === 'vunnen' ? 'text-[#20c58f]' : 'text-red-400'} />
               {lead.stage === 'vunnen'
                 ? 'Leaden är vunnen'
                 : `Förlorad${lead.lost_reason ? `: ${FORLUSTORSAK_ETIKETT[lead.lost_reason]}` : ''}${lead.lost_note ? ` (${lead.lost_note})` : ''}`}
             </p>
             {kanRedigera && lead.stage === 'forlorad' && (
-              <Button variant="secondary" size="sm" onClick={() => onLage('ateruppta')}>
-                <Icon name="allman.aterstall" size={16} className="mr-1.5" /> Återuppta
-              </Button>
+              <button type="button" className={ATGARD} onClick={() => onLage('ateruppta')}>
+                <Icon name="allman.aterstall" size={20} /> Återuppta
+              </button>
             )}
           </div>
         </div>
@@ -138,7 +141,7 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
       return (
         <div className={`p-3 border rounded-xl ${vaknat ? 'bg-amber-500/10 border-amber-500/40' : 'bg-slate-800/30 border-slate-700'}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm">
+            <div className="text-[15px]">
               <p className="text-white flex items-center gap-1.5">
                 <Icon name="lead.parkerad" size={16} className="text-slate-400" />
                 Parkerad till <span className="font-mono">{lead.parked_until}</span>
@@ -147,9 +150,9 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
               {lead.next_action && <p className="text-slate-400 mt-0.5">{lead.next_action}</p>}
             </div>
             {kanRedigera && (
-              <Button variant={vaknat ? 'primary' : 'secondary'} size="sm" onClick={() => onLage('ateruppta')}>
-                <Icon name="allman.aterstall" size={16} className="mr-1.5" /> Återuppta
-              </Button>
+              <button type="button" className={vaknat ? ATGARD_PRIMAR : ATGARD} onClick={() => onLage('ateruppta')}>
+                <Icon name="allman.aterstall" size={20} /> Återuppta
+              </button>
             )}
           </div>
         </div>
@@ -159,8 +162,8 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
     return (
       <div className={`p-3 border rounded-xl ${forsenad ? 'bg-red-500/10 border-red-500/50' : saknas ? 'bg-amber-500/10 border-amber-500/40' : 'bg-slate-800/30 border-slate-700'}`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0 text-sm">
-            <p className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-0.5">
+          <div className="min-w-0 text-[15px]">
+            <p className="text-sm font-medium text-slate-400 flex items-center gap-1.5 mb-0.5">
               <Icon name="lead.nasta-steg" size={16} className={forsenad ? 'text-red-400' : 'text-[#20c58f]'} /> Nästa steg
             </p>
             {saknas ? (
@@ -168,20 +171,24 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
             ) : (
               <p className="text-white">
                 {lead.next_action || 'Nästa steg'}
-                {d.text && <span className={`ml-2 font-mono text-xs ${d.sen ? 'text-red-400' : 'text-slate-400'}`}>{d.text}{d.sen ? ' (försenat)' : ''}</span>}
+                {d.text && <span className={`ml-2 font-mono text-sm ${d.sen ? 'text-red-400' : 'text-slate-400'}`}>{d.text}{d.sen ? ' (försenat)' : ''}</span>}
               </p>
             )}
           </div>
           {kanRedigera && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {saknas ? (
-                <Button variant="primary" size="sm" onClick={() => onLage('andra')}>Välj nästa steg</Button>
+                <button type="button" className={ATGARD_PRIMAR} onClick={() => onLage('andra')}>
+                  <Icon name="lead.nasta-steg" size={20} /> Välj nästa steg
+                </button>
               ) : (
                 <>
-                  <Button variant="primary" size="sm" onClick={() => onLage('klar')}>
-                    <Icon name="allman.bock" size={16} className="mr-1.5" /> Klar, välj nästa
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => onLage('andra')}>Ändra</Button>
+                  <button type="button" className={ATGARD_PRIMAR} onClick={() => onLage('klar')}>
+                    <Icon name="allman.bock" size={20} /> Klar, välj nästa
+                  </button>
+                  <button type="button" className={ATGARD} onClick={() => onLage('andra')}>
+                    <Icon name="rapport.penna" size={20} /> Ändra
+                  </button>
                 </>
               )}
             </div>
@@ -204,8 +211,8 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
 
   return (
     <div className="p-3 bg-slate-800/30 border border-[#20c58f]/50 rounded-xl space-y-3">
-      <p className="text-sm font-semibold text-white flex items-center gap-1.5">
-        <Icon name="lead.nasta-steg" size={16} className="text-[#20c58f]" /> {rubrik[lage]}
+      <p className="text-[15px] font-semibold text-white flex items-center gap-2">
+        <Icon name="lead.nasta-steg" size={20} className="text-[#20c58f]" /> {rubrik[lage]}
       </p>
 
       {lage === 'klar' && (
@@ -273,16 +280,19 @@ export default function LeadNastaSteg({ lead, lage, onLage, kanRedigera, minProf
           />
           <div>
             <label className={ETIKETT} htmlFor="forlust-text">Kommentar</label>
-            <input id="forlust-text" className={FALT} value={orsakText} onChange={(e) => setOrsakText(e.target.value)} placeholder="Till exempel Valde Anticimex, 20 % billigare" />
+            <input id="forlust-text" className={FALT} value={orsakText} onChange={(e) => setOrsakText(e.target.value)} placeholder="Till exempel Valde en annan leverantör, 20 % billigare" />
           </div>
         </div>
       )}
 
+      {fel && <p className={FELTEXT} role="alert">{fel}</p>}
+
       <div className="flex justify-end gap-2 pt-2 border-t border-slate-700/50">
-        <Button variant="ghost" size="sm" onClick={() => onLage('visa')} disabled={sparar}>Avbryt</Button>
-        <Button variant={sedan === 'forlorad' ? 'danger' : 'primary'} size="sm" onClick={() => void spara()} loading={sparar}>
+        <button type="button" className={KNAPP_TEXT} onClick={() => onLage('visa')} disabled={sparar}>Avbryt</button>
+        <button type="button" className={sedan === 'forlorad' ? KNAPP_FARA : KNAPP_PRIMAR} onClick={() => void spara()} disabled={sparar}>
+          {sparar && <Icon name="allman.laddar" size={20} className="animate-spin" />}
           {sedan === 'forlorad' ? 'Markera förlorad' : sedan === 'parkera' ? 'Parkera' : 'Spara'}
-        </Button>
+        </button>
       </div>
     </div>
   )

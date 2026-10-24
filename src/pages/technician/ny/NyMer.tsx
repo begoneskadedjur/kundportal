@@ -73,7 +73,7 @@ export default function NyMer() {
       <section aria-label="Konto">
         <h2 className="px-3 mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Konto</h2>
         <div className="rounded-2xl bg-slate-900 border border-slate-700/60 p-1">
-          <Rad to="/technician/mitt-konto" ikon="rapport.person" label="Mitt konto och visning" />
+          <Rad to="/technician/mitt-konto" ikon="rapport.person" label="Mitt konto" />
           <div className="px-1"><ThemeToggle variant="row" /></div>
           <button type="button" className={RAD} onClick={() => setVisaBugg(true)}>
             <Icon name="falt.bugg" size={24} className="text-slate-400 flex-shrink-0" />

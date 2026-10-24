@@ -160,7 +160,7 @@ export interface MenyGruppData { label: string; items: string[] }
 export const TEKNIKER_GRUPPER: MenyGruppData[] = [
   { label: 'Ärenden & Fält', items: ['Mina ärenden', 'Schema', 'Specialrapporter', 'Utrustning', 'Tickets'] },
   { label: 'Försäljning', items: ['Mina leads och tips', 'Skapa Avtal & Offerter', 'Dokumentsignering', 'Min Kundresa'] },
-  { label: 'Verktyg', items: ['AI Assistent', 'Provisioner', 'Tillbud & Avvikelser'] },
+  { label: 'Verktyg', items: ['AI Assistent', 'Provisioner', 'Tillbud och avvikelser'] },
 ]
 
 /** Teknikerns sidhuvud i telefonen: BeGone, Sök, Notifieringar och Meny */
@@ -248,7 +248,7 @@ export function TeknikerMeny({ tryck, markera, nr, oppen, vyer, aktivVy = 'Tekni
 
 /** Grupperna i koordinatorns sidomeny (coordinatorNavConfig). Planering och Kunder & Avtal är öppna från början (pinned). */
 export const KOORD_GRUPPER: MenyGruppData[] = [
-  { label: 'Planering', items: ['Ärenden', 'Specialrapporter', 'Ordlistan', 'Rondering & Schema', 'Schemaoptimerare', 'Tickets', 'Tillbud & Avvikelser'] },
+  { label: 'Planering', items: ['Ärenden', 'Specialrapporter', 'Ordlistan', 'Rondering & Schema', 'Schemaoptimerare', 'Tickets', 'Tillbud och avvikelser'] },
   { label: 'Kunder & Avtal', items: ['Befintliga kunder', 'Trafikljusöversikt', 'Kundprognos', 'Användarkonton (Kund)'] },
   { label: 'Försäljning', items: ['Försäljningspipeline', 'Försäljningsmöjligheter', 'Leads (B2B)', 'Leads (Webb)', 'Dokumentsignering'] },
   { label: 'Fakturering', items: ['Fakturering'] },
@@ -325,7 +325,7 @@ export function SidRubrik({ titel, under, ikon, knappar }: { titel: string; unde
   )
 }
 
-// ─── Tillbud & Avvikelser ──────────────────────────
+// ─── Tillbud och avvikelser ──────────────────────────
 
 /** Typerna i formuläret (INCIDENT_TYPE_CONFIG) */
 export const TILLBUD_TYPER: { id: 'tillbud' | 'olycka' | 'avvikelse'; utrop: string; label: string; text: string; farg: string; ram: string }[] = [
@@ -336,10 +336,10 @@ export const TILLBUD_TYPER: { id: 'tillbud' | 'olycka' | 'avvikelse'; utrop: str
 
 export type TillbudTyp = (typeof TILLBUD_TYPER)[number]['id']
 
-/** Sidhuvudet på Tillbud & Avvikelser med Rapportera händelse */
+/** Sidhuvudet på Tillbud och avvikelser med Rapportera händelse */
 export function TillbudRubrik({ tryck, markera, nr, mottagare }: SkarmProps & { mottagare?: boolean }) {
   return (
-    <SidRubrik titel="Tillbud & Avvikelser" under="Oj eller aj? Rapportera direkt - stort som smått" ikon={{ bib: 'rapport.avvikelse' }}
+    <SidRubrik titel="Tillbud och avvikelser" under="Oj eller aj? Rapportera direkt - stort som smått" ikon={{ bib: 'rapport.avvikelse' }}
       knappar={<>
         <Markor markor={mk(markera, 'ny', nr)}>
           <button type="button" onClick={() => tryck('ny')} className="flex items-center gap-1.5 rounded-lg bg-[#20c58f] px-2.5 py-1.5 text-[11.5px] font-medium text-[#fff]">

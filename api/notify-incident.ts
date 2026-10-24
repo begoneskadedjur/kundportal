@@ -149,7 +149,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       for (const p of profiles || []) {
         if (!p.email) continue
-        const link = `${APP_URL}${incidentPathForRole(p.role)}`
+        // ?rapport= öppnar rapporten direkt på sidan
+        const link = `${APP_URL}${incidentPathForRole(p.role)}?rapport=${encodeURIComponent(incident.id)}`
         const html = `
 <div style="font-family: Arial, Helvetica, sans-serif; max-width: 560px; margin: 0 auto; color: #1e293b;">
   <div style="background: #0f172a; padding: 20px 24px; border-radius: 12px 12px 0 0;">

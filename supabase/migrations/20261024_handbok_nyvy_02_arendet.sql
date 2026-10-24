@@ -156,7 +156,7 @@ values
   'Boka nästa besök i samma ärende från steget Klart, med förslag på lediga tider.',
   'handbok', 'arenden',
   $json$[
-    {"type":"intro","roller":["technician"],"var":"Ärendet › steget Klart › Bara besöket","tar":"4 min","behover":"Ett privat- eller företagsärende som inte är ett följeärende","enhet":"mobil"},
+    {"type":"intro","roller":["technician"],"var":"Ärendet › steget Klart › Bara besöket","tar":"4 min","behover":"Ett privat- eller företagsärende, även ett följeärende","enhet":"mobil"},
     {"type":"kortsvar","text":"I steget Klart: tryck Bara besöket och [[Boka återbesök|arende.aterbesok]]. Välj datum och längd, tryck [[Visa förslag →]], välj en tid och tryck [[Boka återbesök|allman.kalender]]. Ärendet får status Återbesök och stängs inte."},
     {"type":"visning","steg":[
       {"text":"Tryck på ikonen Klart längst till höger i stegraden.","ser":"Klart visar Kontrollera innan du stänger och valen Hela ärendet och Bara besöket."},
@@ -168,7 +168,6 @@ values
       {"text":"Tryck [[Boka återbesök|allman.kalender]].","ser":"Det står Återbesök bokat! och ärendet har status Återbesök."}
     ]},
     {"type":"felsok","items":[
-      {"fraga":"Jag ser inte Bara besöket","svar":"Bara besöket finns inte i följeärenden, där finns bara Hela ärendet. Fråga koordinatorn om ett nytt besök ska bokas."},
       {"fraga":"Det står Inga lediga tider hittades från detta datum. Prova ett annat datum.","svar":"Tryck [[Ange tid manuellt istället]], eller tryck [[← Byt datum]] och välj en annan dag."},
       {"fraga":"Det står att ärendet saknar adress","svar":"Utan adress kan portalen inte hämta smarta förslag. Tryck [[Ange tid manuellt istället]], eller lägg in adressen i steget Framme först."},
       {"fraga":"Boka återbesök går inte att trycka på","svar":"Välj en tid först, bland förslagen eller med Ange tid manuellt."},
